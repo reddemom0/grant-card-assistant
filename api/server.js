@@ -3,9 +3,6 @@ const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
 const path = require('path');
-const crypto = require('crypto');
-const passport = require('passport');
-const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const session = require('express-session');
 
 // Configure multer for serverless
@@ -44,56 +41,9 @@ let tokenExpiry = 0;
 
 // Knowledge base cache
 let knowledgeBaseLoaded = false;
-let knowledgeBaseCacheTime = 0;
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-
-// Google OAuth Strategy
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: "/auth/google/callback"
-}, async (accessToken, refreshToken, profile, done) => {
-  try {
-    const email = profile.emails[0].value;
-    
-    // Check if user is from your domain
-    if (email.endsWith('@grantedconsulting.com')) {
-      const user = {
-        id: profile.id,
-        name: profile.displayName,
-        email: email,
-        photo: profile.photos[0].value
-      };
-      return done(null, user);
-    } else {
-      return done(null, false, { message: 'Access denied: Not a team member' });
     }
   } catch (error) {
     return done(error, null);
-  }
-}));
-
-// Passport serialization
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((user, done) => {
-  done(null, user);
-});
-
-// Authentication middleware
-function requireAuth(req, res, next) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  // For API calls, return JSON error
-  if (req.path.startsWith('/api/')) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-  // For page requests, redirect to login
-  res.redirect('/login');
-}
 
 // Get Google Access Token using Service Account
 async function getGoogleAccessToken() {
