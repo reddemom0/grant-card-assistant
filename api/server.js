@@ -41,9 +41,6 @@ let tokenExpiry = 0;
 
 // Knowledge base cache
 let knowledgeBaseLoaded = false;
-    }
-  } catch (error) {
-    return done(error, null);
 
 // Get Google Access Token using Service Account
 async function getGoogleAccessToken() {
