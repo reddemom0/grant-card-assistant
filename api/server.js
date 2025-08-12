@@ -1,9 +1,71 @@
-// api/server.js - Complete serverless function with Google Service Account integration
+// api/server.js - Complete serverless function with Google Service Account integration and Authentication
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
 const path = require('path');
 const crypto = require('crypto');
+
+// Authentication configuration
+const TEAM_PASSWORD = process.env.TEAM_PASSWORD;
+const SESSION_COOKIE_NAME = 'granted_session';
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+
+// Simple session store (in production, use Redis or database)
+const activeSessions = new Map();
+
+// Generate secure session token
+function generateSessionToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+// Check if request is authenticated
+function isAuthenticated(req) {
+  const sessionToken = req.headers.cookie?.split(';')
+    .find(cookie => cookie.trim().startsWith(`${SESSION_COOKIE_NAME}=`))
+    ?.split('=')[1];
+
+  if (!sessionToken) return false;
+
+  const session = activeSessions.get(sessionToken);
+  if (!session) return false;
+
+  // Check if session is expired
+  if (Date.now() > session.expires) {
+    activeSessions.delete(sessionToken);
+    return false;
+  }
+
+  return true;
+}
+
+// Authentication middleware
+function requireAuth(req, res, next) {
+  // Skip auth for login endpoint and health check
+  if (req.url === '/api/login' || req.url === '/api/health') {
+    return next();
+  }
+
+  // Check if authenticated
+  if (isAuthenticated(req)) {
+    return next();
+  }
+
+  // Not authenticated - redirect to login
+  if (req.url.startsWith('/api/')) {
+    // API endpoints return JSON error
+    res.status(401).json({ 
+      error: 'Authentication required',
+      redirectTo: '/login.html'
+    });
+  } else {
+    // HTML pages redirect to login
+    const returnTo = encodeURIComponent(req.url);
+    res.writeHead(302, {
+      'Location': `/login.html?returnTo=${returnTo}`
+    });
+    res.end();
+  }
+}
 
 // Configure multer for serverless
 const storage = multer.memoryStorage();
@@ -616,25 +678,112 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-// Main serverless handler
+// Main serverless handler with authentication
 module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Cookie');
 
-  // Load knowledge base
-  await getKnowledgeBase();
-  
   if (req.method === 'OPTIONS') {
     res.status(200).end();
     return;
   }
 
   const { url, method } = req;
+
+  // Apply authentication middleware (except for login and health endpoints)
+  try {
+    await new Promise((resolve, reject) => {
+      requireAuth(req, res, (error) => {
+        if (error) reject(error);
+        else resolve();
+      });
+    });
+  } catch (authError) {
+    return; // Authentication middleware has already handled the response
+  }
+
+  // Load knowledge base
+  await getKnowledgeBase();
   
   try {
+    // Login endpoint
+    if (url === '/api/login' && method === 'POST') {
+      try {
+        let body = '';
+        req.on('data', chunk => {
+          body += chunk.toString();
+        });
+        
+        req.on('end', () => {
+          const { password } = JSON.parse(body);
+          
+          // Check password
+          if (!TEAM_PASSWORD) {
+            res.status(500).json({ 
+              success: false, 
+              message: 'Authentication not configured' 
+            });
+            return;
+          }
+
+          if (password === TEAM_PASSWORD) {
+            // Create session
+            const sessionToken = generateSessionToken();
+            const expires = Date.now() + SESSION_DURATION;
+            
+            activeSessions.set(sessionToken, {
+              expires,
+              loginTime: Date.now()
+            });
+
+            // Set secure cookie
+            res.setHeader('Set-Cookie', [
+              `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_DURATION/1000}; Path=/`
+            ]);
+
+            res.json({ 
+              success: true, 
+              message: 'Authentication successful' 
+            });
+          } else {
+            res.status(401).json({ 
+              success: false, 
+              message: 'Invalid password' 
+            });
+          }
+        });
+
+      } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ 
+          success: false, 
+          message: 'Server error during authentication' 
+        });
+      }
+      return;
+    }
+
+    // Logout endpoint
+    if (url === '/api/logout' && method === 'POST') {
+      const sessionToken = req.headers.cookie?.split(';')
+        .find(cookie => cookie.trim().startsWith(`${SESSION_COOKIE_NAME}=`))
+        ?.split('=')[1];
+
+      if (sessionToken) {
+        activeSessions.delete(sessionToken);
+      }
+
+      res.setHeader('Set-Cookie', [
+        `${SESSION_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`
+      ]);
+
+      res.json({ success: true, message: 'Logged out successfully' });
+      return;
+    }
+
     // Health check endpoint
     if (url === '/api/health') {
       const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
@@ -646,7 +795,9 @@ module.exports = async function handler(req, res) {
         apiKeyConfigured: !!process.env.ANTHROPIC_API_KEY,
         apiCallsThisSession: apiCallCount,
         callsLastMinute: callTimestamps.length,
-        rateLimitDelay: RATE_LIMIT_DELAY
+        rateLimitDelay: RATE_LIMIT_DELAY,
+        authenticationEnabled: !!TEAM_PASSWORD,
+        activeSessions: activeSessions.size
       });
       return;
     }
