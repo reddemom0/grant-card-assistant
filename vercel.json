@@ -5,6 +5,10 @@
       "dest": "/api/server.js"
     },
     {
+      "src": "/login.html",
+      "dest": "/login.html"
+    },
+    {
       "src": "/grant-cards",
       "dest": "/grant-cards.html"
     },
