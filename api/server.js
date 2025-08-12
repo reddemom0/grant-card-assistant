@@ -1,9 +1,9 @@
-// api/server.js - Complete serverless function with Google OAuth authentication
+// api/server.js - Complete serverless function with Google Service Account integration
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
 const path = require('path');
-const session = require('express-session');
+const crypto = require('crypto');
 
 // Configure multer for serverless
 const storage = multer.memoryStorage();
@@ -41,6 +41,8 @@ let tokenExpiry = 0;
 
 // Knowledge base cache
 let knowledgeBaseLoaded = false;
+let knowledgeBaseCacheTime = 0;
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
 // Get Google Access Token using Service Account
 async function getGoogleAccessToken() {
@@ -622,29 +624,6 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
-  // Initialize session middleware for OAuth
-  if (!req.session) {
-    const sessionMiddleware = session({
-      secret: process.env.SESSION_SECRET || 'granted-ai-hub-secret-2024',
-      resave: false,
-      saveUninitialized: false,
-      cookie: { secure: false } // Set to true in production with HTTPS
-    });
-    
-    await new Promise((resolve, reject) => {
-      sessionMiddleware(req, res, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-  }
-
-  // Initialize passport
-  if (!req.user) {
-    passport.initialize()(req, res, () => {});
-    passport.session()(req, res, () => {});
-  }
-
   // Load knowledge base
   await getKnowledgeBase();
   
@@ -656,206 +635,11 @@ module.exports = async function handler(req, res) {
   const { url, method } = req;
   
   try {
-    // Public routes (no auth required)
-    if (url === '/login' || url.startsWith('/auth/')) {
-      // Handle authentication routes
-      if (url === '/auth/google') {
-        return passport.authenticate('google', { scope: ['profile', 'email'] })(req, res);
-      }
-      
-      if (url === '/auth/google/callback') {
-        return passport.authenticate('google', { 
-          failureRedirect: '/login',
-          successRedirect: '/'
-        })(req, res);
-      }
-      
-      // Login page
-      if (url === '/login') {
-        const loginHTML = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Granted AI Hub - Team Login</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        :root {
-            --primary-blue: #008abf;
-            --secondary-gray: #6d7881;
-            --light-gray: #dde1e3;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, var(--light-gray) 0%, #ffffff 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-        }
-        
-        .login-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            padding: 4rem 3rem;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 138, 191, 0.15);
-            text-align: center;
-            max-width: 450px;
-            border: 1px solid rgba(0, 138, 191, 0.1);
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        
-        .logo-icon {
-            width: 60px;
-            height: 60px;
-            background: var(--primary-blue);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 1.75rem;
-            position: relative;
-            box-shadow: 0 8px 24px rgba(0, 138, 191, 0.3);
-        }
-        
-        .logo-icon::before {
-            content: '';
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        
-        .logo-text {
-            color: var(--primary-blue);
-            font-size: 1.75rem;
-            font-weight: 300;
-            letter-spacing: 2px;
-            text-transform: uppercase;
-        }
-        
-        h2 {
-            color: var(--secondary-gray);
-            font-size: 1.5rem;
-            font-weight: 400;
-            margin-bottom: 1rem;
-        }
-        
-        p {
-            color: var(--secondary-gray);
-            margin-bottom: 2.5rem;
-            line-height: 1.6;
-        }
-        
-        .google-btn {
-            background: var(--primary-blue);
-            color: white;
-            border: none;
-            padding: 1.25rem 2.5rem;
-            border-radius: 12px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.75rem;
-            margin: 0 auto;
-            box-shadow: 0 8px 24px rgba(0, 138, 191, 0.2);
-            text-decoration: none;
-        }
-        
-        .google-btn:hover {
-            background: #007aa8;
-            transform: translateY(-2px);
-            box-shadow: 0 12px 32px rgba(0, 138, 191, 0.3);
-        }
-        
-        .security-note {
-            margin-top: 2rem;
-            padding: 1rem;
-            background: rgba(0, 138, 191, 0.05);
-            border-radius: 8px;
-            font-size: 0.875rem;
-            color: var(--secondary-gray);
-            border: 1px solid rgba(0, 138, 191, 0.1);
-        }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <div class="logo">
-            <div class="logo-icon">G</div>
-            <div class="logo-text">Granted AI Hub</div>
-        </div>
-        
-        <h2>Team Member Access</h2>
-        <p>Sign in with your Granted Consulting Google account to access your AI specialists</p>
-        
-        <a href="/auth/google" class="google-btn">
-            <span>📧</span>
-            <span>Sign in with Google</span>
-        </a>
-        
-        <div class="security-note">
-            <strong>🔒 Secure Access:</strong> Only @grantedconsulting.com accounts are permitted. Your session will be encrypted and secure.
-        </div>
-    </div>
-</body>
-</html>`;
-        res.setHeader('Content-Type', 'text/html');
-        res.send(loginHTML);
-        return;
-      }
-    }
-
-    // Protected routes (auth required)
-    if (!req.isAuthenticated || !req.isAuthenticated()) {
-      if (req.path.startsWith('/api/')) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-      res.redirect('/login');
-      return;
-    }
-
-    // Logout route
-    if (url === '/logout') {
-      req.logout(() => {
-        res.redirect('/login');
-      });
-      return;
-    }
-
     // Health check endpoint
     if (url === '/api/health') {
       const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
       res.json({ 
         status: 'healthy',
-        user: req.user ? req.user.name : 'Anonymous',
         knowledgeBaseSize: totalDocs,
         knowledgeBaseSource: 'google-drive-service-account',
         googleDriveConfigured: !!(GOOGLE_DRIVE_FOLDER_ID && GOOGLE_SERVICE_ACCOUNT_KEY),
