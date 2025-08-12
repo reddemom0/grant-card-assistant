@@ -757,7 +757,17 @@
         // Check authentication on page load
         async function checkAuth() {
             try {
-                const response = await fetch('/api/health');
+                const response = await fetch('/api/process-grant', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+        message: 'auth check',
+        task: 'grant-criteria',
+        conversationId: 'auth-test'
+    })
+});
                 if (response.status === 401) {
                     // Not authenticated, redirect to login
                     const returnTo = encodeURIComponent(window.location.pathname);
