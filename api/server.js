@@ -1,8 +1,9 @@
-// api/server.js - Complete serverless function preserving ALL features
+// api/server.js - Complete serverless function with Google Service Account integration
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
-const path = require('path'); // ADDED: Missing path import
+const path = require('path');
+const crypto = require('crypto');
 
 // Configure multer for serverless
 const storage = multer.memoryStorage();
@@ -11,10 +12,10 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-// In-memory storage (consider using database for production persistence)
+// In-memory storage
 let conversations = new Map();
 
-// Multi-Agent Knowledge Base Storage (same structure as your original)
+// Multi-Agent Knowledge Base Storage
 let knowledgeBases = {
   'grant-cards': [],
   'etg': [],
@@ -30,10 +31,295 @@ let apiCallCount = 0;
 const MAX_CALLS_PER_MINUTE = 15; // Conservative limit
 let callTimestamps = [];
 
-// NOTE: In serverless, we can't load files from filesystem in the same way
-// Knowledge base will need to be handled differently (see deployment notes below)
+// Google Service Account configuration
+const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
+const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
-// Process uploaded file content (identical to your original)
+// Google OAuth token cache
+let googleAccessToken = null;
+let tokenExpiry = 0;
+
+// Knowledge base cache
+let knowledgeBaseLoaded = false;
+let knowledgeBaseCacheTime = 0;
+const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+// Get Google Access Token using Service Account
+async function getGoogleAccessToken() {
+  // Check if we have a valid cached token
+  if (googleAccessToken && Date.now() < tokenExpiry) {
+    return googleAccessToken;
+  }
+
+  try {
+    if (!GOOGLE_SERVICE_ACCOUNT_KEY) {
+      throw new Error('Google Service Account key not configured');
+    }
+
+    const serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
+    
+    // Create JWT token
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iss: serviceAccount.client_email,
+      scope: 'https://www.googleapis.com/auth/drive.readonly',
+      aud: 'https://oauth2.googleapis.com/token',
+      iat: now,
+      exp: now + 3600 // 1 hour
+    };
+
+    // Create JWT manually (simple implementation for serverless)
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const headerBase64 = Buffer.from(JSON.stringify(header)).toString('base64url');
+    const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    
+    const signData = `${headerBase64}.${payloadBase64}`;
+    const signature = crypto.sign('RSA-SHA256', Buffer.from(signData), serviceAccount.private_key);
+    const signatureBase64 = signature.toString('base64url');
+    
+    const jwt = `${headerBase64}.${payloadBase64}.${signatureBase64}`;
+
+    // Exchange JWT for access token
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to get access token: ${response.status} ${errorText}`);
+    }
+
+    const tokenData = await response.json();
+    googleAccessToken = tokenData.access_token;
+    tokenExpiry = Date.now() + (tokenData.expires_in * 1000) - 60000; // Expire 1 min early
+
+    console.log('✅ Google access token obtained');
+    return googleAccessToken;
+
+  } catch (error) {
+    console.error('❌ Error getting Google access token:', error);
+    throw error;
+  }
+}
+
+// Load knowledge base from Google Drive using Service Account
+async function loadKnowledgeBaseFromGoogleDrive() {
+  if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
+    console.log('⚠️ Google Drive credentials not configured');
+    return;
+  }
+
+  try {
+    console.log('📚 Loading knowledge base from Google Drive...');
+    
+    // Get access token
+    const accessToken = await getGoogleAccessToken();
+    
+    // Clear existing knowledge base
+    knowledgeBases = {
+      'grant-cards': [],
+      'etg': [],
+      'canexport': [],
+      'readiness-strategist': [],
+      'internal-oracle': []
+    };
+
+    // Get main folder contents (should contain agent subfolders)
+    const mainFolderResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${GOOGLE_DRIVE_FOLDER_ID}'+in+parents&fields=files(id,name,mimeType)`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+    
+    if (!mainFolderResponse.ok) {
+      const errorText = await mainFolderResponse.text();
+      throw new Error(`Google Drive API error: ${mainFolderResponse.status} - ${errorText}`);
+    }
+
+    const mainFolderContents = await mainFolderResponse.json();
+    
+    // Process each agent folder
+    for (const item of mainFolderContents.files) {
+      if (item.mimeType === 'application/vnd.google-apps.folder') {
+        const agentName = item.name.toLowerCase();
+        
+        if (knowledgeBases[agentName]) {
+          console.log(`📁 Loading ${agentName} documents...`);
+          await loadAgentDocuments(item.id, agentName, accessToken);
+        }
+      }
+    }
+
+    // Log summary
+    let totalDocs = 0;
+    let totalSize = 0;
+    
+    console.log('\n📚 GOOGLE DRIVE KNOWLEDGE BASE LOADED:');
+    for (const [agent, docs] of Object.entries(knowledgeBases)) {
+      if (docs.length > 0) {
+        const agentSize = docs.reduce((sum, d) => sum + d.size, 0);
+        console.log(`${agent.toUpperCase()}: ${docs.length} documents (${agentSize.toLocaleString()} chars)`);
+        totalDocs += docs.length;
+        totalSize += agentSize;
+      }
+    }
+    
+    console.log(`TOTAL: ${totalDocs} documents (${totalSize.toLocaleString()} characters)`);
+    console.log(`Source: Google Drive Service Account (${GOOGLE_DRIVE_FOLDER_ID})\n`);
+    
+    knowledgeBaseLoaded = true;
+    
+  } catch (error) {
+    console.error('❌ Error loading knowledge base from Google Drive:', error);
+    knowledgeBaseLoaded = true; // Continue without knowledge base
+  }
+}
+
+// Load documents for a specific agent from their Google Drive folder
+async function loadAgentDocuments(folderId, agentName, accessToken) {
+  try {
+    // Get all files in the agent folder
+    const filesResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType,size,modifiedTime)`,
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`
+        }
+      }
+    );
+    
+    if (!filesResponse.ok) {
+      throw new Error(`Google Drive API error for ${agentName}: ${filesResponse.status}`);
+    }
+
+    const filesData = await filesResponse.json();
+    let loadedCount = 0;
+    
+    for (const file of filesData.files) {
+      // Skip folders for now
+      if (file.mimeType === 'application/vnd.google-apps.folder') {
+        continue;
+      }
+      
+      // Load file content based on type
+      try {
+        const content = await loadFileContent(file, accessToken);
+        
+        if (content) {
+          knowledgeBases[agentName].push({
+            filename: file.name,
+            content: content,
+            type: getFileType(file.name, file.mimeType),
+            size: content.length,
+            googleFileId: file.id,
+            lastModified: file.modifiedTime,
+            source: 'google-drive-service-account'
+          });
+          
+          loadedCount++;
+          console.log(`   ✅ ${file.name} (${content.length} chars)`);
+        }
+      } catch (fileError) {
+        console.log(`   ⚠️  Skipping ${file.name}: ${fileError.message}`);
+      }
+    }
+    
+    console.log(`   📊 Loaded ${loadedCount} documents for ${agentName}`);
+    
+  } catch (error) {
+    console.error(`❌ Error loading documents for ${agentName}:`, error);
+  }
+}
+
+// Load content from different file types
+async function loadFileContent(file, accessToken) {
+  const { id, name, mimeType } = file;
+  
+  try {
+    if (mimeType === 'application/vnd.google-apps.document') {
+      // Google Docs - export as plain text
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/plain`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to export Google Doc: ${response.status}`);
+      }
+      
+      return await response.text();
+      
+    } else if (mimeType === 'text/plain' || mimeType === 'text/markdown') {
+      // Plain text/markdown files
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.status}`);
+      }
+      
+      return await response.text();
+      
+    } else if (mimeType === 'application/pdf') {
+      // PDFs - placeholder for now
+      console.log(`   📄 PDF detected: ${name} - content extraction would be added here`);
+      return `PDF Document: ${name}\n[PDF content would be extracted here with additional processing]`;
+      
+    } else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
+      // Word docs, etc. - placeholder for now  
+      console.log(`   📝 Office document detected: ${name} - content extraction would be added here`);
+      return `Office Document: ${name}\n[Document content would be extracted here with additional processing]`;
+      
+    } else {
+      // Skip unsupported file types
+      return null;
+    }
+    
+  } catch (error) {
+    throw new Error(`Failed to load content: ${error.message}`);
+  }
+}
+
+// Get file type from filename or MIME type
+function getFileType(filename, mimeType) {
+  if (mimeType === 'application/vnd.google-apps.document') return 'gdoc';
+  if (mimeType === 'application/pdf') return 'pdf';
+  if (mimeType.includes('word') || mimeType.includes('officedocument')) return 'docx';
+  
+  const ext = filename.toLowerCase().split('.').pop();
+  return ext || 'unknown';
+}
+
+// Get knowledge base with caching
+async function getKnowledgeBase() {
+  const now = Date.now();
+  
+  if (!knowledgeBaseLoaded || (now - knowledgeBaseCacheTime > CACHE_DURATION)) {
+    await loadKnowledgeBaseFromGoogleDrive();
+    knowledgeBaseCacheTime = now;
+  }
+  
+  return knowledgeBases;
+}
+
+// Process uploaded file content
 async function processFileContent(file) {
   const fileExtension = path.extname(file.originalname).toLowerCase();
   let content = '';
@@ -62,7 +348,7 @@ async function processFileContent(file) {
   }
 }
 
-// Fetch URL content (identical to your original)
+// Fetch URL content
 async function fetchURLContent(url) {
   try {
     console.log(`🔗 Fetching content from: ${url}`);
@@ -86,7 +372,7 @@ This appears to be eligible training content suitable for ETG funding.`;
   }
 }
 
-// Agent system prompts (COMPLETE - identical to your original)
+// Agent system prompts (complete set)
 const agentPrompts = {
   'grant-criteria': `You are a Grant Card Assistant for Granted Consulting. Your task is to generate and format 'Grant Criteria' using the EXACT workflow specified in the knowledge base.
 
@@ -216,21 +502,26 @@ APPROACH:
 Always provide comprehensive, helpful responses that leverage the full depth of Granted Consulting's institutional knowledge.`
 };
 
-// Search knowledge base function (identical to your original)
+// Enhanced search knowledge base function
 function searchKnowledgeBase(query, agent = 'grant-cards') {
   const results = [];
   const searchTerms = query.toLowerCase().split(' ');
   
-  // Get the appropriate knowledge base for the agent
   const docs = knowledgeBases[agent] || [];
   
   for (const doc of docs) {
     const content = doc.content.toLowerCase();
+    const filename = doc.filename.toLowerCase();
     let relevanceScore = 0;
     
     for (const term of searchTerms) {
-      const occurrences = (content.match(new RegExp(term, 'g')) || []).length;
-      relevanceScore += occurrences;
+      // Search in content
+      const contentMatches = (content.match(new RegExp(term, 'g')) || []).length;
+      relevanceScore += contentMatches;
+      
+      // Search in filename (weighted higher)
+      const filenameMatches = (filename.match(new RegExp(term, 'g')) || []).length;
+      relevanceScore += filenameMatches * 3; // Filename matches are more important
     }
     
     if (relevanceScore > 0) {
@@ -244,7 +535,7 @@ function searchKnowledgeBase(query, agent = 'grant-cards') {
   return results.sort((a, b) => b.relevanceScore - a.relevanceScore);
 }
 
-// Rate limiting helper functions (identical to your original)
+// Rate limiting helper functions
 function checkRateLimit() {
   const now = Date.now();
   
@@ -269,7 +560,7 @@ async function waitForRateLimit() {
   }
 }
 
-// Claude API integration (identical to your original)
+// Claude API integration
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
     // Check rate limits first
@@ -325,229 +616,7 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-// Google Drive knowledge base integration
-const GOOGLE_DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-
-// Knowledge base loaded flag and cache
-let knowledgeBaseLoaded = false;
-let knowledgeBaseCacheTime = 0;
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-
-// Load knowledge base from Google Drive
-async function loadKnowledgeBaseFromGoogleDrive() {
-  if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_API_KEY) {
-    console.log('⚠️ Google Drive credentials not configured');
-    return;
-  }
-
-  try {
-    console.log('📚 Loading knowledge base from Google Drive...');
-    
-    // Clear existing knowledge base
-    knowledgeBases = {
-      'grant-cards': [],
-      'etg': [],
-      'canexport': [],
-      'readiness-strategist': [],
-      'internal-oracle': []
-    };
-
-    // Get main folder contents (should contain agent subfolders)
-    const mainFolderResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q='${GOOGLE_DRIVE_FOLDER_ID}'+in+parents&key=${GOOGLE_API_KEY}`
-    );
-    
-    if (!mainFolderResponse.ok) {
-      throw new Error(`Google Drive API error: ${mainFolderResponse.status}`);
-    }
-
-    const mainFolderContents = await mainFolderResponse.json();
-    
-    // Process each agent folder
-    for (const item of mainFolderContents.files) {
-      if (item.mimeType === 'application/vnd.google-apps.folder') {
-        const agentName = item.name.toLowerCase();
-        
-        if (knowledgeBases[agentName]) {
-          console.log(`📁 Loading ${agentName} documents...`);
-          await loadAgentDocuments(item.id, agentName);
-        }
-      }
-    }
-
-    // Log summary
-    let totalDocs = 0;
-    let totalSize = 0;
-    
-    console.log('\n📚 GOOGLE DRIVE KNOWLEDGE BASE LOADED:');
-    for (const [agent, docs] of Object.entries(knowledgeBases)) {
-      if (docs.length > 0) {
-        const agentSize = docs.reduce((sum, d) => sum + d.size, 0);
-        console.log(`${agent.toUpperCase()}: ${docs.length} documents (${agentSize.toLocaleString()} chars)`);
-        totalDocs += docs.length;
-        totalSize += agentSize;
-      }
-    }
-    
-    console.log(`TOTAL: ${totalDocs} documents (${totalSize.toLocaleString()} characters)`);
-    console.log(`Source: Google Drive (${GOOGLE_DRIVE_FOLDER_ID})\n`);
-    
-    knowledgeBaseLoaded = true;
-    
-  } catch (error) {
-    console.error('❌ Error loading knowledge base from Google Drive:', error);
-    knowledgeBaseLoaded = true; // Continue without knowledge base
-  }
-}
-
-// Load documents for a specific agent from their Google Drive folder
-async function loadAgentDocuments(folderId, agentName) {
-  try {
-    // Get all files in the agent folder
-    const filesResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${GOOGLE_API_KEY}&fields=files(id,name,mimeType,size,modifiedTime)`
-    );
-    
-    if (!filesResponse.ok) {
-      throw new Error(`Google Drive API error for ${agentName}: ${filesResponse.status}`);
-    }
-
-    const filesData = await filesResponse.json();
-    let loadedCount = 0;
-    
-    for (const file of filesData.files) {
-      // Skip folders for now
-      if (file.mimeType === 'application/vnd.google-apps.folder') {
-        continue;
-      }
-      
-      // Load file content based on type
-      try {
-        const content = await loadFileContent(file);
-        
-        if (content) {
-          knowledgeBases[agentName].push({
-            filename: file.name,
-            content: content,
-            type: getFileType(file.name, file.mimeType),
-            size: content.length,
-            googleFileId: file.id,
-            lastModified: file.modifiedTime,
-            source: 'google-drive'
-          });
-          
-          loadedCount++;
-          console.log(`   ✅ ${file.name} (${content.length} chars)`);
-        }
-      } catch (fileError) {
-        console.log(`   ⚠️  Skipping ${file.name}: ${fileError.message}`);
-      }
-    }
-    
-    console.log(`   📊 Loaded ${loadedCount} documents for ${agentName}`);
-    
-  } catch (error) {
-    console.error(`❌ Error loading documents for ${agentName}:`, error);
-  }
-}
-
-// Load content from different file types
-async function loadFileContent(file) {
-  const { id, name, mimeType } = file;
-  
-  try {
-    if (mimeType === 'application/vnd.google-apps.document') {
-      // Google Docs - export as plain text
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/plain&key=${GOOGLE_API_KEY}`
-      );
-      return await response.text();
-      
-    } else if (mimeType === 'text/plain' || mimeType === 'text/markdown') {
-      // Plain text/markdown files
-      const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${id}?alt=media&key=${GOOGLE_API_KEY}`
-      );
-      return await response.text();
-      
-    } else if (mimeType === 'application/pdf') {
-      // PDFs - placeholder for now
-      console.log(`   📄 PDF detected: ${name} - content extraction would be added here`);
-      return `PDF Document: ${name}\n[PDF content would be extracted here with additional processing]`;
-      
-    } else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
-      // Word docs, etc. - placeholder for now  
-      console.log(`   📝 Office document detected: ${name} - content extraction would be added here`);
-      return `Office Document: ${name}\n[Document content would be extracted here with additional processing]`;
-      
-    } else {
-      // Skip unsupported file types
-      return null;
-    }
-    
-  } catch (error) {
-    throw new Error(`Failed to load content: ${error.message}`);
-  }
-}
-
-// Get file type from filename or MIME type
-function getFileType(filename, mimeType) {
-  if (mimeType === 'application/vnd.google-apps.document') return 'gdoc';
-  if (mimeType === 'application/pdf') return 'pdf';
-  if (mimeType.includes('word') || mimeType.includes('officedocument')) return 'docx';
-  
-  const ext = filename.toLowerCase().split('.').pop();
-  return ext || 'unknown';
-}
-
-// Get knowledge base with caching
-async function getKnowledgeBase() {
-  const now = Date.now();
-  
-  if (!knowledgeBaseLoaded || (now - knowledgeBaseCacheTime > CACHE_DURATION)) {
-    await loadKnowledgeBaseFromGoogleDrive();
-    knowledgeBaseCacheTime = now;
-  }
-  
-  return knowledgeBases;
-}
-
-// MODIFY YOUR EXISTING searchKnowledgeBase FUNCTION to enhance it:
-// (Replace your existing searchKnowledgeBase function with this enhanced version)
-function searchKnowledgeBase(query, agent = 'grant-cards') {
-  const results = [];
-  const searchTerms = query.toLowerCase().split(' ');
-  
-  const docs = knowledgeBases[agent] || [];
-  
-  for (const doc of docs) {
-    const content = doc.content.toLowerCase();
-    const filename = doc.filename.toLowerCase();
-    let relevanceScore = 0;
-    
-    for (const term of searchTerms) {
-      // Search in content
-      const contentMatches = (content.match(new RegExp(term, 'g')) || []).length;
-      relevanceScore += contentMatches;
-      
-      // Search in filename (weighted higher)
-      const filenameMatches = (filename.match(new RegExp(term, 'g')) || []).length;
-      relevanceScore += filenameMatches * 3; // Filename matches are more important
-    }
-    
-    if (relevanceScore > 0) {
-      results.push({
-        ...doc,
-        relevanceScore
-      });
-    }
-  }
-  
-  return results.sort((a, b) => b.relevanceScore - a.relevanceScore);
-}
-
-// FIXED: Changed from export default to module.exports
+// Main serverless handler
 module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -555,6 +624,7 @@ module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
 
+  // Load knowledge base
   await getKnowledgeBase();
   
   if (req.method === 'OPTIONS') {
@@ -567,21 +637,45 @@ module.exports = async function handler(req, res) {
   try {
     // Health check endpoint
     if (url === '/api/health') {
-  const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
-  res.json({ 
-    status: 'healthy', 
-    knowledgeBaseSize: totalDocs,
-    knowledgeBaseSource: 'google-drive',
-    googleDriveConfigured: !!(GOOGLE_DRIVE_FOLDER_ID && GOOGLE_API_KEY),
-    apiKeyConfigured: !!process.env.ANTHROPIC_API_KEY,
-    apiCallsThisSession: apiCallCount,
-    callsLastMinute: callTimestamps.length,
-    rateLimitDelay: RATE_LIMIT_DELAY
-  });
-  return;
-}
+      const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
+      res.json({ 
+        status: 'healthy', 
+        knowledgeBaseSize: totalDocs,
+        knowledgeBaseSource: 'google-drive-service-account',
+        googleDriveConfigured: !!(GOOGLE_DRIVE_FOLDER_ID && GOOGLE_SERVICE_ACCOUNT_KEY),
+        apiKeyConfigured: !!process.env.ANTHROPIC_API_KEY,
+        apiCallsThisSession: apiCallCount,
+        callsLastMinute: callTimestamps.length,
+        rateLimitDelay: RATE_LIMIT_DELAY
+      });
+      return;
+    }
 
-    // Process grant document (for Grant Card Assistant) - COMPLETE LOGIC
+    // Refresh knowledge base endpoint
+    if (url === '/api/refresh-knowledge-base') {
+      try {
+        if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
+          res.status(500).json({ error: 'Google Drive not configured' });
+          return;
+        }
+        
+        knowledgeBaseLoaded = false; // Force refresh
+        await getKnowledgeBase();
+        const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
+        
+        res.json({ 
+          message: 'Knowledge base refreshed successfully',
+          totalDocuments: totalDocs,
+          agents: Object.keys(knowledgeBases).filter(agent => knowledgeBases[agent].length > 0),
+          lastUpdated: new Date().toISOString()
+        });
+      } catch (error) {
+        res.status(500).json({ error: 'Failed to refresh knowledge base: ' + error.message });
+      }
+      return;
+    }
+
+    // Process grant document (for Grant Card Assistant)
     if (url === '/api/process-grant' && method === 'POST') {
       // Handle file upload with multer
       await new Promise((resolve, reject) => {
@@ -652,7 +746,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       return;
     }
 
-    // Process ETG requests (dedicated endpoint for ETG Writer) - COMPLETE LOGIC
+    // Process ETG requests (dedicated endpoint for ETG Writer)
     if (url === '/api/process-etg' && method === 'POST') {
       await new Promise((resolve, reject) => {
         upload.single('file')(req, res, (err) => {
