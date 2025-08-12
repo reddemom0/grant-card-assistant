@@ -2,8 +2,7 @@
   "version": 2,
   "functions": {
     "api/server.js": {
-      "runtime": "nodejs18.x",
-      "maxDuration": 30
+      "runtime": "nodejs20.x"
     }
   },
   "routes": [
