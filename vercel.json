@@ -1,0 +1,20 @@
+{
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/server.js"
+    },
+    {
+      "src": "/grant-cards",
+      "dest": "/grant-cards.html"
+    },
+    {
+      "src": "/etg-writer", 
+      "dest": "/etg-agent.html"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}
