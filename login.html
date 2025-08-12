@@ -94,7 +94,44 @@
             line-height: 1.6;
         }
         
-        .google-btn {
+        /* Password form styles */
+        .login-form {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .form-group {
+            text-align: left;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--secondary-gray);
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 1rem 1.25rem;
+            border: 2px solid var(--light-gray);
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.8);
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary-blue);
+            box-shadow: 0 0 0 3px rgba(0, 138, 191, 0.1);
+            background: white;
+        }
+        
+        .login-button {
             background: var(--primary-blue);
             color: white;
             border: none;
@@ -108,15 +145,51 @@
             align-items: center;
             justify-content: center;
             gap: 0.75rem;
-            margin: 0 auto;
             box-shadow: 0 8px 24px rgba(0, 138, 191, 0.2);
-            text-decoration: none;
         }
         
-        .google-btn:hover {
+        .login-button:hover:not(:disabled) {
             background: #007aa8;
             transform: translateY(-2px);
             box-shadow: 0 12px 32px rgba(0, 138, 191, 0.3);
+        }
+        
+        .login-button:disabled {
+            background: var(--secondary-gray);
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .error-message {
+            background: rgba(220, 38, 38, 0.1);
+            border: 2px solid rgba(220, 38, 38, 0.2);
+            color: #dc2626;
+            padding: 1rem;
+            border-radius: 12px;
+            font-size: 0.875rem;
+            display: none;
+            margin-bottom: 1rem;
+        }
+        
+        .loading {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+        
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         .security-note {
@@ -199,15 +272,34 @@
         </div>
         
         <h2>Team Member Access</h2>
-        <p>Sign in with your Granted Consulting Google account to access your AI specialists</p>
+        <p>Enter your team password to access your AI specialists</p>
         
-        <a href="/auth/google" class="google-btn">
-            <span>📧</span>
-            <span>Sign in with Google</span>
-        </a>
+        <form class="login-form" id="loginForm">
+            <div class="form-group">
+                <label for="password">Team Password</label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    required 
+                    placeholder="Enter team password"
+                    autocomplete="current-password"
+                >
+            </div>
+            
+            <div class="error-message" id="errorMessage"></div>
+            
+            <button type="submit" class="login-button" id="loginButton">
+                <span id="buttonText">🔑 Access AI Hub</span>
+                <div class="loading" id="loadingSpinner">
+                    <div class="spinner"></div>
+                    <span>Authenticating...</span>
+                </div>
+            </button>
+        </form>
         
         <div class="security-note">
-            <strong>🔒 Secure Access:</strong> Only @grantedconsulting.com accounts are permitted. Your session will be encrypted and secure.
+            <strong>🔒 Secure Access:</strong> Your session will be encrypted and secure for 24 hours.
         </div>
         
         <div class="features-preview">
@@ -221,5 +313,89 @@
             </ul>
         </div>
     </div>
+
+    <script>
+        const loginForm = document.getElementById('loginForm');
+        const passwordInput = document.getElementById('password');
+        const loginButton = document.getElementById('loginButton');
+        const buttonText = document.getElementById('buttonText');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Focus password input on load
+        passwordInput.focus();
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const password = passwordInput.value.trim();
+            if (!password) {
+                showError('Please enter the team password');
+                return;
+            }
+
+            // Show loading state
+            setLoading(true);
+            hideError();
+
+            try {
+                // API configuration - works both locally and on Vercel
+                const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+                
+                const response = await fetch(`${API_BASE}/api/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.success) {
+                    // Success! Redirect to main hub or intended page
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const returnTo = urlParams.get('returnTo') || '/';
+                    window.location.href = returnTo;
+                } else {
+                    showError(data.message || 'Invalid password. Please try again.');
+                    passwordInput.select(); // Select text for easy re-entry
+                }
+
+            } catch (error) {
+                console.error('Login error:', error);
+                showError('Connection error. Please check your internet connection and try again.');
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        function setLoading(loading) {
+            loginButton.disabled = loading;
+            if (loading) {
+                buttonText.style.display = 'none';
+                loadingSpinner.style.display = 'flex';
+            } else {
+                buttonText.style.display = 'block';
+                loadingSpinner.style.display = 'none';
+            }
+        }
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
+        }
+
+        function hideError() {
+            errorMessage.style.display = 'none';
+        }
+
+        // Handle Enter key in password field
+        passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                loginForm.dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
 </body>
 </html>
