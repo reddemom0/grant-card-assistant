@@ -2,6 +2,7 @@
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
+const path = require('path'); // ADDED: Missing path import
 
 // Configure multer for serverless
 const storage = multer.memoryStorage();
@@ -324,8 +325,8 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-// Main serverless function handler
-export default async function handler(req, res) {
+// FIXED: Changed from export default to module.exports
+module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -558,4 +559,4 @@ Use the ETG knowledge base above to find similar successful applications and mat
     
     res.status(500).json({ error: errorMessage });
   }
-}
+};
