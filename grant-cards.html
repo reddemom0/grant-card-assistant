@@ -461,6 +461,36 @@
         const fileInput = document.getElementById('file-input');
         const fileInfo = document.getElementById('file-info');
 
+        // Check authentication on page load
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/process-grant', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: 'auth check',
+                        task: 'grant-criteria',
+                        conversationId: 'auth-test'
+                    })
+                });
+                
+                if (response.status === 401) {
+                    // Not authenticated, redirect to login
+                    const returnTo = encodeURIComponent(window.location.pathname);
+                    window.location.href = `/login.html?returnTo=${returnTo}`;
+                    return;
+                }
+                // If we get here, user is authenticated
+                console.log('✅ User authenticated');
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                // On error, redirect to login to be safe
+                window.location.href = '/login.html';
+            }
+        }
+
         // Task selection
         taskButtons.forEach(button => {
             button.addEventListener('click', () => {
@@ -618,6 +648,9 @@
             a.click();
             URL.revokeObjectURL(url);
         }
+
+        // Run auth check when page loads
+        document.addEventListener('DOMContentLoaded', checkAuth);
     </script>
 </body>
 </html>
