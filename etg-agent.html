@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ETG Business Case Agent - Granted Consulting</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: white;
+            border-bottom: 1px solid #e5e7eb;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .logo-icon {
+            width: 40px;
+            height: 40px;
+            background: #2563eb;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+        
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #111827;
+        }
+        
+        .logo-text p {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+        
+        .nav-link {
+            color: #2563eb;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+        
+        .nav-link:hover {
+            background: #f3f4f6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1.5rem;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 1.5rem;
+        }
+        
+        .specialist-panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            height: fit-content;
+        }
+        
+        .specialist-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .specialist-avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .specialist-info h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 0.25rem;
+        }
+        
+        .specialist-info p {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .process-steps {
+            margin-bottom: 1.5rem;
+        }
+        
+        .process-steps h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 1rem;
+        }
+        
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+        
+        .step-number {
+            width: 24px;
+            height: 24px;
+            background: #2563eb;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .step-text {
+            font-size: 0.875rem;
+            color: #374151;
+            line-height: 1.4;
+        }
+        
+        .eligibility-check {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .eligibility-check h4 {
+            color: #92400e;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .eligibility-check p {
+            color: #92400e;
+            font-size: 0.75rem;
+            line-height: 1.4;
+        }
+        
+        .chat-panel {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            height: 700px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .chat-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e5e7eb;
+            background: #f9fafb;
+            border-radius: 8px 8px 0 0;
+        }
+        
+        .chat-header h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 0.25rem;
+        }
+        
+        .chat-header p {
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        
+        .message {
+            display: flex;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message.assistant {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            max-width: 75%;
+            padding: 1rem;
+            border-radius: 8px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        
+        .message.user .message-content {
+            background: #2563eb;
+            color: white;
+        }
+        
+        .message.assistant .message-content {
+            background: #f3f4f6;
+            color: #111827;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f3f4f6;
+            color: #111827;
+            padding: 1rem;
+            border-radius: 8px;
+            max-width: 75%;
+        }
+        
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #e5e7eb;
+            border-top: 2px solid #2563eb;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .input-area {
+            border-top: 1px solid #e5e7eb;
+            padding: 1rem;
+        }
+        
+        .course-analysis {
+            margin-bottom: 1rem;
+            background: #f0f9ff;
+            border: 1px solid #0ea5e9;
+            border-radius: 6px;
+            padding: 1rem;
+        }
+        
+        .course-analysis h4 {
+            color: #0c4a6e;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .analysis-options {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .analysis-option {
+            flex: 1;
+        }
+        
+        .upload-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .upload-button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border: 2px dashed #d1d5db;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        
+        .upload-button:hover {
+            border-color: #2563eb;
+            background: #f9fafb;
+        }
+        
+        .upload-button.has-file {
+            border-color: #10b981;
+            background: #f0fdf4;
+            color: #065f46;
+        }
+        
+        .url-input-area {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        
+        .url-input {
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            width: 100%;
+        }
+        
+        .url-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+        }
+        
+        .analyze-button {
+            padding: 0.5rem 1rem;
+            background: #0ea5e9;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: background-color 0.2s;
+        }
+        
+        .analyze-button:hover:not(:disabled) {
+            background: #0284c7;
+        }
+        
+        .analyze-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .file-info {
+            font-size: 0.75rem;
+            color: #065f46;
+            padding: 0.5rem;
+            background: #f0fdf4;
+            border-radius: 4px;
+            display: none;
+        }
+        
+        .quick-start {
+            margin-bottom: 1rem;
+        }
+        
+        .quick-start h4 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: #111827;
+            margin-bottom: 0.5rem;
+        }
+        
+        .quick-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .quick-button {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.75rem;
+            transition: all 0.2s;
+        }
+        
+        .quick-button:hover {
+            background: #f9fafb;
+            border-color: #2563eb;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .message-input {
+            flex: 1;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 0.75rem;
+            resize: none;
+            font-family: inherit;
+            font-size: 0.875rem;
+            min-height: 80px;
+        }
+        
+        .message-input:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .send-button {
+            padding: 0.75rem 1rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: background-color 0.2s;
+            align-self: flex-end;
+        }
+        
+        .send-button:hover:not(:disabled) {
+            background: #1d4ed8;
+        }
+        
+        .send-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        .welcome-message {
+            background: #eff6ff;
+            border: 1px solid #dbeafe;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .welcome-message h4 {
+            color: #1e40af;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .welcome-message p {
+            color: #1e40af;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        
+        .export-button {
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+        }
+        
+        .export-button:hover {
+            background: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">📋</div>
+                <div class="logo-text">
+                    <h1>ETG Business Case Agent</h1>
+                    <p>Granted Consulting AI Hub</p>
+                </div>
+            </div>
+            <div class="user-info">
+                <a href="/" class="nav-link">← Back to AI Hub</a>
+                <span>👤 Team Member</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- ETG Specialist Panel -->
+        <div class="specialist-panel">
+            <div class="specialist-header">
+                <div class="specialist-avatar">ETG</div>
+                <div class="specialist-info">
+                    <h2>ETG Specialist</h2>
+                    <p>BC Employee Training Grant Expert</p>
+                </div>
+            </div>
+
+            <div class="eligibility-check">
+                <h4>⚠️ Mandatory Eligibility Pre-Screening</h4>
+                <p>I will verify training eligibility before proceeding. Training types like seminars, conferences, consulting, or coaching are automatically ineligible for ETG funding.</p>
+            </div>
+
+            <div class="process-steps">
+                <h3>My Process</h3>
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-text">Verify training eligibility against ETG requirements</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-text">Search knowledge base for similar successful applications</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-text">Draft Questions 1-3 using proven successful styles</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <div class="step-text">Research BC training alternatives for comparison</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <div class="step-text">Complete Questions 4-7 with comprehensive analysis</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <div class="step-text">Deliver submission-ready ETG Business Case</div>
+                </div>
+            </div>
+
+            <div class="welcome-message">
+                <h4>Professional ETG Service</h4>
+                <p>I take full ownership of creating submission-ready ETG Business Cases that meet all compliance requirements and match the quality of successful applications.</p>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="chat-panel">
+            <div class="chat-header">
+                <h3>ETG Business Case Development</h3>
+                <p>Professional ETG specialist ready to create your submission-ready business case</p>
+            </div>
+
+            <div class="messages" id="messages">
+                <div class="message assistant">
+                    <div class="message-content">
+                        <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Welcome! I'm your ETG Business Case specialist. 📋</div>
+                        
+                        <div style="margin-bottom: 1rem;">I take full ownership of creating submission-ready ETG Business Cases that meet all compliance requirements. Here's what I provide:</div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <div>• <strong>Eligibility Verification</strong> - I'll confirm your training is eligible before proceeding</div>
+                            <div>• <strong>Knowledge Base Analysis</strong> - I'll find similar successful applications to match proven styles</div>
+                            <div>• <strong>Professional Writing</strong> - Detailed, comprehensive business language that matches successful examples</div>
+                            <div>• <strong>BC Alternative Research</strong> - I'll research and compare BC training alternatives</div>
+                            <div>• <strong>Complete Business Case</strong> - All 7 ETG template questions, submission-ready</div>
+                        </div>
+
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">To get started, I need:</div>
+                        <div style="margin-bottom: 1rem;">
+                            <div>• Course/training information (title, provider, content)</div>
+                            <div>• Company details (industry, size, business challenges)</div>
+                            <div>• Training purpose and participants</div>
+                            <div>• Specific outcomes you're targeting</div>
+                        </div>
+
+                        <div>Share your training details and I'll handle the complete ETG Business Case creation process.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="course-analysis">
+                    <h4>📄 Course Information Analysis</h4>
+                    <div class="analysis-options">
+                        <div class="analysis-option">
+                            <div class="upload-area">
+                                <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" style="display: none;">
+                                <div class="upload-button" onclick="document.getElementById('file-input').click()">
+                                    <span>📁</span>
+                                    <span>Upload Course Document</span>
+                                </div>
+                                <div class="file-info" id="file-info"></div>
+                            </div>
+                        </div>
+                        <div class="analysis-option">
+                            <div class="url-input-area">
+                                <input 
+                                    type="url" 
+                                    id="url-input" 
+                                    class="url-input" 
+                                    placeholder="https://example.com/course-info"
+                                >
+                                <button class="analyze-button" onclick="analyzeURL()">
+                                    🔗 Analyze URL
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <p style="font-size: 0.75rem; color: #0c4a6e; margin-top: 0.5rem;">
+                        Upload course brochures, syllabi, or provide URLs for automatic analysis. I'll extract training details and verify ETG eligibility.
+                    </p>
+                </div>
+
+                <div class="quick-start">
+                    <h4>Quick Start Options:</h4>
+                    <div class="quick-buttons">
+                        <button class="quick-button" onclick="insertQuickText('I need an ETG Business Case for:')">Start New Business Case</button>
+                        <button class="quick-button" onclick="insertQuickText('Training Title: \nTraining Provider: \nCompany: \nIndustry: ')">Use Template</button>
+                        <button class="quick-button" onclick="insertQuickText('Is this training eligible for ETG? ')">Check Eligibility</button>
+                        <button class="quick-button" onclick="insertQuickText('Review my Questions 1-3: ')">Review Draft</button>
+                    </div>
+                </div>
+
+                <div class="input-row">
+                    <textarea 
+                        id="message-input" 
+                        class="message-input" 
+                        rows="3" 
+                        placeholder="Describe your training requirements and company details. I'll verify eligibility and create your complete ETG Business Case..."
+                    ></textarea>
+                    <button id="send-button" class="send-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isLoading = false;
+        let uploadedFile = null;
+
+        // API configuration - works both locally and on Vercel
+        const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+        // DOM elements
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const urlInput = document.getElementById('url-input');
+
+        // File upload handling
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadedFile = file;
+                fileInfo.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                fileInfo.style.display = 'block';
+                
+                // Update upload button appearance
+                const uploadButton = document.querySelector('.upload-button');
+                uploadButton.classList.add('has-file');
+                uploadButton.innerHTML = '<span>✅</span><span>File Ready: ' + file.name + '</span>';
+                
+                // Auto-analyze the file
+                addMessage('user', `📎 Uploaded: ${file.name}`);
+                sendMessage(true); // Auto-send with file
+            }
+        });
+
+        // URL analysis function
+        function analyzeURL() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert('Please enter a valid URL');
+                return;
+            }
+
+            if (!isValidURL(url)) {
+                alert('Please enter a valid URL (must start with http:// or https://)');
+                return;
+            }
+
+            addMessage('user', `🔗 Analyze course URL: ${url}`);
+            
+            // Send URL for analysis
+            sendMessageWithURL(url);
+
+            // Clear the URL input
+            urlInput.value = '';
+        }
+
+        // URL validation helper
+        function isValidURL(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        // Send message functionality
+        sendButton.addEventListener('click', () => sendMessage());
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Quick text insertion
+        function insertQuickText(text) {
+            messageInput.value = text;
+            messageInput.focus();
+        }
+
+        function addMessage(role, content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Add export button for completed business cases
+            if (role === 'assistant' && (content.includes('Question 1') || content.includes('**Question 1**'))) {
+                const exportButton = document.createElement('button');
+                exportButton.className = 'export-button';
+                exportButton.innerHTML = '💾 Export Business Case';
+                exportButton.onclick = () => exportBusinessCase(content);
+                contentDiv.appendChild(exportButton);
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addLoadingMessage() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = 'loading-message';
+            
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.innerHTML = '<div class="spinner"></div><span>Analyzing training eligibility and creating your business case...</span>';
+            
+            messageDiv.appendChild(loadingDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function removeLoadingMessage() {
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+        }
+
+        async function sendMessage(autoSend = false) {
+            const message = messageInput.value.trim();
+            if (!message && !uploadedFile && !autoSend) return;
+            if (isLoading) return;
+
+            // Add user message if not auto-sent
+            if (message && !autoSend) {
+                addMessage('user', message);
+            }
+
+            // Show loading
+            isLoading = true;
+            sendButton.disabled = true;
+            addLoadingMessage();
+
+            try {
+                // UPDATED: Prepare form data for ETG-specific endpoint
+                const formData = new FormData();
+                formData.append('message', message);
+                formData.append('conversationId', 'etg-conversation');
+                
+                if (uploadedFile) {
+                    formData.append('file', uploadedFile);
+                }
+                
+                // UPDATED: Use dynamic API URL for both local and production
+                const response = await fetch(`${API_BASE}/api/process-etg`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Backend error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Remove loading and add response
+                removeLoadingMessage();
+                addMessage('assistant', data.response);
+
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('assistant', `I apologize, but I'm having trouble connecting to the ETG analysis service right now. Please check that the backend server is running and try again.\n\nError: ${error.message}`);
+            }
+
+            // Clean up
+            isLoading = false;
+            sendButton.disabled = false;
+            messageInput.value = '';
+            
+            // Clear file after sending
+            if (uploadedFile) {
+                uploadedFile = null;
+                fileInfo.style.display = 'none';
+                const uploadButton = document.querySelector('.upload-button');
+                uploadButton.classList.remove('has-file');
+                uploadButton.innerHTML = '<span>📁</span><span>Upload Course Document</span>';
+                fileInput.value = '';
+            }
+        }
+
+        async function sendMessageWithURL(url) {
+            if (isLoading) return;
+
+            // Show loading
+            isLoading = true;
+            sendButton.disabled = true;
+            addLoadingMessage();
+
+            try {
+                // UPDATED: Prepare form data for ETG agent with URL
+                const formData = new FormData();
+                formData.append('message', 'Analyze this course URL');
+                formData.append('url', url);
+                formData.append('conversationId', 'etg-conversation');
+                
+                // UPDATED: Use dynamic API URL for both local and production
+                const response = await fetch(`${API_BASE}/api/process-etg`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Backend error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Remove loading and add response
+                removeLoadingMessage();
+                addMessage('assistant', data.response);
+
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('assistant', `I apologize, but I'm having trouble analyzing the URL right now. Please check that the backend server is running and try again.\n\nError: ${error.message}`);
+            }
+
+            // Clean up
+            isLoading = false;
+            sendButton.disabled = false;
+        }
+
+        function exportBusinessCase(content) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'etg-business-case.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
