@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Granted AI Hub - Team Login</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --primary-blue: #008abf;
+            --secondary-gray: #6d7881;
+            --light-gray: #dde1e3;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, var(--light-gray) 0%, #ffffff 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+        
+        .login-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 4rem 3rem;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 138, 191, 0.15);
+            text-align: center;
+            max-width: 450px;
+            border: 1px solid rgba(0, 138, 191, 0.1);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--primary-blue);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.75rem;
+            position: relative;
+            box-shadow: 0 8px 24px rgba(0, 138, 191, 0.3);
+        }
+        
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .logo-text {
+            color: var(--primary-blue);
+            font-size: 1.75rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        
+        h2 {
+            color: var(--secondary-gray);
+            font-size: 1.5rem;
+            font-weight: 400;
+            margin-bottom: 1rem;
+        }
+        
+        p {
+            color: var(--secondary-gray);
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+        }
+        
+        .google-btn {
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 1.25rem 2.5rem;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            margin: 0 auto;
+            box-shadow: 0 8px 24px rgba(0, 138, 191, 0.2);
+            text-decoration: none;
+        }
+        
+        .google-btn:hover {
+            background: #007aa8;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(0, 138, 191, 0.3);
+        }
+        
+        .security-note {
+            margin-top: 2rem;
+            padding: 1rem;
+            background: rgba(0, 138, 191, 0.05);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            color: var(--secondary-gray);
+            border: 1px solid rgba(0, 138, 191, 0.1);
+        }
+        
+        .features-preview {
+            margin-top: 3rem;
+            text-align: left;
+        }
+        
+        .features-preview h3 {
+            color: var(--secondary-gray);
+            font-size: 1rem;
+            font-weight: 500;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+        
+        .feature-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .feature-list li {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: var(--secondary-gray);
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            padding: 0.5rem;
+            background: rgba(0, 138, 191, 0.02);
+            border-radius: 6px;
+        }
+        
+        .feature-list li::before {
+            content: '✓';
+            color: var(--primary-blue);
+            font-weight: bold;
+            width: 18px;
+            height: 18px;
+            background: rgba(0, 138, 191, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+        
+        @media (max-width: 480px) {
+            .login-container {
+                padding: 3rem 2rem;
+                margin: 1rem;
+            }
+            
+            .logo-text {
+                font-size: 1.5rem;
+            }
+            
+            h2 {
+                font-size: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <div class="logo-icon">G</div>
+            <div class="logo-text">Granted AI Hub</div>
+        </div>
+        
+        <h2>Team Member Access</h2>
+        <p>Sign in with your Granted Consulting Google account to access your AI specialists</p>
+        
+        <a href="/auth/google" class="google-btn">
+            <span>📧</span>
+            <span>Sign in with Google</span>
+        </a>
+        
+        <div class="security-note">
+            <strong>🔒 Secure Access:</strong> Only @grantedconsulting.com accounts are permitted. Your session will be encrypted and secure.
+        </div>
+        
+        <div class="features-preview">
+            <h3>What's Available</h3>
+            <ul class="feature-list">
+                <li>Grant Card Assistant - Transform documents into structured cards</li>
+                <li>ETG Business Case Specialist - Submission-ready applications</li>
+                <li>Knowledge Base Access - All company workflows & templates</li>
+                <li>File Upload Support - Process PDFs, Word docs, and more</li>
+                <li>Export Capabilities - Download professional outputs</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
