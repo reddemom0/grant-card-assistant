@@ -754,6 +754,25 @@
     </div>
 
     <script>
+        // Check authentication on page load
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/health');
+                if (response.status === 401) {
+                    // Not authenticated, redirect to login
+                    const returnTo = encodeURIComponent(window.location.pathname);
+                    window.location.href = `/login.html?returnTo=${returnTo}`;
+                    return;
+                }
+                // If we get here, user is authenticated
+                console.log('✅ User authenticated');
+            } catch (error) {
+                console.error('Auth check failed:', error);
+                // On error, redirect to login to be safe
+                window.location.href = '/login.html';
+            }
+        }
+
         function openAgent(agentType) {
             const agentMap = {
                 'grant-cards': {
@@ -792,6 +811,9 @@
 
         // Add smooth scroll-triggered animations
         document.addEventListener('DOMContentLoaded', function() {
+            // Run auth check when page loads
+            checkAuth();
+
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach((entry) => {
                     if (entry.isIntersecting) {
