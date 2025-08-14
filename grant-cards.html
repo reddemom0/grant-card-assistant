@@ -27,16 +27,17 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
             background: linear-gradient(135deg, var(--granted-light) 0%, #ffffff 50%, var(--granted-light) 100%);
-            min-height: 100vh;
+            height: 100vh;
             color: var(--text-primary);
+            overflow: hidden;
         }
         
         .header {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-bottom: 1px solid var(--granted-light);
-            box-shadow: 0 4px 20px rgba(0, 138, 191, 0.08);
-            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 12px rgba(0, 138, 191, 0.08);
+            padding: 0.75rem 1.5rem;
             position: sticky;
             top: 0;
             z-index: 1000;
@@ -53,29 +54,29 @@
         .logo {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
         
         .logo-icon {
-            width: 50px;
-            height: 50px;
+            width: 36px;
+            height: 36px;
             background: var(--granted-blue);
-            border-radius: 12px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
             font-weight: bold;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             position: relative;
-            box-shadow: 0 4px 12px rgba(0, 138, 191, 0.25);
+            box-shadow: 0 2px 8px rgba(0, 138, 191, 0.25);
         }
         
         .logo-icon::before {
             content: '';
             position: absolute;
-            width: 20px;
-            height: 20px;
+            width: 16px;
+            height: 16px;
             border: 2px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             top: 50%;
@@ -84,10 +85,10 @@
         }
         
         .logo-text h1 {
-            font-size: 1.5rem;
+            font-size: 1.125rem;
             font-weight: 300;
             color: var(--granted-gray);
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             text-transform: uppercase;
         }
         
@@ -97,29 +98,30 @@
         }
         
         .logo-text p {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: var(--granted-gray);
             font-weight: 400;
             letter-spacing: 0.5px;
             text-transform: uppercase;
-            margin-top: 0.25rem;
+            margin-top: 0.125rem;
         }
         
         .user-info {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
             color: var(--granted-gray);
-            font-size: 0.875rem;
+            font-size: 0.8rem;
         }
         
         .nav-link {
             color: var(--granted-blue);
             text-decoration: none;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
             transition: all 0.2s ease;
             font-weight: 500;
+            font-size: 0.8rem;
         }
         
         .nav-link:hover {
@@ -129,69 +131,65 @@
         .container {
             max-width: 1400px;
             margin: 0 auto;
-            padding: 2rem;
+            padding: 1rem;
             display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 2rem;
-            height: calc(100vh - 120px);
+            grid-template-columns: 260px 1fr;
+            gap: 1rem;
+            height: calc(100vh - 70px);
         }
         
         .sidebar {
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(20px);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 138, 191, 0.08);
-            padding: 1.5rem;
-            height: fit-content;
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 138, 191, 0.08);
+            padding: 1rem;
             border: 1px solid rgba(0, 138, 191, 0.1);
-            max-height: calc(100vh - 160px);
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
         }
         
         .expert-profile {
             text-align: center;
-            margin-bottom: 2rem;
-            padding-bottom: 1.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
             border-bottom: 1px solid var(--granted-light);
         }
         
         .expert-avatar {
-            width: 60px;
-            height: 60px;
+            width: 48px;
+            height: 48px;
             background: linear-gradient(135deg, var(--granted-blue), #0056b3);
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-size: 1.5rem;
+            font-size: 1.125rem;
             font-weight: bold;
-            margin: 0 auto 1rem;
-            box-shadow: 0 4px 12px rgba(0, 138, 191, 0.3);
+            margin: 0 auto 0.75rem;
+            box-shadow: 0 2px 8px rgba(0, 138, 191, 0.3);
         }
         
         .expert-profile h3 {
-            font-size: 1.125rem;
+            font-size: 0.9rem;
             font-weight: 500;
             color: var(--granted-blue);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
         }
         
         .expert-profile p {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: var(--granted-gray);
-            line-height: 1.4;
-        }
-        
-        .quick-actions {
-            margin-bottom: 2rem;
+            line-height: 1.3;
         }
         
         .quick-actions h4 {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--granted-blue);
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -199,17 +197,17 @@
         .action-button {
             width: 100%;
             text-align: left;
-            padding: 0.75rem 1rem;
-            border: 2px solid var(--granted-light);
-            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--granted-light);
+            border-radius: 6px;
             background: rgba(255, 255, 255, 0.8);
             cursor: pointer;
-            margin-bottom: 0.75rem;
-            transition: all 0.3s ease;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            font-size: 0.875rem;
+            gap: 0.5rem;
+            font-size: 0.75rem;
         }
         
         .action-button:hover {
@@ -225,41 +223,42 @@
         }
         
         .action-icon {
-            font-size: 1rem;
-            width: 20px;
+            font-size: 0.875rem;
+            width: 16px;
             text-align: center;
         }
         
         .grant-types {
-            padding-top: 1.5rem;
+            margin-top: auto;
+            padding-top: 1rem;
             border-top: 1px solid var(--granted-light);
         }
         
         .grant-types h4 {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 600;
             color: var(--granted-blue);
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
         
         .grant-type {
-            font-size: 0.75rem;
+            font-size: 0.65rem;
             color: var(--granted-gray);
-            padding: 0.75rem;
+            padding: 0.5rem;
             background: rgba(0, 138, 191, 0.03);
-            border-radius: 6px;
-            margin-bottom: 0.5rem;
-            border-left: 3px solid var(--granted-blue);
-            line-height: 1.3;
+            border-radius: 4px;
+            margin-bottom: 0.375rem;
+            border-left: 2px solid var(--granted-blue);
+            line-height: 1.2;
         }
         
         .chat-panel {
             background: rgba(255, 255, 255, 0.9);
             backdrop-filter: blur(20px);
-            border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 138, 191, 0.08);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(0, 138, 191, 0.08);
             display: flex;
             flex-direction: column;
             border: 1px solid rgba(0, 138, 191, 0.1);
@@ -267,32 +266,32 @@
         }
         
         .chat-header {
-            padding: 1.5rem;
+            padding: 0.875rem 1.25rem;
             border-bottom: 1px solid var(--granted-light);
             background: rgba(0, 138, 191, 0.02);
-            border-radius: 16px 16px 0 0;
+            border-radius: 12px 12px 0 0;
         }
         
         .chat-header h3 {
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 500;
             color: var(--granted-blue);
-            margin-bottom: 0.5rem;
-            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+            letter-spacing: 0.25px;
         }
         
         .chat-header p {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             color: var(--granted-gray);
         }
         
         .messages {
             flex: 1;
             overflow-y: auto;
-            padding: 1.5rem;
+            padding: 1rem;
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 1rem;
         }
         
         .message {
@@ -309,41 +308,43 @@
         
         .message-content {
             max-width: 85%;
-            padding: 1.25rem;
-            border-radius: 16px;
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
             white-space: pre-wrap;
-            line-height: 1.6;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            line-height: 1.5;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+            font-size: 0.875rem;
         }
         
         .message.user .message-content {
             background: var(--granted-blue);
             color: white;
-            border-bottom-right-radius: 6px;
+            border-bottom-right-radius: 4px;
         }
         
         .message.assistant .message-content {
             background: rgba(255, 255, 255, 0.9);
             color: var(--text-primary);
             border: 1px solid var(--granted-light);
-            border-bottom-left-radius: 6px;
+            border-bottom-left-radius: 4px;
         }
         
         .loading {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
+            gap: 0.5rem;
             background: rgba(255, 255, 255, 0.9);
             color: var(--granted-gray);
-            padding: 1.25rem;
-            border-radius: 16px;
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
             max-width: 85%;
             border: 1px solid var(--granted-light);
+            font-size: 0.8rem;
         }
         
         .spinner {
-            width: 18px;
-            height: 18px;
+            width: 16px;
+            height: 16px;
             border: 2px solid var(--granted-light);
             border-top: 2px solid var(--granted-blue);
             border-radius: 50%;
@@ -357,18 +358,18 @@
         
         .input-area {
             border-top: 1px solid var(--granted-light);
-            padding: 1.5rem;
+            padding: 0.875rem;
             background: rgba(0, 138, 191, 0.01);
-            border-radius: 0 0 16px 16px;
+            border-radius: 0 0 12px 12px;
         }
         
         .upload-area {
-            margin-bottom: 1rem;
-            padding: 1rem;
-            border: 2px dashed var(--granted-light);
-            border-radius: 12px;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            border: 1px dashed var(--granted-light);
+            border-radius: 8px;
             text-align: center;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
             background: rgba(255, 255, 255, 0.5);
         }
         
@@ -380,14 +381,14 @@
         .upload-button {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            border: 2px solid var(--granted-blue);
-            border-radius: 8px;
+            gap: 0.375rem;
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--granted-blue);
+            border-radius: 6px;
             background: rgba(0, 138, 191, 0.05);
             color: var(--granted-blue);
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 500;
             transition: all 0.2s ease;
         }
@@ -398,54 +399,54 @@
         }
         
         .file-info {
-            margin-top: 0.75rem;
-            font-size: 0.875rem;
+            margin-top: 0.5rem;
+            font-size: 0.75rem;
         }
         
         .input-row {
             display: flex;
-            gap: 0.75rem;
+            gap: 0.5rem;
             align-items: flex-end;
         }
         
         .message-input {
             flex: 1;
-            border: 2px solid var(--granted-light);
-            border-radius: 12px;
-            padding: 1rem;
+            border: 1px solid var(--granted-light);
+            border-radius: 8px;
+            padding: 0.75rem;
             resize: none;
             font-family: inherit;
-            font-size: 0.9rem;
+            font-size: 0.8rem;
             background: rgba(255, 255, 255, 0.8);
             transition: all 0.2s ease;
-            min-height: 80px;
+            height: 60px;
         }
         
         .message-input:focus {
             outline: none;
             border-color: var(--granted-blue);
-            box-shadow: 0 0 0 3px rgba(0, 138, 191, 0.1);
+            box-shadow: 0 0 0 2px rgba(0, 138, 191, 0.1);
             background: white;
         }
         
         .send-button {
-            padding: 1rem 1.5rem;
+            padding: 0.75rem 1rem;
             background: var(--granted-blue);
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: 8px;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 600;
             transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(0, 138, 191, 0.2);
+            box-shadow: 0 1px 4px rgba(0, 138, 191, 0.2);
             height: fit-content;
         }
         
         .send-button:hover:not(:disabled) {
             background: #007aa8;
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(0, 138, 191, 0.3);
+            box-shadow: 0 2px 8px rgba(0, 138, 191, 0.3);
         }
         
         .send-button:disabled {
@@ -455,17 +456,17 @@
         }
         
         .export-button {
-            margin-top: 0.75rem;
+            margin-top: 0.5rem;
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1rem;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
             background: var(--granted-blue);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             font-weight: 500;
             transition: all 0.2s ease;
         }
@@ -475,18 +476,9 @@
             transform: translateY(-1px);
         }
         
-        .welcome-expert {
-            background: rgba(0, 138, 191, 0.05);
-            border: 1px solid rgba(0, 138, 191, 0.2);
-            border-radius: 12px;
-            padding: 1.25rem;
-            margin: 1rem 0;
-            border-left: 4px solid var(--granted-blue);
-        }
-        
         .status-indicator {
-            width: 8px;
-            height: 8px;
+            width: 6px;
+            height: 6px;
             background: var(--success);
             border-radius: 50%;
             animation: pulse 2s infinite;
@@ -504,19 +496,23 @@
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
-                gap: 1rem;
-                padding: 1rem;
-                height: auto;
+                gap: 0.75rem;
+                padding: 0.75rem;
+                height: calc(100vh - 60px);
             }
             
             .sidebar {
                 order: 2;
-                max-height: none;
+                height: 200px;
             }
             
             .chat-panel {
                 order: 1;
-                height: 70vh;
+                height: calc(100vh - 280px);
+            }
+            
+            .header {
+                padding: 0.5rem 1rem;
             }
         }
     </style>
@@ -548,7 +544,7 @@
             <div class="expert-profile">
                 <div class="expert-avatar">GC</div>
                 <h3>Grant Card Expert</h3>
-                <p>Technical Writer with 8+ years in Grant Card development. Ready to help with any grant formatting task.</p>
+                <p>Ready to help with grant formatting and analysis tasks.</p>
             </div>
 
             <div class="quick-actions">
@@ -582,7 +578,7 @@
             <div class="grant-types">
                 <h4>Grant Types</h4>
                 <div class="grant-type">Hiring Grants</div>
-                <div class="grant-type">Market Expansion/Capital Costs</div>
+                <div class="grant-type">Market Expansion</div>
                 <div class="grant-type">Training Grants</div>
                 <div class="grant-type">R&D Grants</div>
                 <div class="grant-type">Loan Grants</div>
@@ -600,27 +596,7 @@
             <div class="messages" id="messages">
                 <div class="message assistant">
                     <div class="message-content">
-                        <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 1rem; color: #008abf;">
-                            👋 Hello! I'm your Grant Card Expert
-                        </div>
-                        
-                        <div style="margin-bottom: 1.5rem; line-height: 1.6;">
-                            I'm a Technical Writer with 8+ years specializing in Grant Card development for Granted Consulting. I can help you with any grant-related task - just start a conversation!
-                        </div>
-                        
-                        <div class="welcome-expert">
-                            <div style="font-weight: 600; margin-bottom: 0.75rem; color: #008abf;">I can help you with:</div>
-                            <div style="font-size: 0.9rem; color: #6d7881; line-height: 1.5;">
-                                • <strong>Grant Card Creation:</strong> Transform raw documents into professional Grant Cards<br>
-                                • <strong>Document Analysis:</strong> Extract key information and identify missing details<br>
-                                • <strong>Expert Guidance:</strong> Strategic insights and formatting recommendations<br>
-                                • <strong>Quality Assurance:</strong> Ensure compliance with Granted's standards
-                            </div>
-                        </div>
-
-                        <div style="font-size: 0.875rem; color: #6d7881; text-align: center; padding-top: 1rem; border-top: 1px solid #dde1e3;">
-                            <strong>Ready to start:</strong> Upload a document, paste grant information, or ask me anything about grant cards →
-                        </div>
+                        <strong>👋 Grant Card Expert ready!</strong> Upload a document, select a task above, or just start typing.
                     </div>
                 </div>
             </div>
@@ -639,7 +615,7 @@
                     <textarea 
                         id="message-input" 
                         class="message-input" 
-                        placeholder="Upload a document, paste grant information, or ask me anything about grant cards..."
+                        placeholder="Upload a document, select a task, or ask me anything..."
                     ></textarea>
                     <button id="send-button" class="send-button">Send</button>
                 </div>
@@ -663,31 +639,25 @@
         const fileInput = document.getElementById('file-input');
         const fileInfo = document.getElementById('file-info');
 
-        // Quick action buttons (optional task selection)
+        // Quick action buttons
         actionButtons.forEach(button => {
             button.addEventListener('click', () => {
-                // Remove active class from all buttons
                 actionButtons.forEach(b => b.classList.remove('active'));
-                
-                // Add active class to clicked button
                 button.classList.add('active');
                 
-                // Set selected task
                 selectedTask = button.dataset.task;
                 const taskName = button.querySelector('span:last-child').textContent;
                 
-                // Add message and focus input
                 addMessage('user', `I'd like help with: ${taskName}`);
                 messageInput.focus();
                 
-                // Auto-send if we have content
                 if (messageInput.value.trim() || uploadedFile) {
                     sendMessage();
                 }
             });
         });
 
-        // Enhanced file upload with better UX
+        // File upload
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
@@ -697,19 +667,15 @@
                 const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
                 
                 fileInfo.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 8px; font-size: 0.875rem; margin-top: 0.75rem;">
-                        <span style="color: #059669; font-size: 1rem;">✓</span>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; font-size: 0.75rem; margin-top: 0.5rem;">
+                        <span style="color: #059669;">✓</span>
                         <span style="color: #065f46; font-weight: 500;">${file.name}</span>
-                        <span style="color: #047857; font-size: 0.75rem;">(${fileSizeUnit})</span>
+                        <span style="color: #047857; font-size: 0.7rem;">(${fileSizeUnit})</span>
                     </div>
                 `;
                 
-                // Update upload button
                 const uploadButton = document.querySelector('.upload-button');
-                uploadButton.innerHTML = `
-                    <span style="color: #059669;">✓</span>
-                    <span>Document Ready: ${file.name}</span>
-                `;
+                uploadButton.innerHTML = `<span style="color: #059669;">✓</span><span>Ready: ${file.name}</span>`;
                 uploadButton.style.borderColor = '#10b981';
                 uploadButton.style.background = 'rgba(16, 185, 129, 0.1)';
                 
@@ -718,7 +684,7 @@
             }
         });
 
-        // Send message functionality
+        // Send message
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
@@ -732,12 +698,10 @@
             if (!message && !uploadedFile) return;
             if (isLoading) return;
 
-            // Add user message
             if (message) {
                 addMessage('user', message);
             }
 
-            // Show loading
             isLoading = true;
             sendButton.disabled = true;
             addLoadingMessage();
@@ -745,7 +709,7 @@
             try {
                 const formData = new FormData();
                 formData.append('message', message);
-                formData.append('task', selectedTask || 'grant-criteria'); // Default to grant-criteria
+                formData.append('task', selectedTask || 'grant-criteria');
                 formData.append('conversationId', 'expert-conversation');
                 
                 if (uploadedFile) {
@@ -771,12 +735,10 @@
                 addMessage('assistant', `I apologize, but I'm having trouble connecting right now. Please try again.\n\nError: ${error.message}`);
             }
 
-            // Clean up
             isLoading = false;
             sendButton.disabled = false;
             messageInput.value = '';
             
-            // Reset file upload
             if (uploadedFile) {
                 uploadedFile = null;
                 fileInfo.innerHTML = '';
@@ -787,7 +749,6 @@
                 uploadButton.style.background = 'rgba(0, 138, 191, 0.05)';
             }
             
-            // Clear task selection
             actionButtons.forEach(b => b.classList.remove('active'));
             selectedTask = '';
         }
@@ -800,7 +761,6 @@
             contentDiv.className = 'message-content';
             contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             
-            // Add export button for grant cards
             if (role === 'assistant' && content.includes('# GRANT CARD:')) {
                 const exportButton = document.createElement('button');
                 exportButton.className = 'export-button';
@@ -821,7 +781,7 @@
             
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'loading';
-            loadingDiv.innerHTML = '<div class="spinner"></div><span>Analyzing and processing your request...</span>';
+            loadingDiv.innerHTML = '<div class="spinner"></div><span>Processing...</span>';
             
             messageDiv.appendChild(loadingDiv);
             messagesContainer.appendChild(messageDiv);
