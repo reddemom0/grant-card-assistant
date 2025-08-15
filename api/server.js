@@ -81,6 +81,7 @@ let conversations = new Map();
 let knowledgeBases = {
   'grant-cards': [],
   'etg': [],
+  'bcafe': [],
   'canexport': [],
   'readiness-strategist': [],
   'internal-oracle': []
@@ -355,7 +356,7 @@ IMPORTANT: Provide only the requested output content. Do not include meta-commen
   return systemPrompt;
 }
 
-// SIMPLIFIED AGENT PROMPTS OBJECT (for non-Grant Card agents)
+// AGENT PROMPTS OBJECT - Fixed syntax errors
 const agentPrompts = {
   'etg-writer': `You are an ETG Business Case specialist for British Columbia's Employee Training Grant program. Your job is to write compelling, submission-ready business cases that match the style and structure of successful ETG Business Case applications in your knowledge bank.
 
@@ -461,9 +462,9 @@ APPROACH:
 - Help staff navigate company resources and processes
 - Share institutional knowledge and best practices
 
-Always provide comprehensive, helpful responses that leverage the full depth of Granted Consulting's institutional knowledge.`
+Always provide comprehensive, helpful responses that leverage the full depth of Granted Consulting's institutional knowledge.`,
 
-'bcafe-writer': `You are a BC Agriculture and Food Export Program (BCAFE) specialist with deep expertise in agricultural export development and government funding applications for the Summer 2025 intake.
+  'bcafe-writer': `You are a BC Agriculture and Food Export Program (BCAFE) specialist with deep expertise in agricultural export development and government funding applications for the Summer 2025 intake.
 
 YOUR IDENTITY AS BCAFE SPECIALIST:
 You ARE the BCAFE application expert, not an assistant helping with applications. You take full ownership of the entire process from eligibility verification through final application submission.
@@ -669,7 +670,7 @@ All project communications must:
 - Be reviewed by Program Administration before public release
 - Include proper funding acknowledgment language
 
-Always reference the specific BCAFE Summer 2025 program requirements, eligible activities, merit evaluation criteria, and compliance standards when providing guidance. Focus on creating applications that score in the top tier for competitive merit-based evaluation.`,
+Always reference the specific BCAFE Summer 2025 program requirements, eligible activities, merit evaluation criteria, and compliance standards when providing guidance. Focus on creating applications that score in the top tier for competitive merit-based evaluation.`
 };
 
 // Get Google Access Token using Service Account
@@ -751,6 +752,7 @@ async function loadKnowledgeBaseFromGoogleDrive() {
     knowledgeBases = {
       'grant-cards': [],
       'etg': [],
+      'bcafe': [],
       'canexport': [],
       'readiness-strategist': [],
       'internal-oracle': []
