@@ -1,4 +1,4 @@
-// api/server.js - Complete serverless function with Google Service Account integration and Streamlined BCAFE Agent
+// api/server.js - Complete serverless function with Enhanced Context Management
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
@@ -12,6 +12,22 @@ const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
 
 // Simple session store (in production, use Redis or database)
 const activeSessions = new Map();
+
+// Optimized conversation limits
+const CONVERSATION_LIMITS = {
+  'grant-cards': 20,        // Task-based workflows (keep current)
+  'etg-writer': 20,         // Business case development (keep current)  
+  'bcafe-writer': 60        // Complex multi-day applications (6x increase)
+};
+
+// Context monitoring thresholds
+const CONTEXT_WARNING_THRESHOLD = 150000;  // 75% of 200K limit
+const CONTEXT_HARD_LIMIT = 180000;         // 90% of 200K limit (emergency brake)
+const CONTEXT_ABSOLUTE_LIMIT = 200000;     // Claude's actual limit
+
+// Token estimation constants
+const TOKENS_PER_EXCHANGE = 950;           // Average user + assistant pair
+const TOKENS_PER_CHAR = 0.25;             // Rough token-to-character ratio
 
 // Generate secure session token
 function generateSessionToken() {
@@ -64,6 +80,72 @@ function requireAuth(req, res, next) {
       'Location': `/login.html?returnTo=${returnTo}`
     });
     res.end();
+  }
+}
+
+// Estimate total context size for a request
+function estimateContextSize(conversation, knowledgeContext, systemPrompt, currentMessage = '') {
+  const convTokens = conversation.length * (TOKENS_PER_EXCHANGE / 2); // Only count existing messages
+  const kbTokens = knowledgeContext.length * TOKENS_PER_CHAR;
+  const sysTokens = systemPrompt.length * TOKENS_PER_CHAR;
+  const msgTokens = currentMessage.length * TOKENS_PER_CHAR;
+  const responseBuffer = 4000; // Reserve space for Claude's response
+  
+  return Math.ceil(convTokens + kbTokens + sysTokens + msgTokens + responseBuffer);
+}
+
+// Get agent type from endpoint or conversation ID
+function getAgentType(url, conversationId) {
+  if (url.includes('/api/process-grant')) return 'grant-cards';
+  if (url.includes('/api/process-etg')) return 'etg-writer';
+  if (url.includes('/api/process-bcafe')) return 'bcafe-writer';
+  
+  // Fallback: extract from conversation ID
+  if (conversationId.includes('etg')) return 'etg-writer';
+  if (conversationId.includes('bcafe')) return 'bcafe-writer';
+  return 'grant-cards';
+}
+
+// Smart conversation pruning with context awareness
+function pruneConversation(conversation, agentType, estimatedContextSize) {
+  const limit = CONVERSATION_LIMITS[agentType] || 20;
+  
+  // Standard pruning if over limit
+  if (conversation.length > limit * 2) { // *2 because each exchange = 2 messages
+    const messagesToKeep = limit * 2;
+    const removed = conversation.length - messagesToKeep;
+    conversation.splice(0, removed);
+    console.log(`🔄 Standard pruning: Removed ${removed} messages, keeping last ${messagesToKeep}`);
+  }
+  
+  // Emergency pruning if context too large
+  if (estimatedContextSize > CONTEXT_HARD_LIMIT && conversation.length > 20) {
+    const emergencyLimit = Math.max(20, Math.floor((CONTEXT_HARD_LIMIT - 50000) / (TOKENS_PER_EXCHANGE / 2)));
+    if (conversation.length > emergencyLimit) {
+      const removed = conversation.length - emergencyLimit;
+      conversation.splice(0, removed);
+      console.log(`🚨 Emergency pruning: Context too large, removed ${removed} messages`);
+    }
+  }
+  
+  return conversation.length;
+}
+
+// Context monitoring and logging
+function logContextUsage(agentType, estimatedTokens, conversationLength) {
+  const utilization = (estimatedTokens / CONTEXT_ABSOLUTE_LIMIT * 100).toFixed(1);
+  const exchangeCount = Math.floor(conversationLength / 2);
+  
+  console.log(`📊 Context Usage - ${agentType.toUpperCase()}:`);
+  console.log(`   Estimated tokens: ${estimatedTokens.toLocaleString()} (${utilization}%)`);
+  console.log(`   Conversation: ${exchangeCount} exchanges (limit: ${CONVERSATION_LIMITS[agentType]})`);
+  
+  if (estimatedTokens > CONTEXT_WARNING_THRESHOLD) {
+    console.log(`⚠️  High context usage warning!`);
+  }
+  
+  if (estimatedTokens > CONTEXT_HARD_LIMIT) {
+    console.log(`🚨 Context approaching limit - emergency measures may activate`);
   }
 }
 
@@ -1115,9 +1197,13 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Health check endpoint
+    // Enhanced health check endpoint with context monitoring
     if (url === '/api/health') {
       const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
+      const totalConversations = conversations.size;
+      const activeExchanges = Array.from(conversations.values())
+        .reduce((sum, conv) => sum + Math.floor(conv.length / 2), 0);
+      
       res.json({ 
         status: 'healthy',
         knowledgeBaseSize: totalDocs,
@@ -1128,7 +1214,41 @@ module.exports = async function handler(req, res) {
         callsLastMinute: callTimestamps.length,
         rateLimitDelay: RATE_LIMIT_DELAY,
         authenticationEnabled: !!TEAM_PASSWORD,
-        activeSessions: activeSessions.size
+        activeSessions: activeSessions.size,
+        // New context monitoring info
+        contextManagement: {
+          conversationLimits: CONVERSATION_LIMITS,
+          totalConversations: totalConversations,
+          totalActiveExchanges: activeExchanges,
+          warningThreshold: CONTEXT_WARNING_THRESHOLD,
+          hardLimit: CONTEXT_HARD_LIMIT
+        }
+      });
+      return;
+    }
+
+    // Context status endpoint
+    if (url === '/api/context-status' && method === 'GET') {
+      const conversationId = req.query?.conversationId || 'default';
+      const agentType = req.query?.agentType || 'grant-cards';
+      
+      const conversation = conversations.get(conversationId) || [];
+      const exchangeCount = Math.floor(conversation.length / 2);
+      const limit = CONVERSATION_LIMITS[agentType];
+      
+      // Rough estimate without full context
+      const estimatedTokens = conversation.length * (TOKENS_PER_EXCHANGE / 2) + 30000; // +30K for system + KB
+      const utilization = (estimatedTokens / CONTEXT_ABSOLUTE_LIMIT * 100).toFixed(1);
+      
+      res.json({
+        agentType,
+        conversationId,
+        exchanges: exchangeCount,
+        exchangeLimit: limit,
+        utilizationPercent: utilization,
+        estimatedTokens: estimatedTokens,
+        status: estimatedTokens > CONTEXT_WARNING_THRESHOLD ? 'warning' : 'good',
+        remainingCapacity: CONTEXT_ABSOLUTE_LIMIT - estimatedTokens
       });
       return;
     }
@@ -1157,7 +1277,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Process grant document (for Grant Card Assistant)
+    // Process grant document (for Grant Card Assistant) - ENHANCED WITH CONTEXT MANAGEMENT
     if (url === '/api/process-grant' && method === 'POST') {
       // Handle file upload with multer
       await new Promise((resolve, reject) => {
@@ -1216,6 +1336,16 @@ Always follow the exact workflows and instructions from the knowledge base docum
       if (fileContent) {
         userMessage += `\n\nUploaded document content:\n${fileContent}`;
       }
+
+      // ENHANCED CONTEXT MANAGEMENT
+      const agentType = getAgentType(url, conversationId);
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+
+      // Log context usage
+      logContextUsage(agentType, estimatedContext, conversation.length);
+
+      // Smart conversation pruning
+      pruneConversation(conversation, agentType, estimatedContext);
       
       conversation.push({ role: 'user', content: userMessage });
       
@@ -1225,11 +1355,6 @@ Always follow the exact workflows and instructions from the knowledge base docum
       // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
       
-      // Keep conversation history manageable (last 20 messages)
-      if (conversation.length > 20) {
-        conversation.splice(0, conversation.length - 20);
-      }
-      
       res.json({ 
         response: response,
         conversationId: conversationId 
@@ -1237,7 +1362,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       return;
     }
 
-    // Process ETG requests (dedicated endpoint for ETG Writer)
+    // Process ETG requests (dedicated endpoint for ETG Writer) - ENHANCED WITH CONTEXT MANAGEMENT
     if (url === '/api/process-etg' && method === 'POST') {
       await new Promise((resolve, reject) => {
         upload.single('file')(req, res, (err) => {
@@ -1302,6 +1427,13 @@ Use the ETG knowledge base above to find similar successful applications and mat
       if (urlContent) {
         userMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
       }
+
+      // ENHANCED CONTEXT MANAGEMENT FOR ETG
+      const agentType = 'etg-writer';
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+
+      logContextUsage(agentType, estimatedContext, conversation.length);
+      pruneConversation(conversation, agentType, estimatedContext);
       
       conversation.push({ role: 'user', content: userMessage });
       
@@ -1312,11 +1444,6 @@ Use the ETG knowledge base above to find similar successful applications and mat
       // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
       
-      // Keep ETG conversation history manageable (last 15 messages for more context)
-      if (conversation.length > 15) {
-        conversation.splice(0, conversation.length - 15);
-      }
-      
       console.log(`✅ ETG response generated successfully`);
       
       res.json({ 
@@ -1326,7 +1453,7 @@ Use the ETG knowledge base above to find similar successful applications and mat
       return;
     }
 
-    // STREAMLINED BCAFE ENDPOINT - Uses intelligent document selection
+    // STREAMLINED BCAFE ENDPOINT - ENHANCED WITH CONTEXT MANAGEMENT
     if (url === '/api/process-bcafe' && method === 'POST') {
       await new Promise((resolve, reject) => {
         upload.single('file')(req, res, (err) => {
@@ -1395,6 +1522,13 @@ Use the knowledge base documents above for all detailed processes, requirements,
       if (fileContent) {
         userMessage += `\n\nUploaded Business Document Analysis:\n${fileContent}`;
       }
+
+      // ENHANCED CONTEXT MANAGEMENT FOR BCAFE (60 exchanges)
+      const agentType = 'bcafe-writer';
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+
+      logContextUsage(agentType, estimatedContext, conversation.length);
+      pruneConversation(conversation, agentType, estimatedContext);
       
       conversation.push({ role: 'user', content: userMessage });
       
@@ -1404,11 +1538,6 @@ Use the knowledge base documents above for all detailed processes, requirements,
       
       // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
-      
-      // Keep BCAFE conversation history shorter (last 10 messages instead of 15)
-      if (conversation.length > 10) {
-        conversation.splice(0, conversation.length - 10);
-      }
       
       console.log(`✅ BCAFE response generated successfully`);
       
