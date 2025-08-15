@@ -1431,6 +1431,100 @@ Use the ETG knowledge base above to find similar successful applications and mat
       return;
     }
 
+    // Process BCAFE requests (dedicated endpoint for BC Agriculture Export Program)
+    if (url === '/api/process-bcafe' && method === 'POST') {
+      await new Promise((resolve, reject) => {
+        upload.single('file')(req, res, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      const { message, conversationId, orgType, selectedMarkets } = req.body;
+      let fileContent = '';
+      
+      console.log(`🌾 Processing BCAFE request for conversation: ${conversationId}`);
+      console.log(`📊 Organization type: ${orgType}, Target markets: ${selectedMarkets}`);
+      
+      // Process uploaded file if present
+      if (req.file) {
+        console.log(`📄 Processing BCAFE document: ${req.file.originalname}`);
+        fileContent = await processFileContent(req.file);
+      }
+      
+      // Get or create BCAFE conversation
+      const bcafeConversationId = `bcafe-${conversationId}`;
+      if (!conversations.has(bcafeConversationId)) {
+        conversations.set(bcafeConversationId, []);
+      }
+      const conversation = conversations.get(bcafeConversationId);
+      
+      // Search knowledge base for BCAFE-specific information
+      const relevantKnowledge = searchKnowledgeBase('bcafe agriculture export program application', 'bcafe');
+      let knowledgeContext = '';
+      
+      if (relevantKnowledge.length > 0) {
+        knowledgeContext = relevantKnowledge
+          .slice(0, 5) // Top 5 most relevant documents for BCAFE
+          .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+          .join('\n\n');
+          
+        console.log(`📚 Using ${relevantKnowledge.length} BCAFE knowledge base documents`);
+      }
+      
+      // Build BCAFE system prompt with knowledge context
+      const systemPrompt = `${agentPrompts['bcafe-writer']}
+
+BCAFE KNOWLEDGE BASE CONTEXT:
+${knowledgeContext}
+
+CURRENT SESSION CONTEXT:
+- Organization Type: ${orgType || 'Not specified'}
+- Selected Target Markets: ${selectedMarkets || 'Not specified'}
+- Application Deadline: September 5, 2025 (4:00 PM PDT)
+- Project Period: November 17, 2025 - March 1, 2026
+
+Use the BCAFE knowledge base above to ensure complete compliance with Summer 2025 program requirements and optimize for merit-based evaluation criteria.`;
+      
+      // Build comprehensive user message
+      let userMessage = message || "Hello, I need help with a BCAFE application.";
+      
+      // Add context information
+      if (orgType) {
+        userMessage += `\n\nOrganization Type: ${orgType}`;
+      }
+      
+      if (selectedMarkets) {
+        userMessage += `\n\nTarget Export Markets: ${selectedMarkets}`;
+      }
+      
+      if (fileContent) {
+        userMessage += `\n\nUploaded Business Document Analysis:\n${fileContent}`;
+      }
+      
+      conversation.push({ role: 'user', content: userMessage });
+      
+      // Get response from Claude using BCAFE specialist prompt
+      console.log(`🤖 Calling Claude API for BCAFE specialist response`);
+      const response = await callClaudeAPI(conversation, systemPrompt);
+      
+      // Add assistant response to conversation
+      conversation.push({ role: 'assistant', content: response });
+      
+      // Keep BCAFE conversation history manageable (last 15 messages for context)
+      if (conversation.length > 15) {
+        conversation.splice(0, conversation.length - 15);
+      }
+      
+      console.log(`✅ BCAFE response generated successfully`);
+      
+      res.json({ 
+        response: response,
+        conversationId: bcafeConversationId 
+      });
+      return;
+    }
+    
     // Get conversation history
     if (url.startsWith('/api/conversation/') && method === 'GET') {
       const conversationId = url.split('/api/conversation/')[1];
