@@ -834,7 +834,7 @@
                                     <button class="market-btn" data-market="usa">🇺🇸 USA</button>
                                     <button class="market-btn" data-market="asia">🇯🇵 Asia</button>
                                     <button class="market-btn" data-market="europe">🇪🇺 Europe</button>
-                                    <button class="market-btn" data-market="other">🌐 Other</button>
+                                    <button class="market-btn" data-market="other">🌍 Other</button>
                                 </div>
                                 <div class="diversification-bonus">💡 Multiple markets = bonus merit points!</div>
                             </div>
@@ -1049,7 +1049,7 @@
                 const data = await response.json();
                 
                 removeLoadingMessage();
-                addMessage('assistant', data.response, true);
+                addMessage('assistant', data.response, true); // Enable typing animation
 
             } catch (error) {
                 removeLoadingMessage();
@@ -1078,19 +1078,134 @@
             
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             
-            if (role === 'assistant' && content.includes('BCAFE APPLICATION')) {
-                const exportButton = document.createElement('button');
-                exportButton.className = 'export-button';
-                exportButton.innerHTML = '💾 Export BCAFE Application';
-                exportButton.onclick = () => exportApplication(content);
-                contentDiv.appendChild(exportButton);
+            if (role === 'assistant' && shouldAnimate) {
+                // Add typing animation for assistant responses
+                contentDiv.innerHTML = '';
+                messageDiv.appendChild(contentDiv);
+                messagesContainer.appendChild(messageDiv);
+                
+                // Start typing animation
+                typewriterEffect(contentDiv, content, () => {
+                    // Add export button after typing is complete
+                    if (content.includes('BCAFE APPLICATION') || content.includes('**Application Questions**') || content.includes('# BCAFE Application')) {
+                        const exportButton = document.createElement('button');
+                        exportButton.className = 'export-button';
+                        exportButton.innerHTML = '💾 Export BCAFE Application';
+                        exportButton.onclick = () => exportApplication(content);
+                        contentDiv.appendChild(exportButton);
+                    }
+                });
+            } else {
+                // Instant display for user messages
+                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                
+                if (role === 'assistant' && (content.includes('BCAFE APPLICATION') || content.includes('**Application Questions**') || content.includes('# BCAFE Application'))) {
+                    const exportButton = document.createElement('button');
+                    exportButton.className = 'export-button';
+                    exportButton.innerHTML = '💾 Export BCAFE Application';
+                    exportButton.onclick = () => exportApplication(content);
+                    contentDiv.appendChild(exportButton);
+                }
+                
+                messageDiv.appendChild(contentDiv);
+                messagesContainer.appendChild(messageDiv);
             }
             
-            messageDiv.appendChild(contentDiv);
-            messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function typewriterEffect(element, content, onComplete) {
+            const formattedContent = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = formattedContent;
+            
+            let currentIndex = 0;
+            const textNodes = [];
+            
+            // Extract all text content while preserving HTML structure
+            function extractTextNodes(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    textNodes.push({
+                        node: node,
+                        text: node.textContent,
+                        parent: node.parentNode
+                    });
+                } else {
+                    for (let child of node.childNodes) {
+                        extractTextNodes(child);
+                    }
+                }
+            }
+            
+            // Clone the structure but empty the text
+            const clonedContent = tempDiv.cloneNode(true);
+            function clearTextContent(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    node.textContent = '';
+                } else {
+                    for (let child of node.childNodes) {
+                        clearTextContent(child);
+                    }
+                }
+            }
+            
+            clearTextContent(clonedContent);
+            element.appendChild(clonedContent);
+            
+            // Extract text nodes from original
+            extractTextNodes(tempDiv);
+            
+            // Find corresponding nodes in cloned structure
+            const targetNodes = [];
+            function findTargetNodes(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    targetNodes.push(node);
+                } else {
+                    for (let child of node.childNodes) {
+                        findTargetNodes(child);
+                    }
+                }
+            }
+            findTargetNodes(clonedContent);
+            
+            let currentNodeIndex = 0;
+            let currentCharIndex = 0;
+            
+            function typeNextChar() {
+                if (currentNodeIndex >= textNodes.length) {
+                    if (onComplete) onComplete();
+                    return;
+                }
+                
+                const currentTextNode = textNodes[currentNodeIndex];
+                const targetNode = targetNodes[currentNodeIndex];
+                
+                if (currentCharIndex < currentTextNode.text.length) {
+                    targetNode.textContent = currentTextNode.text.substring(0, currentCharIndex + 1);
+                    currentCharIndex++;
+                    
+                    // Auto-scroll as content appears
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    
+                    // Vary typing speed for more natural feel
+                    const char = currentTextNode.text[currentCharIndex - 1];
+                    let delay = 15; // Base typing speed
+                    
+                    if (char === '.' || char === '!' || char === '?') delay = 100; // Pause at sentence ends
+                    else if (char === ',' || char === ';') delay = 50; // Pause at commas
+                    else if (char === ' ') delay = 25; // Slight pause at spaces
+                    else if (char === '\n') delay = 75; // Pause at line breaks
+                    
+                    setTimeout(typeNextChar, delay);
+                } else {
+                    currentNodeIndex++;
+                    currentCharIndex = 0;
+                    setTimeout(typeNextChar, 25);
+                }
+            }
+            
+            typeNextChar();
         }
 
         function addLoadingMessage() {
