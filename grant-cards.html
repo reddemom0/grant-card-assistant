@@ -646,7 +646,7 @@
         const fileInput = document.getElementById('file-input');
         const fileInfo = document.getElementById('file-info');
 
-        // Quick action buttons - FIXED VERSION
+        // FIXED: Quick action buttons - only set input and auto-send
         actionButtons.forEach(button => {
             button.addEventListener('click', () => {
                 actionButtons.forEach(b => b.classList.remove('active'));
@@ -655,13 +655,10 @@
                 selectedTask = button.dataset.task;
                 const taskName = button.querySelector('span:last-child').textContent;
                 
-                // Add the user message to the chat
-                addMessage('user', `I'd like help with: ${taskName}`);
-                
                 // Set the message in the input field
                 messageInput.value = `I'd like help with: ${taskName}`;
                 
-                // Automatically send the message
+                // Automatically send the message (this will handle adding the message)
                 setTimeout(() => {
                     sendMessage();
                 }, 100);
