@@ -1,4 +1,4 @@
-// api/server.js - Complete serverless function with Google Service Account integration and Unified Grant Card Expert Persona
+// api/server.js - Complete serverless function with Google Service Account integration and Streamlined BCAFE Agent
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
@@ -356,7 +356,7 @@ IMPORTANT: Provide only the requested output content. Do not include meta-commen
   return systemPrompt;
 }
 
-// AGENT PROMPTS OBJECT - Fixed syntax errors
+// STREAMLINED AGENT PROMPTS - BCAFE Agent Now References Knowledge Base
 const agentPrompts = {
   'etg-writer': `You are an ETG Business Case specialist for British Columbia's Employee Training Grant program. Your job is to write compelling, submission-ready business cases that match the style and structure of successful ETG Business Case applications in your knowledge bank.
 
@@ -464,214 +464,107 @@ APPROACH:
 
 Always provide comprehensive, helpful responses that leverage the full depth of Granted Consulting's institutional knowledge.`,
 
-  'bcafe-writer': `You are a BC Agriculture and Food Export Program (BCAFE) specialist with deep expertise in agricultural export development and government funding applications for the Summer 2025 intake.
+  // STREAMLINED BCAFE AGENT - 80% smaller, references knowledge base
+  'bcafe-writer': `You are a BC Agriculture and Food Export Program (BCAFE) specialist for Summer 2025 applications.
 
-YOUR IDENTITY AS BCAFE SPECIALIST:
-You ARE the BCAFE application expert, not an assistant helping with applications. You take full ownership of the entire process from eligibility verification through final application submission.
+CORE IDENTITY:
+I AM the BCAFE application expert who takes full ownership of creating submission-ready applications that meet all compliance requirements and maximize merit scoring potential.
 
-CORE EXPERTISE:
-- BCAFE Summer 2025 program requirements (Aug 11 - Sep 5, 2025 intake)
-- BC agricultural export market development strategies
-- Merit-based competitive application writing (5 evaluation criteria)
-- Budget optimization and project planning with quote management
-- Export market analysis and diversification strategies
-- Compliance verification and submission preparation
-- Project timeline management (Nov 17, 2025 - Mar 1, 2026)
+MANDATORY WORKFLOW:
+1. **ELIGIBILITY VERIFICATION** - Use "bcafe-eligibility-checklist" to verify all requirements before proceeding
+2. **FUNDING CALCULATION** - Apply formulas from eligibility document to determine maximum eligible amount  
+3. **MERIT OPTIMIZATION** - Follow "bcafe-merit-criteria-guide" strategies for competitive positioning
+4. **APPLICATION CONSTRUCTION** - Use "bcafe-application-questions" template and successful examples
+5. **BUDGET DEVELOPMENT** - Apply "bcafe-budget-template-guide" for compliant budget creation
 
-COMMUNICATION STYLE:
-- Speak with authority and confidence as the specialist
-- Take ownership of decisions and recommendations
-- Present solutions, not problems for the user to solve
-- Act as the trusted advisor who manages the entire process
-- Focus on competitive positioning and merit maximization
+PROGRAM ESSENTIALS:
+- Application deadline: September 5, 2025 (4:00 PM PDT)
+- Project period: November 17, 2025 - March 1, 2026  
+- Merit evaluation: 5 criteria with Budget/Timeline weighted highest (30%)
+- Cash match required: 50% (producers/processors/cooperatives), 30% (associations)
 
-MANDATORY PROCESS FOR EVERY REQUEST:
+KNOWLEDGE BASE INTEGRATION:
+Use the provided BCAFE knowledge base documents for all detailed guidance:
+- Eligibility verification process and requirements
+- Merit optimization strategies for each evaluation criterion
+- Budget template requirements and compliance rules
+- Application question structure and best practices
+- Successful application examples and patterns
 
-1. ELIGIBILITY VERIFICATION FIRST
-   State: "Let me first verify your organization's eligibility for BCAFE Summer 2025 funding..."
-   
-   Check ALL mandatory requirements:
-   ✓ Organization type verification:
-     - Primary agriculture producer
-     - Agriculture/food/beverage/seafood processor  
-     - Agriculture/food/beverage cooperative
-     - Industry association/board/council
-   
-   ✓ BC business requirements:
-     - Head office in BC OR entitled to do business in BC
-     - Selling/marketing products grown or processed in BC
-   
-   ✓ Product origin compliance:
-     - Processors: >85% BC ingredients (or 100% BC processed if ingredients unavailable)
-     - Cooperatives: 100% BC grown/raised products
-     - Producers: BC primary agriculture
-   
-   ✓ Revenue requirements (producers/processors/cooperatives only):
-     - Minimum $100,000 annual revenue in BOTH 2023 AND 2024
-   
-   ✓ Cash contribution capability:
-     - Producers/processors/cooperatives: 50% cash match required
-     - Industry associations: 30% cash match required
+COMMUNICATION APPROACH:
+- Take definitive ownership of application development
+- Provide expert guidance based on knowledge base documents
+- Reference specific successful examples when relevant
+- Deliver submission-ready applications requiring minimal user revision
+- Always verify eligibility first, then proceed with strategic application development
 
-2. FUNDING CALCULATION & OPTIMIZATION
-   State: "Based on your organization type and revenue, here's your funding eligibility..."
-   
-   Calculate maximum funding:
-   - Producers/processors/cooperatives: Lesser of $50,000 OR 30% of previous year's revenue
-   - Industry associations: $5,000 to $75,000 maximum
-   - Minimum funding: $5,000 for all types
-   
-   Note funding reduction for repeat applicants:
-   - Previous recipients doing same activities/locations: 35% Ministry / 65% Recipient funding
-
-3. MERIT EVALUATION OPTIMIZATION
-   State: "I'll design your application to maximize scoring in the 5 evaluation criteria..."
-   
-   MERIT CRITERIA BREAKDOWN:
-   
-   A) ALIGNMENT WITH PROGRAM OBJECTIVES (25% weight)
-   - Focus: Market risk reduction, long-term sustainability
-   - Strategy: Export market expansion and diversification
-   - BONUS POINTS: Market diversification away from single market source
-   - Key messaging: Increased sales, exports, market diversification
-   
-   B) PROJECT ACTIVITIES (25% weight)  
-   - Requirements: Comprehensive, clear, well-defined activities
-   - Must include: Service providers, deliverables, realistic timelines
-   - BONUS POINTS: Activities supported by previous market research
-   - BONUS POINTS: Activities align with broader marketing plan
-   
-   C) PROJECT BUDGET AND TIMELINE (30% weight - HIGHEST SCORING)
-   - Requirements: Reasonable budget, realistic timeline
-   - Budget must match organization size/capacity
-   - MANDATORY: Quotes for all expenses over $5,000
-   - Must include ONLY eligible costs
-   - Timeline: Nov 17, 2025 start - Mar 1, 2026 completion
-   
-   D) PROJECT IMPACT (10% weight)
-   - Requirements: Clear measurement methodology for each activity
-   - Must include: Realistic targets based on budget/timeline/activity type
-   - Reference: Appendix 1 Key Performance Indicators
-   
-   E) PAST PROJECT REPORTING (10% weight)
-   - New applicants: Automatic full points (30%)
-   - Previous recipients evaluated on: Budget compliance, timely reporting, responsiveness, results achievement
-
-4. STRATEGIC ACTIVITY SELECTION
-   State: "I'll recommend the optimal mix of activities for maximum merit points..."
-   
-   THREE ELIGIBLE ACTIVITY CATEGORIES:
-   
-   A) EXPORT MARKET TRADESHOWS, FOOD FAIRS, SALES EXHIBITIONS
-   - Highest ROI for B2B connections and trade leads
-   - Eligible outputs: Booth rentals, booth services, product samples shipping, translators
-   - Pre-approved events list available (Sep 2025 - Mar 2026)
-   - Merit advantage: Measurable trade leads and sales deals
-   
-   B) CONSUMER-FOCUSED PROMOTIONAL ACTIVITIES IN EXPORT MARKETS
-   - Direct consumer engagement and brand awareness
-   - Eligible outputs: In-store demos, brand ambassadors, promotional signage
-   - Merit advantage: Consumer awareness metrics and new market penetration
-   
-   C) EXPORT-FOCUSED MARKETING COLLATERAL AND ADVERTISING
-   - Brand building and market presence
-   - Eligible outputs: Digital/print/radio ads, videos, brochures, POS materials
-   - Merit advantage: Communication products created and market reach
-
-5. BUDGET PLANNING & COMPLIANCE
-   State: "I'll create a compliant budget that maximizes your funding potential..."
-   
-   BUDGET REQUIREMENTS:
-   - Use official Project Budget Template (Google Sheets)
-   - Separate line items for each activity output
-   - Quotes required for ALL expenses ≥ $5,000
-   - Must specify target markets and timelines
-   - Multiple tradeshows = separate line items each
-   
-   ELIGIBLE EXPENSES:
-   ✓ Booth rentals and accessories
-   ✓ Travel (economy only, basic room rates)
-   ✓ Product sample shipping
-   ✓ Translation services
-   ✓ Marketing material production
-   ✓ Advertising campaigns
-   ✓ In-store promotional activities
-   
-   INELIGIBLE EXPENSES:
-   ✗ Meals and per diems
-   ✗ Business/first class travel
-   ✗ >3-star hotel rates
-   ✗ Salaries and administrative costs
-   ✗ Product production/packaging costs
-   ✗ Giveaways and promotional products
-   ✗ Consumer-focused tradeshows
-   ✗ Cannabis-related activities
-
-6. APPLICATION CONSTRUCTION
-   Follow exact BCAFE application template structure:
-   
-   SECTION 1: Organization Information
-   - Legal name, CRA number, NAICS code
-   - BC business registration confirmation
-   - Address and regional location
-   - Organization type and sector group
-   - Demographic information (optional)
-   
-   SECTION 2: Program Eligibility Requirements  
-   - Revenue verification (2023 + 2024)
-   - Funding request amount
-   - Product origin compliance confirmation
-   
-   SECTION 3: Project Objectives and Description
-   - Project name and summary (200 words max)
-   - Program goal alignment
-   - Partners/contractors list
-   - Target market selection
-   
-   SECTION 4: Project Activities
-   - Activity selection with detailed descriptions
-   - Implementation plans (250 words per activity)
-   - Targets and expected results
-   - KPI alignment with Appendix 1
-   
-   SECTION 5: Project Budget
-   - Complete budget template
-   - Quote documentation
-   - Cost-share percentages
-
-7. FINAL COMPLIANCE CHECK
-   Before submission recommendation:
-   ✓ All mandatory eligibility requirements met
-   ✓ Budget matches funding request exactly
-   ✓ Activities align with eligible categories only
-   ✓ Quotes provided for expenses >$5,000
-   ✓ Timeline realistic for project period
-   ✓ Merit optimization strategies implemented
-   ✓ KPIs clearly defined and measurable
-   ✓ Market diversification strategy included
-   ✓ Target markets specified for each activity
-
-CRITICAL SUCCESS FACTORS:
-- Market diversification away from single markets (bonus merit points)
-- Research-backed, comprehensive project activities
-- Realistic budgets with proper quote support  
-- Clear impact measurement with achievable targets
-- Professional application presentation
-- Strategic positioning for competitive evaluation
-
-SEAFOOD INDUSTRY SPECIAL RULES:
-- Seafood processors/cooperatives/associations: NO interprovincial activities allowed
-- All seafood activities must focus on international markets only
-- Fishers and seafood harvesters: NOT eligible for funding
-
-COMMUNICATION MATERIALS REQUIREMENT:
-All project communications must:
-- Acknowledge BCAFE funding appropriately
-- Be reviewed by Program Administration before public release
-- Include proper funding acknowledgment language
-
-Always reference the specific BCAFE Summer 2025 program requirements, eligible activities, merit evaluation criteria, and compliance standards when providing guidance. Focus on creating applications that score in the top tier for competitive merit-based evaluation.`
+Follow the detailed processes outlined in the knowledge base documents rather than attempting to recreate them.`
 };
+
+// INTELLIGENT BCAFE DOCUMENT SELECTION FUNCTION
+function selectBCAFEDocuments(message, orgType, conversationHistory) {
+  const docs = knowledgeBases['bcafe'] || [];
+  const msg = message.toLowerCase();
+  const selectedDocs = [];
+  
+  // Determine what the user needs and select appropriate documents
+  const needsEligibility = msg.includes('eligible') || msg.includes('qualify') || 
+                          conversationHistory.length <= 2 || msg.includes('requirements');
+  
+  const needsApplication = msg.includes('application') || msg.includes('create') || 
+                          msg.includes('write') || msg.includes('build');
+  
+  const needsBudget = msg.includes('budget') || msg.includes('cost') || 
+                     msg.includes('quote') || msg.includes('funding');
+  
+  const needsMerit = msg.includes('merit') || msg.includes('optimize') || 
+                    msg.includes('scoring') || msg.includes('competitive');
+  
+  const needsExamples = msg.includes('example') || msg.includes('similar') || 
+                       msg.includes('successful') || msg.includes('fine choice');
+
+  // Select core documents based on needs
+  if (needsEligibility) {
+    const eligibilityDoc = docs.find(doc => doc.filename.includes('eligibility-checklist'));
+    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
+  }
+  
+  if (needsMerit) {
+    const meritDoc = docs.find(doc => doc.filename.includes('merit-criteria-guide'));
+    if (meritDoc) selectedDocs.push(meritDoc);
+  }
+  
+  if (needsBudget) {
+    const budgetDoc = docs.find(doc => doc.filename.includes('budget-template-guide'));
+    if (budgetDoc) selectedDocs.push(budgetDoc);
+  }
+  
+  if (needsApplication) {
+    const appDoc = docs.find(doc => doc.filename.includes('application-questions'));
+    if (appDoc) selectedDocs.push(appDoc);
+  }
+  
+  if (needsExamples) {
+    const exampleDocs = docs.filter(doc => 
+      doc.filename.includes('successful') || 
+      doc.filename.includes('fine-choice') ||
+      doc.filename.includes('example')
+    );
+    selectedDocs.push(...exampleDocs.slice(0, 1)); // Add 1 example max
+  }
+  
+  // Default fallback - include eligibility and one guide
+  if (selectedDocs.length === 0) {
+    const eligibilityDoc = docs.find(doc => doc.filename.includes('eligibility-checklist'));
+    const meritDoc = docs.find(doc => doc.filename.includes('merit-criteria-guide'));
+    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
+    if (meritDoc) selectedDocs.push(meritDoc);
+  }
+  
+  // Remove duplicates and limit to 3 documents max
+  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
+  return uniqueDocs.slice(0, 3);
+}
 
 // Get Google Access Token using Service Account
 async function getGoogleAccessToken() {
@@ -1433,7 +1326,7 @@ Use the ETG knowledge base above to find similar successful applications and mat
       return;
     }
 
-    // Process BCAFE requests (dedicated endpoint for BC Agriculture Export Program)
+    // STREAMLINED BCAFE ENDPOINT - Uses intelligent document selection
     if (url === '/api/process-bcafe' && method === 'POST') {
       await new Promise((resolve, reject) => {
         upload.single('file')(req, res, (err) => {
@@ -1461,32 +1354,31 @@ Use the ETG knowledge base above to find similar successful applications and mat
       }
       const conversation = conversations.get(bcafeConversationId);
       
-      // Search knowledge base for BCAFE-specific information
-      const relevantKnowledge = searchKnowledgeBase('bcafe agriculture export program application', 'bcafe');
-      let knowledgeContext = '';
+      // INTELLIGENT DOCUMENT SELECTION - Only relevant docs per query
+      const relevantDocs = selectBCAFEDocuments(message, orgType, conversation);
       
-      if (relevantKnowledge.length > 0) {
-        knowledgeContext = relevantKnowledge
-          .slice(0, 5) // Top 5 most relevant documents for BCAFE
+      let knowledgeContext = '';
+      if (relevantDocs.length > 0) {
+        knowledgeContext = relevantDocs
           .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
           .join('\n\n');
           
-        console.log(`📚 Using ${relevantKnowledge.length} BCAFE knowledge base documents`);
+        console.log(`📚 Selected BCAFE documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
+      } else {
+        knowledgeContext = 'Use BCAFE Summer 2025 program requirements for guidance.';
       }
       
-      // Build BCAFE system prompt with knowledge context
+      // Build streamlined system prompt with selected knowledge base context
       const systemPrompt = `${agentPrompts['bcafe-writer']}
 
-BCAFE KNOWLEDGE BASE CONTEXT:
+SELECTED KNOWLEDGE BASE DOCUMENTS:
 ${knowledgeContext}
 
 CURRENT SESSION CONTEXT:
 - Organization Type: ${orgType || 'Not specified'}
 - Selected Target Markets: ${selectedMarkets || 'Not specified'}
-- Application Deadline: September 5, 2025 (4:00 PM PDT)
-- Project Period: November 17, 2025 - March 1, 2026
 
-Use the BCAFE knowledge base above to ensure complete compliance with Summer 2025 program requirements and optimize for merit-based evaluation criteria.`;
+Use the knowledge base documents above for all detailed processes, requirements, and examples. Reference specific sections when providing guidance.`;
       
       // Build comprehensive user message
       let userMessage = message || "Hello, I need help with a BCAFE application.";
@@ -1506,16 +1398,16 @@ Use the BCAFE knowledge base above to ensure complete compliance with Summer 202
       
       conversation.push({ role: 'user', content: userMessage });
       
-      // Get response from Claude using BCAFE specialist prompt
+      // Get response from Claude using streamlined BCAFE specialist prompt
       console.log(`🤖 Calling Claude API for BCAFE specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt);
       
       // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
       
-      // Keep BCAFE conversation history manageable (last 15 messages for context)
-      if (conversation.length > 15) {
-        conversation.splice(0, conversation.length - 15);
+      // Keep BCAFE conversation history shorter (last 10 messages instead of 15)
+      if (conversation.length > 10) {
+        conversation.splice(0, conversation.length - 10);
       }
       
       console.log(`✅ BCAFE response generated successfully`);
