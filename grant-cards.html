@@ -27,9 +27,8 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
             background: linear-gradient(135deg, var(--granted-light) 0%, #ffffff 50%, var(--granted-light) 100%);
-            min-height: 100vh; /* Changed from height: 100vh */
+            min-height: 100vh;
             color: var(--text-primary);
-            /* Removed overflow: hidden */
         }
         
         .header {
@@ -135,7 +134,7 @@
             display: grid;
             grid-template-columns: 260px 1fr;
             gap: 1rem;
-            min-height: calc(100vh - 70px); /* Changed from height to min-height */
+            min-height: calc(100vh - 70px);
         }
         
         .sidebar {
@@ -145,11 +144,11 @@
             box-shadow: 0 4px 16px rgba(0, 138, 191, 0.08);
             padding: 1rem;
             border: 1px solid rgba(0, 138, 191, 0.1);
-            height: fit-content; /* Changed for better layout */
+            height: fit-content;
             display: flex;
             flex-direction: column;
-            position: sticky; /* Make sidebar sticky */
-            top: calc(70px + 1rem); /* Account for header height + container padding */
+            position: sticky;
+            top: calc(70px + 1rem);
         }
         
         .expert-profile {
@@ -264,7 +263,7 @@
             display: flex;
             flex-direction: column;
             border: 1px solid rgba(0, 138, 191, 0.1);
-            min-height: calc(100vh - 140px); /* Use min-height instead of height */
+            min-height: calc(100vh - 140px);
         }
         
         .chat-header {
@@ -294,7 +293,7 @@
             display: flex;
             flex-direction: column;
             gap: 1rem;
-            max-height: calc(100vh - 300px); /* Set a max height for scrolling */
+            max-height: calc(100vh - 300px);
         }
         
         .message {
@@ -501,22 +500,22 @@
                 grid-template-columns: 1fr;
                 gap: 0.75rem;
                 padding: 0.75rem;
-                min-height: calc(100vh - 60px); /* Changed from height */
+                min-height: calc(100vh - 60px);
             }
             
             .sidebar {
                 order: 2;
-                position: static; /* Remove sticky on mobile */
+                position: static;
                 height: auto;
             }
             
             .chat-panel {
                 order: 1;
-                min-height: 60vh; /* Set minimum height on mobile */
+                min-height: 60vh;
             }
             
             .messages {
-                max-height: 50vh; /* Adjust for mobile */
+                max-height: 50vh;
             }
             
             .header {
@@ -647,7 +646,7 @@
         const fileInput = document.getElementById('file-input');
         const fileInfo = document.getElementById('file-info');
 
-        // Quick action buttons
+        // Quick action buttons - FIXED VERSION
         actionButtons.forEach(button => {
             button.addEventListener('click', () => {
                 actionButtons.forEach(b => b.classList.remove('active'));
@@ -656,12 +655,16 @@
                 selectedTask = button.dataset.task;
                 const taskName = button.querySelector('span:last-child').textContent;
                 
+                // Add the user message to the chat
                 addMessage('user', `I'd like help with: ${taskName}`);
-                messageInput.focus();
                 
-                if (messageInput.value.trim() || uploadedFile) {
+                // Set the message in the input field
+                messageInput.value = `I'd like help with: ${taskName}`;
+                
+                // Automatically send the message
+                setTimeout(() => {
                     sendMessage();
-                }
+                }, 100);
             });
         });
 
