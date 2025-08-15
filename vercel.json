@@ -17,6 +17,10 @@
       "dest": "/etg-agent.html"
     },
     {
+      "src": "/bcafe-writer",
+      "dest": "/bcafe-agent.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
