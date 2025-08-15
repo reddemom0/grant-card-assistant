@@ -238,6 +238,10 @@
             --accent-color: #059669;
         }
         
+        .agent-card.bcafe-writer {
+            --accent-color: #2d5016;
+        }
+        
         .agent-card.canexport-writer {
             --accent-color: #7c3aed;
         }
@@ -508,6 +512,7 @@
         .agent-card:nth-child(3) { animation-delay: 0.2s; }
         .agent-card:nth-child(4) { animation-delay: 0.3s; }
         .agent-card:nth-child(5) { animation-delay: 0.4s; }
+        .agent-card:nth-child(6) { animation-delay: 0.5s; }
         
         @keyframes fadeInUp {
             to {
@@ -533,7 +538,7 @@
                     <span>👤 Team Member</span>
                     <span>•</span>
                     <div class="status-indicator"></div>
-                    <span>5 agents active</span>
+                    <span>3 agents active</span>
                 </div>
             </div>
         </div>
@@ -555,16 +560,16 @@
                     <div class="stat-label">Team Members Online</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">89</div>
+                    <div class="stat-number">127</div>
                     <div class="stat-label">Grants Processed This Month</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">31</div>
+                    <div class="stat-number">45</div>
                     <div class="stat-label">AI Tasks Completed This Week</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">ETG</div>
-                    <div class="stat-label">Most Used Agent</div>
+                    <div class="stat-number">BCAFE</div>
+                    <div class="stat-label">Newest Agent</div>
                 </div>
             </div>
         </div>
@@ -632,6 +637,38 @@
                         <span>→</span>
                     </button>
                     <div class="usage-stats">89 cases written</div>
+                </div>
+            </div>
+
+            <!-- BC Agriculture Export Agent -->
+            <div class="agent-card bcafe-writer" onclick="openAgent('bcafe-writer')">
+                <div class="agent-header">
+                    <div class="agent-icon">🌾</div>
+                    <div class="agent-info">
+                        <h3>BC Agriculture Export Specialist</h3>
+                        <span class="agent-status">
+                            <div class="status-indicator"></div>
+                            Active
+                        </span>
+                    </div>
+                </div>
+                <p class="agent-description">
+                    Expert BC Agriculture and Food Export Program specialist. Creates submission-ready 
+                    applications using merit-based competitive strategies and complete compliance verification.
+                </p>
+                <ul class="agent-features">
+                    <li>BCAFE eligibility verification & funding calculation</li>
+                    <li>Merit-optimized application writing (5 evaluation criteria)</li>
+                    <li>Export market development strategy</li>
+                    <li>Budget optimization with quote management</li>
+                    <li>Activity selection for competitive advantage</li>
+                </ul>
+                <div class="agent-action">
+                    <button class="agent-button">
+                        <span>Open Specialist</span>
+                        <span>→</span>
+                    </button>
+                    <div class="usage-stats">New agent</div>
                 </div>
             </div>
 
@@ -737,17 +774,17 @@
             <h2>Ready to Transform Your Workflow?</h2>
             <p>
                 Each AI agent is trained on your proprietary knowledge base and industry best practices. 
-                Start with the Grant Card Assistant and expand to other specialists as they become available.
+                Start with the Grant Card Assistant or try our newest BC Agriculture Export specialist.
             </p>
             <div class="cta-buttons">
                 <a href="#" class="cta-button primary" onclick="openAgent('grant-cards')">
                     Start with Grant Cards
                 </a>
-                <a href="#" class="cta-button" onclick="openAgent('etg-writer')">
-                    Try ETG Specialist
+                <a href="#" class="cta-button" onclick="openAgent('bcafe-writer')">
+                    Try BC Agriculture Export
                 </a>
-                <a href="#" class="cta-button" onclick="showAnalytics()">
-                    View Performance
+                <a href="#" class="cta-button" onclick="openAgent('etg-writer')">
+                    ETG Specialist
                 </a>
             </div>
         </div>
@@ -758,16 +795,16 @@
         async function checkAuth() {
             try {
                 const response = await fetch('/api/process-grant', {
-    method: 'POST',
-    headers: {
-        'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-        message: 'auth check',
-        task: 'grant-criteria',
-        conversationId: 'auth-test'
-    })
-});
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        message: 'auth check',
+                        task: 'grant-criteria',
+                        conversationId: 'auth-test'
+                    })
+                });
                 if (response.status === 401) {
                     // Not authenticated, redirect to login
                     const returnTo = encodeURIComponent(window.location.pathname);
@@ -791,6 +828,10 @@
                 },
                 'etg-writer': {
                     url: '/etg-writer',
+                    active: true
+                },
+                'bcafe-writer': {
+                    url: '/bcafe-writer',
                     active: true
                 },
                 'canexport-writer': {
