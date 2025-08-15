@@ -348,7 +348,9 @@ ${methodology}
 KNOWLEDGE BASE CONTEXT:
 ${knowledgeContext}
 
-Always follow the exact workflows and instructions from the knowledge base documents above.`;
+Always follow the exact workflows and instructions from the knowledge base documents above.
+
+IMPORTANT: Provide only the requested output content. Do not include meta-commentary about methodologies used, knowledge base references, or explanatory footnotes about your process.`;
 
   return systemPrompt;
 }
