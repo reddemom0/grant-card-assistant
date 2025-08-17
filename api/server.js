@@ -1,17 +1,15 @@
-// api/server.js - Complete serverless function with Enhanced Context Management and Intelligent Document Selection
+// api/server.js - Complete serverless function with JWT Authentication and Fixed Document Selection
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
 const path = require('path');
 const crypto = require('crypto');
 
-// Authentication configuration
+// Authentication configuration with JWT
 const TEAM_PASSWORD = process.env.TEAM_PASSWORD;
 const SESSION_COOKIE_NAME = 'granted_session';
-const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-
-// Simple session store (in production, use Redis or database)
-const activeSessions = new Map();
+const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
+const JWT_SECRET = process.env.JWT_SECRET || 'granted-consulting-jwt-secret-2025-change-in-production';
 
 // Optimized conversation limits
 const CONVERSATION_LIMITS = {
@@ -29,12 +27,26 @@ const CONTEXT_ABSOLUTE_LIMIT = 200000;     // Claude's actual limit
 const TOKENS_PER_EXCHANGE = 950;           // Average user + assistant pair
 const TOKENS_PER_CHAR = 0.25;             // Rough token-to-character ratio
 
-// Generate secure session token
-function generateSessionToken() {
-  return crypto.randomBytes(32).toString('hex');
+// Generate JWT token
+function generateJWTToken() {
+  const payload = {
+    authenticated: true,
+    loginTime: Date.now(),
+    expires: Date.now() + SESSION_DURATION
+  };
+  
+  // Simple JWT implementation for serverless
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const headerBase64 = Buffer.from(JSON.stringify(header)).toString('base64url');
+  const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  
+  const signData = `${headerBase64}.${payloadBase64}`;
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest('base64url');
+  
+  return `${headerBase64}.${payloadBase64}.${signature}`;
 }
 
-// Check if request is authenticated
+// Check if request is authenticated with JWT
 function isAuthenticated(req) {
   const sessionToken = req.headers.cookie?.split(';')
     .find(cookie => cookie.trim().startsWith(`${SESSION_COOKIE_NAME}=`))
@@ -42,16 +54,27 @@ function isAuthenticated(req) {
 
   if (!sessionToken) return false;
 
-  const session = activeSessions.get(sessionToken);
-  if (!session) return false;
-
-  // Check if session is expired
-  if (Date.now() > session.expires) {
-    activeSessions.delete(sessionToken);
+  try {
+    // Verify JWT token
+    const [headerBase64, payloadBase64, signature] = sessionToken.split('.');
+    
+    if (!headerBase64 || !payloadBase64 || !signature) return false;
+    
+    // Verify signature
+    const signData = `${headerBase64}.${payloadBase64}`;
+    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest('base64url');
+    
+    if (signature !== expectedSignature) return false;
+    
+    // Check expiration
+    const payload = JSON.parse(Buffer.from(payloadBase64, 'base64url').toString());
+    if (Date.now() > payload.expires) return false;
+    
+    return true;
+  } catch (error) {
+    console.error('JWT verification error:', error);
     return false;
   }
-
-  return true;
 }
 
 // Authentication middleware
@@ -115,7 +138,7 @@ function pruneConversation(conversation, agentType, estimatedContextSize) {
     const messagesToKeep = limit * 2;
     const removed = conversation.length - messagesToKeep;
     conversation.splice(0, removed);
-    console.log(`🔄 Standard pruning: Removed ${removed} messages, keeping last ${messagesToKeep}`);
+    console.log(`🗂️ Standard pruning: Removed ${removed} messages, keeping last ${messagesToKeep}`);
   }
   
   // Emergency pruning if context too large
@@ -583,7 +606,7 @@ COMMUNICATION APPROACH:
 Follow the detailed processes outlined in the knowledge base documents rather than attempting to recreate them.`
 };
 
-// INTELLIGENT GRANT CARD DOCUMENT SELECTION FUNCTION
+// INTELLIGENT GRANT CARD DOCUMENT SELECTION FUNCTION (FIXED WITH UNDERSCORES)
 function selectGrantCardDocuments(task, message, fileContent, conversationHistory) {
   const docs = knowledgeBases['grant-cards'] || [];
   const msg = message.toLowerCase();
@@ -601,7 +624,7 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   const isLargeFile = fileContent && fileContent.length > 50000;
   const maxDocs = isLargeFile ? 1 : 3;
   
-  // Select task-specific documents
+  // Select task-specific documents (FIXED WITH UNDERSCORES)
   if (needsFormatter) {
     const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant_criteria_formatter'));
     if (formatterDoc) selectedDocs.push(formatterDoc);
@@ -632,7 +655,7 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     if (missingDoc) selectedDocs.push(missingDoc);
   }
   
-  // Default fallback - include grant criteria formatter
+  // Default fallback - include grant criteria formatter (FIXED WITH UNDERSCORES)
   if (selectedDocs.length === 0) {
     const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant_criteria_formatter'));
     if (formatterDoc) selectedDocs.push(formatterDoc);
@@ -1151,7 +1174,7 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-// Main serverless handler with authentication
+// Main serverless handler with JWT authentication
 module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -1182,7 +1205,7 @@ module.exports = async function handler(req, res) {
   await getKnowledgeBase();
   
   try {
-    // Login endpoint
+    // Login endpoint with JWT
     if (url === '/api/login' && method === 'POST') {
       try {
         let body = '';
@@ -1203,14 +1226,8 @@ module.exports = async function handler(req, res) {
           }
 
           if (password === TEAM_PASSWORD) {
-            // Create session
-            const sessionToken = generateSessionToken();
-            const expires = Date.now() + SESSION_DURATION;
-            
-            activeSessions.set(sessionToken, {
-              expires,
-              loginTime: Date.now()
-            });
+            // Create JWT token
+            const sessionToken = generateJWTToken();
 
             // Set secure cookie
             res.setHeader('Set-Cookie', [
@@ -1239,25 +1256,18 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Logout endpoint
+    // Logout endpoint (simplified without session management)
     if (url === '/api/logout' && method === 'POST') {
-      const sessionToken = req.headers.cookie?.split(';')
-        .find(cookie => cookie.trim().startsWith(`${SESSION_COOKIE_NAME}=`))
-        ?.split('=')[1];
-
-      if (sessionToken) {
-        activeSessions.delete(sessionToken);
-      }
-
+      // Just clear the cookie (no server-side session to delete)
       res.setHeader('Set-Cookie', [
-        `${SESSION_COOKIE_NAME}=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/`
+        `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/`
       ]);
 
       res.json({ success: true, message: 'Logged out successfully' });
       return;
     }
 
-    // Enhanced health check endpoint with context monitoring
+    // Enhanced health check endpoint with context monitoring (removed activeSessions)
     if (url === '/api/health') {
       const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
       const totalConversations = conversations.size;
@@ -1274,8 +1284,8 @@ module.exports = async function handler(req, res) {
         callsLastMinute: callTimestamps.length,
         rateLimitDelay: RATE_LIMIT_DELAY,
         authenticationEnabled: !!TEAM_PASSWORD,
-        activeSessions: activeSessions.size,
-        // New context monitoring info
+        jwtEnabled: true,
+        // Context monitoring info
         contextManagement: {
           conversationLimits: CONVERSATION_LIMITS,
           totalConversations: totalConversations,
@@ -1287,33 +1297,34 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // Debug endpoint for testing document selection
     if (url === '/api/debug-grant-docs' && method === 'GET') {
-    const task = req.query.task || 'grant-criteria';
-    console.log(`\n🧪 TESTING DOCUMENT SELECTION FOR TASK: ${task}`);
-    
-    const docs = knowledgeBases['grant-cards'] || [];
-    console.log(`Available docs: ${docs.map(d => d.filename).join(', ')}`);
-    
-    // Test the selection function
-    const testDocs = selectGrantCardDocuments(task, `test message for ${task}`, '', []);
-    
-    res.json({
-      task: task,
-      totalDocs: docs.length,
-      availableDocs: docs.map(d => d.filename),
-      selectedDocs: testDocs.map(d => ({ filename: d.filename, size: d.content.length })),
-      searchPatterns: {
-        'grant-criteria': 'grant-criteria-formatter',
-        'preview': 'preview-section-generator',
-        'requirements': 'general-requirements-creator',
-        'insights': 'granted-insights-generator',
-        'categories': 'categories-tags-classifier',
-        'missing-info': 'missing-info-generator'
-      },
-      actualFileNames: docs.map(d => d.filename)
-    });
-    return;
-  }
+      const task = req.query.task || 'grant-criteria';
+      console.log(`\n🧪 TESTING DOCUMENT SELECTION FOR TASK: ${task}`);
+      
+      const docs = knowledgeBases['grant-cards'] || [];
+      console.log(`Available docs: ${docs.map(d => d.filename).join(', ')}`);
+      
+      // Test the selection function
+      const testDocs = selectGrantCardDocuments(task, `test message for ${task}`, '', []);
+      
+      res.json({
+        task: task,
+        totalDocs: docs.length,
+        availableDocs: docs.map(d => d.filename),
+        selectedDocs: testDocs.map(d => ({ filename: d.filename, size: d.content.length })),
+        searchPatterns: {
+          'grant-criteria': 'grant_criteria_formatter',
+          'preview': 'preview_section_generator',
+          'requirements': 'general_requirements_creator',
+          'insights': 'granted_insights_generator',
+          'categories': 'categories_tags_classifier',
+          'missing-info': 'missing_info_generator'
+        },
+        actualFileNames: docs.map(d => d.filename)
+      });
+      return;
+    }
     
     // Context status endpoint
     if (url === '/api/context-status' && method === 'GET') {
@@ -1389,7 +1400,7 @@ module.exports = async function handler(req, res) {
       }
       const conversation = conversations.get(conversationId);
       
-      // INTELLIGENT DOCUMENT SELECTION for Grant Cards
+      // INTELLIGENT DOCUMENT SELECTION for Grant Cards (FIXED WITH UNDERSCORES)
       const relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation);
       let knowledgeContext = '';
 
