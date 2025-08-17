@@ -1214,7 +1214,7 @@ module.exports = async function handler(req, res) {
 
             // Set secure cookie
             res.setHeader('Set-Cookie', [
-              `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_DURATION/1000}; Path=/`
+              `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION/1000}; Path=/`
             ]);
 
             res.json({ 
