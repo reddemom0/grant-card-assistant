@@ -603,38 +603,38 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   
   // Select task-specific documents
   if (needsFormatter) {
-    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant-criteria-formatter'));
+    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant_criteria_formatter'));
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
   
   if (needsPreview) {
-    const previewDoc = docs.find(doc => doc.filename.toLowerCase().includes('preview-section-generator'));
+    const previewDoc = docs.find(doc => doc.filename.toLowerCase().includes('preview_section_generator'));
     if (previewDoc) selectedDocs.push(previewDoc);
   }
   
   if (needsRequirements) {
-    const reqDoc = docs.find(doc => doc.filename.toLowerCase().includes('general-requirements-creator'));
+    const reqDoc = docs.find(doc => doc.filename.toLowerCase().includes('general_requirements_creator'));
     if (reqDoc) selectedDocs.push(reqDoc);
   }
   
   if (needsInsights) {
-    const insightsDoc = docs.find(doc => doc.filename.toLowerCase().includes('granted-insights-generator'));
+    const insightsDoc = docs.find(doc => doc.filename.toLowerCase().includes('granted_insights_generator'));
     if (insightsDoc) selectedDocs.push(insightsDoc);
   }
   
   if (needsCategories) {
-    const categoriesDoc = docs.find(doc => doc.filename.toLowerCase().includes('categories-tags-classifier'));
+    const categoriesDoc = docs.find(doc => doc.filename.toLowerCase().includes('categories_tags_classifier'));
     if (categoriesDoc) selectedDocs.push(categoriesDoc);
   }
   
   if (needsMissing) {
-    const missingDoc = docs.find(doc => doc.filename.toLowerCase().includes('missing-info-generator'));
+    const missingDoc = docs.find(doc => doc.filename.toLowerCase().includes('missing_info_generator'));
     if (missingDoc) selectedDocs.push(missingDoc);
   }
   
   // Default fallback - include grant criteria formatter
   if (selectedDocs.length === 0) {
-    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant-criteria-formatter'));
+    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant_criteria_formatter'));
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
   
