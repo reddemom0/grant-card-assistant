@@ -1287,6 +1287,34 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    if (url === '/api/debug-grant-docs' && method === 'GET') {
+    const task = req.query.task || 'grant-criteria';
+    console.log(`\n🧪 TESTING DOCUMENT SELECTION FOR TASK: ${task}`);
+    
+    const docs = knowledgeBases['grant-cards'] || [];
+    console.log(`Available docs: ${docs.map(d => d.filename).join(', ')}`);
+    
+    // Test the selection function
+    const testDocs = selectGrantCardDocuments(task, `test message for ${task}`, '', []);
+    
+    res.json({
+      task: task,
+      totalDocs: docs.length,
+      availableDocs: docs.map(d => d.filename),
+      selectedDocs: testDocs.map(d => ({ filename: d.filename, size: d.content.length })),
+      searchPatterns: {
+        'grant-criteria': 'grant-criteria-formatter',
+        'preview': 'preview-section-generator',
+        'requirements': 'general-requirements-creator',
+        'insights': 'granted-insights-generator',
+        'categories': 'categories-tags-classifier',
+        'missing-info': 'missing-info-generator'
+      },
+      actualFileNames: docs.map(d => d.filename)
+    });
+    return;
+  }
+    
     // Context status endpoint
     if (url === '/api/context-status' && method === 'GET') {
       const conversationId = req.query?.conversationId || 'default';
