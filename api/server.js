@@ -1,4 +1,4 @@
-// api/server.js - Complete serverless function with Enhanced Context Management
+// api/server.js - Complete serverless function with Enhanced Context Management and Intelligent Document Selection
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
@@ -582,6 +582,66 @@ COMMUNICATION APPROACH:
 
 Follow the detailed processes outlined in the knowledge base documents rather than attempting to recreate them.`
 };
+
+// INTELLIGENT GRANT CARD DOCUMENT SELECTION FUNCTION
+function selectGrantCardDocuments(task, message, fileContent, conversationHistory) {
+  const docs = knowledgeBases['grant-cards'] || [];
+  const msg = message.toLowerCase();
+  const selectedDocs = [];
+  
+  // Determine what the user needs based on task and message content
+  const needsFormatter = task === 'grant-criteria' || msg.includes('criteria') || msg.includes('format');
+  const needsPreview = task === 'preview' || msg.includes('preview') || msg.includes('description');
+  const needsRequirements = task === 'requirements' || msg.includes('requirements') || msg.includes('general');
+  const needsInsights = task === 'insights' || msg.includes('insights') || msg.includes('strategy');
+  const needsCategories = task === 'categories' || msg.includes('categories') || msg.includes('tags');
+  const needsMissing = task === 'missing-info' || msg.includes('missing') || msg.includes('gaps');
+  
+  // Large file uploaded - reduce knowledge base to save context
+  const isLargeFile = fileContent && fileContent.length > 50000;
+  const maxDocs = isLargeFile ? 1 : 3;
+  
+  // Select task-specific documents
+  if (needsFormatter) {
+    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant-criteria-formatter'));
+    if (formatterDoc) selectedDocs.push(formatterDoc);
+  }
+  
+  if (needsPreview) {
+    const previewDoc = docs.find(doc => doc.filename.toLowerCase().includes('preview-section-generator'));
+    if (previewDoc) selectedDocs.push(previewDoc);
+  }
+  
+  if (needsRequirements) {
+    const reqDoc = docs.find(doc => doc.filename.toLowerCase().includes('general-requirements-creator'));
+    if (reqDoc) selectedDocs.push(reqDoc);
+  }
+  
+  if (needsInsights) {
+    const insightsDoc = docs.find(doc => doc.filename.toLowerCase().includes('granted-insights-generator'));
+    if (insightsDoc) selectedDocs.push(insightsDoc);
+  }
+  
+  if (needsCategories) {
+    const categoriesDoc = docs.find(doc => doc.filename.toLowerCase().includes('categories-tags-classifier'));
+    if (categoriesDoc) selectedDocs.push(categoriesDoc);
+  }
+  
+  if (needsMissing) {
+    const missingDoc = docs.find(doc => doc.filename.toLowerCase().includes('missing-info-generator'));
+    if (missingDoc) selectedDocs.push(missingDoc);
+  }
+  
+  // Default fallback - include grant criteria formatter
+  if (selectedDocs.length === 0) {
+    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant-criteria-formatter'));
+    if (formatterDoc) selectedDocs.push(formatterDoc);
+  }
+  
+  // Remove duplicates and limit based on file size
+  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
+  return uniqueDocs.slice(0, maxDocs);
+}
 
 // INTELLIGENT BCAFE DOCUMENT SELECTION FUNCTION
 function selectBCAFEDocuments(message, orgType, conversationHistory) {
@@ -1277,7 +1337,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Process grant document (for Grant Card Assistant) - ENHANCED WITH CONTEXT MANAGEMENT
+    // Process grant document (for Grant Card Assistant) - ENHANCED WITH INTELLIGENT DOCUMENT SELECTION
     if (url === '/api/process-grant' && method === 'POST') {
       // Handle file upload with multer
       await new Promise((resolve, reject) => {
@@ -1301,17 +1361,18 @@ module.exports = async function handler(req, res) {
       }
       const conversation = conversations.get(conversationId);
       
-      // Search knowledge base for task-specific information (grant-cards agent)
-      const relevantKnowledge = searchKnowledgeBase(task, 'grant-cards');
+      // INTELLIGENT DOCUMENT SELECTION for Grant Cards
+      const relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation);
       let knowledgeContext = '';
-      
-      if (relevantKnowledge.length > 0) {
-        knowledgeContext = relevantKnowledge
-          .slice(0, 3) // Top 3 most relevant documents
+
+      if (relevantDocs.length > 0) {
+        knowledgeContext = relevantDocs
           .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
           .join('\n\n');
           
-        console.log(`📚 Using ${relevantKnowledge.length} grant-cards knowledge base documents for context`);
+        console.log(`📚 Selected Grant Card documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
+      } else {
+        console.log(`📚 No specific Grant Card documents found for task: ${task}`);
       }
       
       // Check if this is a Grant Card task (uses shared persona) or other agent
