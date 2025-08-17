@@ -211,7 +211,7 @@
             font-size: 0.75rem;
         }
         
-        .action-button:hover {
+        .action-button:hover:not(:disabled) {
             background: rgba(0, 138, 191, 0.05);
             border-color: var(--granted-blue);
             transform: translateY(-1px);
@@ -221,6 +221,12 @@
             background: rgba(0, 138, 191, 0.1);
             border-color: var(--granted-blue);
             color: var(--granted-blue);
+        }
+        
+        .action-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
         
         .action-icon {
@@ -604,6 +610,13 @@
                 <div class="message assistant">
                     <div class="message-content">
                         <strong>👋 Grant Card Expert ready!</strong> Upload a document, select a task above, or just start typing.
+                        
+                        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(245, 158, 11, 0.1); border-radius: 6px; font-size: 0.75rem; border-left: 3px solid #f59e0b;">
+                            <strong>📁 File Upload Tips:</strong>
+                            <div style="margin-top: 0.5rem;">• Best results with focused documents (under 20 pages)</div>
+                            <div>• Large files may take 30-60 seconds to process</div>
+                            <div>• Wait for each response before uploading another document</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -612,7 +625,7 @@
                 <div class="upload-area">
                     <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" class="hidden">
                     <button class="upload-button" onclick="document.getElementById('file-input').click()">
-                        <span>📁</span>
+                        <span>📄</span>
                         <span>Upload Grant Document</span>
                     </button>
                     <div class="file-info" id="file-info"></div>
@@ -646,9 +659,20 @@
         const fileInput = document.getElementById('file-input');
         const fileInfo = document.getElementById('file-info');
 
-        // FIXED: Quick action buttons - only set input and auto-send
+        // FIXED: Quick action buttons with rate limiting protection
         actionButtons.forEach(button => {
             button.addEventListener('click', () => {
+                // Prevent multiple rapid clicks while loading
+                if (isLoading) {
+                    console.log('⏳ Still processing previous request, ignoring button click');
+                    return;
+                }
+                
+                // Prevent double-clicking by temporarily disabling button
+                if (button.disabled) return;
+                button.disabled = true;
+                setTimeout(() => button.disabled = false, 3000); // Re-enable after 3 seconds
+                
                 actionButtons.forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
                 
@@ -658,17 +682,30 @@
                 // Set the message in the input field
                 messageInput.value = `I'd like help with: ${taskName}`;
                 
-                // Automatically send the message (this will handle adding the message)
+                // Only send once, with protection
                 setTimeout(() => {
-                    sendMessage();
+                    if (!isLoading) {  // Double-check we're not already processing
+                        sendMessage();
+                    } else {
+                        console.log('⏳ Still processing previous request, skipping auto-send');
+                    }
                 }, 100);
             });
         });
 
-        // File upload
+        // FIXED: File upload with large file warnings
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
+                // Check file size before processing
+                const fileSizeMB = file.size / (1024 * 1024);
+                
+                if (fileSizeMB > 5) { // Warn for files over 5MB
+                    const warningMessage = `⚠️ **Large file detected:** ${file.name} (${fileSizeMB.toFixed(1)}MB)\n\nLarge documents may take longer to process and could hit rate limits. Consider:\n• Breaking into smaller sections\n• Using key excerpts instead of full document\n• Waiting 3-5 minutes between requests`;
+                    
+                    addMessage('assistant', warningMessage, false);
+                }
+                
                 uploadedFile = file;
                 
                 const fileSize = (file.size / 1024).toFixed(1);
@@ -701,17 +738,25 @@
             }
         });
 
+        // FIXED: sendMessage with protection against multiple calls
         async function sendMessage() {
+            // Prevent rapid-fire calls - ADD THIS FIRST
+            if (isLoading) {
+                console.log('🚫 Already processing request, ignoring duplicate call');
+                return;
+            }
+            
             const message = messageInput.value.trim();
             if (!message && !uploadedFile) return;
-            if (isLoading) return;
+
+            // Set loading immediately to prevent duplicates
+            isLoading = true;
+            sendButton.disabled = true;
 
             if (message) {
                 addMessage('user', message);
             }
 
-            isLoading = true;
-            sendButton.disabled = true;
             addLoadingMessage();
 
             try {
@@ -752,7 +797,7 @@
                 fileInfo.innerHTML = '';
                 fileInput.value = '';
                 const uploadButton = document.querySelector('.upload-button');
-                uploadButton.innerHTML = '<span>📁</span><span>Upload Grant Document</span>';
+                uploadButton.innerHTML = '<span>📄</span><span>Upload Grant Document</span>';
                 uploadButton.style.borderColor = '#008abf';
                 uploadButton.style.background = 'rgba(0, 138, 191, 0.05)';
             }
