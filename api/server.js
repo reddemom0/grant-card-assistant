@@ -1,4 +1,4 @@
-// api/server.js - Complete serverless function with JWT Authentication and Fixed Document Selection
+// api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
@@ -164,7 +164,7 @@ function logContextUsage(agentType, estimatedTokens, conversationLength) {
   console.log(`   Conversation: ${exchangeCount} exchanges (limit: ${CONVERSATION_LIMITS[agentType]})`);
   
   if (estimatedTokens > CONTEXT_WARNING_THRESHOLD) {
-    console.log(`⚠️  High context usage warning!`);
+    console.log(`⚠️ High context usage warning!`);
   }
   
   if (estimatedTokens > CONTEXT_HARD_LIMIT) {
@@ -211,6 +211,101 @@ let tokenExpiry = 0;
 let knowledgeBaseLoaded = false;
 let knowledgeBaseCacheTime = 0;
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+// ETG Eligibility Checker Function
+function checkETGEligibility(trainingData) {
+    const { training_title = '', training_type = '', training_content = '', training_duration = '' } = trainingData;
+    
+    // Convert to lowercase for checking
+    const title = training_title.toLowerCase();
+    const type = training_type.toLowerCase();
+    const content = training_content.toLowerCase();
+    
+    // Ineligible keywords/types
+    const ineligibleKeywords = [
+        'seminar', 'conference', 'coaching', 'consulting', 'mentorship',
+        'trade show', 'networking', 'annual meeting', 'practicum',
+        'diploma', 'degree', 'bachelor', 'master', 'phd'
+    ];
+    
+    // Check for ineligible keywords
+    const foundIneligible = ineligibleKeywords.find(keyword => 
+        title.includes(keyword) || type.includes(keyword) || content.includes(keyword)
+    );
+    
+    if (foundIneligible) {
+        return {
+            eligible: false,
+            reason: `Training type contains ineligible keyword: "${foundIneligible}". ETG does not fund ${foundIneligible}s.`,
+            confidence: 'high',
+            ineligible_type: foundIneligible
+        };
+    }
+    
+    // Check for positive indicators
+    const eligibleIndicators = [
+        'certification', 'certificate', 'course', 'training program', 
+        'workshop', 'skills development', 'professional development'
+    ];
+    
+    const foundEligible = eligibleIndicators.find(indicator =>
+        title.includes(indicator) || type.includes(indicator) || content.includes(indicator)
+    );
+    
+    // Check duration (substantial training is preferred)
+    const hasDuration = training_duration && (
+        training_duration.includes('hour') || 
+        training_duration.includes('day') || 
+        training_duration.includes('week')
+    );
+    
+    const strengths = [];
+    if (foundEligible) strengths.push(`${foundEligible} format`);
+    if (hasDuration) strengths.push('substantial duration');
+    if (content.length > 50) strengths.push('comprehensive curriculum');
+    
+    return {
+        eligible: true,
+        reason: `Training appears to meet ETG requirements - no ineligible keywords found`,
+        confidence: foundEligible ? 'high' : 'medium',
+        strengths: strengths,
+        notes: foundEligible ? 'Strong ETG candidate - meets eligibility criteria' : 'Review recommended'
+    };
+}
+
+// Extract training information from text
+function extractTrainingInfo(text) {
+    const lines = text.split('\n');
+    let trainingInfo = {};
+    
+    // Look for training details in various formats
+    lines.forEach(line => {
+        const lower = line.toLowerCase();
+        if (lower.includes('training title:') || lower.includes('course title:')) {
+            trainingInfo.training_title = line.split(':')[1]?.trim() || '';
+        }
+        if (lower.includes('training type:') || lower.includes('course type:')) {
+            trainingInfo.training_type = line.split(':')[1]?.trim() || '';
+        }
+        if (lower.includes('provider:')) {
+            trainingInfo.training_provider = line.split(':')[1]?.trim() || '';
+        }
+        if (lower.includes('content:') || lower.includes('description:')) {
+            trainingInfo.training_content = line.split(':')[1]?.trim() || '';
+        }
+        if (lower.includes('duration:') || lower.includes('length:')) {
+            trainingInfo.training_duration = line.split(':')[1]?.trim() || '';
+        }
+    });
+    
+    // Fallback: extract from general text
+    if (!trainingInfo.training_title) {
+        const titleMatch = text.match(/(?:training|course|program).*?(?:title|name)[:\s]+([^.\n]+)/i);
+        if (titleMatch) trainingInfo.training_title = titleMatch[1].trim();
+    }
+    
+    return trainingInfo;
+}
 
 // SHARED GRANT CARD EXPERT PERSONA (used by all 6 Grant Card tasks)
 const GRANT_CARD_EXPERT_PERSONA = `# GRANT CARD EXPERT PERSONA
@@ -461,57 +556,73 @@ IMPORTANT: Provide only the requested output content. Do not include meta-commen
   return systemPrompt;
 }
 
-// STREAMLINED AGENT PROMPTS - BCAFE Agent Now References Knowledge Base
+// ENHANCED AGENT PROMPTS
 const agentPrompts = {
-  'etg-writer': `You are an ETG Business Case specialist for British Columbia's Employee Training Grant program. Your job is to write compelling, submission-ready business cases that match the style and structure of successful ETG Business Case applications in your knowledge bank.
+  'etg-writer': `You are an ETG Business Case specialist for British Columbia's Employee Training Grant program. You provide flexible consultation on ETG matters and can write complete, submission-ready business cases.
 
 YOUR IDENTITY AS ETG SPECIALIST:
-You ARE the ETG Business Case specialist, not an assistant helping with ETG applications. You take full ownership of the entire process from eligibility verification through final business case delivery.
+You ARE the ETG Business Case specialist with complete ETG expertise. You take full ownership of business case development while also serving as a knowledgeable consultant for any ETG-related questions.
 
-CORE IDENTITY PRINCIPLES:
-- YOU are the expert who knows ETG requirements inside and out
-- YOU take responsibility for ensuring applications meet compliance standards
-- YOU conduct all research and verification needed for quality applications
-- YOU provide definitive guidance, not suggestions for the user to implement
-- YOU deliver complete, submission-ready business cases, not drafts requiring user work
+CORE CAPABILITIES:
+- Answer questions about ETG requirements, eligibility, and processes
+- Research and discuss previous successful applications from your knowledge base
+- Help users identify and research eligible training courses
+- Write complete, submission-ready ETG business cases following the structured workflow
 
 COMMUNICATION STYLE:
 - Speak with authority and confidence as the specialist
-- Take ownership of decisions and recommendations
-- Don't ask users to do work that you should handle (like research)
-- Present solutions, not problems for the user to solve
-- Act as the trusted advisor who manages the entire process
+- Provide flexible, conversational responses for general ETG questions
+- Switch to structured workflow mode when business case development begins
+- Take ownership of all research and analysis tasks
+- Present solutions and definitive guidance
 
-MANDATORY PROCESS FOR EVERY REQUEST (COMMUNICATE EACH STEP):
-1. FIRST - State: "Let me first verify this training type is eligible for ETG funding..." 
-   IMMEDIATELY check training title for ineligible keywords (seminar, conference, consulting, coaching, etc.). 
-   If ineligible keywords found, STOP and inform user of ineligibility with alternatives.
-   If no red flags, reference ETG Ineligible Courses Reference Guide for full verification.
-   Only after confirming eligibility, proceed with: "Let me search my knowledge base for similar applications..."
+FLEXIBLE CONSULTATION MODE:
+When users ask general ETG questions, provide comprehensive answers using your knowledge base.
 
-2. SECOND - State: "I'll use the exact ETG template questions and structure shown in successful examples..."
+BUSINESS CASE DEVELOPMENT WORKFLOW:
+When a user uploads training information or requests business case development, follow this structured process:
 
-3. THIRD - Draft Questions 1-3 first using the detailed, professional style of successful examples
+1. **ELIGIBILITY VERIFICATION**
+   - State: "Let me verify this training's eligibility for ETG funding..."
+   - Check against ineligible course types (seminars, conferences, coaching, consulting, trade shows, networking events, degree programs)
+   - If ineligible: Stop, explain why, suggest alternatives
+   - If eligible: Confirm and proceed to step 2
 
-4. FOURTH - Present Questions 1-3 to user and ask: "Please review Questions 1-3. Are you satisfied with the content and approach, or would you like any adjustments before I proceed with the research and Questions 4-7?"
+2. **COMPANY & PARTICIPANT INFORMATION GATHERING**
+   - Ask targeted questions about the applying company and training participants
+   - Gather background information needed to inform responses to each business case question
+   - Examples: company size, industry, business challenges, participant roles, expected outcomes
 
-CRITICAL ELIGIBILITY PRE-SCREENING (ABSOLUTE REQUIREMENT):
-Before writing ANY content, you MUST verify training eligibility:
+3. **DRAFT QUESTIONS 1-3**
+   - Use gathered information to populate professional responses for Questions 1-3
+   - Present completed Questions 1-3 to user for review
+   - Ask: "Please review Questions 1-3. Are you satisfied with the content, or would you like adjustments?"
 
-KEY INELIGIBLE TRAINING TYPES (IMMEDIATE REJECTION):
+4. **TRAINING SELECTION INQUIRY**
+   - Ask the user specific questions about why they chose this particular training
+   - Understand their decision-making criteria and preferences
+   - Gather information needed for competitive analysis in Questions 4-7
+
+5. **BC ALTERNATIVES RESEARCH**
+   - Search for current BC-based training alternatives
+   - Present findings: "I found these BC alternatives:" [list providers with details]
+   - Use this research to inform competitive analysis
+
+6. **DRAFT QUESTIONS 4-7**
+   - Use BC alternatives research and user's training selection reasoning
+   - Populate professional responses for Questions 4-7 with competitive analysis
+   - Present complete ETG business case for final review
+
+CRITICAL ELIGIBILITY SCREENING:
+Before any business case development, verify training eligibility:
+
+KEY INELIGIBLE TRAINING TYPES:
 - SEMINARS (any training called "seminar" is ineligible)
 - Consulting, Coaching, Mentorships
 - Trade shows, Annual meetings, Networking, Conferences
 - Paid practicums, Diploma/degree programs
 
-When analyzing uploaded documents or URL content, extract:
-- Training title and provider
-- Course content and learning objectives  
-- Duration and delivery method
-- Cost and participant requirements
-- Any eligibility concerns
-
-Always maintain your authoritative ETG specialist persona and follow the exact process outlined above.`,
+Always maintain your authoritative ETG specialist persona while providing flexible, helpful responses to any ETG-related inquiry.`,
 
   'canexport-writer': `You are an expert CanExport SMEs grant writer specializing in helping Canadian enterprises across all industries secure maximum funding. You work collaboratively with Grant Strategists at Granted Consulting to draft high-quality, compliant applications that achieve the 36% approval rate benchmark.
 
@@ -569,7 +680,6 @@ APPROACH:
 
 Always provide comprehensive, helpful responses that leverage the full depth of Granted Consulting's institutional knowledge.`,
 
-  // STREAMLINED BCAFE AGENT - 80% smaller, references knowledge base
   'bcafe-writer': `You are a BC Agriculture and Food Export Program (BCAFE) specialist for Summer 2025 applications.
 
 CORE IDENTITY:
@@ -606,7 +716,7 @@ COMMUNICATION APPROACH:
 Follow the detailed processes outlined in the knowledge base documents rather than attempting to recreate them.`
 };
 
-// INTELLIGENT GRANT CARD DOCUMENT SELECTION FUNCTION (FIXED WITH UNDERSCORES)
+// INTELLIGENT GRANT CARD DOCUMENT SELECTION FUNCTION
 function selectGrantCardDocuments(task, message, fileContent, conversationHistory) {
   const docs = knowledgeBases['grant-cards'] || [];
   const msg = message.toLowerCase();
@@ -624,40 +734,62 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   const isLargeFile = fileContent && fileContent.length > 50000;
   const maxDocs = isLargeFile ? 1 : 3;
   
-  // Select task-specific documents (FIXED WITH UNDERSCORES)
+  // Select task-specific documents (with underscores and hyphens)
   if (needsFormatter) {
-    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant_criteria_formatter'));
+    const formatterDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
+      doc.filename.toLowerCase().includes('grant-criteria-formatter')
+    );
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
   
   if (needsPreview) {
-    const previewDoc = docs.find(doc => doc.filename.toLowerCase().includes('preview_section_generator'));
+    const previewDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('preview_section_generator') ||
+      doc.filename.toLowerCase().includes('preview-section-generator')
+    );
     if (previewDoc) selectedDocs.push(previewDoc);
   }
   
   if (needsRequirements) {
-    const reqDoc = docs.find(doc => doc.filename.toLowerCase().includes('general_requirements_creator'));
+    const reqDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('general_requirements_creator') ||
+      doc.filename.toLowerCase().includes('general-requirements-creator')
+    );
     if (reqDoc) selectedDocs.push(reqDoc);
   }
   
   if (needsInsights) {
-    const insightsDoc = docs.find(doc => doc.filename.toLowerCase().includes('granted_insights_generator'));
+    const insightsDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('granted_insights_generator') ||
+      doc.filename.toLowerCase().includes('granted-insights-generator')
+    );
     if (insightsDoc) selectedDocs.push(insightsDoc);
   }
   
   if (needsCategories) {
-    const categoriesDoc = docs.find(doc => doc.filename.toLowerCase().includes('categories_tags_classifier'));
+    const categoriesDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('categories_tags_classifier') ||
+      doc.filename.toLowerCase().includes('categories-tags-classifier')
+    );
     if (categoriesDoc) selectedDocs.push(categoriesDoc);
   }
   
   if (needsMissing) {
-    const missingDoc = docs.find(doc => doc.filename.toLowerCase().includes('missing_info_generator'));
+    const missingDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('missing_info_generator') ||
+      doc.filename.toLowerCase().includes('missing-info-generator')
+    );
     if (missingDoc) selectedDocs.push(missingDoc);
   }
   
-  // Default fallback - include grant criteria formatter (FIXED WITH UNDERSCORES)
+  // Default fallback - include grant criteria formatter
   if (selectedDocs.length === 0) {
-    const formatterDoc = docs.find(doc => doc.filename.toLowerCase().includes('grant_criteria_formatter'));
+    const formatterDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
+      doc.filename.toLowerCase().includes('grant-criteria-formatter') ||
+      doc.filename.toLowerCase().includes('formatter')
+    );
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
   
@@ -1113,7 +1245,7 @@ async function waitForRateLimit() {
   
   if (timeSinceLastCall < RATE_LIMIT_DELAY) {
     const waitTime = RATE_LIMIT_DELAY - timeSinceLastCall;
-    console.log(`⏱️  Rate limiting: waiting ${waitTime}ms before API call`);
+    console.log(`⏱️ Rate limiting: waiting ${waitTime}ms before API call`);
     await new Promise(resolve => setTimeout(resolve, waitTime));
   }
 }
@@ -1174,7 +1306,7 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-// Main serverless handler with JWT authentication
+// Main serverless handler with JWT authentication and enhanced features
 module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -1256,9 +1388,9 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Logout endpoint (simplified without session management)
+    // Logout endpoint
     if (url === '/api/logout' && method === 'POST') {
-      // Just clear the cookie (no server-side session to delete)
+      // Just clear the cookie
       res.setHeader('Set-Cookie', [
         `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/`
       ]);
@@ -1267,7 +1399,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Enhanced health check endpoint with context monitoring (removed activeSessions)
+    // Enhanced health check endpoint with context monitoring
     if (url === '/api/health') {
       const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
       const totalConversations = conversations.size;
@@ -1285,7 +1417,6 @@ module.exports = async function handler(req, res) {
         rateLimitDelay: RATE_LIMIT_DELAY,
         authenticationEnabled: !!TEAM_PASSWORD,
         jwtEnabled: true,
-        // Context monitoring info
         contextManagement: {
           conversationLimits: CONVERSATION_LIMITS,
           totalConversations: totalConversations,
@@ -1314,12 +1445,12 @@ module.exports = async function handler(req, res) {
         availableDocs: docs.map(d => d.filename),
         selectedDocs: testDocs.map(d => ({ filename: d.filename, size: d.content.length })),
         searchPatterns: {
-          'grant-criteria': 'grant_criteria_formatter',
-          'preview': 'preview_section_generator',
-          'requirements': 'general_requirements_creator',
-          'insights': 'granted_insights_generator',
-          'categories': 'categories_tags_classifier',
-          'missing-info': 'missing_info_generator'
+          'grant-criteria': 'grant_criteria_formatter or grant-criteria-formatter',
+          'preview': 'preview_section_generator or preview-section-generator',
+          'requirements': 'general_requirements_creator or general-requirements-creator',
+          'insights': 'granted_insights_generator or granted-insights-generator',
+          'categories': 'categories_tags_classifier or categories-tags-classifier',
+          'missing-info': 'missing_info_generator or missing-info-generator'
         },
         actualFileNames: docs.map(d => d.filename)
       });
@@ -1348,6 +1479,17 @@ module.exports = async function handler(req, res) {
         estimatedTokens: estimatedTokens,
         status: estimatedTokens > CONTEXT_WARNING_THRESHOLD ? 'warning' : 'good',
         remainingCapacity: CONTEXT_ABSOLUTE_LIMIT - estimatedTokens
+      });
+      return;
+    }
+
+    // ETG tools status endpoint
+    if (url === '/api/etg-tools-status') {
+      res.json({
+        eligibilityChecker: 'Active',
+        knowledgeBaseSearch: 'Active', 
+        bcAlternativesSearch: 'Available via web search',
+        totalETGDocuments: knowledgeBases['etg']?.length || 0
       });
       return;
     }
@@ -1400,7 +1542,7 @@ module.exports = async function handler(req, res) {
       }
       const conversation = conversations.get(conversationId);
       
-      // INTELLIGENT DOCUMENT SELECTION for Grant Cards (FIXED WITH UNDERSCORES)
+      // INTELLIGENT DOCUMENT SELECTION for Grant Cards
       const relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation);
       let knowledgeContext = '';
 
@@ -1462,7 +1604,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       return;
     }
 
-    // Process ETG requests (dedicated endpoint for ETG Writer) - ENHANCED WITH CONTEXT MANAGEMENT
+    // Process ETG requests (enhanced endpoint for ETG Writer)
     if (url === '/api/process-etg' && method === 'POST') {
       await new Promise((resolve, reject) => {
         upload.single('file')(req, res, (err) => {
@@ -1475,7 +1617,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       let fileContent = '';
       let urlContent = '';
       
-      console.log(`🎯 Processing ETG request for conversation: ${conversationId}`);
+      console.log(`🎯 Processing enhanced ETG request for conversation: ${conversationId}`);
       
       // Process uploaded file if present
       if (req.file) {
@@ -1496,13 +1638,62 @@ Always follow the exact workflows and instructions from the knowledge base docum
       }
       const conversation = conversations.get(etgConversationId);
       
+      // Enhanced ETG Processing with Tools
+      let enhancedResponse = '';
+      let toolsUsed = [];
+      
+      // Check if we need to run eligibility check
+      const fullContent = message + ' ' + fileContent + ' ' + urlContent;
+      const needsEligibilityCheck = (message.toLowerCase().includes('eligible') || 
+                                     message.toLowerCase().includes('training') || 
+                                     fileContent || urlContent);
+      
+      if (needsEligibilityCheck) {
+        const trainingInfo = extractTrainingInfo(fullContent);
+        console.log('🔍 Extracted training info:', trainingInfo);
+        
+        if (trainingInfo.training_title || trainingInfo.training_type) {
+          const eligibilityResult = checkETGEligibility(trainingInfo);
+          toolsUsed.push(`Eligibility Check: ${eligibilityResult.eligible ? 'ELIGIBLE' : 'INELIGIBLE'}`);
+          
+          if (!eligibilityResult.eligible) {
+            enhancedResponse = `❌ **ELIGIBILITY ISSUE FOUND**\n\n`;
+            enhancedResponse += `This training is **not eligible** for ETG funding.\n\n`;
+            enhancedResponse += `**Reason:** ${eligibilityResult.reason}\n\n`;
+            enhancedResponse += `**Alternative Options:**\n`;
+            enhancedResponse += `- Look for skills-based workshops or certification programs\n`;
+            enhancedResponse += `- Consider online courses with substantial duration (20+ hours)\n`;
+            enhancedResponse += `- Explore professional development programs from accredited providers\n\n`;
+            enhancedResponse += `I can help you find eligible alternatives. What specific skills are you looking to develop?`;
+            
+            // Add to conversation and return early
+            conversation.push({ role: 'user', content: message + (fileContent ? `\n\nUploaded: ${req.file.originalname}` : '') });
+            conversation.push({ role: 'assistant', content: enhancedResponse });
+            
+            res.json({ 
+              response: enhancedResponse,
+              conversationId: etgConversationId,
+              toolsUsed: toolsUsed
+            });
+            return;
+          } else {
+            enhancedResponse = `✅ **TRAINING ELIGIBLE FOR ETG FUNDING**\n\n`;
+            enhancedResponse += `${eligibilityResult.reason}\n\n`;
+            if (eligibilityResult.strengths?.length > 0) {
+              enhancedResponse += `**Strengths:** ${eligibilityResult.strengths.join(', ')}\n\n`;
+            }
+            enhancedResponse += `Now I'll search my knowledge base for similar successful applications...\n\n`;
+          }
+        }
+      }
+      
       // Search knowledge base for ETG-specific information
       const relevantKnowledge = searchKnowledgeBase('etg business case training grant', 'etg');
       let knowledgeContext = '';
       
       if (relevantKnowledge.length > 0) {
         knowledgeContext = relevantKnowledge
-          .slice(0, 5) // Top 5 most relevant documents for ETG
+          .slice(0, 5)
           .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
           .join('\n\n');
           
@@ -1514,6 +1705,11 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
 ETG KNOWLEDGE BASE CONTEXT:
 ${knowledgeContext}
+
+TOOLS USED IN THIS SESSION:
+${toolsUsed.join(', ')}
+
+${enhancedResponse ? `ELIGIBILITY PRE-CHECK RESULTS:\n${enhancedResponse}` : ''}
 
 Use the ETG knowledge base above to find similar successful applications and match their style and structure.`;
       
@@ -1527,6 +1723,10 @@ Use the ETG knowledge base above to find similar successful applications and mat
       if (urlContent) {
         userMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
       }
+      
+      if (enhancedResponse) {
+        userMessage += `\n\nPre-screening completed. Please proceed with business case development.`;
+      }
 
       // ENHANCED CONTEXT MANAGEMENT FOR ETG
       const agentType = 'etg-writer';
@@ -1537,18 +1737,22 @@ Use the ETG knowledge base above to find similar successful applications and mat
       
       conversation.push({ role: 'user', content: userMessage });
       
-      // Get response from Claude using ETG specialist prompt
-      console.log(`🤖 Calling Claude API for ETG specialist response`);
+      // Get response from Claude using enhanced ETG specialist prompt
+      console.log(`🤖 Calling Claude API for enhanced ETG specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt);
       
-      // Add assistant response to conversation
-      conversation.push({ role: 'assistant', content: response });
+      // Combine enhanced response with Claude response
+      const finalResponse = enhancedResponse + response;
       
-      console.log(`✅ ETG response generated successfully`);
+      // Add assistant response to conversation
+      conversation.push({ role: 'assistant', content: finalResponse });
+      
+      console.log(`✅ Enhanced ETG response generated successfully`);
       
       res.json({ 
-        response: response,
-        conversationId: etgConversationId 
+        response: finalResponse,
+        conversationId: etgConversationId,
+        toolsUsed: toolsUsed
       });
       return;
     }
