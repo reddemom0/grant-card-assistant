@@ -1082,7 +1082,7 @@
             charCount.textContent = `${length} / 2000`;
         }
 
-        // Message handling
+        // Message handling with typewriter effect
         function addMessage(role, content, time = 'Just now') {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
@@ -1096,22 +1096,114 @@
             
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            
-            // Add export button for completed business cases
-            if (role === 'assistant' && (content.includes('Question 1') || content.includes('**Question 1**'))) {
-                const exportButton = document.createElement('button');
-                exportButton.className = 'export-button';
-                exportButton.innerHTML = '💾 Export Business Case';
-                exportButton.onclick = () => exportBusinessCase(content);
-                contentDiv.appendChild(exportButton);
-            }
             
             wrapperDiv.appendChild(metaDiv);
             wrapperDiv.appendChild(contentDiv);
             messageDiv.appendChild(wrapperDiv);
             messagesContainer.appendChild(messageDiv);
+            
+            if (role === 'assistant') {
+                // Add typewriter effect for assistant messages
+                typewriterEffect(contentDiv, content, () => {
+                    // Add export button after typing completes if it's a business case
+                    if (content.includes('Question 1') || content.includes('**Question 1**')) {
+                        const exportButton = document.createElement('button');
+                        exportButton.className = 'export-button';
+                        exportButton.innerHTML = '💾 Export Business Case';
+                        exportButton.onclick = () => exportBusinessCase(content);
+                        contentDiv.appendChild(exportButton);
+                    }
+                });
+            } else {
+                // Instant display for user messages
+                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            }
+            
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+        
+        // Typewriter effect function
+        function typewriterEffect(element, text, onComplete) {
+            let index = 0;
+            const processedHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = processedHTML;
+            const fullText = tempDiv.textContent || tempDiv.innerText || '';
+            
+            element.innerHTML = '';
+            
+            // Track strong tags
+            const strongRegex = /\*\*(.*?)\*\*/g;
+            const strongMatches = [];
+            let match;
+            while ((match = strongRegex.exec(text)) !== null) {
+                strongMatches.push({
+                    start: text.indexOf(match[0]),
+                    end: text.indexOf(match[0]) + match[0].length,
+                    content: match[1]
+                });
+            }
+            
+            function typeChar() {
+                if (index < text.length) {
+                    // Check if we're at the start of a strong tag
+                    let isStrong = false;
+                    let strongContent = '';
+                    
+                    for (const sm of strongMatches) {
+                        if (index === sm.start) {
+                            strongContent = sm.content;
+                            isStrong = true;
+                            break;
+                        }
+                    }
+                    
+                    if (isStrong && strongContent) {
+                        // Add the entire strong content at once
+                        const strongElement = document.createElement('strong');
+                        strongElement.textContent = strongContent;
+                        element.appendChild(strongElement);
+                        index += strongContent.length + 4; // +4 for the ** markers
+                    } else if (text.substr(index, 2) === '**') {
+                        // Skip ** markers
+                        index += 2;
+                    } else {
+                        // Add regular character
+                        const char = text[index];
+                        
+                        // Check if we need to add to existing strong tag
+                        const lastChild = element.lastChild;
+                        if (lastChild && lastChild.nodeName === 'STRONG' && !lastChild.complete) {
+                            lastChild.textContent += char;
+                        } else {
+                            // Add to regular text
+                            if (element.lastChild && element.lastChild.nodeType === Node.TEXT_NODE) {
+                                element.lastChild.textContent += char;
+                            } else {
+                                element.appendChild(document.createTextNode(char));
+                            }
+                        }
+                        index++;
+                    }
+                    
+                    // Scroll to keep new text visible
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    
+                    // Variable typing speed for natural feel
+                    let delay = 20;
+                    const char = text[index - 1];
+                    if (char === '.' || char === '!' || char === '?') delay = 200;
+                    else if (char === ',' || char === ';') delay = 100;
+                    else if (char === '\n') delay = 150;
+                    else if (Math.random() < 0.1) delay = 50; // Random pauses
+                    
+                    setTimeout(typeChar, delay);
+                } else {
+                    if (onComplete) onComplete();
+                }
+            }
+            
+            typeChar();
         }
 
         function addLoadingMessage() {
