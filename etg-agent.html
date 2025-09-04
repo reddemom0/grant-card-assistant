@@ -1,15 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ETG Business Case Specialist - Granted Consulting</title>
-   
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"> 
-   
     <style>
         * {
             margin: 0;
@@ -751,7 +745,7 @@
             transform: translateY(-1px);
         }
         
-        /* Mobile Responsiveness */
+        /* Mobile Responsiveness - Adjusted for floating input */
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
@@ -765,10 +759,17 @@
             
             .messages {
                 max-height: 400px;
+                padding-bottom: 200px;
             }
             
             .message-wrapper {
                 max-width: 90%;
+            }
+            
+            .input-area {
+                left: 0;
+                margin-left: 1rem;
+                margin-right: 1rem;
             }
         }
     </style>
