@@ -1097,8 +1097,8 @@ async function loadFileContent(file, accessToken) {
       
       return await response.text();
       
-   } else if (mimeType === 'application/pdf') {
-  // Download and extract PDF content
+} else if (mimeType === 'application/pdf') {
+  // Download and extract PDF content with error handling
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
     {
@@ -1114,8 +1114,28 @@ async function loadFileContent(file, accessToken) {
   
   const buffer = await response.arrayBuffer();
   const pdf = require('pdf-parse');
-  const data = await pdf(Buffer.from(buffer));
-  return data.text;
+  
+  try {
+    // Try with default options first
+    const data = await pdf(Buffer.from(buffer));
+    return data.text;
+  } catch (error) {
+    // If parsing fails, try with more permissive options
+    console.log(`   ⚠️ PDF parsing warning for ${name}, trying fallback method...`);
+    try {
+      const data = await pdf(Buffer.from(buffer), {
+        // More permissive parsing options
+        normalizeWhitespace: false,
+        disableCombineTextItems: false,
+        max: 0 // No page limit
+      });
+      return data.text;
+    } catch (fallbackError) {
+      // If both methods fail, return partial content notice
+      console.log(`   ❌ PDF extraction failed for ${name}: ${fallbackError.message}`);
+      return `PDF Document: ${name}\n[Content extraction failed due to PDF formatting issues. Consider converting to Word or Google Doc format for better extraction.]`;
+    }
+  }
       
 } else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
   // Download and extract Word document content
