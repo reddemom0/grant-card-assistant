@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CanExport Claims Assistant - Granted Consulting</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --canexport-blue: #1e3a8a;
+            --canexport-light-blue: #3b82f6;
+            --claims-green: #059669;
+            --claims-red: #dc2626;
+            --claims-orange: #ea580c;
+            --granted-blue: #008abf;
+            --granted-gray: #6d7881;
+            --granted-light: #dde1e3;
+            --text-primary: #2c3e50;
+            --text-secondary: #6d7881;
+            --surface-white: #ffffff;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 50%, #f0fdf4 100%);
+            min-height: 100vh;
+            color: var(--text-primary);
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--granted-light);
+            box-shadow: 0 2px 12px rgba(30, 58, 138, 0.08);
+            padding: 0.75rem 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--canexport-blue), var(--canexport-light-blue));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.25rem;
+            position: relative;
+            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.25);
+        }
+        
+        .logo-text h1 {
+            font-size: 1.125rem;
+            font-weight: 300;
+            color: var(--canexport-blue);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        
+        .logo-text h1 .canexport {
+            color: var(--canexport-blue);
+            font-weight: 600;
+        }
+        
+        .logo-text p {
+            font-size: 0.75rem;
+            color: var(--granted-gray);
+            font-weight: 400;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-top: 0.125rem;
+        }
+        
+        .nav-link {
+            color: var(--granted-blue);
+            text-decoration: none;
+            padding: 0.375rem 0.75rem;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+            font-weight: 500;
+            font-size: 0.8rem;
+        }
+        
+        .nav-link:hover {
+            background: rgba(0, 138, 191, 0.1);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+            display: grid;
+            grid-template-columns: 340px 1fr;
+            gap: 1rem;
+            min-height: calc(100vh - 70px);
+        }
+        
+        .sidebar {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(30, 58, 138, 0.08);
+            padding: 1rem;
+            border: 1px solid rgba(30, 58, 138, 0.1);
+            height: fit-content;
+            display: flex;
+            flex-direction: column;
+            position: sticky;
+            top: calc(70px + 1rem);
+        }
+        
+        .expert-profile {
+            text-align: center;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--granted-light);
+        }
+        
+        .expert-avatar {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--canexport-blue), var(--canexport-light-blue));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.125rem;
+            font-weight: bold;
+            margin: 0 auto 0.75rem;
+            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
+        }
+        
+        .expert-profile h3 {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--canexport-blue);
+            margin-bottom: 0.25rem;
+        }
+        
+        .expert-profile p {
+            font-size: 0.75rem;
+            color: var(--granted-gray);
+            line-height: 1.3;
+        }
+        
+        .expense-tools {
+            margin-bottom: 1rem;
+            padding: 1rem;
+            background: rgba(5, 150, 105, 0.05);
+            border: 1px solid rgba(5, 150, 105, 0.2);
+            border-radius: 8px;
+        }
+        
+        .expense-tools h4 {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--canexport-blue);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .project-selector {
+            margin-bottom: 0.75rem;
+        }
+        
+        .project-selector label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        
+        .project-input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--granted-light);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            background: white;
+        }
+        
+        .expense-category-selector {
+            margin-bottom: 0.75rem;
+        }
+        
+        .category-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .category-btn {
+            padding: 0.5rem;
+            border: 1px solid var(--granted-light);
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.65rem;
+            transition: all 0.2s;
+            text-align: center;
+            line-height: 1.2;
+        }
+        
+        .category-btn:hover {
+            background: rgba(30, 58, 138, 0.05);
+            border-color: var(--canexport-blue);
+        }
+        
+        .category-btn.selected {
+            background: var(--canexport-blue);
+            color: white;
+            border-color: var(--canexport-blue);
+        }
+        
+        .submission-info {
+            background: rgba(30, 58, 138, 0.1);
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 0.75rem;
+        }
+        
+        .submission-info strong {
+            color: var(--canexport-blue);
+            font-size: 0.75rem;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+        
+        .submission-info small {
+            color: var(--text-secondary);
+            font-size: 0.65rem;
+            line-height: 1.3;
+            display: block;
+        }
+        
+        .audit-summary {
+            background: rgba(30, 58, 138, 0.1);
+            padding: 0.75rem;
+            border-radius: 6px;
+            text-align: center;
+            margin-top: 0.75rem;
+        }
+        
+        .audit-summary strong {
+            color: var(--canexport-blue);
+            font-size: 0.8rem;
+            display: block;
+        }
+        
+        .audit-summary small {
+            color: var(--text-secondary);
+            font-size: 0.65rem;
+            margin-top: 0.25rem;
+            display: block;
+        }
+        
+        .quick-actions h4 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--canexport-blue);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .action-button {
+            width: 100%;
+            text-align: left;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--granted-light);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+        }
+        
+        .action-button:hover {
+            background: rgba(30, 58, 138, 0.05);
+            border-color: var(--canexport-blue);
+            transform: translateY(-1px);
+        }
+        
+        .action-button.active {
+            background: rgba(30, 58, 138, 0.1);
+            border-color: var(--canexport-blue);
+            color: var(--canexport-blue);
+        }
+        
+        .action-icon {
+            font-size: 0.875rem;
+            width: 16px;
+            text-align: center;
+        }
+        
+        .eligibility-legend {
+            margin-top: auto;
+            padding-top: 1rem;
+            border-top: 1px solid var(--granted-light);
+        }
+        
+        .eligibility-legend h4 {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--canexport-blue);
+            margin-bottom: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .legend-item {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            padding: 0.375rem;
+            border-radius: 4px;
+            margin-bottom: 0.375rem;
+            border-left: 3px solid;
+            line-height: 1.2;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .legend-item.eligible {
+            background: rgba(5, 150, 105, 0.05);
+            border-color: var(--claims-green);
+        }
+        
+        .legend-item.ineligible {
+            background: rgba(220, 38, 38, 0.05);
+            border-color: var(--claims-red);
+        }
+        
+        .legend-item.conditional {
+            background: rgba(234, 88, 12, 0.05);
+            border-color: var(--claims-orange);
+        }
+        
+        .chat-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            box-shadow: 0 4px 16px rgba(30, 58, 138, 0.08);
+            display: flex;
+            flex-direction: column;
+            border: 1px solid rgba(30, 58, 138, 0.1);
+            min-height: calc(100vh - 140px);
+        }
+        
+        .chat-header {
+            padding: 0.875rem 1.25rem;
+            border-bottom: 1px solid var(--granted-light);
+            background: rgba(30, 58, 138, 0.02);
+            border-radius: 12px 12px 0 0;
+        }
+        
+        .chat-header h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--canexport-blue);
+            margin-bottom: 0.25rem;
+            letter-spacing: 0.25px;
+        }
+        
+        .chat-header p {
+            font-size: 0.75rem;
+            color: var(--granted-gray);
+        }
+        
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            max-height: calc(100vh - 350px);
+        }
+        
+        .message {
+            display: flex;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message.assistant {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            max-width: 85%;
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+            font-size: 0.875rem;
+        }
+        
+        .message.user .message-content {
+            background: var(--canexport-blue);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.assistant .message-content {
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--text-primary);
+            border: 1px solid var(--granted-light);
+            border-bottom-left-radius: 4px;
+        }
+        
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.9);
+            color: var(--granted-gray);
+            padding: 0.875rem 1rem;
+            border-radius: 12px;
+            max-width: 85%;
+            border: 1px solid var(--granted-light);
+            font-size: 0.8rem;
+        }
+        
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--granted-light);
+            border-top: 2px solid var(--canexport-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .input-area {
+            border-top: 1px solid var(--granted-light);
+            padding: 0.875rem;
+            background: rgba(30, 58, 138, 0.01);
+            border-radius: 0 0 12px 12px;
+        }
+        
+        .receipt-scanner {
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            border: 2px dashed rgba(30, 58, 138, 0.3);
+            border-radius: 8px;
+            background: rgba(30, 58, 138, 0.02);
+            transition: all 0.3s;
+            cursor: pointer;
+            text-align: center;
+        }
+        
+        .receipt-scanner:hover {
+            border-color: var(--canexport-blue);
+            background: rgba(30, 58, 138, 0.05);
+        }
+        
+        .receipt-scanner.has-file {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .scanner-icon {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--canexport-blue);
+        }
+        
+        .scanner-text {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        
+        .scanner-subtext {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+        
+        .quick-audit-buttons {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .quick-audit-btn {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--granted-light);
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .quick-audit-btn:hover {
+            background: rgba(30, 58, 138, 0.05);
+            border-color: var(--canexport-blue);
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 0.5rem;
+            align-items: flex-end;
+        }
+        
+        .message-input {
+            flex: 1;
+            border: 1px solid var(--granted-light);
+            border-radius: 8px;
+            padding: 0.75rem;
+            resize: none;
+            font-family: inherit;
+            font-size: 0.8rem;
+            background: rgba(255, 255, 255, 0.8);
+            transition: all 0.2s ease;
+            height: 60px;
+        }
+        
+        .message-input:focus {
+            outline: none;
+            border-color: var(--canexport-blue);
+            box-shadow: 0 0 0 2px rgba(30, 58, 138, 0.1);
+            background: white;
+        }
+        
+        .send-button {
+            padding: 0.75rem 1rem;
+            background: var(--canexport-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 4px rgba(30, 58, 138, 0.2);
+            height: fit-content;
+        }
+        
+        .send-button:hover:not(:disabled) {
+            background: #1e40af;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
+        }
+        
+        .send-button:disabled {
+            background: var(--granted-gray);
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .export-button {
+            margin-top: 0.5rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.375rem;
+            padding: 0.375rem 0.75rem;
+            background: var(--canexport-blue);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .export-button:hover {
+            background: #1e40af;
+            transform: translateY(-1px);
+        }
+        
+        .status-indicator {
+            width: 6px;
+            height: 6px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                gap: 0.75rem;
+                padding: 0.75rem;
+                min-height: calc(100vh - 60px);
+            }
+            
+            .sidebar {
+                order: 2;
+                position: static;
+                height: auto;
+            }
+            
+            .chat-panel {
+                order: 1;
+                min-height: 60vh;
+            }
+            
+            .messages {
+                max-height: 50vh;
+            }
+            
+            .header {
+                padding: 0.5rem 1rem;
+            }
+            
+            .category-grid {
+                grid-template-columns: 1fr;
+                gap: 0.4rem;
+            }
+            
+            .category-btn {
+                font-size: 0.6rem;
+                padding: 0.4rem;
+            }
+            
+            .quick-audit-buttons {
+                flex-direction: column;
+            }
+            
+            .quick-audit-btn {
+                font-size: 0.65rem;
+                padding: 0.4rem 0.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">💰</div>
+                <div class="logo-text">
+                    <h1><span class="canexport">CanExport</span> Claims Assistant</h1>
+                    <p>Granted AI Hub</p>
+                </div>
+            </div>
+            <div class="user-info">
+                <a href="index.html" class="nav-link">← Back to AI Hub</a>
+                <span>•</span>
+                <div class="status-indicator"></div>
+                <span>Team Member</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Expert Sidebar -->
+        <div class="sidebar">
+            <div class="expert-profile">
+                <div class="expert-avatar">CA</div>
+                <h3>Claims Audit Specialist</h3>
+                <p>CanExport SME expense eligibility verification and compliance auditing expert.</p>
+            </div>
+
+            <!-- Expense Analysis Tools -->
+            <div class="expense-tools">
+                <h4>🔍 Claims Processing</h4>
+                
+                <div class="project-selector">
+                    <label for="project-id">Project ID:</label>
+                    <input type="text" id="project-id" class="project-input" placeholder="CEE-2024-001">
+                </div>
+
+                <div class="expense-category-selector">
+                    <div style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #374151;">CanExport Categories:</div>
+                    <div class="category-grid">
+                        <button class="category-btn" data-category="travel">✈️ Travel (Cat A)</button>
+                        <button class="category-btn" data-category="tradeshow">🏢 Trade Events (Cat B)</button>
+                        <button class="category-btn" data-category="marketing">📢 Marketing (Cat C)</button>
+                        <button class="category-btn" data-category="interpretation">🗣️ Interpretation (Cat D)</button>
+                        <button class="category-btn" data-category="contracts">📝 Contracts (Cat E)</button>
+                        <button class="category-btn" data-category="business-legal">👔 Business/Legal (Cat F)</button>
+                        <button class="category-btn" data-category="market-research">📊 Market Research (Cat G)</button>
+                        <button class="category-btn" data-category="ip-protection">⚖️ IP Protection (Cat H)</button>
+                    </div>
+                </div>
+
+                <div class="submission-info">
+                    <strong>📋 Submission Requirements</strong>
+                    <small>• Maximum 4 claims per fiscal year<br>
+                    • Final report required with final claim<br>
+                    • 7 days to respond to audit requests<br>
+                    • All invoices must be in CAD or with Bank of Canada conversion</small>
+                </div>
+
+                <div class="audit-summary">
+                    <strong id="audit-status">Ready for Claims Review</strong>
+                    <small id="audit-details">Upload invoice and proof of payment to begin audit</small>
+                </div>
+            </div>
+
+            <div class="quick-actions">
+                <h4>Audit Actions</h4>
+                <button class="action-button" data-task="invoice-review">
+                    <span class="action-icon">📄</span>
+                    <span>Invoice Review</span>
+                </button>
+                <button class="action-button" data-task="proof-of-payment">
+                    <span class="action-icon">💳</span>
+                    <span>Proof of Payment</span>
+                </button>
+                <button class="action-button" data-task="category-eligibility">
+                    <span class="action-icon">✅</span>
+                    <span>Category Eligibility</span>
+                </button>
+                <button class="action-button" data-task="consultant-verification">
+                    <span class="action-icon">🔍</span>
+                    <span>Consultant Verification</span>
+                </button>
+                <button class="action-button" data-task="arms-length">
+                    <span class="action-icon">🤝</span>
+                    <span>Arms-Length Check</span>
+                </button>
+                <button class="action-button" data-task="currency-conversion">
+                    <span class="action-icon">💱</span>
+                    <span>Currency Conversion</span>
+                </button>
+                <button class="action-button" data-task="naming-convention">
+                    <span class="action-icon">📝</span>
+                    <span>File Naming Check</span>
+                </button>
+                <button class="action-button" data-task="audit-report">
+                    <span class="action-icon">📊</span>
+                    <span>Generate Audit Report</span>
+                </button>
+            </div>
+
+            <div class="eligibility-legend">
+                <h4>Eligibility Guide</h4>
+                <div class="legend-item eligible">
+                    <span>✅</span>
+                    <span>Eligible - Meets all CanExport requirements</span>
+                </div>
+                <div class="legend-item conditional">
+                    <span>⚠️</span>
+                    <span>Conditional - Additional documentation needed</span>
+                </div>
+                <div class="legend-item ineligible">
+                    <span>❌</span>
+                    <span>Ineligible - Does not qualify for reimbursement</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Interface -->
+        <div class="chat-panel">
+            <div class="chat-header">
+                <h3>CanExport SME Claims Audit Session</h3>
+                <p>Professional invoice and proof of payment verification per official guidelines</p>
+            </div>
+
+            <div class="messages" id="messages">
+                <div class="message assistant">
+                    <div class="message-content">
+                        <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Welcome! I'm your CanExport Claims audit specialist 💰</div>
+                        
+                        <div style="margin-bottom: 1rem;">I specialize in <strong>CanExport SME claims processing</strong> and help verify invoices, proof of payments, and documentation compliance per the official guidelines.</div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <div><strong>What I audit across all 8 CanExport Categories:</strong></div>
+                            <div>• <strong>Category A - Travel</strong> - International travel, airfare, per diem, ground transportation</div>
+                            <div>• <strong>Category B - Trade Events</strong> - Exhibition costs, booth fees, shipping, business meetings</div>
+                            <div>• <strong>Category C - Marketing</strong> - Promotional materials, website adaptation, translation, advertising</div>
+                            <div>• <strong>Category D - Interpretation</strong> - Professional interpreter services for key meetings</div>
+                            <div>• <strong>Category E - Contracts</strong> - Legal agreements adaptation, supplier diversity certification</div>
+                            <div>• <strong>Category F - Business/Legal</strong> - Expert business, tax, legal advice, regulatory compliance</div>
+                            <div>• <strong>Category G - Market Research</strong> - Export research, feasibility studies, B2B facilitation, contact lists</div>
+                            <div>• <strong>Category H - IP Protection</strong> - Patent filing, trademark registration, IP strategy development</div>
+                        </div>
+
+                        <div style="background: rgba(30, 58, 138, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #1e3a8a; margin-bottom: 0.5rem;">📋 Key Requirements</div>
+                            <div style="font-size: 0.875rem; color: #374151;">
+                                <div><strong>Invoice Date:</strong> Must be within project start and end dates</div>
+                                <div><strong>Payment Date:</strong> Must be within project duration</div>
+                                <div><strong>Billing:</strong> Must be to Canadian company in funding agreement</div>
+                                <div><strong>Taxes:</strong> GST, HST, international taxes NOT eligible</div>
+                                <div><strong>Currency:</strong> All amounts in CAD or with BoC conversion</div>
+                            </div>
+                        </div>
+
+                        <div>Upload invoices and proof of payment documents, or describe the expense you need audited per CanExport guidelines!</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <div class="receipt-scanner" onclick="document.getElementById('file-input').click()">
+                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" style="display: none;">
+                    <div class="scanner-icon">📸</div>
+                    <div class="scanner-text">Upload Invoice or Proof of Payment</div>
+                    <div class="scanner-subtext">Supports invoices, bank statements, receipts, reimbursement forms</div>
+                    <div id="file-info" style="display: none; margin-top: 0.5rem; font-size: 0.75rem; color: var(--success);"></div>
+                </div>
+
+                <div class="quick-audit-buttons">
+                    <button class="quick-audit-btn" onclick="insertQuickText('Review this CanExport invoice for compliance: ')">
+                        📄 Invoice Review
+                    </button>
+                    <button class="quick-audit-btn" onclick="insertQuickText('Verify proof of payment documentation: ')">
+                        💳 Payment Proof
+                    </button>
+                    <button class="quick-audit-btn" onclick="insertQuickText('Check Category A (Travel) eligibility: ')">
+                        ✈️ Travel Audit
+                    </button>
+                    <button class="quick-audit-btn" onclick="insertQuickText('Audit Category F (Business/Legal) consultant fees: ')">
+                        👔 Business/Legal
+                    </button>
+                    <button class="quick-audit-btn" onclick="insertQuickText('Review Category G (Market Research) expenses: ')">
+                        📊 Market Research
+                    </button>
+                    <button class="quick-audit-btn" onclick="insertQuickText('Verify Category H (IP Protection) costs: ')">
+                        ⚖️ IP Protection
+                    </button>
+                    <button class="quick-audit-btn" onclick="insertQuickText('Verify currency conversion using Bank of Canada rates: ')">
+                        💱 Currency Check
+                    </button>
+                    <button class="quick-audit-btn" onclick="insertQuickText('Generate complete claims audit report: ')">
+                        📊 Audit Report
+                    </button>
+                </div>
+
+                <div class="input-row">
+                    <textarea 
+                        id="message-input" 
+                        class="message-input" 
+                        placeholder="Upload CanExport invoice/proof of payment, or describe the expense for eligibility verification per official guidelines..."
+                    ></textarea>
+                    <button id="send-button" class="send-button">Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let isLoading = false;
+        let uploadedFile = null;
+        let selectedCategory = '';
+        let projectId = '';
+
+        // API configuration - uses same backend as other agents
+        const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+        // DOM elements
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const actionButtons = document.querySelectorAll('.action-button');
+        const projectIdInput = document.getElementById('project-id');
+        const auditStatus = document.getElementById('audit-status');
+        const auditDetails = document.getElementById('audit-details');
+        const categoryButtons = document.querySelectorAll('.category-btn');
+
+        // Category selection
+        categoryButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                categoryButtons.forEach(b => b.classList.remove('selected'));
+                button.classList.add('selected');
+                selectedCategory = button.dataset.category;
+                
+                updateAuditStatus();
+            });
+        });
+
+        // Project ID tracking
+        projectIdInput.addEventListener('input', () => {
+            projectId = projectIdInput.value.trim();
+            updateAuditStatus();
+        });
+
+        function updateAuditStatus() {
+            if (projectId && selectedCategory) {
+                auditStatus.textContent = `Ready: ${projectId} - ${selectedCategory}`;
+                auditDetails.textContent = 'Configuration complete, ready to audit CanExport claims';
+            } else if (projectId) {
+                auditStatus.textContent = `Project: ${projectId}`;
+                auditDetails.textContent = 'Select CanExport category to continue';
+            } else if (selectedCategory) {
+                auditStatus.textContent = `Category: ${selectedCategory}`;
+                auditDetails.textContent = 'Enter project ID to complete setup';
+            } else {
+                auditStatus.textContent = 'Ready for Claims Review';
+                auditDetails.textContent = 'Upload invoice and proof of payment to begin audit';
+            }
+        }
+
+        // Quick action buttons
+        actionButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                actionButtons.forEach(b => b.classList.remove('active'));
+                button.classList.add('active');
+                
+                const task = button.dataset.task;
+                const taskMessages = {
+                    'invoice-review': 'Review this CanExport invoice for all required elements per the guidelines.',
+                    'proof-of-payment': 'Verify the proof of payment documentation meets CanExport requirements.',
+                    'category-eligibility': 'Check the eligibility of this expense for the selected CanExport category (A-H).',
+                    'consultant-verification': 'Verify consultant/contractor independence and expertise requirements for Categories C-H.',
+                    'arms-length': 'Verify this is an arms-length transaction at fair market value with no company affiliation.',
+                    'currency-conversion': 'Verify currency conversion using Bank of Canada rates and proper documentation.',
+                    'naming-convention': 'Check if file naming follows the mandatory CanExport naming conventions.',
+                    'audit-report': 'Generate a complete CanExport claims audit report with all findings.'
+                };
+                
+                messageInput.value = taskMessages[task] || 'Help me audit this CanExport claim.';
+                setTimeout(() => sendMessage(), 100);
+            });
+        });
+
+        // File upload handling
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                uploadedFile = file;
+                
+                const fileSize = (file.size / 1024).toFixed(1);
+                const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+                
+                // Check if it's an image for OCR processing
+                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                const isImage = imageTypes.includes(fileExtension);
+                
+                fileInfo.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; font-size: 0.75rem; margin-top: 0.5rem;">
+                        <span style="color: #059669;">✓</span>
+                        <span style="color: #065f46; font-weight: 500;">${file.name}</span>
+                        <span style="color: #047857; font-size: 0.7rem;">(${fileSizeUnit})</span>
+                        ${isImage ? '<span style="color: #059669; font-size: 0.7rem;">📸 OCR Ready</span>' : ''}
+                    </div>
+                `;
+                fileInfo.style.display = 'block';
+                
+                const receiptScanner = document.querySelector('.receipt-scanner');
+                receiptScanner.classList.add('has-file');
+                receiptScanner.innerHTML = `
+                    <div class="scanner-icon" style="color: #059669;">✓</div>
+                    <div class="scanner-text">Ready: ${file.name}</div>
+                    <div class="scanner-subtext">${isImage ? 'Image will be processed with OCR' : 'Document ready for CanExport audit'}</div>
+                `;
+                
+                addMessage('user', `📎 **${file.name}** uploaded for CanExport claims audit${isImage ? ' (will scan with OCR)' : ''}`);
+                messageInput.focus();
+            }
+        });
+
+        // Send message functionality
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Quick text insertion
+        function insertQuickText(text) {
+            messageInput.value = text;
+            messageInput.focus();
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message && !uploadedFile) return;
+            if (isLoading) return;
+
+            if (message) {
+                addMessage('user', message);
+            }
+
+            isLoading = true;
+            sendButton.disabled = true;
+            addLoadingMessage();
+
+            try {
+                const formData = new FormData();
+                formData.append('message', message);
+                formData.append('conversationId', 'canexport-claims-conversation');
+                formData.append('expenseCategory', selectedCategory);
+                formData.append('projectId', projectId);
+                formData.append('agentType', 'canexport-claims');
+                
+                if (uploadedFile) {
+                    formData.append('file', uploadedFile);
+                }
+
+                const response = await fetch(`${API_BASE}/api/chat`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                removeLoadingMessage();
+                addMessage('assistant', data.response, true);
+
+                // Update audit status if analysis was performed
+                if (data.metadata && uploadedFile) {
+                    const metadata = data.metadata;
+                    if (metadata.expenseAmount) {
+                        auditStatus.textContent = `Scanned: $${metadata.expenseAmount}`;
+                        auditDetails.textContent = `Category: ${selectedCategory} | Analysis complete`;
+                    }
+                }
+
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('assistant', `I apologize, but I'm having trouble connecting right now. Please try again.\n\nError: ${error.message}`, false);
+            }
+
+            isLoading = false;
+            sendButton.disabled = false;
+            messageInput.value = '';
+            
+            if (uploadedFile) {
+                uploadedFile = null;
+                fileInfo.style.display = 'none';
+                fileInput.value = '';
+                const receiptScanner = document.querySelector('.receipt-scanner');
+                receiptScanner.classList.remove('has-file');
+                receiptScanner.innerHTML = `
+                    <div class="scanner-icon">📸</div>
+                    <div class="scanner-text">Upload Invoice or Proof of Payment</div>
+                    <div class="scanner-subtext">Supports invoices, bank statements, receipts, reimbursement forms</div>
+                `;
+            }
+            
+            actionButtons.forEach(b => b.classList.remove('active'));
+        }
+
+        function addMessage(role, content, shouldAnimate = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            if (role === 'assistant' && content.includes('CANEXPORT CLAIMS AUDIT')) {
+                const exportButton = document.createElement('button');
+                exportButton.className = 'export-button';
+                exportButton.innerHTML = '💾 Export Claims Audit';
+                exportButton.onclick = () => exportAuditReport(content);
+                contentDiv.appendChild(exportButton);
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addLoadingMessage() {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = 'loading-message';
+            
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.innerHTML = '<div class="spinner"></div><span>Auditing CanExport claim per official guidelines...</span>';
+            
+            messageDiv.appendChild(loadingDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function removeLoadingMessage() {
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+        }
+
+        function exportAuditReport(content) {
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `canexport-claims-audit-${new Date().toISOString().slice(0, 10)}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Initialize drag and drop for receipt scanner
+        document.addEventListener('DOMContentLoaded', function() {
+            const receiptScanner = document.querySelector('.receipt-scanner');
+            
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                receiptScanner.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                receiptScanner.addEventListener(eventName, () => {
+                    receiptScanner.style.background = 'rgba(30, 58, 138, 0.1)';
+                    receiptScanner.style.borderColor = '#1e3a8a';
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                receiptScanner.addEventListener(eventName, () => {
+                    receiptScanner.style.background = '';
+                    receiptScanner.style.borderColor = '';
+                }, false);
+            });
+            
+            receiptScanner.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    const file = files[0];
+                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                    
+                    if (allowedTypes.includes(fileExtension)) {
+                        Object.defineProperty(fileInput, 'files', {
+                            value: files,
+                            writable: false,
+                        });
+                        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    } else {
+                        addMessage('assistant', `❌ **File type not supported:** ${file.name}\n\nPlease upload: Invoices, bank statements, receipts, or reimbursement forms.`, false);
+                    }
+                }
+            }, false);
+        });
+    </script>
+</body>
+</html>
