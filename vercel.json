@@ -21,6 +21,10 @@
       "dest": "/bcafe-agent.html"
     },
     {
+      "src": "/canexport-claims",
+      "dest": "/canexport-claims.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
