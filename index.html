@@ -242,6 +242,10 @@
             --accent-color: #2d5016;
         }
         
+        .agent-card.canexport-claims {
+            --accent-color: #1e3a8a;
+        }
+        
         .agent-card.canexport-writer {
             --accent-color: #7c3aed;
         }
@@ -306,6 +310,12 @@
             padding: 0.375rem 0.75rem;
             border-radius: 6px;
             border: 1px solid rgba(5, 150, 105, 0.2);
+        }
+        
+        .agent-status.new {
+            color: #1e3a8a;
+            background: rgba(30, 58, 138, 0.1);
+            border-color: rgba(30, 58, 138, 0.2);
         }
         
         .agent-status.coming-soon {
@@ -513,6 +523,7 @@
         .agent-card:nth-child(4) { animation-delay: 0.3s; }
         .agent-card:nth-child(5) { animation-delay: 0.4s; }
         .agent-card:nth-child(6) { animation-delay: 0.5s; }
+        .agent-card:nth-child(7) { animation-delay: 0.6s; }
         
         @keyframes fadeInUp {
             to {
@@ -538,7 +549,7 @@
                     <span>👤 Team Member</span>
                     <span>•</span>
                     <div class="status-indicator"></div>
-                    <span>3 agents active</span>
+                    <span>4 agents active</span>
                 </div>
             </div>
         </div>
@@ -564,11 +575,11 @@
                     <div class="stat-label">Grants Processed This Month</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">45</div>
+                    <div class="stat-number">68</div>
                     <div class="stat-label">AI Tasks Completed This Week</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-number">BCAFE</div>
+                    <div class="stat-number">Claims</div>
                     <div class="stat-label">Newest Agent</div>
                 </div>
             </div>
@@ -605,6 +616,38 @@
                         <span>→</span>
                     </button>
                     <div class="usage-stats">247 cards created</div>
+                </div>
+            </div>
+
+            <!-- CanExport Claims Assistant -->
+            <div class="agent-card canexport-claims" onclick="openAgent('canexport-claims')">
+                <div class="agent-header">
+                    <div class="agent-icon">💰</div>
+                    <div class="agent-info">
+                        <h3>CanExport Claims Assistant</h3>
+                        <span class="agent-status new">
+                            <div style="width: 8px; height: 8px; background: #1e3a8a; border-radius: 50%;"></div>
+                            New
+                        </span>
+                    </div>
+                </div>
+                <p class="agent-description">
+                    Professional CanExport SME claims auditing specialist. Verifies invoices, proof of payments, 
+                    and documentation compliance across all 8 expense categories per official guidelines.
+                </p>
+                <ul class="agent-features">
+                    <li>Invoice & proof of payment verification</li>
+                    <li>All 8 CanExport SME categories (A-H)</li>
+                    <li>Currency conversion & Bank of Canada rates</li>
+                    <li>Arms-length transaction verification</li>
+                    <li>File naming convention compliance</li>
+                </ul>
+                <div class="agent-action">
+                    <button class="agent-button">
+                        <span>Open Claims Auditor</span>
+                        <span>→</span>
+                    </button>
+                    <div class="usage-stats">Newly launched</div>
                 </div>
             </div>
 
@@ -668,7 +711,7 @@
                         <span>Open Specialist</span>
                         <span>→</span>
                     </button>
-                    <div class="usage-stats">New agent</div>
+                    <div class="usage-stats">Active agent</div>
                 </div>
             </div>
 
@@ -774,14 +817,17 @@
             <h2>Ready to Transform Your Workflow?</h2>
             <p>
                 Each AI agent is trained on your proprietary knowledge base and industry best practices. 
-                Start with the Grant Card Assistant or try our newest BC Agriculture Export specialist.
+                Start with the Grant Card Assistant or try our newest CanExport Claims auditing specialist.
             </p>
             <div class="cta-buttons">
                 <a href="#" class="cta-button primary" onclick="openAgent('grant-cards')">
                     Start with Grant Cards
                 </a>
+                <a href="#" class="cta-button" onclick="openAgent('canexport-claims')">
+                    Try Claims Assistant
+                </a>
                 <a href="#" class="cta-button" onclick="openAgent('bcafe-writer')">
-                    Try BC Agriculture Export
+                    BC Agriculture Export
                 </a>
                 <a href="#" class="cta-button" onclick="openAgent('etg-writer')">
                     ETG Specialist
@@ -824,6 +870,10 @@
             const agentMap = {
                 'grant-cards': {
                     url: '/grant-cards',
+                    active: true
+                },
+                'canexport-claims': {
+                    url: '/canexport-claims',
                     active: true
                 },
                 'etg-writer': {
