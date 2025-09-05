@@ -212,6 +212,64 @@ let knowledgeBaseLoaded = false;
 let knowledgeBaseCacheTime = 0;
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
+// Agent type to folder mapping
+const AGENT_FOLDER_MAP = {
+  'grant-cards': 'grant-cards',
+  'etg-writer': 'etg', 
+  'bcafe-writer': 'bcafe',
+  'canexport-writer': 'canexport',
+  'readiness-strategist': 'readiness-strategist',
+  'internal-oracle': 'internal-oracle'
+};
+
+// Agent-specific knowledge base cache
+let agentKnowledgeCache = new Map();
+let agentCacheTimestamps = new Map();
+
+// Get knowledge base for specific agent only
+async function getAgentKnowledgeBase(agentType) {
+  const folderName = AGENT_FOLDER_MAP[agentType];
+  if (!folderName) {
+    console.log(`⚠️ Unknown agent type: ${agentType}, falling back to grant-cards`);
+    return knowledgeBases['grant-cards'] || [];
+  }
+  
+  const cacheKey = `agent-${agentType}`;
+  const now = Date.now();
+  const lastCached = agentCacheTimestamps.get(cacheKey) || 0;
+  
+  // Check if we have valid cached documents for this agent
+  if (agentKnowledgeCache.has(cacheKey) && 
+      (now - lastCached < CACHE_DURATION)) {
+    console.log(`🎯 Using cached knowledge base for ${agentType} (${agentKnowledgeCache.get(cacheKey).length} docs)`);
+    return agentKnowledgeCache.get(cacheKey);
+  }
+  
+  // If not cached or expired, load from the full knowledge base
+  // First ensure the full knowledge base is loaded
+  await getKnowledgeBase();
+  
+  // Extract agent-specific documents from the full knowledge base
+  const agentDocs = knowledgeBases[folderName] || [];
+  
+  console.log(`📚 Loaded ${agentDocs.length} documents for agent: ${agentType} (folder: ${folderName})`);
+  
+  // Cache the results
+  agentKnowledgeCache.set(cacheKey, agentDocs);
+  agentCacheTimestamps.set(cacheKey, now);
+  
+  return agentDocs;
+}
+
+// Performance monitoring function
+function logAgentPerformance(agentType, docsLoaded, loadTimeMs) {
+  console.log(`📊 Agent Performance - ${agentType.toUpperCase()}:`);
+  console.log(`   Documents loaded: ${docsLoaded}`);
+  console.log(`   Load time: ${loadTimeMs}ms`);
+  console.log(`   Memory efficiency: ${docsLoaded < 100 ? '✅ Optimized' : '⚠️ Heavy'}`);
+  console.log(`   Cache status: ${agentKnowledgeCache.has(`agent-${agentType}`) ? '🎯 Cached' : '🔄 Fresh load'}`);
+}
+
 // ETG Eligibility Checker Function
 function checkETGEligibility(trainingData) {
     const { training_title = '', training_type = '', training_content = '', training_duration = '' } = trainingData;
@@ -859,6 +917,205 @@ function selectBCAFEDocuments(message, orgType, conversationHistory) {
   }
   
   // Remove duplicates and limit to 3 documents max
+  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
+  return uniqueDocs.slice(0, 3);
+}
+
+// Enhanced document selection for Grant Cards with agent-specific loading
+function selectGrantCardDocumentsOptimized(task, message, fileContent, conversationHistory, agentDocs) {
+  const msg = message.toLowerCase();
+  const selectedDocs = [];
+  
+  // Determine what the user needs based on task and message content
+  const needsFormatter = task === 'grant-criteria' || msg.includes('criteria') || msg.includes('format');
+  const needsPreview = task === 'preview' || msg.includes('preview') || msg.includes('description');
+  const needsRequirements = task === 'requirements' || msg.includes('requirements') || msg.includes('general');
+  const needsInsights = task === 'insights' || msg.includes('insights') || msg.includes('strategy');
+  const needsCategories = task === 'categories' || msg.includes('categories') || msg.includes('tags');
+  const needsMissing = task === 'missing-info' || msg.includes('missing') || msg.includes('gaps');
+  
+  // Large file uploaded - reduce knowledge base to save context
+  const isLargeFile = fileContent && fileContent.length > 50000;
+  const maxDocs = isLargeFile ? 1 : 3;
+  
+  // Select task-specific documents from agent docs
+  if (needsFormatter) {
+    const formatterDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
+      doc.filename.toLowerCase().includes('grant-criteria-formatter') ||
+      doc.filename.toLowerCase().includes('formatter')
+    );
+    if (formatterDoc) selectedDocs.push(formatterDoc);
+  }
+  
+  if (needsPreview) {
+    const previewDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('preview_section_generator') ||
+      doc.filename.toLowerCase().includes('preview-section-generator') ||
+      doc.filename.toLowerCase().includes('preview')
+    );
+    if (previewDoc) selectedDocs.push(previewDoc);
+  }
+  
+  if (needsRequirements) {
+    const reqDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('general_requirements_creator') ||
+      doc.filename.toLowerCase().includes('general-requirements-creator') ||
+      doc.filename.toLowerCase().includes('requirements')
+    );
+    if (reqDoc) selectedDocs.push(reqDoc);
+  }
+  
+  if (needsInsights) {
+    const insightsDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('granted_insights_generator') ||
+      doc.filename.toLowerCase().includes('granted-insights-generator') ||
+      doc.filename.toLowerCase().includes('insights')
+    );
+    if (insightsDoc) selectedDocs.push(insightsDoc);
+  }
+  
+  if (needsCategories) {
+    const categoriesDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('categories_tags_classifier') ||
+      doc.filename.toLowerCase().includes('categories-tags-classifier') ||
+      doc.filename.toLowerCase().includes('categories')
+    );
+    if (categoriesDoc) selectedDocs.push(categoriesDoc);
+  }
+  
+  if (needsMissing) {
+    const missingDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('missing_info_generator') ||
+      doc.filename.toLowerCase().includes('missing-info-generator') ||
+      doc.filename.toLowerCase().includes('missing')
+    );
+    if (missingDoc) selectedDocs.push(missingDoc);
+  }
+  
+  // Default fallback - include grant criteria formatter if nothing selected
+  if (selectedDocs.length === 0) {
+    const formatterDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('formatter') ||
+      doc.filename.toLowerCase().includes('criteria')
+    );
+    if (formatterDoc) selectedDocs.push(formatterDoc);
+  }
+  
+  // Remove duplicates and limit based on file size
+  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
+  return uniqueDocs.slice(0, maxDocs);
+}
+
+// Enhanced document selection for ETG agent
+function selectETGDocumentsOptimized(message, conversationHistory, agentDocs) {
+  const msg = message.toLowerCase();
+  const selectedDocs = [];
+  
+  // Determine what the user needs
+  const needsEligibility = msg.includes('eligible') || msg.includes('eligibility') || 
+                          conversationHistory.length <= 2;
+  const needsBusinessCase = msg.includes('business case') || msg.includes('questions') ||
+                           msg.includes('application');
+  const needsExamples = msg.includes('example') || msg.includes('similar') || 
+                       msg.includes('successful');
+  
+  // Select relevant documents based on needs
+  if (needsEligibility) {
+    const eligibilityDocs = agentDocs.filter(doc => 
+      doc.filename.toLowerCase().includes('eligibility') ||
+      doc.filename.toLowerCase().includes('requirements')
+    );
+    selectedDocs.push(...eligibilityDocs.slice(0, 2));
+  }
+  
+  if (needsBusinessCase) {
+    const businessCaseDocs = agentDocs.filter(doc => 
+      doc.filename.toLowerCase().includes('business case') ||
+      doc.filename.toLowerCase().includes('questions') ||
+      doc.filename.toLowerCase().includes('template')
+    );
+    selectedDocs.push(...businessCaseDocs.slice(0, 2));
+  }
+  
+  if (needsExamples) {
+    const exampleDocs = agentDocs.filter(doc => 
+      doc.filename.toLowerCase().includes('example') ||
+      doc.filename.toLowerCase().includes('successful') ||
+      doc.filename.toLowerCase().includes('sample')
+    );
+    selectedDocs.push(...exampleDocs.slice(0, 1));
+  }
+  
+  // Default fallback
+  if (selectedDocs.length === 0) {
+    selectedDocs.push(...agentDocs.slice(0, 3));
+  }
+  
+  // Remove duplicates and limit to 5 docs max
+  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
+  return uniqueDocs.slice(0, 5);
+}
+
+// Enhanced document selection for BCAFE agent
+function selectBCAFEDocumentsOptimized(message, orgType, conversationHistory, agentDocs) {
+  const msg = message.toLowerCase();
+  const selectedDocs = [];
+  
+  // Determine user needs
+  const needsEligibility = msg.includes('eligible') || msg.includes('qualify') || 
+                          conversationHistory.length <= 2;
+  const needsMerit = msg.includes('merit') || msg.includes('optimize') || 
+                    msg.includes('scoring') || msg.includes('competitive');
+  const needsBudget = msg.includes('budget') || msg.includes('cost') || 
+                     msg.includes('funding');
+  const needsApplication = msg.includes('application') || msg.includes('create');
+  
+  // Select relevant documents
+  if (needsEligibility) {
+    const eligibilityDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('eligibility')
+    );
+    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
+  }
+  
+  if (needsMerit) {
+    const meritDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('merit') ||
+      doc.filename.toLowerCase().includes('criteria')
+    );
+    if (meritDoc) selectedDocs.push(meritDoc);
+  }
+  
+  if (needsBudget) {
+    const budgetDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('budget')
+    );
+    if (budgetDoc) selectedDocs.push(budgetDoc);
+  }
+  
+  if (needsApplication) {
+    const appDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('application') ||
+      doc.filename.toLowerCase().includes('questions')
+    );
+    if (appDoc) selectedDocs.push(appDoc);
+  }
+  
+  // Default fallback
+  if (selectedDocs.length === 0) {
+    const eligibilityDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('eligibility')
+    );
+    const guideDoc = agentDocs.find(doc => 
+      doc.filename.toLowerCase().includes('guide') ||
+      doc.filename.toLowerCase().includes('criteria')
+    );
+    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
+    if (guideDoc) selectedDocs.push(guideDoc);
+  }
+  
+  // Remove duplicates and limit to 3 docs max
   const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
   return uniqueDocs.slice(0, 3);
 }
@@ -1568,94 +1825,104 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Process grant document (for Grant Card Assistant) - ENHANCED WITH INTELLIGENT DOCUMENT SELECTION
-    if (url === '/api/process-grant' && method === 'POST') {
-      // Handle file upload with multer
-      await new Promise((resolve, reject) => {
-        upload.single('file')(req, res, (err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
+   // Process grant document (for Grant Card Assistant) - OPTIMIZED WITH AGENT-SPECIFIC LOADING
+if (url === '/api/process-grant' && method === 'POST') {
+  const startTime = Date.now();
+  
+  // Handle file upload with multer
+  await new Promise((resolve, reject) => {
+    upload.single('file')(req, res, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
 
-      const { message, task, conversationId } = req.body;
-      let fileContent = '';
-      
-      // Process uploaded file if present
-      if (req.file) {
-        fileContent = await processFileContent(req.file);
-      }
-      
-      // Get or create conversation
-      if (!conversations.has(conversationId)) {
-        conversations.set(conversationId, []);
-      }
-      const conversation = conversations.get(conversationId);
-      
-      // INTELLIGENT DOCUMENT SELECTION for Grant Cards
-      const relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation);
-      let knowledgeContext = '';
+  const { message, task, conversationId } = req.body;
+  let fileContent = '';
+  
+  // Process uploaded file if present
+  if (req.file) {
+    fileContent = await processFileContent(req.file);
+  }
+  
+  // Get or create conversation
+  if (!conversations.has(conversationId)) {
+    conversations.set(conversationId, []);
+  }
+  const conversation = conversations.get(conversationId);
+  
+  // 🎯 AGENT-SPECIFIC KNOWLEDGE BASE LOADING
+  const agentDocs = await getAgentKnowledgeBase('grant-cards');
+  const loadTime = Date.now() - startTime;
+  
+  // Log performance
+  logAgentPerformance('grant-cards', agentDocs.length, loadTime);
+  
+  // 🎯 INTELLIGENT DOCUMENT SELECTION from agent-specific docs
+  const relevantDocs = selectGrantCardDocumentsOptimized(task, message, fileContent, conversation, agentDocs);
+  let knowledgeContext = '';
 
-      if (relevantDocs.length > 0) {
-        knowledgeContext = relevantDocs
-          .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
-          .join('\n\n');
-          
-        console.log(`📚 Selected Grant Card documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
-      } else {
-        console.log(`📚 No specific Grant Card documents found for task: ${task}`);
-      }
+  if (relevantDocs.length > 0) {
+    knowledgeContext = relevantDocs
+      .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+      .join('\n\n');
       
-      // Check if this is a Grant Card task (uses shared persona) or other agent
-      const isGrantCardTask = ['grant-criteria', 'preview', 'requirements', 'insights', 'categories', 'missing-info'].includes(task);
+    console.log(`📚 Selected Grant Card documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
+  } else {
+    console.log(`📚 No specific Grant Card documents found for task: ${task}`);
+  }
+  
+  // Check if this is a Grant Card task (uses shared persona) or other agent
+  const isGrantCardTask = ['grant-criteria', 'preview', 'requirements', 'insights', 'categories', 'missing-info'].includes(task);
 
-      let systemPrompt;
-      if (isGrantCardTask) {
-        // Use the shared persona + task methodology builder
-        systemPrompt = buildGrantCardSystemPrompt(task, knowledgeContext);
-      } else {
-        // Use the individual agent prompt (ETG, etc.)
-        systemPrompt = `${agentPrompts[task] || agentPrompts['etg-writer']}
+  let systemPrompt;
+  if (isGrantCardTask) {
+    systemPrompt = buildGrantCardSystemPrompt(task, knowledgeContext);
+  } else {
+    systemPrompt = `${agentPrompts[task] || agentPrompts['etg-writer']}
 
 KNOWLEDGE BASE CONTEXT:
 ${knowledgeContext}
 
 Always follow the exact workflows and instructions from the knowledge base documents above.`;
-      }
-      
-      // Add user message to conversation
-      let userMessage = message;
-      if (fileContent) {
-        userMessage += `\n\nUploaded document content:\n${fileContent}`;
-      }
+  }
+  
+  // Add user message to conversation
+  let userMessage = message;
+  if (fileContent) {
+    userMessage += `\n\nUploaded document content:\n${fileContent}`;
+  }
 
-      // ENHANCED CONTEXT MANAGEMENT
-      const agentType = getAgentType(url, conversationId);
-      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+  // ENHANCED CONTEXT MANAGEMENT
+  const agentType = getAgentType(url, conversationId);
+  const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
 
-      // Log context usage
-      logContextUsage(agentType, estimatedContext, conversation.length);
-
-      // Smart conversation pruning
-      pruneConversation(conversation, agentType, estimatedContext);
-      
-      conversation.push({ role: 'user', content: userMessage });
-      
-      // Get response from Claude with rate limiting
-      const response = await callClaudeAPI(conversation, systemPrompt);
-      
-      // Add assistant response to conversation
-      conversation.push({ role: 'assistant', content: response });
-      
-      res.json({ 
-        response: response,
-        conversationId: conversationId 
-      });
-      return;
+  logContextUsage(agentType, estimatedContext, conversation.length);
+  pruneConversation(conversation, agentType, estimatedContext);
+  
+  conversation.push({ role: 'user', content: userMessage });
+  
+  // Get response from Claude with rate limiting
+  const response = await callClaudeAPI(conversation, systemPrompt);
+  
+  // Add assistant response to conversation
+  conversation.push({ role: 'assistant', content: response });
+  
+  res.json({ 
+    response: response,
+    conversationId: conversationId,
+    performance: {
+      documentsLoaded: agentDocs.length,
+      documentsSelected: relevantDocs.length,
+      loadTimeMs: loadTime
     }
+  });
+  return;
+}
 
     // Process ETG requests (enhanced endpoint for ETG Writer)
     if (url === '/api/process-etg' && method === 'POST') {
+      const startTime = Date.now();
       await new Promise((resolve, reject) => {
         upload.single('file')(req, res, (err) => {
           if (err) reject(err);
@@ -1737,18 +2004,21 @@ Always follow the exact workflows and instructions from the knowledge base docum
         }
       }
       
-      // Search knowledge base for ETG-specific information
-      const relevantKnowledge = searchKnowledgeBase('etg business case training grant', 'etg');
-      let knowledgeContext = '';
-      
-      if (relevantKnowledge.length > 0) {
-        knowledgeContext = relevantKnowledge
-          .slice(0, 5)
-          .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
-          .join('\n\n');
-          
-        console.log(`📚 Using ${relevantKnowledge.length} ETG knowledge base documents`);
-      }
+  // 🎯 AGENT-SPECIFIC KNOWLEDGE BASE LOADING
+const agentDocs = await getAgentKnowledgeBase('etg-writer');
+const loadTime = Date.now() - startTime;
+logAgentPerformance('etg-writer', agentDocs.length, loadTime);
+
+const relevantDocs = selectETGDocumentsOptimized(message, conversation, agentDocs);
+let knowledgeContext = '';
+
+if (relevantDocs.length > 0) {
+  knowledgeContext = relevantDocs
+    .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+    .join('\n\n');
+    
+  console.log(`📚 Using ${relevantDocs.length} ETG documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
+}
       
       // Build ETG system prompt with knowledge context
       const systemPrompt = `${agentPrompts['etg-writer']}
@@ -1836,7 +2106,9 @@ Use the ETG knowledge base above to find similar successful applications and mat
       const conversation = conversations.get(bcafeConversationId);
       
       // INTELLIGENT DOCUMENT SELECTION - Only relevant docs per query
-      const relevantDocs = selectBCAFEDocuments(message, orgType, conversation);
+     // 🎯 AGENT-SPECIFIC KNOWLEDGE BASE LOADING
+const agentDocs = await getAgentKnowledgeBase('bcafe-writer');
+const relevantDocs = selectBCAFEDocumentsOptimized(message, orgType, conversation, agentDocs);
       
       let knowledgeContext = '';
       if (relevantDocs.length > 0) {
