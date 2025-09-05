@@ -5,11 +5,15 @@ const pdf = require('pdf-parse');
 const path = require('path');
 const crypto = require('crypto');
 
-// Authentication configuration with JWT
+// Authentication configuration with JWT - FIXED: Require JWT secret
 const TEAM_PASSWORD = process.env.TEAM_PASSWORD;
 const SESSION_COOKIE_NAME = 'granted_session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
-const JWT_SECRET = process.env.JWT_SECRET || 'granted-consulting-jwt-secret-2025-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required for security');
+}
 
 // Optimized conversation limits
 const CONVERSATION_LIMITS = {
@@ -27,6 +31,33 @@ const CONTEXT_ABSOLUTE_LIMIT = 200000;     // Claude's actual limit
 const TOKENS_PER_EXCHANGE = 950;           // Average user + assistant pair
 const TOKENS_PER_CHAR = 0.25;             // Rough token-to-character ratio
 
+// Conversation cleanup - FIXED: Add memory management
+const CONVERSATION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+const conversationTimestamps = new Map();
+
+function cleanupExpiredConversations() {
+  const now = Date.now();
+  for (const [id, timestamp] of conversationTimestamps.entries()) {
+    if (now - timestamp > CONVERSATION_EXPIRY) {
+      conversations.delete(id);
+      conversationTimestamps.delete(id);
+    }
+  }
+}
+
+// FIXED: Proper base64url encoding for older Node.js versions
+function base64UrlEncode(buffer) {
+  return buffer.toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
+function base64UrlDecode(str) {
+  str += '='.repeat((4 - str.length % 4) % 4);
+  return Buffer.from(str.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
+}
+
 // Generate JWT token
 function generateJWTToken() {
   const payload = {
@@ -37,13 +68,14 @@ function generateJWTToken() {
   
   // Simple JWT implementation for serverless
   const header = { alg: 'HS256', typ: 'JWT' };
-  const headerBase64 = Buffer.from(JSON.stringify(header)).toString('base64url');
-  const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const headerBase64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
+  const payloadBase64 = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
   
   const signData = `${headerBase64}.${payloadBase64}`;
-  const signature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest('base64url');
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest();
+  const signatureBase64 = base64UrlEncode(signature);
   
-  return `${headerBase64}.${payloadBase64}.${signature}`;
+  return `${headerBase64}.${payloadBase64}.${signatureBase64}`;
 }
 
 // Check if request is authenticated with JWT
@@ -62,12 +94,13 @@ function isAuthenticated(req) {
     
     // Verify signature
     const signData = `${headerBase64}.${payloadBase64}`;
-    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest('base64url');
+    const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest();
+    const expectedSignatureBase64 = base64UrlEncode(expectedSignature);
     
-    if (signature !== expectedSignature) return false;
+    if (signature !== expectedSignatureBase64) return false;
     
     // Check expiration
-    const payload = JSON.parse(Buffer.from(payloadBase64, 'base64url').toString());
+    const payload = JSON.parse(base64UrlDecode(payloadBase64).toString());
     if (Date.now() > payload.expires) return false;
     
     return true;
@@ -117,16 +150,42 @@ function estimateContextSize(conversation, knowledgeContext, systemPrompt, curre
   return Math.ceil(convTokens + kbTokens + sysTokens + msgTokens + responseBuffer);
 }
 
+// FIXED: Complete agent type mapping
+const AGENT_URL_MAP = {
+  '/api/process-grant': 'grant-cards',
+  '/api/process-etg': 'etg-writer',
+  '/api/process-bcafe': 'bcafe-writer',
+  '/api/process-canexport': 'canexport-writer',
+  '/api/process-readiness': 'readiness-strategist',
+  '/api/process-oracle': 'internal-oracle'
+};
+
+const AGENT_FOLDER_MAP = {
+  'grant-cards': 'grant-cards',
+  'etg-writer': 'etg', 
+  'bcafe-writer': 'bcafe',
+  'canexport-writer': 'canexport',
+  'readiness-strategist': 'readiness-strategist',
+  'internal-oracle': 'internal-oracle'
+};
+
 // Get agent type from endpoint or conversation ID
 function getAgentType(url, conversationId) {
-  if (url.includes('/api/process-grant')) return 'grant-cards';
-  if (url.includes('/api/process-etg')) return 'etg-writer';
-  if (url.includes('/api/process-bcafe')) return 'bcafe-writer';
+  // Check URL mapping first
+  for (const [urlPattern, agentType] of Object.entries(AGENT_URL_MAP)) {
+    if (url.includes(urlPattern)) {
+      return agentType;
+    }
+  }
   
   // Fallback: extract from conversation ID
-  if (conversationId.includes('etg')) return 'etg-writer';
-  if (conversationId.includes('bcafe')) return 'bcafe-writer';
-  return 'grant-cards';
+  if (conversationId?.includes('etg')) return 'etg-writer';
+  if (conversationId?.includes('bcafe')) return 'bcafe-writer';
+  if (conversationId?.includes('canexport')) return 'canexport-writer';
+  if (conversationId?.includes('readiness')) return 'readiness-strategist';
+  if (conversationId?.includes('oracle')) return 'internal-oracle';
+  
+  return 'grant-cards'; // Default fallback
 }
 
 // Smart conversation pruning with context awareness
@@ -192,7 +251,7 @@ let knowledgeBases = {
   'internal-oracle': []
 };
 
-// Rate limiting variables
+// Rate limiting variables - FIXED: Add safeguards
 let lastAPICall = 0;
 const RATE_LIMIT_DELAY = 3000; // 3 seconds between API calls
 let apiCallCount = 0;
@@ -212,21 +271,20 @@ let knowledgeBaseLoaded = false;
 let knowledgeBaseCacheTime = 0;
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
-// Agent type to folder mapping
-const AGENT_FOLDER_MAP = {
-  'grant-cards': 'grant-cards',
-  'etg-writer': 'etg', 
-  'bcafe-writer': 'bcafe',
-  'canexport-writer': 'canexport',
-  'readiness-strategist': 'readiness-strategist',
-  'internal-oracle': 'internal-oracle'
-};
-
 // Agent-specific knowledge base cache
 let agentKnowledgeCache = new Map();
 let agentCacheTimestamps = new Map();
 
-// Get knowledge base for specific agent only
+// Performance monitoring function
+function logAgentPerformance(agentType, docsLoaded, loadTimeMs) {
+  console.log(`📊 Agent Performance - ${agentType.toUpperCase()}:`);
+  console.log(`   Documents loaded: ${docsLoaded}`);
+  console.log(`   Load time: ${loadTimeMs}ms`);
+  console.log(`   Memory efficiency: ${docsLoaded < 100 ? '✅ Optimized' : '⚠️ Heavy'}`);
+  console.log(`   Cache status: ${agentKnowledgeCache.has(`agent-${agentType}`) ? '🎯 Cached' : '🔄 Fresh load'}`);
+}
+
+// Get knowledge base for specific agent only - FIXED: Add null checks
 async function getAgentKnowledgeBase(agentType) {
   const folderName = AGENT_FOLDER_MAP[agentType];
   if (!folderName) {
@@ -259,15 +317,6 @@ async function getAgentKnowledgeBase(agentType) {
   agentCacheTimestamps.set(cacheKey, now);
   
   return agentDocs;
-}
-
-// Performance monitoring function
-function logAgentPerformance(agentType, docsLoaded, loadTimeMs) {
-  console.log(`📊 Agent Performance - ${agentType.toUpperCase()}:`);
-  console.log(`   Documents loaded: ${docsLoaded}`);
-  console.log(`   Load time: ${loadTimeMs}ms`);
-  console.log(`   Memory efficiency: ${docsLoaded < 100 ? '✅ Optimized' : '⚠️ Heavy'}`);
-  console.log(`   Cache status: ${agentKnowledgeCache.has(`agent-${agentType}`) ? '🎯 Cached' : '🔄 Fresh load'}`);
 }
 
 // ETG Eligibility Checker Function
@@ -774,9 +823,9 @@ COMMUNICATION APPROACH:
 Follow the detailed processes outlined in the knowledge base documents rather than attempting to recreate them.`
 };
 
-// INTELLIGENT GRANT CARD DOCUMENT SELECTION FUNCTION
-function selectGrantCardDocuments(task, message, fileContent, conversationHistory) {
-  const docs = knowledgeBases['grant-cards'] || [];
+// FIXED: Updated document selection functions to accept agent docs
+function selectGrantCardDocuments(task, message, fileContent, conversationHistory, agentDocs = null) {
+  const docs = agentDocs || knowledgeBases['grant-cards'] || [];
   const msg = message.toLowerCase();
   const selectedDocs = [];
   
@@ -796,7 +845,8 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   if (needsFormatter) {
     const formatterDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
-      doc.filename.toLowerCase().includes('grant-criteria-formatter')
+      doc.filename.toLowerCase().includes('grant-criteria-formatter') ||
+      doc.filename.toLowerCase().includes('formatter')
     );
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
@@ -804,7 +854,8 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   if (needsPreview) {
     const previewDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('preview_section_generator') ||
-      doc.filename.toLowerCase().includes('preview-section-generator')
+      doc.filename.toLowerCase().includes('preview-section-generator') ||
+      doc.filename.toLowerCase().includes('preview')
     );
     if (previewDoc) selectedDocs.push(previewDoc);
   }
@@ -812,7 +863,8 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   if (needsRequirements) {
     const reqDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('general_requirements_creator') ||
-      doc.filename.toLowerCase().includes('general-requirements-creator')
+      doc.filename.toLowerCase().includes('general-requirements-creator') ||
+      doc.filename.toLowerCase().includes('requirements')
     );
     if (reqDoc) selectedDocs.push(reqDoc);
   }
@@ -820,7 +872,8 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   if (needsInsights) {
     const insightsDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('granted_insights_generator') ||
-      doc.filename.toLowerCase().includes('granted-insights-generator')
+      doc.filename.toLowerCase().includes('granted-insights-generator') ||
+      doc.filename.toLowerCase().includes('insights')
     );
     if (insightsDoc) selectedDocs.push(insightsDoc);
   }
@@ -828,7 +881,8 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   if (needsCategories) {
     const categoriesDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('categories_tags_classifier') ||
-      doc.filename.toLowerCase().includes('categories-tags-classifier')
+      doc.filename.toLowerCase().includes('categories-tags-classifier') ||
+      doc.filename.toLowerCase().includes('categories')
     );
     if (categoriesDoc) selectedDocs.push(categoriesDoc);
   }
@@ -836,17 +890,17 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   if (needsMissing) {
     const missingDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('missing_info_generator') ||
-      doc.filename.toLowerCase().includes('missing-info-generator')
+      doc.filename.toLowerCase().includes('missing-info-generator') ||
+      doc.filename.toLowerCase().includes('missing')
     );
     if (missingDoc) selectedDocs.push(missingDoc);
   }
   
-  // Default fallback - include grant criteria formatter
+  // Default fallback - include grant criteria formatter if nothing selected
   if (selectedDocs.length === 0) {
     const formatterDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
-      doc.filename.toLowerCase().includes('grant-criteria-formatter') ||
-      doc.filename.toLowerCase().includes('formatter')
+      doc.filename.toLowerCase().includes('formatter') ||
+      doc.filename.toLowerCase().includes('criteria')
     );
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
@@ -856,9 +910,9 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   return uniqueDocs.slice(0, maxDocs);
 }
 
-// INTELLIGENT BCAFE DOCUMENT SELECTION FUNCTION
-function selectBCAFEDocuments(message, orgType, conversationHistory) {
-  const docs = knowledgeBases['bcafe'] || [];
+// FIXED: Updated BCAFE document selection to accept agent docs
+function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs = null) {
+  const docs = agentDocs || knowledgeBases['bcafe'] || [];
   const msg = message.toLowerCase();
   const selectedDocs = [];
   
@@ -921,205 +975,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory) {
   return uniqueDocs.slice(0, 3);
 }
 
-// Enhanced document selection for Grant Cards with agent-specific loading
-function selectGrantCardDocumentsOptimized(task, message, fileContent, conversationHistory, agentDocs) {
-  const msg = message.toLowerCase();
-  const selectedDocs = [];
-  
-  // Determine what the user needs based on task and message content
-  const needsFormatter = task === 'grant-criteria' || msg.includes('criteria') || msg.includes('format');
-  const needsPreview = task === 'preview' || msg.includes('preview') || msg.includes('description');
-  const needsRequirements = task === 'requirements' || msg.includes('requirements') || msg.includes('general');
-  const needsInsights = task === 'insights' || msg.includes('insights') || msg.includes('strategy');
-  const needsCategories = task === 'categories' || msg.includes('categories') || msg.includes('tags');
-  const needsMissing = task === 'missing-info' || msg.includes('missing') || msg.includes('gaps');
-  
-  // Large file uploaded - reduce knowledge base to save context
-  const isLargeFile = fileContent && fileContent.length > 50000;
-  const maxDocs = isLargeFile ? 1 : 3;
-  
-  // Select task-specific documents from agent docs
-  if (needsFormatter) {
-    const formatterDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
-      doc.filename.toLowerCase().includes('grant-criteria-formatter') ||
-      doc.filename.toLowerCase().includes('formatter')
-    );
-    if (formatterDoc) selectedDocs.push(formatterDoc);
-  }
-  
-  if (needsPreview) {
-    const previewDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('preview_section_generator') ||
-      doc.filename.toLowerCase().includes('preview-section-generator') ||
-      doc.filename.toLowerCase().includes('preview')
-    );
-    if (previewDoc) selectedDocs.push(previewDoc);
-  }
-  
-  if (needsRequirements) {
-    const reqDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('general_requirements_creator') ||
-      doc.filename.toLowerCase().includes('general-requirements-creator') ||
-      doc.filename.toLowerCase().includes('requirements')
-    );
-    if (reqDoc) selectedDocs.push(reqDoc);
-  }
-  
-  if (needsInsights) {
-    const insightsDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('granted_insights_generator') ||
-      doc.filename.toLowerCase().includes('granted-insights-generator') ||
-      doc.filename.toLowerCase().includes('insights')
-    );
-    if (insightsDoc) selectedDocs.push(insightsDoc);
-  }
-  
-  if (needsCategories) {
-    const categoriesDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('categories_tags_classifier') ||
-      doc.filename.toLowerCase().includes('categories-tags-classifier') ||
-      doc.filename.toLowerCase().includes('categories')
-    );
-    if (categoriesDoc) selectedDocs.push(categoriesDoc);
-  }
-  
-  if (needsMissing) {
-    const missingDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('missing_info_generator') ||
-      doc.filename.toLowerCase().includes('missing-info-generator') ||
-      doc.filename.toLowerCase().includes('missing')
-    );
-    if (missingDoc) selectedDocs.push(missingDoc);
-  }
-  
-  // Default fallback - include grant criteria formatter if nothing selected
-  if (selectedDocs.length === 0) {
-    const formatterDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('formatter') ||
-      doc.filename.toLowerCase().includes('criteria')
-    );
-    if (formatterDoc) selectedDocs.push(formatterDoc);
-  }
-  
-  // Remove duplicates and limit based on file size
-  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
-  return uniqueDocs.slice(0, maxDocs);
-}
-
-// Enhanced document selection for ETG agent
-function selectETGDocumentsOptimized(message, conversationHistory, agentDocs) {
-  const msg = message.toLowerCase();
-  const selectedDocs = [];
-  
-  // Determine what the user needs
-  const needsEligibility = msg.includes('eligible') || msg.includes('eligibility') || 
-                          conversationHistory.length <= 2;
-  const needsBusinessCase = msg.includes('business case') || msg.includes('questions') ||
-                           msg.includes('application');
-  const needsExamples = msg.includes('example') || msg.includes('similar') || 
-                       msg.includes('successful');
-  
-  // Select relevant documents based on needs
-  if (needsEligibility) {
-    const eligibilityDocs = agentDocs.filter(doc => 
-      doc.filename.toLowerCase().includes('eligibility') ||
-      doc.filename.toLowerCase().includes('requirements')
-    );
-    selectedDocs.push(...eligibilityDocs.slice(0, 2));
-  }
-  
-  if (needsBusinessCase) {
-    const businessCaseDocs = agentDocs.filter(doc => 
-      doc.filename.toLowerCase().includes('business case') ||
-      doc.filename.toLowerCase().includes('questions') ||
-      doc.filename.toLowerCase().includes('template')
-    );
-    selectedDocs.push(...businessCaseDocs.slice(0, 2));
-  }
-  
-  if (needsExamples) {
-    const exampleDocs = agentDocs.filter(doc => 
-      doc.filename.toLowerCase().includes('example') ||
-      doc.filename.toLowerCase().includes('successful') ||
-      doc.filename.toLowerCase().includes('sample')
-    );
-    selectedDocs.push(...exampleDocs.slice(0, 1));
-  }
-  
-  // Default fallback
-  if (selectedDocs.length === 0) {
-    selectedDocs.push(...agentDocs.slice(0, 3));
-  }
-  
-  // Remove duplicates and limit to 5 docs max
-  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
-  return uniqueDocs.slice(0, 5);
-}
-
-// Enhanced document selection for BCAFE agent
-function selectBCAFEDocumentsOptimized(message, orgType, conversationHistory, agentDocs) {
-  const msg = message.toLowerCase();
-  const selectedDocs = [];
-  
-  // Determine user needs
-  const needsEligibility = msg.includes('eligible') || msg.includes('qualify') || 
-                          conversationHistory.length <= 2;
-  const needsMerit = msg.includes('merit') || msg.includes('optimize') || 
-                    msg.includes('scoring') || msg.includes('competitive');
-  const needsBudget = msg.includes('budget') || msg.includes('cost') || 
-                     msg.includes('funding');
-  const needsApplication = msg.includes('application') || msg.includes('create');
-  
-  // Select relevant documents
-  if (needsEligibility) {
-    const eligibilityDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('eligibility')
-    );
-    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
-  }
-  
-  if (needsMerit) {
-    const meritDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('merit') ||
-      doc.filename.toLowerCase().includes('criteria')
-    );
-    if (meritDoc) selectedDocs.push(meritDoc);
-  }
-  
-  if (needsBudget) {
-    const budgetDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('budget')
-    );
-    if (budgetDoc) selectedDocs.push(budgetDoc);
-  }
-  
-  if (needsApplication) {
-    const appDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('application') ||
-      doc.filename.toLowerCase().includes('questions')
-    );
-    if (appDoc) selectedDocs.push(appDoc);
-  }
-  
-  // Default fallback
-  if (selectedDocs.length === 0) {
-    const eligibilityDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('eligibility')
-    );
-    const guideDoc = agentDocs.find(doc => 
-      doc.filename.toLowerCase().includes('guide') ||
-      doc.filename.toLowerCase().includes('criteria')
-    );
-    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
-    if (guideDoc) selectedDocs.push(guideDoc);
-  }
-  
-  // Remove duplicates and limit to 3 docs max
-  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
-  return uniqueDocs.slice(0, 3);
-}
-
 // Get Google Access Token using Service Account
 async function getGoogleAccessToken() {
   // Check if we have a valid cached token
@@ -1146,12 +1001,12 @@ async function getGoogleAccessToken() {
 
     // Create JWT manually (simple implementation for serverless)
     const header = { alg: 'RS256', typ: 'JWT' };
-    const headerBase64 = Buffer.from(JSON.stringify(header)).toString('base64url');
-    const payloadBase64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const headerBase64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
+    const payloadBase64 = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
     
     const signData = `${headerBase64}.${payloadBase64}`;
     const signature = crypto.sign('RSA-SHA256', Buffer.from(signData), serviceAccount.private_key);
-    const signatureBase64 = signature.toString('base64url');
+    const signatureBase64 = base64UrlEncode(signature);
     
     const jwt = `${headerBase64}.${payloadBase64}.${signatureBase64}`;
 
@@ -1315,7 +1170,7 @@ async function loadAgentDocuments(folderId, agentName, accessToken) {
   }
 }
 
-// Load content from different file types
+// FIXED: Enhanced PDF processing with better error handling
 async function loadFileContent(file, accessToken) {
   const { id, name, mimeType } = file;
   
@@ -1354,65 +1209,64 @@ async function loadFileContent(file, accessToken) {
       
       return await response.text();
       
-} else if (mimeType === 'application/pdf') {
-  // Download and extract PDF content with error handling
-  const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
-    {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      }
-    }
-  );
-  
-  if (!response.ok) {
-    throw new Error(`Failed to download PDF: ${response.status}`);
-  }
-  
-  const buffer = await response.arrayBuffer();
-  const pdf = require('pdf-parse');
-  
-  try {
-    // Try with default options first
-    const data = await pdf(Buffer.from(buffer));
-    return data.text;
-  } catch (error) {
-    // If parsing fails, try with more permissive options
-    console.log(`   ⚠️ PDF parsing warning for ${name}, trying fallback method...`);
-    try {
-      const data = await pdf(Buffer.from(buffer), {
-        // More permissive parsing options
-        normalizeWhitespace: false,
-        disableCombineTextItems: false,
-        max: 0 // No page limit
-      });
-      return data.text;
-    } catch (fallbackError) {
-      // If both methods fail, return partial content notice
-      console.log(`   ❌ PDF extraction failed for ${name}: ${fallbackError.message}`);
-      return `PDF Document: ${name}\n[Content extraction failed due to PDF formatting issues. Consider converting to Word or Google Doc format for better extraction.]`;
-    }
-  }
+    } else if (mimeType === 'application/pdf') {
+      // Download and extract PDF content with enhanced error handling
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
       
-} else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
-  // Download and extract Word document content
-  const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
-    {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.status}`);
       }
-    }
-  );
-  
-  if (!response.ok) {
-    throw new Error(`Failed to download document: ${response.status}`);
-  }
-  
-  const buffer = await response.arrayBuffer();
-  const mammoth = require('mammoth');
-  const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) });
-  return result.value;
+      
+      const buffer = await response.arrayBuffer();
+      
+      try {
+        // Try with default options first
+        const data = await pdf(Buffer.from(buffer));
+        return data.text;
+      } catch (primaryError) {
+        // If parsing fails, try with more permissive options
+        console.log(`   ⚠️ PDF parsing warning for ${name}, trying fallback method...`);
+        try {
+          const data = await pdf(Buffer.from(buffer), {
+            normalizeWhitespace: false,
+            disableCombineTextItems: false,
+            max: 0 // No page limit
+          });
+          return data.text;
+        } catch (fallbackError) {
+          // Log both errors for debugging
+          console.log(`   ❌ PDF extraction failed for ${name}:`);
+          console.log(`     Primary error: ${primaryError.message}`);
+          console.log(`     Fallback error: ${fallbackError.message}`);
+          return `PDF Document: ${name}\n[Content extraction failed due to PDF formatting issues. Consider converting to Word or Google Doc format for better extraction.]`;
+        }
+      }
+      
+    } else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
+      // Download and extract Word document content
+      const response = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`Failed to download document: ${response.status}`);
+      }
+      
+      const buffer = await response.arrayBuffer();
+      const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) });
+      return result.value;
       
     } else {
       // Skip unsupported file types
@@ -1532,12 +1386,18 @@ function searchKnowledgeBase(query, agent = 'grant-cards') {
   return results.sort((a, b) => b.relevanceScore - a.relevanceScore);
 }
 
-// Rate limiting helper functions
+// FIXED: Rate limiting with safeguards
 function checkRateLimit() {
   const now = Date.now();
   
   // Remove timestamps older than 1 minute
   callTimestamps = callTimestamps.filter(timestamp => now - timestamp < 60000);
+  
+  // Safeguard against memory issues
+  if (callTimestamps.length > 1000) {
+    console.log('⚠️ Rate limit array too large, trimming...');
+    callTimestamps = callTimestamps.slice(-100);
+  }
   
   if (callTimestamps.length >= MAX_CALLS_PER_MINUTE) {
     throw new Error(`Rate limit exceeded: ${MAX_CALLS_PER_MINUTE} calls per minute maximum. Please wait before trying again.`);
@@ -1628,6 +1488,11 @@ module.exports = async function handler(req, res) {
 
   const { url, method } = req;
 
+  // Clean up expired conversations periodically
+  if (Math.random() < 0.1) { // 10% chance per request
+    cleanupExpiredConversations();
+  }
+
   // Apply authentication middleware (except for login and health endpoints)
   try {
     await new Promise((resolve, reject) => {
@@ -1644,7 +1509,7 @@ module.exports = async function handler(req, res) {
   await getKnowledgeBase();
   
   try {
-    // Login endpoint with JWT
+    // FIXED: Login endpoint with proper error handling
     if (url === '/api/login' && method === 'POST') {
       try {
         let body = '';
@@ -1653,34 +1518,41 @@ module.exports = async function handler(req, res) {
         });
         
         req.on('end', () => {
-          const { password } = JSON.parse(body);
-          
-          // Check password
-          if (!TEAM_PASSWORD) {
-            res.status(500).json({ 
+          try {
+            const { password } = JSON.parse(body);
+            
+            // Check password
+            if (!TEAM_PASSWORD) {
+              res.status(500).json({ 
+                success: false, 
+                message: 'Authentication not configured' 
+              });
+              return;
+            }
+
+            if (password === TEAM_PASSWORD) {
+              // Create JWT token
+              const sessionToken = generateJWTToken();
+
+              // Set secure cookie
+              res.setHeader('Set-Cookie', [
+                `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION/1000}; Path=/`
+              ]);
+
+              res.json({ 
+                success: true, 
+                message: 'Authentication successful' 
+              });
+            } else {
+              res.status(401).json({ 
+                success: false, 
+                message: 'Invalid password' 
+              });
+            }
+          } catch (jsonError) {
+            res.status(400).json({ 
               success: false, 
-              message: 'Authentication not configured' 
-            });
-            return;
-          }
-
-          if (password === TEAM_PASSWORD) {
-            // Create JWT token
-            const sessionToken = generateJWTToken();
-
-            // Set secure cookie
-            res.setHeader('Set-Cookie', [
-              `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION/1000}; Path=/`
-            ]);
-
-            res.json({ 
-              success: true, 
-              message: 'Authentication successful' 
-            });
-          } else {
-            res.status(401).json({ 
-              success: false, 
-              message: 'Invalid password' 
+              message: 'Invalid JSON in request body' 
             });
           }
         });
@@ -1825,102 +1697,103 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-   // Process grant document (for Grant Card Assistant) - OPTIMIZED WITH AGENT-SPECIFIC LOADING
-if (url === '/api/process-grant' && method === 'POST') {
-  const startTime = Date.now();
-  
-  // Handle file upload with multer
-  await new Promise((resolve, reject) => {
-    upload.single('file')(req, res, (err) => {
-      if (err) reject(err);
-      else resolve();
-    });
-  });
-
-  const { message, task, conversationId } = req.body;
-  let fileContent = '';
-  
-  // Process uploaded file if present
-  if (req.file) {
-    fileContent = await processFileContent(req.file);
-  }
-  
-  // Get or create conversation
-  if (!conversations.has(conversationId)) {
-    conversations.set(conversationId, []);
-  }
-  const conversation = conversations.get(conversationId);
-  
-  // 🎯 AGENT-SPECIFIC KNOWLEDGE BASE LOADING
-  const agentDocs = await getAgentKnowledgeBase('grant-cards');
-  const loadTime = Date.now() - startTime;
-  
-  // Log performance
-  logAgentPerformance('grant-cards', agentDocs.length, loadTime);
-  
-  // 🎯 INTELLIGENT DOCUMENT SELECTION from agent-specific docs
-  const relevantDocs = selectGrantCardDocumentsOptimized(task, message, fileContent, conversation, agentDocs);
-  let knowledgeContext = '';
-
-  if (relevantDocs.length > 0) {
-    knowledgeContext = relevantDocs
-      .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
-      .join('\n\n');
+    // FIXED: Process grant document with agent-specific loading
+    if (url === '/api/process-grant' && method === 'POST') {
+      const startTime = Date.now();
       
-    console.log(`📚 Selected Grant Card documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
-  } else {
-    console.log(`📚 No specific Grant Card documents found for task: ${task}`);
-  }
-  
-  // Check if this is a Grant Card task (uses shared persona) or other agent
-  const isGrantCardTask = ['grant-criteria', 'preview', 'requirements', 'insights', 'categories', 'missing-info'].includes(task);
+      // Handle file upload with multer
+      await new Promise((resolve, reject) => {
+        upload.single('file')(req, res, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
 
-  let systemPrompt;
-  if (isGrantCardTask) {
-    systemPrompt = buildGrantCardSystemPrompt(task, knowledgeContext);
-  } else {
-    systemPrompt = `${agentPrompts[task] || agentPrompts['etg-writer']}
+      const { message, task, conversationId } = req.body;
+      let fileContent = '';
+      
+      // Process uploaded file if present
+      if (req.file) {
+        fileContent = await processFileContent(req.file);
+      }
+      
+      // Get or create conversation
+      if (!conversations.has(conversationId)) {
+        conversations.set(conversationId, []);
+        conversationTimestamps.set(conversationId, Date.now());
+      }
+      const conversation = conversations.get(conversationId);
+      
+      // FIXED: Agent-specific knowledge base loading
+      const agentDocs = await getAgentKnowledgeBase('grant-cards');
+      const loadTime = Date.now() - startTime;
+      
+      // Log performance
+      logAgentPerformance('grant-cards', agentDocs.length, loadTime);
+      
+      // FIXED: Use agent-specific docs in selection
+      const relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation, agentDocs);
+      let knowledgeContext = '';
+
+      if (relevantDocs.length > 0) {
+        knowledgeContext = relevantDocs
+          .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+          .join('\n\n');
+          
+        console.log(`📚 Selected Grant Card documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
+      } else {
+        console.log(`📚 No specific Grant Card documents found for task: ${task}`);
+      }
+      
+      // Check if this is a Grant Card task (uses shared persona) or other agent
+      const isGrantCardTask = ['grant-criteria', 'preview', 'requirements', 'insights', 'categories', 'missing-info'].includes(task);
+
+      let systemPrompt;
+      if (isGrantCardTask) {
+        systemPrompt = buildGrantCardSystemPrompt(task, knowledgeContext);
+      } else {
+        systemPrompt = `${agentPrompts[task] || agentPrompts['etg-writer']}
 
 KNOWLEDGE BASE CONTEXT:
 ${knowledgeContext}
 
 Always follow the exact workflows and instructions from the knowledge base documents above.`;
-  }
-  
-  // Add user message to conversation
-  let userMessage = message;
-  if (fileContent) {
-    userMessage += `\n\nUploaded document content:\n${fileContent}`;
-  }
+      }
+      
+      // Add user message to conversation
+      let userMessage = message;
+      if (fileContent) {
+        userMessage += `\n\nUploaded document content:\n${fileContent}`;
+      }
 
-  // ENHANCED CONTEXT MANAGEMENT
-  const agentType = getAgentType(url, conversationId);
-  const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+      // ENHANCED CONTEXT MANAGEMENT
+      const agentType = getAgentType(url, conversationId);
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
 
-  logContextUsage(agentType, estimatedContext, conversation.length);
-  pruneConversation(conversation, agentType, estimatedContext);
-  
-  conversation.push({ role: 'user', content: userMessage });
-  
-  // Get response from Claude with rate limiting
-  const response = await callClaudeAPI(conversation, systemPrompt);
-  
-  // Add assistant response to conversation
-  conversation.push({ role: 'assistant', content: response });
-  
-  res.json({ 
-    response: response,
-    conversationId: conversationId,
-    performance: {
-      documentsLoaded: agentDocs.length,
-      documentsSelected: relevantDocs.length,
-      loadTimeMs: loadTime
+      logContextUsage(agentType, estimatedContext, conversation.length);
+      pruneConversation(conversation, agentType, estimatedContext);
+      
+      conversation.push({ role: 'user', content: userMessage });
+      
+      // Get response from Claude with rate limiting
+      const response = await callClaudeAPI(conversation, systemPrompt);
+      
+      // Add assistant response to conversation
+      conversation.push({ role: 'assistant', content: response });
+      
+      res.json({ 
+        response: response,
+        conversationId: conversationId,
+        performance: {
+          documentsLoaded: agentDocs.length,
+          documentsSelected: relevantDocs.length,
+          loadTimeMs: loadTime
+        }
+      });
+      return;
     }
-  });
-  return;
-}
 
-    // Process ETG requests (enhanced endpoint for ETG Writer)
+    // FIXED: Process ETG requests with agent-specific loading
     if (url === '/api/process-etg' && method === 'POST') {
       const startTime = Date.now();
       await new Promise((resolve, reject) => {
@@ -1952,6 +1825,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       const etgConversationId = `etg-${conversationId}`;
       if (!conversations.has(etgConversationId)) {
         conversations.set(etgConversationId, []);
+        conversationTimestamps.set(etgConversationId, Date.now());
       }
       const conversation = conversations.get(etgConversationId);
       
@@ -2004,21 +1878,22 @@ Always follow the exact workflows and instructions from the knowledge base docum
         }
       }
       
-  // 🎯 AGENT-SPECIFIC KNOWLEDGE BASE LOADING
-const agentDocs = await getAgentKnowledgeBase('etg-writer');
-const loadTime = Date.now() - startTime;
-logAgentPerformance('etg-writer', agentDocs.length, loadTime);
+      // FIXED: Agent-specific knowledge base loading for ETG
+      const agentDocs = await getAgentKnowledgeBase('etg-writer');
+      const loadTime = Date.now() - startTime;
+      logAgentPerformance('etg-writer', agentDocs.length, loadTime);
 
-const relevantDocs = selectETGDocumentsOptimized(message, conversation, agentDocs);
-let knowledgeContext = '';
+      // Use first 5 ETG docs for knowledge context
+      const relevantDocs = agentDocs.slice(0, 5);
+      let knowledgeContext = '';
 
-if (relevantDocs.length > 0) {
-  knowledgeContext = relevantDocs
-    .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
-    .join('\n\n');
-    
-  console.log(`📚 Using ${relevantDocs.length} ETG documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
-}
+      if (relevantDocs.length > 0) {
+        knowledgeContext = relevantDocs
+          .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+          .join('\n\n');
+          
+        console.log(`📚 Using ${relevantDocs.length} ETG documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
+      }
       
       // Build ETG system prompt with knowledge context
       const systemPrompt = `${agentPrompts['etg-writer']}
@@ -2077,7 +1952,7 @@ Use the ETG knowledge base above to find similar successful applications and mat
       return;
     }
 
-    // STREAMLINED BCAFE ENDPOINT - ENHANCED WITH CONTEXT MANAGEMENT
+    // FIXED: BCAFE endpoint with agent-specific loading
     if (url === '/api/process-bcafe' && method === 'POST') {
       await new Promise((resolve, reject) => {
         upload.single('file')(req, res, (err) => {
@@ -2102,13 +1977,13 @@ Use the ETG knowledge base above to find similar successful applications and mat
       const bcafeConversationId = `bcafe-${conversationId}`;
       if (!conversations.has(bcafeConversationId)) {
         conversations.set(bcafeConversationId, []);
+        conversationTimestamps.set(bcafeConversationId, Date.now());
       }
       const conversation = conversations.get(bcafeConversationId);
       
-      // INTELLIGENT DOCUMENT SELECTION - Only relevant docs per query
-     // 🎯 AGENT-SPECIFIC KNOWLEDGE BASE LOADING
-const agentDocs = await getAgentKnowledgeBase('bcafe-writer');
-const relevantDocs = selectBCAFEDocumentsOptimized(message, orgType, conversation, agentDocs);
+      // FIXED: Agent-specific knowledge base loading for BCAFE
+      const agentDocs = await getAgentKnowledgeBase('bcafe-writer');
+      const relevantDocs = selectBCAFEDocuments(message, orgType, conversation, agentDocs);
       
       let knowledgeContext = '';
       if (relevantDocs.length > 0) {
@@ -2186,6 +2061,7 @@ Use the knowledge base documents above for all detailed processes, requirements,
     if (url.startsWith('/api/conversation/') && method === 'DELETE') {
       const conversationId = url.split('/api/conversation/')[1];
       conversations.delete(conversationId);
+      conversationTimestamps.delete(conversationId);
       res.json({ message: 'Conversation cleared' });
       return;
     }
