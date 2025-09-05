@@ -1097,15 +1097,45 @@ async function loadFileContent(file, accessToken) {
       
       return await response.text();
       
-    } else if (mimeType === 'application/pdf') {
-      // PDFs - placeholder for now
-      console.log(`   📄 PDF detected: ${name} - content extraction would be added here`);
-      return `PDF Document: ${name}\n[PDF content would be extracted here with additional processing]`;
+   } else if (mimeType === 'application/pdf') {
+  // Download and extract PDF content
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`Failed to download PDF: ${response.status}`);
+  }
+  
+  const buffer = await response.arrayBuffer();
+  const pdf = require('pdf-parse');
+  const data = await pdf(Buffer.from(buffer));
+  return data.text;
       
-    } else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
-      // Word docs, etc. - placeholder for now  
-      console.log(`   📝 Office document detected: ${name} - content extraction would be added here`);
-      return `Office Document: ${name}\n[Document content would be extracted here with additional processing]`;
+} else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
+  // Download and extract Word document content
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+    {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    throw new Error(`Failed to download document: ${response.status}`);
+  }
+  
+  const buffer = await response.arrayBuffer();
+  const mammoth = require('mammoth');
+  const result = await mammoth.extractRawText({ buffer: Buffer.from(buffer) });
+  return result.value;
       
     } else {
       // Skip unsupported file types
