@@ -850,7 +850,7 @@
                 <div class="analysis-options-sidebar">
                     <div class="upload-zone-sidebar" onclick="document.getElementById('file-input').click()">
                         <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" style="display: none;">
-                        <div class="upload-icon">📁</div>
+                        <div class="upload-icon">📄</div>
                         <div class="upload-text">Upload Course Document</div>
                         <div id="file-info" style="display: none; margin-top: 0.5rem; font-size: 0.7rem; color: var(--success);"></div>
                     </div>
@@ -1206,14 +1206,17 @@
             typeChar();
         }
 
-        function addLoadingMessage() {
+        function addLoadingMessage(customMessage = null) {
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message assistant';
             messageDiv.id = 'loading-message';
             
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'loading';
-            loadingDiv.innerHTML = '<div class="spinner"></div><span>Analyzing training and creating business case...</span>';
+            
+            // Use custom message if provided, otherwise use default
+            const loadingText = customMessage || 'Thinking...';
+            loadingDiv.innerHTML = `<div class="spinner"></div><span>${loadingText}</span>`;
             
             messageDiv.appendChild(loadingDiv);
             messagesContainer.appendChild(messageDiv);
@@ -1247,7 +1250,30 @@
 
             isLoading = true;
             sendButton.disabled = true;
-            addLoadingMessage();
+            
+            // Dynamic loading message based on context
+            const messageLower = message.toLowerCase();
+            let loadingText = 'Thinking...';
+            
+            if (messageLower.includes('eligib')) {
+                loadingText = 'Checking eligibility...';
+            } else if (messageLower.includes('business case') || messageLower.includes('write') || messageLower.includes('create')) {
+                loadingText = 'Writing business case...';
+            } else if (messageLower.includes('question') || messageLower.includes('draft')) {
+                loadingText = 'Drafting questions...';
+            } else if (messageLower.includes('review')) {
+                loadingText = 'Reviewing content...';
+            } else if (messageLower.includes('alternative') || messageLower.includes('bc training')) {
+                loadingText = 'Researching BC alternatives...';
+            } else if (messageLower.includes('search') || messageLower.includes('find')) {
+                loadingText = 'Searching knowledge base...';
+            } else if (uploadedFile) {
+                loadingText = 'Analyzing document...';
+            } else if (messageLower.includes('help') || messageLower.includes('what')) {
+                loadingText = 'Preparing response...';
+            }
+            
+            addLoadingMessage(loadingText);
             
             // Update progress based on message content
             if (message.includes('eligib')) updateProgress(1);
@@ -1303,7 +1329,7 @@
 
             isLoading = true;
             sendButton.disabled = true;
-            addLoadingMessage();
+            addLoadingMessage('Analyzing course website...');
 
             try {
                 const formData = new FormData();
