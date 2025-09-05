@@ -309,7 +309,6 @@ let tokenExpiry = 0;
 // Knowledge base cache
 let knowledgeBaseLoaded = false;
 let knowledgeBaseCacheTime = 0;
-const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
 // ETG Eligibility Checker Function
 function checkETGEligibility(trainingData) {
