@@ -1318,54 +1318,100 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
   const msg = message.toLowerCase();
   const selectedDocs = [];
   
-  // Determine what the user needs for claims processing
-  const needsInvoiceGuide = msg.includes('invoice') || msg.includes('receipt') || 
-                           msg.includes('claim') || msg.includes('expense') ||
-                           conversationHistory.length <= 2;
+// Enhanced CanExport Claims document selection function
+function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs = null) {
+  const docs = agentDocs || knowledgeBases['canexport-claims'] || [];
+  const msg = message.toLowerCase();
+  const conversationText = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
+  const selectedDocs = [];
   
-  const needsCompliance = msg.includes('eligible') || msg.includes('compliance') || 
-                         msg.includes('category') || msg.includes('audit');
+  // PRIORITY 1: Always include main invoice guide for compliance
+  const mainInvoiceGuide = docs.find(doc => 
+    doc.filename.toLowerCase().includes('canexport invoice guide') ||
+    doc.filename.toLowerCase().includes('invoice guide canexport')
+  );
+  if (mainInvoiceGuide) selectedDocs.push(mainInvoiceGuide);
   
-  const needsTemplates = msg.includes('template') || msg.includes('format') || 
-                        msg.includes('report') || msg.includes('summary');
-
-  // Select documents based on needs
-  if (needsInvoiceGuide) {
-    const invoiceGuides = docs.filter(doc => 
-      doc.filename.toLowerCase().includes('invoice') && 
-      doc.filename.toLowerCase().includes('guide')
-    );
-    selectedDocs.push(...invoiceGuides.slice(0, 2)); // Add both invoice guides
+  // PRIORITY 2: Intent-based selection
+  const intents = {
+    categories: ['category', 'categories', 'eligible', 'classification', 'type of expense'],
+    compliance: ['compliance', 'checklist', 'verify', 'audit', 'review', 'check'],
+    templates: ['template', 'format', 'report', 'summary', 'audit report'],
+    receipt: ['receipt', 'invoice', 'document', 'expense', 'claim', 'payment']
+  };
+  
+  // Expense category detection (A-H)
+  const expenseCategories = {
+    travel: ['travel', 'flight', 'hotel', 'accommodation', 'airfare', 'taxi', 'uber'],
+    trade: ['trade show', 'exhibition', 'booth', 'event', 'conference', 'fair'],
+    marketing: ['marketing', 'advertising', 'translation', 'website', 'promotional'],
+    interpretation: ['interpretation', 'interpreter', 'language', 'translation'],
+    certification: ['certification', 'registration', 'regulatory', 'compliance', 'legal'],
+    consulting: ['consulting', 'legal', 'tax', 'business advice', 'professional services'],
+    research: ['research', 'market research', 'feasibility', 'b2b', 'contact'],
+    intellectual: ['ip', 'intellectual property', 'patent', 'trademark', 'copyright']
+  };
+  
+  // Detect expense categories from content
+  const fullContent = msg + ' ' + conversationText;
+  let detectedCategory = null;
+  
+  for (const [category, keywords] of Object.entries(expenseCategories)) {
+    if (keywords.some(keyword => fullContent.includes(keyword))) {
+      detectedCategory = category;
+      console.log(`🎯 CanExport Claims Category Match: ${category}`);
+      break;
+    }
   }
   
-  if (needsCompliance) {
+  // Check for specific intent patterns
+  if (intents.categories.some(keyword => fullContent.includes(keyword)) || detectedCategory) {
+    const categoriesDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('expense-categories') ||
+      doc.filename.toLowerCase().includes('categories')
+    );
+    if (categoriesDoc && selectedDocs.length < 3) selectedDocs.push(categoriesDoc);
+  }
+  
+  if (intents.compliance.some(keyword => fullContent.includes(keyword))) {
     const complianceDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('compliance') ||
+      doc.filename.toLowerCase().includes('compliance-checklist') ||
       doc.filename.toLowerCase().includes('checklist')
     );
-    if (complianceDoc) selectedDocs.push(complianceDoc);
+    if (complianceDoc && selectedDocs.length < 3) selectedDocs.push(complianceDoc);
   }
   
-  if (needsTemplates) {
+  if (intents.templates.some(keyword => fullContent.includes(keyword))) {
     const templateDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('template') ||
-      doc.filename.toLowerCase().includes('audit')
+      doc.filename.toLowerCase().includes('audit-templates') ||
+      doc.filename.toLowerCase().includes('templates')
     );
-    if (templateDoc) selectedDocs.push(templateDoc);
+    if (templateDoc && selectedDocs.length < 3) selectedDocs.push(templateDoc);
   }
   
-  // Default fallback - include main invoice guides
-  if (selectedDocs.length === 0) {
-    const mainGuides = docs.filter(doc => 
-      doc.filename.toLowerCase().includes('invoice') && 
+  // PRIORITY 3: Ensure we have the backup invoice guide if main one wasn't found
+  if (!selectedDocs.some(doc => doc.filename.toLowerCase().includes('invoice guide'))) {
+    const backupGuide = docs.find(doc => 
+      doc.filename.toLowerCase().includes('invoice guide') ||
       doc.filename.toLowerCase().includes('guide')
     );
-    selectedDocs.push(...mainGuides.slice(0, 2));
+    if (backupGuide && selectedDocs.length < 3) selectedDocs.push(backupGuide);
+  }
+  
+  // PRIORITY 4: Default fallback
+  if (selectedDocs.length === 0) {
+    // Add all available documents up to limit
+    selectedDocs.push(...docs.slice(0, 3));
   }
   
   // Remove duplicates and limit to 3 documents max
-  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
-  return uniqueDocs.slice(0, 3);
+  const uniqueDocs = [...new Set(selectedDocs)].slice(0, 3);
+  
+  console.log(`🎯 CanExport Claims Smart Selection: ${uniqueDocs.length} docs selected from ${docs.length} total`);
+  console.log(`   Intent: Claims Processing, Category: ${detectedCategory || 'general'}`);
+  console.log(`   Selected: ${uniqueDocs.map(d => d.filename).join(', ')}`);
+  
+  return uniqueDocs;
 }
 
 // Get Google Access Token using Service Account
