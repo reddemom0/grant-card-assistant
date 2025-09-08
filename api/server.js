@@ -1,4 +1,4 @@
-// api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent
+// api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent + CanExport Claims Agent
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
@@ -15,11 +15,15 @@ if (!process.env.JWT_SECRET) {
   console.warn('⚠️ WARNING: Using default JWT secret. Set JWT_SECRET environment variable for production security!');
 }
 
-// Optimized conversation limits
+// Optimized conversation limits - UPDATED: Added CanExport Claims
 const CONVERSATION_LIMITS = {
   'grant-cards': 20,        // Task-based workflows (keep current)
   'etg-writer': 20,         // Business case development (keep current)  
-  'bcafe-writer': 60        // Complex multi-day applications (6x increase)
+  'bcafe-writer': 60,       // Complex multi-day applications (6x increase)
+  'canexport-writer': 30,   // CanExport SME applications
+  'canexport-claims': 40,   // NEW: CanExport Claims Agent - optimized for thorough expense auditing
+  'readiness-strategist': 30,
+  'internal-oracle': 50
 };
 
 // Context monitoring thresholds
@@ -156,21 +160,24 @@ function estimateContextSize(conversation, knowledgeContext, systemPrompt, curre
   return Math.ceil(convTokens + kbTokens + sysTokens + msgTokens + responseBuffer);
 }
 
-// FIXED: Complete agent type mapping
+// FIXED: Complete agent type mapping - UPDATED: Added CanExport Claims
 const AGENT_URL_MAP = {
   '/api/process-grant': 'grant-cards',
   '/api/process-etg': 'etg-writer',
   '/api/process-bcafe': 'bcafe-writer',
   '/api/process-canexport': 'canexport-writer',
+  '/api/process-claims': 'canexport-claims',    // NEW: CanExport Claims Agent
   '/api/process-readiness': 'readiness-strategist',
   '/api/process-oracle': 'internal-oracle'
 };
 
+// UPDATED: Added CanExport Claims folder mapping
 const AGENT_FOLDER_MAP = {
   'grant-cards': 'grant-cards',
   'etg-writer': 'etg', 
   'bcafe-writer': 'bcafe',
   'canexport-writer': 'canexport',
+  'canexport-claims': 'canexport-claims',       // NEW: CanExport Claims folder
   'readiness-strategist': 'readiness-strategist',
   'internal-oracle': 'internal-oracle'
 };
@@ -187,6 +194,7 @@ function getAgentType(url, conversationId) {
   // Fallback: extract from conversation ID
   if (conversationId?.includes('etg')) return 'etg-writer';
   if (conversationId?.includes('bcafe')) return 'bcafe-writer';
+  if (conversationId?.includes('canexport-claims')) return 'canexport-claims';
   if (conversationId?.includes('canexport')) return 'canexport-writer';
   if (conversationId?.includes('readiness')) return 'readiness-strategist';
   if (conversationId?.includes('oracle')) return 'internal-oracle';
@@ -247,12 +255,13 @@ const upload = multer({
 // In-memory storage
 let conversations = new Map();
 
-// Multi-Agent Knowledge Base Storage
+// Multi-Agent Knowledge Base Storage - UPDATED: Added CanExport Claims
 let knowledgeBases = {
   'grant-cards': [],
   'etg': [],
   'bcafe': [],
   'canexport': [],
+  'canexport-claims': [],                       // NEW: CanExport Claims knowledge base
   'readiness-strategist': [],
   'internal-oracle': []
 };
@@ -669,7 +678,7 @@ IMPORTANT: Provide only the requested output content. Do not include meta-commen
   return systemPrompt;
 }
 
-// ENHANCED AGENT PROMPTS
+// ENHANCED AGENT PROMPTS - UPDATED: Added CanExport Claims
 const agentPrompts = {
   'etg-writer': `You are an ETG Business Case specialist for British Columbia's Employee Training Grant program. You provide flexible consultation on ETG matters and can write complete, submission-ready business cases.
 
@@ -754,6 +763,119 @@ APPROACH:
 - Ensure all documentation meets CanExport standards
 
 Always aim for applications that exceed the 36% approval benchmark through strategic positioning and thorough preparation.`,
+
+  'canexport-claims': `You are the CanExport Claims Assistant, the definitive expense auditing specialist for CanExport SME projects at Granted Consulting. You take full ownership of expense verification, documentation compliance, and audit quality to ensure maximum reimbursement while maintaining perfect NRC compliance.
+
+CORE IDENTITY & MISSION:
+I AM the CanExport Compliance Guardian who ensures every expense meets NRC funding requirements. I provide authoritative, detailed analysis of receipts, invoices, and expense documentation to determine eligibility and compliance with CanExport guidelines.
+
+PRIMARY CAPABILITIES:
+🔍 **Receipt/Invoice Analysis** - Extract and verify all expense details from uploaded documents
+📋 **Eligibility Verification** - Determine compliance with CanExport categories A-H
+✅ **Documentation Review** - Ensure all required elements and supporting documentation
+📊 **Audit Report Generation** - Create professional, submission-ready expense summaries
+🎯 **Real-time Guidance** - Provide immediate feedback and compliance recommendations
+
+EXPENSE ANALYSIS WORKFLOW:
+
+**PHASE 1: DOCUMENT PROCESSING**
+- Extract vendor, amount, date, currency, payment method, description
+- Identify invoice vs receipt vs booking confirmation
+- Flag missing information or unclear documentation
+- Convert foreign currencies using Bank of Canada rates when needed
+
+**PHASE 2: COMPLIANCE MATRIX CHECK**
+✅ Invoice Date: Must be within project start/completion dates
+✅ Payment Date: Must be within project period  
+✅ Travel Dates: Must be within project phase
+✅ Geographic Compliance: Canada departure to approved target markets
+✅ Payment Method: Corporate bank account or business credit card ONLY
+✅ Tax Removal: NO GST, HST, or international taxes eligible
+✅ Reusability Test: Items that can be repurposed are INELIGIBLE
+✅ Target Market: Advertising must target approved markets only (NOT Canada)
+✅ Traveler Limits: Maximum 2 travelers per trip, Canada-based employees only
+✅ Flight Class: Economy or premium economy ONLY
+
+**PHASE 3: CATEGORY CLASSIFICATION**
+
+**Category A - Travel for Meetings/Events with Key Contacts:**
+✅ ELIGIBLE: Economy/premium flights, accommodation, ground transport, meals (reasonable)
+❌ INELIGIBLE: Business/first class, personal expenses, non-project travel, alcohol
+
+**Category B - Trade Events (Non-Travel Related):**
+✅ ELIGIBLE: Registration fees, booth costs, furnishings & utilities, lead scanners, return shipping
+❌ INELIGIBLE: Purchased items for reuse, furniture purchases, entertainment
+
+**Category C - Marketing and Translation:**
+✅ ELIGIBLE: Target market advertising, translation services, marketing materials, website localization
+❌ INELIGIBLE: Canadian market advertising, reusable promotional items, general website costs
+
+**Category D - Interpretation Services:**
+✅ ELIGIBLE: Professional interpretation for meetings, events, negotiations in target markets
+❌ INELIGIBLE: Internal staff interpretation, non-professional services, training
+
+**Category E - Contractual Agreements, Product Registration & Certification:**
+✅ ELIGIBLE: Market-specific certifications, regulatory compliance, legal documentation for target markets
+❌ INELIGIBLE: General business certifications, Canadian market requirements, standard business licenses
+
+**Category F - Business, Tax and Legal Consulting:**
+✅ ELIGIBLE: Market-specific legal advice, tax guidance for target markets, business structure setup
+❌ INELIGIBLE: General business consulting, Canadian legal services, routine legal work
+
+**Category G - Market Research & B2B Facilitation:**
+✅ ELIGIBLE: Target market research, feasibility studies, contact identification, B2B introductions
+❌ INELIGIBLE: General market research, Canadian market studies, internal research
+
+**Category H - Intellectual Property (IP) Protection:**
+✅ ELIGIBLE: Expert/legal services for IP in target markets, patent applications, trademark registration
+❌ INELIGIBLE: General IP consulting, Canadian IP work not specific to export markets
+
+CRITICAL COMPLIANCE REQUIREMENTS:
+
+1. **Timing Requirements**: All expenses must be incurred (invoice date) AND paid (payment date) between Project Start Date and Project Completion Date. Travel dates and event dates must also be within the project phase.
+
+2. **Payment Requirements**: Payments MUST be made using corporate/business bank account or corporate/business credit card. Personal payments are NEVER eligible.
+
+3. **Tax Requirements**: NO taxes will be reimbursed by NRC. ALL tax costs (GST, HST, international taxes, duties) must be removed from claims prior to submission.
+
+4. **Geographic Requirements**: Travel must depart from Canada to approved target markets. Advertising must target ONLY approved markets, not Canada.
+
+5. **Documentation Standards**: All invoices must include: client billing to Canadian company, invoice date, invoice number, vendor information, service description, currency & amounts, payment proof.
+
+AUDIT REPORT FORMAT:
+
+**EXECUTIVE SUMMARY:**
+- Total Expenses Reviewed: $X,XXX CAD
+- Eligible Expenses: $X,XXX CAD (XX%)
+- Ineligible Expenses: $X,XXX CAD (XX%) 
+- Documentation Issues: X items requiring attention
+- Compliance Score: XX%
+
+**DETAILED FINDINGS:**
+For each expense, provide:
+- Expense Description & Amount
+- Category Classification (A-H)
+- Eligibility Determination (✅ Eligible / ❌ Ineligible)
+- Compliance Issues (if any)
+- Required Actions
+- Supporting Guideline References
+
+**COMMUNICATION STYLE:**
+- Use definitive language: "This expense IS eligible" or "This expense IS NOT eligible"
+- Reference specific guideline sections for credibility
+- Provide clear explanations for all determinations
+- Offer alternatives when expenses are ineligible
+- Flag documentation gaps and suggest solutions
+- Generate actionable recommendations
+
+**RESPONSE PATTERNS:**
+✅ GREEN: "This expense is fully compliant and eligible for reimbursement because [specific reason]"
+⚠️ YELLOW: "This expense needs adjustment: [specific issues and solutions]"  
+❌ RED: "This expense is ineligible for the following reasons: [clear explanation + alternatives]"
+
+Always base ALL determinations on the official CanExport Claims and Invoice Guide documentation in the knowledge base. Maintain detailed audit trails for every expense assessment and provide professional, submission-ready reports.
+
+You are the trusted authority on CanExport compliance at Granted Consulting.`,
 
   'readiness-strategist': `You are an Applicant Readiness Strategist for Granted Consulting. Your role is to help the strategy team determine the readiness of a client company to apply for a specific grant by conducting interview questions, readiness assessments, executing research, and providing readiness scores.
 
@@ -981,6 +1103,62 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
   return uniqueDocs.slice(0, 3);
 }
 
+// NEW: CanExport Claims document selection function
+function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs = null) {
+  const docs = agentDocs || knowledgeBases['canexport-claims'] || [];
+  const msg = message.toLowerCase();
+  const selectedDocs = [];
+  
+  // Determine what the user needs for claims processing
+  const needsInvoiceGuide = msg.includes('invoice') || msg.includes('receipt') || 
+                           msg.includes('claim') || msg.includes('expense') ||
+                           conversationHistory.length <= 2;
+  
+  const needsCompliance = msg.includes('eligible') || msg.includes('compliance') || 
+                         msg.includes('category') || msg.includes('audit');
+  
+  const needsTemplates = msg.includes('template') || msg.includes('format') || 
+                        msg.includes('report') || msg.includes('summary');
+
+  // Select documents based on needs
+  if (needsInvoiceGuide) {
+    const invoiceGuides = docs.filter(doc => 
+      doc.filename.toLowerCase().includes('invoice') && 
+      doc.filename.toLowerCase().includes('guide')
+    );
+    selectedDocs.push(...invoiceGuides.slice(0, 2)); // Add both invoice guides
+  }
+  
+  if (needsCompliance) {
+    const complianceDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('compliance') ||
+      doc.filename.toLowerCase().includes('checklist')
+    );
+    if (complianceDoc) selectedDocs.push(complianceDoc);
+  }
+  
+  if (needsTemplates) {
+    const templateDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('template') ||
+      doc.filename.toLowerCase().includes('audit')
+    );
+    if (templateDoc) selectedDocs.push(templateDoc);
+  }
+  
+  // Default fallback - include main invoice guides
+  if (selectedDocs.length === 0) {
+    const mainGuides = docs.filter(doc => 
+      doc.filename.toLowerCase().includes('invoice') && 
+      doc.filename.toLowerCase().includes('guide')
+    );
+    selectedDocs.push(...mainGuides.slice(0, 2));
+  }
+  
+  // Remove duplicates and limit to 3 documents max
+  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
+  return uniqueDocs.slice(0, 3);
+}
+
 // Get Google Access Token using Service Account
 async function getGoogleAccessToken() {
   // Check if we have a valid cached token
@@ -1062,6 +1240,7 @@ async function loadKnowledgeBaseFromGoogleDrive() {
       'etg': [],
       'bcafe': [],
       'canexport': [],
+      'canexport-claims': [],  // NEW: CanExport Claims knowledge base
       'readiness-strategist': [],
       'internal-oracle': []
     };
@@ -2051,6 +2230,100 @@ Use the knowledge base documents above for all detailed processes, requirements,
       res.json({ 
         response: response,
         conversationId: bcafeConversationId 
+      });
+      return;
+    }
+
+    // NEW: CanExport Claims endpoint
+    if (url === '/api/process-claims' && method === 'POST') {
+      const startTime = Date.now();
+      
+      await new Promise((resolve, reject) => {
+        upload.single('file')(req, res, (err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+
+      const { message, conversationId } = req.body;
+      let fileContent = '';
+      
+      console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
+      
+      // Process uploaded file if present (receipts, invoices, etc.)
+      if (req.file) {
+        console.log(`📄 Processing Claims document: ${req.file.originalname}`);
+        fileContent = await processFileContent(req.file);
+      }
+      
+      // Get or create Claims conversation
+      const claimsConversationId = `claims-${conversationId}`;
+      if (!conversations.has(claimsConversationId)) {
+        conversations.set(claimsConversationId, []);
+        conversationTimestamps.set(claimsConversationId, Date.now());
+      }
+      const conversation = conversations.get(claimsConversationId);
+      
+      // Agent-specific knowledge base loading for CanExport Claims
+      const agentDocs = await getAgentKnowledgeBase('canexport-claims');
+      const loadTime = Date.now() - startTime;
+      logAgentPerformance('canexport-claims', agentDocs.length, loadTime);
+
+      // Select relevant claims documents
+      const relevantDocs = selectCanExportClaimsDocuments(message, conversation, agentDocs);
+      
+      let knowledgeContext = '';
+      if (relevantDocs.length > 0) {
+        knowledgeContext = relevantDocs
+          .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+          .join('\n\n');
+          
+        console.log(`📚 Selected CanExport Claims documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
+      } else {
+        knowledgeContext = 'Use CanExport Claims and Invoice Guide for compliance verification.';
+      }
+      
+      // Build Claims system prompt with knowledge context
+      const systemPrompt = `${agentPrompts['canexport-claims']}
+
+CANEXPORT CLAIMS KNOWLEDGE BASE:
+${knowledgeContext}
+
+Use the invoice guides and compliance documents above for all expense eligibility determinations. Always reference specific guideline sections when making compliance assessments.`;
+      
+      // Build comprehensive user message
+      let userMessage = message || "Hello, I need help auditing CanExport expenses.";
+      
+      if (fileContent) {
+        userMessage += `\n\nUploaded Receipt/Invoice Analysis:\n${fileContent}`;
+      }
+
+      // Enhanced context management for Claims (40 exchanges)
+      const agentType = 'canexport-claims';
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+
+      logContextUsage(agentType, estimatedContext, conversation.length);
+      pruneConversation(conversation, agentType, estimatedContext);
+      
+      conversation.push({ role: 'user', content: userMessage });
+      
+      // Get response from Claude using Claims specialist prompt
+      console.log(`🤖 Calling Claude API for CanExport Claims specialist response`);
+      const response = await callClaudeAPI(conversation, systemPrompt);
+      
+      // Add assistant response to conversation
+      conversation.push({ role: 'assistant', content: response });
+      
+      console.log(`✅ CanExport Claims response generated successfully`);
+      
+      res.json({ 
+        response: response,
+        conversationId: claimsConversationId,
+        performance: {
+          documentsLoaded: agentDocs.length,
+          documentsSelected: relevantDocs.length,
+          loadTimeMs: loadTime
+        }
       });
       return;
     }
