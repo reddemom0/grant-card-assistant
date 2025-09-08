@@ -1017,6 +1017,22 @@
                 }
             }, false);
         });
+        // Background cache warming for Grant Cards
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        console.log('🔥 Pre-warming Grant Cards cache...');
+        const response = await fetch(`${API_BASE}/api/warm-cache/grant-cards`, { 
+            method: 'POST' 
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`✅ Grant Cards cache pre-warmed in ${result.warmTime}ms`);
+        }
+    } catch (error) {
+        console.log('Cache warming failed (non-critical):', error);
+    }
+});
     </script>
 </body>
 </html>
