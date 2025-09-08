@@ -2010,7 +2010,7 @@ module.exports = async function handler(req, res) {
       const conversation = conversations.get(conversationId);
       
       // FIXED: Agent-specific knowledge base loading
-      const agentDocs = await getAgentKnowledgeBase('grant-cards');
+      const agentDocs = await loadAgentSpecificKnowledgeBase('grant-cards');
       const loadTime = Date.now() - startTime;
       
       // Log performance
@@ -2164,7 +2164,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       }
       
       // FIXED: Agent-specific knowledge base loading for ETG
-      const agentDocs = await getAgentKnowledgeBase('etg-writer');
+      const agentDocs = await loadAgentSpecificKnowledgeBase('etg-writer');
       const loadTime = Date.now() - startTime;
       logAgentPerformance('etg-writer', agentDocs.length, loadTime);
 
@@ -2267,7 +2267,7 @@ Use the ETG knowledge base above to find similar successful applications and mat
       const conversation = conversations.get(bcafeConversationId);
       
       // FIXED: Agent-specific knowledge base loading for BCAFE
-      const agentDocs = await getAgentKnowledgeBase('bcafe-writer');
+      const agentDocs = await loadAgentSpecificKnowledgeBase('bcafe-writer');
       const relevantDocs = selectBCAFEDocuments(message, orgType, conversation, agentDocs);
       
       let knowledgeContext = '';
