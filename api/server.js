@@ -1232,7 +1232,7 @@ async function getGoogleAccessToken() {
   }
 }
 
-// Load knowledge base for specific agent only
+// Load knowledge base for specific agent only - WITH REDIS CACHING
 async function loadAgentSpecificKnowledgeBase(agentType) {
   const folderName = AGENT_FOLDER_MAP[agentType];
   if (!folderName) {
@@ -1240,24 +1240,27 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
     return [];
   }
 
-  // Check if already loaded and cached
-  const cacheKey = `agent-${agentType}`;
-  const now = Date.now();
-  const lastCached = agentCacheTimestamps.get(cacheKey) || 0;
+  const cacheKey = `${CACHE_PREFIX}${agentType}`;
+  const startTime = Date.now();
   
-  if (agentKnowledgeCache.has(cacheKey) && (now - lastCached < CACHE_DURATION)) {
-    console.log(`Using cached knowledge for ${agentType}`);
-    return agentKnowledgeCache.get(cacheKey);
-  }
-
-  if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
-    console.log('Google Drive not configured');
-    return [];
-  }
-
   try {
-    console.log(`Loading knowledge base for ${agentType} only...`);
+    // Try Redis cache first
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      console.log(`✅ Cache HIT for ${agentType} (${Date.now() - startTime}ms)`);
+      return cachedData;
+    }
     
+    console.log(`⚠️ Cache MISS for ${agentType} - Loading from Google Drive...`);
+    
+    // Load from Google Drive (existing logic)
+    const agentDocs = [];
+    
+    if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
+      console.log('Google Drive not configured');
+      return [];
+    }
+
     const accessToken = await getGoogleAccessToken();
     
     // Get main folder contents
@@ -1274,25 +1277,50 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
       item.name.toLowerCase() === folderName
     );
     
-    if (!agentFolder) {
-      console.log(`No folder found for agent: ${agentType}`);
-      return [];
+    if (agentFolder) {
+      await loadAgentDocumentsSpecific(agentFolder.id, agentType, accessToken, agentDocs);
     }
     
-    // Load only this agent's documents
-    const agentDocs = [];
-    await loadAgentDocumentsSpecific(agentFolder.id, agentType, accessToken, agentDocs);
+    // Store in Redis cache
+    await redis.setex(cacheKey, CACHE_TTL, agentDocs);
     
-    // Cache the results
-    agentKnowledgeCache.set(cacheKey, agentDocs);
-    agentCacheTimestamps.set(cacheKey, now);
+    const loadTime = Date.now() - startTime;
+    logAgentPerformance(agentType, agentDocs.length, loadTime);
     
-    console.log(`✅ Loaded ${agentDocs.length} documents for ${agentType}`);
+    console.log(`📦 Cached ${agentDocs.length} documents for ${agentType}`);
     return agentDocs;
     
   } catch (error) {
-    console.error(`Error loading knowledge base for ${agentType}:`, error);
-    return [];
+    console.error(`Redis error for ${agentType}:`, error);
+    // Fallback to direct Google Drive loading
+    const agentDocs = [];
+    
+    if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
+      return [];
+    }
+    
+    try {
+      const accessToken = await getGoogleAccessToken();
+      const mainFolderResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q='${GOOGLE_DRIVE_FOLDER_ID}'+in+parents&fields=files(id,name,mimeType)`,
+        { headers: { 'Authorization': `Bearer ${accessToken}` }}
+      );
+      
+      const mainFolderContents = await mainFolderResponse.json();
+      const agentFolder = mainFolderContents.files.find(item => 
+        item.mimeType === 'application/vnd.google-apps.folder' && 
+        item.name.toLowerCase() === folderName
+      );
+      
+      if (agentFolder) {
+        await loadAgentDocumentsSpecific(agentFolder.id, agentType, accessToken, agentDocs);
+      }
+      
+      return agentDocs;
+    } catch (fallbackError) {
+      console.error(`Fallback loading failed for ${agentType}:`, fallbackError);
+      return [];
+    }
   }
 }
 
