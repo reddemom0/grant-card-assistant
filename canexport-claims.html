@@ -1045,7 +1045,7 @@
                     formData.append('file', uploadedFile);
                 }
 
-                const response = await fetch(`${API_BASE}/api/chat`, {
+                const response = await fetch(`${API_BASE}/api/process-claims`, {
                     method: 'POST',
                     body: formData
                 });
