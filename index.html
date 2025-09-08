@@ -840,7 +840,7 @@
         // Check authentication on page load
         async function checkAuth() {
             try {
-                const response = await fetch('/api/process-grant', {
+                const response = await fetch('/api/health', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
