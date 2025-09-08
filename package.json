@@ -14,7 +14,8 @@
     "pdf-parse": "^1.1.1",
     "passport": "^0.6.0",
     "passport-google-oauth20": "^2.0.0",
-    "express-session": "^1.17.3"
+    "express-session": "^1.17.3",
+    "@upstash/redis": "^1.25.1"
   },
   "keywords": ["ai", "grants", "consulting", "claude"],
   "author": "Granted Consulting",
