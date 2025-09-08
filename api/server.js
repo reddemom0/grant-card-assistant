@@ -1791,7 +1791,7 @@ module.exports = async function handler(req, res) {
   }
 
   // Load knowledge base
-  await getKnowledgeBase();
+  // await getKnowledgeBase(); // PERFORMANCE FIX: Using agent-specific loading instead
   
   try {
     // FIXED: Login endpoint with proper error handling
