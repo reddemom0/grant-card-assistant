@@ -1189,6 +1189,23 @@
                 }
             }, false);
         });
+        
+        // Background cache warming for CanExport Claims
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        console.log('🔥 Pre-warming CanExport Claims cache...');
+        const response = await fetch(`${API_BASE}/api/warm-cache/canexport-claims`, { 
+            method: 'POST' 
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            console.log(`✅ CanExport Claims cache pre-warmed in ${result.warmTime}ms`);
+        }
+    } catch (error) {
+        console.log('Cache warming failed (non-critical):', error);
+    }
+});
     </script>
 </body>
 </html>
