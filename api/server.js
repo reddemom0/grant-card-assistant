@@ -1158,69 +1158,118 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
   return uniqueDocs;
 }
 
-// FIXED: Updated BCAFE document selection to accept agent docs
+// Enhanced BCAFE document selection function
 function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs = null) {
   const docs = agentDocs || knowledgeBases['bcafe'] || [];
   const msg = message.toLowerCase();
+  const conversationText = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
   const selectedDocs = [];
   
-  // Determine what the user needs and select appropriate documents
-  const needsEligibility = msg.includes('eligible') || msg.includes('qualify') || 
-                          conversationHistory.length <= 2 || msg.includes('requirements');
+  // PRIORITY 1: Always include core infrastructure (1-2 docs)
+  const eligibilityDoc = docs.find(doc => 
+    doc.filename.toLowerCase().includes('bcafe-eligibility-checklist')
+  );
+  if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
   
-  const needsApplication = msg.includes('application') || msg.includes('create') || 
-                          msg.includes('write') || msg.includes('build');
+  const programGuideDoc = docs.find(doc => 
+    doc.filename.toLowerCase().includes('bcafe-program-guide-summer-2025')
+  );
+  if (programGuideDoc) selectedDocs.push(programGuideDoc);
   
-  const needsBudget = msg.includes('budget') || msg.includes('cost') || 
-                     msg.includes('quote') || msg.includes('funding');
+  // PRIORITY 2: Intent-based selection
+  const intents = {
+    eligibility: ['eligible', 'qualify', 'requirements', 'criteria', 'can i apply'],
+    budget: ['budget', 'cost', 'funding', 'money', 'expense', 'financial'],
+    merit: ['merit', 'scoring', 'competitive', 'optimize', 'evaluation', 'points'],
+    application: ['application', 'questions', 'write', 'draft', 'create', 'build'],
+    examples: ['example', 'successful', 'sample', 'similar', 'show me']
+  };
   
-  const needsMerit = msg.includes('merit') || msg.includes('optimize') || 
-                    msg.includes('scoring') || msg.includes('competitive');
+  // Industry detection for relevant examples
+  const industries = {
+    food: ['food', 'foods', 'restaurant', 'catering', 'fine choice'],
+    beverage: ['coffee', 'drink', 'beverage', 'forecast', 'brewing'],
+    agriculture: ['farm', 'agricultural', 'level ground', 'organic', 'produce']
+  };
   
-  const needsExamples = msg.includes('example') || msg.includes('similar') || 
-                       msg.includes('successful') || msg.includes('fine choice');
-
-  // Select core documents based on needs
-  if (needsEligibility) {
-    const eligibilityDoc = docs.find(doc => doc.filename.includes('eligibility-checklist'));
-    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
-  }
-  
-  if (needsMerit) {
-    const meritDoc = docs.find(doc => doc.filename.includes('merit-criteria-guide'));
-    if (meritDoc) selectedDocs.push(meritDoc);
-  }
-  
-  if (needsBudget) {
-    const budgetDoc = docs.find(doc => doc.filename.includes('budget-template-guide'));
-    if (budgetDoc) selectedDocs.push(budgetDoc);
-  }
-  
-  if (needsApplication) {
-    const appDoc = docs.find(doc => doc.filename.includes('application-questions'));
-    if (appDoc) selectedDocs.push(appDoc);
-  }
-  
-  if (needsExamples) {
-    const exampleDocs = docs.filter(doc => 
-      doc.filename.includes('successful') || 
-      doc.filename.includes('fine-choice') ||
-      doc.filename.includes('example')
+  // Check for budget-related intent
+  if (intents.budget.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
+    const budgetDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('bcafe-budget-template-guide')
     );
-    selectedDocs.push(...exampleDocs.slice(0, 1)); // Add 1 example max
+    if (budgetDoc) selectedDocs.push(budgetDoc);
+    console.log(`🎯 BCAFE Intent Match: budget`);
   }
   
-  // Default fallback - include eligibility and one guide
-  if (selectedDocs.length === 0) {
-    const eligibilityDoc = docs.find(doc => doc.filename.includes('eligibility-checklist'));
-    const meritDoc = docs.find(doc => doc.filename.includes('merit-criteria-guide'));
-    if (eligibilityDoc) selectedDocs.push(eligibilityDoc);
+  // Check for merit optimization intent
+  if (intents.merit.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
+    const meritDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('bcafe-merit-criteria-guide')
+    );
     if (meritDoc) selectedDocs.push(meritDoc);
+    console.log(`🎯 BCAFE Intent Match: merit`);
   }
   
-  // Remove duplicates and limit to 3 documents max
-  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
-  return uniqueDocs.slice(0, 3);
+  // Check for application writing intent
+  if (intents.application.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
+    const appDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('bcafe-application-questions')
+    );
+    if (appDoc) selectedDocs.push(appDoc);
+    console.log(`🎯 BCAFE Intent Match: application`);
+  }
+  
+  // Check for examples intent with industry matching
+  if (intents.examples.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
+    // Try to match industry first
+    for (const [industry, keywords] of Object.entries(industries)) {
+      if (keywords.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
+        const industryExamples = docs.filter(doc => 
+          doc.filename.toLowerCase().includes('successful-application') &&
+          keywords.some(keyword => doc.filename.toLowerCase().includes(keyword))
+        );
+        selectedDocs.push(...industryExamples.slice(0, 1));
+        console.log(`🎯 BCAFE Industry Match: ${industry}`);
+        break;
+      }
+    }
+    
+    // If no industry match, add any successful example
+    if (!selectedDocs.some(doc => doc.filename.includes('successful-application'))) {
+      const anyExample = docs.find(doc => 
+        doc.filename.toLowerCase().includes('successful-application')
+      );
+      if (anyExample) selectedDocs.push(anyExample);
+    }
+  }
+  
+  // Add activity examples for early-stage questions
+  if (intents.eligibility.some(keyword => msg.includes(keyword)) || conversationHistory.length <= 2) {
+    const activityDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('bcafe-activity-examples')
+    );
+    if (activityDoc && selectedDocs.length < 4) selectedDocs.push(activityDoc);
+  }
+  
+  // Fallback: ensure we have at least 3 documents
+  if (selectedDocs.length < 3) {
+    const fallbackDocs = docs.filter(doc => 
+      !selectedDocs.includes(doc) && (
+        doc.filename.toLowerCase().includes('merit-criteria-guide') ||
+        doc.filename.toLowerCase().includes('budget-template-guide') ||
+        doc.filename.toLowerCase().includes('successful-application')
+      )
+    );
+    selectedDocs.push(...fallbackDocs.slice(0, 4 - selectedDocs.length));
+  }
+  
+  // Remove duplicates and limit to 4 documents max
+  const uniqueDocs = [...new Set(selectedDocs)].slice(0, 4);
+  
+  console.log(`🎯 BCAFE Smart Selection: ${uniqueDocs.length} docs selected from ${docs.length} total`);
+  console.log(`   Selected: ${uniqueDocs.map(d => d.filename).join(', ')}`);
+  
+  return uniqueDocs;
 }
 
 // NEW: CanExport Claims document selection function
