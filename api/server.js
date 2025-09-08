@@ -2039,7 +2039,37 @@ module.exports = async function handler(req, res) {
       });
       return;
     }
-
+// Cache warming endpoint
+if (url.startsWith('/api/warm-cache/') && method === 'POST') {
+  const agentType = url.split('/api/warm-cache/')[1];
+  
+  try {
+    console.log(`🔥 Warming cache for ${agentType}...`);
+    const startTime = Date.now();
+    
+    // Load documents and cache them
+    await loadAgentSpecificKnowledgeBase(agentType);
+    
+    const warmTime = Date.now() - startTime;
+    console.log(`✅ Cache warmed for ${agentType} in ${warmTime}ms`);
+    
+    res.json({ 
+      success: true, 
+      agentType, 
+      warmTime,
+      message: `Cache warmed successfully for ${agentType}` 
+    });
+    
+  } catch (error) {
+    console.error(`Cache warming failed for ${agentType}:`, error);
+    res.status(500).json({ 
+      error: 'Cache warming failed', 
+      agentType,
+      details: error.message 
+    });
+  }
+  return;
+}
     // Debug endpoint for testing document selection
     if (url === '/api/debug-grant-docs' && method === 'GET') {
       const task = req.query.task || 'grant-criteria';
