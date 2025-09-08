@@ -320,7 +320,7 @@ async function getAgentKnowledgeBase(agentType) {
   
   // If not cached or expired, load from the full knowledge base
   // First ensure the full knowledge base is loaded
-  await getKnowledgeBase();
+  // await getKnowledgeBase(); // PERFORMANCE FIX: Use agent-specific loading instead
   
   // Extract agent-specific documents from the full knowledge base
   const agentDocs = knowledgeBases[folderName] || [];
