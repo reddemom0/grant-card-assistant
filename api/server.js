@@ -13,7 +13,7 @@ const redis = new Redis({
 });
 
 // Cache configuration
-const CACHE_TTL = 30 * 60; // 30 minutes in seconds
+const CACHE_TTL = null; // Indefinite cache - no expiration
 const CACHE_PREFIX = 'knowledge-';
 
 // Authentication configuration with JWT - FIXED: Require JWT secret
@@ -1390,8 +1390,8 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
       await loadAgentDocumentsSpecific(agentFolder.id, agentType, accessToken, agentDocs);
     }
     
-    // Store in Redis cache
-    await redis.setex(cacheKey, CACHE_TTL, agentDocs);
+    // Store in Redis cache (indefinitely)
+  await redis.set(cacheKey, agentDocs);
     
     const loadTime = Date.now() - startTime;
     logAgentPerformance(agentType, agentDocs.length, loadTime);
@@ -2070,6 +2070,34 @@ if (url.startsWith('/api/warm-cache/') && method === 'POST') {
   }
   return;
 }
+
+// Manual cache clearing endpoint
+if (url === '/api/clear-cache' && method === 'POST') {
+  try {
+    const agents = ['grant-cards', 'etg-writer', 'bcafe-writer', 'canexport-claims', 'canexport-writer', 'readiness-strategist', 'internal-oracle'];
+    let clearedCount = 0;
+    
+    for (const agent of agents) {
+      const result = await redis.del(`${CACHE_PREFIX}${agent}`);
+      if (result === 1) clearedCount++;
+    }
+    
+    console.log(`Cleared ${clearedCount} Redis caches`);
+    res.json({ 
+      message: `Successfully cleared ${clearedCount} caches`,
+      clearedAgents: agents,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Cache clearing failed:', error);
+    res.status(500).json({ 
+      error: 'Failed to clear cache', 
+      details: error.message 
+    });
+  }
+  return;
+}
+    
     // Debug endpoint for testing document selection
     if (url === '/api/debug-grant-docs' && method === 'GET') {
       const task = req.query.task || 'grant-criteria';
