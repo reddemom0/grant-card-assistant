@@ -1049,6 +1049,115 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   return uniqueDocs.slice(0, maxDocs);
 }
 
+// Smart ETG document selection function
+function selectETGDocuments(userMessage, conversation, allDocuments) {
+  const message = userMessage.toLowerCase();
+  const conversationText = conversation.map(msg => msg.content).join(' ').toLowerCase();
+  
+  let selectedDocs = [];
+  
+  // PRIORITY 1: Always include core infrastructure (1-2 docs)
+  const coreEligibilityDoc = allDocuments.find(doc => 
+    doc.filename.toLowerCase().includes('bc etg eligibility criteria') ||
+    doc.filename.toLowerCase().includes('eligibility criteria')
+  );
+  if (coreEligibilityDoc) selectedDocs.push(coreEligibilityDoc);
+  
+  const coreTemplateDoc = allDocuments.find(doc => 
+    doc.filename.toLowerCase().includes('etg business case template') ||
+    doc.filename.toLowerCase().includes('compliance & best practices')
+  );
+  if (coreTemplateDoc) selectedDocs.push(coreTemplateDoc);
+  
+  // PRIORITY 2: Context-based selection (2-3 docs)
+  
+  // Training type detection
+  const trainingTypes = {
+    leadership: ['leadership', 'management', 'supervisor', 'manager'],
+    technical: ['technical', 'automotive', 'construction', 'electrical', 'trades'],
+    digital: ['digital', 'marketing', 'social media', 'seo', 'analytics'],
+    professional: ['project management', 'hr', 'human resources', 'finance', 'accounting', 'sales'],
+    certification: ['certificate', 'certification', 'cpa', 'excel', 'fundamentals']
+  };
+  
+  // Industry detection
+  const industries = {
+    automotive: ['automotive', 'car', 'vehicle', 'kirmac'],
+    construction: ['construction', 'electrical', 'building', 'contractor'],
+    hospitality: ['wine', 'golf', 'restaurant', 'hospitality', 'victoria golf'],
+    technology: ['tech', 'software', 'digital', 'it', 'capstone'],
+    finance: ['finance', 'accounting', 'wealth', 'financial']
+  };
+  
+  // Company size detection
+  const companyIndicators = {
+    large: ['corporation', 'inc', 'ltd', 'group', 'corporate'],
+    small: ['local', 'family', 'boutique', 'startup']
+  };
+  
+  // Intent detection
+  const intents = {
+    eligibility: ['eligible', 'qualify', 'requirements', 'criteria', 'allowed'],
+    examples: ['example', 'similar', 'like this', 'show me', 'sample'],
+    writing: ['write', 'create', 'draft', 'develop', 'help me write']
+  };
+  
+  // Check for training type matches
+  for (const [type, keywords] of Object.entries(trainingTypes)) {
+    if (keywords.some(keyword => message.includes(keyword) || conversationText.includes(keyword))) {
+      const typeExamples = allDocuments.filter(doc => 
+        keywords.some(keyword => doc.filename.toLowerCase().includes(keyword))
+      );
+      selectedDocs.push(...typeExamples.slice(0, 2));
+      console.log(`🎯 ETG Training Type Match: ${type}`);
+      break;
+    }
+  }
+  
+  // Check for industry matches
+  for (const [industry, keywords] of Object.entries(industries)) {
+    if (keywords.some(keyword => message.includes(keyword) || conversationText.includes(keyword))) {
+      const industryExamples = allDocuments.filter(doc => 
+        keywords.some(keyword => doc.filename.toLowerCase().includes(keyword))
+      );
+      selectedDocs.push(...industryExamples.slice(0, 2));
+      console.log(`🎯 ETG Industry Match: ${industry}`);
+      break;
+    }
+  }
+  
+  // If user wants examples but no specific match, add high-quality recent examples
+  if (intents.examples.some(keyword => message.includes(keyword)) && selectedDocs.length < 4) {
+    const recentExamples = allDocuments.filter(doc => 
+      doc.filename.toLowerCase().includes('caliber') ||
+      doc.filename.toLowerCase().includes('badinotti') ||
+      doc.filename.toLowerCase().includes('v2 example') ||
+      doc.filename.toLowerCase().includes('template005')
+    );
+    selectedDocs.push(...recentExamples.slice(0, 2));
+  }
+  
+  // Fallback: If we don't have enough docs, add some high-quality defaults
+  if (selectedDocs.length < 3) {
+    const fallbackDocs = allDocuments.filter(doc => 
+      !selectedDocs.includes(doc) && (
+        doc.filename.toLowerCase().includes('caliber') ||
+        doc.filename.toLowerCase().includes('template') ||
+        doc.filename.toLowerCase().includes('guide')
+      )
+    );
+    selectedDocs.push(...fallbackDocs.slice(0, 5 - selectedDocs.length));
+  }
+  
+  // Remove duplicates and limit to 5 documents max
+  const uniqueDocs = [...new Set(selectedDocs)].slice(0, 5);
+  
+  console.log(`🎯 ETG Smart Selection: ${uniqueDocs.length} docs selected from ${allDocuments.length} total`);
+  console.log(`   Selected: ${uniqueDocs.map(d => d.filename).join(', ')}`);
+  
+  return uniqueDocs;
+}
+
 // FIXED: Updated BCAFE document selection to accept agent docs
 function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs = null) {
   const docs = agentDocs || knowledgeBases['bcafe'] || [];
@@ -2207,8 +2316,8 @@ Always follow the exact workflows and instructions from the knowledge base docum
       const loadTime = Date.now() - startTime;
       logAgentPerformance('etg-writer', agentDocs.length, loadTime);
 
-      // Use first 5 ETG docs for knowledge context
-      const relevantDocs = agentDocs.slice(0, 5);
+      // Use smart document selection instead of first 5
+      const relevantDocs = selectETGDocuments(message, conversation, agentDocs);
       let knowledgeContext = '';
 
       if (relevantDocs.length > 0) {
