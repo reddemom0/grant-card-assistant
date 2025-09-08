@@ -4,6 +4,17 @@ const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
 const path = require('path');
 const crypto = require('crypto');
+const { Redis } = require('@upstash/redis');
+
+// Initialize Redis client
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+});
+
+// Cache configuration
+const CACHE_TTL = 30 * 60; // 30 minutes in seconds
+const CACHE_PREFIX = 'knowledge-';
 
 // Authentication configuration with JWT - FIXED: Require JWT secret
 const TEAM_PASSWORD = process.env.TEAM_PASSWORD;
