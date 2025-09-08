@@ -962,91 +962,131 @@ COMMUNICATION APPROACH:
 Follow the detailed processes outlined in the knowledge base documents rather than attempting to recreate them.`
 };
 
-// FIXED: Updated document selection functions to accept agent docs
+// Enhanced Grant Cards document selection function
 function selectGrantCardDocuments(task, message, fileContent, conversationHistory, agentDocs = null) {
   const docs = agentDocs || knowledgeBases['grant-cards'] || [];
   const msg = message.toLowerCase();
+  const conversationText = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
   const selectedDocs = [];
-  
-  // Determine what the user needs based on task and message content
-  const needsFormatter = task === 'grant-criteria' || msg.includes('criteria') || msg.includes('format');
-  const needsPreview = task === 'preview' || msg.includes('preview') || msg.includes('description');
-  const needsRequirements = task === 'requirements' || msg.includes('requirements') || msg.includes('general');
-  const needsInsights = task === 'insights' || msg.includes('insights') || msg.includes('strategy');
-  const needsCategories = task === 'categories' || msg.includes('categories') || msg.includes('tags');
-  const needsMissing = task === 'missing-info' || msg.includes('missing') || msg.includes('gaps');
   
   // Large file uploaded - reduce knowledge base to save context
   const isLargeFile = fileContent && fileContent.length > 50000;
-  const maxDocs = isLargeFile ? 1 : 3;
+  const maxDocs = isLargeFile ? 2 : 4;
   
-  // Select task-specific documents (with underscores and hyphens)
-  if (needsFormatter) {
+  // PRIORITY 1: Always include task-specific core document
+  const taskDocMap = {
+    'grant-criteria': ['grant_criteria_formatter', 'grant-criteria-formatter'],
+    'preview': ['preview_section_generator', 'preview-section-generator'],
+    'requirements': ['general_requirements_creator', 'general-requirements-creator'],
+    'insights': ['granted_insights_generator', 'granted-insights-generator'],
+    'categories': ['categories_tags_classifier', 'categories-tags-classifier'],
+    'missing-info': ['missing_info_generator', 'missing-info-generator']
+  };
+  
+  // Get primary task document
+  const taskPatterns = taskDocMap[task] || taskDocMap['grant-criteria'];
+  const primaryDoc = docs.find(doc => 
+    taskPatterns.some(pattern => doc.filename.toLowerCase().includes(pattern))
+  );
+  if (primaryDoc) selectedDocs.push(primaryDoc);
+  
+  // PRIORITY 2: Grant type detection from content
+  const grantTypes = {
+    hiring: ['hiring', 'wage', 'employment', 'workforce', 'intern', 'staff', 'talent', 'job'],
+    training: ['training', 'skills', 'education', 'certification', 'development', 'learning'],
+    rd: ['research', 'development', 'innovation', 'technology', 'r&d', 'commercialization'],
+    market: ['market', 'expansion', 'export', 'capital', 'equipment', 'infrastructure', 'trade'],
+    loan: ['loan', 'financing', 'interest', 'credit', 'debt', 'fund'],
+    investment: ['investment', 'equity', 'venture', 'capital', 'investor', 'funding']
+  };
+  
+  // Industry detection for better example matching
+  const industries = {
+    technology: ['tech', 'software', 'ai', 'digital', 'innovation', 'startup'],
+    agriculture: ['agricultural', 'farm', 'food', 'rural', 'crop'],
+    healthcare: ['health', 'medical', 'life sciences', 'biotech', 'pharma'],
+    energy: ['clean technology', 'renewable', 'energy', 'environmental'],
+    indigenous: ['indigenous', 'first nations', 'aboriginal']
+  };
+  
+  // Detect grant type from message and file content
+  const fullContent = msg + ' ' + (fileContent || '') + ' ' + conversationText;
+  let detectedGrantType = null;
+  let detectedIndustry = null;
+  
+  // Find grant type
+  for (const [type, keywords] of Object.entries(grantTypes)) {
+    if (keywords.some(keyword => fullContent.includes(keyword))) {
+      detectedGrantType = type;
+      console.log(`🎯 Grant Cards Type Match: ${type}`);
+      break;
+    }
+  }
+  
+  // Find industry
+  for (const [industry, keywords] of Object.entries(industries)) {
+    if (keywords.some(keyword => fullContent.includes(keyword))) {
+      detectedIndustry = industry;
+      console.log(`🎯 Grant Cards Industry Match: ${industry}`);
+      break;
+    }
+  }
+  
+  // PRIORITY 3: Add relevant template and example based on detected type
+  if (detectedGrantType) {
+    // Add template for the grant type
+    const templateDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes(`${detectedGrantType} grant template`) ||
+      (detectedGrantType === 'market' && doc.filename.toLowerCase().includes('market expansion'))
+    );
+    if (templateDoc && selectedDocs.length < maxDocs) selectedDocs.push(templateDoc);
+    
+    // Add relevant example with industry preference
+    let exampleDoc = null;
+    if (detectedIndustry) {
+      // Try to find example matching both grant type and industry
+      exampleDoc = docs.find(doc => 
+        doc.filename.toLowerCase().includes(`${detectedGrantType} - grant card example`) &&
+        industries[detectedIndustry].some(keyword => doc.filename.toLowerCase().includes(keyword))
+      );
+    }
+    
+    // Fallback to any example of the grant type
+    if (!exampleDoc) {
+      exampleDoc = docs.find(doc => 
+        doc.filename.toLowerCase().includes(`${detectedGrantType} - grant card example`)
+      );
+    }
+    
+    if (exampleDoc && selectedDocs.length < maxDocs) selectedDocs.push(exampleDoc);
+  }
+  
+  // PRIORITY 4: Add industry-specific examples if no grant type detected
+  if (!detectedGrantType && detectedIndustry && selectedDocs.length < maxDocs) {
+    const industryExample = docs.find(doc => 
+      doc.filename.toLowerCase().includes('grant card example') &&
+      industries[detectedIndustry].some(keyword => doc.filename.toLowerCase().includes(keyword))
+    );
+    if (industryExample) selectedDocs.push(industryExample);
+  }
+  
+  // PRIORITY 5: Fallback for missing task documents
+  if (selectedDocs.length === 0) {
     const formatterDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
-      doc.filename.toLowerCase().includes('grant-criteria-formatter') ||
       doc.filename.toLowerCase().includes('formatter')
     );
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
   
-  if (needsPreview) {
-    const previewDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('preview_section_generator') ||
-      doc.filename.toLowerCase().includes('preview-section-generator') ||
-      doc.filename.toLowerCase().includes('preview')
-    );
-    if (previewDoc) selectedDocs.push(previewDoc);
-  }
-  
-  if (needsRequirements) {
-    const reqDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('general_requirements_creator') ||
-      doc.filename.toLowerCase().includes('general-requirements-creator') ||
-      doc.filename.toLowerCase().includes('requirements')
-    );
-    if (reqDoc) selectedDocs.push(reqDoc);
-  }
-  
-  if (needsInsights) {
-    const insightsDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('granted_insights_generator') ||
-      doc.filename.toLowerCase().includes('granted-insights-generator') ||
-      doc.filename.toLowerCase().includes('insights')
-    );
-    if (insightsDoc) selectedDocs.push(insightsDoc);
-  }
-  
-  if (needsCategories) {
-    const categoriesDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('categories_tags_classifier') ||
-      doc.filename.toLowerCase().includes('categories-tags-classifier') ||
-      doc.filename.toLowerCase().includes('categories')
-    );
-    if (categoriesDoc) selectedDocs.push(categoriesDoc);
-  }
-  
-  if (needsMissing) {
-    const missingDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('missing_info_generator') ||
-      doc.filename.toLowerCase().includes('missing-info-generator') ||
-      doc.filename.toLowerCase().includes('missing')
-    );
-    if (missingDoc) selectedDocs.push(missingDoc);
-  }
-  
-  // Default fallback - include grant criteria formatter if nothing selected
-  if (selectedDocs.length === 0) {
-    const formatterDoc = docs.find(doc => 
-      doc.filename.toLowerCase().includes('formatter') ||
-      doc.filename.toLowerCase().includes('criteria')
-    );
-    if (formatterDoc) selectedDocs.push(formatterDoc);
-  }
-  
   // Remove duplicates and limit based on file size
-  const uniqueDocs = [...new Map(selectedDocs.map(doc => [doc.filename, doc])).values()];
-  return uniqueDocs.slice(0, maxDocs);
+  const uniqueDocs = [...new Set(selectedDocs)].slice(0, maxDocs);
+  
+  console.log(`🎯 Grant Cards Smart Selection: ${uniqueDocs.length} docs selected from ${docs.length} total`);
+  console.log(`   Task: ${task}, Type: ${detectedGrantType || 'none'}, Industry: ${detectedIndustry || 'none'}`);
+  console.log(`   Selected: ${uniqueDocs.map(d => d.filename).join(', ')}`);
+  
+  return uniqueDocs;
 }
 
 // Smart ETG document selection function
