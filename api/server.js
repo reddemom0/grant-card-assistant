@@ -1221,6 +1221,106 @@ async function getGoogleAccessToken() {
   }
 }
 
+// Load knowledge base for specific agent only
+async function loadAgentSpecificKnowledgeBase(agentType) {
+  const folderName = AGENT_FOLDER_MAP[agentType];
+  if (!folderName) {
+    console.log(`Unknown agent type: ${agentType}`);
+    return [];
+  }
+
+  // Check if already loaded and cached
+  const cacheKey = `agent-${agentType}`;
+  const now = Date.now();
+  const lastCached = agentCacheTimestamps.get(cacheKey) || 0;
+  
+  if (agentKnowledgeCache.has(cacheKey) && (now - lastCached < CACHE_DURATION)) {
+    console.log(`Using cached knowledge for ${agentType}`);
+    return agentKnowledgeCache.get(cacheKey);
+  }
+
+  if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
+    console.log('Google Drive not configured');
+    return [];
+  }
+
+  try {
+    console.log(`Loading knowledge base for ${agentType} only...`);
+    
+    const accessToken = await getGoogleAccessToken();
+    
+    // Get main folder contents
+    const mainFolderResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${GOOGLE_DRIVE_FOLDER_ID}'+in+parents&fields=files(id,name,mimeType)`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` }}
+    );
+    
+    const mainFolderContents = await mainFolderResponse.json();
+    
+    // Find the specific agent folder
+    const agentFolder = mainFolderContents.files.find(item => 
+      item.mimeType === 'application/vnd.google-apps.folder' && 
+      item.name.toLowerCase() === folderName
+    );
+    
+    if (!agentFolder) {
+      console.log(`No folder found for agent: ${agentType}`);
+      return [];
+    }
+    
+    // Load only this agent's documents
+    const agentDocs = [];
+    await loadAgentDocumentsSpecific(agentFolder.id, agentType, accessToken, agentDocs);
+    
+    // Cache the results
+    agentKnowledgeCache.set(cacheKey, agentDocs);
+    agentCacheTimestamps.set(cacheKey, now);
+    
+    console.log(`✅ Loaded ${agentDocs.length} documents for ${agentType}`);
+    return agentDocs;
+    
+  } catch (error) {
+    console.error(`Error loading knowledge base for ${agentType}:`, error);
+    return [];
+  }
+}
+
+// Helper function to load documents for specific agent
+async function loadAgentDocumentsSpecific(folderId, agentName, accessToken, docsArray) {
+  try {
+    const filesResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType,size,modifiedTime)`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` }}
+    );
+    
+    const filesData = await filesResponse.json();
+    
+    for (const file of filesData.files) {
+      if (file.mimeType === 'application/vnd.google-apps.folder') continue;
+      
+      try {
+        const content = await loadFileContent(file, accessToken);
+        if (content) {
+          docsArray.push({
+            filename: file.name,
+            content: content,
+            type: getFileType(file.name, file.mimeType),
+            size: content.length,
+            googleFileId: file.id,
+            lastModified: file.modifiedTime,
+            source: 'google-drive-agent-specific'
+          });
+          console.log(`   ✅ ${file.name} (${content.length} chars)`);
+        }
+      } catch (fileError) {
+        console.log(`   ⚠️  Skipping ${file.name}: ${fileError.message}`);
+      }
+    }
+  } catch (error) {
+    console.error(`Error loading documents for ${agentName}:`, error);
+  }
+}
+
 // Load knowledge base from Google Drive using Service Account
 async function loadKnowledgeBaseFromGoogleDrive() {
   if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -2265,7 +2365,7 @@ Use the knowledge base documents above for all detailed processes, requirements,
       const conversation = conversations.get(claimsConversationId);
       
       // Agent-specific knowledge base loading for CanExport Claims
-      const agentDocs = await getAgentKnowledgeBase('canexport-claims');
+     const agentDocs = await loadAgentSpecificKnowledgeBase('canexport-claims');
       const loadTime = Date.now() - startTime;
       logAgentPerformance('canexport-claims', agentDocs.length, loadTime);
 
