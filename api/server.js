@@ -2798,7 +2798,6 @@ Use the invoice guides and compliance documents above for all expense eligibilit
     // Default 404 for unmatched routes
     res.status(404).json({ error: 'API endpoint not found' });
 
-    }
   } catch (error) {
     console.error('API error:', error);
     
