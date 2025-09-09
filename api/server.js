@@ -12,6 +12,129 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
+// OCR functionality for CanExport Claims
+const Tesseract = require('tesseract.js');
+
+// OCR function to extract text from images
+async function extractTextFromImage(imageBuffer) {
+  console.log('🔍 Starting OCR text extraction...');
+  
+  try {
+    const { data: { text } } = await Tesseract.recognize(
+      imageBuffer,
+      'eng',
+      {
+        logger: m => {
+          if (m.status === 'recognizing text') {
+            console.log(`📄 OCR Progress: ${Math.round(m.progress * 100)}%`);
+          }
+        },
+        tessedit_ocr_engine_mode: 2,
+        tessedit_pageseg_mode: 6,
+      }
+    );
+    
+    console.log('✅ OCR extraction completed');
+    return text.trim();
+    
+  } catch (error) {
+    console.error('❌ OCR extraction failed:', error);
+    return 'OCR extraction failed. Please try with a clearer image or different format.';
+  }
+}
+
+// Analyze expense information from extracted text
+function analyzeExpenseFromText(extractedText, filename) {
+  console.log('💰 Analyzing expense data...');
+  
+  const analysis = {
+    extractedInfo: {
+      amount: null,
+      date: null,
+      vendor: null,
+      category: null,
+      currency: 'CAD',
+      paymentMethod: null
+    },
+    eligibilityAssessment: {
+      category: 'Unknown',
+      eligibilityScore: 0,
+      recommendedAction: 'Manual Review Required'
+    },
+    complianceIssues: [],
+    ocrConfidence: 'Medium'
+  };
+  
+  // Extract monetary amounts
+  const amountPatterns = [
+    /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g,
+    /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*\$/g,
+    /TOTAL[:\s]*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/gi,
+    /AMOUNT[:\s]*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/gi
+  ];
+  
+  for (const pattern of amountPatterns) {
+    const matches = [...extractedText.matchAll(pattern)];
+    if (matches.length > 0) {
+      const amounts = matches.map(match => parseFloat(match[1].replace(',', '')));
+      analysis.extractedInfo.amount = Math.max(...amounts).toFixed(2);
+      break;
+    }
+  }
+  
+  // Extract dates
+  const datePatterns = [
+    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/g,
+    /(\d{2,4}[\/\-]\d{1,2}[\/\-]\d{1,2})/g,
+    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}/gi,
+    /\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}/gi
+  ];
+  
+  for (const pattern of datePatterns) {
+    const match = extractedText.match(pattern);
+    if (match) {
+      analysis.extractedInfo.date = match[0];
+      break;
+    }
+  }
+  
+  // Extract vendor name (first meaningful line)
+  const lines = extractedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+  const skipWords = ['receipt', 'customer', 'copy', 'thank', 'you', 'total', 'tax', 'subtotal'];
+  
+  for (const line of lines.slice(0, 5)) {
+    if (line.length > 2 && line.length < 50 && 
+        !skipWords.some(word => line.toLowerCase().includes(word)) &&
+        !/^\d+[\.\-\/]/.test(line) &&
+        !/^\$/.test(line)) {
+      analysis.extractedInfo.vendor = line;
+      break;
+    }
+  }
+  
+  // Calculate confidence
+  let confidence = 0;
+  if (analysis.extractedInfo.amount) confidence += 40;
+  if (analysis.extractedInfo.date) confidence += 30;
+  if (analysis.extractedInfo.vendor) confidence += 30;
+  
+  analysis.eligibilityAssessment.eligibilityScore = confidence;
+  
+  if (confidence >= 80) {
+    analysis.ocrConfidence = 'High';
+    analysis.eligibilityAssessment.recommendedAction = 'Ready for Review';
+  } else if (confidence >= 50) {
+    analysis.ocrConfidence = 'Medium';
+    analysis.eligibilityAssessment.recommendedAction = 'Requires Additional Documentation';
+  } else {
+    analysis.ocrConfidence = 'Low';
+    analysis.eligibilityAssessment.recommendedAction = 'Manual Entry Required';
+  }
+  
+  console.log(`✅ Expense analysis completed - Confidence: ${analysis.ocrConfidence}`);
+  return analysis;
+}
+
 // Cache configuration
 const CACHE_TTL = null; // Indefinite cache - no expiration
 const CACHE_PREFIX = 'knowledge-';
@@ -2686,10 +2809,59 @@ Use the knowledge base documents above for all detailed processes, requirements,
       console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
       
       // Process uploaded file if present (receipts, invoices, etc.)
-      if (req.file) {
-        console.log(`📄 Processing Claims document: ${req.file.originalname}`);
-        fileContent = await processFileContent(req.file);
-      }
+if (req.file) {
+  console.log(`📄 Processing Claims document: ${req.file.originalname} (${req.file.mimetype})`);
+  
+  // Check if it's an image (receipt scan)
+  const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'];
+  
+  if (imageTypes.includes(req.file.mimetype)) {
+    console.log('📸 Image detected - Starting OCR processing...');
+    
+    try {
+      // Extract text from image using OCR
+      const extractedText = await extractTextFromImage(req.file.buffer);
+      
+      // Analyze expense information
+      const expenseAnalysis = analyzeExpenseFromText(extractedText, req.file.originalname);
+      
+      // Build comprehensive file content for Claude
+      fileContent = `📸 RECEIPT IMAGE PROCESSED WITH OCR:
+File: ${req.file.originalname}
+OCR Confidence: ${expenseAnalysis.ocrConfidence}
+
+EXTRACTED TEXT:
+${extractedText}
+
+AUTOMATIC EXPENSE ANALYSIS:
+💰 Amount: ${expenseAnalysis.extractedInfo.amount ? '$' + expenseAnalysis.extractedInfo.amount : 'Not detected'}
+📅 Date: ${expenseAnalysis.extractedInfo.date || 'Not detected'}
+🏢 Vendor: ${expenseAnalysis.extractedInfo.vendor || 'Not detected'}
+🎯 Eligibility Score: ${expenseAnalysis.eligibilityAssessment.eligibilityScore}/100
+🔍 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
+
+Please analyze this receipt for CanExport SME program eligibility and compliance requirements.`;
+
+      console.log(`✅ OCR processing completed with ${expenseAnalysis.ocrConfidence} confidence`);
+      
+    } catch (ocrError) {
+      console.error('❌ OCR processing failed:', ocrError);
+      fileContent = `📸 RECEIPT IMAGE UPLOAD:
+File: ${req.file.originalname}
+Status: OCR processing failed
+
+Error: ${ocrError.message}
+
+Please analyze this receipt manually or request a clearer image.`;
+    }
+    
+  } else {
+    console.log('📄 Document detected - Processing as regular file...');
+    // Process as regular document (PDF, Word, etc.)
+    fileContent = await processFileContent(req.file);
+  }
+}
+      
       
       // Get or create Claims conversation
       const claimsConversationId = `claims-${conversationId}`;
