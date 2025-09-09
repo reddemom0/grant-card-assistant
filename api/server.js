@@ -1312,12 +1312,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
   return uniqueDocs;
 }
 
-// NEW: CanExport Claims document selection function
-function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs = null) {
-  const docs = agentDocs || knowledgeBases['canexport-claims'] || [];
-  const msg = message.toLowerCase();
-  const selectedDocs = [];
-  
 // Enhanced CanExport Claims document selection function
 function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs = null) {
   const docs = agentDocs || knowledgeBases['canexport-claims'] || [];
