@@ -987,7 +987,7 @@
                         <span style="color: #059669;">✓</span>
                         <span style="color: #065f46; font-weight: 500;">${file.name}</span>
                         <span style="color: #047857; font-size: 0.7rem;">(${fileSizeUnit})</span>
-                        ${isImage ? '<span style="color: #059669; font-size: 0.7rem;">📸 OCR Ready</span>' : ''}
+                       ${isImage ? '<span style="color: #059669; font-size: 0.7rem;">🔍 OCR Processing</span>' : ''}
                     </div>
                 `;
                 fileInfo.style.display = 'block';
@@ -1000,7 +1000,7 @@
                     <div class="scanner-subtext">${isImage ? 'Image will be processed with OCR' : 'Document ready for CanExport audit'}</div>
                 `;
                 
-                addMessage('user', `📎 **${file.name}** uploaded for CanExport claims audit${isImage ? ' (will scan with OCR)' : ''}`);
+                addMessage('user', `📎 **${file.name}** uploaded for CanExport claims audit${isImage ? ' (OCR text extraction enabled)' : ''}`);
                 messageInput.focus();
             }
         });
