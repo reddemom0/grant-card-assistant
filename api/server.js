@@ -62,7 +62,9 @@ function analyzeExpenseFromText(extractedText, filename) {
       recommendedAction: 'Manual Review Required'
     },
     complianceIssues: [],
-    ocrConfidence: 'Medium'
+    ocrConfidence: 'Medium',
+    rejectionWarnings: [],
+    rejectionRisk: 'LOW'
   };
   
   // Extract monetary amounts
@@ -112,6 +114,11 @@ function analyzeExpenseFromText(extractedText, filename) {
     }
   }
   
+  // Check for rejection patterns
+  const rejectionPatterns = checkRejectionPatterns(extractedText, filename);
+  analysis.rejectionWarnings = rejectionPatterns.warnings;
+  analysis.rejectionRisk = rejectionPatterns.riskLevel;
+  
   // Calculate confidence
   let confidence = 0;
   if (analysis.extractedInfo.amount) confidence += 40;
@@ -120,19 +127,135 @@ function analyzeExpenseFromText(extractedText, filename) {
   
   analysis.eligibilityAssessment.eligibilityScore = confidence;
   
-  if (confidence >= 80) {
-    analysis.ocrConfidence = 'High';
-    analysis.eligibilityAssessment.recommendedAction = 'Ready for Review';
-  } else if (confidence >= 50) {
-    analysis.ocrConfidence = 'Medium';
-    analysis.eligibilityAssessment.recommendedAction = 'Requires Additional Documentation';
+  // Adjust eligibility based on rejection risk
+  if (rejectionPatterns.riskLevel === 'HIGH') {
+    analysis.eligibilityAssessment.eligibilityScore = Math.min(analysis.eligibilityAssessment.eligibilityScore, 20);
+    analysis.eligibilityAssessment.recommendedAction = 'LIKELY REJECTED - ' + rejectionPatterns.primaryReason;
+    analysis.eligibilityAssessment.category = 'High Risk';
+  } else if (rejectionPatterns.riskLevel === 'MEDIUM') {
+    analysis.eligibilityAssessment.eligibilityScore = Math.min(analysis.eligibilityAssessment.eligibilityScore, 50);
+    analysis.eligibilityAssessment.recommendedAction = 'NEEDS REVIEW - ' + rejectionPatterns.primaryReason;
+    analysis.eligibilityAssessment.category = 'Medium Risk';
   } else {
-    analysis.ocrConfidence = 'Low';
-    analysis.eligibilityAssessment.recommendedAction = 'Manual Entry Required';
+    if (confidence >= 80) {
+      analysis.ocrConfidence = 'High';
+      analysis.eligibilityAssessment.recommendedAction = 'Ready for Review';
+    } else if (confidence >= 50) {
+      analysis.ocrConfidence = 'Medium';
+      analysis.eligibilityAssessment.recommendedAction = 'Requires Additional Documentation';
+    } else {
+      analysis.ocrConfidence = 'Low';
+      analysis.eligibilityAssessment.recommendedAction = 'Manual Entry Required';
+    }
   }
   
-  console.log(`✅ Expense analysis completed - Confidence: ${analysis.ocrConfidence}`);
+  console.log(`✅ Expense analysis completed - Confidence: ${analysis.ocrConfidence}, Risk: ${analysis.rejectionRisk}`);
   return analysis;
+}
+
+// Check for rejection patterns based on historical rejected claims
+function checkRejectionPatterns(extractedText, filename) {
+  const text = extractedText.toLowerCase();
+  const file = filename.toLowerCase();
+  
+  const warnings = [];
+  let riskLevel = 'LOW';
+  let primaryReason = '';
+  
+  // Critical rejection patterns (HIGH RISK) - based on your rejected claims data
+  const highRiskPatterns = [
+    { 
+      pattern: /amazon|office supplies|reusable items|office equipment/i, 
+      reason: "Re-usable items ineligible",
+      example: "Amazon purchases rejected - items can be repurposed"
+    },
+    { 
+      pattern: /booth purchase|buying booth|purchase.*booth/i, 
+      reason: "Booth purchases ineligible (rentals only)",
+      example: "Booth purchase rejected - only rentals eligible"
+    },
+    { 
+      pattern: /canadian? market|domestic advertising|canada.*advertising/i, 
+      reason: "Canadian advertising ineligible",
+      example: "Advertising targeting Canada rejected"
+    },
+    { 
+      pattern: /airport tax|departure fee|international tax|local.*tax/i, 
+      reason: "Airport taxes/fees ineligible",
+      example: "Airport taxes removed from reimbursement"
+    },
+    { 
+      pattern: /branding|logo design|package design|brand.*design/i, 
+      reason: "Branding/design costs ineligible",
+      example: "Branding costs not export-specific"
+    },
+    { 
+      pattern: /franchise|franchising cost|franchise.*setup/i, 
+      reason: "Franchise costs ineligible",
+      example: "Franchise implementation costs rejected"
+    },
+    { 
+      pattern: /dispute|legal dispute|vendor dispute|handling.*dispute/i, 
+      reason: "Dispute costs ineligible",
+      example: "Vendor dispute costs are core business"
+    }
+  ];
+  
+  // Medium risk patterns
+  const mediumRiskPatterns = [
+    { 
+      pattern: /bank charge|banking fee|transaction fee/i, 
+      reason: "Bank charges typically ineligible"
+    },
+    { 
+      pattern: /damage waiver|insurance waiver/i, 
+      reason: "Damage waivers ineligible"
+    },
+    { 
+      pattern: /interview|hiring|recruitment/i, 
+      reason: "Interview costs ineligible"
+    },
+    { 
+      pattern: /podcast|media production/i, 
+      reason: "Podcast costs may be ineligible"
+    },
+    {
+      pattern: /per diem|hotel.*allowance/i,
+      reason: "Per diem issues possible"
+    }
+  ];
+  
+  // Check high risk patterns first
+  for (const { pattern, reason, example } of highRiskPatterns) {
+    if (pattern.test(text) || pattern.test(file)) {
+      warnings.push(`🚨 HIGH RISK: ${reason}`);
+      if (example) warnings.push(`   Historical example: ${example}`);
+      riskLevel = 'HIGH';
+      primaryReason = reason;
+      break; // Stop at first high risk match
+    }
+  }
+  
+  // Check medium risk patterns if no high risk found
+  if (riskLevel !== 'HIGH') {
+    for (const { pattern, reason } of mediumRiskPatterns) {
+      if (pattern.test(text) || pattern.test(file)) {
+        warnings.push(`⚠️ MEDIUM RISK: ${reason}`);
+        riskLevel = 'MEDIUM';
+        primaryReason = reason;
+        break; // Stop at first medium risk match
+      }
+    }
+  }
+  
+  // Add specific guidance based on risk found
+  if (riskLevel === 'HIGH') {
+    warnings.push(`🔄 SOLUTION: Review CanExport guidelines for compliant alternatives`);
+  } else if (riskLevel === 'MEDIUM') {
+    warnings.push(`📋 ACTION: Verify expense meets all CanExport requirements`);
+  }
+  
+  return { warnings, riskLevel, primaryReason };
 }
 
 // Cache configuration
@@ -924,6 +1047,25 @@ PRIMARY CAPABILITIES:
 📊 **Audit Report Generation** - Create professional, submission-ready expense summaries
 🎯 **Real-time Guidance** - Provide immediate feedback and compliance recommendations
 
+**CRITICAL REJECTION PREVENTION:**
+Before analyzing any expense, check against these HIGH-PRIORITY rejection patterns from historical data:
+
+🚨 IMMEDIATE REJECTION TRIGGERS:
+- Amazon purchases → "Re-usable items ineligible" (Historical: Amazon office supplies rejected)
+- Booth PURCHASES → "Only rentals eligible" (Historical: Informa Media booth purchase rejected)
+- Canadian advertising → "Target market restrictions" (Historical: SRJCA domestic advertising rejected)
+- Pre-project expenses → "Must be after start date" (Historical: IndustryNow invoice predated project)
+- Airport taxes/fees → "Only core travel costs" (Historical: Air Canada taxes removed)
+- Branding/design → "Not export-specific" (Historical: Package design costs rejected)
+- Franchise costs → "Implementation ineligible" (Historical: Franchise law costs rejected)
+- Legal disputes → "Core business operations" (Historical: Vendor dispute costs rejected)
+
+When you detect ANY of these patterns:
+1. 🛑 STOP and flag immediately with "LIKELY REJECTED" status
+2. 📋 Reference specific historical rejection example
+3. 🔄 Suggest compliant alternatives
+4. 📊 Set compliance score to 20% or lower
+
 EXPENSE ANALYSIS WORKFLOW:
 
 **PHASE 1: DOCUMENT PROCESSING**
@@ -1462,8 +1604,26 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
     doc.filename.toLowerCase().includes('invoice guide canexport')
   );
   if (mainInvoiceGuide) selectedDocs.push(mainInvoiceGuide);
+
+  // PRIORITY 2: Always prioritize rejected claims knowledge if red flags detected
+  const rejectionKeywords = ['amazon', 'booth purchase', 'canadian', 'branding', 'franchise', 'airport tax', 'dispute', 'reusable', 'office supplies'];
+  const hasRejectionRisk = rejectionKeywords.some(keyword => 
+    msg.includes(keyword) || conversationText.includes(keyword)
+  );
   
-  // PRIORITY 2: Intent-based selection
+  if (hasRejectionRisk) {
+    const rejectedClaimsDoc = docs.find(doc => 
+      doc.filename.toLowerCase().includes('rejected-claims') ||
+      doc.filename.toLowerCase().includes('rejection') ||
+      doc.filename.toLowerCase().includes('canex rejected')
+    );
+    if (rejectedClaimsDoc && !selectedDocs.includes(rejectedClaimsDoc)) {
+      selectedDocs.push(rejectedClaimsDoc);
+      console.log('🚨 Added rejected claims knowledge due to risk patterns detected');
+    }
+  }
+  
+  // PRIORITY 3: Intent-based selection
   const intents = {
     categories: ['category', 'categories', 'eligible', 'classification', 'type of expense'],
     compliance: ['compliance', 'checklist', 'verify', 'audit', 'review', 'check'],
@@ -2454,6 +2614,164 @@ if (url === '/api/clear-cache' && method === 'POST') {
       return;
     }
 
+    // Expense validation endpoint
+    if (url === '/api/validate-expense' && method === 'POST') {
+      let body = '';
+      req.on('data', chunk => {
+        body += chunk.toString();
+      });
+      
+      req.on('end', () => {
+        try {
+          const { expenseDescription, amount, vendor, category } = JSON.parse(body);
+          
+          const validation = validateExpenseAgainstRejections(expenseDescription, vendor, category);
+          
+          res.json({
+            isValid: validation.riskLevel !== 'HIGH',
+            riskLevel: validation.riskLevel,
+            warnings: validation.warnings,
+            recommendations: validation.recommendations,
+            historicalExamples: validation.examples
+          });
+          
+        } catch (error) {
+          res.status(400).json({ error: 'Invalid request format' });
+        }
+      });
+      return;
+    }
+
+    // Helper function for expense validation against rejection patterns
+function validateExpenseAgainstRejections(description, vendor, category) {
+  const text = `${description} ${vendor} ${category}`.toLowerCase();
+  
+  const rejectionDatabase = {
+    'amazon': {
+      reason: 'Re-usable items ineligible',
+      example: 'Chiwis: Amazon office supplies rejected - items can be repurposed',
+      alternative: 'Use rental services or consumable items only'
+    },
+    'booth purchase': {
+      reason: 'Only booth rentals eligible',
+      example: 'Chiwis: Informa Media booth purchase rejected',
+      alternative: 'Rent booth space instead of purchasing'
+    },
+    'canadian': {
+      reason: 'Canadian market advertising ineligible',
+      example: 'SRJCA: Domestic advertising rejected per Section 5.3',
+      alternative: 'Target only approved export markets'
+    },
+    'airport tax': {
+      reason: 'Airport taxes/fees ineligible',
+      example: 'Craver Solutions: Air Canada taxes removed from reimbursement',
+      alternative: 'Claim only core airfare costs'
+    },
+    'branding': {
+      reason: 'Branding/design costs ineligible',
+      example: 'Chiwis: Package design costs rejected as not admissible',
+      alternative: 'Focus on export-specific marketing materials'
+    },
+    'franchise': {
+      reason: 'Franchise implementation costs ineligible',
+      example: 'Moder Purair: Franchise law costs rejected - advice only allowed',
+      alternative: 'Limit to advisory services only'
+    },
+    'dispute': {
+      reason: 'Vendor dispute costs ineligible',
+      example: 'Moder Purair: Dispute resolution considered core business',
+      alternative: 'Focus on export-specific legal services'
+    },
+    'bank charge': {
+      reason: 'Bank charges typically ineligible',
+      example: 'Various clients: Banking fees consistently rejected',
+      alternative: 'Exclude transaction fees from claims'
+    }
+  };
+  
+  let riskLevel = 'LOW';
+  const warnings = [];
+  const recommendations = [];
+  const examples = [];
+  
+  for (const [pattern, data] of Object.entries(rejectionDatabase)) {
+    if (text.includes(pattern)) {
+      riskLevel = 'HIGH';
+      warnings.push(`🚨 ${data.reason}`);
+      recommendations.push(data.alternative);
+      examples.push(data.example);
+      break;
+    }
+  }
+  
+  return { riskLevel, warnings, recommendations, examples };
+}
+
+    // Helper function for expense validation against rejection patterns
+function validateExpenseAgainstRejections(description, vendor, category) {
+  const text = `${description} ${vendor} ${category}`.toLowerCase();
+  
+  const rejectionDatabase = {
+    'amazon': {
+      reason: 'Re-usable items ineligible',
+      example: 'Chiwis: Amazon office supplies rejected - items can be repurposed',
+      alternative: 'Use rental services or consumable items only'
+    },
+    'booth purchase': {
+      reason: 'Only booth rentals eligible',
+      example: 'Chiwis: Informa Media booth purchase rejected',
+      alternative: 'Rent booth space instead of purchasing'
+    },
+    'canadian': {
+      reason: 'Canadian market advertising ineligible',
+      example: 'SRJCA: Domestic advertising rejected per Section 5.3',
+      alternative: 'Target only approved export markets'
+    },
+    'airport tax': {
+      reason: 'Airport taxes/fees ineligible',
+      example: 'Craver Solutions: Air Canada taxes removed from reimbursement',
+      alternative: 'Claim only core airfare costs'
+    },
+    'branding': {
+      reason: 'Branding/design costs ineligible',
+      example: 'Chiwis: Package design costs rejected as not admissible',
+      alternative: 'Focus on export-specific marketing materials'
+    },
+    'franchise': {
+      reason: 'Franchise implementation costs ineligible',
+      example: 'Moder Purair: Franchise law costs rejected - advice only allowed',
+      alternative: 'Limit to advisory services only'
+    },
+    'dispute': {
+      reason: 'Vendor dispute costs ineligible',
+      example: 'Moder Purair: Dispute resolution considered core business',
+      alternative: 'Focus on export-specific legal services'
+    },
+    'bank charge': {
+      reason: 'Bank charges typically ineligible',
+      example: 'Various clients: Banking fees consistently rejected',
+      alternative: 'Exclude transaction fees from claims'
+    }
+  };
+  
+  let riskLevel = 'LOW';
+  const warnings = [];
+  const recommendations = [];
+  const examples = [];
+  
+  for (const [pattern, data] of Object.entries(rejectionDatabase)) {
+    if (text.includes(pattern)) {
+      riskLevel = 'HIGH';
+      warnings.push(`🚨 ${data.reason}`);
+      recommendations.push(data.alternative);
+      examples.push(data.example);
+      break;
+    }
+  }
+  
+  return { riskLevel, warnings, recommendations, examples };
+}
+
     // FIXED: Process grant document with agent-specific loading
     if (url === '/api/process-grant' && method === 'POST') {
       const startTime = Date.now();
@@ -2472,6 +2790,11 @@ if (url === '/api/clear-cache' && method === 'POST') {
       // Process uploaded file if present
       if (req.file) {
         fileContent = await processFileContent(req.file);
+      }
+
+      // Add validation warnings to file content if present
+      if (fileValidation.hasWarnings) {
+        fileContent += `\n\n🚨 PRE-VALIDATION WARNINGS:\n${fileValidation.warnings.join('\n')}`;
       }
       
       // Get or create conversation
@@ -2806,6 +3129,33 @@ Use the knowledge base documents above for all detailed processes, requirements,
       return;
     }
 
+// Validate claims file name for rejection patterns
+function validateClaimsFile(filename) {
+  const warnings = [];
+  const name = filename.toLowerCase();
+  
+  const triggerWords = [
+    { word: 'amazon', warning: 'Amazon purchases are typically rejected (re-usable items)' },
+    { word: 'booth', warning: 'Verify booth RENTAL vs PURCHASE (purchases rejected)' },
+    { word: 'canadian', warning: 'Canadian market advertising is ineligible' },
+    { word: 'branding', warning: 'Branding/design costs are typically rejected' },
+    { word: 'franchise', warning: 'Franchise costs are typically rejected' },
+    { word: 'dispute', warning: 'Legal dispute costs are typically rejected' },
+    { word: 'airport', warning: 'Airport taxes/fees are typically ineligible' }
+  ];
+  
+  for (const { word, warning } of triggerWords) {
+    if (name.includes(word)) {
+      warnings.push(`⚠️ ${warning}`);
+    }
+  }
+  
+  return {
+    hasWarnings: warnings.length > 0,
+    warnings
+  };
+}
+    
     // NEW: CanExport Claims endpoint
     if (url === '/api/process-claims' && method === 'POST') {
       const startTime = Date.now();
@@ -2825,6 +3175,12 @@ Use the knowledge base documents above for all detailed processes, requirements,
       // Process uploaded file if present (receipts, invoices, etc.)
 if (req.file) {
   console.log(`📄 Processing Claims document: ${req.file.originalname} (${req.file.mimetype})`);
+
+  // Pre-validation before processing
+  const fileValidation = validateClaimsFile(req.file.originalname);
+  if (fileValidation.hasWarnings) {
+    console.log('🚨 File validation warnings detected');
+  }
   
   // Check if it's an image (receipt scan)
   const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'];
