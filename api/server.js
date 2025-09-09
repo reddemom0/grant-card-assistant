@@ -13,33 +13,65 @@ const redis = new Redis({
 });
 
 // OCR functionality for CanExport Claims
-const Tesseract = require('tesseract.js');
+
 
 // OCR function to extract text from images
-async function extractTextFromImage(imageBuffer) {
-  console.log('🔍 Starting OCR text extraction...');
-  
+// OCR function using Claude Vision API
+async function extractTextFromImage(imageBuffer, filename) {
   try {
-    const { data: { text } } = await Tesseract.recognize(
-      imageBuffer,
-      'eng',
-      {
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            console.log(`📄 OCR Progress: ${Math.round(m.progress * 100)}%`);
-          }
-        },
-        tessedit_ocr_engine_mode: 2,
-        tessedit_pageseg_mode: 6,
-      }
-    );
+    console.log('🔍 Starting OCR with Claude Vision API...');
     
-    console.log('✅ OCR extraction completed');
-    return text.trim();
+    // Convert buffer to base64
+    const base64Image = imageBuffer.toString('base64');
+    
+    // Determine image type from filename
+    const extension = filename.toLowerCase().split('.').pop();
+    const mimeType = extension === 'png' ? 'image/png' : 
+                    extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 
+                    'image/png';
+    
+    // Use Claude API with vision for OCR
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": process.env.ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-3-sonnet-20240229",
+        max_tokens: 1000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "image",
+                source: {
+                  type: "base64",
+                  media_type: mimeType,
+                  data: base64Image
+                }
+              },
+              {
+                type: "text", 
+                text: "Extract all text from this receipt/invoice image. Return only the text content, preserving the original structure and formatting as much as possible."
+              }
+            ]
+          }
+        ]
+      })
+    });
+
+    const data = await response.json();
+    const extractedText = data.content[0].text;
+    
+    console.log('✅ Claude Vision OCR completed');
+    return extractedText.trim();
     
   } catch (error) {
-    console.error('❌ OCR extraction failed:', error);
-    return 'OCR extraction failed. Please try with a clearer image or different format.';
+    console.error('❌ Claude Vision OCR failed:', error);
+    return `OCR processing failed: ${error.message}. Please try with a clearer image or manual text input.`;
   }
 }
 
@@ -3185,7 +3217,7 @@ if (req.file) {
     
     try {
       // Extract text from image using OCR
-      const extractedText = await extractTextFromImage(req.file.buffer);
+      const extractedText = await extractTextFromImage(req.file.buffer, req.file.originalname);
       
       // Analyze expense information
       const expenseAnalysis = analyzeExpenseFromText(extractedText, req.file.originalname);
