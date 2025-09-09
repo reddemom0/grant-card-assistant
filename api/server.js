@@ -64,7 +64,14 @@ async function extractTextFromImage(imageBuffer, filename) {
     });
 
     const data = await response.json();
-    const extractedText = data.content[0].text;
+    // Safely extract text with error handling
+let extractedText = '';
+if (data.content && data.content.length > 0 && data.content[0].text) {
+  extractedText = data.content[0].text;
+} else {
+  console.log('Unexpected API response structure:', JSON.stringify(data, null, 2));
+  throw new Error('No text content found in Claude Vision API response');
+}
     
     console.log('✅ Claude Vision OCR completed');
     return extractedText.trim();
