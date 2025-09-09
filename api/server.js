@@ -2791,11 +2791,6 @@ function validateExpenseAgainstRejections(description, vendor, category) {
       if (req.file) {
         fileContent = await processFileContent(req.file);
       }
-
-      // Add validation warnings to file content if present
-      if (fileValidation.hasWarnings) {
-        fileContent += `\n\n🚨 PRE-VALIDATION WARNINGS:\n${fileValidation.warnings.join('\n')}`;
-      }
       
       // Get or create conversation
       if (!conversations.has(conversationId)) {
