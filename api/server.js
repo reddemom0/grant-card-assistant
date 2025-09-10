@@ -2250,8 +2250,10 @@ async function processFileContent(file) {
   content = await extractPDFText(file.buffer);
       
   if (content.trim().length < 10) {
-    throw new Error('Minimal text extracted - possibly image-based PDF');
-    } else {
+      throw new Error('Minimal text extracted - possibly image-based PDF');
+ }
+}
+  } else {
       content = file.buffer.toString('utf8'); // Fallback for other text files
     }
     
