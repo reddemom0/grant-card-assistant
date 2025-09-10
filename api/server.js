@@ -1,7 +1,7 @@
 // api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent + CanExport Claims Agent
 const multer = require('multer');
 const mammoth = require('mammoth');
-const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+const pdfjsLib = require('pdfjs-dist');
 const path = require('path');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
@@ -196,10 +196,17 @@ async function extractPDFText(buffer) {
   try {
     console.log('Starting pdfjs-dist text extraction...');
     
+    // Disable worker and canvas for serverless environment
+    const pdfjsLib = require('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = null;
+    
     const loadingTask = pdfjsLib.getDocument({
       data: new Uint8Array(buffer),
       useSystemFonts: true,
-      disableFontFace: false
+      disableFontFace: true,
+      disableRange: true,
+      disableStream: true,
+      disableAutoFetch: true
     });
     
     const pdf = await loadingTask.promise;
@@ -226,7 +233,6 @@ async function extractPDFText(buffer) {
     throw new Error(`PDF text extraction failed: ${error.message}`);
   }
 }
-
 // Check for rejection patterns based on historical rejected claims
 function checkRejectionPatterns(extractedText, filename) {
   const text = extractedText.toLowerCase();
