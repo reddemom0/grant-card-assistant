@@ -2247,13 +2247,12 @@ async function processFileContent(file) {
       const result = await mammoth.extractRawText({ buffer: file.buffer });
       content = result.value;
     } else if (fileExtension === '.pdf') {
-  content = await extractPDFText(file.buffer);
+      content = await extractPDFText(file.buffer);
       
-  if (content.trim().length < 10) {
-      throw new Error('Minimal text extracted - possibly image-based PDF');
- }
-}
-  } else {
+      if (content.trim().length < 10) {
+        throw new Error('Minimal text extracted - possibly image-based PDF');
+      }
+    } else {
       content = file.buffer.toString('utf8'); // Fallback for other text files
     }
     
