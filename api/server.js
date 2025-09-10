@@ -3206,7 +3206,7 @@ function validateClaimsFile(filename) {
       
       console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
       
-      // Process uploaded file if present (receipts, invoices, etc.)
+// Process uploaded file if present (receipts, invoices, etc.)
 if (req.file) {
   console.log(`📄 Processing Claims document: ${req.file.originalname} (${req.file.mimetype})`);
 
@@ -3216,14 +3216,16 @@ if (req.file) {
     console.log('🚨 File validation warnings detected');
   }
   
-  // Check if it's an image (receipt scan)
+  // Define file types
   const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'];
+  const isPDF = req.file.mimetype === 'application/pdf';
+  const isImage = imageTypes.includes(req.file.mimetype);
   
-  if (imageTypes.includes(req.file.mimetype)) {
+  if (isImage) {
     console.log('📸 Image detected - Starting OCR processing...');
     
     try {
-      // Extract text from image using OCR
+      // Extract text from image using Claude Vision API
       const extractedText = await extractTextFromImage(req.file.buffer, req.file.originalname);
       
       // Analyze expense information
@@ -3242,14 +3244,14 @@ AUTOMATIC EXPENSE ANALYSIS:
 📅 Date: ${expenseAnalysis.extractedInfo.date || 'Not detected'}
 🏢 Vendor: ${expenseAnalysis.extractedInfo.vendor || 'Not detected'}
 🎯 Eligibility Score: ${expenseAnalysis.eligibilityAssessment.eligibilityScore}/100
-🔍 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
+📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
 
 Please analyze this receipt for CanExport SME program eligibility and compliance requirements.`;
 
-      console.log(`✅ OCR processing completed with ${expenseAnalysis.ocrConfidence} confidence`);
+      console.log(`✅ Image OCR processing completed with ${expenseAnalysis.ocrConfidence} confidence`);
       
     } catch (ocrError) {
-      console.error('❌ OCR processing failed:', ocrError);
+      console.error('❌ Image OCR processing failed:', ocrError);
       fileContent = `📸 RECEIPT IMAGE UPLOAD:
 File: ${req.file.originalname}
 Status: OCR processing failed
@@ -3259,13 +3261,98 @@ Error: ${ocrError.message}
 Please analyze this receipt manually or request a clearer image.`;
     }
     
+  } else if (isPDF) {
+    console.log('📋 PDF detected - Attempting smart processing...');
+    
+    try {
+      // First, try standard PDF text extraction
+      console.log('🔍 Attempting PDF text extraction...');
+      const pdfTextContent = await processFileContent(req.file);
+      
+      // Check if PDF text extraction was successful (more than just filename)
+      const hasMeaningfulText = pdfTextContent && 
+        pdfTextContent.length > req.file.originalname.length + 50 &&
+        !pdfTextContent.includes('[Content extraction failed due to PDF formatting issues]');
+      
+      if (hasMeaningfulText) {
+        console.log('✅ PDF text extraction successful');
+        
+        // Analyze the extracted text
+        const expenseAnalysis = analyzeExpenseFromText(pdfTextContent, req.file.originalname);
+        
+        fileContent = `📋 PDF DOCUMENT PROCESSED:
+File: ${req.file.originalname}
+Processing Method: Text Extraction
+Analysis Confidence: ${expenseAnalysis.ocrConfidence}
+
+EXTRACTED CONTENT:
+${pdfTextContent}
+
+AUTOMATIC EXPENSE ANALYSIS:
+💰 Amount: ${expenseAnalysis.extractedInfo.amount ? '$' + expenseAnalysis.extractedInfo.amount : 'Not detected'}
+📅 Date: ${expenseAnalysis.extractedInfo.date || 'Not detected'}
+🏢 Vendor: ${expenseAnalysis.extractedInfo.vendor || 'Not detected'}
+🎯 Eligibility Score: ${expenseAnalysis.eligibilityAssessment.eligibilityScore}/100
+📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
+
+Please analyze this document for CanExport SME program eligibility and compliance requirements.`;
+        
+      } else {
+        console.log('⚠️ PDF text extraction insufficient, trying Vision API...');
+        
+        // Fall back to Claude Vision API for image-based PDFs
+        const extractedText = await extractTextFromImage(req.file.buffer, req.file.originalname);
+        const expenseAnalysis = analyzeExpenseFromText(extractedText, req.file.originalname);
+        
+        fileContent = `📋 PDF IMAGE PROCESSED WITH OCR:
+File: ${req.file.originalname}
+Processing Method: Vision API (Image-based PDF)
+OCR Confidence: ${expenseAnalysis.ocrConfidence}
+
+EXTRACTED TEXT:
+${extractedText}
+
+AUTOMATIC EXPENSE ANALYSIS:
+💰 Amount: ${expenseAnalysis.extractedInfo.amount ? '$' + expenseAnalysis.extractedInfo.amount : 'Not detected'}
+📅 Date: ${expenseAnalysis.extractedInfo.date || 'Not detected'}
+🏢 Vendor: ${expenseAnalysis.extractedInfo.vendor || 'Not detected'}
+🎯 Eligibility Score: ${expenseAnalysis.eligibilityAssessment.eligibilityScore}/100
+📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
+
+Please analyze this PDF receipt for CanExport SME program eligibility and compliance requirements.`;
+        
+        console.log('✅ PDF Vision API processing completed');
+      }
+      
+    } catch (pdfError) {
+      console.error('❌ PDF processing failed:', pdfError);
+      fileContent = `📋 PDF DOCUMENT UPLOAD:
+File: ${req.file.originalname}
+Status: Processing failed
+
+Error: ${pdfError.message}
+
+Please try converting the PDF to an image format (PNG/JPG) or provide the expense details manually.`;
+    }
+    
   } else {
     console.log('📄 Document detected - Processing as regular file...');
-    // Process as regular document (PDF, Word, etc.)
-    fileContent = await processFileContent(req.file);
+    // Process as regular document (Word, text, etc.)
+    try {
+      fileContent = await processFileContent(req.file);
+      console.log('✅ Document processing completed');
+    } catch (docError) {
+      console.error('❌ Document processing failed:', docError);
+      fileContent = `📄 DOCUMENT UPLOAD:
+File: ${req.file.originalname}
+Status: Processing failed
+
+Error: ${docError.message}
+
+Please provide the expense details manually.`;
+    }
   }
 }
-      
       
       // Get or create Claims conversation
       const claimsConversationId = `claims-${conversationId}`;
