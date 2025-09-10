@@ -1,7 +1,7 @@
 // api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent + CanExport Claims Agent
 const multer = require('multer');
 const mammoth = require('mammoth');
-const pdf = require('pdf-parse');
+const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
 const path = require('path');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
@@ -190,6 +190,41 @@ function analyzeExpenseFromText(extractedText, filename) {
   
   console.log(`✅ Expense analysis completed - Confidence: ${analysis.ocrConfidence}, Risk: ${analysis.rejectionRisk}`);
   return analysis;
+}
+
+async function extractPDFText(buffer) {
+  try {
+    console.log('Starting pdfjs-dist text extraction...');
+    
+    const loadingTask = pdfjsLib.getDocument({
+      data: new Uint8Array(buffer),
+      useSystemFonts: true,
+      disableFontFace: false
+    });
+    
+    const pdf = await loadingTask.promise;
+    console.log(`PDF loaded: ${pdf.numPages} pages`);
+    
+    let fullText = '';
+    
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      
+      const pageText = textContent.items
+        .map(item => item.str)
+        .join(' ');
+      
+      fullText += pageText + '\n';
+    }
+    
+    console.log(`Total extraction completed: ${fullText.length} characters`);
+    return fullText.trim();
+    
+  } catch (error) {
+    console.error('pdfjs-dist extraction failed:', error);
+    throw new Error(`PDF text extraction failed: ${error.message}`);
+  }
 }
 
 // Check for rejection patterns based on historical rejected claims
@@ -2212,8 +2247,10 @@ async function processFileContent(file) {
       const result = await mammoth.extractRawText({ buffer: file.buffer });
       content = result.value;
     } else if (fileExtension === '.pdf') {
-      const data = await pdf(file.buffer);
-      content = data.text;
+  content = await extractPDFText(file.buffer);
+      
+  if (content.trim().length < 10) {
+    throw new Error('Minimal text extracted - possibly image-based PDF');
     } else {
       content = file.buffer.toString('utf8'); // Fallback for other text files
     }
