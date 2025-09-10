@@ -196,12 +196,11 @@ async function extractPDFText(buffer) {
   try {
     console.log('Starting pdfjs-dist text extraction...');
     
-    // Load pdfjs-dist and completely disable worker
+    // Load and configure pdfjs-dist
     const pdfjsLib = require('pdfjs-dist');
     
-    // Completely disable worker - this should prevent worker loading
-    pdfjsLib.GlobalWorkerOptions.workerSrc = false;
-    pdfjsLib.GlobalWorkerOptions.workerPort = null;
+    // Set worker to empty string to disable completely
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
     
     const loadingTask = pdfjsLib.getDocument({
       data: new Uint8Array(buffer),
@@ -212,8 +211,7 @@ async function extractPDFText(buffer) {
       disableAutoFetch: true,
       useWorkerFetch: false,
       isEvalSupported: false,
-      maxImageSize: -1,
-      cMapPacked: false
+      verbosity: 0
     });
     
     const pdf = await loadingTask.promise;
