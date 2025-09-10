@@ -1,7 +1,7 @@
 // api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent + CanExport Claims Agent
 const multer = require('multer');
 const mammoth = require('mammoth');
-const pdfjsLib = require('pdfjs-dist');
+const pdf = require('pdf-parse');
 const path = require('path');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
@@ -194,47 +194,41 @@ function analyzeExpenseFromText(extractedText, filename) {
 
 async function extractPDFText(buffer) {
   try {
-    console.log('Starting pdfjs-dist text extraction...');
+    console.log('Starting enhanced pdf-parse text extraction...');
     
-    // Load and configure pdfjs-dist
-    const pdfjsLib = require('pdfjs-dist');
+    // Try multiple configurations for better compatibility
+    const configs = [
+      {}, // Default configuration
+      { 
+        normalizeWhitespace: true, 
+        disableCombineTextItems: false 
+      },
+      { 
+        normalizeWhitespace: false, 
+        disableCombineTextItems: true, 
+        max: 0 
+      }
+    ];
     
-    // Set worker to empty string to disable completely
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '';
-    
-    const loadingTask = pdfjsLib.getDocument({
-      data: new Uint8Array(buffer),
-      useSystemFonts: false,
-      disableFontFace: true,
-      disableRange: true,
-      disableStream: true,
-      disableAutoFetch: true,
-      useWorkerFetch: false,
-      isEvalSupported: false,
-      verbosity: 0
-    });
-    
-    const pdf = await loadingTask.promise;
-    console.log(`PDF loaded: ${pdf.numPages} pages`);
-    
-    let fullText = '';
-    
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum);
-      const textContent = await page.getTextContent();
-      
-      const pageText = textContent.items
-        .map(item => item.str)
-        .join(' ');
-      
-      fullText += pageText + '\n';
+    for (let i = 0; i < configs.length; i++) {
+      try {
+        console.log(`Attempting PDF extraction with config ${i + 1}...`);
+        const data = await pdf(buffer, configs[i]);
+        
+        if (data.text && data.text.trim().length > 10) {
+          console.log(`✅ PDF extraction successful with config ${i + 1} (${data.text.length} characters)`);
+          return data.text.trim();
+        }
+      } catch (configError) {
+        console.log(`Config ${i + 1} failed: ${configError.message}`);
+        continue;
+      }
     }
     
-    console.log(`Total extraction completed: ${fullText.length} characters`);
-    return fullText.trim();
+    throw new Error('PDF appears to be image-based - convert to JPG/PNG for OCR processing');
     
   } catch (error) {
-    console.error('pdfjs-dist extraction failed:', error);
+    console.error('pdf-parse extraction failed:', error);
     throw new Error(`PDF text extraction failed: ${error.message}`);
   }
 }
