@@ -1,7 +1,7 @@
 // api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent + CanExport Claims Agent
 const multer = require('multer');
 const mammoth = require('mammoth');
-const pdfjsLib = require('pdfjs-dist');
+const pdfjsLib = require('pdfjs-dist/es5/build/pdf.js');
 const path = require('path');
 const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
