@@ -21,6 +21,7 @@
             --border: #e5e7eb;
             --success: #10b981;
             --warning: #f59e0b;
+            --error: #dc2626;
         }
         
         body {
@@ -29,7 +30,7 @@
             min-height: 100vh;
             color: var(--text-primary);
             line-height: 1.6;
-            padding-bottom: 120px; /* Space for floating input */
+            padding-bottom: 120px;
         }
         
         /* Header */
@@ -182,6 +183,139 @@
         .message.assistant .message-content {
             background: var(--background);
             color: var(--text-primary);
+            line-height: 1.7;
+        }
+        
+        /* Enhanced structured audit report styling */
+        .message.assistant .message-content .audit-header-eligible {
+            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+            border-left: 4px solid #059669;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 600;
+            color: #059669;
+        }
+        
+        .message.assistant .message-content .audit-header-ineligible {
+            background: linear-gradient(135deg, #fef2f2, #fecaca);
+            border-left: 4px solid #dc2626;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 600;
+            color: #dc2626;
+        }
+        
+        .message.assistant .message-content .audit-header-partial {
+            background: linear-gradient(135deg, #fffbeb, #fed7aa);
+            border-left: 4px solid #d97706;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 600;
+            color: #d97706;
+        }
+        
+        .message.assistant .message-content .section-header {
+            padding: 0.75rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+            font-weight: 600;
+            border-left: 3px solid;
+        }
+        
+        .message.assistant .message-content .section-summary {
+            background: rgba(30, 58, 138, 0.05);
+            border-left-color: #1e3a8a;
+            color: #1e3a8a;
+        }
+        
+        .message.assistant .message-content .section-assessment {
+            background: rgba(16, 185, 129, 0.05);
+            border-left-color: #10b981;
+            color: #10b981;
+        }
+        
+        .message.assistant .message-content .section-financial {
+            background: rgba(245, 158, 11, 0.05);
+            border-left-color: #f59e0b;
+            color: #f59e0b;
+        }
+        
+        .message.assistant .message-content .section-alert {
+            background: rgba(220, 38, 38, 0.05);
+            border-left-color: #dc2626;
+            color: #dc2626;
+        }
+        
+        .message.assistant .message-content .audit-divider {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+            margin: 1.5rem 0;
+        }
+        
+        .message.assistant .message-content .eligible-amount {
+            background: rgba(16, 185, 129, 0.1);
+            padding: 0.75rem;
+            border-radius: 8px;
+            border-left: 4px solid #10b981;
+            margin: 0.75rem 0;
+            font-weight: 700;
+            color: #059669;
+            font-size: 1.1rem;
+        }
+        
+        .message.assistant .message-content .detail-item {
+            padding: 0.25rem 0;
+            margin-left: 1rem;
+        }
+        
+        .message.assistant .message-content .detail-item strong {
+            color: #1e3a8a;
+        }
+        
+        .message.assistant .message-content .check-item {
+            padding: 0.25rem 0;
+            margin-left: 1rem;
+        }
+        
+        .message.assistant .message-content .check-item.success {
+            color: #059669;
+        }
+        
+        .message.assistant .message-content .check-item.error {
+            color: #dc2626;
+        }
+        
+        .message.assistant .message-content .status-approved {
+            background: linear-gradient(135deg, #059669, #047857);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .message.assistant .message-content .status-rejected {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 600;
+            text-align: center;
+        }
+        
+        .message.assistant .message-content .category-analysis {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem;
+            margin: 0.25rem 0;
+            font-size: 0.9rem;
         }
         
         .welcome-message.hidden {
@@ -379,19 +513,41 @@
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: var(--primary);
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, #1e3a8a, #1e40af);
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 500;
+            font-size: 0.9rem;
+            font-weight: 600;
             transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
         }
         
         .export-button:hover {
-            background: var(--primary-dark);
+            background: linear-gradient(135deg, #1e40af, #2563eb);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.4);
+        }
+        
+        /* Notification system */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .notification.info {
+            background: var(--primary);
         }
         
         @media (max-width: 768px) {
@@ -490,7 +646,7 @@
             <div class="file-upload-row">
                 <div class="file-drop-zone" id="file-drop-zone" onclick="document.getElementById('file-input').click()">
                     <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" style="display: none;">
-                    <span class="drop-icon">📎</span>
+                    <span class="drop-icon">🔎</span>
                     <div style="flex: 1;">
                         <div class="drop-text">Upload Invoice or Proof of Payment</div>
                     </div>
@@ -545,41 +701,41 @@
         });
 
         // File upload handling
-fileInput.addEventListener('change', (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length > 0) {
-        uploadedFiles = files;
-        
-        let totalSize = 0;
-        files.forEach(file => totalSize += file.size);
-        const fileSize = (totalSize / 1024).toFixed(1);
-        const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
-        
-        fileDropZone.classList.add('has-file');
-        
-        if (files.length === 1) {
-            fileDropZone.innerHTML = `
-                <span class="drop-icon" style="color: #059669;">✓</span>
-                <div style="flex: 1;">
-                    <div class="drop-text" style="color: #059669;">File Ready: ${files[0].name}</div>
-                    <div class="drop-subtext">${fileSizeUnit}</div>
-                </div>
-            `;
-            messageInput.placeholder = `File ready: ${files[0].name} - Add a message or click Send`;
-        } else {
-            fileDropZone.innerHTML = `
-                <span class="drop-icon" style="color: #059669;">✓</span>
-                <div style="flex: 1;">
-                    <div class="drop-text" style="color: #059669;">${files.length} Files Ready</div>
-                    <div class="drop-subtext">${fileSizeUnit} total</div>
-                </div>
-            `;
-            messageInput.placeholder = `${files.length} files ready - Add a message or click Send`;
-        }
-        
-        messageInput.focus();
-    }
-});
+        fileInput.addEventListener('change', (e) => {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                uploadedFiles = files;
+                
+                let totalSize = 0;
+                files.forEach(file => totalSize += file.size);
+                const fileSize = (totalSize / 1024).toFixed(1);
+                const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+                
+                fileDropZone.classList.add('has-file');
+                
+                if (files.length === 1) {
+                    fileDropZone.innerHTML = `
+                        <span class="drop-icon" style="color: #059669;">✓</span>
+                        <div style="flex: 1;">
+                            <div class="drop-text" style="color: #059669;">File Ready: ${files[0].name}</div>
+                            <div class="drop-subtext">${fileSizeUnit}</div>
+                        </div>
+                    `;
+                    messageInput.placeholder = `File ready: ${files[0].name} - Add a message or click Send`;
+                } else {
+                    fileDropZone.innerHTML = `
+                        <span class="drop-icon" style="color: #059669;">✓</span>
+                        <div style="flex: 1;">
+                            <div class="drop-text" style="color: #059669;">${files.length} Files Ready</div>
+                            <div class="drop-subtext">${fileSizeUnit} total</div>
+                        </div>
+                    `;
+                    messageInput.placeholder = `${files.length} files ready - Add a message or click Send`;
+                }
+                
+                messageInput.focus();
+            }
+        });
 
         // Send message functionality
         sendButton.addEventListener('click', sendMessage);
@@ -609,19 +765,19 @@ fileInput.addEventListener('change', (e) => {
 
         async function sendMessage() {
             const message = messageInput.value.trim();
-            if (!message && !uploadedFile) return;
+            if (!message && uploadedFiles.length === 0) return;
             if (isLoading) return;
 
             hideWelcomeElements();
 
             if (uploadedFiles.length > 0) {
-    uploadedFiles.forEach(file => {
-        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-        const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-        const isImage = imageTypes.includes(fileExtension);
-        addMessage('user', `📎 **${file.name}** uploaded${isImage ? ' (OCR enabled)' : ''}`);
-    });
-}
+                uploadedFiles.forEach(file => {
+                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const isImage = imageTypes.includes(fileExtension);
+                    addMessage('user', `🔎 **${file.name}** uploaded${isImage ? ' (OCR enabled)' : ''}`);
+                });
+            }
 
             if (message) {
                 addMessage('user', message);
@@ -638,10 +794,10 @@ fileInput.addEventListener('change', (e) => {
                 formData.append('agentType', 'canexport-claims');
                 
                 if (uploadedFiles.length > 0) {
-    uploadedFiles.forEach(file => {
-        formData.append('files', file);
-    });
-}
+                    uploadedFiles.forEach(file => {
+                        formData.append('files', file);
+                    });
+                }
 
                 const response = await fetch(`${API_BASE}/api/process-claims`, {
                     method: 'POST',
@@ -669,15 +825,15 @@ fileInput.addEventListener('change', (e) => {
             messageInput.placeholder = "Describe your expense or ask about CanExport eligibility...";
             
             if (uploadedFiles.length > 0) {
-    uploadedFiles = [];
-    resetFileDropZone();
-}
+                uploadedFiles = [];
+                resetFileDropZone();
+            }
         }
 
         function resetFileDropZone() {
             fileDropZone.classList.remove('has-file');
             fileDropZone.innerHTML = `
-                <span class="drop-icon">📎</span>
+                <span class="drop-icon">🔎</span>
                 <div style="flex: 1;">
                     <div class="drop-text">Upload Invoice or Proof of Payment</div>
                 </div>
@@ -696,19 +852,123 @@ fileInput.addEventListener('change', (e) => {
             
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             
-            if (role === 'assistant' && content.includes('CANEXPORT CLAIMS AUDIT')) {
-                const exportButton = document.createElement('button');
-                exportButton.className = 'export-button';
-                exportButton.innerHTML = '💾 Export Audit Report';
-                exportButton.onclick = () => exportAuditReport(content);
-                contentDiv.appendChild(exportButton);
+            if (role === 'assistant') {
+                // Process structured CanExport output
+                const processedContent = processCanExportContent(content);
+                contentDiv.innerHTML = processedContent;
+                
+                // Add export button for completed audits
+                if (content.includes('CANEXPORT CLAIMS AUDIT') || content.includes('AUDIT RECOMMENDATION')) {
+                    const exportButton = document.createElement('button');
+                    exportButton.className = 'export-button';
+                    exportButton.innerHTML = '💾 Export Audit Report';
+                    exportButton.onclick = () => exportAuditReport(content);
+                    contentDiv.appendChild(exportButton);
+                }
+            } else {
+                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             }
             
             messageDiv.appendChild(contentDiv);
             messagesContainer.appendChild(messageDiv);
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function processCanExportContent(content) {
+            let processed = content;
+            
+            // Enhanced markdown processing
+            processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Process audit status headers
+            processed = processed.replace(
+                /✅ CANEXPORT CLAIMS AUDIT - ELIGIBLE EXPENSE/g,
+                '<div class="audit-header-eligible">✅ CANEXPORT CLAIMS AUDIT - ELIGIBLE EXPENSE</div>'
+            );
+            
+            processed = processed.replace(
+                /❌ CANEXPORT CLAIMS AUDIT - INELIGIBLE EXPENSE/g,
+                '<div class="audit-header-ineligible">❌ CANEXPORT CLAIMS AUDIT - INELIGIBLE EXPENSE</div>'
+            );
+            
+            processed = processed.replace(
+                /⚠️ CANEXPORT CLAIMS AUDIT - PARTIAL ELIGIBILITY/g,
+                '<div class="audit-header-partial">⚠️ CANEXPORT CLAIMS AUDIT - PARTIAL ELIGIBILITY</div>'
+            );
+            
+            // Process section headers with emojis
+            processed = processed.replace(
+                /📋 (.*?)$/gm,
+                '<div class="section-header section-summary">📋 $1</div>'
+            );
+            
+            processed = processed.replace(
+                /🎯 (.*?)$/gm,
+                '<div class="section-header section-assessment">🎯 $1</div>'
+            );
+            
+            processed = processed.replace(
+                /💰 (.*?)$/gm,
+                '<div class="section-header section-financial">💰 $1</div>'
+            );
+            
+            processed = processed.replace(
+                /🚨 (.*?)$/gm,
+                '<div class="section-header section-alert">🚨 $1</div>'
+            );
+            
+            // Process horizontal dividers
+            processed = processed.replace(
+                /^---$/gm,
+                '<hr class="audit-divider">'
+            );
+            
+            // Highlight eligible amounts
+            processed = processed.replace(
+                /\*\*ELIGIBLE AMOUNT: (\$[\d,]+\.?\d*)\*\*/g,
+                '<div class="eligible-amount">💰 ELIGIBLE AMOUNT: $1</div>'
+            );
+            
+            // Process bullet points with enhanced styling
+            processed = processed.replace(
+                /^• \*\*(.*?):\*\* (.*?)$/gm,
+                '<div class="detail-item"><strong>• $1:</strong> $2</div>'
+            );
+            
+            // Process checkmarks and X marks
+            processed = processed.replace(
+                /^✅ \*\*(.*?):\*\* (.*?)$/gm,
+                '<div class="check-item success"><strong>✅ $1:</strong> $2</div>'
+            );
+            
+            processed = processed.replace(
+                /^❌ \*\*(.*?):\*\* (.*?)$/gm,
+                '<div class="check-item error"><strong>❌ $1:</strong> $2</div>'
+            );
+            
+            // Process status recommendations
+            processed = processed.replace(
+                /\*\*STATUS:\*\* (APPROVED FOR CANEXPORT CLAIM)/g,
+                '<div class="status-approved">✅ STATUS: $1</div>'
+            );
+            
+            processed = processed.replace(
+                /\*\*STATUS:\*\* (REJECTED FOR CANEXPORT CLAIM)/g,
+                '<div class="status-rejected">❌ STATUS: $1</div>'
+            );
+            
+            // Process category analysis
+            processed = processed.replace(
+                /^• \*\*Category ([A-H]).*?\*\*.*?$/gm,
+                '<div class="category-analysis">$&</div>'
+            );
+            
+            // Convert line breaks to proper HTML
+            processed = processed.replace(/\n/g, '<br>');
+            
+            return processed;
         }
 
         function addLoadingMessage() {
@@ -733,13 +993,50 @@ fileInput.addEventListener('change', (e) => {
         }
 
         function exportAuditReport(content) {
-            const blob = new Blob([content], { type: 'text/plain' });
+            // Clean up content for export
+            const cleanContent = content
+                .replace(/<[^>]*>/g, '') // Remove HTML tags
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .trim();
+            
+            const blob = new Blob([cleanContent], { type: 'text/plain; charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            
+            // Generate filename with timestamp
+            const now = new Date();
+            const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
             a.href = url;
-            a.download = `canexport-audit-${new Date().toISOString().slice(0, 10)}.txt`;
+            a.download = `canexport-audit-report-${timestamp}.txt`;
+            
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            
+            // Show confirmation
+            showNotification('✅ Audit report exported successfully!', 'success');
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
         }
 
         // Initialize drag and drop
@@ -779,7 +1076,7 @@ fileInput.addEventListener('change', (e) => {
                         });
                         fileInput.dispatchEvent(new Event('change', { bubbles: true }));
                     } else {
-                        addMessage('assistant', `❌ **File type not supported:** ${file.name}\n\nPlease upload invoices, receipts, or proof of payment documents.`, false);
+                        addMessage('assistant', `⛔ **File type not supported:** ${file.name}\n\nPlease upload invoices, receipts, or proof of payment documents.`, false);
                     }
                 }
             }, false);
