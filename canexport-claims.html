@@ -550,6 +550,27 @@
             background: var(--primary);
         }
         
+        /* Typing animation styles */
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background-color: var(--primary);
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .typing-container {
+            min-height: 1.2em;
+        }
+        
+        @media (max-width: 768px) {
+        
         @media (max-width: 768px) {
             .welcome-title {
                 font-size: 2rem;
@@ -869,33 +890,114 @@ function clearFiles() {
         }
 
         function addMessage(role, content, shouldAnimate = false) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}`;
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    
+    if (role === 'assistant') {
+        // Start with empty content for typing effect
+        contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
+        
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Start typing animation after a brief delay
+        setTimeout(() => {
+            typeMessage(contentDiv, content);
+        }, 500);
+        
+    } else {
+        // User messages appear immediately
+        contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        messageDiv.appendChild(contentDiv);
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+            function typeMessage(contentDiv, content) {
+    // Process structured CanExport output first
+    const processedContent = processCanExportContent(content);
+    
+    // Clear the typing cursor
+    contentDiv.innerHTML = '<div class="typing-container"></div>';
+    const container = contentDiv.querySelector('.typing-container');
+    
+    // Convert HTML to array of characters/tags
+    const htmlParts = parseHTML(processedContent);
+    let currentIndex = 0;
+    
+    function typeNextChar() {
+        if (currentIndex < htmlParts.length) {
+            const part = htmlParts[currentIndex];
             
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            
-            if (role === 'assistant') {
-                // Process structured CanExport output
-                const processedContent = processCanExportContent(content);
-                contentDiv.innerHTML = processedContent;
-                
-                // Add export button for completed audits
-                if (content.includes('CANEXPORT CLAIMS AUDIT') || content.includes('AUDIT RECOMMENDATION')) {
-                    const exportButton = document.createElement('button');
-                    exportButton.className = 'export-button';
-                    exportButton.innerHTML = '💾 Export Audit Report';
-                    exportButton.onclick = () => exportAuditReport(content);
-                    contentDiv.appendChild(exportButton);
-                }
+            if (part.startsWith('<') && part.endsWith('>')) {
+                // Add HTML tags instantly
+                container.innerHTML += part;
             } else {
-                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                // Add characters one by one
+                container.innerHTML += part;
             }
             
-            messageDiv.appendChild(contentDiv);
-            messagesContainer.appendChild(messageDiv);
+            currentIndex++;
+            
+            // Auto-scroll as content appears
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Continue typing (adjust speed here: lower = faster)
+            setTimeout(typeNextChar, 15);
+        } else {
+            // Typing complete - add export button if needed
+            if (content.includes('CANEXPORT CLAIMS AUDIT') || content.includes('AUDIT RECOMMENDATION')) {
+                const exportButton = document.createElement('button');
+                exportButton.className = 'export-button';
+                exportButton.innerHTML = '💾 Export Audit Report';
+                exportButton.onclick = () => exportAuditReport(content);
+                contentDiv.appendChild(exportButton);
+            }
         }
+    }
+    
+    typeNextChar();
+}
+
+function parseHTML(html) {
+    const parts = [];
+    let currentPos = 0;
+    
+    // Simple HTML parser that preserves tags
+    while (currentPos < html.length) {
+        const nextTag = html.indexOf('<', currentPos);
+        
+        if (nextTag === -1) {
+            // No more tags, add remaining characters
+            for (let i = currentPos; i < html.length; i++) {
+                parts.push(html[i]);
+            }
+            break;
+        }
+        
+        // Add characters before the tag
+        for (let i = currentPos; i < nextTag; i++) {
+            parts.push(html[i]);
+        }
+        
+        // Find the end of the tag
+        const tagEnd = html.indexOf('>', nextTag);
+        if (tagEnd !== -1) {
+            parts.push(html.substring(nextTag, tagEnd + 1));
+            currentPos = tagEnd + 1;
+        } else {
+            // Malformed tag, just add the character
+            parts.push(html[nextTag]);
+            currentPos = nextTag + 1;
+        }
+    }
+    
+    return parts;
+}
 
         function processCanExportContent(content) {
             let processed = content;
