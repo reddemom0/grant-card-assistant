@@ -645,7 +645,7 @@
         <div class="floating-input-container">
             <div class="file-upload-row">
                 <div class="file-drop-zone" id="file-drop-zone" onclick="document.getElementById('file-input').click()">
-                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" style="display: none;">
+                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" multiple style="display: none;">
                     <span class="drop-icon">🔎</span>
                     <div style="flex: 1;">
                         <div class="drop-text">Upload Invoice or Proof of Payment</div>
@@ -701,42 +701,62 @@
         });
 
         // File upload handling
-        fileInput.addEventListener('change', (e) => {
-            const files = Array.from(e.target.files);
-            if (files.length > 0) {
-                uploadedFiles = files;
-                
-                let totalSize = 0;
-                files.forEach(file => totalSize += file.size);
-                const fileSize = (totalSize / 1024).toFixed(1);
-                const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
-                
-                fileDropZone.classList.add('has-file');
-                
-                if (files.length === 1) {
-                    fileDropZone.innerHTML = `
-                        <span class="drop-icon" style="color: #059669;">✓</span>
-                        <div style="flex: 1;">
-                            <div class="drop-text" style="color: #059669;">File Ready: ${files[0].name}</div>
-                            <div class="drop-subtext">${fileSizeUnit}</div>
-                        </div>
-                    `;
-                    messageInput.placeholder = `File ready: ${files[0].name} - Add a message or click Send`;
-                } else {
-                    fileDropZone.innerHTML = `
-                        <span class="drop-icon" style="color: #059669;">✓</span>
-                        <div style="flex: 1;">
-                            <div class="drop-text" style="color: #059669;">${files.length} Files Ready</div>
-                            <div class="drop-subtext">${fileSizeUnit} total</div>
-                        </div>
-                    `;
-                    messageInput.placeholder = `${files.length} files ready - Add a message or click Send`;
-                }
-                
-                messageInput.focus();
-            }
-        });
+fileInput.addEventListener('change', (e) => {
+    const newFiles = Array.from(e.target.files);
+    if (newFiles.length > 0) {
+        // Add new files to existing array instead of replacing
+        uploadedFiles = [...uploadedFiles, ...newFiles];
+        updateFileDisplay();
+        messageInput.focus();
+    }
+});
 
+function updateFileDisplay() {
+    if (uploadedFiles.length === 0) {
+        resetFileDropZone();
+        return;
+    }
+    
+    let totalSize = 0;
+    uploadedFiles.forEach(file => totalSize += file.size);
+    const fileSize = (totalSize / 1024).toFixed(1);
+    const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+    
+    fileDropZone.classList.add('has-file');
+    
+    if (uploadedFiles.length === 1) {
+        const file = uploadedFiles[0];
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+        const isImage = imageTypes.includes(fileExtension);
+        
+        fileDropZone.innerHTML = `
+            <span class="drop-icon" style="color: #059669;">✓</span>
+            <div style="flex: 1;">
+                <div class="drop-text" style="color: #059669;">Ready: ${file.name} ${isImage ? '(OCR)' : ''}</div>
+                <div class="drop-subtext">${fileSizeUnit} - Click to add more files</div>
+            </div>
+            <button onclick="clearFiles()" style="background: none; border: none; color: #dc2626; cursor: pointer; padding: 0.25rem;">×</button>
+        `;
+    } else {
+        fileDropZone.innerHTML = `
+            <span class="drop-icon" style="color: #059669;">✓</span>
+            <div style="flex: 1;">
+                <div class="drop-text" style="color: #059669;">${uploadedFiles.length} Files Ready</div>
+                <div class="drop-subtext">${fileSizeUnit} total - Click to add more</div>
+            </div>
+            <button onclick="clearFiles()" style="background: none; border: none; color: #dc2626; cursor: pointer; padding: 0.25rem;">×</button>
+        `;
+    }
+    
+    messageInput.placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
+}
+
+function clearFiles() {
+    uploadedFiles = [];
+    fileInput.value = '';
+    updateFileDisplay();
+}
         // Send message functionality
         sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keydown', (e) => {
@@ -771,13 +791,15 @@
             hideWelcomeElements();
 
             if (uploadedFiles.length > 0) {
-                uploadedFiles.forEach(file => {
-                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-                    const isImage = imageTypes.includes(fileExtension);
-                    addMessage('user', `🔎 **${file.name}** uploaded${isImage ? ' (OCR enabled)' : ''}`);
-                });
-            }
+    const fileList = uploadedFiles.map(file => {
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+        const isImage = imageTypes.includes(fileExtension);
+        return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
+    }).join('\n');
+    
+    addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
+}
 
             if (message) {
                 addMessage('user', message);
@@ -1062,24 +1084,25 @@
                 }, false);
             });
             
-            fileDropZone.addEventListener('drop', (e) => {
-                const files = e.dataTransfer.files;
-                if (files.length > 0) {
-                    const file = files[0];
-                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                    
-                    if (allowedTypes.includes(fileExtension)) {
-                        Object.defineProperty(fileInput, 'files', {
-                            value: files,
-                            writable: false,
-                        });
-                        fileInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    } else {
-                        addMessage('assistant', `⛔ **File type not supported:** ${file.name}\n\nPlease upload invoices, receipts, or proof of payment documents.`, false);
-                    }
-                }
-            }, false);
+           fileDropZone.addEventListener('drop', (e) => {
+    const droppedFiles = Array.from(e.dataTransfer.files);
+    if (droppedFiles.length > 0) {
+        const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+        const validFiles = droppedFiles.filter(file => {
+            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+            return allowedTypes.includes(fileExtension);
+        });
+        
+        if (validFiles.length > 0) {
+            uploadedFiles = [...uploadedFiles, ...validFiles];
+            updateFileDisplay();
+        }
+        
+        if (validFiles.length !== droppedFiles.length) {
+            addMessage('assistant', `⛔ Some files were skipped. Supported: PDF, DOCX, TXT, MD, JPG, PNG`, false);
+        }
+    }
+}, false);
         });
     </script>
 </body>
