@@ -545,27 +545,41 @@
         });
 
         // File upload handling
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                uploadedFile = file;
-                
-                const fileSize = (file.size / 1024).toFixed(1);
-                const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
-                
-                fileDropZone.classList.add('has-file');
-                fileDropZone.innerHTML = `
-                    <span class="drop-icon" style="color: #059669;">✓</span>
-                    <div style="flex: 1;">
-                        <div class="drop-text" style="color: #059669;">File Ready: ${file.name}</div>
-                        <div class="drop-subtext">${fileSizeUnit}</div>
-                    </div>
-                `;
-                
-                messageInput.placeholder = `File ready: ${file.name} - Add a message or click Send`;
-                messageInput.focus();
-            }
-        });
+fileInput.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
+        uploadedFiles = files;
+        
+        let totalSize = 0;
+        files.forEach(file => totalSize += file.size);
+        const fileSize = (totalSize / 1024).toFixed(1);
+        const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+        
+        fileDropZone.classList.add('has-file');
+        
+        if (files.length === 1) {
+            fileDropZone.innerHTML = `
+                <span class="drop-icon" style="color: #059669;">✓</span>
+                <div style="flex: 1;">
+                    <div class="drop-text" style="color: #059669;">File Ready: ${files[0].name}</div>
+                    <div class="drop-subtext">${fileSizeUnit}</div>
+                </div>
+            `;
+            messageInput.placeholder = `File ready: ${files[0].name} - Add a message or click Send`;
+        } else {
+            fileDropZone.innerHTML = `
+                <span class="drop-icon" style="color: #059669;">✓</span>
+                <div style="flex: 1;">
+                    <div class="drop-text" style="color: #059669;">${files.length} Files Ready</div>
+                    <div class="drop-subtext">${fileSizeUnit} total</div>
+                </div>
+            `;
+            messageInput.placeholder = `${files.length} files ready - Add a message or click Send`;
+        }
+        
+        messageInput.focus();
+    }
+});
 
         // Send message functionality
         sendButton.addEventListener('click', sendMessage);
@@ -600,12 +614,14 @@
 
             hideWelcomeElements();
 
-            if (uploadedFile) {
-                const fileExtension = '.' + uploadedFile.name.split('.').pop().toLowerCase();
-                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-                const isImage = imageTypes.includes(fileExtension);
-                addMessage('user', `📎 **${uploadedFile.name}** uploaded${isImage ? ' (OCR enabled)' : ''}`);
-            }
+            if (uploadedFiles.length > 0) {
+    uploadedFiles.forEach(file => {
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+        const isImage = imageTypes.includes(fileExtension);
+        addMessage('user', `📎 **${file.name}** uploaded${isImage ? ' (OCR enabled)' : ''}`);
+    });
+}
 
             if (message) {
                 addMessage('user', message);
@@ -652,10 +668,10 @@
             messageInput.style.height = '44px';
             messageInput.placeholder = "Describe your expense or ask about CanExport eligibility...";
             
-            if (uploadedFile) {
-                uploadedFile = null;
-                resetFileDropZone();
-            }
+            if (uploadedFiles.length > 0) {
+    uploadedFiles = [];
+    resetFileDropZone();
+}
         }
 
         function resetFileDropZone() {
