@@ -621,9 +621,11 @@
                 formData.append('conversationId', 'canexport-claims-conversation');
                 formData.append('agentType', 'canexport-claims');
                 
-                if (uploadedFile) {
-                    formData.append('file', uploadedFile);
-                }
+                if (uploadedFiles.length > 0) {
+    uploadedFiles.forEach(file => {
+        formData.append('files', file);
+    });
+}
 
                 const response = await fetch(`${API_BASE}/api/process-claims`, {
                     method: 'POST',
