@@ -3238,45 +3238,50 @@ function validateClaimsFile(filename) {
       const startTime = Date.now();
       
       await new Promise((resolve, reject) => {
-        upload.single('file')(req, res, (err) => {
+        upload.array('files', 10)(req, res, (err) => {
           if (err) reject(err);
           else resolve();
         });
       });
 
       const { message, conversationId } = req.body;
-      let fileContent = '';
+      let fileContents = [];
       
       console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
       
-// Process uploaded file if present (receipts, invoices, etc.)
-if (req.file) {
-  console.log(`📄 Processing Claims document: ${req.file.originalname} (${req.file.mimetype})`);
-
-  // Pre-validation before processing
-  const fileValidation = validateClaimsFile(req.file.originalname);
-  if (fileValidation.hasWarnings) {
-    console.log('🚨 File validation warnings detected');
-  }
+// Process uploaded files if present (receipts, invoices, etc.)
+if (req.files && req.files.length > 0) {
+  console.log(`📄 Processing ${req.files.length} Claims documents`);
   
-  // Define file types
-  const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'];
-  const isPDF = req.file.mimetype === 'application/pdf';
-  const isImage = imageTypes.includes(req.file.mimetype);
-  
-  if (isImage) {
-    console.log('📸 Image detected - Starting OCR processing...');
+  for (const file of req.files) {
+    console.log(`📄 Processing: ${file.originalname} (${file.mimetype})`);
     
-    try {
-      // Extract text from image using Claude Vision API
-      const extractedText = await extractTextFromImage(req.file.buffer, req.file.originalname);
+    // Pre-validation before processing
+    const fileValidation = validateClaimsFile(file.originalname);
+    if (fileValidation.hasWarnings) {
+      console.log('🚨 File validation warnings detected');
+    }
+    
+    // Define file types
+    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'];
+    const isPDF = file.mimetype === 'application/pdf';
+    const isImage = imageTypes.includes(file.mimetype);
+    
+    let processedContent = '';
+    
+    if (isImage) {
+      console.log('📸 Image detected - Starting OCR processing...');
       
-      // Analyze expense information
-      const expenseAnalysis = analyzeExpenseFromText(extractedText, req.file.originalname);
-      
-      // Build comprehensive file content for Claude
-      fileContent = `📸 RECEIPT IMAGE PROCESSED WITH OCR:
-File: ${req.file.originalname}
+      try {
+        // Extract text from image using Claude Vision API
+        const extractedText = await extractTextFromImage(file.buffer, file.originalname);
+        
+        // Analyze expense information
+        const expenseAnalysis = analyzeExpenseFromText(extractedText, file.originalname);
+        
+        // Build comprehensive file content for Claude
+        processedContent = `📸 RECEIPT IMAGE PROCESSED WITH OCR:
+File: ${file.originalname}
 OCR Confidence: ${expenseAnalysis.ocrConfidence}
 
 EXTRACTED TEXT:
@@ -3291,40 +3296,40 @@ AUTOMATIC EXPENSE ANALYSIS:
 
 Please analyze this receipt for CanExport SME program eligibility and compliance requirements.`;
 
-      console.log(`✅ Image OCR processing completed with ${expenseAnalysis.ocrConfidence} confidence`);
-      
-    } catch (ocrError) {
-      console.error('❌ Image OCR processing failed:', ocrError);
-      fileContent = `📸 RECEIPT IMAGE UPLOAD:
-File: ${req.file.originalname}
+        console.log(`✅ Image OCR processing completed with ${expenseAnalysis.ocrConfidence} confidence`);
+        
+      } catch (ocrError) {
+        console.error('❌ Image OCR processing failed:', ocrError);
+        processedContent = `📸 RECEIPT IMAGE UPLOAD:
+File: ${file.originalname}
 Status: OCR processing failed
 
 Error: ${ocrError.message}
 
 Please analyze this receipt manually or request a clearer image.`;
-    }
-    
-  } else if (isPDF) {
-    console.log('📋 PDF detected - Attempting smart processing...');
-    
-    try {
-      // First, try standard PDF text extraction
-      console.log('🔍 Attempting PDF text extraction...');
-      const pdfTextContent = await processFileContent(req.file);
+      }
       
-      // Check if PDF text extraction was successful (more than just filename)
-      const hasMeaningfulText = pdfTextContent && 
-        pdfTextContent.length > req.file.originalname.length + 50 &&
-        !pdfTextContent.includes('[Content extraction failed due to PDF formatting issues]');
+    } else if (isPDF) {
+      console.log('📋 PDF detected - Attempting smart processing...');
       
-      if (hasMeaningfulText) {
-        console.log('✅ PDF text extraction successful');
+      try {
+        // First, try standard PDF text extraction
+        console.log('🔍 Attempting PDF text extraction...');
+        const pdfTextContent = await processFileContent(file);
         
-        // Analyze the extracted text
-        const expenseAnalysis = analyzeExpenseFromText(pdfTextContent, req.file.originalname);
+        // Check if PDF text extraction was successful (more than just filename)
+        const hasMeaningfulText = pdfTextContent && 
+          pdfTextContent.length > file.originalname.length + 50 &&
+          !pdfTextContent.includes('[Content extraction failed due to PDF formatting issues]');
         
-        fileContent = `📋 PDF DOCUMENT PROCESSED:
-File: ${req.file.originalname}
+        if (hasMeaningfulText) {
+          console.log('✅ PDF text extraction successful');
+          
+          // Analyze the extracted text
+          const expenseAnalysis = analyzeExpenseFromText(pdfTextContent, file.originalname);
+          
+          processedContent = `📋 PDF DOCUMENT PROCESSED:
+File: ${file.originalname}
 Processing Method: Text Extraction
 Analysis Confidence: ${expenseAnalysis.ocrConfidence}
 
@@ -3339,16 +3344,16 @@ AUTOMATIC EXPENSE ANALYSIS:
 📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
 
 Please analyze this document for CanExport SME program eligibility and compliance requirements.`;
-        
-      } else {
-        console.log('⚠️ PDF text extraction insufficient, trying Vision API...');
-        
-        // Fall back to Claude Vision API for image-based PDFs
-        const extractedText = await extractTextFromImage(req.file.buffer, req.file.originalname);
-        const expenseAnalysis = analyzeExpenseFromText(extractedText, req.file.originalname);
-        
-        fileContent = `📋 PDF IMAGE PROCESSED WITH OCR:
-File: ${req.file.originalname}
+          
+        } else {
+          console.log('⚠️ PDF text extraction insufficient, trying Vision API...');
+          
+          // Fall back to Claude Vision API for image-based PDFs
+          const extractedText = await extractTextFromImage(file.buffer, file.originalname);
+          const expenseAnalysis = analyzeExpenseFromText(extractedText, file.originalname);
+          
+          processedContent = `📋 PDF IMAGE PROCESSED WITH OCR:
+File: ${file.originalname}
 Processing Method: Vision API (Image-based PDF)
 OCR Confidence: ${expenseAnalysis.ocrConfidence}
 
@@ -3363,37 +3368,43 @@ AUTOMATIC EXPENSE ANALYSIS:
 📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
 
 Please analyze this PDF receipt for CanExport SME program eligibility and compliance requirements.`;
+          
+          console.log('✅ PDF Vision API processing completed');
+        }
         
-        console.log('✅ PDF Vision API processing completed');
-      }
-      
-    } catch (pdfError) {
-      console.error('❌ PDF processing failed:', pdfError);
-      fileContent = `📋 PDF DOCUMENT UPLOAD:
-File: ${req.file.originalname}
+      } catch (pdfError) {
+        console.error('❌ PDF processing failed:', pdfError);
+        processedContent = `📋 PDF DOCUMENT UPLOAD:
+File: ${file.originalname}
 Status: Processing failed
 
 Error: ${pdfError.message}
 
 Please try converting the PDF to an image format (PNG/JPG) or provide the expense details manually.`;
-    }
-    
-  } else {
-    console.log('📄 Document detected - Processing as regular file...');
-    // Process as regular document (Word, text, etc.)
-    try {
-      fileContent = await processFileContent(req.file);
-      console.log('✅ Document processing completed');
-    } catch (docError) {
-      console.error('❌ Document processing failed:', docError);
-      fileContent = `📄 DOCUMENT UPLOAD:
-File: ${req.file.originalname}
+      }
+      
+    } else {
+      console.log('📄 Document detected - Processing as regular file...');
+      // Process as regular document (Word, text, etc.)
+      try {
+        const docContent = await processFileContent(file);
+        processedContent = `📄 DOCUMENT PROCESSED:
+File: ${file.originalname}
+Content: ${docContent}`;
+        console.log('✅ Document processing completed');
+      } catch (docError) {
+        console.error('❌ Document processing failed:', docError);
+        processedContent = `📄 DOCUMENT UPLOAD:
+File: ${file.originalname}
 Status: Processing failed
 
 Error: ${docError.message}
 
 Please provide the expense details manually.`;
+      }
     }
+    
+    fileContents.push(processedContent);
   }
 }
       
@@ -3434,10 +3445,14 @@ Use the invoice guides and compliance documents above for all expense eligibilit
       
       // Build comprehensive user message
       let userMessage = message || "Hello, I need help auditing CanExport expenses.";
-      
-      if (fileContent) {
-        userMessage += `\n\nUploaded Receipt/Invoice Analysis:\n${fileContent}`;
-      }
+
+if (fileContents.length > 0) {
+  userMessage += `\n\n=== UPLOADED DOCUMENTS (${fileContents.length} files) ===\n`;
+  fileContents.forEach((content, index) => {
+    userMessage += `\n--- Document ${index + 1} ---\n${content}\n`;
+  });
+  userMessage += `\nPlease analyze all ${fileContents.length} documents for CanExport SME program eligibility and compliance requirements.`;
+}
 
       // Enhanced context management for Claims (40 exchanges)
       const agentType = 'canexport-claims';
