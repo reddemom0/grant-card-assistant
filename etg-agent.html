@@ -222,6 +222,75 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* File thumbnail styles */
+        .file-thumbnail {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .file-icon-large {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .file-grid {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin: 0.5rem 0;
+        }
+
+        .file-grid-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+            min-width: 80px;
+            max-width: 120px;
+            position: relative;
+        }
+
+        .file-grid-item .file-name {
+            font-size: 0.75rem;
+            text-align: center;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        .file-remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--error);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
         /* Floating Input Area */
         .floating-input {
             position: fixed;
@@ -280,6 +349,11 @@
             border-color: var(--primary);
             background: rgba(16, 185, 129, 0.05);
             box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+        }
+        
+        .simple-input-box.has-file {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
         }
         
         .message-input-simple {
@@ -536,7 +610,7 @@
             <button class="floating-quick-btn" onclick="insertQuickText('Questions 4-7')">📊 Complete</button>
         </div>
         <div class="simple-input-box" id="input-box">
-            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" multiple style="display: none;">
             <div style="position: relative;">
                 <textarea 
                     id="message-input" 
@@ -612,6 +686,130 @@
             }
         }
 
+        // File upload functions
+        async function updateFileDisplay() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
+            if (uploadedFiles.length === 0) {
+                resetInputBox();
+                return;
+            }
+            
+            let totalSize = 0;
+            uploadedFiles.forEach(file => totalSize += file.size);
+            const fileSize = (totalSize / 1024).toFixed(1);
+            const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+            
+            inputBox.classList.add('has-file');
+            
+            // Create file grid HTML
+            let fileGridHTML = '<div class="file-grid">';
+            
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
+                const thumbnail = await generateFileThumbnail(file);
+                const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+                
+                fileGridHTML += `
+                    <div class="file-grid-item">
+                        ${thumbnail}
+                        <div class="file-name">${truncatedName}</div>
+                        <button class="file-remove-btn" onclick="removeFile(${i})">×</button>
+                    </div>
+                `;
+            }
+            
+            fileGridHTML += '</div>';
+            
+            // Update input box content to show files
+            const currentValue = messageInput.value;
+            const placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
+            
+            // Create a temporary container above the input
+            let fileDisplay = inputBox.querySelector('.file-display');
+            if (!fileDisplay) {
+                fileDisplay = document.createElement('div');
+                fileDisplay.className = 'file-display';
+                fileDisplay.style.cssText = `
+                    padding: 8px 16px;
+                    border-bottom: 1px solid var(--border);
+                    background: rgba(16, 185, 129, 0.05);
+                `;
+                inputBox.insertBefore(fileDisplay, inputBox.firstChild);
+            }
+            
+            fileDisplay.innerHTML = `
+                <div style="color: #059669; font-weight: 500; font-size: 0.8rem; margin-bottom: 0.5rem;">
+                    ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
+                </div>
+                ${fileGridHTML}
+            `;
+            
+            messageInput.placeholder = placeholder;
+        }
+
+        function generateFileThumbnail(file) {
+            return new Promise((resolve) => {
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                
+                if (imageTypes.includes(fileExtension)) {
+                    // Generate image thumbnail
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = document.createElement('img');
+                        img.className = 'file-thumbnail';
+                        img.src = e.target.result;
+                        img.alt = file.name;
+                        resolve(img.outerHTML);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    // Generate file type icon
+                    const icon = getFileTypeIcon(fileExtension);
+                    const iconHtml = `<div class="file-icon-large">${icon}</div>`;
+                    resolve(iconHtml);
+                }
+            });
+        }
+
+        function getFileTypeIcon(extension) {
+            const icons = {
+                '.pdf': '📄',
+                '.doc': '📝',
+                '.docx': '📝',
+                '.txt': '📄',
+                '.md': '📄'
+            };
+            return icons[extension] || '📄';
+        }
+
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+            updateFileDisplay();
+        }
+
+        function resetInputBox() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
+            inputBox.classList.remove('has-file');
+            const fileDisplay = inputBox.querySelector('.file-display');
+            if (fileDisplay) {
+                fileDisplay.remove();
+            }
+            
+            if (messageInput) {
+                messageInput.placeholder = "Message ETG Specialist...";
+            }
+            
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+        }
+
         // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, initializing ETG interface...');
@@ -650,19 +848,14 @@
                 });
             }
 
-            // File upload handler
+            // File upload handler - now shows preview instead of auto-sending
             if (fileInput) {
-                fileInput.addEventListener('change', function(e) {
+                fileInput.addEventListener('change', async function(e) {
                     const files = Array.from(e.target.files);
                     if (files.length > 0) {
                         uploadedFiles = [...uploadedFiles, ...files];
-                        hideWelcomeElements();
-                        
-                        const fileList = files.map(file => `📎 **${file.name}**`).join('\n');
-                        addMessage('user', `**${files.length} file${files.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
-                        
-                        // Auto-send files
-                        setTimeout(() => sendMessage(true), 100);
+                        await updateFileDisplay();
+                        messageInput.focus();
                     }
                 });
             }
@@ -714,10 +907,10 @@
                 }, false);
             });
             
-            inputBox.addEventListener('drop', (e) => {
+            inputBox.addEventListener('drop', async (e) => {
                 const droppedFiles = Array.from(e.dataTransfer.files);
                 if (droppedFiles.length > 0) {
-                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md'];
+                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
                     const validFiles = droppedFiles.filter(file => {
                         const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
                         return allowedTypes.includes(fileExtension);
@@ -725,28 +918,23 @@
                     
                     if (validFiles.length > 0) {
                         uploadedFiles = [...uploadedFiles, ...validFiles];
-                        hideWelcomeElements();
-                        
-                        const fileList = validFiles.map(file => `📎 **${file.name}**`).join('\n');
-                        addMessage('user', `**${validFiles.length} file${validFiles.length !== 1 ? 's' : ''} dropped:**\n${fileList}`);
-                        
-                        setTimeout(() => sendMessage(true), 100);
+                        await updateFileDisplay();
                     }
                     
                     if (validFiles.length !== droppedFiles.length) {
-                        showNotification('Some files were skipped. Supported: PDF, DOCX, TXT, MD', 'error');
+                        showNotification('Some files were skipped. Supported: PDF, DOCX, TXT, MD, JPG, PNG', 'error');
                     }
                 }
             }, false);
         }
 
-        async function sendMessage(autoSend = false) {
+        async function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             
             const message = messageInput ? messageInput.value.trim() : '';
             
-            if (!message && uploadedFiles.length === 0 && !autoSend) return;
+            if (!message && uploadedFiles.length === 0) return;
             if (isLoading) return;
 
             hideWelcomeElements();
@@ -755,14 +943,20 @@
             const urlRegex = /(https?:\/\/[^\s]+)/g;
             const urls = message.match(urlRegex);
             
-            if (urls && urls.length > 0 && !autoSend) {
+            if (urls && urls.length > 0) {
                 await handleURLMessage(urls[0], message);
                 return;
             }
 
-            // Handle regular message
+            // Handle files
             if (uploadedFiles.length > 0) {
-                const fileList = uploadedFiles.map(file => `📎 **${file.name}**`).join('\n');
+                const fileList = uploadedFiles.map(file => {
+                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const isImage = imageTypes.includes(fileExtension);
+                    return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
+                }).join('\n');
+                
                 addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
             }
 
@@ -780,34 +974,9 @@
                 formData.append('conversationId', 'etg-conversation');
                 formData.append('agentType', 'etg-writer');
                 
-            try {
-                const formData = new FormData();
-                formData.append('message', message || '');
-                formData.append('conversationId', 'etg-conversation');
-                formData.append('agentType', 'etg-writer');
-                
                 uploadedFiles.forEach(file => {
-                    formData.append('file', file);  // Changed from 'files' to 'file'
+                    formData.append('files', file);
                 });
-
-                const response = await fetch(`${API_BASE}/api/process-etg`, {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-
-                const data = await response.json();
-                
-                removeLoadingMessage();
-                addMessage('assistant', data.response, true);
-
-            } catch (error) {
-                removeLoadingMessage();
-                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`);
-            }
 
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
                     method: 'POST',
@@ -833,11 +1002,11 @@
             if (messageInput) {
                 messageInput.value = '';
                 messageInput.style.height = '44px';
+                messageInput.placeholder = "Message ETG Specialist...";
             }
             
             uploadedFiles = [];
-            const fileInput = document.getElementById('file-input');
-            if (fileInput) fileInput.value = '';
+            resetInputBox();
         }
 
         async function handleURLMessage(url, originalMessage) {
