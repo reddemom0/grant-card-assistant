@@ -2954,7 +2954,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
     if (url === '/api/process-etg' && method === 'POST') {
       const startTime = Date.now();
       await new Promise((resolve, reject) => {
-        upload.single('file')(req, res, (err) => {
+        upload.array('files', 10)(req, res, (err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -2967,10 +2967,19 @@ Always follow the exact workflows and instructions from the knowledge base docum
       console.log(`🎯 Processing enhanced ETG request for conversation: ${conversationId}`);
       
       // Process uploaded file if present
-      if (req.file) {
-        console.log(`📄 Processing ETG document: ${req.file.originalname}`);
-        fileContent = await processFileContent(req.file);
-      }
+      let fileContents = [];
+if (req.files && req.files.length > 0) {
+  console.log(`📄 Processing ${req.files.length} ETG documents`);
+  
+  for (const file of req.files) {
+    console.log(`📄 Processing: ${file.originalname}`);
+    const content = await processFileContent(file);
+    fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+  }
+  
+  // Combine all file contents
+  fileContent = fileContents.join('\n\n');
+}
       
       // Process URL if present
       if (courseUrl) {
@@ -3068,9 +3077,9 @@ Use the ETG knowledge base above to find similar successful applications and mat
       // Build comprehensive user message
       let userMessage = message || "Hello, I need help with an ETG Business Case.";
       
-      if (fileContent) {
-        userMessage += `\n\nUploaded Course Document Analysis:\n${fileContent}`;
-      }
+      if (fileContents.length > 0) {
+  userMessage += `\n\nUploaded Course Documents (${fileContents.length} files):\n${fileContent}`;
+}
       
       if (urlContent) {
         userMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
