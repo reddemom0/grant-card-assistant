@@ -192,50 +192,6 @@
             line-height: 1.7;
         }
         
-        /* Enhanced ETG Business Case styling */
-        .message.assistant .message-content .business-case-header {
-            background: linear-gradient(135deg, var(--etg-light), #bbf7d0);
-            border-left: 4px solid var(--primary);
-            padding: 1rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-            font-weight: 600;
-            color: var(--primary);
-        }
-        
-        .message.assistant .message-content .section-header {
-            padding: 0.75rem;
-            margin: 1rem 0;
-            border-radius: 6px;
-            font-weight: 600;
-            border-left: 3px solid;
-        }
-        
-        .message.assistant .message-content .section-eligibility {
-            background: rgba(16, 185, 129, 0.05);
-            border-left-color: var(--primary);
-            color: var(--primary);
-        }
-        
-        .message.assistant .message-content .section-questions {
-            background: rgba(16, 185, 129, 0.05);
-            border-left-color: #10b981;
-            color: #10b981;
-        }
-        
-        .message.assistant .message-content .section-research {
-            background: rgba(245, 158, 11, 0.05);
-            border-left-color: #f59e0b;
-            color: #f59e0b;
-        }
-        
-        .message.assistant .message-content .etg-divider {
-            border: none;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
-            margin: 1.5rem 0;
-        }
-        
         .welcome-message.hidden {
             display: none;
         }
@@ -277,8 +233,34 @@
             width: calc(100% - 40px);
         }
         
-        .floating-input-container {
-            /* Container no longer needed - styles moved to input box */
+        .floating-quick-actions {
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+        
+        .floating-quick-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 6px 12px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        
+        .floating-quick-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(16, 185, 129, 0.05);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
         
         .simple-input-box {
@@ -304,7 +286,7 @@
             width: 100%;
             border: none;
             border-radius: 12px;
-            padding: 12px 45px 12px 16px;
+            padding: 12px 80px 12px 16px;
             resize: none;
             font-family: inherit;
             font-size: 0.95rem;
@@ -313,6 +295,62 @@
             min-height: 44px;
             max-height: 120px;
             outline: none;
+        }
+        
+        .input-buttons {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .file-button-inline {
+            width: 28px;
+            height: 28px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .file-button-inline:hover {
+            background: rgba(16, 185, 129, 0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .send-button-inline {
+            width: 32px;
+            height: 32px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .send-button-inline:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-50%) scale(1.05);
+        }
+        
+        .send-button-inline:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+            transform: translateY(-50%);
         }
         
         .upload-btn-welcome {
@@ -348,61 +386,6 @@
             color: var(--primary);
         }
         
-        .input-row {
-            display: flex;
-            gap: 0.75rem;
-            align-items: flex-end;
-        }
-        
-        .message-input {
-            flex: 1;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            resize: none;
-            font-family: inherit;
-            font-size: 0.95rem;
-            background: var(--surface);
-            transition: all 0.2s ease;
-            min-height: 44px;
-            max-height: 120px;
-        }
-        
-        .message-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
-        }
-        
-        .send-button-inline {
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 32px;
-            height: 32px;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .send-button-inline:hover:not(:disabled) {
-            background: var(--primary-dark);
-            transform: translateY(-50%) scale(1.05);
-        }
-        
-        .send-button-inline:disabled {
-            background: var(--text-secondary);
-            cursor: not-allowed;
-            transform: translateY(-50%);
-        }
-        
         .export-button {
             margin-top: 0.75rem;
             display: inline-flex;
@@ -417,124 +400,13 @@
             font-size: 0.9rem;
             font-weight: 600;
             transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
         }
         
         .export-button:hover {
-            background: linear-gradient(135deg, var(--primary-dark), #4c1d95);
+            background: linear-gradient(135deg, var(--primary-dark), #047857);
             transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
-        }
-        
-        /* File thumbnail styles */
-        .file-thumbnail {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 1px solid var(--border);
-            background: var(--surface);
-        }
-
-        .file-icon-large {
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--background);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 24px;
-            color: var(--text-secondary);
-        }
-
-        .file-grid {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            margin: 0.5rem 0;
-        }
-
-        .file-grid-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--surface);
-            min-width: 80px;
-            max-width: 120px;
-            position: relative;
-        }
-
-        .file-grid-item .file-name {
-            font-size: 0.75rem;
-            text-align: center;
-            word-break: break-word;
-            line-height: 1.2;
-        }
-
-        .file-remove-btn {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: var(--error);
-            color: white;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
-        }
-
-        /* URL input styling */
-        .url-input-row {
-            display: none;
-        }
-
-        .url-input {
-            flex: 1;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.5rem;
-            font-size: 0.85rem;
-            transition: all 0.2s ease;
-        }
-
-        .url-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
-        }
-
-        .analyze-btn {
-            padding: 0.5rem 1rem;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            white-space: nowrap;
-        }
-
-        .analyze-btn:hover:not(:disabled) {
-            background: var(--primary-dark);
-        }
-
-        .analyze-btn:disabled {
-            background: var(--text-secondary);
-            cursor: not-allowed;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
         }
         
         /* Notification system */
@@ -552,27 +424,8 @@
             transition: all 0.3s ease;
         }
         
-        .notification.info {
-            background: var(--primary);
-        }
-        
-        /* Typing animation styles */
-        .typing-cursor {
-            display: inline-block;
-            width: 2px;
-            height: 1.2em;
-            background-color: var(--primary);
-            animation: blink 1s infinite;
-            margin-left: 2px;
-        }
-
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-
-        .typing-container {
-            min-height: 1.2em;
+        .notification.error {
+            background: var(--error);
         }
         
         @media (max-width: 768px) {
@@ -583,18 +436,6 @@
             .capability-tags {
                 flex-direction: column;
                 align-items: center;
-            }
-            
-            .file-upload-row {
-                flex-direction: column;
-            }
-            
-            .input-row {
-                flex-direction: column;
-            }
-            
-            .send-button {
-                width: 100%;
             }
         }
     </style>
@@ -685,9 +526,16 @@
         </div>
     </div>
 
-    <!-- Floating Input Area - Just the input box -->
+    <!-- Floating Input Area -->
     <div class="floating-input">
-        <div class="simple-input-box">
+        <div class="floating-quick-actions">
+            <button class="floating-quick-btn" onclick="insertQuickText('Start New ETG Case')">📝 New Case</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Check eligibility')">✅ Eligibility</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Review draft')">📋 Review</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('BC alternatives')">🔍 BC Options</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Questions 4-7')">📊 Complete</button>
+        </div>
+        <div class="simple-input-box" id="input-box">
             <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
             <div style="position: relative;">
                 <textarea 
@@ -696,19 +544,23 @@
                     placeholder="Message ETG Specialist..."
                     rows="1"
                 ></textarea>
-                <button id="send-button" class="send-button-inline">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                        <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
-                    </svg>
-                </button>
+                <div class="input-buttons">
+                    <button class="file-button-inline" onclick="document.getElementById('file-input').click()" title="Upload files">
+                        📎
+                    </button>
+                    <button id="send-button" class="send-button-inline" title="Send message">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <!-- Hidden URL input -->
-            <input type="url" id="url-input" style="display: none;">
         </div>
     </div>
 
     <script>
+        // Global variables
         let isLoading = false;
         let uploadedFiles = [];
         let hasStartedConversation = false;
@@ -716,46 +568,17 @@
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
-        // DOM elements
-        const messagesContainer = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const fileInput = document.getElementById('file-input');
-        const urlInput = document.getElementById('url-input');
-        const welcomeSection = document.getElementById('welcome-section');
-        const chatContainer = document.getElementById('chat-container');
-        const welcomeMessage = document.getElementById('welcome-message');
-
-        // Auto-resize textarea
-        messageInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        // Tab switching functionality - removed since we no longer use tabs
-        
-        // File upload handling
-        fileInput.addEventListener('change', (e) => {
-            const newFiles = Array.from(e.target.files);
-            if (newFiles.length > 0) {
-                uploadedFiles = [...uploadedFiles, ...newFiles];
-                hideWelcomeElements();
-                
-                const fileList = uploadedFiles.map(file => `📎 **${file.name}**`).join('\n');
-                addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
-                
-                // Auto-send file uploads
-                sendMessage(true);
+        // Global functions for HTML onclick handlers
+        function insertQuickText(text) {
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) {
+                messageInput.value = text + ': ';
+                messageInput.focus();
+                messageInput.style.height = 'auto';
+                messageInput.style.height = messageInput.scrollHeight + 'px';
             }
-        });
-
-        function removeFile(index) {
-            uploadedFiles.splice(index, 1);
-            fileInput.value = '';
-            updateFileStatus();
         }
 
-        // URL input handling
         function focusURLInput() {
             const url = prompt("Enter course website URL:");
             if (url && isValidURL(url)) {
@@ -767,10 +590,6 @@
             }
         }
 
-        function analyzeURL() {
-            // This function is no longer used but kept for compatibility
-        }
-
         function isValidURL(string) {
             try {
                 new URL(string);
@@ -780,44 +599,170 @@
             }
         }
 
-        // Send message functionality
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Quick text insertion
-        function insertQuickText(text) {
-            messageInput.value = text + ': ';
-            messageInput.focus();
-            messageInput.style.height = 'auto';
-            messageInput.style.height = messageInput.scrollHeight + 'px';
-        }
-
         function hideWelcomeElements() {
             if (!hasStartedConversation) {
                 hasStartedConversation = true;
-                welcomeSection.style.display = 'none';
-                welcomeMessage.classList.add('hidden');
-                chatContainer.classList.add('expanded');
+                const welcomeSection = document.getElementById('welcome-section');
+                const welcomeMessage = document.getElementById('welcome-message');
+                const chatContainer = document.getElementById('chat-container');
+                
+                if (welcomeSection) welcomeSection.style.display = 'none';
+                if (welcomeMessage) welcomeMessage.classList.add('hidden');
+                if (chatContainer) chatContainer.classList.add('expanded');
             }
         }
 
-        async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message && uploadedFiles.length === 0) return;
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing ETG interface...');
+            
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const fileInput = document.getElementById('file-input');
+            const inputBox = document.getElementById('input-box');
+
+            // Auto-resize textarea
+            if (messageInput) {
+                messageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                    
+                    // Check for URLs
+                    checkForURLs(this.value);
+                });
+            }
+
+            // Send button click handler
+            if (sendButton) {
+                sendButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    sendMessage();
+                });
+            }
+
+            // Enter key handler
+            if (messageInput) {
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                    }
+                });
+            }
+
+            // File upload handler
+            if (fileInput) {
+                fileInput.addEventListener('change', function(e) {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...files];
+                        hideWelcomeElements();
+                        
+                        const fileList = files.map(file => `📎 **${file.name}**`).join('\n');
+                        addMessage('user', `**${files.length} file${files.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
+                        
+                        // Auto-send files
+                        setTimeout(() => sendMessage(true), 100);
+                    }
+                });
+            }
+
+            // Drag and drop
+            if (inputBox) {
+                setupDragAndDrop(inputBox, messageInput);
+            }
+
+            // Focus input
+            if (messageInput) {
+                messageInput.focus();
+            }
+
+            console.log('ETG interface initialized successfully');
+        });
+
+        function checkForURLs(text) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const urls = text.match(urlRegex);
+            const messageInput = document.getElementById('message-input');
+            
+            if (messageInput) {
+                if (urls && urls.length > 0) {
+                    messageInput.style.borderLeftColor = 'var(--primary)';
+                } else {
+                    messageInput.style.borderLeftColor = 'transparent';
+                }
+            }
+        }
+
+        function setupDragAndDrop(inputBox, messageInput) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.add('drag-over');
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.remove('drag-over');
+                }, false);
+            });
+            
+            inputBox.addEventListener('drop', (e) => {
+                const droppedFiles = Array.from(e.dataTransfer.files);
+                if (droppedFiles.length > 0) {
+                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md'];
+                    const validFiles = droppedFiles.filter(file => {
+                        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                        return allowedTypes.includes(fileExtension);
+                    });
+                    
+                    if (validFiles.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...validFiles];
+                        hideWelcomeElements();
+                        
+                        const fileList = validFiles.map(file => `📎 **${file.name}**`).join('\n');
+                        addMessage('user', `**${validFiles.length} file${validFiles.length !== 1 ? 's' : ''} dropped:**\n${fileList}`);
+                        
+                        setTimeout(() => sendMessage(true), 100);
+                    }
+                    
+                    if (validFiles.length !== droppedFiles.length) {
+                        showNotification('Some files were skipped. Supported: PDF, DOCX, TXT, MD', 'error');
+                    }
+                }
+            }, false);
+        }
+
+        async function sendMessage(autoSend = false) {
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            
+            const message = messageInput ? messageInput.value.trim() : '';
+            
+            if (!message && uploadedFiles.length === 0 && !autoSend) return;
             if (isLoading) return;
 
             hideWelcomeElements();
 
+            // Check for URLs in message
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const urls = message.match(urlRegex);
+            
+            if (urls && urls.length > 0 && !autoSend) {
+                await handleURLMessage(urls[0], message);
+                return;
+            }
+
+            // Handle regular message
             if (uploadedFiles.length > 0) {
-                const fileList = uploadedFiles.map(file => {
-                    return `📎 **${file.name}**`;
-                }).join('\n');
-                
+                const fileList = uploadedFiles.map(file => `📎 **${file.name}**`).join('\n');
                 addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
             }
 
@@ -826,7 +771,7 @@
             }
 
             isLoading = true;
-            sendButton.disabled = true;
+            if (sendButton) sendButton.disabled = true;
             addLoadingMessage();
 
             try {
@@ -835,11 +780,9 @@
                 formData.append('conversationId', 'etg-conversation');
                 formData.append('agentType', 'etg-writer');
                 
-                if (uploadedFiles.length > 0) {
-                    uploadedFiles.forEach(file => {
-                        formData.append('files', file);
-                    });
-                }
+                uploadedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
 
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
                     method: 'POST',
@@ -857,31 +800,39 @@
 
             } catch (error) {
                 removeLoadingMessage();
-                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
+                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`);
             }
 
             isLoading = false;
-            sendButton.disabled = false;
-            messageInput.value = '';
-            messageInput.style.height = '44px';
-            messageInput.placeholder = "Describe your training requirements or ask about ETG eligibility...";
-            
-            if (uploadedFiles.length > 0) {
-                uploadedFiles = [];
-                fileInput.value = '';
+            if (sendButton) sendButton.disabled = false;
+            if (messageInput) {
+                messageInput.value = '';
+                messageInput.style.height = '44px';
             }
+            
+            uploadedFiles = [];
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
         }
 
-        async function sendMessageWithURL(url) {
-            if (isLoading) return;
-
+        async function handleURLMessage(url, originalMessage) {
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            
+            const remainingMessage = originalMessage.replace(url, '').trim();
+            
+            if (remainingMessage) {
+                addMessage('user', remainingMessage);
+            }
+            addMessage('user', `🔗 Analyze course URL: ${url}`);
+            
             isLoading = true;
-            sendButton.disabled = true;
+            if (sendButton) sendButton.disabled = true;
             addLoadingMessage('Analyzing course website...');
 
             try {
                 const formData = new FormData();
-                formData.append('message', 'Analyze this course URL');
+                formData.append('message', remainingMessage || 'Analyze this course URL');
                 formData.append('url', url);
                 formData.append('conversationId', 'etg-conversation');
                 formData.append('agentType', 'etg-writer');
@@ -902,187 +853,50 @@
 
             } catch (error) {
                 removeLoadingMessage();
-                addMessage('assistant', `Error analyzing URL: ${error.message}`, false);
+                addMessage('assistant', `Error analyzing URL: ${error.message}`);
             }
 
             isLoading = false;
-            sendButton.disabled = false;
+            if (sendButton) sendButton.disabled = false;
+            if (messageInput) {
+                messageInput.value = '';
+                messageInput.style.height = '44px';
+            }
         }
 
-        function resetFileDropZone() {
-            fileDropZone.classList.remove('has-file');
-            fileDropZone.innerHTML = `
-                <span class="drop-icon">📄</span>
-                <div style="flex: 1;">
-                    <div class="drop-text">Upload Course Documents</div>
-                </div>
-                <div class="format-badges">
-                    <span class="format-badge">PDF</span>
-                    <span class="format-badge">DOC</span>
-                    <span class="format-badge">TXT</span>
-                </div>
-            `;
-            fileInput.value = '';
+        async function sendMessageWithURL(url) {
+            await handleURLMessage(url, 'Analyze this course URL');
         }
 
         function addMessage(role, content, shouldAnimate = false) {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
             
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
+            contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             
-            if (role === 'assistant' && shouldAnimate) {
-                // Start with empty content for typing effect
-                contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
-                
-                messageDiv.appendChild(contentDiv);
-                messagesContainer.appendChild(messageDiv);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                
-                // Start typing animation after a brief delay
-                setTimeout(() => {
-                    typeMessage(contentDiv, content);
-                }, 500);
-                
-            } else {
-                // User messages appear immediately
-                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                messageDiv.appendChild(contentDiv);
-                messagesContainer.appendChild(messageDiv);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }
-        }
+            messageDiv.appendChild(contentDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        function typeMessage(contentDiv, content) {
-            // Process ETG Business Case content first
-            const processedContent = processETGContent(content);
-            
-            // Clear the typing cursor
-            contentDiv.innerHTML = '<div class="typing-container"></div>';
-            const container = contentDiv.querySelector('.typing-container');
-            
-            // Convert HTML to array of characters/tags
-            const htmlParts = parseHTML(processedContent);
-            let currentIndex = 0;
-            
-            function typeNextChar() {
-                if (currentIndex < htmlParts.length) {
-                    const part = htmlParts[currentIndex];
-                    
-                    if (part.startsWith('<') && part.endsWith('>')) {
-                        // Add HTML tags instantly
-                        container.innerHTML += part;
-                    } else {
-                        // Add characters one by one
-                        container.innerHTML += part;
-                    }
-                    
-                    currentIndex++;
-                    
-                    // Auto-scroll as content appears
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    
-                    // Continue typing (adjust speed here: lower = faster)
-                    setTimeout(typeNextChar, 15);
-                } else {
-                    // Typing complete - add export button if needed
-                    if (content.includes('Question 1') || content.includes('**Question 1**') || content.includes('ETG BUSINESS CASE')) {
-                        const exportButton = document.createElement('button');
-                        exportButton.className = 'export-button';
-                        exportButton.innerHTML = '💾 Export Business Case';
-                        exportButton.onclick = () => exportBusinessCase(content);
-                        contentDiv.appendChild(exportButton);
-                    }
-                }
+            // Add export button for business cases
+            if (role === 'assistant' && (content.includes('Question 1') || content.includes('ETG BUSINESS CASE'))) {
+                const exportButton = document.createElement('button');
+                exportButton.className = 'export-button';
+                exportButton.innerHTML = '💾 Export Business Case';
+                exportButton.onclick = () => exportBusinessCase(content);
+                contentDiv.appendChild(exportButton);
             }
-            
-            typeNextChar();
-        }
-
-        function parseHTML(html) {
-            const parts = [];
-            let currentPos = 0;
-            
-            // Simple HTML parser that preserves tags
-            while (currentPos < html.length) {
-                const nextTag = html.indexOf('<', currentPos);
-                
-                if (nextTag === -1) {
-                    // No more tags, add remaining characters
-                    for (let i = currentPos; i < html.length; i++) {
-                        parts.push(html[i]);
-                    }
-                    break;
-                }
-                
-                // Add characters before the tag
-                for (let i = currentPos; i < nextTag; i++) {
-                    parts.push(html[i]);
-                }
-                
-                // Find the end of the tag
-                const tagEnd = html.indexOf('>', nextTag);
-                if (tagEnd !== -1) {
-                    parts.push(html.substring(nextTag, tagEnd + 1));
-                    currentPos = tagEnd + 1;
-                } else {
-                    // Malformed tag, just add the character
-                    parts.push(html[nextTag]);
-                    currentPos = nextTag + 1;
-                }
-            }
-            
-            return parts;
-        }
-
-        function processETGContent(content) {
-            let processed = content;
-            
-            // Enhanced markdown processing
-            processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
-            
-            // Process ETG Business Case headers
-            processed = processed.replace(
-                /ETG BUSINESS CASE:/g,
-                '<div class="business-case-header">📋 ETG BUSINESS CASE GENERATED</div>'
-            );
-            
-            processed = processed.replace(
-                /## ETG Business Case/g,
-                '<div class="business-case-header">📋 ETG BUSINESS CASE</div>'
-            );
-            
-            // Process section headers with emojis
-            processed = processed.replace(
-                /📋 (.*?)$/gm,
-                '<div class="section-header section-eligibility">📋 $1</div>'
-            );
-            
-            processed = processed.replace(
-                /✅ (.*?)$/gm,
-                '<div class="section-header section-questions">✅ $1</div>'
-            );
-            
-            processed = processed.replace(
-                /🔍 (.*?)$/gm,
-                '<div class="section-header section-research">🔍 $1</div>'
-            );
-            
-            // Process horizontal dividers
-            processed = processed.replace(
-                /^---$/gm,
-                '<hr class="etg-divider">'
-            );
-            
-            // Convert line breaks to proper HTML
-            processed = processed.replace(/\n/g, '<br>');
-            
-            return processed;
         }
 
         function addLoadingMessage(customMessage = 'thinking...') {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message assistant';
             messageDiv.id = 'loading-message';
@@ -1104,9 +918,8 @@
         }
 
         function exportBusinessCase(content) {
-            // Clean up content for export
             const cleanContent = content
-                .replace(/<[^>]*>/g, '') // Remove HTML tags
+                .replace(/<[^>]*>/g, '')
                 .replace(/&nbsp;/g, ' ')
                 .replace(/&amp;/g, '&')
                 .replace(/&lt;/g, '<')
@@ -1117,7 +930,6 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             
-            // Generate filename with timestamp
             const now = new Date();
             const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
             a.href = url;
@@ -1128,8 +940,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            // Show confirmation
-            showNotification('✅ ETG Business Case exported successfully!', 'success');
+            showNotification('✅ ETG Business Case exported successfully!');
         }
 
         function showNotification(message, type = 'info') {
@@ -1149,50 +960,6 @@
                 }, 300);
             }, 3000);
         }
-
-        // Initialize drag and drop
-        document.addEventListener('DOMContentLoaded', function() {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }, false);
-            });
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, () => {
-                    fileDropZone.style.borderColor = '#7c3aed';
-                    fileDropZone.style.background = 'rgba(124, 58, 237, 0.05)';
-                }, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, () => {
-                    fileDropZone.style.borderColor = '';
-                    fileDropZone.style.background = '';
-                }, false);
-            });
-            
-            fileDropZone.addEventListener('drop', (e) => {
-                const droppedFiles = Array.from(e.dataTransfer.files);
-                if (droppedFiles.length > 0) {
-                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md'];
-                    const validFiles = droppedFiles.filter(file => {
-                        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                        return allowedTypes.includes(fileExtension);
-                    });
-                    
-                    if (validFiles.length > 0) {
-                        uploadedFiles = [...uploadedFiles, ...validFiles];
-                        updateFileDisplay();
-                    }
-                    
-                    if (validFiles.length !== droppedFiles.length) {
-                        addMessage('assistant', `Some files were skipped. Supported: PDF, DOCX, TXT, MD`, false);
-                    }
-                }
-            }, false);
-        });
     </script>
 </body>
 </html>
