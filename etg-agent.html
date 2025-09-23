@@ -179,6 +179,8 @@
             padding: 1rem 1.25rem;
             border-radius: 16px;
             font-size: 0.95rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
         }
         
         .message.user .message-content {
@@ -190,6 +192,25 @@
             background: var(--background);
             color: var(--text-primary);
             line-height: 1.7;
+        }
+        
+        /* Enhanced assistant message styling */
+        .message.assistant .message-content p {
+            margin: 0.5rem 0;
+        }
+        
+        .message.assistant .message-content strong {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .message.assistant .message-content ul,
+        .message.assistant .message-content ol {
+            margin: 0.5rem 0 0.5rem 1.5rem;
+        }
+        
+        .message.assistant .message-content li {
+            margin: 0.25rem 0;
         }
         
         .welcome-message.hidden {
@@ -974,9 +995,10 @@
                 formData.append('conversationId', 'etg-conversation');
                 formData.append('agentType', 'etg-writer');
                 
-uploadedFiles.forEach(file => {
-    formData.append('files', file);  // ← Change 'file' to 'files'
-});
+                uploadedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
                     method: 'POST',
                     body: formData
@@ -988,10 +1010,12 @@ uploadedFiles.forEach(file => {
 
                 const data = await response.json();
                 
+                console.log('API Response:', data.response);
                 removeLoadingMessage();
-                addMessage('assistant', data.response, true);
+                addMessage('assistant', data.response);
 
             } catch (error) {
+                console.error('Send message error:', error);
                 removeLoadingMessage();
                 addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`);
             }
@@ -1042,7 +1066,7 @@ uploadedFiles.forEach(file => {
                 const data = await response.json();
                 
                 removeLoadingMessage();
-                addMessage('assistant', data.response, true);
+                addMessage('assistant', data.response);
 
             } catch (error) {
                 removeLoadingMessage();
@@ -1061,7 +1085,10 @@ uploadedFiles.forEach(file => {
             await handleURLMessage(url, 'Analyze this course URL');
         }
 
-        function addMessage(role, content, shouldAnimate = false) {
+        // Fixed addMessage function with proper HTML processing
+        function addMessage(role, content) {
+            console.log('Adding message:', role, content.substring(0, 100) + '...');
+            
             const messagesContainer = document.getElementById('messages');
             if (!messagesContainer) return;
             
@@ -1070,7 +1097,19 @@ uploadedFiles.forEach(file => {
             
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
-            contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Process the content properly
+            let processedContent = content;
+            
+            // Convert line breaks to HTML
+            processedContent = processedContent.replace(/\n/g, '<br>');
+            
+            // Process markdown-style formatting
+            processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Set the processed content
+            contentDiv.innerHTML = processedContent;
             
             messageDiv.appendChild(contentDiv);
             messagesContainer.appendChild(messageDiv);
@@ -1084,6 +1123,8 @@ uploadedFiles.forEach(file => {
                 exportButton.onclick = () => exportBusinessCase(content);
                 contentDiv.appendChild(exportButton);
             }
+            
+            console.log('Message added successfully');
         }
 
         function addLoadingMessage(customMessage = 'thinking...') {
