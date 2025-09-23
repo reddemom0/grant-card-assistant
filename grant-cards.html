@@ -150,13 +150,10 @@
             box-shadow: 0 8px 32px rgba(0, 138, 191, 0.08);
             min-height: 500px;
             transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
         }
         
         .chat-container.expanded {
-            min-height: calc(100vh - 160px);
-            height: calc(100vh - 160px);
+            min-height: calc(100vh - 200px);
         }
         
         .messages {
@@ -165,8 +162,7 @@
             flex-direction: column;
             gap: 1.5rem;
             overflow-y: auto;
-            flex: 1;
-            min-height: 0;
+            max-height: calc(100vh - 300px);
         }
         
         .message {
@@ -1436,5 +1432,3 @@
     </script>
 </body>
 </html>
-
-
