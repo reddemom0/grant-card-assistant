@@ -285,59 +285,133 @@
             padding: 0 1.5rem;
         }
         
-        .file-upload-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+        .unified-input-area {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface);
+            transition: all 0.2s ease;
             margin-bottom: 0.75rem;
         }
         
-        .file-drop-zone {
-            flex: 1;
-            border: 2px dashed var(--border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: var(--background);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .file-drop-zone:hover {
+        .unified-input-area:focus-within {
             border-color: var(--primary);
-            background: rgba(124, 58, 237, 0.02);
+            box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
         }
         
-        .file-drop-zone.has-file {
-            border-color: var(--success);
+        .input-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .input-tab {
+            flex: 1;
+            padding: 0.5rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+        
+        .input-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
             background: rgba(16, 185, 129, 0.05);
         }
         
-        .drop-icon {
-            font-size: 1.25rem;
-            color: var(--text-secondary);
+        .input-tab:hover {
+            background: rgba(16, 185, 129, 0.03);
         }
         
-        .drop-text {
-            flex: 1;
-            font-size: 0.9rem;
-            color: var(--text-primary);
+        .tab-content {
+            padding: 0.75rem;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .file-upload-content {
+            text-align: center;
+        }
+        
+        .upload-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--primary);
+            transition: all 0.2s ease;
+        }
+        
+        .upload-button:hover {
+            background: rgba(16, 185, 129, 0.2);
         }
         
         .format-badges {
             display: flex;
+            justify-content: center;
             gap: 0.25rem;
+            margin-top: 0.5rem;
         }
         
         .format-badge {
             background: var(--primary);
             color: white;
-            padding: 0.15rem 0.4rem;
-            border-radius: 10px;
-            font-size: 0.7rem;
+            padding: 0.1rem 0.3rem;
+            border-radius: 8px;
+            font-size: 0.6rem;
             font-weight: 600;
+        }
+        
+        .url-content {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .url-input {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            transition: all 0.2s ease;
+        }
+        
+        .url-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+        }
+        
+        .analyze-btn {
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+        
+        .analyze-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+        
+        .analyze-btn:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
         }
         
         .quick-actions {
@@ -515,13 +589,7 @@
 
         /* URL input styling */
         .url-input-row {
-            display: flex;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
-            padding: 0.75rem;
-            background: rgba(16, 185, 129, 0.03);
-            border: 1px solid rgba(16, 185, 129, 0.1);
-            border-radius: 8px;
+            display: none;
         }
 
         .url-input {
@@ -689,31 +757,54 @@
     <!-- Floating Input Area -->
     <div class="floating-input">
         <div class="floating-input-container">
-            <div class="file-upload-row">
-                <div class="file-drop-zone" id="file-drop-zone" onclick="document.getElementById('file-input').click()">
-                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
-                    <span class="drop-icon">📄</span>
-                    <div style="flex: 1;">
-                        <div class="drop-text">Upload Course Documents</div>
-                    </div>
-                    <div class="format-badges">
-                        <span class="format-badge">PDF</span>
-                        <span class="format-badge">DOC</span>
-                        <span class="format-badge">TXT</span>
+            <div class="unified-input-area">
+                <div class="input-tabs">
+                    <button class="input-tab active" onclick="switchTab('message')">💬 Message</button>
+                    <button class="input-tab" onclick="switchTab('file')">📄 Upload</button>
+                    <button class="input-tab" onclick="switchTab('url')">🔗 URL</button>
+                </div>
+                
+                <!-- Message Tab -->
+                <div class="tab-content active" id="message-tab">
+                    <textarea 
+                        id="message-input" 
+                        class="message-input" 
+                        placeholder="Describe your training requirements or ask about ETG eligibility..."
+                        rows="2"
+                        style="border: none; resize: none; width: 100%; padding: 0; background: transparent; min-height: 60px;"
+                    ></textarea>
+                </div>
+                
+                <!-- File Upload Tab -->
+                <div class="tab-content" id="file-tab">
+                    <div class="file-upload-content">
+                        <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
+                        <button class="upload-button" onclick="document.getElementById('file-input').click()">
+                            📄 Upload Course Documents
+                        </button>
+                        <div class="format-badges">
+                            <span class="format-badge">PDF</span>
+                            <span class="format-badge">DOC</span>
+                            <span class="format-badge">TXT</span>
+                        </div>
+                        <div id="file-status" style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--success); display: none;"></div>
                     </div>
                 </div>
-            </div>
-
-            <div class="url-input-row">
-                <input 
-                    type="url" 
-                    id="url-input" 
-                    class="url-input" 
-                    placeholder="https://course-website.com - I'll analyze the course details"
-                >
-                <button class="analyze-btn" onclick="analyzeURL()">
-                    🔗 Analyze URL
-                </button>
+                
+                <!-- URL Tab -->
+                <div class="tab-content" id="url-tab">
+                    <div class="url-content">
+                        <input 
+                            type="url" 
+                            id="url-input" 
+                            class="url-input" 
+                            placeholder="https://course-website.com"
+                        >
+                        <button class="analyze-btn" onclick="analyzeURL()">
+                            Analyze
+                        </button>
+                    </div>
+                </div>
             </div>
             
             <div class="quick-actions">
@@ -725,13 +816,7 @@
             </div>
             
             <div class="input-row">
-                <textarea 
-                    id="message-input" 
-                    class="message-input" 
-                    placeholder="Describe your training requirements or ask about ETG eligibility..."
-                    rows="1"
-                ></textarea>
-                <button id="send-button" class="send-button">Send</button>
+                <button id="send-button" class="send-button" style="width: 100%; justify-content: center;">Send</button>
             </div>
         </div>
     </div>
@@ -761,87 +846,74 @@
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
 
+        // Tab switching functionality
+        function switchTab(tabName) {
+            // Remove active class from all tabs and content
+            document.querySelectorAll('.input-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // Add active class to selected tab and content
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Focus appropriate input
+            if (tabName === 'message') {
+                messageInput.focus();
+            } else if (tabName === 'url') {
+                document.getElementById('url-input').focus();
+            }
+        }
+
         // File upload handling
         fileInput.addEventListener('change', (e) => {
             const newFiles = Array.from(e.target.files);
             if (newFiles.length > 0) {
                 uploadedFiles = [...uploadedFiles, ...newFiles];
-                updateFileDisplay();
+                updateFileStatus();
+                // Switch to message tab after upload
+                switchTabTo('message');
                 messageInput.focus();
             }
         });
 
-        async function updateFileDisplay() {
-            if (uploadedFiles.length === 0) {
-                resetFileDropZone();
-                return;
-            }
+        function switchTabTo(tabName) {
+            document.querySelectorAll('.input-tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
             
-            let totalSize = 0;
-            uploadedFiles.forEach(file => totalSize += file.size);
-            const fileSize = (totalSize / 1024).toFixed(1);
-            const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
-            
-            fileDropZone.classList.add('has-file');
-            
-            // Create file grid HTML
-            let fileGridHTML = '<div class="file-grid">';
-            
-            for (let i = 0; i < uploadedFiles.length; i++) {
-                const file = uploadedFiles[i];
-                const thumbnail = await generateFileThumbnail(file);
-                const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+            // Find and activate the correct tab
+            const tabs = document.querySelectorAll('.input-tab');
+            const tabIndex = tabName === 'message' ? 0 : tabName === 'file' ? 1 : 2;
+            tabs[tabIndex].classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        function updateFileStatus() {
+            const fileStatus = document.getElementById('file-status');
+            if (uploadedFiles.length > 0) {
+                let totalSize = 0;
+                uploadedFiles.forEach(file => totalSize += file.size);
+                const fileSize = (totalSize / 1024).toFixed(1);
+                const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
                 
-                fileGridHTML += `
-                    <div class="file-grid-item">
-                        ${thumbnail}
-                        <div class="file-name">${truncatedName}</div>
-                        <button class="file-remove-btn" onclick="removeFile(${i})">×</button>
-                    </div>
-                `;
+                fileStatus.innerHTML = `✅ ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})`;
+                fileStatus.style.display = 'block';
+                
+                // Update upload button
+                const uploadButton = document.querySelector('.upload-button');
+                uploadButton.innerHTML = `✅ ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded`;
+                uploadButton.style.background = 'rgba(16, 185, 129, 0.2)';
+            } else {
+                fileStatus.style.display = 'none';
+                const uploadButton = document.querySelector('.upload-button');
+                uploadButton.innerHTML = '📄 Upload Course Documents';
+                uploadButton.style.background = 'rgba(16, 185, 129, 0.1)';
             }
-            
-            fileGridHTML += '</div>';
-            
-            fileDropZone.innerHTML = `
-                <div style="width: 100%; text-align: center;">
-                    <div style="color: #059669; font-weight: 500; margin-bottom: 0.5rem;">
-                        ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
-                    </div>
-                    ${fileGridHTML}
-                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
-                        Click to add more files
-                    </div>
-                </div>
-            `;
-            
-            messageInput.placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
-        }
-
-        function generateFileThumbnail(file) {
-            return new Promise((resolve) => {
-                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                const icon = getFileTypeIcon(fileExtension);
-                const iconHtml = `<div class="file-icon-large">${icon}</div>`;
-                resolve(iconHtml);
-            });
-        }
-
-        function getFileTypeIcon(extension) {
-            const icons = {
-                '.pdf': '📄',
-                '.doc': '📝',
-                '.docx': '📝',
-                '.txt': '📄',
-                '.md': '📄'
-            };
-            return icons[extension] || '📄';
         }
 
         function removeFile(index) {
             uploadedFiles.splice(index, 1);
             fileInput.value = '';
-            updateFileDisplay();
+            updateFileStatus();
         }
 
         // URL analysis
@@ -960,7 +1032,7 @@
             
             if (uploadedFiles.length > 0) {
                 uploadedFiles = [];
-                resetFileDropZone();
+                updateFileStatus();
             }
         }
 
