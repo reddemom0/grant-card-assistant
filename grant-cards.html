@@ -15,8 +15,10 @@
         }
         
         :root {
-            --primary: #1e3a8a;
-            --primary-dark: #1e40af;
+            --granted-blue: #008ABF;
+            --granted-blue-dark: #007aa8;
+            --granted-light: #E8F4F8;
+            --granted-gray: #555555;
             --text-primary: #2c3e50;
             --text-secondary: #6b7280;
             --surface: #ffffff;
@@ -30,7 +32,7 @@
         body {
             font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
             font-size: 22px;
-            background: var(--background);
+            background: linear-gradient(135deg, var(--granted-light) 0%, #f0f9ff 100%);
             min-height: 100vh;
             color: var(--text-primary);
             line-height: 1.6;
@@ -39,12 +41,14 @@
         
         /* Header */
         .header {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 138, 191, 0.1);
             padding: 1rem 0;
             position: sticky;
             top: 0;
             z-index: 100;
+            box-shadow: 0 2px 8px rgba(0, 138, 191, 0.05);
         }
         
         .header-content {
@@ -65,6 +69,7 @@
         .logo-text {
             font-size: 1.25rem;
             font-weight: 600;
+            color: var(--granted-blue);
         }
         
         .nav-link {
@@ -77,8 +82,8 @@
         }
         
         .nav-link:hover {
-            background: var(--border);
-            color: var(--text-primary);
+            background: var(--granted-light);
+            color: var(--granted-blue);
         }
         
         /* Main Container */
@@ -103,6 +108,7 @@
             font-size: 2.5rem;
             font-weight: 300;
             margin-bottom: 1rem;
+            color: var(--granted-blue);
         }
         
         .welcome-subtitle {
@@ -130,28 +136,37 @@
         }
         
         .capability-tag:hover {
-            border-color: var(--primary);
-            color: var(--primary);
+            border-color: var(--granted-blue);
+            color: var(--granted-blue);
+            background: rgba(0, 138, 191, 0.05);
         }
         
         /* Chat Container */
         .chat-container {
-            background: var(--surface);
-            border-radius: 12px;
-            border: 1px solid var(--border);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 138, 191, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 138, 191, 0.08);
             min-height: 500px;
             transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
         }
         
         .chat-container.expanded {
-            min-height: calc(100vh - 200px);
+            min-height: calc(100vh - 160px);
+            height: calc(100vh - 160px);
         }
         
         .messages {
             padding: 1.5rem;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.5rem;
+            overflow-y: auto;
+            flex: 1;
+            min-height: 0;
         }
         
         .message {
@@ -174,31 +189,35 @@
         
         .message-content {
             max-width: 80%;
-            padding: 1rem 1.25rem;
-            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
+            border-radius: 18px;
             font-size: 0.95rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.6;
         }
         
         .message.user .message-content {
-            background: var(--primary);
+            background: linear-gradient(135deg, var(--granted-blue), var(--granted-blue-dark));
             color: white;
+            box-shadow: 0 4px 12px rgba(0, 138, 191, 0.3);
         }
         
         .message.assistant .message-content {
             background: var(--background);
             color: var(--text-primary);
-            line-height: 1.7;
+            border: 1px solid var(--border);
         }
         
         /* Enhanced Grant Card styling */
         .message.assistant .message-content .grant-card-header {
-            background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-            border-left: 4px solid #059669;
+            background: linear-gradient(135deg, var(--granted-light), rgba(0, 138, 191, 0.1));
+            border-left: 4px solid var(--granted-blue);
             padding: 1rem;
             border-radius: 8px;
             margin: 1rem 0;
             font-weight: 600;
-            color: #059669;
+            color: var(--granted-blue);
         }
         
         .message.assistant .message-content .section-header {
@@ -210,9 +229,9 @@
         }
         
         .message.assistant .message-content .section-criteria {
-            background: rgba(30, 58, 138, 0.05);
-            border-left-color: #1e3a8a;
-            color: #1e3a8a;
+            background: rgba(0, 138, 191, 0.05);
+            border-left-color: var(--granted-blue);
+            color: var(--granted-blue);
         }
         
         .message.assistant .message-content .section-requirements {
@@ -230,8 +249,26 @@
         .message.assistant .message-content .grant-divider {
             border: none;
             height: 1px;
-            background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
             margin: 1.5rem 0;
+        }
+        
+        .message.assistant .message-content p {
+            margin: 0.75rem 0;
+        }
+        
+        .message.assistant .message-content strong {
+            color: var(--granted-blue);
+            font-weight: 600;
+        }
+        
+        .message.assistant .message-content ul,
+        .message.assistant .message-content ol {
+            margin: 0.75rem 0 0.75rem 1.5rem;
+        }
+        
+        .message.assistant .message-content li {
+            margin: 0.5rem 0;
         }
         
         .welcome-message.hidden {
@@ -244,17 +281,18 @@
             gap: 0.75rem;
             background: var(--background);
             color: var(--text-secondary);
-            padding: 1rem 1.25rem;
-            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
+            border-radius: 18px;
             max-width: 200px;
             font-size: 0.9rem;
+            border: 1px solid var(--border);
         }
         
         .spinner {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             border: 2px solid var(--border);
-            border-top: 2px solid var(--primary);
+            border-top: 2px solid var(--granted-blue);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -262,190 +300,6 @@
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-        }
-        
-        /* Floating Input Area */
-        .floating-input {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 200;
-            padding: 1rem 0;
-        }
-        
-        .floating-input-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 0 1.5rem;
-        }
-        
-        .file-upload-row {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.75rem;
-        }
-        
-        .file-drop-zone {
-            flex: 1;
-            border: 2px dashed var(--border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            background: var(--background);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        
-        .file-drop-zone:hover {
-            border-color: var(--primary);
-            background: rgba(30, 58, 138, 0.02);
-        }
-        
-        .file-drop-zone.has-file {
-            border-color: var(--success);
-            background: rgba(16, 185, 129, 0.05);
-        }
-        
-        .drop-icon {
-            font-size: 1.25rem;
-            color: var(--text-secondary);
-        }
-        
-        .drop-text {
-            flex: 1;
-            font-size: 0.9rem;
-            color: var(--text-primary);
-        }
-        
-        .format-badges {
-            display: flex;
-            gap: 0.25rem;
-        }
-        
-        .format-badge {
-            background: var(--success);
-            color: white;
-            padding: 0.15rem 0.4rem;
-            border-radius: 10px;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
-        
-        .quick-actions {
-            display: flex;
-            gap: 0.5rem;
-            overflow-x: auto;
-            padding-bottom: 0.25rem;
-        }
-        
-        .quick-actions::-webkit-scrollbar {
-            height: 4px;
-        }
-        
-        .quick-actions::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 2px;
-        }
-        
-        .quick-btn {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            padding: 0.4rem 0.8rem;
-            cursor: pointer;
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-            white-space: nowrap;
-            transition: all 0.2s ease;
-        }
-        
-        .quick-btn:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        
-        .quick-btn.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-        
-        .input-row {
-            display: flex;
-            gap: 0.75rem;
-            align-items: flex-end;
-        }
-        
-        .message-input {
-            flex: 1;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            resize: none;
-            font-family: inherit;
-            font-size: 0.95rem;
-            background: var(--surface);
-            transition: all 0.2s ease;
-            min-height: 44px;
-            max-height: 120px;
-        }
-        
-        .message-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
-        }
-        
-        .send-button {
-            padding: 0.75rem 1.25rem;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            height: 44px;
-        }
-        
-        .send-button:hover:not(:disabled) {
-            background: var(--primary-dark);
-        }
-        
-        .send-button:disabled {
-            background: var(--text-secondary);
-            cursor: not-allowed;
-        }
-        
-        .export-button {
-            margin-top: 0.75rem;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.5rem;
-            background: linear-gradient(135deg, #1e3a8a, #1e40af);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.3);
-        }
-        
-        .export-button:hover {
-            background: linear-gradient(135deg, #1e40af, #2563eb);
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.4);
         }
         
         /* File thumbnail styles */
@@ -475,7 +329,7 @@
             display: flex;
             gap: 0.75rem;
             flex-wrap: wrap;
-            margin: 0.5rem 0;
+            margin: 0.75rem 0;
         }
 
         .file-grid-item {
@@ -485,7 +339,7 @@
             gap: 0.5rem;
             padding: 0.75rem;
             border: 1px solid var(--border);
-            border-radius: 8px;
+            border-radius: 10px;
             background: var(--surface);
             min-width: 80px;
             max-width: 120px;
@@ -497,6 +351,7 @@
             text-align: center;
             word-break: break-word;
             line-height: 1.2;
+            color: var(--granted-gray);
         }
 
         .file-remove-btn {
@@ -517,6 +372,224 @@
             font-weight: bold;
         }
         
+        /* Floating Input Area */
+        .floating-input {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            max-width: 700px;
+            width: calc(100% - 40px);
+        }
+        
+        .floating-quick-actions {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .floating-quick-btn {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            color: var(--granted-blue);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 138, 191, 0.1);
+            font-weight: 500;
+        }
+        
+        .floating-quick-btn:hover {
+            border-color: var(--granted-blue);
+            background: rgba(0, 138, 191, 0.05);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 138, 191, 0.2);
+        }
+        
+        .floating-quick-btn.active {
+            background: var(--granted-blue);
+            color: white;
+            border-color: var(--granted-blue);
+        }
+        
+        .simple-input-box {
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 24px rgba(0, 138, 191, 0.1);
+        }
+        
+        .simple-input-box:focus-within {
+            border-color: var(--granted-blue);
+            box-shadow: 0 0 0 3px rgba(0, 138, 191, 0.1);
+        }
+        
+        .simple-input-box.drag-over {
+            border-color: var(--granted-blue);
+            background: rgba(0, 138, 191, 0.05);
+            box-shadow: 0 0 0 3px rgba(0, 138, 191, 0.2);
+        }
+        
+        .simple-input-box.has-file {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .message-input-simple {
+            width: 100%;
+            border: none;
+            border-radius: 16px;
+            padding: 12px 80px 12px 16px;
+            resize: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            background: transparent;
+            transition: all 0.2s ease;
+            min-height: 44px;
+            max-height: 120px;
+            outline: none;
+        }
+        
+        .input-buttons {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .file-button-inline {
+            width: 32px;
+            height: 32px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .file-button-inline:hover {
+            background: rgba(0, 138, 191, 0.1);
+            border-color: var(--granted-blue);
+            color: var(--granted-blue);
+        }
+        
+        .send-button-inline {
+            width: 36px;
+            height: 36px;
+            background: var(--granted-blue);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .send-button-inline:hover:not(:disabled) {
+            background: var(--granted-blue-dark);
+            transform: translateY(-50%) scale(1.05);
+        }
+        
+        .send-button-inline:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+            transform: translateY(-50%);
+        }
+        
+        .upload-btn-welcome {
+            padding: 0.5rem 1rem;
+            background: rgba(0, 138, 191, 0.1);
+            border: 1px solid var(--granted-blue);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--granted-blue);
+            transition: all 0.2s ease;
+        }
+        
+        .upload-btn-welcome:hover {
+            background: rgba(0, 138, 191, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .quick-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 0.4rem 0.8rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        
+        .quick-btn:hover {
+            border-color: var(--granted-blue);
+            color: var(--granted-blue);
+        }
+        
+        .export-button {
+            margin-top: 0.75rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--granted-blue), var(--granted-blue-dark));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 138, 191, 0.3);
+        }
+        
+        .export-button:hover {
+            background: linear-gradient(135deg, var(--granted-blue-dark), #0056a3);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 138, 191, 0.4);
+        }
+        
+        /* Typing animation styles */
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background-color: var(--granted-blue);
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .typing-container {
+            min-height: 1.2em;
+        }
+        
         /* Notification system */
         .notification {
             position: fixed;
@@ -532,27 +605,8 @@
             transition: all 0.3s ease;
         }
         
-        .notification.info {
-            background: var(--primary);
-        }
-        
-        /* Typing animation styles */
-        .typing-cursor {
-            display: inline-block;
-            width: 2px;
-            height: 1.2em;
-            background-color: var(--primary);
-            animation: blink 1s infinite;
-            margin-left: 2px;
-        }
-
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0; }
-        }
-
-        .typing-container {
-            min-height: 1.2em;
+        .notification.error {
+            background: var(--error);
         }
         
         @media (max-width: 768px) {
@@ -563,18 +617,6 @@
             .capability-tags {
                 flex-direction: column;
                 align-items: center;
-            }
-            
-            .file-upload-row {
-                flex-direction: column;
-            }
-            
-            .input-row {
-                flex-direction: column;
-            }
-            
-            .send-button {
-                width: 100%;
             }
         }
     </style>
@@ -599,12 +641,12 @@
             <p class="welcome-subtitle">Professional grant document analysis and structured card generation</p>
             
             <div class="capability-tags">
-                <div class="capability-tag" onclick="insertQuickText('Generate Grant Criteria')">📋 Generate Criteria</div>
+                <div class="capability-tag" onclick="insertQuickText('Generate Criteria')">📋 Generate Criteria</div>
                 <div class="capability-tag" onclick="insertQuickText('Preview Description')">👁️ Preview Description</div>
-                <div class="capability-tag" onclick="insertQuickText('General Requirements')">📝 Requirements</div>
-                <div class="capability-tag" onclick="insertQuickText('Granted Insights')">💡 Insights</div>
-                <div class="capability-tag" onclick="insertQuickText('Categories & Tags')">🏷️ Categories</div>
-                <div class="capability-tag" onclick="insertQuickText('Missing Information')">🔍 Missing Info</div>
+                <div class="capability-tag" onclick="insertQuickText('Requirements')">📝 Requirements</div>
+                <div class="capability-tag" onclick="insertQuickText('Insights')">💡 Insights</div>
+                <div class="capability-tag" onclick="insertQuickText('Categories')">🏷️ Categories</div>
+                <div class="capability-tag" onclick="insertQuickText('Missing Info')">🔍 Missing Info</div>
             </div>
         </div>
 
@@ -627,15 +669,39 @@
                             <div>• <strong>Missing Information</strong> - Identify gaps in documentation</div>
                         </div>
 
-                        <div style="background: rgba(30, 58, 138, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                            <div style="font-weight: 600; color: #1e3a8a; margin-bottom: 0.5rem;">📋 Grant Types Supported</div>
+                        <div style="background: rgba(0, 138, 191, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #008ABF; margin-bottom: 0.5rem;">📋 Grant Types Supported</div>
                             <div style="font-size: 0.9rem; color: #374151;">
                                 <div>• Hiring & Training Grants • Market Expansion • R&D Funding</div>
                                 <div>• Investment Grants • Loan Programs • Export Development</div>
                             </div>
                         </div>
 
-                        <div>Upload grant documents or describe the grant program you need formatted into a professional Grant Card!</div>
+                        <div>Upload grant documents, provide URLs, or describe the grant program you need formatted into a professional Grant Card!</div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--granted-blue); margin-bottom: 0.75rem;">Quick Actions:</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                <button class="quick-btn" onclick="insertQuickText('Generate Criteria')">📋 Criteria</button>
+                                <button class="quick-btn" onclick="insertQuickText('Preview Description')">👁️ Preview</button>
+                                <button class="quick-btn" onclick="insertQuickText('Requirements')">📝 Requirements</button>
+                                <button class="quick-btn" onclick="insertQuickText('Insights')">💡 Insights</button>
+                                <button class="quick-btn" onclick="insertQuickText('Categories')">🏷️ Categories</button>
+                                <button class="quick-btn" onclick="insertQuickText('Missing Info')">🔍 Missing</button>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--granted-blue); margin-bottom: 0.75rem;">Upload Options:</div>
+                            <div style="display: flex; gap: 1rem;">
+                                <button class="upload-btn-welcome" onclick="document.getElementById('file-input').click()">
+                                    📄 Upload Documents
+                                </button>
+                                <button class="upload-btn-welcome" onclick="focusURLInput()">
+                                    🔗 Analyze URL
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -644,43 +710,40 @@
 
     <!-- Floating Input Area -->
     <div class="floating-input">
-        <div class="floating-input-container">
-            <div class="file-upload-row">
-                <div class="file-drop-zone" id="file-drop-zone" onclick="document.getElementById('file-input').click()">
-                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
-                    <span class="drop-icon">📄</span>
-                    <div style="flex: 1;">
-                        <div class="drop-text">Upload Grant Documents</div>
-                    </div>
-                    <div class="format-badges">
-                        <span class="format-badge">PDF</span>
-                        <span class="format-badge">DOC</span>
-                        <span class="format-badge">TXT</span>
-                    </div>
-                </div>
-                <div class="quick-actions">
-                    <button class="quick-btn" onclick="insertQuickText('Generate Criteria')" data-task="grant-criteria">📋 Criteria</button>
-                    <button class="quick-btn" onclick="insertQuickText('Preview Description')" data-task="preview">👁️ Preview</button>
-                    <button class="quick-btn" onclick="insertQuickText('Requirements')" data-task="requirements">📝 Requirements</button>
-                    <button class="quick-btn" onclick="insertQuickText('Insights')" data-task="insights">💡 Insights</button>
-                    <button class="quick-btn" onclick="insertQuickText('Categories')" data-task="categories">🏷️ Categories</button>
-                    <button class="quick-btn" onclick="insertQuickText('Missing Info')" data-task="missing-info">🔍 Missing</button>
-                </div>
-            </div>
-            
-            <div class="input-row">
+        <div class="floating-quick-actions">
+            <button class="floating-quick-btn" onclick="insertQuickText('Generate Criteria')" data-task="grant-criteria">📋 Criteria</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Preview Description')" data-task="preview">👁️ Preview</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Requirements')" data-task="requirements">📝 Requirements</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Insights')" data-task="insights">💡 Insights</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Categories')" data-task="categories">🏷️ Categories</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Missing Info')" data-task="missing-info">🔍 Missing</button>
+        </div>
+        <div class="simple-input-box" id="input-box">
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" multiple style="display: none;">
+            <div style="position: relative;">
                 <textarea 
                     id="message-input" 
-                    class="message-input" 
-                    placeholder="Upload documents or describe the grant program..."
+                    class="message-input-simple" 
+                    placeholder="Message Grant Card Assistant..."
                     rows="1"
                 ></textarea>
-                <button id="send-button" class="send-button">Send</button>
+                <div class="input-buttons">
+                    <button class="file-button-inline" onclick="document.getElementById('file-input').click()" title="Upload files">
+                        📎
+                    </button>
+                    <button id="send-button" class="send-button-inline" title="Send message">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Global variables
         let isLoading = false;
         let uploadedFiles = [];
         let hasStartedConversation = false;
@@ -689,35 +752,66 @@
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
-        // DOM elements
-        const messagesContainer = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const fileInput = document.getElementById('file-input');
-        const fileDropZone = document.getElementById('file-drop-zone');
-        const welcomeSection = document.getElementById('welcome-section');
-        const chatContainer = document.getElementById('chat-container');
-        const welcomeMessage = document.getElementById('welcome-message');
-
-        // Auto-resize textarea
-        messageInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        // File upload handling
-        fileInput.addEventListener('change', (e) => {
-            const newFiles = Array.from(e.target.files);
-            if (newFiles.length > 0) {
-                uploadedFiles = [...uploadedFiles, ...newFiles];
-                updateFileDisplay();
-                messageInput.focus();
+        // Global functions for HTML onclick handlers
+        function insertQuickText(text) {
+            const messageInput = document.getElementById('message-input');
+            const quickBtn = event?.target.closest('.floating-quick-btn');
+            
+            if (quickBtn) {
+                // Update selected task
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                quickBtn.classList.add('active');
+                selectedTask = quickBtn.dataset.task || '';
             }
-        });
+            
+            if (messageInput) {
+                messageInput.value = text + ': ';
+                messageInput.focus();
+                messageInput.style.height = 'auto';
+                messageInput.style.height = messageInput.scrollHeight + 'px';
+            }
+        }
 
+        function focusURLInput() {
+            const url = prompt("Enter grant website URL:");
+            if (url && isValidURL(url)) {
+                hideWelcomeElements();
+                addMessage('user', `🔗 Analyze grant URL: ${url}`);
+                sendMessageWithURL(url);
+            } else if (url) {
+                showNotification('Please enter a valid URL (must start with http:// or https://)', 'error');
+            }
+        }
+
+        function isValidURL(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function hideWelcomeElements() {
+            if (!hasStartedConversation) {
+                hasStartedConversation = true;
+                const welcomeSection = document.getElementById('welcome-section');
+                const welcomeMessage = document.getElementById('welcome-message');
+                const chatContainer = document.getElementById('chat-container');
+                
+                if (welcomeSection) welcomeSection.style.display = 'none';
+                if (welcomeMessage) welcomeMessage.classList.add('hidden');
+                if (chatContainer) chatContainer.classList.add('expanded');
+            }
+        }
+
+        // File upload functions
         async function updateFileDisplay() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
             if (uploadedFiles.length === 0) {
-                resetFileDropZone();
+                resetInputBox();
                 return;
             }
             
@@ -726,7 +820,7 @@
             const fileSize = (totalSize / 1024).toFixed(1);
             const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
             
-            fileDropZone.classList.add('has-file');
+            inputBox.classList.add('has-file');
             
             // Create file grid HTML
             let fileGridHTML = '<div class="file-grid">';
@@ -747,27 +841,55 @@
             
             fileGridHTML += '</div>';
             
-            fileDropZone.innerHTML = `
-                <div style="width: 100%; text-align: center;">
-                    <div style="color: #059669; font-weight: 500; margin-bottom: 0.5rem;">
-                        ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
-                    </div>
-                    ${fileGridHTML}
-                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
-                        Click to add more files
-                    </div>
+            // Update input box content to show files
+            const currentValue = messageInput.value;
+            const placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
+            
+            // Create a temporary container above the input
+            let fileDisplay = inputBox.querySelector('.file-display');
+            if (!fileDisplay) {
+                fileDisplay = document.createElement('div');
+                fileDisplay.className = 'file-display';
+                fileDisplay.style.cssText = `
+                    padding: 8px 16px;
+                    border-bottom: 1px solid var(--border);
+                    background: rgba(0, 138, 191, 0.05);
+                `;
+                inputBox.insertBefore(fileDisplay, inputBox.firstChild);
+            }
+            
+            fileDisplay.innerHTML = `
+                <div style="color: #008ABF; font-weight: 500; font-size: 0.8rem; margin-bottom: 0.5rem;">
+                    ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
                 </div>
+                ${fileGridHTML}
             `;
             
-            messageInput.placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
+            messageInput.placeholder = placeholder;
         }
 
         function generateFileThumbnail(file) {
             return new Promise((resolve) => {
                 const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                const icon = getFileTypeIcon(fileExtension);
-                const iconHtml = `<div class="file-icon-large">${icon}</div>`;
-                resolve(iconHtml);
+                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                
+                if (imageTypes.includes(fileExtension)) {
+                    // Generate image thumbnail
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = document.createElement('img');
+                        img.className = 'file-thumbnail';
+                        img.src = e.target.result;
+                        img.alt = file.name;
+                        resolve(img.outerHTML);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    // Generate file type icon
+                    const icon = getFileTypeIcon(fileExtension);
+                    const iconHtml = `<div class="file-icon-large">${icon}</div>`;
+                    resolve(iconHtml);
+                }
             });
         }
 
@@ -784,54 +906,174 @@
 
         function removeFile(index) {
             uploadedFiles.splice(index, 1);
-            fileInput.value = '';
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
             updateFileDisplay();
         }
 
-        // Send message functionality
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Quick text insertion and task selection
-        function insertQuickText(text) {
-            const quickBtn = event.target.closest('.quick-btn');
-            if (quickBtn) {
-                // Update selected task
-                document.querySelectorAll('.quick-btn').forEach(btn => btn.classList.remove('active'));
-                quickBtn.classList.add('active');
-                selectedTask = quickBtn.dataset.task || '';
+        function resetInputBox() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
+            inputBox.classList.remove('has-file');
+            const fileDisplay = inputBox.querySelector('.file-display');
+            if (fileDisplay) {
+                fileDisplay.remove();
             }
             
-            messageInput.value = text + ': ';
-            messageInput.focus();
-            messageInput.style.height = 'auto';
-            messageInput.style.height = messageInput.scrollHeight + 'px';
+            if (messageInput) {
+                messageInput.placeholder = "Message Grant Card Assistant...";
+            }
+            
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
         }
 
-        function hideWelcomeElements() {
-            if (!hasStartedConversation) {
-                hasStartedConversation = true;
-                welcomeSection.style.display = 'none';
-                welcomeMessage.classList.add('hidden');
-                chatContainer.classList.add('expanded');
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing Grant Card interface...');
+            
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const fileInput = document.getElementById('file-input');
+            const inputBox = document.getElementById('input-box');
+
+            // Auto-resize textarea
+            if (messageInput) {
+                messageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                    
+                    // Check for URLs
+                    checkForURLs(this.value);
+                });
             }
+
+            // Send button click handler
+            if (sendButton) {
+                sendButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    sendMessage();
+                });
+            }
+
+            // Enter key handler
+            if (messageInput) {
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                    }
+                });
+            }
+
+            // File upload handler - now shows preview instead of auto-sending
+            if (fileInput) {
+                fileInput.addEventListener('change', async function(e) {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...files];
+                        await updateFileDisplay();
+                        messageInput.focus();
+                    }
+                });
+            }
+
+            // Drag and drop
+            if (inputBox) {
+                setupDragAndDrop(inputBox, messageInput);
+            }
+
+            // Focus input
+            if (messageInput) {
+                messageInput.focus();
+            }
+
+            console.log('Grant Card interface initialized successfully');
+        });
+
+        function checkForURLs(text) {
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const urls = text.match(urlRegex);
+            const messageInput = document.getElementById('message-input');
+            
+            if (messageInput) {
+                if (urls && urls.length > 0) {
+                    messageInput.style.borderLeftColor = 'var(--granted-blue)';
+                } else {
+                    messageInput.style.borderLeftColor = 'transparent';
+                }
+            }
+        }
+
+        function setupDragAndDrop(inputBox, messageInput) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.add('drag-over');
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.remove('drag-over');
+                }, false);
+            });
+            
+            inputBox.addEventListener('drop', async (e) => {
+                const droppedFiles = Array.from(e.dataTransfer.files);
+                if (droppedFiles.length > 0) {
+                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const validFiles = droppedFiles.filter(file => {
+                        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                        return allowedTypes.includes(fileExtension);
+                    });
+                    
+                    if (validFiles.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...validFiles];
+                        await updateFileDisplay();
+                    }
+                    
+                    if (validFiles.length !== droppedFiles.length) {
+                        showNotification('Some files were skipped. Supported: PDF, DOCX, TXT, MD, JPG, PNG', 'error');
+                    }
+                }
+            }, false);
         }
 
         async function sendMessage() {
-            const message = messageInput.value.trim();
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            
+            const message = messageInput ? messageInput.value.trim() : '';
+            
             if (!message && uploadedFiles.length === 0) return;
             if (isLoading) return;
 
             hideWelcomeElements();
 
+            // Check for URLs in message
+            const urlRegex = /(https?:\/\/[^\s]+)/g;
+            const urls = message.match(urlRegex);
+            
+            if (urls && urls.length > 0) {
+                await handleURLMessage(urls[0], message);
+                return;
+            }
+
+            // Handle files
             if (uploadedFiles.length > 0) {
                 const fileList = uploadedFiles.map(file => {
-                    return `📎 **${file.name}**`;
+                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const isImage = imageTypes.includes(fileExtension);
+                    return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
                 }).join('\n');
                 
                 addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
@@ -842,7 +1084,7 @@
             }
 
             isLoading = true;
-            sendButton.disabled = true;
+            if (sendButton) sendButton.disabled = true;
             addLoadingMessage();
 
             try {
@@ -852,12 +1094,70 @@
                 formData.append('conversationId', 'grant-cards-conversation');
                 formData.append('agentType', 'grant-cards');
                 
-                if (uploadedFiles.length > 0) {
-                    uploadedFiles.forEach(file => {
-                        formData.append('files', file);
-                    });
+                uploadedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
+
+                const response = await fetch(`${API_BASE}/api/process-grant`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
                 }
 
+                const data = await response.json();
+                
+                console.log('API Response:', data.response);
+                removeLoadingMessage();
+                addMessage('assistant', data.response, true);
+
+            } catch (error) {
+                console.error('Send message error:', error);
+                removeLoadingMessage();
+                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
+            }
+
+            isLoading = false;
+            if (sendButton) sendButton.disabled = false;
+            if (messageInput) {
+                messageInput.value = '';
+                messageInput.style.height = '44px';
+                messageInput.placeholder = "Message Grant Card Assistant...";
+            }
+            
+            uploadedFiles = [];
+            resetInputBox();
+            
+            // Clear task selection
+            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+            selectedTask = '';
+        }
+
+        async function handleURLMessage(url, originalMessage) {
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            
+            const remainingMessage = originalMessage.replace(url, '').trim();
+            
+            if (remainingMessage) {
+                addMessage('user', remainingMessage);
+            }
+            addMessage('user', `🔗 Analyze grant URL: ${url}`);
+            
+            isLoading = true;
+            if (sendButton) sendButton.disabled = true;
+            addLoadingMessage('Analyzing grant website...');
+
+            try {
+                const formData = new FormData();
+                formData.append('message', remainingMessage || 'Analyze this grant URL');
+                formData.append('url', url);
+                formData.append('task', selectedTask || 'grant-criteria');
+                formData.append('conversationId', 'grant-cards-conversation');
+                formData.append('agentType', 'grant-cards');
+                
                 const response = await fetch(`${API_BASE}/api/process-grant`, {
                     method: 'POST',
                     body: formData
@@ -874,42 +1174,32 @@
 
             } catch (error) {
                 removeLoadingMessage();
-                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
+                addMessage('assistant', `Error analyzing URL: ${error.message}`, false);
             }
 
             isLoading = false;
-            sendButton.disabled = false;
-            messageInput.value = '';
-            messageInput.style.height = '44px';
-            messageInput.placeholder = "Upload documents or describe the grant program...";
-            
-            if (uploadedFiles.length > 0) {
-                uploadedFiles = [];
-                resetFileDropZone();
+            if (sendButton) sendButton.disabled = false;
+            if (messageInput) {
+                messageInput.value = '';
+                messageInput.style.height = '44px';
             }
             
             // Clear task selection
-            document.querySelectorAll('.quick-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
             selectedTask = '';
         }
 
-        function resetFileDropZone() {
-            fileDropZone.classList.remove('has-file');
-            fileDropZone.innerHTML = `
-                <span class="drop-icon">📄</span>
-                <div style="flex: 1;">
-                    <div class="drop-text">Upload Grant Documents</div>
-                </div>
-                <div class="format-badges">
-                    <span class="format-badge">PDF</span>
-                    <span class="format-badge">DOC</span>
-                    <span class="format-badge">TXT</span>
-                </div>
-            `;
-            fileInput.value = '';
+        async function sendMessageWithURL(url) {
+            await handleURLMessage(url, 'Analyze this grant URL');
         }
 
+        // Fixed addMessage function with proper HTML processing and typing animation
         function addMessage(role, content, shouldAnimate = false) {
+            console.log('Adding message:', role, content.substring(0, 100) + '...');
+            
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
             
@@ -917,25 +1207,32 @@
             contentDiv.className = 'message-content';
             
             if (role === 'assistant' && shouldAnimate) {
-                // Start with empty content for typing effect
+                // Start with typing cursor for animation
                 contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
                 
                 messageDiv.appendChild(contentDiv);
                 messagesContainer.appendChild(messageDiv);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
-                // Start typing animation after a brief delay
+                // Start typing animation after brief delay
                 setTimeout(() => {
                     typeMessage(contentDiv, content);
                 }, 500);
                 
             } else {
-                // User messages appear immediately
-                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                // User messages or non-animated assistant messages appear immediately
+                let processedContent = content;
+                processedContent = processedContent.replace(/\n/g, '<br>');
+                processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                contentDiv.innerHTML = processedContent;
                 messageDiv.appendChild(contentDiv);
                 messagesContainer.appendChild(messageDiv);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
+            
+            console.log('Message added successfully');
         }
 
         function typeMessage(contentDiv, content) {
@@ -965,13 +1262,16 @@
                     currentIndex++;
                     
                     // Auto-scroll as content appears
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    const messagesContainer = document.getElementById('messages');
+                    if (messagesContainer) {
+                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    }
                     
                     // Continue typing (adjust speed here: lower = faster)
                     setTimeout(typeNextChar, 15);
                 } else {
                     // Typing complete - add export button if needed
-                    if (content.includes('# GRANT CARD:') || content.includes('## Grant Card')) {
+                    if (content.includes('# GRANT CARD:') || content.includes('## Grant Card') || content.includes('GRANT CARD GENERATED')) {
                         const exportButton = document.createElement('button');
                         exportButton.className = 'export-button';
                         exportButton.innerHTML = '💾 Export Grant Card';
@@ -1066,14 +1366,17 @@
             return processed;
         }
 
-        function addLoadingMessage() {
+        function addLoadingMessage(customMessage = 'analyzing') {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message assistant';
             messageDiv.id = 'loading-message';
             
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'loading';
-            loadingDiv.innerHTML = '<div class="spinner"></div><span>analyzing</span>';
+            loadingDiv.innerHTML = `<div class="spinner"></div><span>${customMessage}...</span>`;
             
             messageDiv.appendChild(loadingDiv);
             messagesContainer.appendChild(messageDiv);
@@ -1088,9 +1391,8 @@
         }
 
         function exportGrantCard(content) {
-            // Clean up content for export
             const cleanContent = content
-                .replace(/<[^>]*>/g, '') // Remove HTML tags
+                .replace(/<[^>]*>/g, '')
                 .replace(/&nbsp;/g, ' ')
                 .replace(/&amp;/g, '&')
                 .replace(/&lt;/g, '<')
@@ -1101,7 +1403,6 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             
-            // Generate filename with timestamp
             const now = new Date();
             const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
             a.href = url;
@@ -1112,8 +1413,7 @@
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
             
-            // Show confirmation
-            showNotification('✅ Grant Card exported successfully!', 'success');
+            showNotification('✅ Grant Card exported successfully!');
         }
 
         function showNotification(message, type = 'info') {
@@ -1133,50 +1433,6 @@
                 }, 300);
             }, 3000);
         }
-
-        // Initialize drag and drop
-        document.addEventListener('DOMContentLoaded', function() {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }, false);
-            });
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, () => {
-                    fileDropZone.style.borderColor = '#1e3a8a';
-                    fileDropZone.style.background = 'rgba(30, 58, 138, 0.05)';
-                }, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, () => {
-                    fileDropZone.style.borderColor = '';
-                    fileDropZone.style.background = '';
-                }, false);
-            });
-            
-            fileDropZone.addEventListener('drop', (e) => {
-                const droppedFiles = Array.from(e.dataTransfer.files);
-                if (droppedFiles.length > 0) {
-                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md'];
-                    const validFiles = droppedFiles.filter(file => {
-                        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                        return allowedTypes.includes(fileExtension);
-                    });
-                    
-                    if (validFiles.length > 0) {
-                        uploadedFiles = [...uploadedFiles, ...validFiles];
-                        updateFileDisplay();
-                    }
-                    
-                    if (validFiles.length !== droppedFiles.length) {
-                        addMessage('assistant', `⛔ Some files were skipped. Supported: PDF, DOCX, TXT, MD`, false);
-                    }
-                }
-            }, false);
-        });
     </script>
 </body>
 </html>
