@@ -780,9 +780,34 @@
                 formData.append('conversationId', 'etg-conversation');
                 formData.append('agentType', 'etg-writer');
                 
+            try {
+                const formData = new FormData();
+                formData.append('message', message || '');
+                formData.append('conversationId', 'etg-conversation');
+                formData.append('agentType', 'etg-writer');
+                
                 uploadedFiles.forEach(file => {
-                    formData.append('files', file);
+                    formData.append('file', file);  // Changed from 'files' to 'file'
                 });
+
+                const response = await fetch(`${API_BASE}/api/process-etg`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                removeLoadingMessage();
+                addMessage('assistant', data.response, true);
+
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`);
+            }
 
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
                     method: 'POST',
