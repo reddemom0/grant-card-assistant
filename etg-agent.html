@@ -975,7 +975,7 @@
                 formData.append('agentType', 'etg-writer');
                 
                 uploadedFiles.forEach(file => {
-                    formData.append('files', file);
+                    formData.append('file', file);
                 });
 
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
