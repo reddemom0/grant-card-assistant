@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ETG Business Case Specialist - Granted Consulting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -12,44 +15,43 @@
         }
         
         :root {
-            --granted-blue: #008abf;
-            --granted-dark-blue: #005f84;
-            --granted-gray: #6d7881;
-            --granted-light: #dde1e3;
-            --text-primary: #1a1a1a;
+            --primary: #10b981;
+            --primary-dark: #059669;
+            --text-primary: #2c3e50;
             --text-secondary: #6b7280;
-            --surface-white: #ffffff;
-            --background: #f8fafc;
+            --surface: #ffffff;
+            --background: #fafafa;
+            --border: #e5e7eb;
             --success: #10b981;
             --warning: #f59e0b;
-            --error: #ef4444;
-            --etg-purple: #7c3aed;
-            --etg-purple-light: #ede9fe;
-            --etg-purple-dark: #5b21b6;
+            --error: #dc2626;
+            --etg-light: #dcfce7;
         }
         
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background: linear-gradient(135deg, var(--granted-light) 0%, #ffffff 50%, var(--granted-light) 100%);
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 22px;
+            background: var(--background);
             min-height: 100vh;
             color: var(--text-primary);
+            line-height: 1.6;
+            padding-bottom: 120px;
         }
         
-        /* Header Styles */
+        /* Header */
         .header {
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--granted-light);
-            box-shadow: 0 2px 12px rgba(0, 138, 191, 0.08);
-            padding: 0.875rem 1.5rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 0;
             position: sticky;
             top: 0;
-            z-index: 1000;
+            z-index: 100;
         }
         
         .header-content {
-            max-width: 1500px;
+            max-width: 900px;
             margin: 0 auto;
+            padding: 0 1.5rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -58,485 +60,110 @@
         .logo {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
         
-        .logo-icon {
-            width: 42px;
-            height: 42px;
-            background: linear-gradient(135deg, var(--etg-purple), var(--etg-purple-dark));
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
-            font-size: 1.25rem;
-            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);
-            position: relative;
-        }
-        
-        .logo-icon::after {
-            content: '';
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-        }
-        
-        .logo-text h1 {
+        .logo-text {
             font-size: 1.25rem;
             font-weight: 600;
-            color: var(--text-primary);
-            letter-spacing: -0.5px;
-        }
-        
-        .logo-text p {
-            font-size: 0.8rem;
-            color: var(--granted-gray);
-            margin-top: 0.125rem;
-        }
-        
-        .header-nav {
-            display: flex;
-            align-items: center;
-            gap: 1.5rem;
         }
         
         .nav-link {
-            color: var(--granted-blue);
+            color: var(--text-secondary);
             text-decoration: none;
             padding: 0.5rem 1rem;
             border-radius: 8px;
-            transition: all 0.2s;
-            font-size: 0.875rem;
-            font-weight: 500;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
         }
         
         .nav-link:hover {
-            background: rgba(0, 138, 191, 0.1);
-            transform: translateY(-1px);
+            background: var(--border);
+            color: var(--text-primary);
         }
         
-        .user-badge {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.5rem 1rem;
-            background: rgba(124, 58, 237, 0.05);
-            border: 1px solid rgba(124, 58, 237, 0.2);
-            border-radius: 20px;
-            color: var(--etg-purple-dark);
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-        
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background: var(--success);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.2); }
-        }
-        
-        /* Main Container - Adjusted for larger chat area */
+        /* Main Container */
         .container {
-            max-width: 1500px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 1.5rem;
-            display: grid;
-            grid-template-columns: 280px 1fr;
-            gap: 1.25rem;
-            min-height: calc(100vh - 80px);
+            padding: 2rem 1.5rem;
         }
         
-        /* Specialist Panel - Narrower for more chat space */
-        .specialist-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08);
-            padding: 1.25rem;
-            height: fit-content;
-            border: 1px solid rgba(124, 58, 237, 0.1);
-            display: flex;
-            flex-direction: column;
-            position: sticky;
-            top: calc(80px + 1.5rem);
-        }
-        
-        .specialist-header {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            padding-bottom: 1.5rem;
-            border-bottom: 1px solid var(--granted-light);
-        }
-        
-        .specialist-avatar {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, var(--etg-purple), var(--etg-purple-dark));
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.5rem;
-            font-weight: bold;
-            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.3);
-            position: relative;
-        }
-        
-        .specialist-avatar::before {
-            content: '';
-            position: absolute;
-            inset: -2px;
-            background: linear-gradient(135deg, var(--etg-purple), var(--etg-purple-dark));
-            border-radius: 16px;
-            z-index: -1;
-            opacity: 0.3;
-            filter: blur(10px);
-        }
-        
-        .specialist-info h2 {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.25rem;
-        }
-        
-        .specialist-info p {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }
-        
-        .specialist-status {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-top: 0.5rem;
-            padding: 0.25rem 0.75rem;
-            background: rgba(16, 185, 129, 0.1);
-            border-radius: 12px;
-            font-size: 0.7rem;
-            color: var(--success);
-            font-weight: 600;
-        }
-        
-        /* Process Steps with Progress */
-        .process-steps {
-            margin-bottom: 1.5rem;
-        }
-        
-        .process-steps h3 {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.875rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .progress-indicator {
-            font-size: 0.7rem;
-            color: var(--etg-purple);
-            font-weight: 500;
-        }
-        
-        .steps-container {
-            position: relative;
-        }
-        
-        .steps-container::before {
-            content: '';
-            position: absolute;
-            left: 12px;
-            top: 24px;
-            bottom: 24px;
-            width: 2px;
-            background: linear-gradient(to bottom, var(--etg-purple), var(--granted-light));
-        }
-        
-        .step {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            margin-bottom: 0.75rem;
-            padding: 0.5rem;
-            background: rgba(255, 255, 255, 0.8);
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            position: relative;
-            cursor: pointer;
-        }
-        
-        .step:hover {
-            background: var(--etg-purple-light);
-            transform: translateX(2px);
-        }
-        
-        .step.completed {
-            opacity: 0.7;
-        }
-        
-        .step.active {
-            background: var(--etg-purple-light);
-            border: 1px solid var(--etg-purple);
-        }
-        
-        .step-number {
-            width: 26px;
-            height: 26px;
-            background: white;
-            border: 2px solid var(--etg-purple);
-            color: var(--etg-purple);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.75rem;
-            font-weight: bold;
-            flex-shrink: 0;
-            z-index: 1;
-        }
-        
-        .step.completed .step-number {
-            background: var(--success);
-            border-color: var(--success);
-            color: white;
-        }
-        
-        .step.completed .step-number::after {
-            content: '✓';
-            font-size: 0.7rem;
-        }
-        
-        .step.active .step-number {
-            background: var(--etg-purple);
-            color: white;
-            box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.2);
-        }
-        
-        .step-text {
-            font-size: 0.8rem;
-            color: var(--text-primary);
-            line-height: 1.4;
-        }
-        
-        /* Course Analysis Tools - Sidebar version */
-        .course-analysis-sidebar {
-            margin-top: 1.25rem;
-            padding: 1.25rem;
-            background: rgba(124, 58, 237, 0.03);
-            border-radius: 8px;
-            border: 1px solid rgba(124, 58, 237, 0.1);
-        }
-        
-        .course-analysis-sidebar h4 {
-            color: var(--etg-purple-dark);
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .analysis-options-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-        }
-        
-        .upload-zone-sidebar {
-            border: 2px dashed rgba(124, 58, 237, 0.3);
-            border-radius: 8px;
-            padding: 0.75rem;
-            background: white;
-            transition: all 0.3s;
-            cursor: pointer;
+        /* Welcome Section */
+        .welcome-section {
             text-align: center;
-            font-size: 0.8rem;
+            padding: 3rem 0;
+            transition: all 0.3s ease;
         }
         
-        .upload-zone-sidebar:hover {
-            border-color: var(--etg-purple);
-            background: var(--etg-purple-light);
+        .welcome-section.hidden {
+            display: none;
         }
         
-        .upload-zone-sidebar.has-file {
-            border-color: var(--success);
-            background: rgba(16, 185, 129, 0.05);
+        .welcome-title {
+            font-size: 2.5rem;
+            font-weight: 300;
+            margin-bottom: 1rem;
+            color: var(--primary);
         }
         
-        .upload-icon {
-            font-size: 1.25rem;
-            margin-bottom: 0.25rem;
-        }
-        
-        .upload-text {
-            font-size: 0.75rem;
+        .welcome-subtitle {
+            font-size: 1.1rem;
             color: var(--text-secondary);
+            margin-bottom: 2rem;
         }
         
-        .url-zone-sidebar {
+        .capability-tags {
             display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        
-        .url-input {
-            padding: 0.5rem;
-            border: 1px solid var(--granted-light);
-            border-radius: 6px;
-            font-size: 0.75rem;
-            transition: all 0.2s;
-            width: 100%;
-        }
-        
-        .url-input:focus {
-            outline: none;
-            border-color: var(--etg-purple);
-            box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
-        }
-        
-        .analyze-btn {
-            padding: 0.5rem;
-            background: var(--etg-purple);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            width: 100%;
-        }
-        
-        .analyze-btn:hover:not(:disabled) {
-            background: var(--etg-purple-dark);
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
-        }
-        
-        .analyze-btn:disabled {
-            background: var(--granted-gray);
-            cursor: not-allowed;
-        }
-        
-        /* Chat Panel - Larger size */
-        .chat-panel {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.08);
-            display: flex;
-            flex-direction: column;
-            border: 1px solid rgba(124, 58, 237, 0.1);
-            min-height: calc(100vh - 120px);
-            height: calc(100vh - 120px);
-        }
-        
-        .chat-header {
-            padding: 1.25rem 1.5rem;
-            border-bottom: 1px solid var(--granted-light);
-            background: rgba(124, 58, 237, 0.02);
-            border-radius: 16px 16px 0 0;
-        }
-        
-        .chat-header-top {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 0.5rem;
-        }
-        
-        .chat-header h3 {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-        
-        .chat-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-        
-        .chat-action-btn {
-            padding: 0.375rem 0.75rem;
-            background: white;
-            border: 1px solid var(--granted-light);
-            border-radius: 8px;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .chat-action-btn:hover {
-            background: var(--etg-purple-light);
-            border-color: var(--etg-purple);
-            color: var(--etg-purple);
-        }
-        
-        .chat-header p {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-        
-        /* Messages Area - Larger */
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1.25rem;
-            display: flex;
-            flex-direction: column;
+            justify-content: center;
             gap: 0.75rem;
-            min-height: 550px;
-            max-height: calc(100vh - 280px);
+            flex-wrap: wrap;
         }
         
-        .messages::-webkit-scrollbar {
-            width: 6px;
+        .capability-tag {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
         
-        .messages::-webkit-scrollbar-track {
-            background: var(--granted-light);
-            border-radius: 3px;
+        .capability-tag:hover {
+            border-color: var(--primary);
+            color: var(--primary);
         }
         
-        .messages::-webkit-scrollbar-thumb {
-            background: var(--etg-purple);
-            border-radius: 3px;
+        /* Chat Container */
+        .chat-container {
+            background: var(--surface);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            min-height: 500px;
+            transition: all 0.3s ease;
+        }
+        
+        .chat-container.expanded {
+            min-height: calc(100vh - 200px);
+        }
+        
+        .messages {
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
         }
         
         .message {
             display: flex;
-            animation: fadeInUp 0.3s ease;
+            animation: fadeIn 0.3s ease;
         }
         
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .message.user {
@@ -547,63 +174,89 @@
             justify-content: flex-start;
         }
         
-        .message-wrapper {
-            max-width: 80%;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        
-        .message-meta {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            padding: 0 0.5rem;
-        }
-        
-        .message.user .message-meta {
-            text-align: right;
-        }
-        
         .message-content {
-            padding: 0.875rem 1rem;
-            border-radius: 12px;
-            white-space: pre-wrap;
-            line-height: 1.4;
-            font-size: 0.875rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            max-width: 80%;
+            padding: 1rem 1.25rem;
+            border-radius: 16px;
+            font-size: 0.95rem;
         }
         
         .message.user .message-content {
-            background: linear-gradient(135deg, var(--etg-purple), var(--etg-purple-dark));
+            background: var(--primary);
             color: white;
-            border-bottom-right-radius: 4px;
         }
         
         .message.assistant .message-content {
-            background: #f5f5f5;
+            background: var(--background);
             color: var(--text-primary);
+            line-height: 1.7;
+        }
+        
+        /* Enhanced ETG Business Case styling */
+        .message.assistant .message-content .business-case-header {
+            background: linear-gradient(135deg, var(--etg-light), #bbf7d0);
+            border-left: 4px solid var(--primary);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .message.assistant .message-content .section-header {
+            padding: 0.75rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+            font-weight: 600;
+            border-left: 3px solid;
+        }
+        
+        .message.assistant .message-content .section-eligibility {
+            background: rgba(16, 185, 129, 0.05);
+            border-left-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .message.assistant .message-content .section-questions {
+            background: rgba(16, 185, 129, 0.05);
+            border-left-color: #10b981;
+            color: #10b981;
+        }
+        
+        .message.assistant .message-content .section-research {
+            background: rgba(245, 158, 11, 0.05);
+            border-left-color: #f59e0b;
+            color: #f59e0b;
+        }
+        
+        .message.assistant .message-content .etg-divider {
             border: none;
-            border-bottom-left-radius: 4px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #e5e7eb, transparent);
+            margin: 1.5rem 0;
+        }
+        
+        .welcome-message.hidden {
+            display: none;
         }
         
         .loading {
             display: flex;
             align-items: center;
             gap: 0.75rem;
-            background: white;
-            color: var(--text-primary);
+            background: var(--background);
+            color: var(--text-secondary);
             padding: 1rem 1.25rem;
             border-radius: 16px;
-            max-width: 80%;
-            border: 1px solid var(--granted-light);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+            max-width: 200px;
+            font-size: 0.9rem;
         }
         
         .spinner {
-            width: 20px;
-            height: 20px;
-            border: 2px solid var(--granted-light);
-            border-top: 2px solid var(--etg-purple);
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top: 2px solid var(--primary);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -613,327 +266,480 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Input Area - Streamlined without Course Analysis */
-        .input-area {
-            border-top: 1px solid var(--granted-light);
-            padding: 1rem 1.25rem;
-            background: rgba(124, 58, 237, 0.02);
-            border-radius: 0 0 16px 16px;
+        /* Floating Input Area */
+        .floating-input {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            z-index: 200;
+            padding: 1rem 0;
         }
         
-        /* Quick Actions */
-        .quick-actions {
-            margin-bottom: 1rem;
+        .floating-input-container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
         }
         
-        .quick-actions h4 {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
-        }
-        
-        .action-chips {
+        .file-upload-row {
             display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
         }
         
-        .action-chip {
-            padding: 0.5rem 1rem;
-            background: white;
-            border: 1px solid var(--granted-light);
-            border-radius: 20px;
-            font-size: 0.75rem;
-            color: var(--text-secondary);
+        .file-drop-zone {
+            flex: 1;
+            border: 2px dashed var(--border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
+            background: var(--background);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
         
-        .action-chip:hover {
-            background: var(--etg-purple-light);
-            border-color: var(--etg-purple);
-            color: var(--etg-purple);
-            transform: translateY(-1px);
+        .file-drop-zone:hover {
+            border-color: var(--primary);
+            background: rgba(124, 58, 237, 0.02);
         }
         
-        /* Input Row */
+        .file-drop-zone.has-file {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .drop-icon {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+        }
+        
+        .drop-text {
+            flex: 1;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        
+        .format-badges {
+            display: flex;
+            gap: 0.25rem;
+        }
+        
+        .format-badge {
+            background: var(--primary);
+            color: white;
+            padding: 0.15rem 0.4rem;
+            border-radius: 10px;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+        
+        .quick-actions {
+            display: flex;
+            gap: 0.5rem;
+            overflow-x: auto;
+            padding-bottom: 0.25rem;
+        }
+        
+        .quick-actions::-webkit-scrollbar {
+            height: 4px;
+        }
+        
+        .quick-actions::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 2px;
+        }
+        
+        .quick-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 0.4rem 0.8rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        
+        .quick-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
         .input-row {
             display: flex;
             gap: 0.75rem;
             align-items: flex-end;
         }
         
-        .message-input-container {
-            flex: 1;
-            position: relative;
-        }
-        
         .message-input {
-            width: 100%;
-            border: 1px solid var(--granted-light);
-            border-radius: 12px;
-            padding: 1rem;
-            padding-right: 3rem;
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem 1rem;
             resize: none;
             font-family: inherit;
-            font-size: 0.875rem;
-            min-height: 80px;
-            transition: all 0.2s;
+            font-size: 0.95rem;
+            background: var(--surface);
+            transition: all 0.2s ease;
+            min-height: 44px;
+            max-height: 120px;
         }
         
         .message-input:focus {
             outline: none;
-            border-color: var(--etg-purple);
+            border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
         }
         
-        .char-count {
-            position: absolute;
-            bottom: 0.5rem;
-            right: 0.75rem;
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-        }
-        
         .send-button {
-            padding: 1rem 1.5rem;
-            background: linear-gradient(135deg, var(--etg-purple), var(--etg-purple-dark));
+            padding: 0.75rem 1.25rem;
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 0.875rem;
+            font-size: 0.9rem;
             font-weight: 600;
-            transition: all 0.2s;
-            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.3);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            transition: all 0.2s ease;
+            height: 44px;
         }
         
         .send-button:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+            background: var(--primary-dark);
         }
         
         .send-button:disabled {
-            background: var(--granted-gray);
+            background: var(--text-secondary);
             cursor: not-allowed;
-            box-shadow: none;
         }
         
-        /* Export Button */
         .export-button {
             margin-top: 0.75rem;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.5rem 1rem;
-            background: var(--etg-purple);
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
             color: white;
             border: none;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 500;
-            transition: all 0.2s;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
         }
         
         .export-button:hover {
-            background: var(--etg-purple-dark);
+            background: linear-gradient(135deg, var(--primary-dark), #4c1d95);
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(124, 58, 237, 0.4);
         }
         
-        /* Mobile Responsiveness - Adjusted for floating input */
+        /* File thumbnail styles */
+        .file-thumbnail {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .file-icon-large {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .file-grid {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin: 0.5rem 0;
+        }
+
+        .file-grid-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+            min-width: 80px;
+            max-width: 120px;
+            position: relative;
+        }
+
+        .file-grid-item .file-name {
+            font-size: 0.75rem;
+            text-align: center;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        .file-remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--error);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* URL input styling */
+        .url-input-row {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem;
+            background: rgba(16, 185, 129, 0.03);
+            border: 1px solid rgba(16, 185, 129, 0.1);
+            border-radius: 8px;
+        }
+
+        .url-input {
+            flex: 1;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 0.5rem;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .url-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
+        }
+
+        .analyze-btn {
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .analyze-btn:hover:not(:disabled) {
+            background: var(--primary-dark);
+        }
+
+        .analyze-btn:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+        }
+        
+        /* Notification system */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success);
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .notification.info {
+            background: var(--primary);
+        }
+        
+        /* Typing animation styles */
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background-color: var(--primary);
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .typing-container {
+            min-height: 1.2em;
+        }
+        
         @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-                gap: 1rem;
+            .welcome-title {
+                font-size: 2rem;
             }
             
-            .specialist-panel {
-                position: static;
-                margin-bottom: 1rem;
+            .capability-tags {
+                flex-direction: column;
+                align-items: center;
             }
             
-            .messages {
-                max-height: 400px;
-                padding-bottom: 200px;
+            .file-upload-row {
+                flex-direction: column;
             }
             
-            .message-wrapper {
-                max-width: 90%;
+            .input-row {
+                flex-direction: column;
             }
             
-            .input-area {
-                left: 0;
-                margin-left: 1rem;
-                margin-right: 1rem;
+            .send-button {
+                width: 100%;
             }
         }
     </style>
 </head>
 <body>
-    <!-- Enhanced Header -->
+    <!-- Header -->
     <div class="header">
         <div class="header-content">
             <div class="logo">
-                <div class="logo-icon">📋</div>
-                <div class="logo-text">
-                    <h1>ETG Business Case Specialist</h1>
-                    <p>Granted Consulting AI Hub</p>
-                </div>
+                <span>📋</span>
+                <span class="logo-text">ETG Business Case Specialist</span>
             </div>
-            <div class="header-nav">
-                <a href="/" class="nav-link">← Back to AI Hub</a>
-                <div class="user-badge">
-                    <div class="status-dot"></div>
-                    <span>Team Member</span>
-                </div>
-            </div>
+            <a href="index.html" class="nav-link">← Back to AI Hub</a>
         </div>
     </div>
 
     <!-- Main Container -->
     <div class="container">
-        <!-- Enhanced Specialist Panel with Course Analysis Tools -->
-        <div class="specialist-panel">
-            <div class="specialist-header">
-                <div class="specialist-avatar">ETG</div>
-                <div class="specialist-info">
-                    <h2>ETG Specialist</h2>
-                    <p>BC Employee Training Grant Expert</p>
-                    <div class="specialist-status">
-                        <div class="status-dot"></div>
-                        Ready to assist
-                    </div>
-                </div>
-            </div>
-
-            <div class="process-steps">
-                <h3>
-                    My Process
-                    <span class="progress-indicator">Step 1 of 6</span>
-                </h3>
-                <div class="steps-container">
-                    <div class="step active" data-step="1">
-                        <div class="step-number">1</div>
-                        <div class="step-text">Verify training eligibility</div>
-                    </div>
-                    <div class="step" data-step="2">
-                        <div class="step-number">2</div>
-                        <div class="step-text">Search knowledge base</div>
-                    </div>
-                    <div class="step" data-step="3">
-                        <div class="step-number">3</div>
-                        <div class="step-text">Draft Questions 1-3</div>
-                    </div>
-                    <div class="step" data-step="4">
-                        <div class="step-number">4</div>
-                        <div class="step-text">Research BC alternatives</div>
-                    </div>
-                    <div class="step" data-step="5">
-                        <div class="step-number">5</div>
-                        <div class="step-text">Complete Questions 4-7</div>
-                    </div>
-                    <div class="step" data-step="6">
-                        <div class="step-number">6</div>
-                        <div class="step-text">Deliver final business case</div>
-                    </div>
-                </div>
-            </div>
+        <!-- Welcome Section -->
+        <div class="welcome-section" id="welcome-section">
+            <h1 class="welcome-title">How can I help you create your ETG Business Case?</h1>
+            <p class="welcome-subtitle">Professional BC Employee Training Grant specialist with submission-ready outputs</p>
             
-            <!-- Course Analysis Tools in Sidebar -->
-            <div class="course-analysis-sidebar">
-                <h4>🔍 Course Analysis Tools</h4>
-                <div class="analysis-options-sidebar">
-                    <div class="upload-zone-sidebar" onclick="document.getElementById('file-input').click()">
-                        <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" style="display: none;">
-                        <div class="upload-icon">📄</div>
-                        <div class="upload-text">Upload Course Document</div>
-                        <div id="file-info" style="display: none; margin-top: 0.5rem; font-size: 0.7rem; color: var(--success);"></div>
-                    </div>
-                    <div class="url-zone-sidebar">
-                        <input 
-                            type="url" 
-                            id="url-input" 
-                            class="url-input" 
-                            placeholder="https://course-website.com"
-                        >
-                        <button class="analyze-btn" onclick="analyzeURL()">
-                            🔗 Analyze URL
-                        </button>
+            <div class="capability-tags">
+                <div class="capability-tag" onclick="insertQuickText('Start New ETG Case')">📝 New Business Case</div>
+                <div class="capability-tag" onclick="insertQuickText('Check eligibility')">✅ Check Eligibility</div>
+                <div class="capability-tag" onclick="insertQuickText('Review draft Questions 1-3')">📋 Review Draft</div>
+                <div class="capability-tag" onclick="insertQuickText('Research BC alternatives')">🔍 BC Alternatives</div>
+                <div class="capability-tag" onclick="insertQuickText('Questions 4-7')">📊 Complete Case</div>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="chat-container" id="chat-container">
+            <div class="messages" id="messages">
+                <div class="message assistant welcome-message" id="welcome-message">
+                    <div class="message-content">
+                        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">Welcome! I'm your ETG Business Case specialist</div>
+                        
+                        <div style="margin-bottom: 1rem;">I create <strong>submission-ready ETG Business Cases</strong> for BC Employee Training Grant applications using Granted Consulting's proven methodology.</div>
+                        
+                        <div style="margin-bottom: 1rem;">
+                            <div><strong>My 6-Step Process:</strong></div>
+                            <div>• <strong>Step 1:</strong> Verify training eligibility requirements</div>
+                            <div>• <strong>Step 2:</strong> Search our comprehensive knowledge base</div>
+                            <div>• <strong>Step 3:</strong> Draft Questions 1-3 (training details)</div>
+                            <div>• <strong>Step 4:</strong> Research BC training alternatives</div>
+                            <div>• <strong>Step 5:</strong> Complete Questions 4-7 (business case)</div>
+                            <div>• <strong>Step 6:</strong> Deliver polished final document</div>
+                        </div>
+
+                        <div style="background: rgba(16, 185, 129, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: #10b981; margin-bottom: 0.5rem;">📚 Course Analysis Tools</div>
+                            <div style="font-size: 0.9rem; color: #374151;">
+                                <div>• Upload course documents for detailed analysis</div>
+                                <div>• Provide course website URLs for automated research</div>
+                                <div>• Get eligibility assessments and cost justifications</div>
+                            </div>
+                        </div>
+
+                        <div>Share your training requirements, upload course materials, or provide URLs to begin your professional ETG Business Case!</div>
                     </div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- Enhanced Chat Panel -->
-        <div class="chat-panel">
-            <div class="chat-header">
-                <div class="chat-header-top">
-                    <h3>ETG Business Case Development</h3>
-                    <div class="chat-actions">
-                        <button class="chat-action-btn" onclick="clearChat()">Clear</button>
-                        <button class="chat-action-btn" onclick="downloadChat()">Download</button>
+    <!-- Floating Input Area -->
+    <div class="floating-input">
+        <div class="floating-input-container">
+            <div class="file-upload-row">
+                <div class="file-drop-zone" id="file-drop-zone" onclick="document.getElementById('file-input').click()">
+                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
+                    <span class="drop-icon">📄</span>
+                    <div style="flex: 1;">
+                        <div class="drop-text">Upload Course Documents</div>
                     </div>
-                </div>
-                <p>Professional ETG specialist • Submission-ready business cases • Knowledge-based writing</p>
-            </div>
-
-            <div class="messages" id="messages">
-                <div class="message assistant">
-                    <div class="message-wrapper">
-                        <div class="message-meta">ETG Specialist • Just now</div>
-                        <div class="message-content"><strong>Welcome! I'm your ETG Business Case specialist and can assist with all things ETG.</strong></div>
+                    <div class="format-badges">
+                        <span class="format-badge">PDF</span>
+                        <span class="format-badge">DOC</span>
+                        <span class="format-badge">TXT</span>
                     </div>
                 </div>
             </div>
 
-            <div class="input-area">
-                <div class="quick-actions">
-                    <h4>Quick Actions</h4>
-                    <div class="action-chips">
-                        <button class="action-chip" onclick="insertQuickText('I need an ETG Business Case for: ')">
-                            Start New Case
-                        </button>
-                        <button class="action-chip" onclick="insertQuickText('Training Title: \nProvider: \nCompany: \nIndustry: ')">
-                            Use Template
-                        </button>
-                        <button class="action-chip" onclick="insertQuickText('Check eligibility for: ')">
-                            Check Eligibility
-                        </button>
-                        <button class="action-chip" onclick="insertQuickText('Review my draft Questions 1-3: ')">
-                            Review Draft
-                        </button>
-                    </div>
-                </div>
-
-                <div class="input-row">
-                    <div class="message-input-container">
-                        <textarea 
-                            id="message-input" 
-                            class="message-input" 
-                            rows="3" 
-                            placeholder="Describe your training requirements and I'll create your complete ETG Business Case..."
-                            maxlength="2000"
-                        ></textarea>
-                        <span class="char-count" id="char-count">0 / 2000</span>
-                    </div>
-                    <button id="send-button" class="send-button">
-                        Send
-                        <span>→</span>
-                    </button>
-                </div>
+            <div class="url-input-row">
+                <input 
+                    type="url" 
+                    id="url-input" 
+                    class="url-input" 
+                    placeholder="https://course-website.com - I'll analyze the course details"
+                >
+                <button class="analyze-btn" onclick="analyzeURL()">
+                    🔗 Analyze URL
+                </button>
+            </div>
+            
+            <div class="quick-actions">
+                <button class="quick-btn" onclick="insertQuickText('Start New ETG Case')">📝 New Case</button>
+                <button class="quick-btn" onclick="insertQuickText('Check eligibility')">✅ Eligibility</button>
+                <button class="quick-btn" onclick="insertQuickText('Review draft')">📋 Review</button>
+                <button class="quick-btn" onclick="insertQuickText('BC alternatives')">🔍 BC Options</button>
+                <button class="quick-btn" onclick="insertQuickText('Questions 4-7')">📊 Complete</button>
+            </div>
+            
+            <div class="input-row">
+                <textarea 
+                    id="message-input" 
+                    class="message-input" 
+                    placeholder="Describe your training requirements or ask about ETG eligibility..."
+                    rows="1"
+                ></textarea>
+                <button id="send-button" class="send-button">Send</button>
             </div>
         </div>
     </div>
 
     <script>
         let isLoading = false;
-        let uploadedFile = null;
-        let currentStep = 1;
+        let uploadedFiles = [];
+        let hasStartedConversation = false;
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
@@ -943,124 +749,116 @@
         const messageInput = document.getElementById('message-input');
         const sendButton = document.getElementById('send-button');
         const fileInput = document.getElementById('file-input');
-        const fileInfo = document.getElementById('file-info');
+        const fileDropZone = document.getElementById('file-drop-zone');
         const urlInput = document.getElementById('url-input');
-        const charCount = document.getElementById('char-count');
+        const welcomeSection = document.getElementById('welcome-section');
+        const chatContainer = document.getElementById('chat-container');
+        const welcomeMessage = document.getElementById('welcome-message');
 
-        // Character counter
-        messageInput.addEventListener('input', () => {
-            const length = messageInput.value.length;
-            charCount.textContent = `${length} / 2000`;
-            if (length > 1800) {
-                charCount.style.color = 'var(--warning)';
-            } else {
-                charCount.style.color = 'var(--text-secondary)';
-            }
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
 
-        // Progress tracking
-        function updateProgress(step) {
-            currentStep = step;
-            document.querySelector('.progress-indicator').textContent = `Step ${step} of 6`;
-            
-            document.querySelectorAll('.step').forEach((el, index) => {
-                if (index + 1 < step) {
-                    el.classList.add('completed');
-                    el.classList.remove('active');
-                } else if (index + 1 === step) {
-                    el.classList.add('active');
-                    el.classList.remove('completed');
-                } else {
-                    el.classList.remove('completed', 'active');
-                }
-            });
-        }
-
-        // Clear chat function
-        function clearChat() {
-            if (confirm('Clear all messages? This cannot be undone.')) {
-                const welcomeMessage = messagesContainer.firstElementChild;
-                messagesContainer.innerHTML = '';
-                messagesContainer.appendChild(welcomeMessage);
-                updateProgress(1);
-            }
-        }
-
-        // Download chat function
-        function downloadChat() {
-            const messages = messagesContainer.querySelectorAll('.message-content');
-            let chatContent = 'ETG Business Case Conversation\n';
-            chatContent += '='.repeat(50) + '\n\n';
-            
-            messages.forEach((msg, index) => {
-                const role = msg.closest('.message').classList.contains('user') ? 'USER' : 'ASSISTANT';
-                chatContent += `[${role}]\n${msg.textContent}\n\n`;
-            });
-            
-            const blob = new Blob([chatContent], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `etg-conversation-${new Date().toISOString().slice(0, 10)}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
-        }
-
-        // Authentication check
-        async function checkAuth() {
-            try {
-                const response = await fetch('/api/process-etg', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: 'auth check',
-                        conversationId: 'auth-test'
-                    })
-                });
-                
-                if (response.status === 401) {
-                    const returnTo = encodeURIComponent(window.location.pathname);
-                    window.location.href = `/login.html?returnTo=${returnTo}`;
-                    return;
-                }
-                console.log('✅ User authenticated');
-            } catch (error) {
-                console.error('Auth check failed:', error);
-                window.location.href = '/login.html';
-            }
-        }
-
-        // File upload handling - Updated to use sidebar class
+        // File upload handling
         fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                uploadedFile = file;
-                const uploadZone = document.querySelector('.upload-zone-sidebar');
-                uploadZone.classList.add('has-file');
-                fileInfo.textContent = `✓ ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-                fileInfo.style.display = 'block';
-                
-                addMessage('user', `📎 Uploaded: ${file.name}`, 'Just now');
-                sendMessage(true);
+            const newFiles = Array.from(e.target.files);
+            if (newFiles.length > 0) {
+                uploadedFiles = [...uploadedFiles, ...newFiles];
+                updateFileDisplay();
+                messageInput.focus();
             }
         });
+
+        async function updateFileDisplay() {
+            if (uploadedFiles.length === 0) {
+                resetFileDropZone();
+                return;
+            }
+            
+            let totalSize = 0;
+            uploadedFiles.forEach(file => totalSize += file.size);
+            const fileSize = (totalSize / 1024).toFixed(1);
+            const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+            
+            fileDropZone.classList.add('has-file');
+            
+            // Create file grid HTML
+            let fileGridHTML = '<div class="file-grid">';
+            
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
+                const thumbnail = await generateFileThumbnail(file);
+                const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+                
+                fileGridHTML += `
+                    <div class="file-grid-item">
+                        ${thumbnail}
+                        <div class="file-name">${truncatedName}</div>
+                        <button class="file-remove-btn" onclick="removeFile(${i})">×</button>
+                    </div>
+                `;
+            }
+            
+            fileGridHTML += '</div>';
+            
+            fileDropZone.innerHTML = `
+                <div style="width: 100%; text-align: center;">
+                    <div style="color: #059669; font-weight: 500; margin-bottom: 0.5rem;">
+                        ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
+                    </div>
+                    ${fileGridHTML}
+                    <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
+                        Click to add more files
+                    </div>
+                </div>
+            `;
+            
+            messageInput.placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
+        }
+
+        function generateFileThumbnail(file) {
+            return new Promise((resolve) => {
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                const icon = getFileTypeIcon(fileExtension);
+                const iconHtml = `<div class="file-icon-large">${icon}</div>`;
+                resolve(iconHtml);
+            });
+        }
+
+        function getFileTypeIcon(extension) {
+            const icons = {
+                '.pdf': '📄',
+                '.doc': '📝',
+                '.docx': '📝',
+                '.txt': '📄',
+                '.md': '📄'
+            };
+            return icons[extension] || '📄';
+        }
+
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            fileInput.value = '';
+            updateFileDisplay();
+        }
 
         // URL analysis
         function analyzeURL() {
             const url = urlInput.value.trim();
             if (!url) {
-                alert('Please enter a valid URL');
+                showNotification('Please enter a valid URL', 'error');
                 return;
             }
 
             if (!isValidURL(url)) {
-                alert('Please enter a valid URL (must start with http:// or https://)');
+                showNotification('Please enter a valid URL (must start with http:// or https://)', 'error');
                 return;
             }
 
-            addMessage('user', `🔗 Analyze course URL: ${url}`, 'Just now');
+            hideWelcomeElements();
+            addMessage('user', `🔗 Analyze course URL: ${url}`);
             sendMessageWithURL(url);
             urlInput.value = '';
         }
@@ -1074,164 +872,8 @@
             }
         }
 
-        // Quick text insertion
-        function insertQuickText(text) {
-            messageInput.value = text;
-            messageInput.focus();
-            const length = text.length;
-            charCount.textContent = `${length} / 2000`;
-        }
-
-        // Message handling with typewriter effect
-        function addMessage(role, content, time = 'Just now') {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}`;
-            
-            const wrapperDiv = document.createElement('div');
-            wrapperDiv.className = 'message-wrapper';
-            
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'message-meta';
-            metaDiv.textContent = role === 'user' ? `You • ${time}` : `ETG Specialist • ${time}`;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            
-            wrapperDiv.appendChild(metaDiv);
-            wrapperDiv.appendChild(contentDiv);
-            messageDiv.appendChild(wrapperDiv);
-            messagesContainer.appendChild(messageDiv);
-            
-            if (role === 'assistant') {
-                // Add typewriter effect for assistant messages
-                typewriterEffect(contentDiv, content, () => {
-                    // Add export button after typing completes if it's a business case
-                    if (content.includes('Question 1') || content.includes('**Question 1**')) {
-                        const exportButton = document.createElement('button');
-                        exportButton.className = 'export-button';
-                        exportButton.innerHTML = '💾 Export Business Case';
-                        exportButton.onclick = () => exportBusinessCase(content);
-                        contentDiv.appendChild(exportButton);
-                    }
-                });
-            } else {
-                // Instant display for user messages
-                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            }
-            
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-        
-        // Typewriter effect function
-        function typewriterEffect(element, text, onComplete) {
-            let index = 0;
-            const processedHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = processedHTML;
-            const fullText = tempDiv.textContent || tempDiv.innerText || '';
-            
-            element.innerHTML = '';
-            
-            // Track strong tags
-            const strongRegex = /\*\*(.*?)\*\*/g;
-            const strongMatches = [];
-            let match;
-            while ((match = strongRegex.exec(text)) !== null) {
-                strongMatches.push({
-                    start: text.indexOf(match[0]),
-                    end: text.indexOf(match[0]) + match[0].length,
-                    content: match[1]
-                });
-            }
-            
-            function typeChar() {
-                if (index < text.length) {
-                    // Check if we're at the start of a strong tag
-                    let isStrong = false;
-                    let strongContent = '';
-                    
-                    for (const sm of strongMatches) {
-                        if (index === sm.start) {
-                            strongContent = sm.content;
-                            isStrong = true;
-                            break;
-                        }
-                    }
-                    
-                    if (isStrong && strongContent) {
-                        // Add the entire strong content at once
-                        const strongElement = document.createElement('strong');
-                        strongElement.textContent = strongContent;
-                        element.appendChild(strongElement);
-                        index += strongContent.length + 4; // +4 for the ** markers
-                    } else if (text.substr(index, 2) === '**') {
-                        // Skip ** markers
-                        index += 2;
-                    } else {
-                        // Add regular character
-                        const char = text[index];
-                        
-                        // Check if we need to add to existing strong tag
-                        const lastChild = element.lastChild;
-                        if (lastChild && lastChild.nodeName === 'STRONG' && !lastChild.complete) {
-                            lastChild.textContent += char;
-                        } else {
-                            // Add to regular text
-                            if (element.lastChild && element.lastChild.nodeType === Node.TEXT_NODE) {
-                                element.lastChild.textContent += char;
-                            } else {
-                                element.appendChild(document.createTextNode(char));
-                            }
-                        }
-                        index++;
-                    }
-                    
-                    // Scroll to keep new text visible
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    
-                    // Variable typing speed for natural feel
-                    let delay = 20;
-                    const char = text[index - 1];
-                    if (char === '.' || char === '!' || char === '?') delay = 200;
-                    else if (char === ',' || char === ';') delay = 100;
-                    else if (char === '\n') delay = 150;
-                    else if (Math.random() < 0.1) delay = 50; // Random pauses
-                    
-                    setTimeout(typeChar, delay);
-                } else {
-                    if (onComplete) onComplete();
-                }
-            }
-            
-            typeChar();
-        }
-
-        function addLoadingMessage(customMessage = null) {
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'message assistant';
-            messageDiv.id = 'loading-message';
-            
-            const loadingDiv = document.createElement('div');
-            loadingDiv.className = 'loading';
-            
-            // Use custom message if provided, otherwise use default
-            const loadingText = customMessage || 'Thinking...';
-            loadingDiv.innerHTML = `<div class="spinner"></div><span>${loadingText}</span>`;
-            
-            messageDiv.appendChild(loadingDiv);
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function removeLoadingMessage() {
-            const loadingMessage = document.getElementById('loading-message');
-            if (loadingMessage) {
-                loadingMessage.remove();
-            }
-        }
-
-        // Send message functions
-        sendButton.addEventListener('click', () => sendMessage());
+        // Send message functionality
+        sendButton.addEventListener('click', sendMessage);
         messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -1239,88 +881,86 @@
             }
         });
 
-        async function sendMessage(autoSend = false) {
+        // Quick text insertion
+        function insertQuickText(text) {
+            messageInput.value = text + ': ';
+            messageInput.focus();
+            messageInput.style.height = 'auto';
+            messageInput.style.height = messageInput.scrollHeight + 'px';
+        }
+
+        function hideWelcomeElements() {
+            if (!hasStartedConversation) {
+                hasStartedConversation = true;
+                welcomeSection.style.display = 'none';
+                welcomeMessage.classList.add('hidden');
+                chatContainer.classList.add('expanded');
+            }
+        }
+
+        async function sendMessage() {
             const message = messageInput.value.trim();
-            if (!message && !uploadedFile && !autoSend) return;
+            if (!message && uploadedFiles.length === 0) return;
             if (isLoading) return;
 
-            if (message && !autoSend) {
-                addMessage('user', message, 'Just now');
+            hideWelcomeElements();
+
+            if (uploadedFiles.length > 0) {
+                const fileList = uploadedFiles.map(file => {
+                    return `📎 **${file.name}**`;
+                }).join('\n');
+                
+                addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
+            }
+
+            if (message) {
+                addMessage('user', message);
             }
 
             isLoading = true;
             sendButton.disabled = true;
-            
-            // Dynamic loading message based on context
-            const messageLower = message.toLowerCase();
-            let loadingText = 'Thinking...';
-            
-            if (messageLower.includes('eligib')) {
-                loadingText = 'Checking eligibility...';
-            } else if (messageLower.includes('business case') || messageLower.includes('write') || messageLower.includes('create')) {
-                loadingText = 'Writing business case...';
-            } else if (messageLower.includes('question') || messageLower.includes('draft')) {
-                loadingText = 'Drafting questions...';
-            } else if (messageLower.includes('review')) {
-                loadingText = 'Reviewing content...';
-            } else if (messageLower.includes('alternative') || messageLower.includes('bc training')) {
-                loadingText = 'Researching BC alternatives...';
-            } else if (messageLower.includes('search') || messageLower.includes('find')) {
-                loadingText = 'Searching knowledge base...';
-            } else if (uploadedFile) {
-                loadingText = 'Analyzing document...';
-            } else if (messageLower.includes('help') || messageLower.includes('what')) {
-                loadingText = 'Preparing response...';
-            }
-            
-            addLoadingMessage(loadingText);
-            
-            // Update progress based on message content
-            if (message.includes('eligib')) updateProgress(1);
-            else if (message.includes('Question')) updateProgress(3);
+            addLoadingMessage();
 
             try {
                 const formData = new FormData();
-                formData.append('message', message);
+                formData.append('message', message || '');
                 formData.append('conversationId', 'etg-conversation');
+                formData.append('agentType', 'etg-writer');
                 
-                if (uploadedFile) {
-                    formData.append('file', uploadedFile);
+                if (uploadedFiles.length > 0) {
+                    uploadedFiles.forEach(file => {
+                        formData.append('files', file);
+                    });
                 }
-                
+
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
                     method: 'POST',
                     body: formData
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Backend error: ${response.status}`);
+                    throw new Error(`Server error: ${response.status}`);
                 }
 
                 const data = await response.json();
-                removeLoadingMessage();
-                addMessage('assistant', data.response, 'Just now');
                 
-                // Update progress based on response
-                if (data.response.includes('eligible')) updateProgress(2);
-                else if (data.response.includes('Questions 1-3')) updateProgress(4);
-                else if (data.response.includes('Questions 4-7')) updateProgress(6);
+                removeLoadingMessage();
+                addMessage('assistant', data.response, true);
 
             } catch (error) {
                 removeLoadingMessage();
-                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, 'Just now');
+                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
             }
 
             isLoading = false;
             sendButton.disabled = false;
             messageInput.value = '';
-            charCount.textContent = '0 / 2000';
+            messageInput.style.height = '44px';
+            messageInput.placeholder = "Describe your training requirements or ask about ETG eligibility...";
             
-            if (uploadedFile) {
-                uploadedFile = null;
-                fileInfo.style.display = 'none';
-                document.querySelector('.upload-zone-sidebar').classList.remove('has-file');
-                fileInput.value = '';
+            if (uploadedFiles.length > 0) {
+                uploadedFiles = [];
+                resetFileDropZone();
             }
         }
 
@@ -1336,6 +976,7 @@
                 formData.append('message', 'Analyze this course URL');
                 formData.append('url', url);
                 formData.append('conversationId', 'etg-conversation');
+                formData.append('agentType', 'etg-writer');
                 
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
                     method: 'POST',
@@ -1343,50 +984,307 @@
                 });
 
                 if (!response.ok) {
-                    throw new Error(`Backend error: ${response.status}`);
+                    throw new Error(`Server error: ${response.status}`);
                 }
 
                 const data = await response.json();
+                
                 removeLoadingMessage();
-                addMessage('assistant', data.response, 'Just now');
+                addMessage('assistant', data.response, true);
 
             } catch (error) {
                 removeLoadingMessage();
-                addMessage('assistant', `Error analyzing URL: ${error.message}`, 'Just now');
+                addMessage('assistant', `Error analyzing URL: ${error.message}`, false);
             }
 
             isLoading = false;
             sendButton.disabled = false;
         }
 
-        function exportBusinessCase(content) {
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `etg-business-case-${new Date().toISOString().slice(0, 10)}.txt`;
-            a.click();
-            URL.revokeObjectURL(url);
+        function resetFileDropZone() {
+            fileDropZone.classList.remove('has-file');
+            fileDropZone.innerHTML = `
+                <span class="drop-icon">📄</span>
+                <div style="flex: 1;">
+                    <div class="drop-text">Upload Course Documents</div>
+                </div>
+                <div class="format-badges">
+                    <span class="format-badge">PDF</span>
+                    <span class="format-badge">DOC</span>
+                    <span class="format-badge">TXT</span>
+                </div>
+            `;
+            fileInput.value = '';
         }
 
-        // Initialize
-        document.addEventListener('DOMContentLoaded', checkAuth);
-        // Background cache warming for ETG
-document.addEventListener('DOMContentLoaded', async function() {
-    try {
-        console.log('🔥 Pre-warming ETG cache...');
-        const response = await fetch(`${API_BASE}/api/warm-cache/etg-writer`, { 
-            method: 'POST' 
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            console.log(`✅ ETG cache pre-warmed in ${result.warmTime}ms`);
+        function addMessage(role, content, shouldAnimate = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (role === 'assistant' && shouldAnimate) {
+                // Start with empty content for typing effect
+                contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
+                
+                messageDiv.appendChild(contentDiv);
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Start typing animation after a brief delay
+                setTimeout(() => {
+                    typeMessage(contentDiv, content);
+                }, 500);
+                
+            } else {
+                // User messages appear immediately
+                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                messageDiv.appendChild(contentDiv);
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
         }
-    } catch (error) {
-        console.log('Cache warming failed (non-critical):', error);
-    }
-});
+
+        function typeMessage(contentDiv, content) {
+            // Process ETG Business Case content first
+            const processedContent = processETGContent(content);
+            
+            // Clear the typing cursor
+            contentDiv.innerHTML = '<div class="typing-container"></div>';
+            const container = contentDiv.querySelector('.typing-container');
+            
+            // Convert HTML to array of characters/tags
+            const htmlParts = parseHTML(processedContent);
+            let currentIndex = 0;
+            
+            function typeNextChar() {
+                if (currentIndex < htmlParts.length) {
+                    const part = htmlParts[currentIndex];
+                    
+                    if (part.startsWith('<') && part.endsWith('>')) {
+                        // Add HTML tags instantly
+                        container.innerHTML += part;
+                    } else {
+                        // Add characters one by one
+                        container.innerHTML += part;
+                    }
+                    
+                    currentIndex++;
+                    
+                    // Auto-scroll as content appears
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    
+                    // Continue typing (adjust speed here: lower = faster)
+                    setTimeout(typeNextChar, 15);
+                } else {
+                    // Typing complete - add export button if needed
+                    if (content.includes('Question 1') || content.includes('**Question 1**') || content.includes('ETG BUSINESS CASE')) {
+                        const exportButton = document.createElement('button');
+                        exportButton.className = 'export-button';
+                        exportButton.innerHTML = '💾 Export Business Case';
+                        exportButton.onclick = () => exportBusinessCase(content);
+                        contentDiv.appendChild(exportButton);
+                    }
+                }
+            }
+            
+            typeNextChar();
+        }
+
+        function parseHTML(html) {
+            const parts = [];
+            let currentPos = 0;
+            
+            // Simple HTML parser that preserves tags
+            while (currentPos < html.length) {
+                const nextTag = html.indexOf('<', currentPos);
+                
+                if (nextTag === -1) {
+                    // No more tags, add remaining characters
+                    for (let i = currentPos; i < html.length; i++) {
+                        parts.push(html[i]);
+                    }
+                    break;
+                }
+                
+                // Add characters before the tag
+                for (let i = currentPos; i < nextTag; i++) {
+                    parts.push(html[i]);
+                }
+                
+                // Find the end of the tag
+                const tagEnd = html.indexOf('>', nextTag);
+                if (tagEnd !== -1) {
+                    parts.push(html.substring(nextTag, tagEnd + 1));
+                    currentPos = tagEnd + 1;
+                } else {
+                    // Malformed tag, just add the character
+                    parts.push(html[nextTag]);
+                    currentPos = nextTag + 1;
+                }
+            }
+            
+            return parts;
+        }
+
+        function processETGContent(content) {
+            let processed = content;
+            
+            // Enhanced markdown processing
+            processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Process ETG Business Case headers
+            processed = processed.replace(
+                /ETG BUSINESS CASE:/g,
+                '<div class="business-case-header">📋 ETG BUSINESS CASE GENERATED</div>'
+            );
+            
+            processed = processed.replace(
+                /## ETG Business Case/g,
+                '<div class="business-case-header">📋 ETG BUSINESS CASE</div>'
+            );
+            
+            // Process section headers with emojis
+            processed = processed.replace(
+                /📋 (.*?)$/gm,
+                '<div class="section-header section-eligibility">📋 $1</div>'
+            );
+            
+            processed = processed.replace(
+                /✅ (.*?)$/gm,
+                '<div class="section-header section-questions">✅ $1</div>'
+            );
+            
+            processed = processed.replace(
+                /🔍 (.*?)$/gm,
+                '<div class="section-header section-research">🔍 $1</div>'
+            );
+            
+            // Process horizontal dividers
+            processed = processed.replace(
+                /^---$/gm,
+                '<hr class="etg-divider">'
+            );
+            
+            // Convert line breaks to proper HTML
+            processed = processed.replace(/\n/g, '<br>');
+            
+            return processed;
+        }
+
+        function addLoadingMessage(customMessage = 'thinking...') {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message assistant';
+            messageDiv.id = 'loading-message';
+            
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'loading';
+            loadingDiv.innerHTML = `<div class="spinner"></div><span>${customMessage}</span>`;
+            
+            messageDiv.appendChild(loadingDiv);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function removeLoadingMessage() {
+            const loadingMessage = document.getElementById('loading-message');
+            if (loadingMessage) {
+                loadingMessage.remove();
+            }
+        }
+
+        function exportBusinessCase(content) {
+            // Clean up content for export
+            const cleanContent = content
+                .replace(/<[^>]*>/g, '') // Remove HTML tags
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .trim();
+            
+            const blob = new Blob([cleanContent], { type: 'text/plain; charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            // Generate filename with timestamp
+            const now = new Date();
+            const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
+            a.href = url;
+            a.download = `etg-business-case-${timestamp}.txt`;
+            
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            // Show confirmation
+            showNotification('✅ ETG Business Case exported successfully!', 'success');
+        }
+
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize drag and drop
+        document.addEventListener('DOMContentLoaded', function() {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                fileDropZone.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                fileDropZone.addEventListener(eventName, () => {
+                    fileDropZone.style.borderColor = '#7c3aed';
+                    fileDropZone.style.background = 'rgba(124, 58, 237, 0.05)';
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                fileDropZone.addEventListener(eventName, () => {
+                    fileDropZone.style.borderColor = '';
+                    fileDropZone.style.background = '';
+                }, false);
+            });
+            
+            fileDropZone.addEventListener('drop', (e) => {
+                const droppedFiles = Array.from(e.dataTransfer.files);
+                if (droppedFiles.length > 0) {
+                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md'];
+                    const validFiles = droppedFiles.filter(file => {
+                        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                        return allowedTypes.includes(fileExtension);
+                    });
+                    
+                    if (validFiles.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...validFiles];
+                        updateFileDisplay();
+                    }
+                    
+                    if (validFiles.length !== droppedFiles.length) {
+                        addMessage('assistant', `Some files were skipped. Supported: PDF, DOCX, TXT, MD`, false);
+                    }
+                }
+            }, false);
+        });
     </script>
 </body>
 </html>
