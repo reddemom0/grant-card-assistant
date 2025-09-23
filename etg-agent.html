@@ -974,10 +974,9 @@
                 formData.append('conversationId', 'etg-conversation');
                 formData.append('agentType', 'etg-writer');
                 
-                uploadedFiles.forEach(file => {
-                    formData.append('file', file);
-                });
-
+uploadedFiles.forEach(file => {
+    formData.append('files', file);  // ← Change 'file' to 'files'
+});
                 const response = await fetch(`${API_BASE}/api/process-etg`, {
                     method: 'POST',
                     body: formData
