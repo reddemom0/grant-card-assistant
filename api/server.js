@@ -2511,36 +2511,6 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-    // Update rate limiting tracking
-    lastAPICall = Date.now();
-    callTimestamps.push(lastAPICall);
-    apiCallCount++;
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      
-      if (response.status === 429) {
-        throw new Error(`Rate limit exceeded. Please wait a few minutes before trying again. Current usage: ${callTimestamps.length} calls in the last minute.`);
-      }
-      
-      throw new Error(`Claude API error: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    console.log(`✅ API call successful (Total calls this session: ${apiCallCount})`);
-    return data.content[0].text;
-    
-  } catch (error) {
-    console.error('Claude API Error:', error);
-    
-    if (error.message.includes('Rate limit')) {
-      throw new Error(`${error.message}\n\nTip: Wait 2-3 minutes between requests, or try smaller documents.`);
-    }
-    
-    throw new Error('Failed to get response from Claude API: ' + error.message);
-  }
-}
-
 // Streaming Claude API integration
 async function callClaudeAPIStream(messages, systemPrompt = '', res) {
   try {
