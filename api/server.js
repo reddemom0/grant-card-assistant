@@ -2405,7 +2405,10 @@ async function callClaudeAPI(messages, systemPrompt = '') {
     }
 
     const data = await response.json();
-    console.log('✅ API call successful');
+console.log('✅ API call successful');
+console.log('🔍 FULL RESPONSE STRUCTURE:', JSON.stringify(data, null, 2)); 
+
+return data.content[0].text;
     
     return data.content[0].text;
     
