@@ -2384,11 +2384,22 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-       model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages: messages
-      })
+  model: 'claude-sonnet-4-20250514',
+  max_tokens: 4000,
+  system: systemPrompt,
+  messages: messages,
+  tools: [{
+    name: "web_search",
+    description: "Search the web for relevant and current information",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" }
+      },
+      required: ["query"]
+    }
+  }]
+})
     });
 
     // Update rate limiting tracking
@@ -2437,12 +2448,23 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
-        system: systemPrompt,
-        messages: messages,
-        stream: true
-      })
+  model: 'claude-sonnet-4-20250514',
+  max_tokens: 4000,
+  system: systemPrompt,
+  messages: messages,
+  stream: true,
+  tools: [{
+    name: "web_search",
+    description: "Search the web for relevant and current information",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "string", description: "Search query" }
+      },
+      required: ["query"]
+    }
+  }]
+})
     });
 
     lastAPICall = Date.now();
