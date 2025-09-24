@@ -496,15 +496,22 @@ function estimateContextSize(conversation, knowledgeContext, systemPrompt, curre
   return Math.ceil(convTokens + kbTokens + sysTokens + msgTokens + responseBuffer);
 }
 
-// FIXED: Complete agent type mapping - UPDATED: Added CanExport Claims
+// FIXED: Complete agent type mapping - UPDATED: Added CanExport Claims + Streaming
 const AGENT_URL_MAP = {
   '/api/process-grant': 'grant-cards',
+  '/api/process-grant/stream': 'grant-cards',
   '/api/process-etg': 'etg-writer',
+  '/api/process-etg/stream': 'etg-writer',
   '/api/process-bcafe': 'bcafe-writer',
+  '/api/process-bcafe/stream': 'bcafe-writer',
   '/api/process-canexport': 'canexport-writer',
-  '/api/process-claims': 'canexport-claims',    // NEW: CanExport Claims Agent
+  '/api/process-canexport/stream': 'canexport-writer',
+  '/api/process-claims': 'canexport-claims',
+  '/api/process-claims/stream': 'canexport-claims',
   '/api/process-readiness': 'readiness-strategist',
-  '/api/process-oracle': 'internal-oracle'
+  '/api/process-readiness/stream': 'readiness-strategist',
+  '/api/process-oracle': 'internal-oracle',
+  '/api/process-oracle/stream': 'internal-oracle'
 };
 
 // UPDATED: Added CanExport Claims folder mapping
@@ -2414,7 +2421,201 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
+// Streaming Claude API integration
+async function callClaudeAPIStream(messages, systemPrompt = '', res) {
+  try {
+    checkRateLimit();
+    await waitForRateLimit();
+    
+    console.log(`🔥 Making streaming Claude API call`);
+    
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: messages,
+        stream: true
+      })
+    });
+
+    lastAPICall = Date.now();
+    callTimestamps.push(lastAPICall);
+    apiCallCount++;
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+    }
+
+    // Set up SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/plain',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*'
+    });
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6);
+            
+            if (data === '[DONE]') {
+              res.write('data: [DONE]\n\n');
+              res.end();
+              return;
+            }
+
+            try {
+              const parsed = JSON.parse(data);
+              
+              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                const chunk = parsed.delta.text;
+                res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+              }
+            } catch (parseError) {
+              continue;
+            }
+          }
+        }
+      }
+    } catch (streamError) {
+      console.error('Streaming error:', streamError);
+      res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
+    }
+
+    res.write('data: [DONE]\n\n');
+    res.end();
+    
+  } catch (error) {
+    console.error('Claude Streaming API Error:', error);
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    res.end();
+  }
+}
+
 // Main serverless handler with JWT authentication and enhanced features
+// Generic streaming request handler
+async function handleStreamingRequest(req, res, agentType) {
+  const startTime = Date.now();
+  
+  // Handle multipart form data
+  await new Promise((resolve, reject) => {
+    upload.array('files', 10)(req, res, (err) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+
+  const { message, task, conversationId, url: courseUrl } = req.body;
+  let fileContent = '';
+  
+  // Process uploaded files
+  if (req.files && req.files.length > 0) {
+    console.log(`📄 Processing ${req.files.length} files for streaming`);
+    const fileContents = [];
+    
+    for (const file of req.files) {
+      try {
+        const content = await processFileContent(file);
+        fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+      } catch (error) {
+        console.error(`Error processing ${file.originalname}:`, error);
+      }
+    }
+    
+    fileContent = fileContents.join('\n\n');
+  }
+  
+  // Get/create conversation
+  const fullConversationId = `${agentType}-${conversationId}`;
+  if (!conversations.has(fullConversationId)) {
+    conversations.set(fullConversationId, []);
+    conversationTimestamps.set(fullConversationId, Date.now());
+  }
+  const conversation = conversations.get(fullConversationId);
+  
+  // Load agent-specific knowledge base
+  const agentDocs = await loadAgentSpecificKnowledgeBase(agentType);
+  const loadTime = Date.now() - startTime;
+  logAgentPerformance(agentType, agentDocs.length, loadTime);
+  
+  // Select relevant documents based on agent type
+  let relevantDocs = [];
+  let knowledgeContext = '';
+  
+  if (agentType === 'grant-cards') {
+    relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation, agentDocs);
+  } else if (agentType === 'etg-writer') {
+    relevantDocs = selectETGDocuments(message, conversation, agentDocs);
+  } else if (agentType === 'bcafe-writer') {
+    relevantDocs = selectBCAFEDocuments(message, null, conversation, agentDocs);
+  } else if (agentType === 'canexport-claims') {
+    relevantDocs = selectCanExportClaimsDocuments(message, conversation, agentDocs);
+  } else {
+    // Default selection for other agents
+    relevantDocs = agentDocs.slice(0, 3);
+  }
+  
+  if (relevantDocs.length > 0) {
+    knowledgeContext = relevantDocs
+      .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+      .join('\n\n');
+  }
+  
+  // Build system prompt based on agent type
+  let systemPrompt;
+  if (agentType === 'grant-cards') {
+    systemPrompt = buildGrantCardSystemPrompt(task, knowledgeContext);
+  } else {
+    systemPrompt = `${agentPrompts[agentType]}
+
+KNOWLEDGE BASE CONTEXT:
+${knowledgeContext}
+
+Always follow the exact workflows and instructions from the knowledge base documents above.`;
+  }
+  
+  // Build user message
+  let userMessage = message || '';
+  if (fileContent) {
+    userMessage += `\n\nUploaded content:\n${fileContent}`;
+  }
+  if (courseUrl) {
+    const urlContent = await fetchURLContent(courseUrl);
+    userMessage += `\n\nURL content:\n${urlContent}`;
+  }
+  
+  // Context management
+  const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+  logContextUsage(agentType, estimatedContext, conversation.length);
+  pruneConversation(conversation, agentType, estimatedContext);
+  
+  // Add user message to conversation
+  conversation.push({ role: 'user', content: userMessage });
+  
+  // Stream response
+  await callClaudeAPIStream(conversation, systemPrompt, res);
+}
 module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -2855,6 +3056,41 @@ function validateExpenseAgainstRejections(description, vendor, category) {
 }
 
     // FIXED: Process grant document with agent-specific loading
+    // Streaming endpoints
+if (url === '/api/process-grant/stream' && method === 'POST') {
+  await handleStreamingRequest(req, res, 'grant-cards');
+  return;
+}
+
+if (url === '/api/process-etg/stream' && method === 'POST') {
+  await handleStreamingRequest(req, res, 'etg-writer');
+  return;
+}
+
+if (url === '/api/process-bcafe/stream' && method === 'POST') {
+  await handleStreamingRequest(req, res, 'bcafe-writer');
+  return;
+}
+
+if (url === '/api/process-claims/stream' && method === 'POST') {
+  await handleStreamingRequest(req, res, 'canexport-claims');
+  return;
+}
+
+if (url === '/api/process-canexport/stream' && method === 'POST') {
+  await handleStreamingRequest(req, res, 'canexport-writer');
+  return;
+}
+
+if (url === '/api/process-readiness/stream' && method === 'POST') {
+  await handleStreamingRequest(req, res, 'readiness-strategist');
+  return;
+}
+
+if (url === '/api/process-oracle/stream' && method === 'POST') {
+  await handleStreamingRequest(req, res, 'internal-oracle');
+  return;
+}
     if (url === '/api/process-grant' && method === 'POST') {
       const startTime = Date.now();
       
