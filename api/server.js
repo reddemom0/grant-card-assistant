@@ -2366,7 +2366,7 @@ async function waitForRateLimit() {
 }
 
 
-// Claude API integration - let Anthropic handle web search automatically
+// Claude API integration with official web search format
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
     checkRateLimit();
@@ -2385,8 +2385,19 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
-        messages: messages
-        // NO TOOLS - let console settings handle web search
+        messages: messages,
+        tools: [{
+          type: "web_search_20250305",
+          name: "web_search",
+          max_uses: 5,
+          user_location: {
+            type: "approximate",
+            city: "Vancouver",
+            region: "British Columbia", 
+            country: "CA",
+            timezone: "America/Vancouver"
+          }
+        }]
       })
     });
 
