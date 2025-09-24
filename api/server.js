@@ -2366,7 +2366,7 @@ async function waitForRateLimit() {
 }
 
 
-// Claude API integration with proper tool handling and error checking
+// Claude API integration - let Anthropic handle web search automatically
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
     checkRateLimit();
@@ -2385,68 +2385,20 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
-        messages: messages,
-        tools: [{
-          name: "web_search",
-          description: "Search the web for relevant and current information",
-          input_schema: {
-            type: "object",
-            properties: {
-              query: { type: "string", description: "Search query" }
-            },
-            required: ["query"]
-          }
-        }]
+        messages: messages
+        // NO TOOLS - let console settings handle web search
       })
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
     console.log('✅ API call successful');
+    console.log('🔍 RESPONSE STRUCTURE:', JSON.stringify(data, null, 2));
     
-    // Check if Claude requested tool use
-    if (data.stop_reason === 'tool_use') {
-      console.log('🔧 Claude requested web search - sending back to continue conversation');
-      
-      // Continue the conversation by sending the tool response back
-      const continueResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
-          system: systemPrompt,
-          messages: [
-            ...messages,
-            { role: 'assistant', content: data.content }
-          ]
-        })
-      });
-      
-      if (!continueResponse.ok) {
-        throw new Error(`Continue API request failed: ${continueResponse.status} ${continueResponse.statusText}`);
-      }
-      
-      const continueData = await continueResponse.json();
-      console.log('🔍 CONTINUE RESPONSE STRUCTURE:', JSON.stringify(continueData, null, 2));
-      
-      // Check if continue response has expected structure
-      if (!continueData.content || !continueData.content[0] || !continueData.content[0].text) {
-        console.error('❌ Continue response missing expected content structure');
-        return "I apologize, but I encountered an issue with the web search. Please try again.";
-      }
-      
-      return continueData.content[0].text;
-    }
-    
-    // No tools requested, return normal response
     return data.content[0].text;
     
   } catch (error) {
