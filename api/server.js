@@ -2404,7 +2404,8 @@ async function executeTools(toolUses) {
         });
         
         const searchData = await searchResponse.json();
-        const searchResults = searchData.content[0].text;
+        console.log('🔍 Search response structure:', JSON.stringify(searchData, null, 2));
+const searchResults = searchData.content?.[0]?.text || 'Search completed but no results found';
         
         toolResults.push({
           tool_use_id: toolUse.id,
@@ -2499,7 +2500,7 @@ async function callClaudeAPI(messages, systemPrompt = '') {
       });
       
       const finalData = await finalResponse.json();
-      return finalData.content[0].text;
+      return finalData.content?.[0]?.text || 'Final response could not be parsed';
     }
     
     // No tools requested, return normal response
