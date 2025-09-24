@@ -3096,7 +3096,7 @@ if (url === '/api/process-oracle/stream' && method === 'POST') {
       
       // Handle file upload with multer
       await new Promise((resolve, reject) => {
-        upload.single('file')(req, res, (err) => {
+        upload.array('files', 10)(req, res, (err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -3105,10 +3105,22 @@ if (url === '/api/process-oracle/stream' && method === 'POST') {
       const { message, task, conversationId } = req.body;
       let fileContent = '';
       
-      // Process uploaded file if present
-      if (req.file) {
-        fileContent = await processFileContent(req.file);
-      }
+      // Process uploaded files if present
+if (req.files && req.files.length > 0) {
+  console.log(`📄 Processing ${req.files.length} Grant Card documents`);
+  const fileContents = [];
+  
+  for (const file of req.files) {
+    try {
+      const content = await processFileContent(file);
+      fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+    } catch (error) {
+      console.error(`Error processing ${file.originalname}:`, error);
+    }
+  }
+  
+  fileContent = fileContents.join('\n\n');
+}
       
       // Get or create conversation
       if (!conversations.has(conversationId)) {
@@ -3357,7 +3369,7 @@ Use the ETG knowledge base above to find similar successful applications and mat
     // FIXED: BCAFE endpoint with agent-specific loading
     if (url === '/api/process-bcafe' && method === 'POST') {
       await new Promise((resolve, reject) => {
-        upload.single('file')(req, res, (err) => {
+        upload.array('files', 10)(req, res, (err) => {
           if (err) reject(err);
           else resolve();
         });
@@ -3369,11 +3381,22 @@ Use the ETG knowledge base above to find similar successful applications and mat
       console.log(`🌾 Processing BCAFE request for conversation: ${conversationId}`);
       console.log(`📊 Organization type: ${orgType}, Target markets: ${selectedMarkets}`);
       
-      // Process uploaded file if present
-      if (req.file) {
-        console.log(`📄 Processing BCAFE document: ${req.file.originalname}`);
-        fileContent = await processFileContent(req.file);
-      }
+      // Process uploaded files if present
+if (req.files && req.files.length > 0) {
+  console.log(`📄 Processing ${req.files.length} BCAFE documents`);
+  const fileContents = [];
+  
+  for (const file of req.files) {
+    try {
+      const content = await processFileContent(file);
+      fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+    } catch (error) {
+      console.error(`Error processing ${file.originalname}:`, error);
+    }
+  }
+  
+  fileContent = fileContents.join('\n\n');
+}
       
       // Get or create BCAFE conversation
       const bcafeConversationId = `bcafe-${conversationId}`;
