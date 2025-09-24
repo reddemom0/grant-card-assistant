@@ -39,7 +39,7 @@ async function extractTextFromImage(imageBuffer, filename) {
         "anthropic-version": "2023-06-01"
       },
       body: JSON.stringify({
-        model: "claude-3-5-sonnet-20241022",
+        model: "claude-sonnet-4-20250514",
         max_tokens: 1000,
         messages: [
           {
@@ -2384,7 +2384,7 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+       model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
         messages: messages
@@ -2437,7 +2437,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
         messages: messages,
