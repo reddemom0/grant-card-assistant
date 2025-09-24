@@ -2410,7 +2410,12 @@ async function callClaudeAPI(messages, systemPrompt = '') {
     console.log('✅ API call successful');
     console.log('🔍 RESPONSE STRUCTURE:', JSON.stringify(data, null, 2));
     
-    return data.content[0].text;
+    const textBlocks = data.content
+  .filter(block => block.type === 'text')
+  .map(block => block.text)
+  .join('');
+
+return textBlocks;
     
   } catch (error) {
     console.error('Claude API Error:', error);
