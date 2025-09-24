@@ -2365,74 +2365,11 @@ async function waitForRateLimit() {
   }
 }
 
-// Tool execution handler
-async function executeTools(toolUses) {
-  const toolResults = [];
-  
-  for (const toolUse of toolUses) {
-    if (toolUse.name === 'web_search') {
-      try {
-        console.log(`🔍 Executing web search: "${toolUse.input.query}"`);
-        
-        // Use Anthropic's built-in web search by making another API call
-        const searchResponse = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': process.env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01'
-          },
-          body: JSON.stringify({
-            model: 'claude-sonnet-4-20250514',
-            max_tokens: 2000,
-            messages: [{
-              role: 'user',
-              content: `Search for: ${toolUse.input.query}`
-            }],
-            tools: [{
-              name: "web_search",
-              description: "Search the web for relevant and current information",
-              input_schema: {
-                type: "object",
-                properties: {
-                  query: { type: "string", description: "Search query" }
-                },
-                required: ["query"]
-              }
-            }]
-          })
-        });
-        
-        const searchData = await searchResponse.json();
-        console.log('🔍 Search response structure:', JSON.stringify(searchData, null, 2));
-const searchResults = searchData.content?.[0]?.text || 'Search completed but no results found';
-        
-        toolResults.push({
-          tool_use_id: toolUse.id,
-          type: "tool_result",
-          content: searchResults
-        });
-        
-      } catch (error) {
-        console.error('Web search error:', error);
-        toolResults.push({
-          tool_use_id: toolUse.id,
-          type: "tool_result", 
-          content: `Search error: ${error.message}`
-        });
-      }
-    }
-  }
-  
-  return toolResults;
-}
+
 // Claude API integration
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
-    // Check rate limits first
     checkRateLimit();
-    
-    // Wait for rate limit if needed
     await waitForRateLimit();
     
     console.log(`🔥 Making Claude API call (${callTimestamps.length + 1}/${MAX_CALLS_PER_MINUTE} this minute)`);
@@ -2468,42 +2405,8 @@ async function callClaudeAPI(messages, systemPrompt = '') {
     }
 
     const data = await response.json();
-    console.log('✅ API call successful (Total calls this session: ' + (apiCallCount + 1) + ')');
+    console.log('✅ API call successful');
     
-    // Check if Claude wants to use tools
-    const toolUses = data.content.filter(content => content.type === 'tool_use');
-    
-    if (toolUses.length > 0) {
-      console.log(`🔧 Claude requested ${toolUses.length} tool(s)`);
-      
-      // Execute tools
-      const toolResults = await executeTools(toolUses);
-      
-      // Send tool results back to Claude for final response
-      const finalResponse = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': process.env.ANTHROPIC_API_KEY,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 4000,
-          system: systemPrompt,
-          messages: [
-            ...messages,
-            { role: 'assistant', content: data.content },
-            { role: 'user', content: toolResults }
-          ]
-        })
-      });
-      
-      const finalData = await finalResponse.json();
-      return finalData.content?.[0]?.text || 'Final response could not be parsed';
-    }
-    
-    // No tools requested, return normal response
     return data.content[0].text;
     
   } catch (error) {
