@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BC Agriculture Export Specialist - Granted Consulting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -15,39 +18,45 @@
             --bc-green: #2d5016;
             --bc-light-green: #7fb069;
             --agriculture-gold: #d4a574;
-            --export-blue: #1e3a8a;
-            --granted-blue: #008abf;
-            --granted-gray: #6d7881;
-            --granted-light: #dde1e3;
+            --granted-blue: #008ABF;
+            --granted-blue-dark: #007aa8;
+            --granted-light: #E8F4F8;
             --text-primary: #2c3e50;
-            --text-secondary: #6d7881;
-            --surface-white: #ffffff;
+            --text-secondary: #6b7280;
+            --surface: #ffffff;
+            --background: #fafafa;
+            --border: #e5e7eb;
             --success: #10b981;
             --warning: #f59e0b;
-            --error: #ef4444;
+            --error: #dc2626;
         }
         
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Inter', sans-serif;
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 22px;
             background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 50%, #f0fdf4 100%);
             min-height: 100vh;
             color: var(--text-primary);
+            line-height: 1.6;
+            padding-bottom: 120px;
         }
         
+        /* Header */
         .header {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--granted-light);
-            box-shadow: 0 2px 12px rgba(45, 80, 22, 0.08);
-            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid rgba(45, 80, 22, 0.1);
+            padding: 1rem 0;
             position: sticky;
             top: 0;
-            z-index: 1000;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(45, 80, 22, 0.05);
         }
         
         .header-content {
-            max-width: 1400px;
+            max-width: 900px;
             margin: 0 auto;
+            padding: 0 1.5rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -59,304 +68,185 @@
             gap: 0.75rem;
         }
         
-        .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, var(--bc-green), var(--bc-light-green));
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: bold;
+        .logo-text {
             font-size: 1.25rem;
-            position: relative;
-            box-shadow: 0 2px 8px rgba(45, 80, 22, 0.25);
-        }
-        
-        .logo-text h1 {
-            font-size: 1.125rem;
-            font-weight: 300;
-            color: var(--bc-green);
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-        }
-        
-        .logo-text h1 .bc {
-            color: var(--bc-green);
             font-weight: 600;
-        }
-        
-        .logo-text p {
-            font-size: 0.75rem;
-            color: var(--granted-gray);
-            font-weight: 400;
-            letter-spacing: 0.5px;
-            text-transform: uppercase;
-            margin-top: 0.125rem;
+            color: var(--bc-green);
         }
         
         .nav-link {
-            color: var(--granted-blue);
+            color: var(--text-secondary);
             text-decoration: none;
-            padding: 0.375rem 0.75rem;
-            border-radius: 6px;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
             transition: all 0.2s ease;
-            font-weight: 500;
-            font-size: 0.8rem;
+            font-size: 0.9rem;
         }
         
         .nav-link:hover {
-            background: rgba(0, 138, 191, 0.1);
-        }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 1rem;
-            display: grid;
-            grid-template-columns: 320px 1fr;
-            gap: 1rem;
-            min-height: calc(100vh - 70px);
-        }
-        
-        .sidebar {
-            background: rgba(255, 255, 255, 0.9);
-            backdrop-filter: blur(20px);
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(45, 80, 22, 0.08);
-            padding: 1rem;
-            border: 1px solid rgba(45, 80, 22, 0.1);
-            height: fit-content;
-            display: flex;
-            flex-direction: column;
-            position: sticky;
-            top: calc(70px + 1rem);
-        }
-        
-        .expert-profile {
-            text-align: center;
-            margin-bottom: 1rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid var(--granted-light);
-        }
-        
-        .expert-avatar {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--bc-green), var(--bc-light-green));
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 1.125rem;
-            font-weight: bold;
-            margin: 0 auto 0.75rem;
-            box-shadow: 0 2px 8px rgba(45, 80, 22, 0.3);
-        }
-        
-        .expert-profile h3 {
-            font-size: 0.9rem;
-            font-weight: 500;
+            background: rgba(45, 80, 22, 0.1);
             color: var(--bc-green);
-            margin-bottom: 0.25rem;
         }
         
-        .expert-profile p {
-            font-size: 0.75rem;
-            color: var(--granted-gray);
-            line-height: 1.3;
+        /* Main Container */
+        .container {
+            padding: 2rem 1.5rem;
         }
         
-        .funding-calculator {
+        .container.chat-active {
+            padding: 0;
+        }
+        
+        /* Welcome Section */
+        .welcome-section {
+            max-width: 900px;
+            margin: 0 auto;
+            text-align: center;
+            padding: 3rem 2rem;
+            transition: all 0.3s ease;
+        }
+        
+        .welcome-section.hidden {
+            display: none;
+        }
+        
+        .welcome-title {
+            font-size: 2.5rem;
+            font-weight: 300;
             margin-bottom: 1rem;
-            padding: 1rem;
-            background: rgba(16, 185, 129, 0.05);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            border-radius: 8px;
+            color: var(--bc-green);
         }
         
-        .funding-calculator h4 {
-            font-size: 0.8rem;
+        .welcome-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+        
+        .capability-tags {
+            display: flex;
+            justify-content: center;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+        }
+        
+        .capability-tag {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .capability-tag:hover {
+            border-color: var(--bc-green);
+            color: var(--bc-green);
+            background: rgba(45, 80, 22, 0.05);
+        }
+        
+        /* Funding Calculator in Welcome */
+        .welcome-calculator {
+            max-width: 600px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background: rgba(45, 80, 22, 0.05);
+            border: 1px solid rgba(45, 80, 22, 0.2);
+            border-radius: 12px;
+        }
+        
+        .calculator-title {
+            font-size: 1.2rem;
             font-weight: 600;
             color: var(--bc-green);
-            margin-bottom: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            margin-bottom: 1rem;
+            text-align: center;
         }
         
-        .org-type-selector {
-            margin-bottom: 0.75rem;
+        .calculator-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
         }
         
-        .org-type-selector label {
-            font-size: 0.7rem;
-            color: var(--text-secondary);
-            margin-bottom: 0.25rem;
-            display: block;
-        }
-        
-        .org-type-select {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid var(--granted-light);
-            border-radius: 6px;
-            font-size: 0.75rem;
-            background: white;
-        }
-        
-        .revenue-inputs {
+        .input-group {
             display: flex;
             flex-direction: column;
-            gap: 0.5rem;
-            margin-bottom: 0.75rem;
         }
         
-        .revenue-inputs label {
-            font-size: 0.7rem;
+        .input-group label {
+            font-size: 0.9rem;
             color: var(--text-secondary);
+            margin-bottom: 0.5rem;
         }
         
-        .revenue-inputs input {
-            padding: 0.5rem;
-            border: 1px solid var(--granted-light);
-            border-radius: 4px;
-            font-size: 0.75rem;
+        .input-group select,
+        .input-group input {
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            background: white;
         }
         
         .funding-result {
             background: rgba(45, 80, 22, 0.1);
-            padding: 0.75rem;
-            border-radius: 6px;
+            padding: 1rem;
+            border-radius: 8px;
             text-align: center;
+            margin-top: 1rem;
         }
         
         .funding-result strong {
             color: var(--bc-green);
-            font-size: 0.8rem;
+            font-size: 1rem;
             display: block;
+            margin-bottom: 0.5rem;
         }
         
         .funding-result small {
             color: var(--text-secondary);
-            font-size: 0.65rem;
-            margin-top: 0.25rem;
-            display: block;
+            font-size: 0.8rem;
         }
         
-        .quick-actions h4 {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--bc-green);
-            margin-bottom: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .action-button {
-            width: 100%;
-            text-align: left;
-            padding: 0.5rem 0.75rem;
-            border: 1px solid var(--granted-light);
-            border-radius: 6px;
-            background: rgba(255, 255, 255, 0.8);
-            cursor: pointer;
-            margin-bottom: 0.5rem;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 0.75rem;
-        }
-        
-        .action-button:hover {
-            background: rgba(45, 80, 22, 0.05);
-            border-color: var(--bc-green);
-            transform: translateY(-1px);
-        }
-        
-        .action-button.active {
-            background: rgba(45, 80, 22, 0.1);
-            border-color: var(--bc-green);
-            color: var(--bc-green);
-        }
-        
-        .action-icon {
-            font-size: 0.875rem;
-            width: 16px;
-            text-align: center;
-        }
-        
-        .merit-tips {
-            margin-top: auto;
-            padding-top: 1rem;
-            border-top: 1px solid var(--granted-light);
-        }
-        
-        .merit-tips h4 {
-            font-size: 0.75rem;
-            font-weight: 600;
-            color: var(--agriculture-gold);
-            margin-bottom: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        .merit-tip {
-            font-size: 0.65rem;
-            color: var(--text-secondary);
-            padding: 0.5rem;
-            background: rgba(212, 165, 116, 0.05);
-            border-radius: 4px;
-            margin-bottom: 0.375rem;
-            border-left: 2px solid var(--agriculture-gold);
-            line-height: 1.2;
-        }
-        
-        .chat-panel {
-            background: rgba(255, 255, 255, 0.9);
+        /* Chat Container */
+        .chat-container {
+            background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(45, 80, 22, 0.08);
-            display: flex;
-            flex-direction: column;
+            border-radius: 16px;
             border: 1px solid rgba(45, 80, 22, 0.1);
-            min-height: calc(100vh - 140px);
+            box-shadow: 0 8px 32px rgba(45, 80, 22, 0.08);
+            min-height: 500px;
+            margin: 0 2rem;
+            transition: all 0.3s ease;
         }
         
-        .chat-header {
-            padding: 0.875rem 1.25rem;
-            border-bottom: 1px solid var(--granted-light);
-            background: rgba(45, 80, 22, 0.02);
-            border-radius: 12px 12px 0 0;
-        }
-        
-        .chat-header h3 {
-            font-size: 1rem;
-            font-weight: 500;
-            color: var(--bc-green);
-            margin-bottom: 0.25rem;
-            letter-spacing: 0.25px;
-        }
-        
-        .chat-header p {
-            font-size: 0.75rem;
-            color: var(--granted-gray);
+        .chat-container.expanded {
+            min-height: calc(100vh - 160px);
+            margin: 0 2rem;
         }
         
         .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
+            padding: 1.5rem;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
-            max-height: calc(100vh - 350px);
+            gap: 1.5rem;
+            overflow-y: auto;
+            max-height: calc(100vh - 160px);
         }
         
         .message {
             display: flex;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         
         .message.user {
@@ -368,45 +258,110 @@
         }
         
         .message-content {
-            max-width: 85%;
-            padding: 0.875rem 1rem;
-            border-radius: 12px;
-            white-space: pre-wrap;
-            line-height: 1.5;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-            font-size: 0.875rem;
+            max-width: 80%;
+            padding: 1.25rem 1.5rem;
+            border-radius: 18px;
+            font-size: 0.95rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.6;
         }
         
         .message.user .message-content {
-            background: var(--bc-green);
+            background: linear-gradient(135deg, var(--bc-green), #1e3a0f);
             color: white;
-            border-bottom-right-radius: 4px;
+            box-shadow: 0 4px 12px rgba(45, 80, 22, 0.3);
         }
         
         .message.assistant .message-content {
-            background: rgba(255, 255, 255, 0.9);
+            background: var(--background);
             color: var(--text-primary);
-            border: 1px solid var(--granted-light);
-            border-bottom-left-radius: 4px;
+            border: 1px solid var(--border);
+        }
+        
+        /* Enhanced BCAFE styling */
+        .message.assistant .message-content .bcafe-header {
+            background: linear-gradient(135deg, rgba(45, 80, 22, 0.1), rgba(127, 176, 105, 0.1));
+            border-left: 4px solid var(--bc-green);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            font-weight: 600;
+            color: var(--bc-green);
+        }
+        
+        .message.assistant .message-content .section-header {
+            padding: 0.75rem;
+            margin: 1rem 0;
+            border-radius: 6px;
+            font-weight: 600;
+            border-left: 3px solid;
+        }
+        
+        .message.assistant .message-content .section-eligibility {
+            background: rgba(45, 80, 22, 0.05);
+            border-left-color: var(--bc-green);
+            color: var(--bc-green);
+        }
+        
+        .message.assistant .message-content .section-funding {
+            background: rgba(16, 185, 129, 0.05);
+            border-left-color: #10b981;
+            color: #10b981;
+        }
+        
+        .message.assistant .message-content .section-strategy {
+            background: rgba(212, 165, 116, 0.05);
+            border-left-color: var(--agriculture-gold);
+            color: var(--agriculture-gold);
+        }
+        
+        .message.assistant .message-content .bcafe-divider {
+            border: none;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 1.5rem 0;
+        }
+        
+        .message.assistant .message-content p {
+            margin: 0.75rem 0;
+        }
+        
+        .message.assistant .message-content strong {
+            color: var(--bc-green);
+            font-weight: 600;
+        }
+        
+        .message.assistant .message-content ul,
+        .message.assistant .message-content ol {
+            margin: 0.75rem 0 0.75rem 1.5rem;
+        }
+        
+        .message.assistant .message-content li {
+            margin: 0.5rem 0;
+        }
+        
+        .welcome-message.hidden {
+            display: none;
         }
         
         .loading {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            background: rgba(255, 255, 255, 0.9);
-            color: var(--granted-gray);
-            padding: 0.875rem 1rem;
-            border-radius: 12px;
-            max-width: 85%;
-            border: 1px solid var(--granted-light);
-            font-size: 0.8rem;
+            gap: 0.75rem;
+            background: var(--background);
+            color: var(--text-secondary);
+            padding: 1.25rem 1.5rem;
+            border-radius: 18px;
+            max-width: 200px;
+            font-size: 0.9rem;
+            border: 1px solid var(--border);
         }
         
         .spinner {
-            width: 16px;
-            height: 16px;
-            border: 2px solid var(--granted-light);
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--border);
             border-top: 2px solid var(--bc-green);
             border-radius: 50%;
             animation: spin 1s linear infinite;
@@ -417,263 +372,356 @@
             100% { transform: rotate(360deg); }
         }
         
-        .input-area {
-            border-top: 1px solid var(--granted-light);
-            padding: 0.875rem;
-            background: rgba(45, 80, 22, 0.01);
-            border-radius: 0 0 12px 12px;
-        }
-        
-        .bcafe-tools {
-            margin-bottom: 0.75rem;
-            padding: 0.75rem;
-            border: 1px solid rgba(45, 80, 22, 0.2);
+        /* File thumbnail styles */
+        .file-thumbnail {
+            width: 60px;
+            height: 60px;
             border-radius: 8px;
-            background: rgba(45, 80, 22, 0.02);
+            object-fit: cover;
+            border: 1px solid var(--border);
+            background: var(--surface);
         }
-        
-        .bcafe-tools h4 {
-            color: var(--bc-green);
-            font-size: 0.8rem;
-            font-weight: 600;
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .bcafe-options {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        
-        .bcafe-option {
-            text-align: center;
-        }
-        
-        .upload-area {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        
-        .upload-button {
+
+        .file-icon-large {
+            width: 60px;
+            height: 60px;
             display: flex;
             align-items: center;
             justify-content: center;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .file-grid {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin: 0.75rem 0;
+        }
+
+        .file-grid-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             gap: 0.5rem;
             padding: 0.75rem;
-            border: 2px dashed var(--granted-light);
-            border-radius: 6px;
-            background: white;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface);
+            min-width: 80px;
+            max-width: 120px;
+            position: relative;
+        }
+
+        .file-grid-item .file-name {
+            font-size: 0.75rem;
+            text-align: center;
+            word-break: break-word;
+            line-height: 1.2;
+            color: var(--text-secondary);
+        }
+
+        .file-remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--error);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        /* Floating Input Area */
+        .floating-input {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 200;
+            max-width: 700px;
+            width: calc(100% - 40px);
+        }
+        
+        .floating-quick-actions {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .floating-quick-btn {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 8px 14px;
             cursor: pointer;
             font-size: 0.75rem;
-            transition: all 0.2s;
-            text-align: center;
+            color: var(--bc-green);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(45, 80, 22, 0.1);
+            font-weight: 500;
         }
         
-        .upload-button:hover {
+        .floating-quick-btn:hover {
             border-color: var(--bc-green);
-            background: rgba(45, 80, 22, 0.02);
-        }
-        
-        .upload-button.has-file {
-            border-color: var(--success);
-            background: rgba(16, 185, 129, 0.05);
-            color: #065f46;
-        }
-        
-        .market-selector {
-            text-align: center;
-        }
-        
-        .market-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .market-btn {
-            padding: 0.5rem;
-            border: 1px solid var(--granted-light);
-            border-radius: 4px;
-            background: white;
-            cursor: pointer;
-            font-size: 0.7rem;
-            transition: all 0.2s;
-        }
-        
-        .market-btn:hover {
             background: rgba(45, 80, 22, 0.05);
-            border-color: var(--bc-green);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(45, 80, 22, 0.2);
         }
         
-        .market-btn.selected {
+        .floating-quick-btn.active {
             background: var(--bc-green);
             color: white;
             border-color: var(--bc-green);
         }
         
-        .diversification-bonus {
-            font-size: 0.65rem;
-            color: var(--agriculture-gold);
-            font-weight: 500;
-            margin-top: 0.5rem;
+        .simple-input-box {
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 24px rgba(45, 80, 22, 0.1);
         }
         
-        .quick-start {
-            margin-bottom: 1rem;
-        }
-        
-        .quick-start h4 {
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--bc-green);
-            margin-bottom: 0.5rem;
-        }
-        
-        .quick-buttons {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        
-        .quick-button {
-            padding: 0.5rem 0.75rem;
-            border: 1px solid var(--granted-light);
-            border-radius: 6px;
-            background: white;
-            cursor: pointer;
-            font-size: 0.7rem;
-            transition: all 0.2s;
-        }
-        
-        .quick-button:hover {
-            background: rgba(45, 80, 22, 0.05);
+        .simple-input-box:focus-within {
             border-color: var(--bc-green);
+            box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.1);
         }
         
-        .input-row {
-            display: flex;
-            gap: 0.5rem;
-            align-items: flex-end;
+        .simple-input-box.drag-over {
+            border-color: var(--bc-green);
+            background: rgba(45, 80, 22, 0.05);
+            box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.2);
         }
         
-        .message-input {
-            flex: 1;
-            border: 1px solid var(--granted-light);
-            border-radius: 8px;
-            padding: 0.75rem;
+        .simple-input-box.has-file {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.05);
+        }
+        
+        .message-input-simple {
+            width: 100%;
+            border: none;
+            border-radius: 16px;
+            padding: 12px 80px 12px 16px;
             resize: none;
             font-family: inherit;
-            font-size: 0.8rem;
-            background: rgba(255, 255, 255, 0.8);
+            font-size: 0.95rem;
+            background: transparent;
             transition: all 0.2s ease;
-            height: 60px;
-        }
-        
-        .message-input:focus {
+            min-height: 44px;
+            max-height: 120px;
             outline: none;
-            border-color: var(--bc-green);
-            box-shadow: 0 0 0 2px rgba(45, 80, 22, 0.1);
-            background: white;
         }
         
-        .send-button {
-            padding: 0.75rem 1rem;
+        .input-buttons {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        
+        .file-button-inline {
+            width: 32px;
+            height: 32px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .file-button-inline:hover {
+            background: rgba(45, 80, 22, 0.1);
+            border-color: var(--bc-green);
+            color: var(--bc-green);
+        }
+        
+        .send-button-inline {
+            width: 36px;
+            height: 36px;
             background: var(--bc-green);
             color: white;
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            font-size: 0.75rem;
-            font-weight: 600;
             transition: all 0.2s ease;
-            box-shadow: 0 1px 4px rgba(45, 80, 22, 0.2);
-            height: fit-content;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
-        .send-button:hover:not(:disabled) {
+        .send-button-inline:hover:not(:disabled) {
             background: #1e3a0f;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(45, 80, 22, 0.3);
+            transform: translateY(-50%) scale(1.05);
         }
         
-        .send-button:disabled {
-            background: var(--granted-gray);
+        .send-button-inline:disabled {
+            background: var(--text-secondary);
             cursor: not-allowed;
-            transform: none;
+            transform: translateY(-50%);
+        }
+        
+        .upload-btn-welcome {
+            padding: 0.5rem 1rem;
+            background: rgba(45, 80, 22, 0.1);
+            border: 1px solid var(--bc-green);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--bc-green);
+            transition: all 0.2s ease;
+        }
+        
+        .upload-btn-welcome:hover {
+            background: rgba(45, 80, 22, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        .quick-btn {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 0.4rem 0.8rem;
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+        
+        .quick-btn:hover {
+            border-color: var(--bc-green);
+            color: var(--bc-green);
         }
         
         .export-button {
-            margin-top: 0.5rem;
+            margin-top: 0.75rem;
             display: inline-flex;
             align-items: center;
-            gap: 0.375rem;
-            padding: 0.375rem 0.75rem;
-            background: var(--bc-green);
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: linear-gradient(135deg, var(--bc-green), #1e3a0f);
             color: white;
             border: none;
-            border-radius: 6px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 0.7rem;
-            font-weight: 500;
+            font-size: 0.9rem;
+            font-weight: 600;
             transition: all 0.2s ease;
+            box-shadow: 0 2px 8px rgba(45, 80, 22, 0.3);
         }
         
         .export-button:hover {
-            background: #1e3a0f;
+            background: linear-gradient(135deg, #1e3a0f, #0f1a05);
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(45, 80, 22, 0.4);
         }
         
-        .status-indicator {
-            width: 6px;
-            height: 6px;
+        /* Typing animation styles */
+        .typing-cursor {
+            display: inline-block;
+            width: 2px;
+            height: 1.2em;
+            background-color: var(--bc-green);
+            animation: blink 1s infinite;
+            margin-left: 2px;
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .typing-container {
+            min-height: 1.2em;
+        }
+        
+        /* Notification system */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
             background: var(--success);
-            border-radius: 50%;
-            animation: pulse 2s infinite;
+            color: white;
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 1000;
+            font-weight: 600;
+            transition: all 0.3s ease;
         }
         
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        .notification.error {
+            background: var(--error);
         }
         
-        .hidden {
+        /* Stop Generation Button */
+        .stop-generation-btn {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            z-index: 250;
             display: none;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .stop-generation-btn:hover {
+            background: #b91c1c;
+            transform: translateX(-50%) translateY(-2px);
+            box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+        }
+        
+        .stop-generation-btn.show {
+            display: flex;
         }
         
         @media (max-width: 768px) {
-            .container {
-                grid-template-columns: 1fr;
-                gap: 0.75rem;
-                padding: 0.75rem;
-                min-height: calc(100vh - 60px);
+            .welcome-title {
+                font-size: 2rem;
             }
             
-            .sidebar {
-                order: 2;
-                position: static;
-                height: auto;
+            .capability-tags {
+                flex-direction: column;
+                align-items: center;
             }
             
-            .chat-panel {
-                order: 1;
-                min-height: 60vh;
-            }
-            
-            .messages {
-                max-height: 50vh;
-            }
-            
-            .header {
-                padding: 0.5rem 1rem;
-            }
-            
-            .bcafe-options {
+            .calculator-inputs {
                 grid-template-columns: 1fr;
             }
         }
@@ -684,116 +732,73 @@
     <div class="header">
         <div class="header-content">
             <div class="logo">
-                <div class="logo-icon">🌾</div>
-                <div class="logo-text">
-                    <h1><span class="bc">BC Agriculture</span> Export Specialist</h1>
-                    <p>Granted AI Hub</p>
-                </div>
+                <span>🌾</span>
+                <span class="logo-text">BC Agriculture Export Specialist</span>
             </div>
-            <div class="user-info">
-                <a href="/" class="nav-link">← Back to AI Hub</a>
-                <span>•</span>
-                <div class="status-indicator"></div>
-                <span>Team Member</span>
-            </div>
+            <a href="index.html" class="nav-link">← Back to AI Hub</a>
         </div>
     </div>
 
     <!-- Main Container -->
     <div class="container">
-        <!-- Expert Sidebar -->
-        <div class="sidebar">
-            <div class="expert-profile">
-                <div class="expert-avatar">BC</div>
-                <h3>BCAFE Export Specialist</h3>
-                <p>BC Agriculture and Food Export Program expert with merit optimization strategies.</p>
+        <!-- Welcome Section -->
+        <div class="welcome-section" id="welcome-section">
+            <h1 class="welcome-title">How can I help with your BC Agriculture Export application?</h1>
+            <p class="welcome-subtitle">Merit-optimized BCAFE application development with competitive strategy</p>
+            
+            <div class="capability-tags">
+                <div class="capability-tag" onclick="insertQuickText('Eligibility Check')">✅ Eligibility Check</div>
+                <div class="capability-tag" onclick="insertQuickText('Activity Strategy')">🎯 Activity Strategy</div>
+                <div class="capability-tag" onclick="insertQuickText('Market Selection')">🌍 Market Selection</div>
+                <div class="capability-tag" onclick="insertQuickText('Budget Planning')">💰 Budget Planning</div>
+                <div class="capability-tag" onclick="insertQuickText('Merit Optimization')">⭐ Merit Optimization</div>
+                <div class="capability-tag" onclick="insertQuickText('Application Review')">📋 Application Review</div>
             </div>
-
+            
             <!-- Funding Calculator -->
-            <div class="funding-calculator">
-                <h4>💰 Funding Calculator</h4>
-                
-                <div class="org-type-selector">
-                    <label for="org-type">Organization Type:</label>
-                    <select id="org-type" class="org-type-select">
-                        <option value="">Select organization type...</option>
-                        <option value="producer">Primary Producer</option>
-                        <option value="processor">Processor</option>
-                        <option value="cooperative">Cooperative</option>
-                        <option value="association">Industry Association</option>
-                    </select>
+            <div class="welcome-calculator">
+                <div class="calculator-title">💰 BCAFE Funding Calculator</div>
+                <div class="calculator-inputs">
+                    <div class="input-group">
+                        <label for="org-type">Organization Type:</label>
+                        <select id="org-type">
+                            <option value="">Select type...</option>
+                            <option value="producer">Primary Producer</option>
+                            <option value="processor">Processor</option>
+                            <option value="cooperative">Cooperative</option>
+                            <option value="association">Industry Association</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="revenue-2023">2023 Annual Revenue:</label>
+                        <input type="number" id="revenue-2023" placeholder="$100,000 minimum">
+                    </div>
+                    <div class="input-group">
+                        <label for="revenue-2024">2024 Annual Revenue:</label>
+                        <input type="number" id="revenue-2024" placeholder="$100,000 minimum">
+                    </div>
                 </div>
-
-                <div class="revenue-inputs">
-                    <label for="revenue-2023">2023 Annual Revenue:</label>
-                    <input type="number" id="revenue-2023" placeholder="$100,000 minimum">
-                    
-                    <label for="revenue-2024">2024 Annual Revenue:</label>
-                    <input type="number" id="revenue-2024" placeholder="$100,000 minimum">
-                </div>
-
                 <div class="funding-result">
-                    <strong id="max-funding">Enter revenue to calculate</strong>
-                    <small id="funding-details">Funding limits depend on organization type</small>
+                    <strong id="max-funding">Enter details to calculate funding</strong>
+                    <small id="funding-details">Summer 2025 intake: Applications due Sept 5, 2025</small>
                 </div>
-            </div>
-
-            <div class="quick-actions">
-                <h4>Merit Optimization</h4>
-                <button class="action-button" data-task="eligibility">
-                    <span class="action-icon">✅</span>
-                    <span>Verify Eligibility</span>
-                </button>
-                <button class="action-button" data-task="strategy">
-                    <span class="action-icon">🎯</span>
-                    <span>Activity Strategy</span>
-                </button>
-                <button class="action-button" data-task="markets">
-                    <span class="action-icon">🌍</span>
-                    <span>Market Selection</span>
-                </button>
-                <button class="action-button" data-task="budget">
-                    <span class="action-icon">💰</span>
-                    <span>Budget Planning</span>
-                </button>
-                <button class="action-button" data-task="application">
-                    <span class="action-icon">📋</span>
-                    <span>Build Application</span>
-                </button>
-                <button class="action-button" data-task="review">
-                    <span class="action-icon">🔍</span>
-                    <span>Final Review</span>
-                </button>
-            </div>
-
-            <div class="merit-tips">
-                <h4>Merit Tips</h4>
-                <div class="merit-tip">Market diversification earns bonus points</div>
-                <div class="merit-tip">Research-backed activities score higher</div>
-                <div class="merit-tip">Realistic budgets with quotes preferred</div>
-                <div class="merit-tip">Clear KPIs strengthen impact measurement</div>
             </div>
         </div>
 
-        <!-- Chat Interface -->
-        <div class="chat-panel">
-            <div class="chat-header">
-                <h3>BC Agriculture Export Development Session</h3>
-                <p>Merit-optimized BCAFE application development with competitive strategy</p>
-            </div>
-
+        <!-- Chat Container -->
+        <div class="chat-container" id="chat-container">
             <div class="messages" id="messages">
-                <div class="message assistant">
+                <div class="message assistant welcome-message" id="welcome-message">
                     <div class="message-content">
-                        <div style="font-size: 1.125rem; font-weight: 600; margin-bottom: 0.75rem;">Welcome! I'm your BC Agriculture Export specialist 🌾</div>
+                        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">Welcome! I'm your BC Agriculture Export specialist 🌾</div>
                         
                         <div style="margin-bottom: 1rem;">I specialize in the <strong>BC Agriculture and Food Export Program (BCAFE)</strong> and help maximize your approval chances through merit-based optimization strategies.</div>
                         
                         <div style="margin-bottom: 1rem;">
-                            <div><strong>What I provide:</strong></div>
-                            <div>• <strong>Eligibility Verification</strong> - Complete BCAFE requirements check</div>
-                            <div>• <strong>Merit Optimization</strong> - Strategic positioning for the 5 evaluation criteria</div>
-                            <div>• <strong>Funding Calculation</strong> - Maximum eligible amounts based on your revenue</div>
+                            <div><strong>BCAFE Specializations:</strong></div>
+                            <div>• <strong>Eligibility Verification</strong> - Complete requirements assessment</div>
+                            <div>• <strong>Merit Optimization</strong> - Strategic positioning for 5 evaluation criteria</div>
+                            <div>• <strong>Funding Calculation</strong> - Maximum eligible amounts based on revenue</div>
                             <div>• <strong>Activity Strategy</strong> - Export market development planning</div>
                             <div>• <strong>Budget Intelligence</strong> - Quote management and realistic planning</div>
                             <div>• <strong>Market Diversification</strong> - Bonus point strategies</div>
@@ -801,97 +806,159 @@
 
                         <div style="background: rgba(45, 80, 22, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
                             <div style="font-weight: 600; color: #2d5016; margin-bottom: 0.5rem;">📅 Summer 2025 Intake</div>
-                            <div style="font-size: 0.875rem; color: #374151;">
+                            <div style="font-size: 0.9rem; color: #374151;">
                                 <div><strong>Application Deadline:</strong> September 5, 2025 (4:00 PM PDT)</div>
                                 <div><strong>Project Period:</strong> November 17, 2025 - March 1, 2026</div>
-                                <div><strong>Funding Range:</strong> $5,000 - $50,000 (producers/processors) | $5,000 - $75,000 (associations)</div>
+                                <div><strong>Funding:</strong> $5K-$50K (producers/processors) | $5K-$75K (associations)</div>
                             </div>
                         </div>
 
-                        <div>Use the funding calculator on the left to get started, or tell me about your agricultural business and export goals!</div>
+                        <div>Use the funding calculator above to get started, or tell me about your agricultural business and export goals!</div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--bc-green); margin-bottom: 0.75rem;">Quick Actions:</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                <button class="quick-btn" onclick="insertQuickText('Eligibility Check')">✅ Eligibility</button>
+                                <button class="quick-btn" onclick="insertQuickText('Activity Strategy')">🎯 Strategy</button>
+                                <button class="quick-btn" onclick="insertQuickText('Market Selection')">🌍 Markets</button>
+                                <button class="quick-btn" onclick="insertQuickText('Budget Planning')">💰 Budget</button>
+                                <button class="quick-btn" onclick="insertQuickText('Merit Optimization')">⭐ Merit</button>
+                                <button class="quick-btn" onclick="insertQuickText('Application Review')">📋 Review</button>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--bc-green); margin-bottom: 0.75rem;">Upload Options:</div>
+                            <div style="display: flex; gap: 1rem;">
+                                <button class="upload-btn-welcome" onclick="document.getElementById('file-input').click()">
+                                    📄 Upload Documents
+                                </button>
+                                <button class="upload-btn-welcome" onclick="focusURLInput()">
+                                    🔗 Analyze Website
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="input-area">
-                <div class="bcafe-tools">
-                    <h4>🔧 BCAFE Application Tools</h4>
-                    <div class="bcafe-options">
-                        <div class="bcafe-option">
-                            <div class="upload-area">
-                                <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" style="display: none;">
-                                <div class="upload-button" onclick="document.getElementById('file-input').click()">
-                                    <span>📄</span>
-                                    <span>Upload Business Documents</span>
-                                </div>
-                                <div class="file-info" id="file-info"></div>
-                            </div>
-                        </div>
-                        <div class="bcafe-option">
-                            <div class="market-selector">
-                                <div style="font-size: 0.75rem; margin-bottom: 0.5rem; color: #374151;">Target Export Markets:</div>
-                                <div class="market-grid">
-                                    <button class="market-btn" data-market="usa">🇺🇸 USA</button>
-                                    <button class="market-btn" data-market="asia">🇯🇵 Asia</button>
-                                    <button class="market-btn" data-market="europe">🇪🇺 Europe</button>
-                                    <button class="market-btn" data-market="other">🌍 Other</button>
-                                </div>
-                                <div class="diversification-bonus">💡 Multiple markets = bonus merit points!</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <!-- Stop Generation Button -->
+    <button id="stop-generation-btn" class="stop-generation-btn">
+        <span>⏹️</span>
+        <span>Stop generating</span>
+    </button>
 
-                <div class="quick-start">
-                    <h4>Quick Start Options:</h4>
-                    <div class="quick-buttons">
-                        <button class="quick-button" onclick="insertQuickText('I need help with a BCAFE application for my ')">Start New Application</button>
-                        <button class="quick-button" onclick="insertQuickText('Check eligibility: Primary Producer in BC with ')">Check Eligibility</button>
-                        <button class="quick-button" onclick="insertQuickText('Activity strategy for export to ')">Plan Activities</button>
-                        <button class="quick-button" onclick="insertQuickText('Budget planning for $')">Budget Planning</button>
-                        <button class="quick-button" onclick="insertQuickText('Merit optimization review for ')">Merit Review</button>
-                    </div>
-                </div>
-
-                <div class="input-row">
-                    <textarea 
-                        id="message-input" 
-                        class="message-input" 
-                        placeholder="Tell me about your agricultural business, target export markets, and BCAFE application goals..."
-                    ></textarea>
-                    <button id="send-button" class="send-button">Send</button>
+    <!-- Floating Input Area -->
+    <div class="floating-input">
+        <div class="floating-quick-actions">
+            <button class="floating-quick-btn" onclick="insertQuickText('Eligibility Check')" data-task="eligibility">✅ Eligibility</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Activity Strategy')" data-task="strategy">🎯 Strategy</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Market Selection')" data-task="markets">🌍 Markets</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Budget Planning')" data-task="budget">💰 Budget</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Merit Optimization')" data-task="merit">⭐ Merit</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Application Review')" data-task="review">📋 Review</button>
+        </div>
+        <div class="simple-input-box" id="input-box">
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" multiple style="display: none;">
+            <div style="position: relative;">
+                <textarea 
+                    id="message-input" 
+                    class="message-input-simple" 
+                    placeholder="Tell me about your agricultural business, target export markets, and BCAFE application goals..."
+                    rows="1"
+                ></textarea>
+                <div class="input-buttons">
+                    <button class="file-button-inline" onclick="document.getElementById('file-input').click()" title="Upload files">
+                        📎
+                    </button>
+                    <button id="send-button" class="send-button-inline" title="Send message">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                        </svg>
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Global variables
         let isLoading = false;
-        let uploadedFile = null;
+        let uploadedFiles = [];
+        let hasStartedConversation = false;
+        let selectedTask = '';
+        let isGenerating = false;
+        let currentTypingTimeout = null;
         let selectedMarkets = [];
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
-        // DOM elements
-        const messagesContainer = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const fileInput = document.getElementById('file-input');
-        const fileInfo = document.getElementById('file-info');
-        const actionButtons = document.querySelectorAll('.action-button');
-        const orgTypeSelect = document.getElementById('org-type');
-        const revenue2023Input = document.getElementById('revenue-2023');
-        const revenue2024Input = document.getElementById('revenue-2024');
-        const maxFundingDisplay = document.getElementById('max-funding');
-        const fundingDetailsDisplay = document.getElementById('funding-details');
-        const marketButtons = document.querySelectorAll('.market-btn');
+        // Global functions for HTML onclick handlers
+        function insertQuickText(text) {
+            const messageInput = document.getElementById('message-input');
+            const quickBtn = event?.target.closest('.floating-quick-btn');
+            
+            if (quickBtn) {
+                // Update selected task
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                quickBtn.classList.add('active');
+                selectedTask = quickBtn.dataset.task || '';
+            }
+            
+            if (messageInput) {
+                messageInput.value = text + ': ';
+                messageInput.focus();
+                messageInput.style.height = 'auto';
+                messageInput.style.height = messageInput.scrollHeight + 'px';
+            }
+        }
+
+        function focusURLInput() {
+            const url = prompt("Enter agricultural business or export program URL:");
+            if (url && isValidURL(url)) {
+                hideWelcomeElements();
+                addMessage('user', `🔗 Analyze URL: ${url}`);
+                sendMessageWithURL(url);
+            } else if (url) {
+                showNotification('Please enter a valid URL (must start with http:// or https://)', 'error');
+            }
+        }
+
+        function isValidURL(string) {
+            try {
+                new URL(string);
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function hideWelcomeElements() {
+            if (!hasStartedConversation) {
+                hasStartedConversation = true;
+                const welcomeSection = document.getElementById('welcome-section');
+                const welcomeMessage = document.getElementById('welcome-message');
+                const chatContainer = document.getElementById('chat-container');
+                const container = document.querySelector('.container');
+                
+                if (welcomeSection) welcomeSection.style.display = 'none';
+                if (welcomeMessage) welcomeMessage.classList.add('hidden');
+                if (chatContainer) chatContainer.classList.add('expanded');
+                if (container) container.classList.add('chat-active');
+            }
+        }
 
         // Funding calculator
         function updateFundingCalculation() {
-            const orgType = orgTypeSelect.value;
-            const revenue2023 = parseInt(revenue2023Input.value) || 0;
-            const revenue2024 = parseInt(revenue2024Input.value) || 0;
+            const orgType = document.getElementById('org-type').value;
+            const revenue2023 = parseInt(document.getElementById('revenue-2023').value) || 0;
+            const revenue2024 = parseInt(document.getElementById('revenue-2024').value) || 0;
+            const maxFundingDisplay = document.getElementById('max-funding');
+            const fundingDetailsDisplay = document.getElementById('funding-details');
             
             if (!orgType) {
                 maxFundingDisplay.textContent = 'Select organization type';
@@ -915,127 +982,299 @@
                 details = 'Industry associations: $5K - $75K max, 30% cash match required';
             } else {
                 maxFunding = Math.min(50000, revenue2024 * 0.30);
-                details = `Producers/Processors: Lesser of $50K or 30% of ${revenue2024.toLocaleString()}, 50% cash match required`;
+                details = `Producers/Processors: Lesser of $50K or 30% of $${revenue2024.toLocaleString()}, 50% cash match required`;
             }
             
             maxFundingDisplay.textContent = `$${maxFunding.toLocaleString()} maximum eligible`;
             fundingDetailsDisplay.textContent = details;
         }
 
-        // Event listeners for funding calculator
-        orgTypeSelect.addEventListener('change', updateFundingCalculation);
-        revenue2023Input.addEventListener('input', updateFundingCalculation);
-        revenue2024Input.addEventListener('input', updateFundingCalculation);
-
-        // Market selection
-        marketButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                button.classList.toggle('selected');
-                const market = button.dataset.market;
+        // File upload functions
+        async function updateFileDisplay() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
+            if (uploadedFiles.length === 0) {
+                resetInputBox();
+                return;
+            }
+            
+            let totalSize = 0;
+            uploadedFiles.forEach(file => totalSize += file.size);
+            const fileSize = (totalSize / 1024).toFixed(1);
+            const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+            
+            inputBox.classList.add('has-file');
+            
+            // Create file grid HTML
+            let fileGridHTML = '<div class="file-grid">';
+            
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
+                const thumbnail = await generateFileThumbnail(file);
+                const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
                 
-                if (selectedMarkets.includes(market)) {
-                    selectedMarkets = selectedMarkets.filter(m => m !== market);
-                } else {
-                    selectedMarkets.push(market);
-                }
-                
-                // Update diversification bonus message
-                const bonusDiv = document.querySelector('.diversification-bonus');
-                if (selectedMarkets.length > 1) {
-                    bonusDiv.innerHTML = '🎉 Market diversification = BONUS merit points!';
-                    bonusDiv.style.color = '#10b981';
-                } else {
-                    bonusDiv.innerHTML = '💡 Multiple markets = bonus merit points!';
-                    bonusDiv.style.color = '#d4a574';
-                }
-            });
-        });
-
-        // Quick action buttons
-        actionButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                actionButtons.forEach(b => b.classList.remove('active'));
-                button.classList.add('active');
-                
-                const task = button.dataset.task;
-                const taskMessages = {
-                    'eligibility': 'I need help verifying BCAFE eligibility for my agricultural business.',
-                    'strategy': 'Help me develop an activity strategy that maximizes merit points.',
-                    'markets': 'I need guidance on selecting target export markets for maximum impact.',
-                    'budget': 'Help me create a realistic budget with proper quote management.',
-                    'application': 'I want to build a complete BCAFE application step by step.',
-                    'review': 'Please review my application for merit optimization opportunities.'
-                };
-                
-                messageInput.value = taskMessages[task] || 'Help me with my BCAFE application.';
-                setTimeout(() => sendMessage(), 100);
-            });
-        });
-
-        // File upload handling
-        fileInput.addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                uploadedFile = file;
-                
-                const fileSize = (file.size / 1024).toFixed(1);
-                const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
-                
-                fileInfo.innerHTML = `
-                    <div style="display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 6px; font-size: 0.75rem; margin-top: 0.5rem;">
-                        <span style="color: #059669;">✓</span>
-                        <span style="color: #065f46; font-weight: 500;">${file.name}</span>
-                        <span style="color: #047857; font-size: 0.7rem;">(${fileSizeUnit})</span>
+                fileGridHTML += `
+                    <div class="file-grid-item">
+                        ${thumbnail}
+                        <div class="file-name">${truncatedName}</div>
+                        <button class="file-remove-btn" onclick="removeFile(${i})">×</button>
                     </div>
                 `;
+            }
+            
+            fileGridHTML += '</div>';
+            
+            // Update input box content to show files
+            const placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
+            
+            // Create a temporary container above the input
+            let fileDisplay = inputBox.querySelector('.file-display');
+            if (!fileDisplay) {
+                fileDisplay = document.createElement('div');
+                fileDisplay.className = 'file-display';
+                fileDisplay.style.cssText = `
+                    padding: 8px 16px;
+                    border-bottom: 1px solid var(--border);
+                    background: rgba(45, 80, 22, 0.05);
+                `;
+                inputBox.insertBefore(fileDisplay, inputBox.firstChild);
+            }
+            
+            fileDisplay.innerHTML = `
+                <div style="color: #2d5016; font-weight: 500; font-size: 0.8rem; margin-bottom: 0.5rem;">
+                    ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
+                </div>
+                ${fileGridHTML}
+            `;
+            
+            messageInput.placeholder = placeholder;
+        }
+
+        function generateFileThumbnail(file) {
+            return new Promise((resolve) => {
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
                 
-                const uploadButton = document.querySelector('.upload-button');
-                uploadButton.innerHTML = `<span style="color: #059669;">✓</span><span>Ready: ${file.name}</span>`;
-                uploadButton.classList.add('has-file');
-                
-                addMessage('user', `📄 **${file.name}** uploaded for BCAFE analysis`);
+                if (imageTypes.includes(fileExtension)) {
+                    // Generate image thumbnail
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = document.createElement('img');
+                        img.className = 'file-thumbnail';
+                        img.src = e.target.result;
+                        img.alt = file.name;
+                        resolve(img.outerHTML);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    // Generate file type icon
+                    const icon = getFileTypeIcon(fileExtension);
+                    const iconHtml = `<div class="file-icon-large">${icon}</div>`;
+                    resolve(iconHtml);
+                }
+            });
+        }
+
+        function getFileTypeIcon(extension) {
+            const icons = {
+                '.pdf': '📄',
+                '.doc': '📝',
+                '.docx': '📝',
+                '.txt': '📄',
+                '.md': '📄'
+            };
+            return icons[extension] || '📄';
+        }
+
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+            updateFileDisplay();
+        }
+
+        function resetInputBox() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
+            inputBox.classList.remove('has-file');
+            const fileDisplay = inputBox.querySelector('.file-display');
+            if (fileDisplay) {
+                fileDisplay.remove();
+            }
+            
+            if (messageInput) {
+                messageInput.placeholder = "Tell me about your agricultural business, target export markets, and BCAFE application goals...";
+            }
+            
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing BCAFE interface...');
+            
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const fileInput = document.getElementById('file-input');
+            const inputBox = document.getElementById('input-box');
+            const stopButton = document.getElementById('stop-generation-btn');
+            const orgTypeSelect = document.getElementById('org-type');
+            const revenue2023Input = document.getElementById('revenue-2023');
+            const revenue2024Input = document.getElementById('revenue-2024');
+
+            // Stop generation button click handler
+            if (stopButton) {
+                stopButton.addEventListener('click', function() {
+                    stopGeneration();
+                });
+            }
+
+            // Funding calculator event listeners
+            if (orgTypeSelect) orgTypeSelect.addEventListener('change', updateFundingCalculation);
+            if (revenue2023Input) revenue2023Input.addEventListener('input', updateFundingCalculation);
+            if (revenue2024Input) revenue2024Input.addEventListener('input', updateFundingCalculation);
+
+            // Auto-resize textarea
+            if (messageInput) {
+                messageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                });
+            }
+
+            // Send button click handler
+            if (sendButton) {
+                sendButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    sendMessage();
+                });
+            }
+
+            // Enter key handler
+            if (messageInput) {
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                    }
+                });
+            }
+
+            // File upload handler
+            if (fileInput) {
+                fileInput.addEventListener('change', async function(e) {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...files];
+                        await updateFileDisplay();
+                        messageInput.focus();
+                    }
+                });
+            }
+
+            // Drag and drop
+            if (inputBox) {
+                setupDragAndDrop(inputBox, messageInput);
+            }
+
+            // Focus input
+            if (messageInput) {
                 messageInput.focus();
             }
+
+            // Initialize funding calculator
+            updateFundingCalculation();
+
+            console.log('BCAFE interface initialized successfully');
         });
 
-        // Send message functionality
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Quick text insertion
-        function insertQuickText(text) {
-            messageInput.value = text;
-            messageInput.focus();
+        function setupDragAndDrop(inputBox, messageInput) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.add('drag-over');
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.remove('drag-over');
+                }, false);
+            });
+            
+            inputBox.addEventListener('drop', async (e) => {
+                const droppedFiles = Array.from(e.dataTransfer.files);
+                if (droppedFiles.length > 0) {
+                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const validFiles = droppedFiles.filter(file => {
+                        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                        return allowedTypes.includes(fileExtension);
+                    });
+                    
+                    if (validFiles.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...validFiles];
+                        await updateFileDisplay();
+                    }
+                    
+                    if (validFiles.length !== droppedFiles.length) {
+                        showNotification('Some files were skipped. Supported: PDF, DOCX, TXT, MD, JPG, PNG', 'error');
+                    }
+                }
+            }, false);
         }
 
         async function sendMessage() {
-            const message = messageInput.value.trim();
-            if (!message && !uploadedFile) return;
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            
+            const message = messageInput ? messageInput.value.trim() : '';
+            
+            if (!message && uploadedFiles.length === 0) return;
             if (isLoading) return;
+
+            hideWelcomeElements();
+
+            // Handle files
+            if (uploadedFiles.length > 0) {
+                const fileList = uploadedFiles.map(file => {
+                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const isImage = imageTypes.includes(fileExtension);
+                    return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
+                }).join('\n');
+                
+                addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
+            }
 
             if (message) {
                 addMessage('user', message);
             }
 
             isLoading = true;
-            sendButton.disabled = true;
+            if (sendButton) sendButton.disabled = true;
             addLoadingMessage();
 
             try {
                 const formData = new FormData();
-                formData.append('message', message);
+                formData.append('message', message || '');
+                formData.append('task', selectedTask || 'bcafe-application');
                 formData.append('conversationId', 'bcafe-conversation');
-                formData.append('orgType', orgTypeSelect.value);
-                formData.append('selectedMarkets', selectedMarkets.join(','));
+                formData.append('agentType', 'bcafe');
+                formData.append('orgType', document.getElementById('org-type').value || '');
+                formData.append('selectedMarkets', selectedMarkets.join(',') || '');
                 
-                if (uploadedFile) {
-                    formData.append('file', uploadedFile);
-                }
+                uploadedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
 
                 const response = await fetch(`${API_BASE}/api/process-bcafe`, {
                     method: 'POST',
@@ -1048,31 +1287,105 @@
 
                 const data = await response.json();
                 
+                console.log('API Response:', data.response);
                 removeLoadingMessage();
-                addMessage('assistant', data.response, true); // Enable typing animation
+                addMessage('assistant', data.response, true);
 
             } catch (error) {
+                console.error('Send message error:', error);
                 removeLoadingMessage();
-                addMessage('assistant', `I apologize, but I'm having trouble connecting right now. Please try again.\n\nError: ${error.message}`, false);
+                addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
             }
 
             isLoading = false;
-            sendButton.disabled = false;
-            messageInput.value = '';
-            
-            if (uploadedFile) {
-                uploadedFile = null;
-                fileInfo.innerHTML = '';
-                fileInput.value = '';
-                const uploadButton = document.querySelector('.upload-button');
-                uploadButton.innerHTML = '<span>📄</span><span>Upload Business Documents</span>';
-                uploadButton.classList.remove('has-file');
+            if (sendButton) sendButton.disabled = false;
+            if (messageInput) {
+                messageInput.value = '';
+                messageInput.style.height = '44px';
+                messageInput.placeholder = "Tell me about your agricultural business, target export markets, and BCAFE application goals...";
             }
             
-            actionButtons.forEach(b => b.classList.remove('active'));
+            uploadedFiles = [];
+            resetInputBox();
+            
+            // Clear task selection
+            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+            selectedTask = '';
+        }
+
+        async function sendMessageWithURL(url) {
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            
+            isLoading = true;
+            if (sendButton) sendButton.disabled = true;
+            addLoadingMessage('Analyzing website...');
+
+            try {
+                const formData = new FormData();
+                formData.append('message', 'Analyze this BCAFE-related URL');
+                formData.append('url', url);
+                formData.append('task', selectedTask || 'bcafe-application');
+                formData.append('conversationId', 'bcafe-conversation');
+                formData.append('agentType', 'bcafe');
+                
+                const response = await fetch(`${API_BASE}/api/process-bcafe`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                removeLoadingMessage();
+                addMessage('assistant', data.response, true);
+
+            } catch (error) {
+                removeLoadingMessage();
+                addMessage('assistant', `Error analyzing URL: ${error.message}`, false);
+            }
+
+            isLoading = false;
+            if (sendButton) sendButton.disabled = false;
+            
+            // Clear task selection
+            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+            selectedTask = '';
+        }
+
+        function stopGeneration() {
+            if (currentTypingTimeout) {
+                clearTimeout(currentTypingTimeout);
+                currentTypingTimeout = null;
+            }
+            
+            isGenerating = false;
+            hideStopButton();
+        }
+
+        function showStopButton() {
+            const stopButton = document.getElementById('stop-generation-btn');
+            if (stopButton) {
+                stopButton.classList.add('show');
+            }
+        }
+
+        function hideStopButton() {
+            const stopButton = document.getElementById('stop-generation-btn');
+            if (stopButton) {
+                stopButton.classList.remove('show');
+            }
         }
 
         function addMessage(role, content, shouldAnimate = false) {
+            console.log('Adding message:', role, content.substring(0, 100) + '...');
+            
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
             
@@ -1080,142 +1393,195 @@
             contentDiv.className = 'message-content';
             
             if (role === 'assistant' && shouldAnimate) {
-                // Add typing animation for assistant responses
-                contentDiv.innerHTML = '';
+                console.log('Starting typing animation...');
+                // Start with typing cursor for animation
+                contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
+                
                 messageDiv.appendChild(contentDiv);
                 messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
-                // Start typing animation
-                typewriterEffect(contentDiv, content, () => {
-                    // Add export button after typing is complete
-                    if (content.includes('BCAFE APPLICATION') || content.includes('**Application Questions**') || content.includes('# BCAFE Application')) {
+                // Start typing animation immediately
+                setTimeout(() => {
+                    typeMessage(contentDiv, content);
+                }, 200);
+                
+            } else {
+                // User messages or non-animated assistant messages appear immediately
+                let processedContent = content;
+                processedContent = processedContent.replace(/\n/g, '<br>');
+                processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                contentDiv.innerHTML = processedContent;
+                messageDiv.appendChild(contentDiv);
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            }
+            
+            console.log('Message added successfully');
+        }
+
+        function typeMessage(contentDiv, content) {
+            // Process BCAFE content first
+            const processedContent = processBCAFEContent(content);
+            
+            // Clear the typing cursor
+            contentDiv.innerHTML = '<div class="typing-container"></div>';
+            const container = contentDiv.querySelector('.typing-container');
+            
+            // Convert HTML to array of characters/tags
+            const htmlParts = parseHTML(processedContent);
+            let currentIndex = 0;
+            
+            // Show stop button and set generating state
+            isGenerating = true;
+            showStopButton();
+            
+            function typeNextChar() {
+                // Check if generation was stopped
+                if (!isGenerating || currentIndex >= htmlParts.length) {
+                    // Generation complete or stopped
+                    isGenerating = false;
+                    hideStopButton();
+                    
+                    // If stopped early, just finish with current content
+                    if (currentIndex < htmlParts.length) {
+                        // Add remaining content instantly if stopped
+                        for (let i = currentIndex; i < htmlParts.length; i++) {
+                            container.innerHTML += htmlParts[i];
+                        }
+                    }
+                    
+                    // Add export button if needed
+                    if (content.includes('# BCAFE APPLICATION') || content.includes('## BCAFE Application') || content.includes('BCAFE APPLICATION GENERATED')) {
                         const exportButton = document.createElement('button');
                         exportButton.className = 'export-button';
                         exportButton.innerHTML = '💾 Export BCAFE Application';
-                        exportButton.onclick = () => exportApplication(content);
+                        exportButton.onclick = () => exportBCAFEApplication(content);
                         contentDiv.appendChild(exportButton);
                     }
-                });
-            } else {
-                // Instant display for user messages
-                contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-                
-                if (role === 'assistant' && (content.includes('BCAFE APPLICATION') || content.includes('**Application Questions**') || content.includes('# BCAFE Application'))) {
-                    const exportButton = document.createElement('button');
-                    exportButton.className = 'export-button';
-                    exportButton.innerHTML = '💾 Export BCAFE Application';
-                    exportButton.onclick = () => exportApplication(content);
-                    contentDiv.appendChild(exportButton);
-                }
-                
-                messageDiv.appendChild(contentDiv);
-                messagesContainer.appendChild(messageDiv);
-            }
-            
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function typewriterEffect(element, content, onComplete) {
-            const formattedContent = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = formattedContent;
-            
-            let currentIndex = 0;
-            const textNodes = [];
-            
-            // Extract all text content while preserving HTML structure
-            function extractTextNodes(node) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    textNodes.push({
-                        node: node,
-                        text: node.textContent,
-                        parent: node.parentNode
-                    });
-                } else {
-                    for (let child of node.childNodes) {
-                        extractTextNodes(child);
-                    }
-                }
-            }
-            
-            // Clone the structure but empty the text
-            const clonedContent = tempDiv.cloneNode(true);
-            function clearTextContent(node) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    node.textContent = '';
-                } else {
-                    for (let child of node.childNodes) {
-                        clearTextContent(child);
-                    }
-                }
-            }
-            
-            clearTextContent(clonedContent);
-            element.appendChild(clonedContent);
-            
-            // Extract text nodes from original
-            extractTextNodes(tempDiv);
-            
-            // Find corresponding nodes in cloned structure
-            const targetNodes = [];
-            function findTargetNodes(node) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    targetNodes.push(node);
-                } else {
-                    for (let child of node.childNodes) {
-                        findTargetNodes(child);
-                    }
-                }
-            }
-            findTargetNodes(clonedContent);
-            
-            let currentNodeIndex = 0;
-            let currentCharIndex = 0;
-            
-            function typeNextChar() {
-                if (currentNodeIndex >= textNodes.length) {
-                    if (onComplete) onComplete();
                     return;
                 }
                 
-                const currentTextNode = textNodes[currentNodeIndex];
-                const targetNode = targetNodes[currentNodeIndex];
+                const part = htmlParts[currentIndex];
                 
-                if (currentCharIndex < currentTextNode.text.length) {
-                    targetNode.textContent = currentTextNode.text.substring(0, currentCharIndex + 1);
-                    currentCharIndex++;
-                    
-                    // Auto-scroll as content appears
-                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    
-                    // Vary typing speed for more natural feel
-                    const char = currentTextNode.text[currentCharIndex - 1];
-                    let delay = 15; // Base typing speed
-                    
-                    if (char === '.' || char === '!' || char === '?') delay = 100; // Pause at sentence ends
-                    else if (char === ',' || char === ';') delay = 50; // Pause at commas
-                    else if (char === ' ') delay = 25; // Slight pause at spaces
-                    else if (char === '\n') delay = 75; // Pause at line breaks
-                    
-                    setTimeout(typeNextChar, delay);
+                if (part.startsWith('<') && part.endsWith('>')) {
+                    // Add HTML tags instantly
+                    container.innerHTML += part;
                 } else {
-                    currentNodeIndex++;
-                    currentCharIndex = 0;
-                    setTimeout(typeNextChar, 25);
+                    // Add characters one by one
+                    container.innerHTML += part;
                 }
+                
+                currentIndex++;
+                
+                // Auto-scroll as content appears
+                const messagesContainer = document.getElementById('messages');
+                if (messagesContainer) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+                
+                // Continue typing (adjust speed here: lower = faster)
+                currentTypingTimeout = setTimeout(typeNextChar, 15);
             }
             
             typeNextChar();
         }
 
-        function addLoadingMessage() {
+        function parseHTML(html) {
+            const parts = [];
+            let currentPos = 0;
+            
+            // Simple HTML parser that preserves tags
+            while (currentPos < html.length) {
+                const nextTag = html.indexOf('<', currentPos);
+                
+                if (nextTag === -1) {
+                    // No more tags, add remaining characters
+                    for (let i = currentPos; i < html.length; i++) {
+                        parts.push(html[i]);
+                    }
+                    break;
+                }
+                
+                // Add characters before the tag
+                for (let i = currentPos; i < nextTag; i++) {
+                    parts.push(html[i]);
+                }
+                
+                // Find the end of the tag
+                const tagEnd = html.indexOf('>', nextTag);
+                if (tagEnd !== -1) {
+                    parts.push(html.substring(nextTag, tagEnd + 1));
+                    currentPos = tagEnd + 1;
+                } else {
+                    // Malformed tag, just add the character
+                    parts.push(html[nextTag]);
+                    currentPos = nextTag + 1;
+                }
+            }
+            
+            return parts;
+        }
+
+        function processBCAFEContent(content) {
+            let processed = content;
+            
+            // Enhanced markdown processing
+            processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Process BCAFE headers
+            processed = processed.replace(
+                /# BCAFE APPLICATION:/g,
+                '<div class="bcafe-header">🌾 BCAFE APPLICATION GENERATED</div>'
+            );
+            
+            processed = processed.replace(
+                /## BCAFE Application/g,
+                '<div class="bcafe-header">🌾 BCAFE APPLICATION</div>'
+            );
+            
+            // Process section headers with emojis
+            processed = processed.replace(
+                /✅ (.*?)$/gm,
+                '<div class="section-header section-eligibility">✅ $1</div>'
+            );
+            
+            processed = processed.replace(
+                /💰 (.*?)$/gm,
+                '<div class="section-header section-funding">💰 $1</div>'
+            );
+            
+            processed = processed.replace(
+                /🎯 (.*?)$/gm,
+                '<div class="section-header section-strategy">🎯 $1</div>'
+            );
+            
+            // Process horizontal dividers
+            processed = processed.replace(
+                /^---$/gm,
+                '<hr class="bcafe-divider">'
+            );
+            
+            // Convert line breaks to proper HTML
+            processed = processed.replace(/\n/g, '<br>');
+            
+            return processed;
+        }
+
+        function addLoadingMessage(customMessage = 'Analyzing for BCAFE compliance and merit optimization') {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message assistant';
             messageDiv.id = 'loading-message';
             
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'loading';
-            loadingDiv.innerHTML = '<div class="spinner"></div><span>Analyzing for BCAFE compliance and merit optimization...</span>';
+            loadingDiv.innerHTML = `<div class="spinner"></div><span>${customMessage}...</span>`;
             
             messageDiv.appendChild(loadingDiv);
             messagesContainer.appendChild(messageDiv);
@@ -1229,35 +1595,49 @@
             }
         }
 
-        function exportApplication(content) {
-            const blob = new Blob([content], { type: 'text/plain' });
+        function exportBCAFEApplication(content) {
+            const cleanContent = content
+                .replace(/<[^>]*>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .trim();
+            
+            const blob = new Blob([cleanContent], { type: 'text/plain; charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
+            
+            const now = new Date();
+            const timestamp = now.toISOString().slice(0, 19).replace(/:/g, '-');
             a.href = url;
-            a.download = 'bcafe-application.txt';
+            a.download = `bcafe-application-${timestamp}.txt`;
+            
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            
+            showNotification('✅ BCAFE Application exported successfully!');
         }
 
-        // Initialize funding calculator
-        updateFundingCalculation();
-
-        // Background cache warming for BCAFE
-document.addEventListener('DOMContentLoaded', async function() {
-    try {
-        console.log('🔥 Pre-warming BCAFE cache...');
-        const response = await fetch(`${API_BASE}/api/warm-cache/bcafe-writer`, { 
-            method: 'POST' 
-        });
-        
-        if (response.ok) {
-            const result = await response.json();
-            console.log(`✅ BCAFE cache pre-warmed in ${result.warmTime}ms`);
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.opacity = '0';
+                notification.style.transform = 'translateX(100%)';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        notification.parentNode.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
         }
-    } catch (error) {
-        console.log('Cache warming failed (non-critical):', error);
-    }
-});
     </script>
 </body>
 </html>
