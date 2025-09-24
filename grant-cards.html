@@ -88,15 +88,19 @@
         
         /* Main Container */
         .container {
-            max-width: 900px;
-            margin: 0 auto;
             padding: 2rem 1.5rem;
+        }
+        
+        .container.chat-active {
+            padding: 0;
         }
         
         /* Welcome Section */
         .welcome-section {
+            max-width: 900px;
+            margin: 0 auto;
             text-align: center;
-            padding: 3rem 0;
+            padding: 3rem 2rem;
             transition: all 0.3s ease;
         }
         
@@ -149,11 +153,13 @@
             border: 1px solid rgba(0, 138, 191, 0.1);
             box-shadow: 0 8px 32px rgba(0, 138, 191, 0.08);
             min-height: 500px;
+            margin: 0 2rem;
             transition: all 0.3s ease;
         }
         
         .chat-container.expanded {
-            min-height: calc(100vh - 200px);
+            min-height: calc(100vh - 160px);
+            margin: 0 2rem;
         }
         
         .messages {
@@ -162,7 +168,7 @@
             flex-direction: column;
             gap: 1.5rem;
             overflow-y: auto;
-            max-height: calc(100vh - 300px);
+            max-height: calc(100vh - 160px);
         }
         
         .message {
@@ -605,6 +611,38 @@
             background: var(--error);
         }
         
+        /* Stop Generation Button */
+        .stop-generation-btn {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 24px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            z-index: 250;
+            display: none;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .stop-generation-btn:hover {
+            background: #b91c1c;
+            transform: translateX(-50%) translateY(-2px);
+            box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+        }
+        
+        .stop-generation-btn.show {
+            display: flex;
+        }
+        
         @media (max-width: 768px) {
             .welcome-title {
                 font-size: 2rem;
@@ -704,6 +742,12 @@
         </div>
     </div>
 
+    <!-- Stop Generation Button -->
+    <button id="stop-generation-btn" class="stop-generation-btn">
+        <span>⏹️</span>
+        <span>Stop generating</span>
+    </button>
+
     <!-- Floating Input Area -->
     <div class="floating-input">
         <div class="floating-quick-actions">
@@ -725,7 +769,7 @@
                 ></textarea>
                 <div class="input-buttons">
                     <button class="file-button-inline" onclick="document.getElementById('file-input').click()" title="Upload files">
-                        📎
+                        🔎
                     </button>
                     <button id="send-button" class="send-button-inline" title="Send message">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -744,6 +788,8 @@
         let uploadedFiles = [];
         let hasStartedConversation = false;
         let selectedTask = '';
+        let isGenerating = false;
+        let currentTypingTimeout = null;
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
@@ -794,10 +840,12 @@
                 const welcomeSection = document.getElementById('welcome-section');
                 const welcomeMessage = document.getElementById('welcome-message');
                 const chatContainer = document.getElementById('chat-container');
+                const container = document.querySelector('.container');
                 
                 if (welcomeSection) welcomeSection.style.display = 'none';
                 if (welcomeMessage) welcomeMessage.classList.add('hidden');
                 if (chatContainer) chatContainer.classList.add('expanded');
+                if (container) container.classList.add('chat-active');
             }
         }
 
@@ -933,6 +981,14 @@
             const sendButton = document.getElementById('send-button');
             const fileInput = document.getElementById('file-input');
             const inputBox = document.getElementById('input-box');
+            const stopButton = document.getElementById('stop-generation-btn');
+
+            // Stop generation button click handler
+            if (stopButton) {
+                stopButton.addEventListener('click', function() {
+                    stopGeneration();
+                });
+            }
 
             // Auto-resize textarea
             if (messageInput) {
@@ -1069,7 +1125,7 @@
                     const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
                     const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
                     const isImage = imageTypes.includes(fileExtension);
-                    return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
+                    return `🔎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
                 }).join('\n');
                 
                 addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
@@ -1189,6 +1245,30 @@
             await handleURLMessage(url, 'Analyze this grant URL');
         }
 
+        function stopGeneration() {
+            if (currentTypingTimeout) {
+                clearTimeout(currentTypingTimeout);
+                currentTypingTimeout = null;
+            }
+            
+            isGenerating = false;
+            hideStopButton();
+        }
+
+        function showStopButton() {
+            const stopButton = document.getElementById('stop-generation-btn');
+            if (stopButton) {
+                stopButton.classList.add('show');
+            }
+        }
+
+        function hideStopButton() {
+            const stopButton = document.getElementById('stop-generation-btn');
+            if (stopButton) {
+                stopButton.classList.remove('show');
+            }
+        }
+
         // Fixed addMessage function with proper HTML processing and typing animation
         function addMessage(role, content, shouldAnimate = false) {
             console.log('Adding message:', role, content.substring(0, 100) + '...');
@@ -1203,6 +1283,7 @@
             contentDiv.className = 'message-content';
             
             if (role === 'assistant' && shouldAnimate) {
+                console.log('Starting typing animation...');
                 // Start with typing cursor for animation
                 contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
                 
@@ -1210,10 +1291,10 @@
                 messagesContainer.appendChild(messageDiv);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
                 
-                // Start typing animation after brief delay
+                // Start typing animation immediately
                 setTimeout(() => {
                     typeMessage(contentDiv, content);
-                }, 500);
+                }, 200);
                 
             } else {
                 // User messages or non-animated assistant messages appear immediately
@@ -1243,30 +1324,26 @@
             const htmlParts = parseHTML(processedContent);
             let currentIndex = 0;
             
+            // Show stop button and set generating state
+            isGenerating = true;
+            showStopButton();
+            
             function typeNextChar() {
-                if (currentIndex < htmlParts.length) {
-                    const part = htmlParts[currentIndex];
+                // Check if generation was stopped
+                if (!isGenerating || currentIndex >= htmlParts.length) {
+                    // Generation complete or stopped
+                    isGenerating = false;
+                    hideStopButton();
                     
-                    if (part.startsWith('<') && part.endsWith('>')) {
-                        // Add HTML tags instantly
-                        container.innerHTML += part;
-                    } else {
-                        // Add characters one by one
-                        container.innerHTML += part;
+                    // If stopped early, just finish with current content
+                    if (currentIndex < htmlParts.length) {
+                        // Add remaining content instantly if stopped
+                        for (let i = currentIndex; i < htmlParts.length; i++) {
+                            container.innerHTML += htmlParts[i];
+                        }
                     }
                     
-                    currentIndex++;
-                    
-                    // Auto-scroll as content appears
-                    const messagesContainer = document.getElementById('messages');
-                    if (messagesContainer) {
-                        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-                    }
-                    
-                    // Continue typing (adjust speed here: lower = faster)
-                    setTimeout(typeNextChar, 15);
-                } else {
-                    // Typing complete - add export button if needed
+                    // Add export button if needed
                     if (content.includes('# GRANT CARD:') || content.includes('## Grant Card') || content.includes('GRANT CARD GENERATED')) {
                         const exportButton = document.createElement('button');
                         exportButton.className = 'export-button';
@@ -1274,7 +1351,29 @@
                         exportButton.onclick = () => exportGrantCard(content);
                         contentDiv.appendChild(exportButton);
                     }
+                    return;
                 }
+                
+                const part = htmlParts[currentIndex];
+                
+                if (part.startsWith('<') && part.endsWith('>')) {
+                    // Add HTML tags instantly
+                    container.innerHTML += part;
+                } else {
+                    // Add characters one by one
+                    container.innerHTML += part;
+                }
+                
+                currentIndex++;
+                
+                // Auto-scroll as content appears
+                const messagesContainer = document.getElementById('messages');
+                if (messagesContainer) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+                
+                // Continue typing (adjust speed here: lower = faster)
+                currentTypingTimeout = setTimeout(typeNextChar, 15);
             }
             
             typeNextChar();
@@ -1427,7 +1526,7 @@
                         notification.parentNode.removeChild(notification);
                     }
                 }, 300);
-            }, 3000);
+            }, 300);
         }
     </script>
 </body>
