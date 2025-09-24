@@ -2366,7 +2366,7 @@ async function waitForRateLimit() {
 }
 
 
-// Claude API integration with proper tool handling
+// Claude API integration with proper tool handling and error checking
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
     checkRateLimit();
@@ -2430,7 +2430,19 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         })
       });
       
+      if (!continueResponse.ok) {
+        throw new Error(`Continue API request failed: ${continueResponse.status} ${continueResponse.statusText}`);
+      }
+      
       const continueData = await continueResponse.json();
+      console.log('🔍 CONTINUE RESPONSE STRUCTURE:', JSON.stringify(continueData, null, 2));
+      
+      // Check if continue response has expected structure
+      if (!continueData.content || !continueData.content[0] || !continueData.content[0].text) {
+        console.error('❌ Continue response missing expected content structure');
+        return "I apologize, but I encountered an issue with the web search. Please try again.";
+      }
+      
       return continueData.content[0].text;
     }
     
