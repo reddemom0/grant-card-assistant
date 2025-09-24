@@ -89,6 +89,10 @@
             padding: 2rem 1.5rem;
         }
         
+        .container.chat-active {
+            padding: 0;
+        }
+        
         /* Welcome Section */
         .welcome-section {
             text-align: center;
@@ -142,17 +146,21 @@
             border: 1px solid var(--border);
             min-height: 500px;
             transition: all 0.3s ease;
+            margin: 0 2rem;
         }
         
         .chat-container.expanded {
-            min-height: calc(100vh - 200px);
+            min-height: calc(100vh - 160px);
+            margin: 0 2rem;
         }
         
         .messages {
             padding: 1.5rem;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 1.5rem;
+            overflow-y: auto;
+            max-height: calc(100vh - 160px);
         }
         
         .message {
@@ -175,20 +183,24 @@
         
         .message-content {
             max-width: 80%;
-            padding: 1rem 1.25rem;
-            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
+            border-radius: 18px;
             font-size: 0.95rem;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.6;
         }
         
         .message.user .message-content {
             background: var(--primary);
             color: white;
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
         }
         
         .message.assistant .message-content {
             background: var(--background);
             color: var(--text-primary);
-            line-height: 1.7;
+            border: 1px solid var(--border);
         }
         
         /* Enhanced structured audit report styling */
@@ -323,6 +335,24 @@
             font-size: 0.9rem;
         }
         
+        .message.assistant .message-content p {
+            margin: 0.75rem 0;
+        }
+        
+        .message.assistant .message-content strong {
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .message.assistant .message-content ul,
+        .message.assistant .message-content ol {
+            margin: 0.75rem 0 0.75rem 1.5rem;
+        }
+        
+        .message.assistant .message-content li {
+            margin: 0.5rem 0;
+        }
+        
         .welcome-message.hidden {
             display: none;
         }
@@ -333,15 +363,16 @@
             gap: 0.75rem;
             background: var(--background);
             color: var(--text-secondary);
-            padding: 1rem 1.25rem;
-            border-radius: 16px;
+            padding: 1.25rem 1.5rem;
+            border-radius: 18px;
             max-width: 200px;
             font-size: 0.9rem;
+            border: 1px solid var(--border);
         }
         
         .spinner {
-            width: 16px;
-            height: 16px;
+            width: 18px;
+            height: 18px;
             border: 2px solid var(--border);
             border-top: 2px solid var(--primary);
             border-radius: 50%;
@@ -353,99 +384,233 @@
             100% { transform: rotate(360deg); }
         }
         
+        /* File thumbnail styles */
+        .file-thumbnail {
+            width: 60px;
+            height: 60px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .file-icon-large {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 24px;
+            color: var(--text-secondary);
+        }
+
+        .file-grid {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            margin: 0.75rem 0;
+        }
+
+        .file-grid-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--surface);
+            min-width: 80px;
+            max-width: 120px;
+            position: relative;
+        }
+
+        .file-grid-item .file-name {
+            font-size: 0.75rem;
+            text-align: center;
+            word-break: break-word;
+            line-height: 1.2;
+            color: var(--text-secondary);
+        }
+
+        .file-remove-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--error);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
         /* Floating Input Area */
         .floating-input {
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--surface);
-            border-top: 1px solid var(--border);
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 200;
-            padding: 1rem 0;
+            max-width: 700px;
+            width: calc(100% - 40px);
         }
         
-        .floating-input-container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 0 1.5rem;
-        }
-        
-        .file-upload-row {
+        .floating-quick-actions {
+            margin-bottom: 10px;
             display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 0.75rem;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         
-        .file-drop-zone {
-            flex: 1;
-            border: 2px dashed var(--border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
+        .floating-quick-btn {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 8px 14px;
             cursor: pointer;
+            font-size: 0.75rem;
+            color: var(--primary);
+            white-space: nowrap;
             transition: all 0.2s ease;
-            background: var(--background);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
+            box-shadow: 0 2px 8px rgba(30, 58, 138, 0.1);
+            font-weight: 500;
         }
         
-        .file-drop-zone:hover {
+        .floating-quick-btn:hover {
             border-color: var(--primary);
-            background: rgba(30, 58, 138, 0.02);
+            background: rgba(30, 58, 138, 0.05);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(30, 58, 138, 0.2);
         }
         
-        .file-drop-zone.has-file {
+        .floating-quick-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        .simple-input-box {
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 24px rgba(30, 58, 138, 0.1);
+        }
+        
+        .simple-input-box:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
+        }
+        
+        .simple-input-box.drag-over {
+            border-color: var(--primary);
+            background: rgba(30, 58, 138, 0.05);
+            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.2);
+        }
+        
+        .simple-input-box.has-file {
             border-color: var(--success);
             background: rgba(16, 185, 129, 0.05);
         }
         
-        .drop-icon {
-            font-size: 1.25rem;
-            color: var(--text-secondary);
+        .message-input-simple {
+            width: 100%;
+            border: none;
+            border-radius: 16px;
+            padding: 12px 80px 12px 16px;
+            resize: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            background: transparent;
+            transition: all 0.2s ease;
+            min-height: 44px;
+            max-height: 120px;
+            outline: none;
         }
         
-        .drop-text {
-            flex: 1;
-            font-size: 0.9rem;
-            color: var(--text-primary);
-        }
-        
-        .drop-subtext {
-            font-size: 0.8rem;
-            color: var(--text-secondary);
-        }
-        
-        .format-badges {
+        .input-buttons {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
             display: flex;
-            gap: 0.25rem;
+            gap: 4px;
+            align-items: center;
         }
         
-        .format-badge {
-            background: var(--success);
+        .file-button-inline {
+            width: 32px;
+            height: 32px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .file-button-inline:hover {
+            background: rgba(30, 58, 138, 0.1);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .send-button-inline {
+            width: 36px;
+            height: 36px;
+            background: var(--primary);
             color: white;
-            padding: 0.15rem 0.4rem;
-            border-radius: 10px;
-            font-size: 0.7rem;
-            font-weight: 600;
-        }
-        
-        .quick-actions {
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
             display: flex;
-            gap: 0.5rem;
-            overflow-x: auto;
-            padding-bottom: 0.25rem;
+            align-items: center;
+            justify-content: center;
         }
         
-        .quick-actions::-webkit-scrollbar {
-            height: 4px;
+        .send-button-inline:hover:not(:disabled) {
+            background: var(--primary-dark);
+            transform: translateY(-50%) scale(1.05);
         }
         
-        .quick-actions::-webkit-scrollbar-thumb {
-            background: var(--border);
-            border-radius: 2px;
+        .send-button-inline:disabled {
+            background: var(--text-secondary);
+            cursor: not-allowed;
+            transform: translateY(-50%);
+        }
+        
+        .upload-btn-welcome {
+            padding: 0.5rem 1rem;
+            background: rgba(30, 58, 138, 0.1);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: var(--primary);
+            transition: all 0.2s ease;
+        }
+        
+        .upload-btn-welcome:hover {
+            background: rgba(30, 58, 138, 0.2);
+            transform: translateY(-1px);
         }
         
         .quick-btn {
@@ -463,54 +628,6 @@
         .quick-btn:hover {
             border-color: var(--primary);
             color: var(--primary);
-        }
-        
-        .input-row {
-            display: flex;
-            gap: 0.75rem;
-            align-items: flex-end;
-        }
-        
-        .message-input {
-            flex: 1;
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 0.75rem 1rem;
-            resize: none;
-            font-family: inherit;
-            font-size: 0.95rem;
-            background: var(--surface);
-            transition: all 0.2s ease;
-            min-height: 44px;
-            max-height: 120px;
-        }
-        
-        .message-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(30, 58, 138, 0.1);
-        }
-        
-        .send-button {
-            padding: 0.75rem 1.25rem;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            font-weight: 600;
-            transition: all 0.2s ease;
-            height: 44px;
-        }
-        
-        .send-button:hover:not(:disabled) {
-            background: var(--primary-dark);
-        }
-        
-        .send-button:disabled {
-            background: var(--text-secondary);
-            cursor: not-allowed;
         }
         
         .export-button {
@@ -555,6 +672,10 @@
             background: var(--primary);
         }
         
+        .notification.error {
+            background: var(--error);
+        }
+        
         /* Typing animation styles */
         .typing-cursor {
             display: inline-block;
@@ -573,77 +694,37 @@
         .typing-container {
             min-height: 1.2em;
         }
-        .typing-container {
-            min-height: 1.2em;
-        }
         
-        /* File thumbnail styles */
-        .file-thumbnail {
-            width: 60px;
-            height: 60px;
-            border-radius: 8px;
-            object-fit: cover;
-            border: 1px solid var(--border);
-            background: var(--surface);
-        }
-
-        .file-icon-large {
-            width: 60px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--background);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 24px;
-            color: var(--text-secondary);
-        }
-
-        .file-grid {
-            display: flex;
-            gap: 0.75rem;
-            flex-wrap: wrap;
-            margin: 0.5rem 0;
-        }
-
-        .file-grid-item {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            background: var(--surface);
-            min-width: 80px;
-            max-width: 120px;
-            position: relative;
-        }
-
-        .file-grid-item .file-name {
-            font-size: 0.75rem;
-            text-align: center;
-            word-break: break-word;
-            line-height: 1.2;
-        }
-
-        .file-remove-btn {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
+        /* Stop Generation Button */
+        .stop-generation-btn {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
             background: var(--error);
             color: white;
             border: none;
+            border-radius: 24px;
+            padding: 8px 16px;
+            font-size: 0.85rem;
+            font-weight: 500;
             cursor: pointer;
-            display: flex;
+            z-index: 250;
+            display: none;
             align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: bold;
+            gap: 6px;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+            transition: all 0.2s ease;
+        }
+        
+        .stop-generation-btn:hover {
+            background: #b91c1c;
+            transform: translateX(-50%) translateY(-2px);
+            box-shadow: 0 6px 16px rgba(220, 38, 38, 0.4);
+        }
+        
+        .stop-generation-btn.show {
+            display: flex;
         }
         
         @media (max-width: 768px) {
@@ -654,18 +735,6 @@
             .capability-tags {
                 flex-direction: column;
                 align-items: center;
-            }
-            
-            .file-upload-row {
-                flex-direction: column;
-            }
-            
-            .input-row {
-                flex-direction: column;
-            }
-            
-            .send-button {
-                width: 100%;
             }
         }
     </style>
@@ -730,245 +799,391 @@
                         </div>
 
                         <div>Upload invoices and proof of payment documents, or describe the expense you need audited per CanExport guidelines!</div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary); margin-bottom: 0.75rem;">Quick Actions:</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                <button class="quick-btn" onclick="insertQuickText('Review invoice')">📄 Invoice</button>
+                                <button class="quick-btn" onclick="insertQuickText('Verify payment')">💳 Payment</button>
+                                <button class="quick-btn" onclick="insertQuickText('Check category')">✅ Category</button>
+                                <button class="quick-btn" onclick="insertQuickText('Currency check')">💱 Currency</button>
+                                <button class="quick-btn" onclick="insertQuickText('Audit report')">📊 Audit</button>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary); margin-bottom: 0.75rem;">Upload Options:</div>
+                            <div style="display: flex; gap: 1rem;">
+                                <button class="upload-btn-welcome" onclick="document.getElementById('file-input').click()">
+                                    📄 Upload Documents
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Stop Generation Button -->
+    <button id="stop-generation-btn" class="stop-generation-btn">
+        <span>⏹️</span>
+        <span>Stop generating</span>
+    </button>
+
     <!-- Floating Input Area -->
     <div class="floating-input">
-        <div class="floating-input-container">
-            <div class="file-upload-row">
-                <div class="file-drop-zone" id="file-drop-zone" onclick="document.getElementById('file-input').click()">
-                    <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" multiple style="display: none;">
-                    <span class="drop-icon">🔎</span>
-                    <div style="flex: 1;">
-                        <div class="drop-text">Upload Invoice or Proof of Payment</div>
-                    </div>
-                    <div class="format-badges">
-                        <span class="format-badge">JPG</span>
-                        <span class="format-badge">PNG</span>
-                        <span class="format-badge">PDF</span>
-                    </div>
-                </div>
-                <div class="quick-actions">
-                    <button class="quick-btn" onclick="insertQuickText('Review invoice')">📄 Invoice</button>
-                    <button class="quick-btn" onclick="insertQuickText('Verify payment')">💳 Payment</button>
-                    <button class="quick-btn" onclick="insertQuickText('Check category')">✅ Category</button>
-                    <button class="quick-btn" onclick="insertQuickText('Currency check')">💱 Currency</button>
-                </div>
-            </div>
-            
-            <div class="input-row">
+        <div class="floating-quick-actions">
+            <button class="floating-quick-btn" onclick="insertQuickText('Review invoice')" data-task="invoice">📄 Invoice</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Verify payment')" data-task="payment">💳 Payment</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Check category')" data-task="category">✅ Category</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Currency check')" data-task="currency">💱 Currency</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Audit report')" data-task="audit">📊 Audit</button>
+        </div>
+        <div class="simple-input-box" id="input-box">
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" multiple style="display: none;">
+            <div style="position: relative;">
                 <textarea 
                     id="message-input" 
-                    class="message-input" 
+                    class="message-input-simple" 
                     placeholder="Describe your expense or ask about CanExport eligibility..."
                     rows="1"
                 ></textarea>
-                <button id="send-button" class="send-button">Send</button>
+                <div class="input-buttons">
+                    <button class="file-button-inline" onclick="document.getElementById('file-input').click()" title="Upload files">
+                        📎
+                    </button>
+                    <button id="send-button" class="send-button-inline" title="Send message">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // Global variables
         let isLoading = false;
         let uploadedFiles = [];
         let hasStartedConversation = false;
+        let selectedTask = '';
+        let isGenerating = false;
+        let currentTypingTimeout = null;
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
-        // DOM elements
-        const messagesContainer = document.getElementById('messages');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const fileInput = document.getElementById('file-input');
-        const fileDropZone = document.getElementById('file-drop-zone');
-        const welcomeSection = document.getElementById('welcome-section');
-        const chatContainer = document.getElementById('chat-container');
-        const welcomeMessage = document.getElementById('welcome-message');
-
-        // Auto-resize textarea
-        messageInput.addEventListener('input', function() {
-            this.style.height = 'auto';
-            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
-        });
-
-        // File upload handling
-fileInput.addEventListener('change', (e) => {
-    const newFiles = Array.from(e.target.files);
-    if (newFiles.length > 0) {
-        // Add new files to existing array instead of replacing
-        uploadedFiles = [...uploadedFiles, ...newFiles];
-        updateFileDisplay();
-        messageInput.focus();
-    }
-});
-
-async function updateFileDisplay() {
-    if (uploadedFiles.length === 0) {
-        resetFileDropZone();
-        return;
-    }
-    
-    let totalSize = 0;
-    uploadedFiles.forEach(file => totalSize += file.size);
-    const fileSize = (totalSize / 1024).toFixed(1);
-    const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
-    
-    fileDropZone.classList.add('has-file');
-    
-    // Create file grid HTML
-    let fileGridHTML = '<div class="file-grid">';
-    
-    for (let i = 0; i < uploadedFiles.length; i++) {
-        const file = uploadedFiles[i];
-        const thumbnail = await generateFileThumbnail(file);
-        const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
-        
-        fileGridHTML += `
-            <div class="file-grid-item">
-                ${thumbnail}
-                <div class="file-name">${truncatedName}</div>
-                <button class="file-remove-btn" onclick="removeFile(${i})">×</button>
-            </div>
-        `;
-    }
-    
-    fileGridHTML += '</div>';
-    
-    fileDropZone.innerHTML = `
-        <div style="width: 100%; text-align: center;">
-            <div style="color: #059669; font-weight: 500; margin-bottom: 0.5rem;">
-                ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
-            </div>
-            ${fileGridHTML}
-            <div style="font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem;">
-                Click to add more files
-            </div>
-        </div>
-    `;
-    
-    messageInput.placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
-}
-
-function clearFiles() {
-    uploadedFiles = [];
-    fileInput.value = '';
-    updateFileDisplay();
-}
-    function clearFiles() {
-    uploadedFiles = [];
-    fileInput.value = '';
-    updateFileDisplay();
-}
-
-// Add these new functions here:
-function generateFileThumbnail(file) {
-    return new Promise((resolve) => {
-        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-        const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-        
-        if (imageTypes.includes(fileExtension)) {
-            // Generate image thumbnail
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = document.createElement('img');
-                img.className = 'file-thumbnail';
-                img.src = e.target.result;
-                img.alt = file.name;
-                resolve(img.outerHTML);
-            };
-            reader.readAsDataURL(file);
-        } else {
-            // Generate file type icon
-            const icon = getFileTypeIcon(fileExtension);
-            const iconHtml = `<div class="file-icon-large">${icon}</div>`;
-            resolve(iconHtml);
-        }
-    });
-}
-
-function getFileTypeIcon(extension) {
-    const icons = {
-        '.pdf': '📄',
-        '.doc': '📝',
-        '.docx': '📝',
-        '.txt': '📄',
-        '.md': '📄'
-    };
-    return icons[extension] || '📄';
-}
-        function removeFile(index) {
-    uploadedFiles.splice(index, 1);
-    fileInput.value = '';
-    updateFileDisplay();
-}
-        // Send message functionality
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // Quick text insertion
+        // Global functions for HTML onclick handlers
         function insertQuickText(text) {
-            messageInput.value = text + ': ';
-            messageInput.focus();
-            messageInput.style.height = 'auto';
-            messageInput.style.height = messageInput.scrollHeight + 'px';
+            const messageInput = document.getElementById('message-input');
+            const quickBtn = event?.target.closest('.floating-quick-btn');
+            
+            if (quickBtn) {
+                // Update selected task
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                quickBtn.classList.add('active');
+                selectedTask = quickBtn.dataset.task || '';
+            }
+            
+            if (messageInput) {
+                messageInput.value = text + ': ';
+                messageInput.focus();
+                messageInput.style.height = 'auto';
+                messageInput.style.height = messageInput.scrollHeight + 'px';
+            }
         }
 
         function hideWelcomeElements() {
             if (!hasStartedConversation) {
                 hasStartedConversation = true;
-                welcomeSection.style.display = 'none';
-                welcomeMessage.classList.add('hidden');
-                chatContainer.classList.add('expanded');
+                const welcomeSection = document.getElementById('welcome-section');
+                const welcomeMessage = document.getElementById('welcome-message');
+                const chatContainer = document.getElementById('chat-container');
+                const container = document.querySelector('.container');
+                
+                if (welcomeSection) welcomeSection.style.display = 'none';
+                if (welcomeMessage) welcomeMessage.classList.add('hidden');
+                if (chatContainer) chatContainer.classList.add('expanded');
+                if (container) container.classList.add('chat-active');
             }
         }
 
+        // File upload functions
+        async function updateFileDisplay() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
+            if (uploadedFiles.length === 0) {
+                resetInputBox();
+                return;
+            }
+            
+            let totalSize = 0;
+            uploadedFiles.forEach(file => totalSize += file.size);
+            const fileSize = (totalSize / 1024).toFixed(1);
+            const fileSizeUnit = fileSize > 1024 ? `${(fileSize/1024).toFixed(1)} MB` : `${fileSize} KB`;
+            
+            inputBox.classList.add('has-file');
+            
+            // Create file grid HTML
+            let fileGridHTML = '<div class="file-grid">';
+            
+            for (let i = 0; i < uploadedFiles.length; i++) {
+                const file = uploadedFiles[i];
+                const thumbnail = await generateFileThumbnail(file);
+                const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+                
+                fileGridHTML += `
+                    <div class="file-grid-item">
+                        ${thumbnail}
+                        <div class="file-name">${truncatedName}</div>
+                        <button class="file-remove-btn" onclick="removeFile(${i})">×</button>
+                    </div>
+                `;
+            }
+            
+            fileGridHTML += '</div>';
+            
+            // Update input box content to show files
+            const placeholder = `${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready - Add message or click Send`;
+            
+            // Create a temporary container above the input
+            let fileDisplay = inputBox.querySelector('.file-display');
+            if (!fileDisplay) {
+                fileDisplay = document.createElement('div');
+                fileDisplay.className = 'file-display';
+                fileDisplay.style.cssText = `
+                    padding: 8px 16px;
+                    border-bottom: 1px solid var(--border);
+                    background: rgba(30, 58, 138, 0.05);
+                `;
+                inputBox.insertBefore(fileDisplay, inputBox.firstChild);
+            }
+            
+            fileDisplay.innerHTML = `
+                <div style="color: #1e3a8a; font-weight: 500; font-size: 0.8rem; margin-bottom: 0.5rem;">
+                    ${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} ready (${fileSizeUnit})
+                </div>
+                ${fileGridHTML}
+            `;
+            
+            messageInput.placeholder = placeholder;
+        }
+
+        function generateFileThumbnail(file) {
+            return new Promise((resolve) => {
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                
+                if (imageTypes.includes(fileExtension)) {
+                    // Generate image thumbnail
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = document.createElement('img');
+                        img.className = 'file-thumbnail';
+                        img.src = e.target.result;
+                        img.alt = file.name;
+                        resolve(img.outerHTML);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    // Generate file type icon
+                    const icon = getFileTypeIcon(fileExtension);
+                    const iconHtml = `<div class="file-icon-large">${icon}</div>`;
+                    resolve(iconHtml);
+                }
+            });
+        }
+
+        function getFileTypeIcon(extension) {
+            const icons = {
+                '.pdf': '📄',
+                '.doc': '📝',
+                '.docx': '📝',
+                '.txt': '📄',
+                '.md': '📄'
+            };
+            return icons[extension] || '📄';
+        }
+
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+            updateFileDisplay();
+        }
+
+        function resetInputBox() {
+            const inputBox = document.getElementById('input-box');
+            const messageInput = document.getElementById('message-input');
+            
+            inputBox.classList.remove('has-file');
+            const fileDisplay = inputBox.querySelector('.file-display');
+            if (fileDisplay) {
+                fileDisplay.remove();
+            }
+            
+            if (messageInput) {
+                messageInput.placeholder = "Describe your expense or ask about CanExport eligibility...";
+            }
+            
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) fileInput.value = '';
+        }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing CanExport Claims interface...');
+            
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            const fileInput = document.getElementById('file-input');
+            const inputBox = document.getElementById('input-box');
+            const stopButton = document.getElementById('stop-generation-btn');
+
+            // Stop generation button click handler
+            if (stopButton) {
+                stopButton.addEventListener('click', function() {
+                    stopGeneration();
+                });
+            }
+
+            // Auto-resize textarea
+            if (messageInput) {
+                messageInput.addEventListener('input', function() {
+                    this.style.height = 'auto';
+                    this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+                });
+            }
+
+            // Send button click handler
+            if (sendButton) {
+                sendButton.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    sendMessage();
+                });
+            }
+
+            // Enter key handler
+            if (messageInput) {
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendMessage();
+                    }
+                });
+            }
+
+            // File upload handler
+            if (fileInput) {
+                fileInput.addEventListener('change', async function(e) {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...files];
+                        await updateFileDisplay();
+                        messageInput.focus();
+                    }
+                });
+            }
+
+            // Drag and drop
+            if (inputBox) {
+                setupDragAndDrop(inputBox, messageInput);
+            }
+
+            // Focus input
+            if (messageInput) {
+                messageInput.focus();
+            }
+
+            console.log('CanExport Claims interface initialized successfully');
+        });
+
+        function setupDragAndDrop(inputBox, messageInput) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }, false);
+            });
+            
+            ['dragenter', 'dragover'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.add('drag-over');
+                }, false);
+            });
+            
+            ['dragleave', 'drop'].forEach(eventName => {
+                inputBox.addEventListener(eventName, () => {
+                    inputBox.classList.remove('drag-over');
+                }, false);
+            });
+            
+            inputBox.addEventListener('drop', async (e) => {
+                const droppedFiles = Array.from(e.dataTransfer.files);
+                if (droppedFiles.length > 0) {
+                    const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const validFiles = droppedFiles.filter(file => {
+                        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                        return allowedTypes.includes(fileExtension);
+                    });
+                    
+                    if (validFiles.length > 0) {
+                        uploadedFiles = [...uploadedFiles, ...validFiles];
+                        await updateFileDisplay();
+                    }
+                    
+                    if (validFiles.length !== droppedFiles.length) {
+                        showNotification('Some files were skipped. Supported: PDF, DOCX, TXT, MD, JPG, PNG', 'error');
+                    }
+                }
+            }, false);
+        }
+
         async function sendMessage() {
-            const message = messageInput.value.trim();
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+            
+            const message = messageInput ? messageInput.value.trim() : '';
+            
             if (!message && uploadedFiles.length === 0) return;
             if (isLoading) return;
 
             hideWelcomeElements();
 
+            // Handle files
             if (uploadedFiles.length > 0) {
-    const fileList = uploadedFiles.map(file => {
-        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-        const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-        const isImage = imageTypes.includes(fileExtension);
-        return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
-    }).join('\n');
-    
-    addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
-}
+                const fileList = uploadedFiles.map(file => {
+                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                    const isImage = imageTypes.includes(fileExtension);
+                    return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
+                }).join('\n');
+                
+                addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
+            }
 
             if (message) {
                 addMessage('user', message);
             }
 
             isLoading = true;
-            sendButton.disabled = true;
+            if (sendButton) sendButton.disabled = true;
             addLoadingMessage();
 
             try {
                 const formData = new FormData();
                 formData.append('message', message || '');
+                formData.append('task', selectedTask || 'claims-audit');
                 formData.append('conversationId', 'canexport-claims-conversation');
                 formData.append('agentType', 'canexport-claims');
                 
-                if (uploadedFiles.length > 0) {
-                    uploadedFiles.forEach(file => {
-                        formData.append('files', file);
-                    });
-                }
+                uploadedFiles.forEach(file => {
+                    formData.append('files', file);
+                });
 
                 const response = await fetch(`${API_BASE}/api/process-claims`, {
                     method: 'POST',
@@ -981,151 +1196,200 @@ function getFileTypeIcon(extension) {
 
                 const data = await response.json();
                 
+                console.log('API Response:', data.response);
                 removeLoadingMessage();
                 addMessage('assistant', data.response, true);
 
             } catch (error) {
+                console.error('Send message error:', error);
                 removeLoadingMessage();
                 addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
             }
 
             isLoading = false;
-            sendButton.disabled = false;
-            messageInput.value = '';
-            messageInput.style.height = '44px';
-            messageInput.placeholder = "Describe your expense or ask about CanExport eligibility...";
+            if (sendButton) sendButton.disabled = false;
+            if (messageInput) {
+                messageInput.value = '';
+                messageInput.style.height = '44px';
+                messageInput.placeholder = "Describe your expense or ask about CanExport eligibility...";
+            }
             
-            if (uploadedFiles.length > 0) {
-                uploadedFiles = [];
-                resetFileDropZone();
+            uploadedFiles = [];
+            resetInputBox();
+            
+            // Clear task selection
+            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+            selectedTask = '';
+        }
+
+        function stopGeneration() {
+            if (currentTypingTimeout) {
+                clearTimeout(currentTypingTimeout);
+                currentTypingTimeout = null;
+            }
+            
+            isGenerating = false;
+            hideStopButton();
+        }
+
+        function showStopButton() {
+            const stopButton = document.getElementById('stop-generation-btn');
+            if (stopButton) {
+                stopButton.classList.add('show');
             }
         }
 
-        function resetFileDropZone() {
-            fileDropZone.classList.remove('has-file');
-            fileDropZone.innerHTML = `
-                <span class="drop-icon">🔎</span>
-                <div style="flex: 1;">
-                    <div class="drop-text">Upload Invoice or Proof of Payment</div>
-                </div>
-                <div class="format-badges">
-                    <span class="format-badge">JPG</span>
-                    <span class="format-badge">PNG</span>
-                    <span class="format-badge">PDF</span>
-                </div>
-            `;
-            fileInput.value = '';
+        function hideStopButton() {
+            const stopButton = document.getElementById('stop-generation-btn');
+            if (stopButton) {
+                stopButton.classList.remove('show');
+            }
         }
 
         function addMessage(role, content, shouldAnimate = false) {
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}`;
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    
-    if (role === 'assistant') {
-        // Start with empty content for typing effect
-        contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
-        
-        messageDiv.appendChild(contentDiv);
-        messagesContainer.appendChild(messageDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        
-        // Start typing animation after a brief delay
-        setTimeout(() => {
-            typeMessage(contentDiv, content);
-        }, 500);
-        
-    } else {
-        // User messages appear immediately
-        contentDiv.innerHTML = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        messageDiv.appendChild(contentDiv);
-        messagesContainer.appendChild(messageDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-}
-            function typeMessage(contentDiv, content) {
-    // Process structured CanExport output first
-    const processedContent = processCanExportContent(content);
-    
-    // Clear the typing cursor
-    contentDiv.innerHTML = '<div class="typing-container"></div>';
-    const container = contentDiv.querySelector('.typing-container');
-    
-    // Convert HTML to array of characters/tags
-    const htmlParts = parseHTML(processedContent);
-    let currentIndex = 0;
-    
-    function typeNextChar() {
-        if (currentIndex < htmlParts.length) {
-            const part = htmlParts[currentIndex];
+            console.log('Adding message:', role, content.substring(0, 100) + '...');
             
-            if (part.startsWith('<') && part.endsWith('>')) {
-                // Add HTML tags instantly
-                container.innerHTML += part;
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${role}`;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            if (role === 'assistant' && shouldAnimate) {
+                console.log('Starting typing animation...');
+                // Start with typing cursor for animation
+                contentDiv.innerHTML = '<div class="typing-container"><span class="typing-cursor"></span></div>';
+                
+                messageDiv.appendChild(contentDiv);
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                
+                // Start typing animation immediately
+                setTimeout(() => {
+                    typeMessage(contentDiv, content);
+                }, 200);
+                
             } else {
-                // Add characters one by one
-                container.innerHTML += part;
+                // User messages or non-animated assistant messages appear immediately
+                let processedContent = content;
+                processedContent = processedContent.replace(/\n/g, '<br>');
+                processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+                
+                contentDiv.innerHTML = processedContent;
+                messageDiv.appendChild(contentDiv);
+                messagesContainer.appendChild(messageDiv);
+                messagesContainer.scrollTop = messagesContainer.scrollHeight;
             }
             
-            currentIndex++;
-            
-            // Auto-scroll as content appears
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            
-            // Continue typing (adjust speed here: lower = faster)
-            setTimeout(typeNextChar, 15);
-        } else {
-            // Typing complete - add export button if needed
-            if (content.includes('CANEXPORT CLAIMS AUDIT') || content.includes('AUDIT RECOMMENDATION')) {
-                const exportButton = document.createElement('button');
-                exportButton.className = 'export-button';
-                exportButton.innerHTML = '💾 Export Audit Report';
-                exportButton.onclick = () => exportAuditReport(content);
-                contentDiv.appendChild(exportButton);
-            }
+            console.log('Message added successfully');
         }
-    }
-    
-    typeNextChar();
-}
 
-function parseHTML(html) {
-    const parts = [];
-    let currentPos = 0;
-    
-    // Simple HTML parser that preserves tags
-    while (currentPos < html.length) {
-        const nextTag = html.indexOf('<', currentPos);
-        
-        if (nextTag === -1) {
-            // No more tags, add remaining characters
-            for (let i = currentPos; i < html.length; i++) {
-                parts.push(html[i]);
+        function typeMessage(contentDiv, content) {
+            // Process CanExport content first
+            const processedContent = processCanExportContent(content);
+            
+            // Clear the typing cursor
+            contentDiv.innerHTML = '<div class="typing-container"></div>';
+            const container = contentDiv.querySelector('.typing-container');
+            
+            // Convert HTML to array of characters/tags
+            const htmlParts = parseHTML(processedContent);
+            let currentIndex = 0;
+            
+            // Show stop button and set generating state
+            isGenerating = true;
+            showStopButton();
+            
+            function typeNextChar() {
+                // Check if generation was stopped
+                if (!isGenerating || currentIndex >= htmlParts.length) {
+                    // Generation complete or stopped
+                    isGenerating = false;
+                    hideStopButton();
+                    
+                    // If stopped early, just finish with current content
+                    if (currentIndex < htmlParts.length) {
+                        // Add remaining content instantly if stopped
+                        for (let i = currentIndex; i < htmlParts.length; i++) {
+                            container.innerHTML += htmlParts[i];
+                        }
+                    }
+                    
+                    // Add export button if needed
+                    if (content.includes('CANEXPORT CLAIMS AUDIT') || content.includes('AUDIT RECOMMENDATION')) {
+                        const exportButton = document.createElement('button');
+                        exportButton.className = 'export-button';
+                        exportButton.innerHTML = '💾 Export Audit Report';
+                        exportButton.onclick = () => exportAuditReport(content);
+                        contentDiv.appendChild(exportButton);
+                    }
+                    return;
+                }
+                
+                const part = htmlParts[currentIndex];
+                
+                if (part.startsWith('<') && part.endsWith('>')) {
+                    // Add HTML tags instantly
+                    container.innerHTML += part;
+                } else {
+                    // Add characters one by one
+                    container.innerHTML += part;
+                }
+                
+                currentIndex++;
+                
+                // Auto-scroll as content appears
+                const messagesContainer = document.getElementById('messages');
+                if (messagesContainer) {
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                }
+                
+                // Continue typing (adjust speed here: lower = faster)
+                currentTypingTimeout = setTimeout(typeNextChar, 15);
             }
-            break;
+            
+            typeNextChar();
         }
-        
-        // Add characters before the tag
-        for (let i = currentPos; i < nextTag; i++) {
-            parts.push(html[i]);
+
+        function parseHTML(html) {
+            const parts = [];
+            let currentPos = 0;
+            
+            // Simple HTML parser that preserves tags
+            while (currentPos < html.length) {
+                const nextTag = html.indexOf('<', currentPos);
+                
+                if (nextTag === -1) {
+                    // No more tags, add remaining characters
+                    for (let i = currentPos; i < html.length; i++) {
+                        parts.push(html[i]);
+                    }
+                    break;
+                }
+                
+                // Add characters before the tag
+                for (let i = currentPos; i < nextTag; i++) {
+                    parts.push(html[i]);
+                }
+                
+                // Find the end of the tag
+                const tagEnd = html.indexOf('>', nextTag);
+                if (tagEnd !== -1) {
+                    parts.push(html.substring(nextTag, tagEnd + 1));
+                    currentPos = tagEnd + 1;
+                } else {
+                    // Malformed tag, just add the character
+                    parts.push(html[nextTag]);
+                    currentPos = nextTag + 1;
+                }
+            }
+            
+            return parts;
         }
-        
-        // Find the end of the tag
-        const tagEnd = html.indexOf('>', nextTag);
-        if (tagEnd !== -1) {
-            parts.push(html.substring(nextTag, tagEnd + 1));
-            currentPos = tagEnd + 1;
-        } else {
-            // Malformed tag, just add the character
-            parts.push(html[nextTag]);
-            currentPos = nextTag + 1;
-        }
-    }
-    
-    return parts;
-}
 
         function processCanExportContent(content) {
             let processed = content;
@@ -1224,6 +1488,9 @@ function parseHTML(html) {
         }
 
         function addLoadingMessage() {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+            
             const messageDiv = document.createElement('div');
             messageDiv.className = 'message assistant';
             messageDiv.id = 'loading-message';
@@ -1290,50 +1557,6 @@ function parseHTML(html) {
                 }, 300);
             }, 3000);
         }
-
-        // Initialize drag and drop
-        document.addEventListener('DOMContentLoaded', function() {
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                }, false);
-            });
-            
-            ['dragenter', 'dragover'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, () => {
-                    fileDropZone.style.borderColor = '#1e3a8a';
-                    fileDropZone.style.background = 'rgba(30, 58, 138, 0.05)';
-                }, false);
-            });
-            
-            ['dragleave', 'drop'].forEach(eventName => {
-                fileDropZone.addEventListener(eventName, () => {
-                    fileDropZone.style.borderColor = '';
-                    fileDropZone.style.background = '';
-                }, false);
-            });
-            
-           fileDropZone.addEventListener('drop', (e) => {
-    const droppedFiles = Array.from(e.dataTransfer.files);
-    if (droppedFiles.length > 0) {
-        const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-        const validFiles = droppedFiles.filter(file => {
-            const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-            return allowedTypes.includes(fileExtension);
-        });
-        
-        if (validFiles.length > 0) {
-            uploadedFiles = [...uploadedFiles, ...validFiles];
-            updateFileDisplay();
-        }
-        
-        if (validFiles.length !== droppedFiles.length) {
-            addMessage('assistant', `⛔ Some files were skipped. Supported: PDF, DOCX, TXT, MD, JPG, PNG`, false);
-        }
-    }
-}, false);
-        });
     </script>
 </body>
 </html>
