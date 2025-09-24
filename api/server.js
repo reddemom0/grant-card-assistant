@@ -2366,7 +2366,7 @@ async function waitForRateLimit() {
 }
 
 
-// Claude API integration
+// Claude API integration with proper tool handling
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
     checkRateLimit();
@@ -2405,11 +2405,36 @@ async function callClaudeAPI(messages, systemPrompt = '') {
     }
 
     const data = await response.json();
-console.log('✅ API call successful');
-console.log('🔍 FULL RESPONSE STRUCTURE:', JSON.stringify(data, null, 2)); 
-
-return data.content[0].text;
+    console.log('✅ API call successful');
     
+    // Check if Claude requested tool use
+    if (data.stop_reason === 'tool_use') {
+      console.log('🔧 Claude requested web search - sending back to continue conversation');
+      
+      // Continue the conversation by sending the tool response back
+      const continueResponse = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': process.env.ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          system: systemPrompt,
+          messages: [
+            ...messages,
+            { role: 'assistant', content: data.content }
+          ]
+        })
+      });
+      
+      const continueData = await continueResponse.json();
+      return continueData.content[0].text;
+    }
+    
+    // No tools requested, return normal response
     return data.content[0].text;
     
   } catch (error) {
