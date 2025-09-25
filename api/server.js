@@ -2499,8 +2499,8 @@ async function handleStreamingRequest(req, res, agentType) {
   const { message, task, conversationId, url: courseUrl } = req.body;
   let fileContent = '';
   // Get existing file context for streaming
-  const fullConversationId = `${agentType}-${conversationId}`;
-  let conversationMeta = getConversationFileContext(fullConversationId);
+  const streamingConversationId = `${agentType}-${conversationId}`;
+  let conversationMeta = getConversationFileContext(streamingConversationId);
   console.log(`📋 STREAMING: ${conversationMeta.uploadedFiles.length} existing files for ${agentType}`);
   
   // Process uploaded files - ready for native Claude document support
