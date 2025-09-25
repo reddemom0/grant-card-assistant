@@ -3189,7 +3189,17 @@ Use the ETG knowledge base above to find similar successful applications and mat
         baseMessage += `\n\nPre-screening completed. Please proceed with business case development.`;
       }
       
-      const messageContent = buildMessageContentWithFiles(baseMessage, conversationMeta);
+      // Build user message (simple text for now)
+let userMessage = baseMessage;
+
+// Add file context info to message text
+if (conversationMeta.uploadedFiles.length > 0) {
+  userMessage += `\n\n=== PREVIOUSLY UPLOADED DOCUMENTS (${conversationMeta.uploadedFiles.length} files) ===\n`;
+  userMessage += conversationMeta.uploadedFiles.map((f, i) => 
+    `${i + 1}. ${f.filename} (file_id: ${f.file_id})`
+  ).join('\n');
+  userMessage += `\n\n[Note: These documents should be available for reference.]`;
+}
 
       // ENHANCED CONTEXT MANAGEMENT FOR ETG
       const agentType = 'etg-writer';
