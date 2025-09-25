@@ -737,6 +737,16 @@
                 align-items: center;
             }
         }
+        .typing-cursor {
+    animation: blink 1s infinite;
+    color: #059669;
+    font-weight: bold;
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
     </style>
 </head>
 <body>
@@ -875,6 +885,95 @@
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+        // Streaming Functions - Define early to avoid ReferenceError
+function addStreamingMessage(role) {
+    const messagesContainer = document.getElementById('messages');
+    if (!messagesContainer) return null;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.innerHTML = '<span class="typing-cursor">▎</span>';
+    
+    messageDiv.appendChild(contentDiv);
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    return contentDiv;
+}
+
+function updateStreamingMessage(messageDiv, content, isComplete = false) {
+    if (!messageDiv) return;
+    
+    let processedContent = content;
+    processedContent = processedContent.replace(/\n/g, '<br>');
+    processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    processedContent = processedContent.replace(/`(.*?)`/g, '<code>$1</code>');
+    
+    if (isComplete) {
+        messageDiv.innerHTML = processedContent;
+    } else {
+        messageDiv.innerHTML = processedContent + '<span class="typing-cursor">▎</span>';
+    }
+    
+    const messagesContainer = document.getElementById('messages');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
+async function handleStreamingResponse(response, messageDiv) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullContent = '';
+
+    try {
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    
+                    if (data === '[DONE]') {
+                        updateStreamingMessage(messageDiv, fullContent, true);
+                        return;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data);
+                        
+                        if (parsed.chunk) {
+                            fullContent += parsed.chunk;
+                            updateStreamingMessage(messageDiv, fullContent, false);
+                        }
+                        
+                        if (parsed.error) {
+                            updateStreamingMessage(messageDiv, `Error: ${parsed.error}`, true);
+                            return;
+                        }
+                    } catch (parseError) {
+                        continue;
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Streaming error:', error);
+        updateStreamingMessage(messageDiv, `Stream interrupted: ${error.message}`, true);
+    }
+    
+    updateStreamingMessage(messageDiv, fullContent, true);
+}
 
         // Global functions for HTML onclick handlers
         function insertQuickText(text) {
@@ -1185,7 +1284,7 @@
                     formData.append('files', file);
                 });
 
-                const response = await fetch(`${API_BASE}/api/process-claims`, {
+                const response = await fetch(`${API_BASE}/api/process-claims/stream`, {
                     method: 'POST',
                     body: formData
                 });
@@ -1194,11 +1293,9 @@
                     throw new Error(`Server error: ${response.status}`);
                 }
 
-                const data = await response.json();
-                
-                console.log('API Response:', data.response);
                 removeLoadingMessage();
-                addMessage('assistant', data.response, true);
+const streamingMessageDiv = addStreamingMessage('assistant');
+await handleStreamingResponse(response, streamingMessageDiv);;
 
             } catch (error) {
                 console.error('Send message error:', error);
