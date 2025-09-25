@@ -3043,6 +3043,10 @@ Always follow the exact workflows and instructions from the knowledge base docum
       
   // Get existing file context
       let conversationMeta = getConversationFileContext(etgConversationId);
+      console.log(`📋 ETG Conversation Context: ${conversationMeta.uploadedFiles.length} existing files`);
+if (conversationMeta.uploadedFiles.length > 0) {
+  console.log(`📋 Existing files: ${conversationMeta.uploadedFiles.map(f => f.filename).join(', ')}`);
+}
       
       // Process NEW uploaded files with Files API
       let newUploadResults = [];
