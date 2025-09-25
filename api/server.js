@@ -3040,6 +3040,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       let urlContent = '';
       
       console.log(`🎯 Processing enhanced ETG request for conversation: ${conversationId}`);
+      console.log(`🔍 TESTING: About to get file context for ${etgConversationId}`);
       
   // Get existing file context
       let conversationMeta = getConversationFileContext(etgConversationId);
