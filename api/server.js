@@ -304,6 +304,100 @@ function logContextUsage(agentType, estimatedTokens, conversationLength) {
     console.log(`🚨 Context approaching limit - emergency measures may activate`);
   }
 }
+// FILES API HELPER FUNCTION #1 (step 1a)
+function getConversationFileContext(conversationId) {
+  const metaKey = `${conversationId}-meta`;
+  return conversations.get(metaKey) || {
+    uploadedFiles: [],
+    lastUploadTimestamp: null
+  };
+}
+// FILES API HELPER FUNCTION #2 (step 1b)
+function updateConversationFileContext(conversationId, uploadResults) {
+  const metaKey = `${conversationId}-meta`;
+  let conversationMeta = getConversationFileContext(conversationId);
+  
+  // Add new files to metadata - ONLY store file_id and metadata
+  for (const uploadResult of uploadResults) {
+    const fileInfo = {
+      filename: uploadResult.originalname,
+      file_id: uploadResult.file_id,
+      uploadTimestamp: Date.now(),
+      mimetype: uploadResult.mimetype,
+      isImage: uploadResult.mimetype && uploadResult.mimetype.startsWith('image/')
+    };
+    conversationMeta.uploadedFiles.push(fileInfo);
+  }
+  
+  conversationMeta.lastUploadTimestamp = Date.now();
+  conversations.set(metaKey, conversationMeta);
+  
+  return conversationMeta;
+}
+// FILES API HELPER FUNCTION #3 (step 1c)
+function buildMessageContentWithFiles(message, conversationMeta) {
+  const contentBlocks = [];
+  
+  // Add text content first
+  if (message && message.trim()) {
+    let textContent = message;
+    
+    // Add context about available files
+    if (conversationMeta.uploadedFiles.length > 0) {
+      textContent += `\n\n=== PREVIOUSLY UPLOADED DOCUMENTS (${conversationMeta.uploadedFiles.length} files) ===\n`;
+      textContent += conversationMeta.uploadedFiles.map((f, i) => 
+        `${i + 1}. ${f.filename} (uploaded ${new Date(f.uploadTimestamp).toLocaleString()})`
+      ).join('\n');
+      textContent += '\n\n[Note: Full document content is available for reference in the attached files below.]';
+    }
+    
+    contentBlocks.push({
+      type: "text",
+      text: textContent
+    });
+  }
+  
+  // Add each file as a separate content block using file_id
+  for (const fileInfo of conversationMeta.uploadedFiles) {
+    if (fileInfo.isImage) {
+      contentBlocks.push({
+        type: "image",
+        source: {
+          type: "file",
+          file_id: fileInfo.file_id
+        }
+      });
+    } else {
+      contentBlocks.push({
+        type: "document",
+        source: {
+          type: "file",
+          file_id: fileInfo.file_id
+        },
+        title: fileInfo.filename
+      });
+    }
+  }
+  
+  return contentBlocks;
+}
+// FILES API HELPER FUNCTION #4 (step 1d)
+function buildSystemPromptWithFileContext(baseSystemPrompt, knowledgeContext, conversationMeta, agentType) {
+  return `${baseSystemPrompt}
+
+KNOWLEDGE BASE CONTEXT:
+${knowledgeContext}
+
+CONVERSATION FILE CONTEXT:
+${conversationMeta.uploadedFiles.length > 0 ? `
+Previously uploaded documents (${conversationMeta.uploadedFiles.length} files):
+${conversationMeta.uploadedFiles.map((f, i) => `${i + 1}. ${f.filename} (file_id: ${f.file_id})`).join('\n')}
+
+CRITICAL: These documents are available as document blocks in the user's message. Reference them directly when answering questions. Do NOT ask for documents to be uploaded again.
+` : 'No documents uploaded yet.'}
+
+Always reference uploaded documents when relevant to the user's questions.`;
+}
 
 // Configure multer for serverless
 const storage = multer.memoryStorage();
@@ -2947,19 +3041,28 @@ Always follow the exact workflows and instructions from the knowledge base docum
       
       console.log(`🎯 Processing enhanced ETG request for conversation: ${conversationId}`);
       
-      // Process uploaded file if present
-      let fileContents = [];
+  // Get existing file context
+      let conversationMeta = getConversationFileContext(etgConversationId);
+      
+      // Process NEW uploaded files with Files API
+      let newUploadResults = [];
       if (req.files && req.files.length > 0) {
-        console.log(`📄 Processing ${req.files.length} ETG documents`);
+        console.log(`📄 Uploading ${req.files.length} ETG documents to Files API`);
         
         for (const file of req.files) {
-          console.log(`📄 Processing: ${file.originalname}`);
-          const content = await processFileContent(file);
-          fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+          try {
+            const uploadResult = await uploadFileToAnthropic(file);
+            newUploadResults.push(uploadResult);
+            console.log(`✅ Uploaded ${file.originalname} → ${uploadResult.file_id}`);
+          } catch (uploadError) {
+            console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
+          }
         }
         
-        // Combine all file contents
-        fileContent = fileContents.join('\n\n');
+        if (newUploadResults.length > 0) {
+          conversationMeta = updateConversationFileContext(etgConversationId, newUploadResults);
+          console.log(`✅ Added ${newUploadResults.length} files to ETG conversation context`);
+        }
       }
       
       // Process URL if present
@@ -3055,29 +3158,27 @@ ${enhancedResponse ? `ELIGIBILITY PRE-CHECK RESULTS:\n${enhancedResponse}` : ''}
 
 Use the ETG knowledge base above to find similar successful applications and match their style and structure.`;
       
-      // Build comprehensive user message
-      let userMessage = message || "Hello, I need help with an ETG Business Case.";
-      
-      if (fileContents.length > 0) {
-        userMessage += `\n\nUploaded Course Documents (${fileContents.length} files):\n${fileContent}`;
-      }
+// Build message content using Files API
+      let baseMessage = message || "Hello, I need help with an ETG Business Case.";
       
       if (urlContent) {
-        userMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
+        baseMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
       }
       
       if (enhancedResponse) {
-        userMessage += `\n\nPre-screening completed. Please proceed with business case development.`;
+        baseMessage += `\n\nPre-screening completed. Please proceed with business case development.`;
       }
+      
+      const messageContent = buildMessageContentWithFiles(baseMessage, conversationMeta);
 
       // ENHANCED CONTEXT MANAGEMENT FOR ETG
       const agentType = 'etg-writer';
-      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, messageContent[0]?.text || '');
 
       logContextUsage(agentType, estimatedContext, conversation.length);
       pruneConversation(conversation, agentType, estimatedContext);
       
-      conversation.push({ role: 'user', content: userMessage });
+      conversation.push({ role: 'user', content: messageContent });
       
       // Get response from Claude using enhanced ETG specialist prompt
       console.log(`🤖 Calling Claude API for enhanced ETG specialist response`);
