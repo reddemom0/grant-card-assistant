@@ -16,9 +16,12 @@
     "passport-google-oauth20": "^2.0.0",
     "express-session": "^1.17.3",
     "@upstash/redis": "^1.25.1",
-    "tesseract.js": "^4.1.1"
+    "tesseract.js": "^4.1.1",
+    "@vercel/postgres": "^0.5.1",
+    "jsonwebtoken": "^9.0.2",
+    "googleapis": "^128.0.0"
   },
-  "keywords": ["ai", "grants", "consulting", "claude", "ocr"],
+  "keywords": ["ai", "grants", "consulting", "claude", "ocr", "authentication"],
   "author": "Granted Consulting",
   "license": "Private",
   "engines": {
