@@ -2380,7 +2380,7 @@ const WEB_SEARCH_TOOL = {
   }
 };
 
-// Enhanced Claude API integration with native document support
+// Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   try {
     checkRateLimit();
@@ -2398,29 +2398,41 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
-      // Add document blocks first (PDFs, images)  
-for (const file of files) {
-  console.log('🔍 DEBUG File object:', {
-    originalname: file.originalname,
-    mimetype: file.mimetype,
-    size: file.size,
-    hasBuffer: !!file.buffer,
-    bufferLength: file.buffer?.length || 0
-  });
-  
-  const base64Data = file.buffer.toString('base64');
-        const mimeType = file.mimetype || 'application/octet-stream';
-        
-        contentBlocks.push({
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: mimeType,
-            data: base64Data
+      // Upload files to Files API and create document blocks
+      for (const file of files) {
+        try {
+          // Upload file to Anthropic's Files API
+          const uploadResult = await uploadFileToAnthropic(file);
+          
+          // Determine content block type based on file type
+          const isImage = file.mimetype && file.mimetype.startsWith('image/');
+          
+          if (isImage) {
+            // Use image block for images
+            contentBlocks.push({
+              type: "image",
+              source: {
+                type: "file",
+                file_id: uploadResult.file_id
+              }
+            });
+            console.log(`📸 Added image file: ${uploadResult.originalname}`);
+          } else {
+            // Use document block for PDFs, text files, etc.
+            contentBlocks.push({
+              type: "document",
+              source: {
+                type: "file",
+                file_id: uploadResult.file_id
+              }
+            });
+            console.log(`📄 Added document file: ${uploadResult.originalname}`);
           }
-        });
-        
-        console.log(`📄 Added ${mimeType} document: ${file.originalname}`);
+        } catch (uploadError) {
+          console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
+          // Continue with other files instead of failing completely
+          continue;
+        }
       }
       
       // Add text content if present
@@ -2443,7 +2455,8 @@ for (const file of files) {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'files-api-2025-04-14'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
@@ -2515,7 +2528,7 @@ for (const file of files) {
   }
 }
 
-// Enhanced Streaming Claude API with native document support
+// Enhanced Streaming Claude API with Files API support
 async function callClaudeAPIStream(messages, systemPrompt = '', res, files = []) {
   try {
     checkRateLimit();
@@ -2533,21 +2546,41 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
-      // Add document blocks first (PDFs, images)
+      // Upload files to Files API and create document blocks
       for (const file of files) {
-        const base64Data = file.buffer.toString('base64');
-        const mimeType = file.mimetype || 'application/octet-stream';
-        
-        contentBlocks.push({
-          type: "document",
-          source: {
-            type: "base64",
-            media_type: mimeType,
-            data: base64Data
+        try {
+          // Upload file to Anthropic's Files API
+          const uploadResult = await uploadFileToAnthropic(file);
+          
+          // Determine content block type based on file type
+          const isImage = file.mimetype && file.mimetype.startsWith('image/');
+          
+          if (isImage) {
+            // Use image block for images
+            contentBlocks.push({
+              type: "image",
+              source: {
+                type: "file",
+                file_id: uploadResult.file_id
+              }
+            });
+            console.log(`📸 Added image file: ${uploadResult.originalname}`);
+          } else {
+            // Use document block for PDFs, text files, etc.
+            contentBlocks.push({
+              type: "document",
+              source: {
+                type: "file",
+                file_id: uploadResult.file_id
+              }
+            });
+            console.log(`📄 Added document file: ${uploadResult.originalname}`);
           }
-        });
-        
-        console.log(`📄 Added ${mimeType} document: ${file.originalname}`);
+        } catch (uploadError) {
+          console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
+          // Continue with other files instead of failing completely
+          continue;
+        }
       }
       
       // Add text content if present
@@ -2570,7 +2603,8 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'files-api-2025-04-14'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
@@ -2604,7 +2638,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
     let buffer = '';
     let toolUsageCount = 0;
 
-    console.log(`🚀 Starting streaming response with native document support...`);
+    console.log(`🚀 Starting streaming response with Files API support...`);
 
     try {
       while (true) {
@@ -2620,7 +2654,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
             const data = line.slice(6);
             
             if (data === '[DONE]') {
-              console.log(`✅ Streaming completed with native document support`);
+              console.log(`✅ Streaming completed with Files API support`);
               if (toolUsageCount > 0) {
                 console.log(`🌐 Total web searches used: ${toolUsageCount}`);
               } else {
@@ -2679,6 +2713,48 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
     console.error('Claude Streaming API Error:', error);
     res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
     res.end();
+  }
+}
+
+// Upload file to Anthropic's Files API (serverless-friendly)
+async function uploadFileToAnthropic(file) {
+  try {
+    console.log(`📤 Uploading ${file.originalname} to Files API...`);
+    
+    // Create form data for the upload
+    const formData = new FormData();
+    
+    // Create a Blob from the buffer (works in serverless environments)
+    const blob = new Blob([file.buffer], { type: file.mimetype });
+    formData.append('file', blob, file.originalname);
+    
+    const response = await fetch('https://api.anthropic.com/v1/files', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'files-api-2025-04-14'
+      },
+      body: formData
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Files API upload failed: ${response.status} - ${errorText}`);
+    }
+    
+    const result = await response.json();
+    console.log(`✅ File uploaded successfully: ${result.id} (${file.originalname})`);
+    
+    return {
+      file_id: result.id,
+      originalname: file.originalname,
+      mimetype: file.mimetype
+    };
+    
+  } catch (error) {
+    console.error(`❌ Files API upload error for ${file.originalname}:`, error);
+    throw new Error(`Failed to upload ${file.originalname}: ${error.message}`);
   }
 }
 
