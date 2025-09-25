@@ -1,4 +1,4 @@
-// api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced ETG Agent + CanExport Claims Agent
+// api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced File Memory
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
@@ -12,7 +12,7 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// ✅ KEEP: PDF text extraction (not base64, just text extraction)
+// PDF text extraction (not base64, just text extraction)
 async function extractPDFText(buffer) {
   try {
     console.log('Starting enhanced pdf-parse text extraction...');
@@ -58,7 +58,7 @@ async function extractPDFText(buffer) {
 const CACHE_TTL = null; // Indefinite cache - no expiration
 const CACHE_PREFIX = 'knowledge-';
 
-// Authentication configuration with JWT - FIXED: Require JWT secret
+// Authentication configuration with JWT
 const TEAM_PASSWORD = process.env.TEAM_PASSWORD;
 const SESSION_COOKIE_NAME = 'granted_session';
 const SESSION_DURATION = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -68,13 +68,13 @@ if (!process.env.JWT_SECRET) {
   console.warn('⚠️ WARNING: Using default JWT secret. Set JWT_SECRET environment variable for production security!');
 }
 
-// Optimized conversation limits - UPDATED: Added CanExport Claims
+// Optimized conversation limits
 const CONVERSATION_LIMITS = {
-  'grant-cards': 20,        // Task-based workflows (keep current)
-  'etg-writer': 20,         // Business case development (keep current)  
-  'bcafe-writer': 60,       // Complex multi-day applications (6x increase)
-  'canexport-writer': 30,   // CanExport SME applications
-  'canexport-claims': 40,   // NEW: CanExport Claims Agent - optimized for thorough expense auditing
+  'grant-cards': 20,        
+  'etg-writer': 20,         
+  'bcafe-writer': 60,       
+  'canexport-writer': 30,   
+  'canexport-claims': 40,   
   'readiness-strategist': 30,
   'internal-oracle': 50
 };
@@ -88,7 +88,7 @@ const CONTEXT_ABSOLUTE_LIMIT = 200000;     // Claude's actual limit
 const TOKENS_PER_EXCHANGE = 950;           // Average user + assistant pair
 const TOKENS_PER_CHAR = 0.25;             // Rough token-to-character ratio
 
-// Conversation cleanup - FIXED: Add memory management
+// Conversation cleanup
 const CONVERSATION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 const conversationTimestamps = new Map();
 
@@ -102,7 +102,7 @@ function cleanupExpiredConversations() {
   }
 }
 
-// FIXED: Proper base64url encoding for older Node.js versions
+// Base64url encoding for older Node.js versions
 function base64UrlEncode(buffer) {
   return buffer.toString('base64')
     .replace(/\+/g, '-')
@@ -123,7 +123,6 @@ function generateJWTToken() {
     expires: Date.now() + SESSION_DURATION
   };
   
-  // Simple JWT implementation for serverless
   const header = { alg: 'HS256', typ: 'JWT' };
   const headerBase64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
   const payloadBase64 = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
@@ -144,7 +143,6 @@ function isAuthenticated(req) {
   if (!sessionToken) return false;
 
   try {
-    // Verify JWT token
     const [headerBase64, payloadBase64, signature] = sessionToken.split('.');
     
     if (!headerBase64 || !payloadBase64 || !signature) return false;
@@ -167,33 +165,27 @@ function isAuthenticated(req) {
   }
 }
 
-// SIMPLIFIED: Authentication middleware with fallback
+// Authentication middleware
 function requireAuth(req, res, next) {
-  // Skip auth for login endpoint and health check
   if (req.url === '/api/login' || req.url === '/api/health') {
     return next();
   }
 
-  // For debugging - temporarily allow bypass if no team password is set
   if (!TEAM_PASSWORD) {
     console.warn('⚠️ WARNING: No team password set, allowing all requests');
     return next();
   }
 
-  // Check if authenticated
   if (isAuthenticated(req)) {
     return next();
   }
 
-  // Not authenticated - redirect to login
   if (req.url.startsWith('/api/')) {
-    // API endpoints return JSON error
     res.status(401).json({ 
       error: 'Authentication required',
       redirectTo: '/login.html'
     });
   } else {
-    // HTML pages redirect to login
     const returnTo = encodeURIComponent(req.url);
     res.writeHead(302, {
       'Location': `/login.html?returnTo=${returnTo}`
@@ -204,16 +196,16 @@ function requireAuth(req, res, next) {
 
 // Estimate total context size for a request
 function estimateContextSize(conversation, knowledgeContext, systemPrompt, currentMessage = '') {
-  const convTokens = conversation.length * (TOKENS_PER_EXCHANGE / 2); // Only count existing messages
+  const convTokens = conversation.length * (TOKENS_PER_EXCHANGE / 2);
   const kbTokens = knowledgeContext.length * TOKENS_PER_CHAR;
   const sysTokens = systemPrompt.length * TOKENS_PER_CHAR;
   const msgTokens = currentMessage.length * TOKENS_PER_CHAR;
-  const responseBuffer = 4000; // Reserve space for Claude's response
+  const responseBuffer = 4000;
   
   return Math.ceil(convTokens + kbTokens + sysTokens + msgTokens + responseBuffer);
 }
 
-// FIXED: Complete agent type mapping - UPDATED: Added CanExport Claims + Streaming
+// Complete agent type mapping
 const AGENT_URL_MAP = {
   '/api/process-grant': 'grant-cards',
   '/api/process-grant/stream': 'grant-cards',
@@ -231,27 +223,25 @@ const AGENT_URL_MAP = {
   '/api/process-oracle/stream': 'internal-oracle'
 };
 
-// UPDATED: Added CanExport Claims folder mapping
+// Agent folder mapping
 const AGENT_FOLDER_MAP = {
   'grant-cards': 'grant-cards',
   'etg-writer': 'etg', 
   'bcafe-writer': 'bcafe',
   'canexport-writer': 'canexport',
-  'canexport-claims': 'canexport-claims',       // NEW: CanExport Claims folder
+  'canexport-claims': 'canexport-claims',
   'readiness-strategist': 'readiness-strategist',
   'internal-oracle': 'internal-oracle'
 };
 
 // Get agent type from endpoint or conversation ID
 function getAgentType(url, conversationId) {
-  // Check URL mapping first
   for (const [urlPattern, agentType] of Object.entries(AGENT_URL_MAP)) {
     if (url.includes(urlPattern)) {
       return agentType;
     }
   }
   
-  // Fallback: extract from conversation ID
   if (conversationId?.includes('etg')) return 'etg-writer';
   if (conversationId?.includes('bcafe')) return 'bcafe-writer';
   if (conversationId?.includes('canexport-claims')) return 'canexport-claims';
@@ -259,22 +249,20 @@ function getAgentType(url, conversationId) {
   if (conversationId?.includes('readiness')) return 'readiness-strategist';
   if (conversationId?.includes('oracle')) return 'internal-oracle';
   
-  return 'grant-cards'; // Default fallback
+  return 'grant-cards';
 }
 
 // Smart conversation pruning with context awareness
 function pruneConversation(conversation, agentType, estimatedContextSize) {
   const limit = CONVERSATION_LIMITS[agentType] || 20;
   
-  // Standard pruning if over limit
-  if (conversation.length > limit * 2) { // *2 because each exchange = 2 messages
+  if (conversation.length > limit * 2) {
     const messagesToKeep = limit * 2;
     const removed = conversation.length - messagesToKeep;
     conversation.splice(0, removed);
     console.log(`🗂️ Standard pruning: Removed ${removed} messages, keeping last ${messagesToKeep}`);
   }
   
-  // Emergency pruning if context too large
   if (estimatedContextSize > CONTEXT_HARD_LIMIT && conversation.length > 20) {
     const emergencyLimit = Math.max(20, Math.floor((CONTEXT_HARD_LIMIT - 50000) / (TOKENS_PER_EXCHANGE / 2)));
     if (conversation.length > emergencyLimit) {
@@ -304,7 +292,10 @@ function logContextUsage(agentType, estimatedTokens, conversationLength) {
     console.log(`🚨 Context approaching limit - emergency measures may activate`);
   }
 }
-// FILES API HELPER FUNCTION #1 (step 1a)
+
+// ===== FILE MANAGEMENT SYSTEM =====
+
+// Get conversation file context
 function getConversationFileContext(conversationId) {
   const metaKey = `${conversationId}-meta`;
   return conversations.get(metaKey) || {
@@ -312,12 +303,12 @@ function getConversationFileContext(conversationId) {
     lastUploadTimestamp: null
   };
 }
-// FILES API HELPER FUNCTION #2 (step 1b)
+
+// Update conversation file context
 function updateConversationFileContext(conversationId, uploadResults) {
   const metaKey = `${conversationId}-meta`;
   let conversationMeta = getConversationFileContext(conversationId);
   
-  // Add new files to metadata - ONLY store file_id and metadata
   for (const uploadResult of uploadResults) {
     const fileInfo = {
       filename: uploadResult.originalname,
@@ -334,9 +325,14 @@ function updateConversationFileContext(conversationId, uploadResults) {
   
   return conversationMeta;
 }
-// FILES API HELPER FUNCTION #3 (step 1c)
+
+// Build message content with persistent file memory
 function buildMessageContentWithFiles(message, conversationMeta) {
-  console.log('🔍 buildMessageContentWithFiles DEBUG:', { message, hasFiles: conversationMeta.uploadedFiles.length });
+  console.log('🔍 buildMessageContentWithFiles DEBUG:', { 
+    message: message ? message.substring(0, 100) : 'empty', 
+    hasFiles: conversationMeta.uploadedFiles.length 
+  });
+  
   const contentBlocks = [];
   
   // Add text content first
@@ -382,7 +378,8 @@ function buildMessageContentWithFiles(message, conversationMeta) {
   
   return contentBlocks;
 }
-// FILES API HELPER FUNCTION #4 (step 1d)
+
+// Build system prompt with file context
 function buildSystemPromptWithFileContext(baseSystemPrompt, knowledgeContext, conversationMeta, agentType) {
   return `${baseSystemPrompt}
 
@@ -406,7 +403,6 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    // Accept images and documents
     const allowedTypes = [
       'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff',
       'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -424,22 +420,22 @@ const upload = multer({
 // In-memory storage
 let conversations = new Map();
 
-// Multi-Agent Knowledge Base Storage - UPDATED: Added CanExport Claims
+// Multi-Agent Knowledge Base Storage
 let knowledgeBases = {
   'grant-cards': [],
   'etg': [],
   'bcafe': [],
   'canexport': [],
-  'canexport-claims': [],                       // NEW: CanExport Claims knowledge base
+  'canexport-claims': [],
   'readiness-strategist': [],
   'internal-oracle': []
 };
 
-// Rate limiting variables - FIXED: Add safeguards
+// Rate limiting variables
 let lastAPICall = 0;
 const RATE_LIMIT_DELAY = 3000; // 3 seconds between API calls
 let apiCallCount = 0;
-const MAX_CALLS_PER_MINUTE = 15; // Conservative limit
+const MAX_CALLS_PER_MINUTE = 15;
 let callTimestamps = [];
 
 // Google Service Account configuration
@@ -468,7 +464,7 @@ function logAgentPerformance(agentType, docsLoaded, loadTimeMs) {
   console.log(`   Cache status: ${agentKnowledgeCache.has(`agent-${agentType}`) ? '🎯 Cached' : '🔄 Fresh load'}`);
 }
 
-// Get knowledge base for specific agent only - FIXED: Add null checks
+// Get knowledge base for specific agent only
 async function getAgentKnowledgeBase(agentType) {
   const folderName = AGENT_FOLDER_MAP[agentType];
   if (!folderName) {
@@ -480,23 +476,16 @@ async function getAgentKnowledgeBase(agentType) {
   const now = Date.now();
   const lastCached = agentCacheTimestamps.get(cacheKey) || 0;
   
-  // Check if we have valid cached documents for this agent
   if (agentKnowledgeCache.has(cacheKey) && 
       (now - lastCached < CACHE_DURATION)) {
     console.log(`🎯 Using cached knowledge base for ${agentType} (${agentKnowledgeCache.get(cacheKey).length} docs)`);
     return agentKnowledgeCache.get(cacheKey);
   }
   
-  // If not cached or expired, load from the full knowledge base
-  // First ensure the full knowledge base is loaded
-  // await getKnowledgeBase(); // PERFORMANCE FIX: Use agent-specific loading instead
-  
-  // Extract agent-specific documents from the full knowledge base
   const agentDocs = knowledgeBases[folderName] || [];
   
   console.log(`📚 Loaded ${agentDocs.length} documents for agent: ${agentType} (folder: ${folderName})`);
   
-  // Cache the results
   agentKnowledgeCache.set(cacheKey, agentDocs);
   agentCacheTimestamps.set(cacheKey, now);
   
@@ -507,19 +496,16 @@ async function getAgentKnowledgeBase(agentType) {
 function checkETGEligibility(trainingData) {
     const { training_title = '', training_type = '', training_content = '', training_duration = '' } = trainingData;
     
-    // Convert to lowercase for checking
     const title = training_title.toLowerCase();
     const type = training_type.toLowerCase();
     const content = training_content.toLowerCase();
     
-    // Ineligible keywords/types
     const ineligibleKeywords = [
         'seminar', 'conference', 'coaching', 'consulting', 'mentorship',
         'trade show', 'networking', 'annual meeting', 'practicum',
         'diploma', 'degree', 'bachelor', 'master', 'phd'
     ];
     
-    // Check for ineligible keywords
     const foundIneligible = ineligibleKeywords.find(keyword => 
         title.includes(keyword) || type.includes(keyword) || content.includes(keyword)
     );
@@ -533,7 +519,6 @@ function checkETGEligibility(trainingData) {
         };
     }
     
-    // Check for positive indicators
     const eligibleIndicators = [
         'certification', 'certificate', 'course', 'training program', 
         'workshop', 'skills development', 'professional development'
@@ -543,7 +528,6 @@ function checkETGEligibility(trainingData) {
         title.includes(indicator) || type.includes(indicator) || content.includes(indicator)
     );
     
-    // Check duration (substantial training is preferred)
     const hasDuration = training_duration && (
         training_duration.includes('hour') || 
         training_duration.includes('day') || 
@@ -569,7 +553,6 @@ function extractTrainingInfo(text) {
     const lines = text.split('\n');
     let trainingInfo = {};
     
-    // Look for training details in various formats
     lines.forEach(line => {
         const lower = line.toLowerCase();
         if (lower.includes('training title:') || lower.includes('course title:')) {
@@ -589,7 +572,6 @@ function extractTrainingInfo(text) {
         }
     });
     
-    // Fallback: extract from general text
     if (!trainingInfo.training_title) {
         const titleMatch = text.match(/(?:training|course|program).*?(?:title|name)[:\s]+([^.\n]+)/i);
         if (titleMatch) trainingInfo.training_title = titleMatch[1].trim();
@@ -598,7 +580,7 @@ function extractTrainingInfo(text) {
     return trainingInfo;
 }
 
-// SHARED GRANT CARD EXPERT PERSONA (used by all 6 Grant Card tasks)
+// SHARED GRANT CARD EXPERT PERSONA
 const GRANT_CARD_EXPERT_PERSONA = `# GRANT CARD EXPERT PERSONA
 ## WHO YOU ARE:
 You are the Grant Card writer at Granted Consulting with years of experience.
@@ -621,7 +603,7 @@ You are the Grant Card writer at Granted Consulting with years of experience.
 ## YOUR KNOWLEDGE BASE MASTERY:
 You have complete familiarity with all Granted Consulting workflow documents and reference the appropriate methodology for each task.`;
 
-// TASK-SPECIFIC METHODOLOGIES (combined with persona at runtime)
+// TASK-SPECIFIC METHODOLOGIES
 const taskMethodologies = {
   'grant-criteria': `
 # GRANT CRITERIA GENERATION METHODOLOGY
@@ -827,12 +809,10 @@ Reference the CATEGORIES-TAGS-Classifier systems from the knowledge base for sys
 Reference the MISSING-INFO-Generator analysis frameworks from the knowledge base for field completeness analysis, strategic gap identification, and actionable question generation.`
 };
 
-// FUNCTION TO BUILD COMPLETE GRANT CARD SYSTEM PROMPT
+// BUILD COMPLETE GRANT CARD SYSTEM PROMPT
 function buildGrantCardSystemPrompt(task, knowledgeContext = '') {
-  // Get the task-specific methodology
   const methodology = taskMethodologies[task] || taskMethodologies['grant-criteria'];
   
-  // Combine persona + methodology + knowledge context
   const systemPrompt = `${GRANT_CARD_EXPERT_PERSONA}
 
 ${methodology}
@@ -847,7 +827,7 @@ IMPORTANT: Provide only the requested output content. Do not include meta-commen
   return systemPrompt;
 }
 
-// ENHANCED AGENT PROMPTS - UPDATED: Added CanExport Claims
+// ENHANCED AGENT PROMPTS
 const agentPrompts = {
   'etg-writer': `You are an ETG Business Case specialist for British Columbia's Employee Training Grant program. You provide flexible consultation on ETG matters and can write complete, submission-ready business cases.
 
@@ -1062,11 +1042,9 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
   const conversationText = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
   const selectedDocs = [];
   
-  // Large file uploaded - reduce knowledge base to save context
   const isLargeFile = fileContent && fileContent.length > 50000;
   const maxDocs = isLargeFile ? 2 : 4;
   
-  // PRIORITY 1: Always include task-specific core document
   const taskDocMap = {
     'grant-criteria': ['grant_criteria_formatter', 'grant-criteria-formatter'],
     'preview': ['preview_section_generator', 'preview-section-generator'],
@@ -1076,14 +1054,12 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     'missing-info': ['missing_info_generator', 'missing-info-generator']
   };
   
-  // Get primary task document
   const taskPatterns = taskDocMap[task] || taskDocMap['grant-criteria'];
   const primaryDoc = docs.find(doc => 
     taskPatterns.some(pattern => doc.filename.toLowerCase().includes(pattern))
   );
   if (primaryDoc) selectedDocs.push(primaryDoc);
   
-  // PRIORITY 2: Grant type detection from content
   const grantTypes = {
     hiring: ['hiring', 'wage', 'employment', 'workforce', 'intern', 'staff', 'talent', 'job'],
     training: ['training', 'skills', 'education', 'certification', 'development', 'learning'],
@@ -1093,7 +1069,6 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     investment: ['investment', 'equity', 'venture', 'capital', 'investor', 'funding']
   };
   
-  // Industry detection for better example matching
   const industries = {
     technology: ['tech', 'software', 'ai', 'digital', 'innovation', 'startup'],
     agriculture: ['agricultural', 'farm', 'food', 'rural', 'crop'],
@@ -1102,12 +1077,10 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     indigenous: ['indigenous', 'first nations', 'aboriginal']
   };
   
-  // Detect grant type from message and file content
   const fullContent = msg + ' ' + (fileContent || '') + ' ' + conversationText;
   let detectedGrantType = null;
   let detectedIndustry = null;
   
-  // Find grant type
   for (const [type, keywords] of Object.entries(grantTypes)) {
     if (keywords.some(keyword => fullContent.includes(keyword))) {
       detectedGrantType = type;
@@ -1116,7 +1089,6 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     }
   }
   
-  // Find industry
   for (const [industry, keywords] of Object.entries(industries)) {
     if (keywords.some(keyword => fullContent.includes(keyword))) {
       detectedIndustry = industry;
@@ -1125,26 +1097,21 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     }
   }
   
-  // PRIORITY 3: Add relevant template and example based on detected type
   if (detectedGrantType) {
-    // Add template for the grant type
     const templateDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes(`${detectedGrantType} grant template`) ||
       (detectedGrantType === 'market' && doc.filename.toLowerCase().includes('market expansion'))
     );
     if (templateDoc && selectedDocs.length < maxDocs) selectedDocs.push(templateDoc);
     
-    // Add relevant example with industry preference
     let exampleDoc = null;
     if (detectedIndustry) {
-      // Try to find example matching both grant type and industry
       exampleDoc = docs.find(doc => 
         doc.filename.toLowerCase().includes(`${detectedGrantType} - grant card example`) &&
         industries[detectedIndustry].some(keyword => doc.filename.toLowerCase().includes(keyword))
       );
     }
     
-    // Fallback to any example of the grant type
     if (!exampleDoc) {
       exampleDoc = docs.find(doc => 
         doc.filename.toLowerCase().includes(`${detectedGrantType} - grant card example`)
@@ -1154,7 +1121,6 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     if (exampleDoc && selectedDocs.length < maxDocs) selectedDocs.push(exampleDoc);
   }
   
-  // PRIORITY 4: Add industry-specific examples if no grant type detected
   if (!detectedGrantType && detectedIndustry && selectedDocs.length < maxDocs) {
     const industryExample = docs.find(doc => 
       doc.filename.toLowerCase().includes('grant card example') &&
@@ -1163,7 +1129,6 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     if (industryExample) selectedDocs.push(industryExample);
   }
   
-  // PRIORITY 5: Fallback for missing task documents
   if (selectedDocs.length === 0) {
     const formatterDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('grant_criteria_formatter') ||
@@ -1172,7 +1137,6 @@ function selectGrantCardDocuments(task, message, fileContent, conversationHistor
     if (formatterDoc) selectedDocs.push(formatterDoc);
   }
   
-  // Remove duplicates and limit based on file size
   const uniqueDocs = [...new Set(selectedDocs)].slice(0, maxDocs);
   
   console.log(`🎯 Grant Cards Smart Selection: ${uniqueDocs.length} docs selected from ${docs.length} total`);
@@ -1189,7 +1153,6 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
   
   let selectedDocs = [];
   
-  // PRIORITY 1: Always include core infrastructure (1-2 docs)
   const coreEligibilityDoc = allDocuments.find(doc => 
     doc.filename.toLowerCase().includes('bc etg eligibility criteria') ||
     doc.filename.toLowerCase().includes('eligibility criteria')
@@ -1202,9 +1165,6 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
   );
   if (coreTemplateDoc) selectedDocs.push(coreTemplateDoc);
   
-  // PRIORITY 2: Context-based selection (2-3 docs)
-  
-  // Training type detection
   const trainingTypes = {
     leadership: ['leadership', 'management', 'supervisor', 'manager'],
     technical: ['technical', 'automotive', 'construction', 'electrical', 'trades'],
@@ -1213,7 +1173,6 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
     certification: ['certificate', 'certification', 'cpa', 'excel', 'fundamentals']
   };
   
-  // Industry detection
   const industries = {
     automotive: ['automotive', 'car', 'vehicle', 'kirmac'],
     construction: ['construction', 'electrical', 'building', 'contractor'],
@@ -1222,20 +1181,17 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
     finance: ['finance', 'accounting', 'wealth', 'financial']
   };
   
-  // Company size detection
   const companyIndicators = {
     large: ['corporation', 'inc', 'ltd', 'group', 'corporate'],
     small: ['local', 'family', 'boutique', 'startup']
   };
   
-  // Intent detection
   const intents = {
     eligibility: ['eligible', 'qualify', 'requirements', 'criteria', 'allowed'],
     examples: ['example', 'similar', 'like this', 'show me', 'sample'],
     writing: ['write', 'create', 'draft', 'develop', 'help me write']
   };
   
-  // Check for training type matches
   for (const [type, keywords] of Object.entries(trainingTypes)) {
     if (keywords.some(keyword => message.includes(keyword) || conversationText.includes(keyword))) {
       const typeExamples = allDocuments.filter(doc => 
@@ -1247,7 +1203,6 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
     }
   }
   
-  // Check for industry matches
   for (const [industry, keywords] of Object.entries(industries)) {
     if (keywords.some(keyword => message.includes(keyword) || conversationText.includes(keyword))) {
       const industryExamples = allDocuments.filter(doc => 
@@ -1259,7 +1214,6 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
     }
   }
   
-  // If user wants examples but no specific match, add high-quality recent examples
   if (intents.examples.some(keyword => message.includes(keyword)) && selectedDocs.length < 4) {
     const recentExamples = allDocuments.filter(doc => 
       doc.filename.toLowerCase().includes('caliber') ||
@@ -1270,7 +1224,6 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
     selectedDocs.push(...recentExamples.slice(0, 2));
   }
   
-  // Fallback: If we don't have enough docs, add some high-quality defaults
   if (selectedDocs.length < 3) {
     const fallbackDocs = allDocuments.filter(doc => 
       !selectedDocs.includes(doc) && (
@@ -1282,7 +1235,6 @@ function selectETGDocuments(userMessage, conversation, allDocuments) {
     selectedDocs.push(...fallbackDocs.slice(0, 5 - selectedDocs.length));
   }
   
-  // Remove duplicates and limit to 5 documents max
   const uniqueDocs = [...new Set(selectedDocs)].slice(0, 5);
   
   console.log(`🎯 ETG Smart Selection: ${uniqueDocs.length} docs selected from ${allDocuments.length} total`);
@@ -1298,7 +1250,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
   const conversationText = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
   const selectedDocs = [];
   
-  // PRIORITY 1: Always include core infrastructure (1-2 docs)
   const eligibilityDoc = docs.find(doc => 
     doc.filename.toLowerCase().includes('bcafe-eligibility-checklist')
   );
@@ -1309,7 +1260,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
   );
   if (programGuideDoc) selectedDocs.push(programGuideDoc);
   
-  // PRIORITY 2: Intent-based selection
   const intents = {
     eligibility: ['eligible', 'qualify', 'requirements', 'criteria', 'can i apply'],
     budget: ['budget', 'cost', 'funding', 'money', 'expense', 'financial'],
@@ -1318,14 +1268,12 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
     examples: ['example', 'successful', 'sample', 'similar', 'show me']
   };
   
-  // Industry detection for relevant examples
   const industries = {
     food: ['food', 'foods', 'restaurant', 'catering', 'fine choice'],
     beverage: ['coffee', 'drink', 'beverage', 'forecast', 'brewing'],
     agriculture: ['farm', 'agricultural', 'level ground', 'organic', 'produce']
   };
   
-  // Check for budget-related intent
   if (intents.budget.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
     const budgetDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('bcafe-budget-template-guide')
@@ -1334,7 +1282,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
     console.log(`🎯 BCAFE Intent Match: budget`);
   }
   
-  // Check for merit optimization intent
   if (intents.merit.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
     const meritDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('bcafe-merit-criteria-guide')
@@ -1343,7 +1290,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
     console.log(`🎯 BCAFE Intent Match: merit`);
   }
   
-  // Check for application writing intent
   if (intents.application.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
     const appDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('bcafe-application-questions')
@@ -1352,9 +1298,7 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
     console.log(`🎯 BCAFE Intent Match: application`);
   }
   
-  // Check for examples intent with industry matching
   if (intents.examples.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
-    // Try to match industry first
     for (const [industry, keywords] of Object.entries(industries)) {
       if (keywords.some(keyword => msg.includes(keyword) || conversationText.includes(keyword))) {
         const industryExamples = docs.filter(doc => 
@@ -1367,7 +1311,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
       }
     }
     
-    // If no industry match, add any successful example
     if (!selectedDocs.some(doc => doc.filename.includes('successful-application'))) {
       const anyExample = docs.find(doc => 
         doc.filename.toLowerCase().includes('successful-application')
@@ -1376,7 +1319,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
     }
   }
   
-  // Add activity examples for early-stage questions
   if (intents.eligibility.some(keyword => msg.includes(keyword)) || conversationHistory.length <= 2) {
     const activityDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('bcafe-activity-examples')
@@ -1384,7 +1326,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
     if (activityDoc && selectedDocs.length < 4) selectedDocs.push(activityDoc);
   }
   
-  // Fallback: ensure we have at least 3 documents
   if (selectedDocs.length < 3) {
     const fallbackDocs = docs.filter(doc => 
       !selectedDocs.includes(doc) && (
@@ -1396,7 +1337,6 @@ function selectBCAFEDocuments(message, orgType, conversationHistory, agentDocs =
     selectedDocs.push(...fallbackDocs.slice(0, 4 - selectedDocs.length));
   }
   
-  // Remove duplicates and limit to 4 documents max
   const uniqueDocs = [...new Set(selectedDocs)].slice(0, 4);
   
   console.log(`🎯 BCAFE Smart Selection: ${uniqueDocs.length} docs selected from ${docs.length} total`);
@@ -1412,14 +1352,12 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
   const conversationText = conversationHistory.map(msg => msg.content).join(' ').toLowerCase();
   const selectedDocs = [];
   
-  // PRIORITY 1: Always include main invoice guide for compliance
   const mainInvoiceGuide = docs.find(doc => 
     doc.filename.toLowerCase().includes('canexport invoice guide') ||
     doc.filename.toLowerCase().includes('invoice guide canexport')
   );
   if (mainInvoiceGuide) selectedDocs.push(mainInvoiceGuide);
 
-  // PRIORITY 2: Always prioritize rejected claims knowledge if red flags detected
   const rejectionKeywords = ['amazon', 'booth purchase', 'canadian', 'branding', 'franchise', 'airport tax', 'dispute', 'reusable', 'office supplies'];
   const hasRejectionRisk = rejectionKeywords.some(keyword => 
     msg.includes(keyword) || conversationText.includes(keyword)
@@ -1437,7 +1375,6 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
     }
   }
   
-  // PRIORITY 3: Intent-based selection
   const intents = {
     categories: ['category', 'categories', 'eligible', 'classification', 'type of expense'],
     compliance: ['compliance', 'checklist', 'verify', 'audit', 'review', 'check'],
@@ -1445,7 +1382,6 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
     receipt: ['receipt', 'invoice', 'document', 'expense', 'claim', 'payment']
   };
   
-  // Expense category detection (A-H)
   const expenseCategories = {
     travel: ['travel', 'flight', 'hotel', 'accommodation', 'airfare', 'taxi', 'uber'],
     trade: ['trade show', 'exhibition', 'booth', 'event', 'conference', 'fair'],
@@ -1457,7 +1393,6 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
     intellectual: ['ip', 'intellectual property', 'patent', 'trademark', 'copyright']
   };
   
-  // Detect expense categories from content
   const fullContent = msg + ' ' + conversationText;
   let detectedCategory = null;
   
@@ -1469,7 +1404,6 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
     }
   }
   
-  // Check for specific intent patterns
   if (intents.categories.some(keyword => fullContent.includes(keyword)) || detectedCategory) {
     const categoriesDoc = docs.find(doc => 
       doc.filename.toLowerCase().includes('expense-categories') ||
@@ -1494,7 +1428,6 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
     if (templateDoc && selectedDocs.length < 3) selectedDocs.push(templateDoc);
   }
   
-  // PRIORITY 3: Ensure we have the backup invoice guide if main one wasn't found
   if (!selectedDocs.some(doc => doc.filename.toLowerCase().includes('invoice guide'))) {
     const backupGuide = docs.find(doc => 
       doc.filename.toLowerCase().includes('invoice guide') ||
@@ -1503,13 +1436,10 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
     if (backupGuide && selectedDocs.length < 3) selectedDocs.push(backupGuide);
   }
   
-  // PRIORITY 4: Default fallback
   if (selectedDocs.length === 0) {
-    // Add all available documents up to limit
     selectedDocs.push(...docs.slice(0, 3));
   }
   
-  // Remove duplicates and limit to 3 documents max
   const uniqueDocs = [...new Set(selectedDocs)].slice(0, 3);
   
   console.log(`🎯 CanExport Claims Smart Selection: ${uniqueDocs.length} docs selected from ${docs.length} total`);
@@ -1521,7 +1451,6 @@ function selectCanExportClaimsDocuments(message, conversationHistory, agentDocs 
 
 // Get Google Access Token using Service Account
 async function getGoogleAccessToken() {
-  // Check if we have a valid cached token
   if (googleAccessToken && Date.now() < tokenExpiry) {
     return googleAccessToken;
   }
@@ -1533,17 +1462,15 @@ async function getGoogleAccessToken() {
 
     const serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
     
-    // Create JWT token
     const now = Math.floor(Date.now() / 1000);
     const payload = {
       iss: serviceAccount.client_email,
       scope: 'https://www.googleapis.com/auth/drive.readonly',
       aud: 'https://oauth2.googleapis.com/token',
       iat: now,
-      exp: now + 3600 // 1 hour
+      exp: now + 3600
     };
 
-    // Create JWT manually (simple implementation for serverless)
     const header = { alg: 'RS256', typ: 'JWT' };
     const headerBase64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
     const payloadBase64 = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
@@ -1554,7 +1481,6 @@ async function getGoogleAccessToken() {
     
     const jwt = `${headerBase64}.${payloadBase64}.${signatureBase64}`;
 
-    // Exchange JWT for access token
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: {
@@ -1570,7 +1496,7 @@ async function getGoogleAccessToken() {
 
     const tokenData = await response.json();
     googleAccessToken = tokenData.access_token;
-    tokenExpiry = Date.now() + (tokenData.expires_in * 1000) - 60000; // Expire 1 min early
+    tokenExpiry = Date.now() + (tokenData.expires_in * 1000) - 60000;
 
     console.log('✅ Google access token obtained');
     return googleAccessToken;
@@ -1593,7 +1519,6 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
   const startTime = Date.now();
   
   try {
-    // Try Redis cache first
     const cachedData = await redis.get(cacheKey);
     if (cachedData) {
       console.log(`✅ Cache HIT for ${agentType} (${Date.now() - startTime}ms)`);
@@ -1602,7 +1527,6 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
     
     console.log(`⚠️ Cache MISS for ${agentType} - Loading from Google Drive...`);
     
-    // Load from Google Drive (existing logic)
     const agentDocs = [];
     
     if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -1612,7 +1536,6 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
 
     const accessToken = await getGoogleAccessToken();
     
-    // Get main folder contents
     const mainFolderResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?q='${GOOGLE_DRIVE_FOLDER_ID}'+in+parents&fields=files(id,name,mimeType)`,
       { headers: { 'Authorization': `Bearer ${accessToken}` }}
@@ -1620,7 +1543,6 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
     
     const mainFolderContents = await mainFolderResponse.json();
     
-    // Find the specific agent folder
     const agentFolder = mainFolderContents.files.find(item => 
       item.mimeType === 'application/vnd.google-apps.folder' && 
       item.name.toLowerCase() === folderName
@@ -1630,7 +1552,6 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
       await loadAgentDocumentsSpecific(agentFolder.id, agentType, accessToken, agentDocs);
     }
     
-    // Store in Redis cache (indefinitely)
     await redis.set(cacheKey, agentDocs);
     
     const loadTime = Date.now() - startTime;
@@ -1641,7 +1562,6 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
     
   } catch (error) {
     console.error(`Redis error for ${agentType}:`, error);
-    // Fallback to direct Google Drive loading
     const agentDocs = [];
     
     if (!GOOGLE_DRIVE_FOLDER_ID || !GOOGLE_SERVICE_ACCOUNT_KEY) {
@@ -1719,21 +1639,18 @@ async function loadKnowledgeBaseFromGoogleDrive() {
   try {
     console.log('📚 Loading knowledge base from Google Drive...');
     
-    // Get access token
     const accessToken = await getGoogleAccessToken();
     
-    // Clear existing knowledge base
     knowledgeBases = {
       'grant-cards': [],
       'etg': [],
       'bcafe': [],
       'canexport': [],
-      'canexport-claims': [],  // NEW: CanExport Claims knowledge base
+      'canexport-claims': [],
       'readiness-strategist': [],
       'internal-oracle': []
     };
 
-    // Get main folder contents (should contain agent subfolders)
     const mainFolderResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?q='${GOOGLE_DRIVE_FOLDER_ID}'+in+parents&fields=files(id,name,mimeType)`,
       {
@@ -1750,7 +1667,6 @@ async function loadKnowledgeBaseFromGoogleDrive() {
 
     const mainFolderContents = await mainFolderResponse.json();
     
-    // Process each agent folder
     for (const item of mainFolderContents.files) {
       if (item.mimeType === 'application/vnd.google-apps.folder') {
         const agentName = item.name.toLowerCase();
@@ -1762,7 +1678,6 @@ async function loadKnowledgeBaseFromGoogleDrive() {
       }
     }
 
-    // Log summary
     let totalDocs = 0;
     let totalSize = 0;
     
@@ -1783,14 +1698,13 @@ async function loadKnowledgeBaseFromGoogleDrive() {
     
   } catch (error) {
     console.error('❌ Error loading knowledge base from Google Drive:', error);
-    knowledgeBaseLoaded = true; // Continue without knowledge base
+    knowledgeBaseLoaded = true;
   }
 }
 
 // Load documents for a specific agent from their Google Drive folder
 async function loadAgentDocuments(folderId, agentName, accessToken) {
   try {
-    // Get all files in the agent folder
     const filesResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&fields=files(id,name,mimeType,size,modifiedTime)`,
       {
@@ -1808,12 +1722,10 @@ async function loadAgentDocuments(folderId, agentName, accessToken) {
     let loadedCount = 0;
     
     for (const file of filesData.files) {
-      // Skip folders for now
       if (file.mimeType === 'application/vnd.google-apps.folder') {
         continue;
       }
       
-      // Load file content based on type
       try {
         const content = await loadFileContent(file, accessToken);
         
@@ -1843,13 +1755,12 @@ async function loadAgentDocuments(folderId, agentName, accessToken) {
   }
 }
 
-// FIXED: Enhanced PDF processing with better error handling
+// Enhanced PDF processing with better error handling
 async function loadFileContent(file, accessToken) {
   const { id, name, mimeType } = file;
   
   try {
     if (mimeType === 'application/vnd.google-apps.document') {
-      // Google Docs - export as plain text
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/plain`,
         {
@@ -1866,7 +1777,6 @@ async function loadFileContent(file, accessToken) {
       return await response.text();
       
     } else if (mimeType === 'text/plain' || mimeType === 'text/markdown') {
-      // Plain text/markdown files
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
         {
@@ -1883,7 +1793,6 @@ async function loadFileContent(file, accessToken) {
       return await response.text();
       
     } else if (mimeType === 'application/pdf') {
-      // Download and extract PDF content with enhanced error handling
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
         {
@@ -1900,21 +1809,18 @@ async function loadFileContent(file, accessToken) {
       const buffer = await response.arrayBuffer();
       
       try {
-        // Try with default options first
         const data = await pdf(Buffer.from(buffer));
         return data.text;
       } catch (primaryError) {
-        // If parsing fails, try with more permissive options
         console.log(`   ⚠️ PDF parsing warning for ${name}, trying fallback method...`);
         try {
           const data = await pdf(Buffer.from(buffer), {
             normalizeWhitespace: false,
             disableCombineTextItems: false,
-            max: 0 // No page limit
+            max: 0
           });
           return data.text;
         } catch (fallbackError) {
-          // Log both errors for debugging
           console.log(`   ❌ PDF extraction failed for ${name}:`);
           console.log(`     Primary error: ${primaryError.message}`);
           console.log(`     Fallback error: ${fallbackError.message}`);
@@ -1923,7 +1829,6 @@ async function loadFileContent(file, accessToken) {
       }
       
     } else if (mimeType.includes('officedocument') || mimeType.includes('opendocument')) {
-      // Download and extract Word document content
       const response = await fetch(
         `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
         {
@@ -1942,7 +1847,6 @@ async function loadFileContent(file, accessToken) {
       return result.value;
       
     } else {
-      // Skip unsupported file types
       return null;
     }
     
@@ -1973,7 +1877,7 @@ async function getKnowledgeBase() {
   return knowledgeBases;
 }
 
-// ✅ KEEP: Simple file processing (no base64 encoding)
+// Simple file processing (no base64 encoding)
 async function processFileContent(file) {
   const fileExtension = path.extname(file.originalname).toLowerCase();
   let content = '';
@@ -1993,7 +1897,7 @@ async function processFileContent(file) {
         throw new Error('Minimal text extracted - possibly image-based PDF');
       }
     } else {
-      content = file.buffer.toString('utf8'); // Fallback for other text files
+      content = file.buffer.toString('utf8');
     }
     
     console.log(`✅ File processed successfully (${content.length} characters extracted)`);
@@ -2010,8 +1914,6 @@ async function fetchURLContent(url) {
   try {
     console.log(`🔗 Fetching content from: ${url}`);
     
-    // For now, return a simulated response
-    // In production, you'd use a web scraping library like puppeteer or cheerio
     return `Course Information from ${url}:
 
 Course Title: Professional Development Training
@@ -2042,13 +1944,11 @@ function searchKnowledgeBase(query, agent = 'grant-cards') {
     let relevanceScore = 0;
     
     for (const term of searchTerms) {
-      // Search in content
       const contentMatches = (content.match(new RegExp(term, 'g')) || []).length;
       relevanceScore += contentMatches;
       
-      // Search in filename (weighted higher)
       const filenameMatches = (filename.match(new RegExp(term, 'g')) || []).length;
-      relevanceScore += filenameMatches * 3; // Filename matches are more important
+      relevanceScore += filenameMatches * 3;
     }
     
     if (relevanceScore > 0) {
@@ -2062,14 +1962,12 @@ function searchKnowledgeBase(query, agent = 'grant-cards') {
   return results.sort((a, b) => b.relevanceScore - a.relevanceScore);
 }
 
-// FIXED: Rate limiting with safeguards
+// Rate limiting with safeguards
 function checkRateLimit() {
   const now = Date.now();
   
-  // Remove timestamps older than 1 minute
   callTimestamps = callTimestamps.filter(timestamp => now - timestamp < 60000);
   
-  // Safeguard against memory issues
   if (callTimestamps.length > 1000) {
     console.log('⚠️ Rate limit array too large, trimming...');
     callTimestamps = callTimestamps.slice(-100);
@@ -2093,7 +1991,7 @@ async function waitForRateLimit() {
   }
 }
 
-// ✅ CONSISTENT WEB SEARCH CONFIGURATION (use for both functions)
+// WEB SEARCH CONFIGURATION
 const WEB_SEARCH_TOOL = {
   type: "web_search_20250305",
   name: "web_search", 
@@ -2107,7 +2005,7 @@ const WEB_SEARCH_TOOL = {
   }
 };
 
-// ✅ KEEP: Enhanced Claude API integration with Files API support
+// Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   try {
     checkRateLimit();
@@ -2117,25 +2015,19 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
     console.log(`🔧 Tools available: web_search (max 5 uses)`);
     console.log(`📄 Files to process: ${files.length}`);
     
-    // Build the final messages array with document support
     let apiMessages = [...messages];
     
-    // If we have files, modify the last user message to include document blocks
     if (files.length > 0) {
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
-      // Upload files to Files API and create document blocks
       for (const file of files) {
         try {
-          // Upload file to Anthropic's Files API
           const uploadResult = await uploadFileToAnthropic(file);
           
-          // Determine content block type based on file type
           const isImage = file.mimetype && file.mimetype.startsWith('image/');
           
           if (isImage) {
-            // Use image block for images
             contentBlocks.push({
               type: "image",
               source: {
@@ -2143,9 +2035,8 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
                 file_id: uploadResult.file_id
               }
             });
-            console.log(`📸 Added image file: ${uploadResult.originalname}`);
+            console.log(`🔸 Added image file: ${uploadResult.originalname}`);
           } else {
-            // Use document block for PDFs, text files, etc.
             contentBlocks.push({
               type: "document",
               source: {
@@ -2157,20 +2048,17 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
           }
         } catch (uploadError) {
           console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
-          // Continue with other files instead of failing completely
           continue;
         }
       }
       
-      // Add text content if present
-if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? lastUserMessage.content.trim() : lastUserMessage.content.length > 0)) {
-      contentBlocks.push({
+      if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? lastUserMessage.content.trim() : lastUserMessage.content.length > 0)) {
+        contentBlocks.push({
           type: "text",
           text: lastUserMessage.content
         });
       }
       
-      // Replace last message content with structured blocks
       apiMessages[apiMessages.length - 1] = {
         role: 'user',
         content: contentBlocks
@@ -2206,8 +2094,7 @@ if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? la
     const data = await response.json();
     console.log(`✅ API call successful (Total calls this session: ${apiCallCount})`);
     
-    // 📄 ENHANCED TOOL USAGE LOGGING
-    console.log('📄 RESPONSE ANALYSIS:');
+    console.log('🔄 RESPONSE ANALYSIS:');
     console.log(`   Content blocks: ${data.content?.length || 0}`);
     
     let toolUsageCount = 0;
@@ -2239,7 +2126,6 @@ if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? la
       console.log(`📚 No web search used - Claude answered from knowledge base`);
     }
     
-    // Log usage stats
     console.log(`📊 Usage: ${data.usage?.input_tokens || 0} in + ${data.usage?.output_tokens || 0} out tokens`);
     
     return textContent;
@@ -2255,7 +2141,7 @@ if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? la
   }
 }
 
-// ✅ KEEP: Enhanced Streaming Claude API with Files API support
+// Enhanced Streaming Claude API with Files API support
 async function callClaudeAPIStream(messages, systemPrompt = '', res, files = []) {
   try {
     checkRateLimit();
@@ -2265,25 +2151,19 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
     console.log(`🔧 Tools available: web_search (max 5 uses)`);
     console.log(`📄 Files to process: ${files.length}`);
     
-    // Build the final messages array with document support
     let apiMessages = [...messages];
     
-    // If we have files, modify the last user message to include document blocks
     if (files.length > 0) {
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
-      // Upload files to Files API and create document blocks
       for (const file of files) {
         try {
-          // Upload file to Anthropic's Files API
           const uploadResult = await uploadFileToAnthropic(file);
           
-          // Determine content block type based on file type
           const isImage = file.mimetype && file.mimetype.startsWith('image/');
           
           if (isImage) {
-            // Use image block for images
             contentBlocks.push({
               type: "image",
               source: {
@@ -2291,9 +2171,8 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
                 file_id: uploadResult.file_id
               }
             });
-            console.log(`📸 Added image file: ${uploadResult.originalname}`);
+            console.log(`🔸 Added image file: ${uploadResult.originalname}`);
           } else {
-            // Use document block for PDFs, text files, etc.
             contentBlocks.push({
               type: "document",
               source: {
@@ -2305,12 +2184,10 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
           }
         } catch (uploadError) {
           console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
-          // Continue with other files instead of failing completely
           continue;
         }
       }
       
-      // Add text content if present
       if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? lastUserMessage.content.trim() : lastUserMessage.content.length > 0)) {
         contentBlocks.push({
           type: "text",
@@ -2318,7 +2195,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
         });
       }
       
-      // Replace last message content with structured blocks
       apiMessages[apiMessages.length - 1] = {
         role: 'user',
         content: contentBlocks
@@ -2352,7 +2228,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       throw new Error(`Claude API error: ${response.status} - ${errorText}`);
     }
 
-    // Set up SSE headers
     res.writeHead(200, {
       'Content-Type': 'text/plain',
       'Cache-Control': 'no-cache',
@@ -2395,20 +2270,17 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
             try {
               const parsed = JSON.parse(data);
               
-              // Handle text content
               if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                 const chunk = parsed.delta.text;
                 res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
               }
               
-              // 📄 LOG TOOL USAGE IN STREAMING
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
                 toolUsageCount++;
                 console.log(`🌐 STREAMING TOOL USED: ${parsed.content_block.name}`);
                 console.log(`   Tool ID: ${parsed.content_block.id}`);
                 console.log(`   Query: ${parsed.content_block.input?.query || 'N/A'}`);
                 
-                // Send tool usage to frontend (optional)
                 res.write(`data: ${JSON.stringify({ 
                   tool_use: {
                     name: parsed.content_block.name,
@@ -2417,7 +2289,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
                 })}\n\n`);
               }
               
-              // Log tool results
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_result') {
                 console.log(`📄 Tool result received for: ${parsed.content_block.tool_use_id}`);
               }
@@ -2443,15 +2314,13 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
   }
 }
 
-// ✅ KEEP: Upload file to Anthropic's Files API (serverless-friendly)
+// Upload file to Anthropic's Files API (serverless-friendly)
 async function uploadFileToAnthropic(file) {
   try {
     console.log(`📤 Uploading ${file.originalname} to Files API...`);
     
-    // Create form data for the upload
     const formData = new FormData();
     
-    // Create a Blob from the buffer (works in serverless environments)
     const blob = new Blob([file.buffer], { type: file.mimetype });
     formData.append('file', blob, file.originalname);
     
@@ -2485,7 +2354,7 @@ async function uploadFileToAnthropic(file) {
   }
 }
 
-// Generic streaming request handler
+// ===== UNIFIED STREAMING REQUEST HANDLER =====
 async function handleStreamingRequest(req, res, agentType) {
   const startTime = Date.now();
   
@@ -2498,19 +2367,36 @@ async function handleStreamingRequest(req, res, agentType) {
   });
 
   const { message, task, conversationId, url: courseUrl } = req.body;
-  let fileContent = '';
-  // Get existing file context for streaming
-  const streamingConversationId = `${agentType}-${conversationId}`;
-  let conversationMeta = getConversationFileContext(streamingConversationId);
-  console.log(`📋 STREAMING: ${conversationMeta.uploadedFiles.length} existing files for ${agentType}`);
   
-// Let native callClaudeAPIStream handle file processing
-if (req.files && req.files.length > 0) {
-  console.log(`📄 Ready to send ${req.files.length} files to native Files API`);
-}
+  // Build proper conversation ID with agent prefix
+  const fullConversationId = `${agentType}-${conversationId}`;
+  
+  // Get existing file context
+  let conversationMeta = getConversationFileContext(fullConversationId);
+  console.log(`📋 STREAMING (${agentType}): ${conversationMeta.uploadedFiles.length} existing files`);
+  
+  // Process NEW uploaded files with Files API
+  let newUploadResults = [];
+  if (req.files && req.files.length > 0) {
+    console.log(`📄 Uploading ${req.files.length} new documents to Files API for ${agentType}`);
+    
+    for (const file of req.files) {
+      try {
+        const uploadResult = await uploadFileToAnthropic(file);
+        newUploadResults.push(uploadResult);
+        console.log(`✅ Uploaded ${file.originalname} → ${uploadResult.file_id}`);
+      } catch (uploadError) {
+        console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
+      }
+    }
+    
+    if (newUploadResults.length > 0) {
+      conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+      console.log(`✅ Added ${newUploadResults.length} files to ${agentType} conversation context`);
+    }
+  }
   
   // Get/create conversation
-  const fullConversationId = `${agentType}-${conversationId}`;
   if (!conversations.has(fullConversationId)) {
     conversations.set(fullConversationId, []);
     conversationTimestamps.set(fullConversationId, Date.now());
@@ -2527,7 +2413,7 @@ if (req.files && req.files.length > 0) {
   let knowledgeContext = '';
   
   if (agentType === 'grant-cards') {
-    relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation, agentDocs);
+    relevantDocs = selectGrantCardDocuments(task, message, '', conversation, agentDocs);
   } else if (agentType === 'etg-writer') {
     relevantDocs = selectETGDocuments(message, conversation, agentDocs);
   } else if (agentType === 'bcafe-writer') {
@@ -2535,7 +2421,6 @@ if (req.files && req.files.length > 0) {
   } else if (agentType === 'canexport-claims') {
     relevantDocs = selectCanExportClaimsDocuments(message, conversation, agentDocs);
   } else {
-    // Default selection for other agents
     relevantDocs = agentDocs.slice(0, 3);
   }
   
@@ -2549,31 +2434,26 @@ if (req.files && req.files.length > 0) {
   let systemPrompt;
   if (agentType === 'grant-cards') {
     systemPrompt = buildGrantCardSystemPrompt(task, knowledgeContext);
-} else {
-  systemPrompt = buildSystemPromptWithFileContext(
-    agentPrompts[agentType],
-    knowledgeContext,
-    conversationMeta,
-    agentType
-  );
-}
+  } else {
+    systemPrompt = buildSystemPromptWithFileContext(
+      agentPrompts[agentType],
+      knowledgeContext,
+      conversationMeta,
+      agentType
+    );
+  }
   
-
-// Build user message (simple text for now)
-let userMessage = message || '';
-if (courseUrl) {
-  const urlContent = await fetchURLContent(courseUrl);
-  userMessage += `\n\nURL content:\n${urlContent}`;
-}
-
-// Add file context info to message text
-if (conversationMeta.uploadedFiles.length > 0) {
-  userMessage += `\n\n=== PREVIOUSLY UPLOADED DOCUMENTS (${conversationMeta.uploadedFiles.length} files) ===\n`;
-  userMessage += conversationMeta.uploadedFiles.map((f, i) => 
-    `${i + 1}. ${f.filename} (file_id: ${f.file_id})`
-  ).join('\n');
-  userMessage += `\n\n[Note: These documents should be available for reference.]`;
-}
+  // Build user message with persistent file memory
+  let userMessage = message || `Hello, I need help with ${agentType.replace('-', ' ')}.`;
+  
+  // Add course URL content if provided (ETG specific)
+  if (courseUrl && agentType === 'etg-writer') {
+    const urlContent = await fetchURLContent(courseUrl);
+    userMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
+  }
+  
+  // Build message content with all file context
+  const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta);
   
   // Context management
   const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
@@ -2581,16 +2461,17 @@ if (conversationMeta.uploadedFiles.length > 0) {
   pruneConversation(conversation, agentType, estimatedContext);
   
   // Add user message to conversation
- conversation.push({ role: 'user', content: messageContent });
+  conversation.push({ role: 'user', content: messageContent });
   
-  // Stream response
-  console.log('🔍 DEBUG: Message content being sent to Claude:');
-console.log('Conversation length:', conversation.length);
-console.log('Last message content:', JSON.stringify(conversation[conversation.length - 1]?.content, null, 2));
+  // Stream response with Files API integration
+  console.log('📋 Streaming with full file memory integration');
+  console.log(`   Files available: ${conversationMeta.uploadedFiles.length}`);
+  console.log(`   New files uploaded: ${newUploadResults.length}`);
+  
   await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
 }
 
-// ✅ KEEP: Validate claims file name for rejection patterns
+// Validate claims file name for rejection patterns
 function validateClaimsFile(filename) {
   const warnings = [];
   const name = filename.toLowerCase();
@@ -2617,6 +2498,7 @@ function validateClaimsFile(filename) {
   };
 }
 
+// ===== MAIN HANDLER =====
 module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -2632,11 +2514,11 @@ module.exports = async function handler(req, res) {
   const { url, method } = req;
 
   // Clean up expired conversations periodically
-  if (Math.random() < 0.1) { // 10% chance per request
+  if (Math.random() < 0.1) {
     cleanupExpiredConversations();
   }
 
-  // Apply authentication middleware (except for login and health endpoints)
+  // Apply authentication middleware
   try {
     await new Promise((resolve, reject) => {
       requireAuth(req, res, (error) => {
@@ -2645,11 +2527,11 @@ module.exports = async function handler(req, res) {
       });
     });
   } catch (authError) {
-    return; // Authentication middleware has already handled the response
+    return;
   }
   
   try {
-    // FIXED: Login endpoint with proper error handling
+    // Login endpoint
     if (url === '/api/login' && method === 'POST') {
       try {
         let body = '';
@@ -2661,7 +2543,6 @@ module.exports = async function handler(req, res) {
           try {
             const { password } = JSON.parse(body);
             
-            // Check password
             if (!TEAM_PASSWORD) {
               res.status(500).json({ 
                 success: false, 
@@ -2671,10 +2552,8 @@ module.exports = async function handler(req, res) {
             }
 
             if (password === TEAM_PASSWORD) {
-              // Create JWT token
               const sessionToken = generateJWTToken();
 
-              // Set secure cookie
               res.setHeader('Set-Cookie', [
                 `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION/1000}; Path=/`
               ]);
@@ -2709,7 +2588,6 @@ module.exports = async function handler(req, res) {
 
     // Logout endpoint
     if (url === '/api/logout' && method === 'POST') {
-      // Just clear the cookie
       res.setHeader('Set-Cookie', [
         `${SESSION_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Max-Age=0; Path=/`
       ]);
@@ -2718,7 +2596,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Enhanced health check endpoint with context monitoring
+    // Enhanced health check endpoint
     if (url === '/api/health') {
       const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
       const totalConversations = conversations.size;
@@ -2755,7 +2633,6 @@ module.exports = async function handler(req, res) {
         console.log(`🔥 Warming cache for ${agentType}...`);
         const startTime = Date.now();
         
-        // Load documents and cache them
         await loadAgentSpecificKnowledgeBase(agentType);
         
         const warmTime = Date.now() - startTime;
@@ -2814,7 +2691,6 @@ module.exports = async function handler(req, res) {
       const docs = knowledgeBases['grant-cards'] || [];
       console.log(`Available docs: ${docs.map(d => d.filename).join(', ')}`);
       
-      // Test the selection function
       const testDocs = selectGrantCardDocuments(task, `test message for ${task}`, '', []);
       
       res.json({
@@ -2844,8 +2720,7 @@ module.exports = async function handler(req, res) {
       const exchangeCount = Math.floor(conversation.length / 2);
       const limit = CONVERSATION_LIMITS[agentType];
       
-      // Rough estimate without full context
-      const estimatedTokens = conversation.length * (TOKENS_PER_EXCHANGE / 2) + 30000; // +30K for system + KB
+      const estimatedTokens = conversation.length * (TOKENS_PER_EXCHANGE / 2) + 30000;
       const utilization = (estimatedTokens / CONTEXT_ABSOLUTE_LIMIT * 100).toFixed(1);
       
       res.json({
@@ -2880,7 +2755,7 @@ module.exports = async function handler(req, res) {
           return;
         }
         
-        knowledgeBaseLoaded = false; // Force refresh
+        knowledgeBaseLoaded = false;
         await getKnowledgeBase();
         const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
         
@@ -2896,7 +2771,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    // Streaming endpoints
+    // ===== STREAMING ENDPOINTS =====
     if (url === '/api/process-grant/stream' && method === 'POST') {
       await handleStreamingRequest(req, res, 'grant-cards');
       return;
@@ -2932,11 +2807,12 @@ module.exports = async function handler(req, res) {
       return;
     }
     
-    // FIXED: Process grant document with agent-specific loading
+    // ===== NON-STREAMING ENDPOINTS (Legacy Support) =====
+    
+    // Process grant document
     if (url === '/api/process-grant' && method === 'POST') {
       const startTime = Date.now();
       
-      // Handle file upload with multer
       await new Promise((resolve, reject) => {
         upload.array('files', 10)(req, res, (err) => {
           if (err) reject(err);
@@ -2945,41 +2821,42 @@ module.exports = async function handler(req, res) {
       });
 
       const { message, task, conversationId } = req.body;
-      let fileContent = '';
       
-      // Process uploaded files if present
+      // Build proper conversation ID
+      const fullConversationId = `grant-cards-${conversationId}`;
+      
+      // Get existing file context
+      let conversationMeta = getConversationFileContext(fullConversationId);
+      
+      // Process NEW uploaded files
+      let newUploadResults = [];
       if (req.files && req.files.length > 0) {
-        console.log(`📄 Processing ${req.files.length} Grant Card documents`);
-        const fileContents = [];
-        
         for (const file of req.files) {
           try {
-            const content = await processFileContent(file);
-            fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
-          } catch (error) {
-            console.error(`Error processing ${file.originalname}:`, error);
+            const uploadResult = await uploadFileToAnthropic(file);
+            newUploadResults.push(uploadResult);
+          } catch (uploadError) {
+            console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
           }
         }
         
-        fileContent = fileContents.join('\n\n');
+        if (newUploadResults.length > 0) {
+          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+        }
       }
       
-      // Get or create conversation
-      if (!conversations.has(conversationId)) {
-        conversations.set(conversationId, []);
-        conversationTimestamps.set(conversationId, Date.now());
+      if (!conversations.has(fullConversationId)) {
+        conversations.set(fullConversationId, []);
+        conversationTimestamps.set(fullConversationId, Date.now());
       }
-      const conversation = conversations.get(conversationId);
+      const conversation = conversations.get(fullConversationId);
       
-      // FIXED: Agent-specific knowledge base loading
       const agentDocs = await loadAgentSpecificKnowledgeBase('grant-cards');
       const loadTime = Date.now() - startTime;
       
-      // Log performance
       logAgentPerformance('grant-cards', agentDocs.length, loadTime);
       
-      // FIXED: Use agent-specific docs in selection
-      const relevantDocs = selectGrantCardDocuments(task, message, fileContent, conversation, agentDocs);
+      const relevantDocs = selectGrantCardDocuments(task, message, '', conversation, agentDocs);
       let knowledgeContext = '';
 
       if (relevantDocs.length > 0) {
@@ -2992,7 +2869,6 @@ module.exports = async function handler(req, res) {
         console.log(`📚 No specific Grant Card documents found for task: ${task}`);
       }
       
-      // Check if this is a Grant Card task (uses shared persona) or other agent
       const isGrantCardTask = ['grant-criteria', 'preview', 'requirements', 'insights', 'categories', 'missing-info'].includes(task);
 
       let systemPrompt;
@@ -3007,25 +2883,19 @@ ${knowledgeContext}
 Always follow the exact workflows and instructions from the knowledge base documents above.`;
       }
       
-      // Add user message to conversation
-      let userMessage = message;
-      if (fileContent) {
-        userMessage += `\n\nUploaded document content:\n${fileContent}`;
-      }
+      // Build message content with persistent file memory
+      const messageContent = buildMessageContentWithFiles(message, conversationMeta);
 
-      // ENHANCED CONTEXT MANAGEMENT
-      const agentType = getAgentType(url, conversationId);
-      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+      const agentType = 'grant-cards';
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, message);
 
       logContextUsage(agentType, estimatedContext, conversation.length);
       pruneConversation(conversation, agentType, estimatedContext);
       
-      conversation.push({ role: 'user', content: userMessage });
+      conversation.push({ role: 'user', content: messageContent });
       
-      // Get response from Claude with rate limiting
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
-      // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
       
       res.json({ 
@@ -3040,7 +2910,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       return;
     }
 
-    // FIXED: Process ETG requests with agent-specific loading
+    // Process ETG requests
     if (url === '/api/process-etg' && method === 'POST') {
       const startTime = Date.now();
       await new Promise((resolve, reject) => {
@@ -3051,18 +2921,15 @@ Always follow the exact workflows and instructions from the knowledge base docum
       });
 
       const { message, conversationId, url: courseUrl } = req.body;
-      let fileContent = '';
-      let urlContent = '';
       
       console.log(`🎯 Processing enhanced ETG request for conversation: ${conversationId}`);
-      console.log(`🔍 TESTING: About to get file context for ${etgConversationId}`);
       
-  // Get existing file context
-      let conversationMeta = getConversationFileContext(etgConversationId);
+      // Build proper conversation ID
+      const fullConversationId = `etg-${conversationId}`;
+      
+      // Get existing file context
+      let conversationMeta = getConversationFileContext(fullConversationId);
       console.log(`📋 ETG Conversation Context: ${conversationMeta.uploadedFiles.length} existing files`);
-if (conversationMeta.uploadedFiles.length > 0) {
-  console.log(`📋 Existing files: ${conversationMeta.uploadedFiles.map(f => f.filename).join(', ')}`);
-}
       
       // Process NEW uploaded files with Files API
       let newUploadResults = [];
@@ -3080,34 +2947,31 @@ if (conversationMeta.uploadedFiles.length > 0) {
         }
         
         if (newUploadResults.length > 0) {
-          conversationMeta = updateConversationFileContext(etgConversationId, newUploadResults);
+          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
           console.log(`✅ Added ${newUploadResults.length} files to ETG conversation context`);
         }
       }
       
-      // Process URL if present
-      if (courseUrl) {
-        console.log(`🔗 Processing ETG URL: ${courseUrl}`);
-        urlContent = await fetchURLContent(courseUrl);
+      if (!conversations.has(fullConversationId)) {
+        conversations.set(fullConversationId, []);
+        conversationTimestamps.set(fullConversationId, Date.now());
       }
-      
-      // Get or create ETG conversation
-      const etgConversationId = `etg-${conversationId}`;
-      if (!conversations.has(etgConversationId)) {
-        conversations.set(etgConversationId, []);
-        conversationTimestamps.set(etgConversationId, Date.now());
-      }
-      const conversation = conversations.get(etgConversationId);
+      const conversation = conversations.get(fullConversationId);
       
       // Enhanced ETG Processing with Tools
       let enhancedResponse = '';
       let toolsUsed = [];
       
       // Check if we need to run eligibility check
-      const fullContent = message + ' ' + fileContent + ' ' + urlContent;
+      let urlContent = '';
+      if (courseUrl) {
+        urlContent = await fetchURLContent(courseUrl);
+      }
+      
+      const fullContent = message + ' ' + urlContent;
       const needsEligibilityCheck = (message.toLowerCase().includes('eligible') || 
                                      message.toLowerCase().includes('training') || 
-                                     fileContent || urlContent);
+                                     req.files?.length > 0 || urlContent);
       
       if (needsEligibilityCheck) {
         const trainingInfo = extractTrainingInfo(fullContent);
@@ -3127,13 +2991,13 @@ if (conversationMeta.uploadedFiles.length > 0) {
             enhancedResponse += `- Explore professional development programs from accredited providers\n\n`;
             enhancedResponse += `I can help you find eligible alternatives. What specific skills are you looking to develop?`;
             
-            // Add to conversation and return early
-            conversation.push({ role: 'user', content: message + (fileContent ? `\n\nUploaded: ${req.file.originalname}` : '') });
+            const messageContent = buildMessageContentWithFiles(message, conversationMeta);
+            conversation.push({ role: 'user', content: messageContent });
             conversation.push({ role: 'assistant', content: enhancedResponse });
             
             res.json({ 
               response: enhancedResponse,
-              conversationId: etgConversationId,
+              conversationId: conversationId,
               toolsUsed: toolsUsed
             });
             return;
@@ -3148,12 +3012,10 @@ if (conversationMeta.uploadedFiles.length > 0) {
         }
       }
       
-      // FIXED: Agent-specific knowledge base loading for ETG
       const agentDocs = await loadAgentSpecificKnowledgeBase('etg-writer');
       const loadTime = Date.now() - startTime;
       logAgentPerformance('etg-writer', agentDocs.length, loadTime);
 
-      // Use smart document selection instead of first 5
       const relevantDocs = selectETGDocuments(message, conversation, agentDocs);
       let knowledgeContext = '';
 
@@ -3165,20 +3027,13 @@ if (conversationMeta.uploadedFiles.length > 0) {
         console.log(`📚 Using ${relevantDocs.length} ETG documents: ${relevantDocs.map(d => d.filename).join(', ')}`);
       }
       
-      // Build ETG system prompt with knowledge context
-      const systemPrompt = `${agentPrompts['etg-writer']}
-
-ETG KNOWLEDGE BASE CONTEXT:
-${knowledgeContext}
-
-TOOLS USED IN THIS SESSION:
-${toolsUsed.join(', ')}
-
-${enhancedResponse ? `ELIGIBILITY PRE-CHECK RESULTS:\n${enhancedResponse}` : ''}
-
-Use the ETG knowledge base above to find similar successful applications and match their style and structure.`;
+      const systemPrompt = buildSystemPromptWithFileContext(
+        agentPrompts['etg-writer'],
+        knowledgeContext,
+        conversationMeta,
+        'etg-writer'
+      );
       
-// Build message content using Files API
       let baseMessage = message || "Hello, I need help with an ETG Business Case.";
       
       if (urlContent) {
@@ -3188,48 +3043,34 @@ Use the ETG knowledge base above to find similar successful applications and mat
       if (enhancedResponse) {
         baseMessage += `\n\nPre-screening completed. Please proceed with business case development.`;
       }
-      
-      // Build user message (simple text for now)
-let userMessage = baseMessage;
 
-// Add file context info to message text
-if (conversationMeta.uploadedFiles.length > 0) {
-  userMessage += `\n\n=== PREVIOUSLY UPLOADED DOCUMENTS (${conversationMeta.uploadedFiles.length} files) ===\n`;
-  userMessage += conversationMeta.uploadedFiles.map((f, i) => 
-    `${i + 1}. ${f.filename} (file_id: ${f.file_id})`
-  ).join('\n');
-  userMessage += `\n\n[Note: These documents should be available for reference.]`;
-}
+      const messageContent = buildMessageContentWithFiles(baseMessage, conversationMeta);
 
-      // ENHANCED CONTEXT MANAGEMENT FOR ETG
       const agentType = 'etg-writer';
-      conversation.push({ role: 'user', content: messageContent });
+      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, baseMessage);
       logContextUsage(agentType, estimatedContext, conversation.length);
       pruneConversation(conversation, agentType, estimatedContext);
       
       conversation.push({ role: 'user', content: messageContent });
       
-      // Get response from Claude using enhanced ETG specialist prompt
       console.log(`🤖 Calling Claude API for enhanced ETG specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
-      // Combine enhanced response with Claude response
       const finalResponse = enhancedResponse + response;
       
-      // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: finalResponse });
       
       console.log(`✅ Enhanced ETG response generated successfully`);
       
       res.json({ 
         response: finalResponse,
-        conversationId: etgConversationId,
+        conversationId: conversationId,
         toolsUsed: toolsUsed
       });
       return;
     }
 
-    // FIXED: BCAFE endpoint with agent-specific loading
+    // BCAFE endpoint
     if (url === '/api/process-bcafe' && method === 'POST') {
       await new Promise((resolve, reject) => {
         upload.array('files', 10)(req, res, (err) => {
@@ -3239,37 +3080,41 @@ if (conversationMeta.uploadedFiles.length > 0) {
       });
 
       const { message, conversationId, orgType, selectedMarkets } = req.body;
-      let fileContent = '';
       
       console.log(`🌾 Processing BCAFE request for conversation: ${conversationId}`);
       console.log(`📊 Organization type: ${orgType}, Target markets: ${selectedMarkets}`);
       
-      // Process uploaded files if present
+      // Build proper conversation ID
+      const fullConversationId = `bcafe-${conversationId}`;
+      
+      // Get existing file context
+      let conversationMeta = getConversationFileContext(fullConversationId);
+      
+      // Process NEW uploaded files
+      let newUploadResults = [];
       if (req.files && req.files.length > 0) {
         console.log(`📄 Processing ${req.files.length} BCAFE documents`);
-        const fileContents = [];
         
         for (const file of req.files) {
           try {
-            const content = await processFileContent(file);
-            fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
-          } catch (error) {
-            console.error(`Error processing ${file.originalname}:`, error);
+            const uploadResult = await uploadFileToAnthropic(file);
+            newUploadResults.push(uploadResult);
+          } catch (uploadError) {
+            console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
           }
         }
         
-        fileContent = fileContents.join('\n\n');
+        if (newUploadResults.length > 0) {
+          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+        }
       }
       
-      // Get or create BCAFE conversation
-      const bcafeConversationId = `bcafe-${conversationId}`;
-      if (!conversations.has(bcafeConversationId)) {
-        conversations.set(bcafeConversationId, []);
-        conversationTimestamps.set(bcafeConversationId, Date.now());
+      if (!conversations.has(fullConversationId)) {
+        conversations.set(fullConversationId, []);
+        conversationTimestamps.set(fullConversationId, Date.now());
       }
-      const conversation = conversations.get(bcafeConversationId);
+      const conversation = conversations.get(fullConversationId);
       
-      // FIXED: Agent-specific knowledge base loading for BCAFE
       const agentDocs = await loadAgentSpecificKnowledgeBase('bcafe-writer');
       const relevantDocs = selectBCAFEDocuments(message, orgType, conversation, agentDocs);
       
@@ -3284,22 +3129,15 @@ if (conversationMeta.uploadedFiles.length > 0) {
         knowledgeContext = 'Use BCAFE Summer 2025 program requirements for guidance.';
       }
       
-      // Build streamlined system prompt with selected knowledge base context
-      const systemPrompt = `${agentPrompts['bcafe-writer']}
-
-SELECTED KNOWLEDGE BASE DOCUMENTS:
-${knowledgeContext}
-
-CURRENT SESSION CONTEXT:
-- Organization Type: ${orgType || 'Not specified'}
-- Selected Target Markets: ${selectedMarkets || 'Not specified'}
-
-Use the knowledge base documents above for all detailed processes, requirements, and examples. Reference specific sections when providing guidance.`;
+      const systemPrompt = buildSystemPromptWithFileContext(
+        agentPrompts['bcafe-writer'],
+        knowledgeContext,
+        conversationMeta,
+        'bcafe-writer'
+      );
       
-      // Build comprehensive user message
       let userMessage = message || "Hello, I need help with a BCAFE application.";
       
-      // Add context information
       if (orgType) {
         userMessage += `\n\nOrganization Type: ${orgType}`;
       }
@@ -3307,37 +3145,32 @@ Use the knowledge base documents above for all detailed processes, requirements,
       if (selectedMarkets) {
         userMessage += `\n\nTarget Export Markets: ${selectedMarkets}`;
       }
-      
-      if (fileContent) {
-        userMessage += `\n\nUploaded Business Document Analysis:\n${fileContent}`;
-      }
 
-      // ENHANCED CONTEXT MANAGEMENT FOR BCAFE (60 exchanges)
+      const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta);
+
       const agentType = 'bcafe-writer';
       const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
 
       logContextUsage(agentType, estimatedContext, conversation.length);
       pruneConversation(conversation, agentType, estimatedContext);
       
-      conversation.push({ role: 'user', content: userMessage });
+      conversation.push({ role: 'user', content: messageContent });
       
-      // Get response from Claude using streamlined BCAFE specialist prompt
       console.log(`🤖 Calling Claude API for BCAFE specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
-      // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
       
       console.log(`✅ BCAFE response generated successfully`);
       
       res.json({ 
         response: response,
-        conversationId: bcafeConversationId 
+        conversationId: conversationId 
       });
       return;
     }
     
-    // NEW: CanExport Claims endpoint - CLEANED UP (no OCR functions)
+    // CanExport Claims endpoint
     if (url === '/api/process-claims' && method === 'POST') {
       const startTime = Date.now();
       
@@ -3349,48 +3182,51 @@ Use the knowledge base documents above for all detailed processes, requirements,
       });
 
       const { message, conversationId } = req.body;
-      let fileContents = [];
       
       console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
       
-      // Process uploaded files if present - SIMPLIFIED (no OCR processing)
+      // Build proper conversation ID
+      const fullConversationId = `claims-${conversationId}`;
+      
+      // Get existing file context
+      let conversationMeta = getConversationFileContext(fullConversationId);
+      
+      // Process NEW uploaded files
+      let newUploadResults = [];
       if (req.files && req.files.length > 0) {
         console.log(`📄 Processing ${req.files.length} Claims documents with Files API`);
         
         for (const file of req.files) {
           console.log(`📄 Preparing: ${file.originalname} for Files API upload`);
           
-          // Pre-validation before processing
           const fileValidation = validateClaimsFile(file.originalname);
           if (fileValidation.hasWarnings) {
             console.log('🚨 File validation warnings detected');
           }
           
-          // Simple file info for user message (Files API will handle actual processing)
-          let processedContent = `📄 DOCUMENT UPLOADED: ${file.originalname}
-File Type: ${file.mimetype}
-Size: ${(file.buffer.length / 1024).toFixed(2)} KB
-
-${fileValidation.hasWarnings ? `⚠️ VALIDATION WARNINGS:\n${fileValidation.warnings.join('\n')}\n\n` : ''}Please analyze this document for CanExport SME program eligibility and compliance requirements.`;
-          
-          fileContents.push(processedContent);
+          try {
+            const uploadResult = await uploadFileToAnthropic(file);
+            newUploadResults.push(uploadResult);
+          } catch (uploadError) {
+            console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
+          }
+        }
+        
+        if (newUploadResults.length > 0) {
+          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
         }
       }
       
-      // Get or create Claims conversation
-      const claimsConversationId = `claims-${conversationId}`;
-      if (!conversations.has(claimsConversationId)) {
-        conversations.set(claimsConversationId, []);
-        conversationTimestamps.set(claimsConversationId, Date.now());
+      if (!conversations.has(fullConversationId)) {
+        conversations.set(fullConversationId, []);
+        conversationTimestamps.set(fullConversationId, Date.now());
       }
-      const conversation = conversations.get(claimsConversationId);
+      const conversation = conversations.get(fullConversationId);
       
-      // Agent-specific knowledge base loading for CanExport Claims
       const agentDocs = await loadAgentSpecificKnowledgeBase('canexport-claims');
       const loadTime = Date.now() - startTime;
       logAgentPerformance('canexport-claims', agentDocs.length, loadTime);
 
-      // Select relevant claims documents
       const relevantDocs = selectCanExportClaimsDocuments(message, conversation, agentDocs);
       
       let knowledgeContext = '';
@@ -3404,46 +3240,35 @@ ${fileValidation.hasWarnings ? `⚠️ VALIDATION WARNINGS:\n${fileValidation.wa
         knowledgeContext = 'Use CanExport Claims and Invoice Guide for compliance verification.';
       }
       
-      // Build Claims system prompt with knowledge context
-      const systemPrompt = `${agentPrompts['canexport-claims']}
-
-CANEXPORT CLAIMS KNOWLEDGE BASE:
-${knowledgeContext}
-
-Use the invoice guides and compliance documents above for all expense eligibility determinations. Always reference specific guideline sections when making compliance assessments.`;
+      const systemPrompt = buildSystemPromptWithFileContext(
+        agentPrompts['canexport-claims'],
+        knowledgeContext,
+        conversationMeta,
+        'canexport-claims'
+      );
       
-      // Build comprehensive user message
       let userMessage = message || "Hello, I need help auditing CanExport expenses.";
 
-      if (fileContents.length > 0) {
-        userMessage += `\n\n=== UPLOADED DOCUMENTS (${fileContents.length} files) ===\n`;
-        fileContents.forEach((content, index) => {
-          userMessage += `\n--- Document ${index + 1} ---\n${content}\n`;
-        });
-        userMessage += `\nPlease analyze all ${fileContents.length} documents for CanExport SME program eligibility and compliance requirements.`;
-      }
+      const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta);
 
-      // Enhanced context management for Claims (40 exchanges)
       const agentType = 'canexport-claims';
       const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
 
       logContextUsage(agentType, estimatedContext, conversation.length);
       pruneConversation(conversation, agentType, estimatedContext);
       
-      conversation.push({ role: 'user', content: userMessage });
+      conversation.push({ role: 'user', content: messageContent });
       
-      // Get response from Claude using Claims specialist prompt
       console.log(`🤖 Calling Claude API for CanExport Claims specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
-      // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
       
       console.log(`✅ CanExport Claims response generated successfully`);
       
       res.json({ 
         response: response,
-        conversationId: claimsConversationId,
+        conversationId: conversationId,
         performance: {
           documentsLoaded: agentDocs.length,
           documentsSelected: relevantDocs.length,
@@ -3466,6 +3291,9 @@ Use the invoice guides and compliance documents above for all expense eligibilit
       const conversationId = url.split('/api/conversation/')[1];
       conversations.delete(conversationId);
       conversationTimestamps.delete(conversationId);
+      // Also clear file metadata
+      const metaKey = `${conversationId}-meta`;
+      conversations.delete(metaKey);
       res.json({ message: 'Conversation cleared' });
       return;
     }
@@ -3491,7 +3319,6 @@ Use the invoice guides and compliance documents above for all expense eligibilit
   } catch (error) {
     console.error('API error:', error);
     
-    // Send user-friendly error messages
     let errorMessage = error.message;
     if (error.message.includes('Rate limit')) {
       errorMessage = `${error.message}\n\nPlease wait a few minutes before making another request.`;
