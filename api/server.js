@@ -2380,14 +2380,55 @@ const WEB_SEARCH_TOOL = {
   }
 };
 
-// Enhanced Claude API integration with detailed tool usage logging
-async function callClaudeAPI(messages, systemPrompt = '') {
+// Enhanced Claude API integration with native document support
+async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   try {
     checkRateLimit();
     await waitForRateLimit();
     
     console.log(`🔥 Making Claude API call (${callTimestamps.length + 1}/${MAX_CALLS_PER_MINUTE} this minute)`);
     console.log(`🔧 Tools available: web_search (max 5 uses)`);
+    console.log(`📄 Files to process: ${files.length}`);
+    
+    // Build the final messages array with document support
+    let apiMessages = [...messages];
+    
+    // If we have files, modify the last user message to include document blocks
+    if (files.length > 0) {
+      const lastUserMessage = apiMessages[apiMessages.length - 1];
+      const contentBlocks = [];
+      
+      // Add document blocks first (PDFs, images)
+      for (const file of files) {
+        const base64Data = file.buffer.toString('base64');
+        const mimeType = file.mimetype || 'application/octet-stream';
+        
+        contentBlocks.push({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: mimeType,
+            data: base64Data
+          }
+        });
+        
+        console.log(`📄 Added ${mimeType} document: ${file.originalname}`);
+      }
+      
+      // Add text content if present
+      if (lastUserMessage.content && lastUserMessage.content.trim()) {
+        contentBlocks.push({
+          type: "text",
+          text: lastUserMessage.content
+        });
+      }
+      
+      // Replace last message content with structured blocks
+      apiMessages[apiMessages.length - 1] = {
+        role: 'user',
+        content: contentBlocks
+      };
+    }
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2400,7 +2441,7 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
-        messages: messages,
+        messages: apiMessages,
         tools: [WEB_SEARCH_TOOL]
       })
     });
@@ -2425,24 +2466,24 @@ async function callClaudeAPI(messages, systemPrompt = '') {
     let textContent = '';
     
     for (const block of data.content || []) {
-  console.log(`   Block type: ${block.type}`);
-  
-  if (block.type === 'text') {
-    textContent += block.text;
-    console.log(`   Text length: ${block.text?.length || 0} chars`);
-  } 
-  else if (block.type === 'server_tool_use') {
-    toolUsageCount++;
-    console.log(`   🌐 WEB SEARCH INITIATED: ${block.name || 'web_search'}`);
-    console.log(`   Tool ID: ${block.id}`);
-    if (block.input?.query) {
-      console.log(`   Query: "${block.input.query}"`);
+      console.log(`   Block type: ${block.type}`);
+      
+      if (block.type === 'text') {
+        textContent += block.text;
+        console.log(`   Text length: ${block.text?.length || 0} chars`);
+      } 
+      else if (block.type === 'server_tool_use') {
+        toolUsageCount++;
+        console.log(`   🌐 WEB SEARCH INITIATED: ${block.name || 'web_search'}`);
+        console.log(`   Tool ID: ${block.id}`);
+        if (block.input?.query) {
+          console.log(`   Query: "${block.input.query}"`);
+        }
+      }
+      else if (block.type === 'web_search_tool_result') {
+        console.log(`   🔍 WEB SEARCH RESULT: Found ${block.content?.length || 0} results`);
+      }
     }
-  }
-  else if (block.type === 'web_search_tool_result') {
-    console.log(`   🔍 WEB SEARCH RESULT: Found ${block.content?.length || 0} results`);
-  }
-}
     
     if (toolUsageCount > 0) {
       console.log(`🌐 Web searches performed: ${toolUsageCount}`);
@@ -2466,14 +2507,55 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-// Enhanced Streaming Claude API with tool usage logging
-async function callClaudeAPIStream(messages, systemPrompt = '', res) {
+// Enhanced Streaming Claude API with native document support
+async function callClaudeAPIStream(messages, systemPrompt = '', res, files = []) {
   try {
     checkRateLimit();
     await waitForRateLimit();
     
     console.log(`🔥 Making streaming Claude API call`);
     console.log(`🔧 Tools available: web_search (max 5 uses)`);
+    console.log(`📄 Files to process: ${files.length}`);
+    
+    // Build the final messages array with document support
+    let apiMessages = [...messages];
+    
+    // If we have files, modify the last user message to include document blocks
+    if (files.length > 0) {
+      const lastUserMessage = apiMessages[apiMessages.length - 1];
+      const contentBlocks = [];
+      
+      // Add document blocks first (PDFs, images)
+      for (const file of files) {
+        const base64Data = file.buffer.toString('base64');
+        const mimeType = file.mimetype || 'application/octet-stream';
+        
+        contentBlocks.push({
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: mimeType,
+            data: base64Data
+          }
+        });
+        
+        console.log(`📄 Added ${mimeType} document: ${file.originalname}`);
+      }
+      
+      // Add text content if present
+      if (lastUserMessage.content && lastUserMessage.content.trim()) {
+        contentBlocks.push({
+          type: "text",
+          text: lastUserMessage.content
+        });
+      }
+      
+      // Replace last message content with structured blocks
+      apiMessages[apiMessages.length - 1] = {
+        role: 'user',
+        content: contentBlocks
+      };
+    }
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2486,7 +2568,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
         system: systemPrompt,
-        messages: messages,
+        messages: apiMessages,
         stream: true,
         tools: [WEB_SEARCH_TOOL]
       })
@@ -2514,7 +2596,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
     let buffer = '';
     let toolUsageCount = 0;
 
-    console.log(`🚀 Starting streaming response...`);
+    console.log(`🚀 Starting streaming response with native document support...`);
 
     try {
       while (true) {
@@ -2530,7 +2612,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
             const data = line.slice(6);
             
             if (data === '[DONE]') {
-              console.log(`✅ Streaming completed`);
+              console.log(`✅ Streaming completed with native document support`);
               if (toolUsageCount > 0) {
                 console.log(`🌐 Total web searches used: ${toolUsageCount}`);
               } else {
@@ -2693,7 +2775,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
   conversation.push({ role: 'user', content: userMessage });
   
   // Stream response
-  await callClaudeAPIStream(conversation, systemPrompt, res);
+ await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
 }
 module.exports = async function handler(req, res) {
   // CORS headers
@@ -3260,7 +3342,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'user', content: userMessage });
       
       // Get response from Claude with rate limiting
-      const response = await callClaudeAPI(conversation, systemPrompt);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
@@ -3427,7 +3509,7 @@ Use the ETG knowledge base above to find similar successful applications and mat
       
       // Get response from Claude using enhanced ETG specialist prompt
       console.log(`🤖 Calling Claude API for enhanced ETG specialist response`);
-      const response = await callClaudeAPI(conversation, systemPrompt);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       // Combine enhanced response with Claude response
       const finalResponse = enhancedResponse + response;
@@ -3539,7 +3621,7 @@ Use the knowledge base documents above for all detailed processes, requirements,
       
       // Get response from Claude using streamlined BCAFE specialist prompt
       console.log(`🤖 Calling Claude API for BCAFE specialist response`);
-      const response = await callClaudeAPI(conversation, systemPrompt);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
@@ -3812,7 +3894,7 @@ if (fileContents.length > 0) {
       
       // Get response from Claude using Claims specialist prompt
       console.log(`🤖 Calling Claude API for CanExport Claims specialist response`);
-      const response = await callClaudeAPI(conversation, systemPrompt);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       // Add assistant response to conversation
       conversation.push({ role: 'assistant', content: response });
