@@ -2425,18 +2425,24 @@ async function callClaudeAPI(messages, systemPrompt = '') {
     let textContent = '';
     
     for (const block of data.content || []) {
-      console.log(`   Block type: ${block.type}`);
-      
-      if (block.type === 'text') {
-        textContent += block.text;
-        console.log(`   Text length: ${block.text?.length || 0} chars`);
-      } else if (block.type === 'tool_use') {
-        toolUsageCount++;
-        console.log(`   🌐 TOOL USED: ${block.name}`);
-        console.log(`   Tool ID: ${block.id}`);
-        console.log(`   Query: ${block.input?.query || 'N/A'}`);
-      }
+  console.log(`   Block type: ${block.type}`);
+  
+  if (block.type === 'text') {
+    textContent += block.text;
+    console.log(`   Text length: ${block.text?.length || 0} chars`);
+  } 
+  else if (block.type === 'server_tool_use') {
+    toolUsageCount++;
+    console.log(`   🌐 WEB SEARCH INITIATED: ${block.name || 'web_search'}`);
+    console.log(`   Tool ID: ${block.id}`);
+    if (block.input?.query) {
+      console.log(`   Query: "${block.input.query}"`);
     }
+  }
+  else if (block.type === 'web_search_tool_result') {
+    console.log(`   🔍 WEB SEARCH RESULT: Found ${block.content?.length || 0} results`);
+  }
+}
     
     if (toolUsageCount > 0) {
       console.log(`🌐 Web searches performed: ${toolUsageCount}`);
