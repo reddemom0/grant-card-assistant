@@ -2564,34 +2564,37 @@ if (req.files && req.files.length > 0) {
   let systemPrompt;
   if (agentType === 'grant-cards') {
     systemPrompt = buildGrantCardSystemPrompt(task, knowledgeContext);
-  } else {
-    systemPrompt = `${agentPrompts[agentType]}
-
-KNOWLEDGE BASE CONTEXT:
-${knowledgeContext}
-
-Always follow the exact workflows and instructions from the knowledge base documents above.`;
-  }
+} else {
+  systemPrompt = buildSystemPromptWithFileContext(
+    agentPrompts[agentType],
+    knowledgeContext,
+    conversationMeta,
+    agentType
+  );
+}
   
-  // Build user message
-  let userMessage = message || '';
-  if (fileContent) {
-    userMessage += `\n\nUploaded content:\n${fileContent}`;
-  }
-  if (courseUrl) {
-    const urlContent = await fetchURLContent(courseUrl);
-    userMessage += `\n\nURL content:\n${urlContent}`;
-  }
+
+  // Build message with Files API context
+let baseMessage = message || '';
+if (courseUrl) {
+  const urlContent = await fetchURLContent(courseUrl);
+  baseMessage += `\n\nURL content:\n${urlContent}`;
+}
+
+const messageContent = buildMessageContentWithFiles(baseMessage, conversationMeta);
   
   // Context management
-  const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
+  const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, messageContent[0]?.text || '');
   logContextUsage(agentType, estimatedContext, conversation.length);
   pruneConversation(conversation, agentType, estimatedContext);
   
   // Add user message to conversation
-  conversation.push({ role: 'user', content: userMessage });
+ conversation.push({ role: 'user', content: messageContent });
   
   // Stream response
+  console.log('🔍 DEBUG: Message content being sent to Claude:');
+console.log('Conversation length:', conversation.length);
+console.log('Last message content:', JSON.stringify(conversation[conversation.length - 1]?.content, null, 2));
   await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
 }
 
