@@ -2021,6 +2021,23 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
+      // First, handle existing content (could be string or array of blocks)
+      if (lastUserMessage.content) {
+        if (typeof lastUserMessage.content === 'string') {
+          // Simple string content
+          if (lastUserMessage.content.trim()) {
+            contentBlocks.push({
+              type: "text",
+              text: lastUserMessage.content
+            });
+          }
+        } else if (Array.isArray(lastUserMessage.content)) {
+          // Already an array of content blocks - merge them
+          contentBlocks.push(...lastUserMessage.content);
+        }
+      }
+      
+      // Then add new uploaded files
       for (const file of files) {
         try {
           const uploadResult = await uploadFileToAnthropic(file);
@@ -2050,13 +2067,6 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
           console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
           continue;
         }
-      }
-      
-      if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? lastUserMessage.content.trim() : lastUserMessage.content.length > 0)) {
-        contentBlocks.push({
-          type: "text",
-          text: lastUserMessage.content
-        });
       }
       
       apiMessages[apiMessages.length - 1] = {
@@ -2157,6 +2167,23 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
+      // First, handle existing content (could be string or array of blocks)
+      if (lastUserMessage.content) {
+        if (typeof lastUserMessage.content === 'string') {
+          // Simple string content
+          if (lastUserMessage.content.trim()) {
+            contentBlocks.push({
+              type: "text",
+              text: lastUserMessage.content
+            });
+          }
+        } else if (Array.isArray(lastUserMessage.content)) {
+          // Already an array of content blocks - merge them
+          contentBlocks.push(...lastUserMessage.content);
+        }
+      }
+      
+      // Then add new uploaded files
       for (const file of files) {
         try {
           const uploadResult = await uploadFileToAnthropic(file);
@@ -2186,13 +2213,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
           console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
           continue;
         }
-      }
-      
-      if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? lastUserMessage.content.trim() : lastUserMessage.content.length > 0)) {
-        contentBlocks.push({
-          type: "text",
-          text: lastUserMessage.content
-        });
       }
       
       apiMessages[apiMessages.length - 1] = {
