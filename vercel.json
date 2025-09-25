@@ -1,8 +1,8 @@
 {
   "routes": [
     {
-      "src": "/api/test-db",
-      "dest": "/api/test-db.js"
+      "src": "/api/auth-google",
+      "dest": "/api/auth-google.js"
     },
     {
       "src": "/api/(.*)",
