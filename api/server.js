@@ -336,6 +336,7 @@ function updateConversationFileContext(conversationId, uploadResults) {
 }
 // FILES API HELPER FUNCTION #3 (step 1c)
 function buildMessageContentWithFiles(message, conversationMeta) {
+  console.log('🔍 buildMessageContentWithFiles DEBUG:', { message, hasFiles: conversationMeta.uploadedFiles.length });
   const contentBlocks = [];
   
   // Add text content first
