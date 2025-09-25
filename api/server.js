@@ -2162,8 +2162,8 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
       }
       
       // Add text content if present
-      if (lastUserMessage.content && lastUserMessage.content.trim()) {
-        contentBlocks.push({
+if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? lastUserMessage.content.trim() : lastUserMessage.content.length > 0)) {
+      contentBlocks.push({
           type: "text",
           text: lastUserMessage.content
         });
@@ -2310,7 +2310,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       }
       
       // Add text content if present
-      if (lastUserMessage.content && lastUserMessage.content.trim()) {
+      if (lastUserMessage.content && (typeof lastUserMessage.content === 'string' ? lastUserMessage.content.trim() : lastUserMessage.content.length > 0)) {
         contentBlocks.push({
           type: "text",
           text: lastUserMessage.content
