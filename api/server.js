@@ -2380,13 +2380,14 @@ const WEB_SEARCH_TOOL = {
   }
 };
 
-// Regular Claude API integration with web search
+// Enhanced Claude API integration with detailed tool usage logging
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
     checkRateLimit();
     await waitForRateLimit();
     
     console.log(`🔥 Making Claude API call (${callTimestamps.length + 1}/${MAX_CALLS_PER_MINUTE} this minute)`);
+    console.log(`🔧 Tools available: web_search (max 5 uses)`);
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2400,7 +2401,7 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         max_tokens: 4000,
         system: systemPrompt,
         messages: messages,
-        tools: [WEB_SEARCH_TOOL] // ✅ Consistent configuration
+        tools: [WEB_SEARCH_TOOL]
       })
     });
 
@@ -2416,13 +2417,37 @@ async function callClaudeAPI(messages, systemPrompt = '') {
     const data = await response.json();
     console.log(`✅ API call successful (Total calls this session: ${apiCallCount})`);
     
-    // Handle both text and tool use responses
-    const textBlocks = data.content
-      .filter(block => block.type === 'text')
-      .map(block => block.text)
-      .join('');
-
-    return textBlocks;
+    // 🔍 ENHANCED TOOL USAGE LOGGING
+    console.log('🔍 RESPONSE ANALYSIS:');
+    console.log(`   Content blocks: ${data.content?.length || 0}`);
+    
+    let toolUsageCount = 0;
+    let textContent = '';
+    
+    for (const block of data.content || []) {
+      console.log(`   Block type: ${block.type}`);
+      
+      if (block.type === 'text') {
+        textContent += block.text;
+        console.log(`   Text length: ${block.text?.length || 0} chars`);
+      } else if (block.type === 'tool_use') {
+        toolUsageCount++;
+        console.log(`   🌐 TOOL USED: ${block.name}`);
+        console.log(`   Tool ID: ${block.id}`);
+        console.log(`   Query: ${block.input?.query || 'N/A'}`);
+      }
+    }
+    
+    if (toolUsageCount > 0) {
+      console.log(`🌐 Web searches performed: ${toolUsageCount}`);
+    } else {
+      console.log(`📚 No web search used - Claude answered from knowledge base`);
+    }
+    
+    // Log usage stats
+    console.log(`📊 Usage: ${data.usage?.input_tokens || 0} in + ${data.usage?.output_tokens || 0} out tokens`);
+    
+    return textContent;
     
   } catch (error) {
     console.error('Claude API Error:', error);
@@ -2435,13 +2460,14 @@ async function callClaudeAPI(messages, systemPrompt = '') {
   }
 }
 
-// Streaming Claude API integration with web search
+// Enhanced Streaming Claude API with tool usage logging
 async function callClaudeAPIStream(messages, systemPrompt = '', res) {
   try {
     checkRateLimit();
     await waitForRateLimit();
     
     console.log(`🔥 Making streaming Claude API call`);
+    console.log(`🔧 Tools available: web_search (max 5 uses)`);
     
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2456,7 +2482,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
         system: systemPrompt,
         messages: messages,
         stream: true,
-        tools: [WEB_SEARCH_TOOL] // ✅ Same configuration as regular API
+        tools: [WEB_SEARCH_TOOL]
       })
     });
 
@@ -2480,6 +2506,9 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let toolUsageCount = 0;
+
+    console.log(`🚀 Starting streaming response...`);
 
     try {
       while (true) {
@@ -2495,6 +2524,12 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
             const data = line.slice(6);
             
             if (data === '[DONE]') {
+              console.log(`✅ Streaming completed`);
+              if (toolUsageCount > 0) {
+                console.log(`🌐 Total web searches used: ${toolUsageCount}`);
+              } else {
+                console.log(`📚 No web search used during streaming`);
+              }
               res.write('data: [DONE]\n\n');
               res.end();
               return;
@@ -2509,9 +2544,25 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
                 res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
               }
               
-              // Handle tool use (web search) - you might want to add this
+              // 🔍 LOG TOOL USAGE IN STREAMING
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
-                res.write(`data: ${JSON.stringify({ tool_use: parsed.content_block })}\n\n`);
+                toolUsageCount++;
+                console.log(`🌐 STREAMING TOOL USED: ${parsed.content_block.name}`);
+                console.log(`   Tool ID: ${parsed.content_block.id}`);
+                console.log(`   Query: ${parsed.content_block.input?.query || 'N/A'}`);
+                
+                // Send tool usage to frontend (optional)
+                res.write(`data: ${JSON.stringify({ 
+                  tool_use: {
+                    name: parsed.content_block.name,
+                    query: parsed.content_block.input?.query
+                  }
+                })}\n\n`);
+              }
+              
+              // Log tool results
+              if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_result') {
+                console.log(`🔍 Tool result received for: ${parsed.content_block.tool_use_id}`);
               }
               
             } catch (parseError) {
@@ -2534,17 +2585,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
     res.end();
   }
 }
-
-// ✅ USAGE GUIDE:
-// callClaudeAPI() - Use for:
-//   - Quick responses where streaming isn't needed
-//   - Debugging and testing  
-//   - Simple tasks
-//
-// callClaudeAPIStream() - Use for:
-//   - Long-form content (Grant Cards, ETG applications)
-//   - Better user experience with real-time feedback
-//   - When you want the typing effect
 
 // Main serverless handler with JWT authentication and enhanced features
 // Generic streaming request handler
