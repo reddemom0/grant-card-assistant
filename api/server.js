@@ -326,12 +326,11 @@ function updateConversationFileContext(conversationId, uploadResults) {
   return conversationMeta;
 }
 
-// FIXED: Build message content with files (ONLY for NEW messages)
-function buildMessageContentWithFiles(message, conversationMeta, isNewMessage = true) {
+// Build message content with persistent file memory
+function buildMessageContentWithFiles(message, conversationMeta) {
   console.log('🔍 buildMessageContentWithFiles DEBUG:', { 
     message: message ? message.substring(0, 100) : 'empty', 
-    hasFiles: conversationMeta.uploadedFiles.length,
-    isNewMessage
+    hasFiles: conversationMeta.uploadedFiles.length 
   });
   
   const contentBlocks = [];
@@ -340,13 +339,13 @@ function buildMessageContentWithFiles(message, conversationMeta, isNewMessage = 
   if (message && message.trim()) {
     let textContent = message;
     
-    // ONLY add file context to NEW messages, not historical ones
-    if (isNewMessage && conversationMeta.uploadedFiles.length > 0) {
-      textContent += `\n\n=== AVAILABLE DOCUMENTS (${conversationMeta.uploadedFiles.length} files) ===\n`;
+    // Add context about available files
+    if (conversationMeta.uploadedFiles.length > 0) {
+      textContent += `\n\n=== PREVIOUSLY UPLOADED DOCUMENTS (${conversationMeta.uploadedFiles.length} files) ===\n`;
       textContent += conversationMeta.uploadedFiles.map((f, i) => 
         `${i + 1}. ${f.filename} (uploaded ${new Date(f.uploadTimestamp).toLocaleString()})`
       ).join('\n');
-      textContent += '\n\n[Note: These documents are available for reference in this conversation.]';
+      textContent += '\n\n[Note: Full document content is available for reference in the attached files below.]';
     }
     
     contentBlocks.push({
@@ -355,34 +354,32 @@ function buildMessageContentWithFiles(message, conversationMeta, isNewMessage = 
     });
   }
   
-  // ONLY add file blocks to NEW messages with new uploads
-  if (isNewMessage) {
-    for (const fileInfo of conversationMeta.uploadedFiles) {
-      if (fileInfo.isImage) {
-        contentBlocks.push({
-          type: "image",
-          source: {
-            type: "file",
-            file_id: fileInfo.file_id
-          }
-        });
-      } else {
-        contentBlocks.push({
-          type: "document",
-          source: {
-            type: "file",
-            file_id: fileInfo.file_id
-          },
-          title: fileInfo.filename
-        });
-      }
+  // Add each file as a separate content block using file_id
+  for (const fileInfo of conversationMeta.uploadedFiles) {
+    if (fileInfo.isImage) {
+      contentBlocks.push({
+        type: "image",
+        source: {
+          type: "file",
+          file_id: fileInfo.file_id
+        }
+      });
+    } else {
+      contentBlocks.push({
+        type: "document",
+        source: {
+          type: "file",
+          file_id: fileInfo.file_id
+        },
+        title: fileInfo.filename
+      });
     }
   }
   
   return contentBlocks;
 }
 
-// FIXED: Enhanced system prompt to prevent responding to historical messages
+// Build system prompt with file context
 function buildSystemPromptWithFileContext(baseSystemPrompt, knowledgeContext, conversationMeta, agentType) {
   return `${baseSystemPrompt}
 
@@ -391,43 +388,13 @@ ${knowledgeContext}
 
 CONVERSATION FILE CONTEXT:
 ${conversationMeta.uploadedFiles.length > 0 ? `
-Available documents in this conversation (${conversationMeta.uploadedFiles.length} files):
-${conversationMeta.uploadedFiles.map((f, i) => `${i + 1}. ${f.filename}`).join('\n')}
+Previously uploaded documents (${conversationMeta.uploadedFiles.length} files):
+${conversationMeta.uploadedFiles.map((f, i) => `${i + 1}. ${f.filename} (file_id: ${f.file_id})`).join('\n')}
 
-CRITICAL: These documents are available for reference throughout the conversation.
+CRITICAL: These documents are available as document blocks in the user's message. Reference them directly when answering questions. Do NOT ask for documents to be uploaded again.
 ` : 'No documents uploaded yet.'}
 
-IMPORTANT INSTRUCTION: You are an AI assistant responding to conversations. Only respond to the MOST RECENT user message. Do not re-respond to previous messages in the conversation history - those are provided only for context. Focus your response on addressing the latest user input only.`;
-}
-
-// NEW: Clean conversation to ensure proper structure
-function cleanConversationForAPI(conversation) {
-  const cleaned = [];
-  
-  for (let i = 0; i < conversation.length; i++) {
-    const msg = conversation[i];
-    
-    // Ensure proper role alternation
-    if (cleaned.length === 0 || cleaned[cleaned.length - 1].role !== msg.role) {
-      // For historical messages, simplify content to avoid re-processing
-      if (msg.role === 'user' && i < conversation.length - 1) {
-        // This is a historical user message - simplify it
-        const simplifiedContent = typeof msg.content === 'string' 
-          ? msg.content.split('\n')[0] // Just take the first line
-          : msg.content[0]?.text?.split('\n')[0] || 'Previous message'; // Simplify complex content
-        
-        cleaned.push({
-          role: msg.role,
-          content: simplifiedContent
-        });
-      } else {
-        // This is either an assistant message or the most recent user message
-        cleaned.push(msg);
-      }
-    }
-  }
-  
-  return cleaned;
+Always reference uploaded documents when relevant to the user's questions.`;
 }
 
 // Configure multer for serverless
@@ -855,9 +822,7 @@ ${knowledgeContext}
 
 Always follow the exact workflows and instructions from the knowledge base documents above.
 
-IMPORTANT: Provide only the requested output content. Do not include meta-commentary about methodologies used, knowledge base references, or explanatory footnotes about your process.
-
-CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous messages are for context only.`;
+IMPORTANT: Provide only the requested output content. Do not include meta-commentary about methodologies used, knowledge base references, or explanatory footnotes about your process.`;
 
   return systemPrompt;
 }
@@ -976,7 +941,7 @@ Before analyzing any expense, check against these HIGH-PRIORITY rejection patter
 When you detect ANY of these patterns:
 1. 🛑 STOP and flag immediately with "LIKELY REJECTED" status
 2. 📋 Reference specific historical rejection example
-3. 📄 Suggest compliant alternatives
+3. 🔄 Suggest compliant alternatives
 4. 📊 Set compliance score to 20% or lower
 
 **COMMUNICATION STYLE:**
@@ -2040,7 +2005,7 @@ const WEB_SEARCH_TOOL = {
   }
 };
 
-// FIXED: Enhanced Claude API integration with Files API support
+// Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   try {
     checkRateLimit();
@@ -2049,9 +2014,6 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
     console.log(`🔥 Making Claude API call (${callTimestamps.length + 1}/${MAX_CALLS_PER_MINUTE} this minute)`);
     console.log(`🔧 Tools available: web_search (max 5 uses)`);
     console.log(`📄 Files to process: ${files.length}`);
-    
-    // ENSURE the system prompt includes the critical instruction
-    const enhancedSystemPrompt = systemPrompt + '\n\nCRITICAL: Only respond to the most recent user message in the conversation. Previous messages are provided for context only - do not re-respond to them.';
     
     let apiMessages = [...messages];
     
@@ -2090,7 +2052,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
                 file_id: uploadResult.file_id
               }
             });
-            console.log(`📸 Added image file: ${uploadResult.originalname}`);
+            console.log(`🔸 Added image file: ${uploadResult.originalname}`);
           } else {
             contentBlocks.push({
               type: "document",
@@ -2124,7 +2086,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
-        system: enhancedSystemPrompt, // Use enhanced system prompt
+        system: systemPrompt,
         messages: apiMessages,
         tools: [WEB_SEARCH_TOOL]
       })
@@ -2142,7 +2104,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
     const data = await response.json();
     console.log(`✅ API call successful (Total calls this session: ${apiCallCount})`);
     
-    console.log('📄 RESPONSE ANALYSIS:');
+    console.log('🔄 RESPONSE ANALYSIS:');
     console.log(`   Content blocks: ${data.content?.length || 0}`);
     
     let toolUsageCount = 0;
@@ -2189,7 +2151,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   }
 }
 
-// FIXED: Enhanced Streaming Claude API with Files API support
+// Enhanced Streaming Claude API with Files API support
 async function callClaudeAPIStream(messages, systemPrompt = '', res, files = []) {
   try {
     checkRateLimit();
@@ -2198,9 +2160,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
     console.log(`🔥 Making streaming Claude API call`);
     console.log(`🔧 Tools available: web_search (max 5 uses)`);
     console.log(`📄 Files to process: ${files.length}`);
-    
-    // ENSURE the system prompt includes the critical instruction
-    const enhancedSystemPrompt = systemPrompt + '\n\nCRITICAL: Only respond to the most recent user message in the conversation. Previous messages are provided for context only - do not re-respond to them.';
     
     let apiMessages = [...messages];
     
@@ -2239,7 +2198,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
                 file_id: uploadResult.file_id
               }
             });
-            console.log(`📸 Added image file: ${uploadResult.originalname}`);
+            console.log(`🔸 Added image file: ${uploadResult.originalname}`);
           } else {
             contentBlocks.push({
               type: "document",
@@ -2273,7 +2232,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4000,
-        system: enhancedSystemPrompt, // Use enhanced system prompt
+        system: systemPrompt,
         messages: apiMessages,
         stream: true,
         tools: [WEB_SEARCH_TOOL]
@@ -2415,7 +2374,7 @@ async function uploadFileToAnthropic(file) {
   }
 }
 
-// FIXED: Unified streaming request handler with conversation cleanup
+// ===== UNIFIED STREAMING REQUEST HANDLER =====
 async function handleStreamingRequest(req, res, agentType) {
   const startTime = Date.now();
   
@@ -2438,11 +2397,8 @@ async function handleStreamingRequest(req, res, agentType) {
   
   // Process NEW uploaded files with Files API
   let newUploadResults = [];
-  let hasNewFiles = false;
-  
   if (req.files && req.files.length > 0) {
     console.log(`📄 Uploading ${req.files.length} new documents to Files API for ${agentType}`);
-    hasNewFiles = true;
     
     for (const file of req.files) {
       try {
@@ -2507,7 +2463,7 @@ async function handleStreamingRequest(req, res, agentType) {
     );
   }
   
-  // Build user message - ONLY add file context if there are NEW files
+  // Build user message with persistent file memory
   let userMessage = message || `Hello, I need help with ${agentType.replace('-', ' ')}.`;
   
   // Add course URL content if provided (ETG specific)
@@ -2516,8 +2472,8 @@ async function handleStreamingRequest(req, res, agentType) {
     userMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
   }
   
-  // FIXED: Only build file context for NEW messages
-  const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta, true);
+  // Build message content with all file context
+  const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta);
   
   // Context management
   const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
@@ -2527,16 +2483,12 @@ async function handleStreamingRequest(req, res, agentType) {
   // Add user message to conversation
   conversation.push({ role: 'user', content: messageContent });
   
-  // CRITICAL FIX: Clean the conversation before sending to ensure proper structure
-  const cleanedConversation = cleanConversationForAPI(conversation);
-  
   // Stream response with Files API integration
-  console.log('📋 Streaming with cleaned conversation structure');
-  console.log(`   Total conversation length: ${cleanedConversation.length}`);
+  console.log('📋 Streaming with full file memory integration');
   console.log(`   Files available: ${conversationMeta.uploadedFiles.length}`);
   console.log(`   New files uploaded: ${newUploadResults.length}`);
   
-  await callClaudeAPIStream(cleanedConversation, systemPrompt, res, hasNewFiles ? req.files : []);
+  await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
 }
 
 // Validate claims file name for rejection patterns
@@ -2948,13 +2900,11 @@ module.exports = async function handler(req, res) {
 KNOWLEDGE BASE CONTEXT:
 ${knowledgeContext}
 
-Always follow the exact workflows and instructions from the knowledge base documents above.
-
-CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous messages are for context only.`;
+Always follow the exact workflows and instructions from the knowledge base documents above.`;
       }
       
       // Build message content with persistent file memory
-      const messageContent = buildMessageContentWithFiles(message, conversationMeta, true);
+      const messageContent = buildMessageContentWithFiles(message, conversationMeta);
 
       const agentType = 'grant-cards';
       const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, message);
@@ -2964,10 +2914,7 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
       
       conversation.push({ role: 'user', content: messageContent });
       
-      // CRITICAL FIX: Clean the conversation before sending
-      const cleanedConversation = cleanConversationForAPI(conversation);
-      
-      const response = await callClaudeAPI(cleanedConversation, systemPrompt, req.files || []);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       conversation.push({ role: 'assistant', content: response });
       
@@ -3064,7 +3011,7 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
             enhancedResponse += `- Explore professional development programs from accredited providers\n\n`;
             enhancedResponse += `I can help you find eligible alternatives. What specific skills are you looking to develop?`;
             
-            const messageContent = buildMessageContentWithFiles(message, conversationMeta, true);
+            const messageContent = buildMessageContentWithFiles(message, conversationMeta);
             conversation.push({ role: 'user', content: messageContent });
             conversation.push({ role: 'assistant', content: enhancedResponse });
             
@@ -3117,7 +3064,7 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
         baseMessage += `\n\nPre-screening completed. Please proceed with business case development.`;
       }
 
-      const messageContent = buildMessageContentWithFiles(baseMessage, conversationMeta, true);
+      const messageContent = buildMessageContentWithFiles(baseMessage, conversationMeta);
 
       const agentType = 'etg-writer';
       const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, baseMessage);
@@ -3126,11 +3073,8 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
       
       conversation.push({ role: 'user', content: messageContent });
       
-      // CRITICAL FIX: Clean the conversation before sending
-      const cleanedConversation = cleanConversationForAPI(conversation);
-      
       console.log(`🤖 Calling Claude API for enhanced ETG specialist response`);
-      const response = await callClaudeAPI(cleanedConversation, systemPrompt, req.files || []);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       const finalResponse = enhancedResponse + response;
       
@@ -3222,7 +3166,7 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
         userMessage += `\n\nTarget Export Markets: ${selectedMarkets}`;
       }
 
-      const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta, true);
+      const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta);
 
       const agentType = 'bcafe-writer';
       const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
@@ -3232,11 +3176,8 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
       
       conversation.push({ role: 'user', content: messageContent });
       
-      // CRITICAL FIX: Clean the conversation before sending
-      const cleanedConversation = cleanConversationForAPI(conversation);
-      
       console.log(`🤖 Calling Claude API for BCAFE specialist response`);
-      const response = await callClaudeAPI(cleanedConversation, systemPrompt, req.files || []);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       conversation.push({ role: 'assistant', content: response });
       
@@ -3328,7 +3269,7 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
       
       let userMessage = message || "Hello, I need help auditing CanExport expenses.";
 
-      const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta, true);
+      const messageContent = buildMessageContentWithFiles(userMessage, conversationMeta);
 
       const agentType = 'canexport-claims';
       const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
@@ -3338,11 +3279,8 @@ CRITICAL INSTRUCTION: Only respond to the most recent user message. Previous mes
       
       conversation.push({ role: 'user', content: messageContent });
       
-      // CRITICAL FIX: Clean the conversation before sending
-      const cleanedConversation = cleanConversationForAPI(conversation);
-      
       console.log(`🤖 Calling Claude API for CanExport Claims specialist response`);
-      const response = await callClaudeAPI(cleanedConversation, systemPrompt, req.files || []);
+      const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       conversation.push({ role: 'assistant', content: response });
       
