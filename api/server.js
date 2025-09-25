@@ -12,186 +12,7 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
 });
 
-// OCR functionality for CanExport Claims
-
-
-// OCR function to extract text from images
-// OCR function using Claude Vision API
-async function extractTextFromImage(imageBuffer, filename) {
-  try {
-    console.log('🔍 Starting OCR with Claude Vision API...');
-    
-    // Convert buffer to base64
-    const base64Image = imageBuffer.toString('base64');
-    
-    // Determine image type from filename
-    const extension = filename.toLowerCase().split('.').pop();
-    const mimeType = extension === 'png' ? 'image/png' : 
-                    extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg' : 
-                    'image/png';
-    
-    // Use Claude API with vision for OCR
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": process.env.ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01"
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: mimeType,
-                  data: base64Image
-                }
-              },
-              {
-                type: "text", 
-                text: "Extract all text from this receipt/invoice image. Return only the text content, preserving the original structure and formatting as much as possible."
-              }
-            ]
-          }
-        ]
-      })
-    });
-
-    const data = await response.json();
-    // Safely extract text with error handling
-let extractedText = '';
-if (data.content && data.content.length > 0 && data.content[0].text) {
-  extractedText = data.content[0].text;
-} else {
-  console.log('Unexpected API response structure:', JSON.stringify(data, null, 2));
-  throw new Error('No text content found in Claude Vision API response');
-}
-    
-    console.log('✅ Claude Vision OCR completed');
-    return extractedText.trim();
-    
-  } catch (error) {
-    console.error('❌ Claude Vision OCR failed:', error);
-    return `OCR processing failed: ${error.message}. Please try with a clearer image or manual text input.`;
-  }
-}
-
-// Analyze expense information from extracted text
-function analyzeExpenseFromText(extractedText, filename) {
-  console.log('💰 Analyzing expense data...');
-  
-  const analysis = {
-    extractedInfo: {
-      amount: null,
-      date: null,
-      vendor: null,
-      category: null,
-      currency: 'CAD',
-      paymentMethod: null
-    },
-    eligibilityAssessment: {
-      category: 'Unknown',
-      eligibilityScore: 0,
-      recommendedAction: 'Manual Review Required'
-    },
-    complianceIssues: [],
-    ocrConfidence: 'Medium',
-    rejectionWarnings: [],
-    rejectionRisk: 'LOW'
-  };
-  
-  // Extract monetary amounts
-  const amountPatterns = [
-    /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/g,
-    /(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*\$/g,
-    /TOTAL[:\s]*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/gi,
-    /AMOUNT[:\s]*\$?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/gi
-  ];
-  
-  for (const pattern of amountPatterns) {
-    const matches = [...extractedText.matchAll(pattern)];
-    if (matches.length > 0) {
-      const amounts = matches.map(match => parseFloat(match[1].replace(',', '')));
-      analysis.extractedInfo.amount = Math.max(...amounts).toFixed(2);
-      break;
-    }
-  }
-  
-  // Extract dates
-  const datePatterns = [
-    /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/g,
-    /(\d{2,4}[\/\-]\d{1,2}[\/\-]\d{1,2})/g,
-    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2},?\s+\d{2,4}/gi,
-    /\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}/gi
-  ];
-  
-  for (const pattern of datePatterns) {
-    const match = extractedText.match(pattern);
-    if (match) {
-      analysis.extractedInfo.date = match[0];
-      break;
-    }
-  }
-  
-  // Extract vendor name (first meaningful line)
-  const lines = extractedText.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-  const skipWords = ['receipt', 'customer', 'copy', 'thank', 'you', 'total', 'tax', 'subtotal'];
-  
-  for (const line of lines.slice(0, 5)) {
-    if (line.length > 2 && line.length < 50 && 
-        !skipWords.some(word => line.toLowerCase().includes(word)) &&
-        !/^\d+[\.\-\/]/.test(line) &&
-        !/^\$/.test(line)) {
-      analysis.extractedInfo.vendor = line;
-      break;
-    }
-  }
-  
-  // Check for rejection patterns
-  const rejectionPatterns = checkRejectionPatterns(extractedText, filename);
-  analysis.rejectionWarnings = rejectionPatterns.warnings;
-  analysis.rejectionRisk = rejectionPatterns.riskLevel;
-  
-  // Calculate confidence
-  let confidence = 0;
-  if (analysis.extractedInfo.amount) confidence += 40;
-  if (analysis.extractedInfo.date) confidence += 30;
-  if (analysis.extractedInfo.vendor) confidence += 30;
-  
-  analysis.eligibilityAssessment.eligibilityScore = confidence;
-  
-  // Adjust eligibility based on rejection risk
-  if (rejectionPatterns.riskLevel === 'HIGH') {
-    analysis.eligibilityAssessment.eligibilityScore = Math.min(analysis.eligibilityAssessment.eligibilityScore, 20);
-    analysis.eligibilityAssessment.recommendedAction = 'LIKELY REJECTED - ' + rejectionPatterns.primaryReason;
-    analysis.eligibilityAssessment.category = 'High Risk';
-  } else if (rejectionPatterns.riskLevel === 'MEDIUM') {
-    analysis.eligibilityAssessment.eligibilityScore = Math.min(analysis.eligibilityAssessment.eligibilityScore, 50);
-    analysis.eligibilityAssessment.recommendedAction = 'NEEDS REVIEW - ' + rejectionPatterns.primaryReason;
-    analysis.eligibilityAssessment.category = 'Medium Risk';
-  } else {
-    if (confidence >= 80) {
-      analysis.ocrConfidence = 'High';
-      analysis.eligibilityAssessment.recommendedAction = 'Ready for Review';
-    } else if (confidence >= 50) {
-      analysis.ocrConfidence = 'Medium';
-      analysis.eligibilityAssessment.recommendedAction = 'Requires Additional Documentation';
-    } else {
-      analysis.ocrConfidence = 'Low';
-      analysis.eligibilityAssessment.recommendedAction = 'Manual Entry Required';
-    }
-  }
-  
-  console.log(`✅ Expense analysis completed - Confidence: ${analysis.ocrConfidence}, Risk: ${analysis.rejectionRisk}`);
-  return analysis;
-}
-
+// ✅ KEEP: PDF text extraction (not base64, just text extraction)
 async function extractPDFText(buffer) {
   try {
     console.log('Starting enhanced pdf-parse text extraction...');
@@ -231,110 +52,6 @@ async function extractPDFText(buffer) {
     console.error('pdf-parse extraction failed:', error);
     throw new Error(`PDF text extraction failed: ${error.message}`);
   }
-}
-// Check for rejection patterns based on historical rejected claims
-function checkRejectionPatterns(extractedText, filename) {
-  const text = extractedText.toLowerCase();
-  const file = filename.toLowerCase();
-  
-  const warnings = [];
-  let riskLevel = 'LOW';
-  let primaryReason = '';
-  
-  // Critical rejection patterns (HIGH RISK) - based on your rejected claims data
-  const highRiskPatterns = [
-    { 
-      pattern: /amazon|office supplies|reusable items|office equipment/i, 
-      reason: "Re-usable items ineligible",
-      example: "Amazon purchases rejected - items can be repurposed"
-    },
-    { 
-      pattern: /booth purchase|buying booth|purchase.*booth/i, 
-      reason: "Booth purchases ineligible (rentals only)",
-      example: "Booth purchase rejected - only rentals eligible"
-    },
-    { 
-      pattern: /canadian? market|domestic advertising|canada.*advertising/i, 
-      reason: "Canadian advertising ineligible",
-      example: "Advertising targeting Canada rejected"
-    },
-    { 
-      pattern: /airport tax|departure fee|international tax|local.*tax/i, 
-      reason: "Airport taxes/fees ineligible",
-      example: "Airport taxes removed from reimbursement"
-    },
-    { 
-      pattern: /branding|logo design|package design|brand.*design/i, 
-      reason: "Branding/design costs ineligible",
-      example: "Branding costs not export-specific"
-    },
-    { 
-      pattern: /franchise|franchising cost|franchise.*setup/i, 
-      reason: "Franchise costs ineligible",
-      example: "Franchise implementation costs rejected"
-    },
-    { 
-      pattern: /dispute|legal dispute|vendor dispute|handling.*dispute/i, 
-      reason: "Dispute costs ineligible",
-      example: "Vendor dispute costs are core business"
-    }
-  ];
-  
-  // Medium risk patterns
-  const mediumRiskPatterns = [
-    { 
-      pattern: /bank charge|banking fee|transaction fee/i, 
-      reason: "Bank charges typically ineligible"
-    },
-    { 
-      pattern: /damage waiver|insurance waiver/i, 
-      reason: "Damage waivers ineligible"
-    },
-    { 
-      pattern: /interview|hiring|recruitment/i, 
-      reason: "Interview costs ineligible"
-    },
-    { 
-      pattern: /podcast|media production/i, 
-      reason: "Podcast costs may be ineligible"
-    },
-    {
-      pattern: /per diem|hotel.*allowance/i,
-      reason: "Per diem issues possible"
-    }
-  ];
-  
-  // Check high risk patterns first
-  for (const { pattern, reason, example } of highRiskPatterns) {
-    if (pattern.test(text) || pattern.test(file)) {
-      warnings.push(`🚨 HIGH RISK: ${reason}`);
-      if (example) warnings.push(`   Historical example: ${example}`);
-      riskLevel = 'HIGH';
-      primaryReason = reason;
-      break; // Stop at first high risk match
-    }
-  }
-  
-  // Check medium risk patterns if no high risk found
-  if (riskLevel !== 'HIGH') {
-    for (const { pattern, reason } of mediumRiskPatterns) {
-      if (pattern.test(text) || pattern.test(file)) {
-        warnings.push(`⚠️ MEDIUM RISK: ${reason}`);
-        riskLevel = 'MEDIUM';
-        primaryReason = reason;
-        break; // Stop at first medium risk match
-      }
-    }
-  }
-  
-  // Add specific guidance based on risk found
-  if (riskLevel === 'HIGH') {
-    warnings.push(`🔄 SOLUTION: Review CanExport guidelines for compliant alternatives`);
-  } else if (riskLevel === 'MEDIUM') {
-    warnings.push(`📋 ACTION: Verify expense meets all CanExport requirements`);
-  }
-  
-  return { warnings, riskLevel, primaryReason };
 }
 
 // Cache configuration
@@ -1127,7 +844,7 @@ CORE IDENTITY & MISSION:
 I AM the CanExport Compliance Guardian who ensures every expense meets NRC funding requirements. I provide authoritative, detailed analysis of receipts, invoices, and expense documentation to determine eligibility and compliance with CanExport guidelines.
 
 PRIMARY CAPABILITIES:
-🔍 **Receipt/Invoice Analysis** - Extract and verify all expense details from uploaded documents
+📄 **Document Analysis** - Extract and verify all expense details from uploaded files
 📋 **Eligibility Verification** - Determine compliance with CanExport categories A-H
 ✅ **Documentation Review** - Ensure all required elements and supporting documentation
 📊 **Audit Report Generation** - Create professional, submission-ready expense summaries
@@ -1151,90 +868,6 @@ When you detect ANY of these patterns:
 2. 📋 Reference specific historical rejection example
 3. 🔄 Suggest compliant alternatives
 4. 📊 Set compliance score to 20% or lower
-
-EXPENSE ANALYSIS WORKFLOW:
-
-**PHASE 1: DOCUMENT PROCESSING**
-- Extract vendor, amount, date, currency, payment method, description
-- Identify invoice vs receipt vs booking confirmation
-- Flag missing information or unclear documentation
-- Convert foreign currencies using Bank of Canada rates when needed
-
-**PHASE 2: COMPLIANCE MATRIX CHECK**
-✅ Invoice Date: Must be within project start/completion dates
-✅ Payment Date: Must be within project period  
-✅ Travel Dates: Must be within project phase
-✅ Geographic Compliance: Canada departure to approved target markets
-✅ Payment Method: Corporate bank account or business credit card ONLY
-✅ Tax Removal: NO GST, HST, or international taxes eligible
-✅ Reusability Test: Items that can be repurposed are INELIGIBLE
-✅ Target Market: Advertising must target approved markets only (NOT Canada)
-✅ Traveler Limits: Maximum 2 travelers per trip, Canada-based employees only
-✅ Flight Class: Economy or premium economy ONLY
-
-**PHASE 3: CATEGORY CLASSIFICATION**
-
-**Category A - Travel for Meetings/Events with Key Contacts:**
-✅ ELIGIBLE: Economy/premium flights, accommodation, ground transport, meals (reasonable)
-❌ INELIGIBLE: Business/first class, personal expenses, non-project travel, alcohol
-
-**Category B - Trade Events (Non-Travel Related):**
-✅ ELIGIBLE: Registration fees, booth costs, furnishings & utilities, lead scanners, return shipping
-❌ INELIGIBLE: Purchased items for reuse, furniture purchases, entertainment
-
-**Category C - Marketing and Translation:**
-✅ ELIGIBLE: Target market advertising, translation services, marketing materials, website localization
-❌ INELIGIBLE: Canadian market advertising, reusable promotional items, general website costs
-
-**Category D - Interpretation Services:**
-✅ ELIGIBLE: Professional interpretation for meetings, events, negotiations in target markets
-❌ INELIGIBLE: Internal staff interpretation, non-professional services, training
-
-**Category E - Contractual Agreements, Product Registration & Certification:**
-✅ ELIGIBLE: Market-specific certifications, regulatory compliance, legal documentation for target markets
-❌ INELIGIBLE: General business certifications, Canadian market requirements, standard business licenses
-
-**Category F - Business, Tax and Legal Consulting:**
-✅ ELIGIBLE: Market-specific legal advice, tax guidance for target markets, business structure setup
-❌ INELIGIBLE: General business consulting, Canadian legal services, routine legal work
-
-**Category G - Market Research & B2B Facilitation:**
-✅ ELIGIBLE: Target market research, feasibility studies, contact identification, B2B introductions
-❌ INELIGIBLE: General market research, Canadian market studies, internal research
-
-**Category H - Intellectual Property (IP) Protection:**
-✅ ELIGIBLE: Expert/legal services for IP in target markets, patent applications, trademark registration
-❌ INELIGIBLE: General IP consulting, Canadian IP work not specific to export markets
-
-CRITICAL COMPLIANCE REQUIREMENTS:
-
-1. **Timing Requirements**: All expenses must be incurred (invoice date) AND paid (payment date) between Project Start Date and Project Completion Date. Travel dates and event dates must also be within the project phase.
-
-2. **Payment Requirements**: Payments MUST be made using corporate/business bank account or corporate/business credit card. Personal payments are NEVER eligible.
-
-3. **Tax Requirements**: NO taxes will be reimbursed by NRC. ALL tax costs (GST, HST, international taxes, duties) must be removed from claims prior to submission.
-
-4. **Geographic Requirements**: Travel must depart from Canada to approved target markets. Advertising must target ONLY approved markets, not Canada.
-
-5. **Documentation Standards**: All invoices must include: client billing to Canadian company, invoice date, invoice number, vendor information, service description, currency & amounts, payment proof.
-
-AUDIT REPORT FORMAT:
-
-**EXECUTIVE SUMMARY:**
-- Total Expenses Reviewed: $X,XXX CAD
-- Eligible Expenses: $X,XXX CAD (XX%)
-- Ineligible Expenses: $X,XXX CAD (XX%) 
-- Documentation Issues: X items requiring attention
-- Compliance Score: XX%
-
-**DETAILED FINDINGS:**
-For each expense, provide:
-- Expense Description & Amount
-- Category Classification (A-H)
-- Eligibility Determination (✅ Eligible / ❌ Ineligible)
-- Compliance Issues (if any)
-- Required Actions
-- Supporting Guideline References
 
 **COMMUNICATION STYLE:**
 - Use definitive language: "This expense IS eligible" or "This expense IS NOT eligible"
@@ -1903,7 +1536,7 @@ async function loadAgentSpecificKnowledgeBase(agentType) {
     }
     
     // Store in Redis cache (indefinitely)
-  await redis.set(cacheKey, agentDocs);
+    await redis.set(cacheKey, agentDocs);
     
     const loadTime = Date.now() - startTime;
     logAgentPerformance(agentType, agentDocs.length, loadTime);
@@ -2245,7 +1878,7 @@ async function getKnowledgeBase() {
   return knowledgeBases;
 }
 
-// Process uploaded file content
+// ✅ KEEP: Simple file processing (no base64 encoding)
 async function processFileContent(file) {
   const fileExtension = path.extname(file.originalname).toLowerCase();
   let content = '';
@@ -2365,7 +1998,6 @@ async function waitForRateLimit() {
   }
 }
 
-
 // ✅ CONSISTENT WEB SEARCH CONFIGURATION (use for both functions)
 const WEB_SEARCH_TOOL = {
   type: "web_search_20250305",
@@ -2380,7 +2012,7 @@ const WEB_SEARCH_TOOL = {
   }
 };
 
-// Enhanced Claude API integration with Files API support
+// ✅ KEEP: Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   try {
     checkRateLimit();
@@ -2479,8 +2111,8 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
     const data = await response.json();
     console.log(`✅ API call successful (Total calls this session: ${apiCallCount})`);
     
-    // 🔍 ENHANCED TOOL USAGE LOGGING
-    console.log('🔍 RESPONSE ANALYSIS:');
+    // 📄 ENHANCED TOOL USAGE LOGGING
+    console.log('📄 RESPONSE ANALYSIS:');
     console.log(`   Content blocks: ${data.content?.length || 0}`);
     
     let toolUsageCount = 0;
@@ -2502,7 +2134,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
         }
       }
       else if (block.type === 'web_search_tool_result') {
-        console.log(`   🔍 WEB SEARCH RESULT: Found ${block.content?.length || 0} results`);
+        console.log(`   📄 WEB SEARCH RESULT: Found ${block.content?.length || 0} results`);
       }
     }
     
@@ -2528,7 +2160,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   }
 }
 
-// Enhanced Streaming Claude API with Files API support
+// ✅ KEEP: Enhanced Streaming Claude API with Files API support
 async function callClaudeAPIStream(messages, systemPrompt = '', res, files = []) {
   try {
     checkRateLimit();
@@ -2674,7 +2306,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
                 res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
               }
               
-              // 🔍 LOG TOOL USAGE IN STREAMING
+              // 📄 LOG TOOL USAGE IN STREAMING
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
                 toolUsageCount++;
                 console.log(`🌐 STREAMING TOOL USED: ${parsed.content_block.name}`);
@@ -2692,7 +2324,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
               
               // Log tool results
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_result') {
-                console.log(`🔍 Tool result received for: ${parsed.content_block.tool_use_id}`);
+                console.log(`📄 Tool result received for: ${parsed.content_block.tool_use_id}`);
               }
               
             } catch (parseError) {
@@ -2716,7 +2348,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
   }
 }
 
-// Upload file to Anthropic's Files API (serverless-friendly)
+// ✅ KEEP: Upload file to Anthropic's Files API (serverless-friendly)
 async function uploadFileToAnthropic(file) {
   try {
     console.log(`📤 Uploading ${file.originalname} to Files API...`);
@@ -2758,7 +2390,6 @@ async function uploadFileToAnthropic(file) {
   }
 }
 
-// Main serverless handler with JWT authentication and enhanced features
 // Generic streaming request handler
 async function handleStreamingRequest(req, res, agentType) {
   const startTime = Date.now();
@@ -2774,10 +2405,10 @@ async function handleStreamingRequest(req, res, agentType) {
   const { message, task, conversationId, url: courseUrl } = req.body;
   let fileContent = '';
   
- // Process uploaded files - ready for native Claude document support
-if (req.files && req.files.length > 0) {
-  console.log(`📄 Ready to send ${req.files.length} files directly to Claude`);
-}
+  // Process uploaded files - ready for native Claude document support
+  if (req.files && req.files.length > 0) {
+    console.log(`📄 Ready to send ${req.files.length} files directly to Claude`);
+  }
   
   // Get/create conversation
   const fullConversationId = `${agentType}-${conversationId}`;
@@ -2847,8 +2478,36 @@ Always follow the exact workflows and instructions from the knowledge base docum
   conversation.push({ role: 'user', content: userMessage });
   
   // Stream response
- await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
+  await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
 }
+
+// ✅ KEEP: Validate claims file name for rejection patterns
+function validateClaimsFile(filename) {
+  const warnings = [];
+  const name = filename.toLowerCase();
+  
+  const triggerWords = [
+    { word: 'amazon', warning: 'Amazon purchases are typically rejected (re-usable items)' },
+    { word: 'booth', warning: 'Verify booth RENTAL vs PURCHASE (purchases rejected)' },
+    { word: 'canadian', warning: 'Canadian market advertising is ineligible' },
+    { word: 'branding', warning: 'Branding/design costs are typically rejected' },
+    { word: 'franchise', warning: 'Franchise costs are typically rejected' },
+    { word: 'dispute', warning: 'Legal dispute costs are typically rejected' },
+    { word: 'airport', warning: 'Airport taxes/fees are typically ineligible' }
+  ];
+  
+  for (const { word, warning } of triggerWords) {
+    if (name.includes(word)) {
+      warnings.push(`⚠️ ${warning}`);
+    }
+  }
+  
+  return {
+    hasWarnings: warnings.length > 0,
+    warnings
+  };
+}
+
 module.exports = async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -2879,9 +2538,6 @@ module.exports = async function handler(req, res) {
   } catch (authError) {
     return; // Authentication middleware has already handled the response
   }
-
-  // Load knowledge base
-  // await getKnowledgeBase(); // PERFORMANCE FIX: Using agent-specific loading instead
   
   try {
     // FIXED: Login endpoint with proper error handling
@@ -2981,64 +2637,65 @@ module.exports = async function handler(req, res) {
       });
       return;
     }
-// Cache warming endpoint
-if (url.startsWith('/api/warm-cache/') && method === 'POST') {
-  const agentType = url.split('/api/warm-cache/')[1];
-  
-  try {
-    console.log(`🔥 Warming cache for ${agentType}...`);
-    const startTime = Date.now();
-    
-    // Load documents and cache them
-    await loadAgentSpecificKnowledgeBase(agentType);
-    
-    const warmTime = Date.now() - startTime;
-    console.log(`✅ Cache warmed for ${agentType} in ${warmTime}ms`);
-    
-    res.json({ 
-      success: true, 
-      agentType, 
-      warmTime,
-      message: `Cache warmed successfully for ${agentType}` 
-    });
-    
-  } catch (error) {
-    console.error(`Cache warming failed for ${agentType}:`, error);
-    res.status(500).json({ 
-      error: 'Cache warming failed', 
-      agentType,
-      details: error.message 
-    });
-  }
-  return;
-}
 
-// Manual cache clearing endpoint
-if (url === '/api/clear-cache' && method === 'POST') {
-  try {
-    const agents = ['grant-cards', 'etg-writer', 'bcafe-writer', 'canexport-claims', 'canexport-writer', 'readiness-strategist', 'internal-oracle'];
-    let clearedCount = 0;
-    
-    for (const agent of agents) {
-      const result = await redis.del(`${CACHE_PREFIX}${agent}`);
-      if (result === 1) clearedCount++;
+    // Cache warming endpoint
+    if (url.startsWith('/api/warm-cache/') && method === 'POST') {
+      const agentType = url.split('/api/warm-cache/')[1];
+      
+      try {
+        console.log(`🔥 Warming cache for ${agentType}...`);
+        const startTime = Date.now();
+        
+        // Load documents and cache them
+        await loadAgentSpecificKnowledgeBase(agentType);
+        
+        const warmTime = Date.now() - startTime;
+        console.log(`✅ Cache warmed for ${agentType} in ${warmTime}ms`);
+        
+        res.json({ 
+          success: true, 
+          agentType, 
+          warmTime,
+          message: `Cache warmed successfully for ${agentType}` 
+        });
+        
+      } catch (error) {
+        console.error(`Cache warming failed for ${agentType}:`, error);
+        res.status(500).json({ 
+          error: 'Cache warming failed', 
+          agentType,
+          details: error.message 
+        });
+      }
+      return;
     }
-    
-    console.log(`Cleared ${clearedCount} Redis caches`);
-    res.json({ 
-      message: `Successfully cleared ${clearedCount} caches`,
-      clearedAgents: agents,
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Cache clearing failed:', error);
-    res.status(500).json({ 
-      error: 'Failed to clear cache', 
-      details: error.message 
-    });
-  }
-  return;
-}
+
+    // Manual cache clearing endpoint
+    if (url === '/api/clear-cache' && method === 'POST') {
+      try {
+        const agents = ['grant-cards', 'etg-writer', 'bcafe-writer', 'canexport-claims', 'canexport-writer', 'readiness-strategist', 'internal-oracle'];
+        let clearedCount = 0;
+        
+        for (const agent of agents) {
+          const result = await redis.del(`${CACHE_PREFIX}${agent}`);
+          if (result === 1) clearedCount++;
+        }
+        
+        console.log(`Cleared ${clearedCount} Redis caches`);
+        res.json({ 
+          message: `Successfully cleared ${clearedCount} caches`,
+          clearedAgents: agents,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Cache clearing failed:', error);
+        res.status(500).json({ 
+          error: 'Failed to clear cache', 
+          details: error.message 
+        });
+      }
+      return;
+    }
     
     // Debug endpoint for testing document selection
     if (url === '/api/debug-grant-docs' && method === 'GET') {
@@ -3130,200 +2787,43 @@ if (url === '/api/clear-cache' && method === 'POST') {
       return;
     }
 
-    // Expense validation endpoint
-    if (url === '/api/validate-expense' && method === 'POST') {
-      let body = '';
-      req.on('data', chunk => {
-        body += chunk.toString();
-      });
-      
-      req.on('end', () => {
-        try {
-          const { expenseDescription, amount, vendor, category } = JSON.parse(body);
-          
-          const validation = validateExpenseAgainstRejections(expenseDescription, vendor, category);
-          
-          res.json({
-            isValid: validation.riskLevel !== 'HIGH',
-            riskLevel: validation.riskLevel,
-            warnings: validation.warnings,
-            recommendations: validation.recommendations,
-            historicalExamples: validation.examples
-          });
-          
-        } catch (error) {
-          res.status(400).json({ error: 'Invalid request format' });
-        }
-      });
+    // Streaming endpoints
+    if (url === '/api/process-grant/stream' && method === 'POST') {
+      await handleStreamingRequest(req, res, 'grant-cards');
       return;
     }
 
-    // Helper function for expense validation against rejection patterns
-function validateExpenseAgainstRejections(description, vendor, category) {
-  const text = `${description} ${vendor} ${category}`.toLowerCase();
-  
-  const rejectionDatabase = {
-    'amazon': {
-      reason: 'Re-usable items ineligible',
-      example: 'Chiwis: Amazon office supplies rejected - items can be repurposed',
-      alternative: 'Use rental services or consumable items only'
-    },
-    'booth purchase': {
-      reason: 'Only booth rentals eligible',
-      example: 'Chiwis: Informa Media booth purchase rejected',
-      alternative: 'Rent booth space instead of purchasing'
-    },
-    'canadian': {
-      reason: 'Canadian market advertising ineligible',
-      example: 'SRJCA: Domestic advertising rejected per Section 5.3',
-      alternative: 'Target only approved export markets'
-    },
-    'airport tax': {
-      reason: 'Airport taxes/fees ineligible',
-      example: 'Craver Solutions: Air Canada taxes removed from reimbursement',
-      alternative: 'Claim only core airfare costs'
-    },
-    'branding': {
-      reason: 'Branding/design costs ineligible',
-      example: 'Chiwis: Package design costs rejected as not admissible',
-      alternative: 'Focus on export-specific marketing materials'
-    },
-    'franchise': {
-      reason: 'Franchise implementation costs ineligible',
-      example: 'Moder Purair: Franchise law costs rejected - advice only allowed',
-      alternative: 'Limit to advisory services only'
-    },
-    'dispute': {
-      reason: 'Vendor dispute costs ineligible',
-      example: 'Moder Purair: Dispute resolution considered core business',
-      alternative: 'Focus on export-specific legal services'
-    },
-    'bank charge': {
-      reason: 'Bank charges typically ineligible',
-      example: 'Various clients: Banking fees consistently rejected',
-      alternative: 'Exclude transaction fees from claims'
+    if (url === '/api/process-etg/stream' && method === 'POST') {
+      await handleStreamingRequest(req, res, 'etg-writer');
+      return;
     }
-  };
-  
-  let riskLevel = 'LOW';
-  const warnings = [];
-  const recommendations = [];
-  const examples = [];
-  
-  for (const [pattern, data] of Object.entries(rejectionDatabase)) {
-    if (text.includes(pattern)) {
-      riskLevel = 'HIGH';
-      warnings.push(`🚨 ${data.reason}`);
-      recommendations.push(data.alternative);
-      examples.push(data.example);
-      break;
-    }
-  }
-  
-  return { riskLevel, warnings, recommendations, examples };
-}
 
-    // Helper function for expense validation against rejection patterns
-function validateExpenseAgainstRejections(description, vendor, category) {
-  const text = `${description} ${vendor} ${category}`.toLowerCase();
-  
-  const rejectionDatabase = {
-    'amazon': {
-      reason: 'Re-usable items ineligible',
-      example: 'Chiwis: Amazon office supplies rejected - items can be repurposed',
-      alternative: 'Use rental services or consumable items only'
-    },
-    'booth purchase': {
-      reason: 'Only booth rentals eligible',
-      example: 'Chiwis: Informa Media booth purchase rejected',
-      alternative: 'Rent booth space instead of purchasing'
-    },
-    'canadian': {
-      reason: 'Canadian market advertising ineligible',
-      example: 'SRJCA: Domestic advertising rejected per Section 5.3',
-      alternative: 'Target only approved export markets'
-    },
-    'airport tax': {
-      reason: 'Airport taxes/fees ineligible',
-      example: 'Craver Solutions: Air Canada taxes removed from reimbursement',
-      alternative: 'Claim only core airfare costs'
-    },
-    'branding': {
-      reason: 'Branding/design costs ineligible',
-      example: 'Chiwis: Package design costs rejected as not admissible',
-      alternative: 'Focus on export-specific marketing materials'
-    },
-    'franchise': {
-      reason: 'Franchise implementation costs ineligible',
-      example: 'Moder Purair: Franchise law costs rejected - advice only allowed',
-      alternative: 'Limit to advisory services only'
-    },
-    'dispute': {
-      reason: 'Vendor dispute costs ineligible',
-      example: 'Moder Purair: Dispute resolution considered core business',
-      alternative: 'Focus on export-specific legal services'
-    },
-    'bank charge': {
-      reason: 'Bank charges typically ineligible',
-      example: 'Various clients: Banking fees consistently rejected',
-      alternative: 'Exclude transaction fees from claims'
+    if (url === '/api/process-bcafe/stream' && method === 'POST') {
+      await handleStreamingRequest(req, res, 'bcafe-writer');
+      return;
     }
-  };
-  
-  let riskLevel = 'LOW';
-  const warnings = [];
-  const recommendations = [];
-  const examples = [];
-  
-  for (const [pattern, data] of Object.entries(rejectionDatabase)) {
-    if (text.includes(pattern)) {
-      riskLevel = 'HIGH';
-      warnings.push(`🚨 ${data.reason}`);
-      recommendations.push(data.alternative);
-      examples.push(data.example);
-      break;
-    }
-  }
-  
-  return { riskLevel, warnings, recommendations, examples };
-}
 
+    if (url === '/api/process-claims/stream' && method === 'POST') {
+      await handleStreamingRequest(req, res, 'canexport-claims');
+      return;
+    }
+
+    if (url === '/api/process-canexport/stream' && method === 'POST') {
+      await handleStreamingRequest(req, res, 'canexport-writer');
+      return;
+    }
+
+    if (url === '/api/process-readiness/stream' && method === 'POST') {
+      await handleStreamingRequest(req, res, 'readiness-strategist');
+      return;
+    }
+
+    if (url === '/api/process-oracle/stream' && method === 'POST') {
+      await handleStreamingRequest(req, res, 'internal-oracle');
+      return;
+    }
+    
     // FIXED: Process grant document with agent-specific loading
-    // Streaming endpoints
-if (url === '/api/process-grant/stream' && method === 'POST') {
-  await handleStreamingRequest(req, res, 'grant-cards');
-  return;
-}
-
-if (url === '/api/process-etg/stream' && method === 'POST') {
-  await handleStreamingRequest(req, res, 'etg-writer');
-  return;
-}
-
-if (url === '/api/process-bcafe/stream' && method === 'POST') {
-  await handleStreamingRequest(req, res, 'bcafe-writer');
-  return;
-}
-
-if (url === '/api/process-claims/stream' && method === 'POST') {
-  await handleStreamingRequest(req, res, 'canexport-claims');
-  return;
-}
-
-if (url === '/api/process-canexport/stream' && method === 'POST') {
-  await handleStreamingRequest(req, res, 'canexport-writer');
-  return;
-}
-
-if (url === '/api/process-readiness/stream' && method === 'POST') {
-  await handleStreamingRequest(req, res, 'readiness-strategist');
-  return;
-}
-
-if (url === '/api/process-oracle/stream' && method === 'POST') {
-  await handleStreamingRequest(req, res, 'internal-oracle');
-  return;
-}
     if (url === '/api/process-grant' && method === 'POST') {
       const startTime = Date.now();
       
@@ -3339,21 +2839,21 @@ if (url === '/api/process-oracle/stream' && method === 'POST') {
       let fileContent = '';
       
       // Process uploaded files if present
-if (req.files && req.files.length > 0) {
-  console.log(`📄 Processing ${req.files.length} Grant Card documents`);
-  const fileContents = [];
-  
-  for (const file of req.files) {
-    try {
-      const content = await processFileContent(file);
-      fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
-    } catch (error) {
-      console.error(`Error processing ${file.originalname}:`, error);
-    }
-  }
-  
-  fileContent = fileContents.join('\n\n');
-}
+      if (req.files && req.files.length > 0) {
+        console.log(`📄 Processing ${req.files.length} Grant Card documents`);
+        const fileContents = [];
+        
+        for (const file of req.files) {
+          try {
+            const content = await processFileContent(file);
+            fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+          } catch (error) {
+            console.error(`Error processing ${file.originalname}:`, error);
+          }
+        }
+        
+        fileContent = fileContents.join('\n\n');
+      }
       
       // Get or create conversation
       if (!conversations.has(conversationId)) {
@@ -3449,18 +2949,18 @@ Always follow the exact workflows and instructions from the knowledge base docum
       
       // Process uploaded file if present
       let fileContents = [];
-if (req.files && req.files.length > 0) {
-  console.log(`📄 Processing ${req.files.length} ETG documents`);
-  
-  for (const file of req.files) {
-    console.log(`📄 Processing: ${file.originalname}`);
-    const content = await processFileContent(file);
-    fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
-  }
-  
-  // Combine all file contents
-  fileContent = fileContents.join('\n\n');
-}
+      if (req.files && req.files.length > 0) {
+        console.log(`📄 Processing ${req.files.length} ETG documents`);
+        
+        for (const file of req.files) {
+          console.log(`📄 Processing: ${file.originalname}`);
+          const content = await processFileContent(file);
+          fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+        }
+        
+        // Combine all file contents
+        fileContent = fileContents.join('\n\n');
+      }
       
       // Process URL if present
       if (courseUrl) {
@@ -3559,8 +3059,8 @@ Use the ETG knowledge base above to find similar successful applications and mat
       let userMessage = message || "Hello, I need help with an ETG Business Case.";
       
       if (fileContents.length > 0) {
-  userMessage += `\n\nUploaded Course Documents (${fileContents.length} files):\n${fileContent}`;
-}
+        userMessage += `\n\nUploaded Course Documents (${fileContents.length} files):\n${fileContent}`;
+      }
       
       if (urlContent) {
         userMessage += `\n\nCourse URL Content Analysis:\n${urlContent}`;
@@ -3615,21 +3115,21 @@ Use the ETG knowledge base above to find similar successful applications and mat
       console.log(`📊 Organization type: ${orgType}, Target markets: ${selectedMarkets}`);
       
       // Process uploaded files if present
-if (req.files && req.files.length > 0) {
-  console.log(`📄 Processing ${req.files.length} BCAFE documents`);
-  const fileContents = [];
-  
-  for (const file of req.files) {
-    try {
-      const content = await processFileContent(file);
-      fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
-    } catch (error) {
-      console.error(`Error processing ${file.originalname}:`, error);
-    }
-  }
-  
-  fileContent = fileContents.join('\n\n');
-}
+      if (req.files && req.files.length > 0) {
+        console.log(`📄 Processing ${req.files.length} BCAFE documents`);
+        const fileContents = [];
+        
+        for (const file of req.files) {
+          try {
+            const content = await processFileContent(file);
+            fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
+          } catch (error) {
+            console.error(`Error processing ${file.originalname}:`, error);
+          }
+        }
+        
+        fileContent = fileContents.join('\n\n');
+      }
       
       // Get or create BCAFE conversation
       const bcafeConversationId = `bcafe-${conversationId}`;
@@ -3706,35 +3206,8 @@ Use the knowledge base documents above for all detailed processes, requirements,
       });
       return;
     }
-
-// Validate claims file name for rejection patterns
-function validateClaimsFile(filename) {
-  const warnings = [];
-  const name = filename.toLowerCase();
-  
-  const triggerWords = [
-    { word: 'amazon', warning: 'Amazon purchases are typically rejected (re-usable items)' },
-    { word: 'booth', warning: 'Verify booth RENTAL vs PURCHASE (purchases rejected)' },
-    { word: 'canadian', warning: 'Canadian market advertising is ineligible' },
-    { word: 'branding', warning: 'Branding/design costs are typically rejected' },
-    { word: 'franchise', warning: 'Franchise costs are typically rejected' },
-    { word: 'dispute', warning: 'Legal dispute costs are typically rejected' },
-    { word: 'airport', warning: 'Airport taxes/fees are typically ineligible' }
-  ];
-  
-  for (const { word, warning } of triggerWords) {
-    if (name.includes(word)) {
-      warnings.push(`⚠️ ${warning}`);
-    }
-  }
-  
-  return {
-    hasWarnings: warnings.length > 0,
-    warnings
-  };
-}
     
-    // NEW: CanExport Claims endpoint
+    // NEW: CanExport Claims endpoint - CLEANED UP (no OCR functions)
     if (url === '/api/process-claims' && method === 'POST') {
       const startTime = Date.now();
       
@@ -3750,164 +3223,29 @@ function validateClaimsFile(filename) {
       
       console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
       
-// Process uploaded files if present (receipts, invoices, etc.)
-if (req.files && req.files.length > 0) {
-  console.log(`📄 Processing ${req.files.length} Claims documents`);
-  
-  for (const file of req.files) {
-    console.log(`📄 Processing: ${file.originalname} (${file.mimetype})`);
-    
-    // Pre-validation before processing
-    const fileValidation = validateClaimsFile(file.originalname);
-    if (fileValidation.hasWarnings) {
-      console.log('🚨 File validation warnings detected');
-    }
-    
-    // Define file types
-    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/tiff'];
-    const isPDF = file.mimetype === 'application/pdf';
-    const isImage = imageTypes.includes(file.mimetype);
-    
-    let processedContent = '';
-    
-    if (isImage) {
-      console.log('📸 Image detected - Starting OCR processing...');
-      
-      try {
-        // Extract text from image using Claude Vision API
-        const extractedText = await extractTextFromImage(file.buffer, file.originalname);
+      // Process uploaded files if present - SIMPLIFIED (no OCR processing)
+      if (req.files && req.files.length > 0) {
+        console.log(`📄 Processing ${req.files.length} Claims documents with Files API`);
         
-        // Analyze expense information
-        const expenseAnalysis = analyzeExpenseFromText(extractedText, file.originalname);
-        
-        // Build comprehensive file content for Claude
-        processedContent = `📸 RECEIPT IMAGE PROCESSED WITH OCR:
-File: ${file.originalname}
-OCR Confidence: ${expenseAnalysis.ocrConfidence}
-
-EXTRACTED TEXT:
-${extractedText}
-
-AUTOMATIC EXPENSE ANALYSIS:
-💰 Amount: ${expenseAnalysis.extractedInfo.amount ? '$' + expenseAnalysis.extractedInfo.amount : 'Not detected'}
-📅 Date: ${expenseAnalysis.extractedInfo.date || 'Not detected'}
-🏢 Vendor: ${expenseAnalysis.extractedInfo.vendor || 'Not detected'}
-🎯 Eligibility Score: ${expenseAnalysis.eligibilityAssessment.eligibilityScore}/100
-📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
-
-Please analyze this receipt for CanExport SME program eligibility and compliance requirements.`;
-
-        console.log(`✅ Image OCR processing completed with ${expenseAnalysis.ocrConfidence} confidence`);
-        
-      } catch (ocrError) {
-        console.error('❌ Image OCR processing failed:', ocrError);
-        processedContent = `📸 RECEIPT IMAGE UPLOAD:
-File: ${file.originalname}
-Status: OCR processing failed
-
-Error: ${ocrError.message}
-
-Please analyze this receipt manually or request a clearer image.`;
-      }
-      
-    } else if (isPDF) {
-      console.log('📋 PDF detected - Attempting smart processing...');
-      
-      try {
-        // First, try standard PDF text extraction
-        console.log('🔍 Attempting PDF text extraction...');
-        const pdfTextContent = await processFileContent(file);
-        
-        // Check if PDF text extraction was successful (more than just filename)
-        const hasMeaningfulText = pdfTextContent && 
-          pdfTextContent.length > file.originalname.length + 50 &&
-          !pdfTextContent.includes('[Content extraction failed due to PDF formatting issues]');
-        
-        if (hasMeaningfulText) {
-          console.log('✅ PDF text extraction successful');
+        for (const file of req.files) {
+          console.log(`📄 Preparing: ${file.originalname} for Files API upload`);
           
-          // Analyze the extracted text
-          const expenseAnalysis = analyzeExpenseFromText(pdfTextContent, file.originalname);
+          // Pre-validation before processing
+          const fileValidation = validateClaimsFile(file.originalname);
+          if (fileValidation.hasWarnings) {
+            console.log('🚨 File validation warnings detected');
+          }
           
-          processedContent = `📋 PDF DOCUMENT PROCESSED:
-File: ${file.originalname}
-Processing Method: Text Extraction
-Analysis Confidence: ${expenseAnalysis.ocrConfidence}
+          // Simple file info for user message (Files API will handle actual processing)
+          let processedContent = `📄 DOCUMENT UPLOADED: ${file.originalname}
+File Type: ${file.mimetype}
+Size: ${(file.buffer.length / 1024).toFixed(2)} KB
 
-EXTRACTED CONTENT:
-${pdfTextContent}
-
-AUTOMATIC EXPENSE ANALYSIS:
-💰 Amount: ${expenseAnalysis.extractedInfo.amount ? '$' + expenseAnalysis.extractedInfo.amount : 'Not detected'}
-📅 Date: ${expenseAnalysis.extractedInfo.date || 'Not detected'}
-🏢 Vendor: ${expenseAnalysis.extractedInfo.vendor || 'Not detected'}
-🎯 Eligibility Score: ${expenseAnalysis.eligibilityAssessment.eligibilityScore}/100
-📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
-
-Please analyze this document for CanExport SME program eligibility and compliance requirements.`;
+${fileValidation.hasWarnings ? `⚠️ VALIDATION WARNINGS:\n${fileValidation.warnings.join('\n')}\n\n` : ''}Please analyze this document for CanExport SME program eligibility and compliance requirements.`;
           
-        } else {
-          console.log('⚠️ PDF text extraction insufficient, trying Vision API...');
-          
-          // Fall back to Claude Vision API for image-based PDFs
-          const extractedText = await extractTextFromImage(file.buffer, file.originalname);
-          const expenseAnalysis = analyzeExpenseFromText(extractedText, file.originalname);
-          
-          processedContent = `📋 PDF IMAGE PROCESSED WITH OCR:
-File: ${file.originalname}
-Processing Method: Vision API (Image-based PDF)
-OCR Confidence: ${expenseAnalysis.ocrConfidence}
-
-EXTRACTED TEXT:
-${extractedText}
-
-AUTOMATIC EXPENSE ANALYSIS:
-💰 Amount: ${expenseAnalysis.extractedInfo.amount ? '$' + expenseAnalysis.extractedInfo.amount : 'Not detected'}
-📅 Date: ${expenseAnalysis.extractedInfo.date || 'Not detected'}
-🏢 Vendor: ${expenseAnalysis.extractedInfo.vendor || 'Not detected'}
-🎯 Eligibility Score: ${expenseAnalysis.eligibilityAssessment.eligibilityScore}/100
-📝 Recommended Action: ${expenseAnalysis.eligibilityAssessment.recommendedAction}
-
-Please analyze this PDF receipt for CanExport SME program eligibility and compliance requirements.`;
-          
-          console.log('✅ PDF Vision API processing completed');
+          fileContents.push(processedContent);
         }
-        
-      } catch (pdfError) {
-        console.error('❌ PDF processing failed:', pdfError);
-        processedContent = `📋 PDF DOCUMENT UPLOAD:
-File: ${file.originalname}
-Status: Processing failed
-
-Error: ${pdfError.message}
-
-Please try converting the PDF to an image format (PNG/JPG) or provide the expense details manually.`;
       }
-      
-    } else {
-      console.log('📄 Document detected - Processing as regular file...');
-      // Process as regular document (Word, text, etc.)
-      try {
-        const docContent = await processFileContent(file);
-        processedContent = `📄 DOCUMENT PROCESSED:
-File: ${file.originalname}
-Content: ${docContent}`;
-        console.log('✅ Document processing completed');
-      } catch (docError) {
-        console.error('❌ Document processing failed:', docError);
-        processedContent = `📄 DOCUMENT UPLOAD:
-File: ${file.originalname}
-Status: Processing failed
-
-Error: ${docError.message}
-
-Please provide the expense details manually.`;
-      }
-    }
-    
-    fileContents.push(processedContent);
-  }
-}
       
       // Get or create Claims conversation
       const claimsConversationId = `claims-${conversationId}`;
@@ -3918,7 +3256,7 @@ Please provide the expense details manually.`;
       const conversation = conversations.get(claimsConversationId);
       
       // Agent-specific knowledge base loading for CanExport Claims
-     const agentDocs = await loadAgentSpecificKnowledgeBase('canexport-claims');
+      const agentDocs = await loadAgentSpecificKnowledgeBase('canexport-claims');
       const loadTime = Date.now() - startTime;
       logAgentPerformance('canexport-claims', agentDocs.length, loadTime);
 
@@ -3947,13 +3285,13 @@ Use the invoice guides and compliance documents above for all expense eligibilit
       // Build comprehensive user message
       let userMessage = message || "Hello, I need help auditing CanExport expenses.";
 
-if (fileContents.length > 0) {
-  userMessage += `\n\n=== UPLOADED DOCUMENTS (${fileContents.length} files) ===\n`;
-  fileContents.forEach((content, index) => {
-    userMessage += `\n--- Document ${index + 1} ---\n${content}\n`;
-  });
-  userMessage += `\nPlease analyze all ${fileContents.length} documents for CanExport SME program eligibility and compliance requirements.`;
-}
+      if (fileContents.length > 0) {
+        userMessage += `\n\n=== UPLOADED DOCUMENTS (${fileContents.length} files) ===\n`;
+        fileContents.forEach((content, index) => {
+          userMessage += `\n--- Document ${index + 1} ---\n${content}\n`;
+        });
+        userMessage += `\nPlease analyze all ${fileContents.length} documents for CanExport SME program eligibility and compliance requirements.`;
+      }
 
       // Enhanced context management for Claims (40 exchanges)
       const agentType = 'canexport-claims';
@@ -4032,4 +3370,3 @@ if (fileContents.length > 0) {
     res.status(500).json({ error: errorMessage });
   }
 };
-
