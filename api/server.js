@@ -2504,25 +2504,9 @@ async function handleStreamingRequest(req, res, agentType) {
   let conversationMeta = getConversationFileContext(streamingConversationId);
   console.log(`📋 STREAMING: ${conversationMeta.uploadedFiles.length} existing files for ${agentType}`);
   
-  // Process NEW uploaded files with Files API
-let newUploadResults = [];
+// Let native callClaudeAPIStream handle file processing
 if (req.files && req.files.length > 0) {
-  console.log(`📄 Uploading ${req.files.length} files to Files API (streaming)`);
-  
-  for (const file of req.files) {
-    try {
-      const uploadResult = await uploadFileToAnthropic(file);
-      newUploadResults.push(uploadResult);
-      console.log(`✅ STREAMING: Uploaded ${file.originalname} → ${uploadResult.file_id}`);
-    } catch (uploadError) {
-      console.error(`❌ STREAMING: Failed to upload ${file.originalname}:`, uploadError);
-    }
-  }
-  
-  if (newUploadResults.length > 0) {
-    conversationMeta = updateConversationFileContext(streamingConversationId, newUploadResults);
-    console.log(`✅ STREAMING: Added ${newUploadResults.length} files to conversation context`);
-  }
+  console.log(`📄 Ready to send ${req.files.length} files to native Files API`);
 }
   
   // Get/create conversation
@@ -2575,17 +2559,24 @@ if (req.files && req.files.length > 0) {
 }
   
 
-  // Build message with Files API context
-let baseMessage = message || '';
+// Build user message (simple text for now)
+let userMessage = message || '';
 if (courseUrl) {
   const urlContent = await fetchURLContent(courseUrl);
-  baseMessage += `\n\nURL content:\n${urlContent}`;
+  userMessage += `\n\nURL content:\n${urlContent}`;
 }
 
-const messageContent = buildMessageContentWithFiles(baseMessage, conversationMeta);
+// Add file context info to message text
+if (conversationMeta.uploadedFiles.length > 0) {
+  userMessage += `\n\n=== PREVIOUSLY UPLOADED DOCUMENTS (${conversationMeta.uploadedFiles.length} files) ===\n`;
+  userMessage += conversationMeta.uploadedFiles.map((f, i) => 
+    `${i + 1}. ${f.filename} (file_id: ${f.file_id})`
+  ).join('\n');
+  userMessage += `\n\n[Note: These documents should be available for reference.]`;
+}
   
   // Context management
-  const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, messageContent[0]?.text || '');
+  const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, userMessage);
   logContextUsage(agentType, estimatedContext, conversation.length);
   pruneConversation(conversation, agentType, estimatedContext);
   
@@ -3202,8 +3193,7 @@ Use the ETG knowledge base above to find similar successful applications and mat
 
       // ENHANCED CONTEXT MANAGEMENT FOR ETG
       const agentType = 'etg-writer';
-      const estimatedContext = estimateContextSize(conversation, knowledgeContext, systemPrompt, messageContent[0]?.text || '');
-
+      conversation.push({ role: 'user', content: messageContent });
       logContextUsage(agentType, estimatedContext, conversation.length);
       pruneConversation(conversation, agentType, estimatedContext);
       
