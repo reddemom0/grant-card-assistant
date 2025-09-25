@@ -2366,7 +2366,21 @@ async function waitForRateLimit() {
 }
 
 
-// Claude API integration with official web search format
+// ✅ CONSISTENT WEB SEARCH CONFIGURATION (use for both functions)
+const WEB_SEARCH_TOOL = {
+  type: "web_search_20250305",
+  name: "web_search", 
+  max_uses: 5,
+  user_location: {
+    type: "approximate",
+    city: "Vancouver",
+    region: "British Columbia",
+    country: "CA", 
+    timezone: "America/Vancouver"
+  }
+};
+
+// Regular Claude API integration with web search
 async function callClaudeAPI(messages, systemPrompt = '') {
   try {
     checkRateLimit();
@@ -2386,44 +2400,42 @@ async function callClaudeAPI(messages, systemPrompt = '') {
         max_tokens: 4000,
         system: systemPrompt,
         messages: messages,
-        tools: [{
-          type: "web_search_20250305",
-          name: "web_search",
-          max_uses: 5,
-          user_location: {
-            type: "approximate",
-            city: "Vancouver",
-            region: "British Columbia", 
-            country: "CA",
-            timezone: "America/Vancouver"
-          }
-        }]
+        tools: [WEB_SEARCH_TOOL] // ✅ Consistent configuration
       })
     });
 
+    lastAPICall = Date.now();
+    callTimestamps.push(lastAPICall);
+    apiCallCount++;
+
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`API request failed: ${response.status} ${response.statusText} - ${errorText}`);
+      throw new Error(`Claude API error: ${response.status} ${response.statusText} - ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('✅ API call successful');
-    console.log('🔍 RESPONSE STRUCTURE:', JSON.stringify(data, null, 2));
+    console.log(`✅ API call successful (Total calls this session: ${apiCallCount})`);
     
+    // Handle both text and tool use responses
     const textBlocks = data.content
-  .filter(block => block.type === 'text')
-  .map(block => block.text)
-  .join('');
+      .filter(block => block.type === 'text')
+      .map(block => block.text)
+      .join('');
 
-return textBlocks;
+    return textBlocks;
     
   } catch (error) {
     console.error('Claude API Error:', error);
-    throw error;
+    
+    if (error.message.includes('Rate limit')) {
+      throw new Error(`${error.message}\n\nTip: Wait 2-3 minutes between requests, or try smaller documents.`);
+    }
+    
+    throw new Error('Failed to get response from Claude API: ' + error.message);
   }
 }
 
-// Streaming Claude API integration
+// Streaming Claude API integration with web search
 async function callClaudeAPIStream(messages, systemPrompt = '', res) {
   try {
     checkRateLimit();
@@ -2439,23 +2451,13 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-  model: 'claude-sonnet-4-20250514',
-  max_tokens: 4000,
-  system: systemPrompt,
-  messages: messages,
-  stream: true,
-  tools: [{
-    name: "web_search",
-    description: "Search the web for relevant and current information",
-    input_schema: {
-      type: "object",
-      properties: {
-        query: { type: "string", description: "Search query" }
-      },
-      required: ["query"]
-    }
-  }]
-})
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        system: systemPrompt,
+        messages: messages,
+        stream: true,
+        tools: [WEB_SEARCH_TOOL] // ✅ Same configuration as regular API
+      })
     });
 
     lastAPICall = Date.now();
@@ -2501,10 +2503,17 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
             try {
               const parsed = JSON.parse(data);
               
+              // Handle text content
               if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                 const chunk = parsed.delta.text;
                 res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
               }
+              
+              // Handle tool use (web search) - you might want to add this
+              if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
+                res.write(`data: ${JSON.stringify({ tool_use: parsed.content_block })}\n\n`);
+              }
+              
             } catch (parseError) {
               continue;
             }
@@ -2525,6 +2534,17 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res) {
     res.end();
   }
 }
+
+// ✅ USAGE GUIDE:
+// callClaudeAPI() - Use for:
+//   - Quick responses where streaming isn't needed
+//   - Debugging and testing  
+//   - Simple tasks
+//
+// callClaudeAPIStream() - Use for:
+//   - Long-form content (Grant Cards, ETG applications)
+//   - Better user experience with real-time feedback
+//   - When you want the typing effect
 
 // Main serverless handler with JWT authentication and enhanced features
 // Generic streaming request handler
