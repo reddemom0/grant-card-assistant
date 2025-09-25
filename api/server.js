@@ -2503,10 +2503,26 @@ async function handleStreamingRequest(req, res, agentType) {
   let conversationMeta = getConversationFileContext(streamingConversationId);
   console.log(`📋 STREAMING: ${conversationMeta.uploadedFiles.length} existing files for ${agentType}`);
   
-  // Process uploaded files - ready for native Claude document support
-  if (req.files && req.files.length > 0) {
-    console.log(`📄 Ready to send ${req.files.length} files directly to Claude`);
+  // Process NEW uploaded files with Files API
+let newUploadResults = [];
+if (req.files && req.files.length > 0) {
+  console.log(`📄 Uploading ${req.files.length} files to Files API (streaming)`);
+  
+  for (const file of req.files) {
+    try {
+      const uploadResult = await uploadFileToAnthropic(file);
+      newUploadResults.push(uploadResult);
+      console.log(`✅ STREAMING: Uploaded ${file.originalname} → ${uploadResult.file_id}`);
+    } catch (uploadError) {
+      console.error(`❌ STREAMING: Failed to upload ${file.originalname}:`, uploadError);
+    }
   }
+  
+  if (newUploadResults.length > 0) {
+    conversationMeta = updateConversationFileContext(streamingConversationId, newUploadResults);
+    console.log(`✅ STREAMING: Added ${newUploadResults.length} files to conversation context`);
+  }
+}
   
   // Get/create conversation
   const fullConversationId = `${agentType}-${conversationId}`;
