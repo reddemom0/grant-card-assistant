@@ -673,6 +673,98 @@
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
+// ✅ Streaming Functions - Define early to avoid ReferenceError
+function addStreamingMessage(role) {
+    const messagesContainer = document.getElementById('messages');
+    if (!messagesContainer) return null;
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${role}`;
+    
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.innerHTML = '<span class="typing-cursor">▎</span>';
+    
+    messageDiv.appendChild(contentDiv);
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    
+    return contentDiv;
+}
+
+function updateStreamingMessage(messageDiv, content, isComplete = false) {
+    if (!messageDiv) return;
+    
+    let processedContent = content;
+    processedContent = processedContent.replace(/\n/g, '<br>');
+    processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+    processedContent = processedContent.replace(/`(.*?)`/g, '<code>$1</code>');
+    
+    if (isComplete) {
+        messageDiv.innerHTML = processedContent;
+    } else {
+        messageDiv.innerHTML = processedContent + '<span class="typing-cursor">▎</span>';
+    }
+    
+    const messagesContainer = document.getElementById('messages');
+    if (messagesContainer) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
+async function handleStreamingResponse(response, messageDiv) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullContent = '';
+
+    try {
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    
+                    if (data === '[DONE]') {
+                        updateStreamingMessage(messageDiv, fullContent, true);
+                        return;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(data);
+                        
+                        if (parsed.chunk) {
+                            fullContent += parsed.chunk;
+                            updateStreamingMessage(messageDiv, fullContent, false);
+                        }
+                        
+                        if (parsed.error) {
+                            updateStreamingMessage(messageDiv, `Error: ${parsed.error}`, true);
+                            return;
+                        }
+                    } catch (parseError) {
+                        continue;
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Streaming error:', error);
+        updateStreamingMessage(messageDiv, `Stream interrupted: ${error.message}`, true);
+    }
+    
+    updateStreamingMessage(messageDiv, fullContent, true);
+}
+
+// Global functions for HTML onclick handlers
+
         // Global functions for HTML onclick handlers
         function insertQuickText(text) {
             const messageInput = document.getElementById('message-input');
@@ -1201,95 +1293,6 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 }, 300);
             }, 3000);
         }
-    // ✅ Streaming Functions - Add before </script>
-function addStreamingMessage(role) {
-    const messagesContainer = document.getElementById('messages');
-    if (!messagesContainer) return null;
-    
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `message ${role}`;
-    
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.innerHTML = '<span class="typing-cursor">▎</span>';
-    
-    messageDiv.appendChild(contentDiv);
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
-    return contentDiv;
-}
-
-function updateStreamingMessage(messageDiv, content, isComplete = false) {
-    if (!messageDiv) return;
-    
-    let processedContent = content;
-    processedContent = processedContent.replace(/\n/g, '<br>');
-    processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    processedContent = processedContent.replace(/`(.*?)`/g, '<code>$1</code>');
-    
-    if (isComplete) {
-        messageDiv.innerHTML = processedContent;
-    } else {
-        messageDiv.innerHTML = processedContent + '<span class="typing-cursor">▎</span>';
-    }
-    
-    const messagesContainer = document.getElementById('messages');
-    if (messagesContainer) {
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    }
-}
-
-async function handleStreamingResponse(response, messageDiv) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let fullContent = '';
-
-    try {
-        while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const data = line.slice(6);
-                    
-                    if (data === '[DONE]') {
-                        updateStreamingMessage(messageDiv, fullContent, true);
-                        return;
-                    }
-
-                    try {
-                        const parsed = JSON.parse(data);
-                        
-                        if (parsed.chunk) {
-                            fullContent += parsed.chunk;
-                            updateStreamingMessage(messageDiv, fullContent, false);
-                        }
-                        
-                        if (parsed.error) {
-                            updateStreamingMessage(messageDiv, `Error: ${parsed.error}`, true);
-                            return;
-                        }
-                    } catch (parseError) {
-                        continue;
-                    }
-                }
-            }
-        }
-    } catch (error) {
-        console.error('Streaming error:', error);
-        updateStreamingMessage(messageDiv, `Stream interrupted: ${error.message}`, true);
-    }
-    
-    updateStreamingMessage(messageDiv, fullContent, true);
-}
     </script>
 </body>
 </html>
