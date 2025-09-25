@@ -1094,7 +1094,13 @@ async function handleStreamingResponse(response, messageDiv) {
             try {
                 const formData = new FormData();
                 formData.append('message', message || '');
-                formData.append('conversationId', 'etg-conversation');
+                // Generate or retrieve conversation ID
+let conversationId = sessionStorage.getItem('etg-conversation-id');
+if (!conversationId) {
+    conversationId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    sessionStorage.setItem('etg-conversation-id', conversationId);
+}
+formData.append('conversationId', conversationId);
                 formData.append('agentType', 'etg-writer');
                 
                 uploadedFiles.forEach(file => {
