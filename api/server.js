@@ -2690,22 +2690,10 @@ async function handleStreamingRequest(req, res, agentType) {
   const { message, task, conversationId, url: courseUrl } = req.body;
   let fileContent = '';
   
-  // Process uploaded files
-  if (req.files && req.files.length > 0) {
-    console.log(`📄 Processing ${req.files.length} files for streaming`);
-    const fileContents = [];
-    
-    for (const file of req.files) {
-      try {
-        const content = await processFileContent(file);
-        fileContents.push(`📄 DOCUMENT: ${file.originalname}\n${content}`);
-      } catch (error) {
-        console.error(`Error processing ${file.originalname}:`, error);
-      }
-    }
-    
-    fileContent = fileContents.join('\n\n');
-  }
+ // Process uploaded files - ready for native Claude document support
+if (req.files && req.files.length > 0) {
+  console.log(`📄 Ready to send ${req.files.length} files directly to Claude`);
+}
   
   // Get/create conversation
   const fullConversationId = `${agentType}-${conversationId}`;
