@@ -2398,9 +2398,17 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
-      // Add document blocks first (PDFs, images)
-      for (const file of files) {
-        const base64Data = file.buffer.toString('base64');
+      // Add document blocks first (PDFs, images)  
+for (const file of files) {
+  console.log('🔍 DEBUG File object:', {
+    originalname: file.originalname,
+    mimetype: file.mimetype,
+    size: file.size,
+    hasBuffer: !!file.buffer,
+    bufferLength: file.buffer?.length || 0
+  });
+  
+  const base64Data = file.buffer.toString('base64');
         const mimeType = file.mimetype || 'application/octet-stream';
         
         contentBlocks.push({
