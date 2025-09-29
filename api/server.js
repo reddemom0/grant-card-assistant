@@ -302,48 +302,6 @@ function stripThinkingTags(text) {
   return text.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
 }
 
-// === TEST ENDPOINT - REMOVE AFTER VERIFICATION ===
-// Add this inside your main request handler, after the rate-limit-status endpoint
-
-if (url === '/api/test-thinking-strip' && method === 'GET') {
-  const testCases = [
-    {
-      name: 'Basic test',
-      input: '<thinking>This is internal reasoning</thinking>\n\nThis is the actual answer.',
-      expected: 'This is the actual answer.'
-    },
-    {
-      name: 'Multi-line thinking',
-      input: '<thinking>\nMulti-line\nthinking\nblock\n</thinking>\n\nClean answer here.',
-      expected: 'Clean answer here.'
-    },
-    {
-      name: 'No thinking tags',
-      input: 'No thinking tags at all.',
-      expected: 'No thinking tags at all.'
-    }
-  ];
-
-  const results = testCases.map(test => {
-    const output = stripThinkingTags(test.input);
-    const pass = output === test.expected;
-    return {
-      name: test.name,
-      pass: pass,
-      output: output,
-      expected: test.expected
-    };
-  });
-
-  res.json({
-    message: 'stripThinkingTags function test results',
-    allPassed: results.every(r => r.pass),
-    results: results
-  });
-  return;
-}
-// === END TEST ENDPOINT ===
-
 // ===== FILE MANAGEMENT SYSTEM =====
 
 // Get conversation file context
@@ -3275,17 +3233,20 @@ Always follow the exact workflows and instructions from the knowledge base docum
       console.log(`🤖 Calling Claude API for enhanced ETG specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
-      const finalResponse = enhancedResponse + response;
-      
-      conversation.push({ role: 'assistant', content: finalResponse });
+      // Store FULL response (with thinking) in conversation history
+conversation.push({ role: 'assistant', content: response });
+
+// Strip thinking tags for user display
+const cleanResponse = stripThinkingTags(response);
+const finalResponse = enhancedResponse + cleanResponse;
       
       console.log(`✅ Enhanced ETG response generated successfully`);
       
-      res.json({ 
-        response: finalResponse,
-        conversationId: conversationId,
-        toolsUsed: toolsUsed
-      });
+      res.json({
+  response: finalResponse,  // This now has thinking stripped
+  conversationId: conversationId,
+  toolsUsed: toolsUsed
+});
       return;
     }
 
