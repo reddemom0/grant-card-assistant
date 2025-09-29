@@ -302,6 +302,34 @@ function stripThinkingTags(text) {
   return text.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
 }
 
+// === TEST CODE - REMOVE AFTER VERIFICATION ===
+console.log('\n🧪 Testing stripThinkingTags function:');
+
+const testInput1 = '<thinking>This is internal reasoning</thinking>\n\nThis is the actual answer.';
+const testOutput1 = stripThinkingTags(testInput1);
+console.log('Test 1 - Basic test:');
+console.log('  Input:', testInput1);
+console.log('  Output:', testOutput1);
+console.log('  Expected: "This is the actual answer."');
+console.log('  Pass:', testOutput1 === 'This is the actual answer.' ? '✅' : '❌');
+
+const testInput2 = '<thinking>\nMulti-line\nthinking\nblock\n</thinking>\n\nClean answer here.';
+const testOutput2 = stripThinkingTags(testInput2);
+console.log('\nTest 2 - Multi-line thinking:');
+console.log('  Output:', testOutput2);
+console.log('  Expected: "Clean answer here."');
+console.log('  Pass:', testOutput2 === 'Clean answer here.' ? '✅' : '❌');
+
+const testInput3 = 'No thinking tags at all.';
+const testOutput3 = stripThinkingTags(testInput3);
+console.log('\nTest 3 - No thinking tags:');
+console.log('  Output:', testOutput3);
+console.log('  Expected: "No thinking tags at all."');
+console.log('  Pass:', testOutput3 === 'No thinking tags at all.' ? '✅' : '❌');
+
+console.log('\n');
+// === END TEST CODE ===
+
 // ===== FILE MANAGEMENT SYSTEM =====
 
 // Get conversation file context
