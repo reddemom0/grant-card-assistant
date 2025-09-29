@@ -2512,13 +2512,6 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
         }  // Line 2512 - closes the for loop (processing lines)
       }  // Closes the while (true) loop
       
-      // Stream completed successfully – close it properly
-      if (thinkingBuffer) {
-        console.log(`🧠 Thinking used: ${thinkingBuffer.length} chars (hidden from user)`);
-      }
-      console.log(`✅ Streaming completed`);
-      res.write('data: [DONE]\n\n');
-      res.end();
     } 
     } catch (streamError) {
       console.error('Streaming error:', streamError);
