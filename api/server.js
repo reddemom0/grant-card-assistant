@@ -2456,6 +2456,16 @@ console.log(`🚀 Starting streaming response with Extended Thinking...`);
   }
   continue;
 }
+              // Capture signature for thinking blocks
+      if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'signature_delta') {
+        if (currentThinkingBlock) {
+          if (!currentThinkingBlock.signature) {
+            currentThinkingBlock.signature = '';
+          }
+          currentThinkingBlock.signature += parsed.delta.signature;
+        }
+        continue;
+      }
               
               if (parsed.type === 'content_block_stop' && inThinkingBlock) {
   inThinkingBlock = false;
