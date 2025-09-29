@@ -293,6 +293,15 @@ function logContextUsage(agentType, estimatedTokens, conversationLength) {
   }
 }
 
+/**
+ * Strip thinking tags from response text
+ * @param {string} text - The full response text
+ * @returns {string} - Text with thinking tags removed
+ */
+function stripThinkingTags(text) {
+  return text.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
+}
+
 // ===== FILE MANAGEMENT SYSTEM =====
 
 // Get conversation file context
