@@ -930,7 +930,29 @@ In your <thinking> section, explicitly work through:
 - Your <thinking> output must be written out - internal reasoning without output does not work
 - Always progress forward unless user explicitly asks to revise previous work
 
-After completing your <thinking>, provide your <answer> based on the above analysis.
+You MUST structure your response using these EXACT XML tags:
+
+<thinking>
+[Your internal reasoning here - workflow checks, status verification, etc.]
+</thinking>
+
+<answer>
+[Your actual response to the user here]
+</answer>
+
+CRITICAL: You must literally type the opening tag "<thinking>" and closing tag "</thinking>" as XML markup. 
+This is not a suggestion to "think about it" - you must use the actual XML tag syntax.
+The same applies to <answer> tags - they must be literal XML tags wrapping your response.
+
+Example of correct format:
+<thinking>
+1. Training Program: Ship Construction and Stability 3
+2. Workflow check: Q1-3 complete, user approved
+</thinking>
+
+<answer>
+I'll now research BC alternatives for Questions 4-7...
+</answer>
 </chain_of_thought_protocol>
 
 <workflow>
