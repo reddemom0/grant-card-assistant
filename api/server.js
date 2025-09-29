@@ -2282,6 +2282,11 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
 
 // Enhanced Streaming Claude API with Files API support + Extended Thinking
 async function callClaudeAPIStream(messages, systemPrompt = '', res, files = []) {
+  // Declare these variables at function scope
+  let fullContentBlocks = [];
+  let currentTextBlock = '';
+  let currentThinkingBlock = null;
+  
   try {
     checkRateLimit();
     await waitForRateLimit();
@@ -2390,9 +2395,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
     let toolUsageCount = 0;
     let thinkingBuffer = '';  // Buffer thinking (don't show to user)
 let inThinkingBlock = false;
-let fullContentBlocks = [];  // Capture all blocks for conversation history
-let currentTextBlock = '';
-let currentThinkingBlock = null;
 
 console.log(`🚀 Starting streaming response with Extended Thinking...`);
 
