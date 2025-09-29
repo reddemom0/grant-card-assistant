@@ -885,83 +885,25 @@ Your knowledge base also contains numerous successful ETG business case examples
 </reference_protocol>
 </knowledge_base>
 
-<chain_of_thought_protocol>
-**CRITICAL: You MUST use <thinking> tags before EVERY response.**
+<workflow_tracking>
+Before responding, internally reason through:
 
-In your <thinking> section, explicitly work through:
-
-1. **Training Program Identification**
-   - Review uploaded documents and conversation history
-   - State: "The training program for this business case is: [EXACT NAME]"
-   - If uncertain, write: "I need to re-read the uploaded document to identify the training program"
-
-2. **Conversation History Scan**
-   - Review ALL previous messages in the conversation
-   - For each major workflow step, quote the specific message where it occurred OR state it hasn't happened
-   
-3. **Workflow Status Check**
-   Mark each step as COMPLETE ✓ or INCOMPLETE ✗:
-   
-   - Eligibility verified? 
-     [If COMPLETE: Quote where you confirmed eligible/ineligible]
-     [If INCOMPLETE: State "Not yet verified"]
-   
+1. **Training Program Identification** - What training is this business case about?
+2. **Conversation History Scan** - What has already been completed in this conversation?
+3. **Workflow Status Check** - Mark each step as COMPLETE ✓ or INCOMPLETE ✗:
+   - Eligibility verified?
    - Company info gathered?
-     [If COMPLETE: State "User provided company details in message X"]
-     [If INCOMPLETE: State "No company information yet"]
-   
    - Q1-3 drafted?
-     [If COMPLETE: State "I drafted Q1-3 in message X, user responded with: [quote their response]"]
-     [If INCOMPLETE: State "Q1-3 not yet drafted"]
-   
    - BC alternatives researched?
-     [If COMPLETE: State "I researched and presented BC alternatives in message X"]
-     [If INCOMPLETE: State "BC alternatives not yet researched"]
-   
    - Q4-7 drafted?
-     [If COMPLETE: State "I drafted Q4-7 in message X"]
-     [If INCOMPLETE: State "Q4-7 not yet drafted"]
+4. **User's Current Request** - What is the user asking for right now?
+5. **Required Action Decision** - What should I do based on the above analysis?
 
-4. **User's Current Request**
-   - State: "The user's most recent message asks for: [SPECIFIC REQUEST]"
-   - Determine: Is this asking me to repeat something I already did?
-
-5. **Required Action Decision**
-   Based on the above analysis:
-   - If user is asking for something already COMPLETE → Acknowledge it's done, provide link/summary, ask what they need next
-   - If user is asking for the next logical step → Proceed with that step
-   - If I'm unsure → Ask for clarification
-
-**CRITICAL RULES:**
-- If workflow status shows something is COMPLETE, DO NOT do it again
-- If you just did something in the previous message, DO NOT repeat it in this message
-- Your <thinking> output must be written out - internal reasoning without output does not work
-- Always progress forward unless user explicitly asks to revise previous work
-
-You MUST structure your response using these EXACT XML tags:
-
-<thinking>
-[Your internal reasoning here - workflow checks, status verification, etc.]
-</thinking>
-
-<answer>
-[Your actual response to the user here]
-</answer>
-
-CRITICAL: You must literally type the opening tag "<thinking>" and closing tag "</thinking>" as XML markup. 
-This is not a suggestion to "think about it" - you must use the actual XML tag syntax.
-The same applies to <answer> tags - they must be literal XML tags wrapping your response.
-
-Example of correct format:
-<thinking>
-1. Training Program: Ship Construction and Stability 3
-2. Workflow check: Q1-3 complete, user approved
-</thinking>
-
-<answer>
-I'll now research BC alternatives for Questions 4-7...
-</answer>
-</chain_of_thought_protocol>
+**Critical Rules:**
+- If workflow status shows something is COMPLETE, do NOT repeat it
+- Always progress forward unless user explicitly asks to revise
+- Never ask for information already provided in conversation history
+</workflow_tracking>
 
 <workflow>
 The ETG Business Case development follows a flexible workflow.
@@ -2338,13 +2280,13 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   }
 }
 
-// Enhanced Streaming Claude API with Files API support
+// Enhanced Streaming Claude API with Files API support + Extended Thinking
 async function callClaudeAPIStream(messages, systemPrompt = '', res, files = []) {
   try {
     checkRateLimit();
     await waitForRateLimit();
     
-    console.log(`🔥 Making streaming Claude API call`);
+    console.log(`🔥 Making streaming Claude API call with Extended Thinking`);
     console.log(`🔧 Tools available: web_search (max 5 uses)`);
     console.log(`📄 Files to process: ${files.length}`);
     
@@ -2354,10 +2296,8 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       const lastUserMessage = apiMessages[apiMessages.length - 1];
       const contentBlocks = [];
       
-      // First, handle existing content (could be string or array of blocks)
       if (lastUserMessage.content) {
         if (typeof lastUserMessage.content === 'string') {
-          // Simple string content
           if (lastUserMessage.content.trim()) {
             contentBlocks.push({
               type: "text",
@@ -2365,12 +2305,10 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
             });
           }
         } else if (Array.isArray(lastUserMessage.content)) {
-          // Already an array of content blocks - merge them
           contentBlocks.push(...lastUserMessage.content);
         }
       }
       
-      // Then add new uploaded files
       for (const file of files) {
         try {
           const uploadResult = await uploadFileToAnthropic(file);
@@ -2418,7 +2356,11 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 4000,
+        max_tokens: 16000,  // Increased for thinking
+        thinking: {         // ADDED: Extended Thinking
+          type: "enabled",
+          budget_tokens: 10000
+        },
         system: systemPrompt,
         messages: apiMessages,
         stream: true,
@@ -2446,8 +2388,13 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
     const decoder = new TextDecoder();
     let buffer = '';
     let toolUsageCount = 0;
+    let thinkingBuffer = '';  // Buffer thinking (don't show to user)
+let inThinkingBlock = false;
+let fullContentBlocks = [];  // Capture all blocks for conversation history
+let currentTextBlock = '';
+let currentThinkingBlock = null;
 
-    console.log(`🚀 Starting streaming response with Files API support...`);
+console.log(`🚀 Starting streaming response with Extended Thinking...`);
 
     try {
       while (true) {
@@ -2463,11 +2410,12 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
             const data = line.slice(6);
             
             if (data === '[DONE]') {
-              console.log(`✅ Streaming completed with Files API support`);
+              console.log(`✅ Streaming completed`);
+              if (thinkingBuffer) {
+                console.log(`🧠 Thinking used: ${thinkingBuffer.length} chars (hidden from user)`);
+              }
               if (toolUsageCount > 0) {
                 console.log(`🌐 Total web searches used: ${toolUsageCount}`);
-              } else {
-                console.log(`📚 No web search used during streaming`);
               }
               res.write('data: [DONE]\n\n');
               res.end();
@@ -2477,16 +2425,52 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
             try {
               const parsed = JSON.parse(data);
               
-              if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                const chunk = parsed.delta.text;
-                res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
-              }
+              // Handle thinking blocks (buffer, don't stream to user)
+              if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'thinking') {
+  inThinkingBlock = true;
+  currentThinkingBlock = { type: 'thinking', thinking: '' };
+  console.log(`🧠 Thinking block started`);
+  continue;
+}
+              
+              if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'thinking_delta') {
+  thinkingBuffer += parsed.delta.thinking;
+  if (currentThinkingBlock) {
+    currentThinkingBlock.thinking += parsed.delta.thinking;
+  }
+  continue;
+}
+              
+              if (parsed.type === 'content_block_stop' && inThinkingBlock) {
+  inThinkingBlock = false;
+  if (currentThinkingBlock) {
+    fullContentBlocks.push(currentThinkingBlock);
+    currentThinkingBlock = null;
+  }
+  console.log(`🧠 Thinking block completed`);
+  continue;
+}
+              
+              // Handle text blocks (stream to user)
+              if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'text') {
+  currentTextBlock = '';
+  continue;
+}
+
+if (parsed.type === 'content_block_delta' && parsed.delta?.type === 'text_delta') {
+  const chunk = parsed.delta.text;
+  currentTextBlock += chunk;
+  res.write(`data: ${JSON.stringify({ chunk })}\n\n`);
+}
+
+if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
+  fullContentBlocks.push({ type: 'text', text: currentTextBlock });
+  currentTextBlock = '';
+}
               
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
                 toolUsageCount++;
                 console.log(`🌐 STREAMING TOOL USED: ${parsed.content_block.name}`);
-                console.log(`   Tool ID: ${parsed.content_block.id}`);
-                console.log(`   Query: ${parsed.content_block.input?.query || 'N/A'}`);
                 
                 res.write(`data: ${JSON.stringify({ 
                   tool_use: {
@@ -2494,10 +2478,6 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
                     query: parsed.content_block.input?.query
                   }
                 })}\n\n`);
-              }
-              
-              if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_result') {
-                console.log(`📄 Tool result received for: ${parsed.content_block.tool_use_id}`);
               }
               
             } catch (parseError) {
@@ -2519,6 +2499,10 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [])
     res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
     res.end();
   }
+  
+  // Return captured content blocks for conversation history
+  return fullContentBlocks;
+}
 }
 
 // Upload file to Anthropic's Files API (serverless-friendly)
@@ -2675,7 +2659,14 @@ async function handleStreamingRequest(req, res, agentType) {
   console.log(`   Files available: ${conversationMeta.uploadedFiles.length}`);
   console.log(`   New files uploaded: ${newUploadResults.length}`);
   
-  await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
+// Stream response and capture full content blocks for conversation history
+const fullContentBlocks = await callClaudeAPIStream(conversation, systemPrompt, res, req.files || []);
+
+// Store full response (with thinking blocks) in conversation history
+if (fullContentBlocks && fullContentBlocks.length > 0) {
+  conversation.push({ role: 'assistant', content: fullContentBlocks });
+  console.log(`💾 Stored response with ${fullContentBlocks.length} content blocks in conversation history`);
+}
 }
 
 // Validate claims file name for rejection patterns
