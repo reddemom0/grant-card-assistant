@@ -2491,8 +2491,7 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
       res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
     }
 
-    res.write('data: [DONE]\n\n');
-    res.end();
+    
     
   } catch (error) {
     console.error('Claude Streaming API Error:', error);
@@ -2502,7 +2501,6 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
   
   // Return captured content blocks for conversation history
   return fullContentBlocks;
-}
 }
 
 // Upload file to Anthropic's Files API (serverless-friendly)
