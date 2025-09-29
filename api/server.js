@@ -294,12 +294,20 @@ function logContextUsage(agentType, estimatedTokens, conversationLength) {
 }
 
 /**
- * Strip thinking tags from response text
+ * Strip thinking process from response text
+ * Claude outputs thinking as numbered steps 1-5, followed by blank lines, then the answer
  * @param {string} text - The full response text
- * @returns {string} - Text with thinking tags removed
+ * @returns {string} - Text with thinking process removed
  */
 function stripThinkingTags(text) {
-  return text.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '').trim();
+  // Pattern 1: Remove everything up to and including "Required Action Decision:" and its content until double newline
+  const pattern1 = /^[\s\S]*?5\.\s*Required Action Decision:[\s\S]*?\n\n+/;
+  let cleaned = text.replace(pattern1, '');
+  
+  // Pattern 2: Also try XML tags in case Claude starts using them
+  cleaned = cleaned.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '');
+  
+  return cleaned.trim();
 }
 
 // ===== FILE MANAGEMENT SYSTEM =====
