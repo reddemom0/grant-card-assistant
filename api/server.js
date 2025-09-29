@@ -2522,8 +2522,9 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
       } catch (streamError) {
         console.error('Streaming error:', streamError);
         res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
-      }
-    
+    }
+      
+      }  // Closes the while (true) loop
     }  // Closes the inner try block that wraps the while loop
     
   } catch (error) {
