@@ -2525,7 +2525,6 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
     }
       
       }  // Closes the while (true) loop
-    }  // Closes the inner try block that wraps the while loop
     
   } catch (error) {
     console.error('Claude Streaming API Error:', error);
