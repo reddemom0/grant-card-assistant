@@ -2509,23 +2509,22 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
             } catch (parseError) {
               continue;
             }
-          }  // Line 2512 - closes the for loop (processing lines)
- }  // Line 2512 - closes the for loop (processing lines)
+}  // Line 2512 - closes the for loop (processing lines)
 
       // Stream completed successfully – close it properly
-      try {  // ← ADD THIS LINE
+      try {
         if (thinkingBuffer) {
           console.log(`🧠 Thinking used: ${thinkingBuffer.length} chars (hidden from user)`);
         }
         console.log(`✅ Streaming completed`);
         res.write('data: [DONE]\n\n');
         res.end();
-      } catch (streamError) {  // Line 2515
+      } catch (streamError) {
         console.error('Streaming error:', streamError);
         res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
       }
-
     
+    }  // Closes the inner try block that wraps the while loop
     
   } catch (error) {
     console.error('Claude Streaming API Error:', error);
