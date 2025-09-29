@@ -5,6 +5,10 @@
       "dest": "/api/auth-google.js"
     },
     {
+      "src": "/api/auth-callback",
+      "dest": "/api/auth-callback.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/server.js"
     },
