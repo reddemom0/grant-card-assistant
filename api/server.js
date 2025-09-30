@@ -324,11 +324,12 @@ async function getConversationFileContext(conversationId) {
       };
     }
 
-    // Check for corruption before parsing
-    if (typeof data === 'string' && data.includes('[object Object]')) {
-      console.error(`❌ Corrupted file metadata detected for ${conversationId}`);
-      console.error(`❌ Corrupted data sample:`, data.substring(0, 200));
-      console.log(`🔄 Deleting corrupted metadata and starting fresh...`);
+    // Upstash Redis auto-deserializes JSON, so data is already an object
+    // Validate structure
+    if (typeof data !== 'object' || !Array.isArray(data.uploadedFiles)) {
+      console.error(`❌ Invalid file metadata structure for ${conversationId}`);
+      console.error(`❌ Data:`, JSON.stringify(data).substring(0, 200));
+      console.log(`🔄 Deleting invalid metadata and starting fresh...`);
       await redis.del(`conv-meta:${conversationId}`);
       return {
         uploadedFiles: [],
@@ -336,13 +337,12 @@ async function getConversationFileContext(conversationId) {
       };
     }
 
-    const parsed = JSON.parse(data);
-    console.log(`✅ Loaded file metadata for ${conversationId}: ${parsed.uploadedFiles?.length || 0} files`);
-    return parsed;
+    console.log(`✅ Loaded file metadata for ${conversationId}: ${data.uploadedFiles?.length || 0} files`);
+    return data;
   } catch (error) {
     console.error(`❌ Error loading conversation metadata ${conversationId}:`, error);
     if (data) {
-      console.error(`❌ Raw metadata from Redis:`, typeof data === 'string' ? data.substring(0, 200) : typeof data);
+      console.error(`❌ Data type:`, typeof data, `Value:`, JSON.stringify(data).substring(0, 200));
     }
     console.log(`🔄 Deleting corrupted metadata and starting fresh...`);
     await redis.del(`conv-meta:${conversationId}`).catch(e => console.error('Failed to delete:', e));
@@ -529,22 +529,22 @@ async function getConversation(conversationId) {
       return [];
     }
 
-    // Check for corruption before parsing
-    if (typeof data === 'string' && data.includes('[object Object]')) {
-      console.error(`❌ Corrupted data detected in Redis for ${conversationId}`);
-      console.error(`❌ Corrupted data sample:`, data.substring(0, 200));
-      console.log(`🔄 Deleting corrupted data and starting fresh...`);
+    // Upstash Redis auto-deserializes JSON, so data is already an object/array
+    // Check if it's a valid array
+    if (!Array.isArray(data)) {
+      console.error(`❌ Invalid conversation data type for ${conversationId}:`, typeof data);
+      console.error(`❌ Data:`, JSON.stringify(data).substring(0, 200));
+      console.log(`🔄 Deleting invalid data and starting fresh...`);
       await redis.del(`conv:${conversationId}`);
       return [];
     }
 
-    const parsed = JSON.parse(data);
-    console.log(`✅ Loaded conversation ${conversationId}: ${parsed.length} messages`);
-    return parsed;
+    console.log(`✅ Loaded conversation ${conversationId}: ${data.length} messages`);
+    return data;
   } catch (error) {
     console.error(`❌ Error loading conversation ${conversationId}:`, error);
     if (data) {
-      console.error(`❌ Raw data from Redis:`, typeof data === 'string' ? data.substring(0, 200) : typeof data);
+      console.error(`❌ Data type:`, typeof data, `Value:`, JSON.stringify(data).substring(0, 200));
     }
     console.log(`🔄 Deleting corrupted data and starting fresh...`);
     await redis.del(`conv:${conversationId}`).catch(e => console.error('Failed to delete:', e));
