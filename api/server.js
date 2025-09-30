@@ -92,12 +92,11 @@ const TOKENS_PER_CHAR = 0.25;             // Rough token-to-character ratio
 const CONVERSATION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 const conversationTimestamps = new Map();
 
-function cleanupExpiredConversations() {
+async function cleanupExpiredConversations() {
   const now = Date.now();
-  for (const [id, timestamp] of conversationTimestamps.entries()) {
+  for (const [id, timestamp] of conversationMetadata.entries()) {
     if (now - timestamp > CONVERSATION_EXPIRY) {
-      conversations.delete(id);
-      conversationTimestamps.delete(id);
+      await deleteConversation(id);
     }
   }
 }
@@ -312,19 +311,26 @@ function stripThinkingTags(text) {
 
 // ===== FILE MANAGEMENT SYSTEM =====
 
-// Get conversation file context
-function getConversationFileContext(conversationId) {
-  const metaKey = `${conversationId}-meta`;
-  return conversations.get(metaKey) || {
-    uploadedFiles: [],
-    lastUploadTimestamp: null
-  };
+// Get conversation file context (from Redis)
+async function getConversationFileContext(conversationId) {
+  try {
+    const data = await redis.get(`conv-meta:${conversationId}`);
+    return data ? JSON.parse(data) : {
+      uploadedFiles: [],
+      lastUploadTimestamp: null
+    };
+  } catch (error) {
+    console.error(`❌ Error loading conversation metadata ${conversationId}:`, error);
+    return {
+      uploadedFiles: [],
+      lastUploadTimestamp: null
+    };
+  }
 }
 
-// Update conversation file context
-function updateConversationFileContext(conversationId, uploadResults) {
-  const metaKey = `${conversationId}-meta`;
-  let conversationMeta = getConversationFileContext(conversationId);
+// Update conversation file context (save to Redis)
+async function updateConversationFileContext(conversationId, uploadResults) {
+  let conversationMeta = await getConversationFileContext(conversationId);
   
   for (const uploadResult of uploadResults) {
     const fileInfo = {
@@ -338,8 +344,17 @@ function updateConversationFileContext(conversationId, uploadResults) {
   }
   
   conversationMeta.lastUploadTimestamp = Date.now();
-  conversations.set(metaKey, conversationMeta);
-  
+
+  // Save to Redis
+  try {
+    await redis.set(`conv-meta:${conversationId}`, JSON.stringify(conversationMeta), {
+      ex: 24 * 60 * 60 // 24 hour expiry
+    });
+    console.log(`💾 Saved file metadata for ${conversationId} to Redis (${conversationMeta.uploadedFiles.length} files)`);
+  } catch (error) {
+    console.error(`❌ Error saving conversation metadata ${conversationId}:`, error);
+  }
+
   return conversationMeta;
 }
 
@@ -434,8 +449,42 @@ const upload = multer({
   }
 });
 
-// In-memory storage
-let conversations = new Map();
+// Redis-based conversation persistence (replaced in-memory Map)
+// Conversation metadata tracking (timestamps only)
+const conversationMetadata = new Map();
+
+// Redis helper functions for conversation persistence
+async function getConversation(conversationId) {
+  try {
+    const data = await redis.get(`conv:${conversationId}`);
+    return data ? JSON.parse(data) : [];
+  } catch (error) {
+    console.error(`❌ Error loading conversation ${conversationId}:`, error);
+    return [];
+  }
+}
+
+async function saveConversation(conversationId, conversation) {
+  try {
+    await redis.set(`conv:${conversationId}`, JSON.stringify(conversation), {
+      ex: 24 * 60 * 60 // 24 hour expiry
+    });
+    conversationMetadata.set(conversationId, Date.now());
+    console.log(`💾 Saved conversation ${conversationId} to Redis (${conversation.length} messages)`);
+  } catch (error) {
+    console.error(`❌ Error saving conversation ${conversationId}:`, error);
+  }
+}
+
+async function deleteConversation(conversationId) {
+  try {
+    await redis.del(`conv:${conversationId}`);
+    conversationMetadata.delete(conversationId);
+    console.log(`🗑️ Deleted conversation ${conversationId} from Redis`);
+  } catch (error) {
+    console.error(`❌ Error deleting conversation ${conversationId}:`, error);
+  }
+}
 
 // Multi-Agent Knowledge Base Storage
 let knowledgeBases = {
@@ -2587,7 +2636,7 @@ async function handleStreamingRequest(req, res, agentType) {
   const fullConversationId = `${agentType}-${conversationId}`;
   
   // Get existing file context
-  let conversationMeta = getConversationFileContext(fullConversationId);
+  let conversationMeta = await getConversationFileContext(fullConversationId);
   console.log(`📋 STREAMING (${agentType}): ${conversationMeta.uploadedFiles.length} existing files`);
   
   // Process NEW uploaded files with Files API
@@ -2606,17 +2655,18 @@ async function handleStreamingRequest(req, res, agentType) {
     }
     
     if (newUploadResults.length > 0) {
-      conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+      conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
       console.log(`✅ Added ${newUploadResults.length} files to ${agentType} conversation context`);
     }
   }
-  
-  // Get/create conversation
-  if (!conversations.has(fullConversationId)) {
-    conversations.set(fullConversationId, []);
-    conversationTimestamps.set(fullConversationId, Date.now());
+
+  // Get/create conversation from Redis
+  let conversation = await getConversation(fullConversationId);
+  if (conversation.length === 0) {
+    console.log(`🆕 Starting new conversation: ${fullConversationId}`);
+  } else {
+    console.log(`📜 Loaded conversation: ${fullConversationId} (${conversation.length} messages)`);
   }
-  const conversation = conversations.get(fullConversationId);
   
   // Load agent-specific knowledge base
   const agentDocs = await loadAgentSpecificKnowledgeBase(agentType);
@@ -2690,6 +2740,9 @@ const fullContentBlocks = await callClaudeAPIStream(conversation, systemPrompt, 
 if (fullContentBlocks && fullContentBlocks.length > 0) {
   conversation.push({ role: 'assistant', content: fullContentBlocks });
   console.log(`💾 Stored response with ${fullContentBlocks.length} content blocks in conversation history`);
+
+  // Save conversation to Redis
+  await saveConversation(fullConversationId, conversation);
 }
 }
 
@@ -2937,8 +2990,8 @@ module.exports = async function handler(req, res) {
     if (url === '/api/context-status' && method === 'GET') {
       const conversationId = req.query?.conversationId || 'default';
       const agentType = req.query?.agentType || 'grant-cards';
-      
-      const conversation = conversations.get(conversationId) || [];
+
+      const conversation = await getConversation(conversationId);
       const exchangeCount = Math.floor(conversation.length / 2);
       const limit = CONVERSATION_LIMITS[agentType];
       
@@ -3046,10 +3099,10 @@ module.exports = async function handler(req, res) {
       
       // Build proper conversation ID
       const fullConversationId = `grant-cards-${conversationId}`;
-      
+
       // Get existing file context
-      let conversationMeta = getConversationFileContext(fullConversationId);
-      
+      let conversationMeta = await getConversationFileContext(fullConversationId);
+
       // Process NEW uploaded files
       let newUploadResults = [];
       if (req.files && req.files.length > 0) {
@@ -3061,17 +3114,19 @@ module.exports = async function handler(req, res) {
             console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
           }
         }
-        
+
         if (newUploadResults.length > 0) {
-          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
         }
       }
-      
-      if (!conversations.has(fullConversationId)) {
-        conversations.set(fullConversationId, []);
-        conversationTimestamps.set(fullConversationId, Date.now());
+
+      // Get/create conversation from Redis
+      let conversation = await getConversation(fullConversationId);
+      if (conversation.length === 0) {
+        console.log(`🆕 Starting new grant-cards conversation: ${fullConversationId}`);
+      } else {
+        console.log(`📜 Loaded grant-cards conversation: ${fullConversationId} (${conversation.length} messages)`);
       }
-      const conversation = conversations.get(fullConversationId);
       
       const agentDocs = await loadAgentSpecificKnowledgeBase('grant-cards');
       const loadTime = Date.now() - startTime;
@@ -3115,11 +3170,14 @@ Always follow the exact workflows and instructions from the knowledge base docum
       pruneConversation(conversation, agentType, estimatedContext);
       
       conversation.push({ role: 'user', content: messageContent });
-      
+
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
-      
+
       conversation.push({ role: 'assistant', content: response });
-      
+
+      // Save conversation to Redis
+      await saveConversation(fullConversationId, conversation);
+
       res.json({ 
         response: response,
         conversationId: conversationId,
@@ -3148,16 +3206,16 @@ Always follow the exact workflows and instructions from the knowledge base docum
       
       // Build proper conversation ID
       const fullConversationId = `etg-${conversationId}`;
-      
+
       // Get existing file context
-      let conversationMeta = getConversationFileContext(fullConversationId);
+      let conversationMeta = await getConversationFileContext(fullConversationId);
       console.log(`📋 ETG Conversation Context: ${conversationMeta.uploadedFiles.length} existing files`);
-      
+
       // Process NEW uploaded files with Files API
       let newUploadResults = [];
       if (req.files && req.files.length > 0) {
         console.log(`📄 Uploading ${req.files.length} ETG documents to Files API`);
-        
+
         for (const file of req.files) {
           try {
             const uploadResult = await uploadFileToAnthropic(file);
@@ -3167,18 +3225,20 @@ Always follow the exact workflows and instructions from the knowledge base docum
             console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
           }
         }
-        
+
         if (newUploadResults.length > 0) {
-          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
           console.log(`✅ Added ${newUploadResults.length} files to ETG conversation context`);
         }
       }
-      
-      if (!conversations.has(fullConversationId)) {
-        conversations.set(fullConversationId, []);
-        conversationTimestamps.set(fullConversationId, Date.now());
+
+      // Get/create conversation from Redis
+      let conversation = await getConversation(fullConversationId);
+      if (conversation.length === 0) {
+        console.log(`🆕 Starting new ETG conversation: ${fullConversationId}`);
+      } else {
+        console.log(`📜 Loaded ETG conversation: ${fullConversationId} (${conversation.length} messages)`);
       }
-      const conversation = conversations.get(fullConversationId);
       
       // Enhanced ETG Processing with Tools
       let enhancedResponse = '';
@@ -3279,19 +3339,22 @@ Always follow the exact workflows and instructions from the knowledge base docum
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       // Store FULL response (with thinking) in conversation history
-conversation.push({ role: 'assistant', content: response });
+      conversation.push({ role: 'assistant', content: response });
 
-// Strip thinking tags for user display
-const cleanResponse = stripThinkingTags(response);
-const finalResponse = enhancedResponse + cleanResponse;
-      
+      // Save conversation to Redis
+      await saveConversation(fullConversationId, conversation);
+
+      // Strip thinking tags for user display
+      const cleanResponse = stripThinkingTags(response);
+      const finalResponse = enhancedResponse + cleanResponse;
+
       console.log(`✅ Enhanced ETG response generated successfully`);
-      
+
       res.json({
-  response: finalResponse,  // This now has thinking stripped
-  conversationId: conversationId,
-  toolsUsed: toolsUsed
-});
+        response: finalResponse,  // This now has thinking stripped
+        conversationId: conversationId,
+        toolsUsed: toolsUsed
+      });
       return;
     }
 
@@ -3311,15 +3374,15 @@ const finalResponse = enhancedResponse + cleanResponse;
       
       // Build proper conversation ID
       const fullConversationId = `bcafe-${conversationId}`;
-      
+
       // Get existing file context
-      let conversationMeta = getConversationFileContext(fullConversationId);
-      
+      let conversationMeta = await getConversationFileContext(fullConversationId);
+
       // Process NEW uploaded files
       let newUploadResults = [];
       if (req.files && req.files.length > 0) {
         console.log(`📄 Processing ${req.files.length} BCAFE documents`);
-        
+
         for (const file of req.files) {
           try {
             const uploadResult = await uploadFileToAnthropic(file);
@@ -3328,17 +3391,19 @@ const finalResponse = enhancedResponse + cleanResponse;
             console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
           }
         }
-        
+
         if (newUploadResults.length > 0) {
-          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
         }
       }
-      
-      if (!conversations.has(fullConversationId)) {
-        conversations.set(fullConversationId, []);
-        conversationTimestamps.set(fullConversationId, Date.now());
+
+      // Get/create conversation from Redis
+      let conversation = await getConversation(fullConversationId);
+      if (conversation.length === 0) {
+        console.log(`🆕 Starting new BCAFE conversation: ${fullConversationId}`);
+      } else {
+        console.log(`📜 Loaded BCAFE conversation: ${fullConversationId} (${conversation.length} messages)`);
       }
-      const conversation = conversations.get(fullConversationId);
       
       const agentDocs = await loadAgentSpecificKnowledgeBase('bcafe-writer');
       const relevantDocs = selectBCAFEDocuments(message, orgType, conversation, agentDocs);
@@ -3380,17 +3445,20 @@ const finalResponse = enhancedResponse + cleanResponse;
       pruneConversation(conversation, agentType, estimatedContext);
       
       conversation.push({ role: 'user', content: messageContent });
-      
+
       console.log(`🤖 Calling Claude API for BCAFE specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
-      
+
       conversation.push({ role: 'assistant', content: response });
-      
+
+      // Save conversation to Redis
+      await saveConversation(fullConversationId, conversation);
+
       console.log(`✅ BCAFE response generated successfully`);
-      
-      res.json({ 
+
+      res.json({
         response: response,
-        conversationId: conversationId 
+        conversationId: conversationId
       });
       return;
     }
@@ -3414,7 +3482,7 @@ const finalResponse = enhancedResponse + cleanResponse;
       const fullConversationId = `claims-${conversationId}`;
       
       // Get existing file context
-      let conversationMeta = getConversationFileContext(fullConversationId);
+      let conversationMeta = await getConversationFileContext(fullConversationId);
       
       // Process NEW uploaded files
       let newUploadResults = [];
@@ -3438,15 +3506,17 @@ const finalResponse = enhancedResponse + cleanResponse;
         }
         
         if (newUploadResults.length > 0) {
-          conversationMeta = updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
         }
       }
       
-      if (!conversations.has(fullConversationId)) {
-        conversations.set(fullConversationId, []);
-        conversationTimestamps.set(fullConversationId, Date.now());
+      // Get/create conversation from Redis
+      let conversation = await getConversation(fullConversationId);
+      if (conversation.length === 0) {
+        console.log(`🆕 Starting new CanExport Claims conversation: ${fullConversationId}`);
+      } else {
+        console.log(`📜 Loaded CanExport Claims conversation: ${fullConversationId} (${conversation.length} messages)`);
       }
-      const conversation = conversations.get(fullConversationId);
       
       const agentDocs = await loadAgentSpecificKnowledgeBase('canexport-claims');
       const loadTime = Date.now() - startTime;
@@ -3488,9 +3558,12 @@ const finalResponse = enhancedResponse + cleanResponse;
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
       
       conversation.push({ role: 'assistant', content: response });
-      
+
+      // Save conversation to Redis
+      await saveConversation(fullConversationId, conversation);
+
       console.log(`✅ CanExport Claims response generated successfully`);
-      
+
       res.json({ 
         response: response,
         conversationId: conversationId,
@@ -3506,7 +3579,7 @@ const finalResponse = enhancedResponse + cleanResponse;
     // Get conversation history
     if (url.startsWith('/api/conversation/') && method === 'GET') {
       const conversationId = url.split('/api/conversation/')[1];
-      const conversation = conversations.get(conversationId) || [];
+      const conversation = await getConversation(conversationId);
       res.json({ messages: conversation });
       return;
     }
@@ -3514,11 +3587,9 @@ const finalResponse = enhancedResponse + cleanResponse;
     // Clear conversation
     if (url.startsWith('/api/conversation/') && method === 'DELETE') {
       const conversationId = url.split('/api/conversation/')[1];
-      conversations.delete(conversationId);
-      conversationTimestamps.delete(conversationId);
+      await deleteConversation(conversationId);
       // Also clear file metadata
-      const metaKey = `${conversationId}-meta`;
-      conversations.delete(metaKey);
+      await redis.del(`conv-meta:${conversationId}`);
       res.json({ message: 'Conversation cleared' });
       return;
     }
