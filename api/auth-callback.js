@@ -1,7 +1,9 @@
 // api/auth-callback.js
 import { google } from 'googleapis';
 import jwt from 'jsonwebtoken';
-import { sql } from '@vercel/postgres';
+import pg from 'pg';
+
+const { Client } = pg;
 
 export default async function handler(req, res) {
   const { code } = req.query;
@@ -9,6 +11,11 @@ export default async function handler(req, res) {
   if (!code) {
     return res.status(400).json({ error: 'No authorization code provided' });
   }
+
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
 
   try {
     // Set up OAuth2 client
@@ -26,16 +33,14 @@ export default async function handler(req, res) {
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const { data: userInfo } = await oauth2.userinfo.get();
 
-    // Create or update user in database using Vercel Postgres
-    const userResult = await sql`
-      INSERT INTO users (google_id, email, name, picture)
-      VALUES (${userInfo.id}, ${userInfo.email}, ${userInfo.name}, ${userInfo.picture})
-      ON CONFLICT (google_id)
-      DO UPDATE SET
-        name = ${userInfo.name},
-        picture = ${userInfo.picture}
-      RETURNING id, email, name, picture;
-    `;
+    // Connect to database
+    await client.connect();
+
+    // Create or update user in database
+    const userResult = await client.query(
+      'INSERT INTO users (google_id, email, name, picture) VALUES ($1, $2, $3, $4) ON CONFLICT (google_id) DO UPDATE SET name = $2, picture = $4 RETURNING id, email, name, picture',
+      [userInfo.id, userInfo.email, userInfo.name, userInfo.picture]
+    );
 
     const user = userResult.rows[0];
 
@@ -68,5 +73,7 @@ export default async function handler(req, res) {
       message: error.message,
       details: error.response?.data || null
     });
+  } finally {
+    await client.end();
   }
 }
