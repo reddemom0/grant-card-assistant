@@ -315,12 +315,34 @@ function stripThinkingTags(text) {
 async function getConversationFileContext(conversationId) {
   try {
     const data = await redis.get(`conv-meta:${conversationId}`);
-    return data ? JSON.parse(data) : {
-      uploadedFiles: [],
-      lastUploadTimestamp: null
-    };
+    if (!data) {
+      console.log(`📭 No file metadata found for ${conversationId}`);
+      return {
+        uploadedFiles: [],
+        lastUploadTimestamp: null
+      };
+    }
+
+    // Check for corruption before parsing
+    if (typeof data === 'string' && data.includes('[object Object]')) {
+      console.error(`❌ Corrupted file metadata detected for ${conversationId}`);
+      console.error(`❌ Corrupted data sample:`, data.substring(0, 200));
+      console.log(`🔄 Deleting corrupted metadata and starting fresh...`);
+      await redis.del(`conv-meta:${conversationId}`);
+      return {
+        uploadedFiles: [],
+        lastUploadTimestamp: null
+      };
+    }
+
+    const parsed = JSON.parse(data);
+    console.log(`✅ Loaded file metadata for ${conversationId}: ${parsed.uploadedFiles?.length || 0} files`);
+    return parsed;
   } catch (error) {
     console.error(`❌ Error loading conversation metadata ${conversationId}:`, error);
+    console.error(`❌ Raw metadata from Redis:`, typeof data === 'string' ? data.substring(0, 200) : data);
+    console.log(`🔄 Deleting corrupted metadata and starting fresh...`);
+    await redis.del(`conv-meta:${conversationId}`).catch(e => console.error('Failed to delete:', e));
     return {
       uploadedFiles: [],
       lastUploadTimestamp: null
@@ -498,9 +520,28 @@ function safeStringify(obj, label = 'object') {
 async function getConversation(conversationId) {
   try {
     const data = await redis.get(`conv:${conversationId}`);
-    return data ? JSON.parse(data) : [];
+    if (!data) {
+      console.log(`📭 No existing conversation found for ${conversationId}`);
+      return [];
+    }
+
+    // Check for corruption before parsing
+    if (typeof data === 'string' && data.includes('[object Object]')) {
+      console.error(`❌ Corrupted data detected in Redis for ${conversationId}`);
+      console.error(`❌ Corrupted data sample:`, data.substring(0, 200));
+      console.log(`🔄 Deleting corrupted data and starting fresh...`);
+      await redis.del(`conv:${conversationId}`);
+      return [];
+    }
+
+    const parsed = JSON.parse(data);
+    console.log(`✅ Loaded conversation ${conversationId}: ${parsed.length} messages`);
+    return parsed;
   } catch (error) {
     console.error(`❌ Error loading conversation ${conversationId}:`, error);
+    console.error(`❌ Raw data from Redis:`, typeof data === 'string' ? data.substring(0, 200) : data);
+    console.log(`🔄 Deleting corrupted data and starting fresh...`);
+    await redis.del(`conv:${conversationId}`).catch(e => console.error('Failed to delete:', e));
     return [];
   }
 }
@@ -2953,6 +2994,61 @@ module.exports = async function handler(req, res) {
       ]);
 
       res.json({ success: true, message: 'Logged out successfully' });
+      return;
+    }
+
+    // Redis cleanup utility endpoint (for clearing corrupted data)
+    if (url === '/api/redis/cleanup' && method === 'POST') {
+      try {
+        console.log('🧹 Starting Redis cleanup for corrupted conversations...');
+        let cleanedConv = 0;
+        let cleanedMeta = 0;
+
+        // Scan for corrupted conversation keys
+        const convKeys = await redis.keys('conv:*');
+        for (const key of convKeys) {
+          try {
+            const data = await redis.get(key);
+            if (data && data.includes('[object Object]')) {
+              console.log(`🗑️ Deleting corrupted conversation: ${key}`);
+              await redis.del(key);
+              cleanedConv++;
+            }
+          } catch (e) {
+            console.log(`🗑️ Deleting unparseable conversation: ${key}`);
+            await redis.del(key);
+            cleanedConv++;
+          }
+        }
+
+        // Scan for corrupted metadata keys
+        const metaKeys = await redis.keys('conv-meta:*');
+        for (const key of metaKeys) {
+          try {
+            const data = await redis.get(key);
+            if (data && data.includes('[object Object]')) {
+              console.log(`🗑️ Deleting corrupted metadata: ${key}`);
+              await redis.del(key);
+              cleanedMeta++;
+            }
+          } catch (e) {
+            console.log(`🗑️ Deleting unparseable metadata: ${key}`);
+            await redis.del(key);
+            cleanedMeta++;
+          }
+        }
+
+        res.json({
+          success: true,
+          message: 'Redis cleanup complete',
+          conversationsDeleted: cleanedConv,
+          metadataDeleted: cleanedMeta,
+          totalKeys: convKeys.length + metaKeys.length
+        });
+      } catch (error) {
+        console.error('❌ Redis cleanup error:', error);
+        res.status(500).json({ success: false, error: error.message });
+      }
       return;
     }
 
