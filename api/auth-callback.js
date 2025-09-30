@@ -28,13 +28,12 @@ export default async function handler(req, res) {
 
     // Create or update user in database using Vercel Postgres
     const userResult = await sql`
-      INSERT INTO users (google_id, email, name, picture, last_login)
-      VALUES (${userInfo.id}, ${userInfo.email}, ${userInfo.name}, ${userInfo.picture}, NOW())
+      INSERT INTO users (google_id, email, name, picture)
+      VALUES (${userInfo.id}, ${userInfo.email}, ${userInfo.name}, ${userInfo.picture})
       ON CONFLICT (google_id)
       DO UPDATE SET
         name = ${userInfo.name},
-        picture = ${userInfo.picture},
-        last_login = NOW()
+        picture = ${userInfo.picture}
       RETURNING id, email, name, picture;
     `;
 
