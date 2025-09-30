@@ -57,11 +57,9 @@ export default async function handler(req, res) {
     );
 
     // Set HTTP-only cookie
-    res.setHeader('Set-Cookie', [
-      `auth_token=${token}; Path=/; HttpOnly; Max-Age=${7 * 24 * 60 * 60}; SameSite=Lax${
-        process.env.NODE_ENV === 'production' ? '; Secure' : ''
-      }`
-    ]);
+    res.setHeader('Set-Cookie',
+      `auth_token=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+    );
 
     // Redirect to dashboard
     res.redirect('/dashboard.html');
