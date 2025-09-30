@@ -331,28 +331,38 @@ async function getConversationFileContext(conversationId) {
 // Update conversation file context (save to Redis)
 async function updateConversationFileContext(conversationId, uploadResults) {
   let conversationMeta = await getConversationFileContext(conversationId);
-  
+
+  console.log('🔍 updateConversationFileContext - Input uploadResults:', JSON.stringify(uploadResults, null, 2));
+
   for (const uploadResult of uploadResults) {
+    // Ensure uploadResult is a plain object, not a complex type
     const fileInfo = {
-      filename: uploadResult.originalname,
-      file_id: uploadResult.file_id,
+      filename: String(uploadResult.originalname || 'unknown'),
+      file_id: String(uploadResult.file_id || ''),
       uploadTimestamp: Date.now(),
-      mimetype: uploadResult.mimetype,
-      isImage: uploadResult.mimetype && uploadResult.mimetype.startsWith('image/')
+      mimetype: String(uploadResult.mimetype || ''),
+      isImage: uploadResult.mimetype && String(uploadResult.mimetype).startsWith('image/')
     };
+    console.log('🔍 Adding fileInfo:', JSON.stringify(fileInfo));
     conversationMeta.uploadedFiles.push(fileInfo);
   }
-  
+
   conversationMeta.lastUploadTimestamp = Date.now();
 
-  // Save to Redis
+  // Save to Redis with validation
   try {
-    await redis.set(`conv-meta:${conversationId}`, JSON.stringify(conversationMeta), {
+    // Validate JSON serializability using safeStringify
+    const jsonString = safeStringify(conversationMeta, `conversationMeta ${conversationId}`);
+
+    console.log('🔍 Saving conversationMeta to Redis:', jsonString.substring(0, 200) + '...');
+
+    await redis.set(`conv-meta:${conversationId}`, jsonString, {
       ex: 24 * 60 * 60 // 24 hour expiry
     });
     console.log(`💾 Saved file metadata for ${conversationId} to Redis (${conversationMeta.uploadedFiles.length} files)`);
   } catch (error) {
     console.error(`❌ Error saving conversation metadata ${conversationId}:`, error);
+    console.error('❌ Failed conversationMeta:', JSON.stringify(conversationMeta, null, 2));
   }
 
   return conversationMeta;
@@ -453,6 +463,37 @@ const upload = multer({
 // Conversation metadata tracking (timestamps only)
 const conversationMetadata = new Map();
 
+// Helper function to safely stringify objects and detect corruption
+function safeStringify(obj, label = 'object') {
+  try {
+    const str = JSON.stringify(obj);
+    if (str.includes('[object Object]')) {
+      console.error(`❌ JSON corruption detected in ${label}:`, str.substring(0, 500));
+      // Try to find the corrupted property
+      const findCorruption = (o, path = '') => {
+        for (const key in o) {
+          if (o.hasOwnProperty(key)) {
+            const val = o[key];
+            const currentPath = path ? `${path}.${key}` : key;
+            if (typeof val === 'object' && val !== null) {
+              if (val.toString() === '[object Object]') {
+                console.error(`❌ Found corruption at: ${currentPath}`, val);
+              }
+              findCorruption(val, currentPath);
+            }
+          }
+        }
+      };
+      findCorruption(obj);
+      throw new Error(`JSON corruption detected in ${label}`);
+    }
+    return str;
+  } catch (error) {
+    console.error(`❌ Failed to stringify ${label}:`, error);
+    throw error;
+  }
+}
+
 // Redis helper functions for conversation persistence
 async function getConversation(conversationId) {
   try {
@@ -466,13 +507,57 @@ async function getConversation(conversationId) {
 
 async function saveConversation(conversationId, conversation) {
   try {
-    await redis.set(`conv:${conversationId}`, JSON.stringify(conversation), {
+    console.log(`🔍 saveConversation - Saving ${conversation.length} messages for ${conversationId}`);
+
+    // Deep validation and sanitization
+    const sanitizedConversation = conversation.map((msg, idx) => {
+      if (!msg || typeof msg !== 'object') {
+        console.error(`❌ Invalid message at index ${idx}:`, msg);
+        return { role: 'user', content: 'Invalid message' };
+      }
+
+      // Handle different content types
+      let sanitizedContent;
+      if (typeof msg.content === 'string') {
+        sanitizedContent = msg.content;
+      } else if (Array.isArray(msg.content)) {
+        // Content blocks array - ensure all are serializable
+        sanitizedContent = msg.content.map(block => {
+          if (typeof block === 'string') {
+            return block;
+          }
+          // For objects, ensure they're plain objects
+          const plainBlock = JSON.parse(JSON.stringify(block));
+          return plainBlock;
+        });
+      } else if (typeof msg.content === 'object') {
+        // Single content object
+        sanitizedContent = JSON.parse(JSON.stringify(msg.content));
+      } else {
+        console.warn(`⚠️ Unexpected content type at index ${idx}:`, typeof msg.content);
+        sanitizedContent = String(msg.content);
+      }
+
+      return {
+        role: String(msg.role || 'user'),
+        content: sanitizedContent
+      };
+    });
+
+    // Validate JSON serializability using safeStringify
+    const jsonString = safeStringify(sanitizedConversation, `conversation ${conversationId}`);
+
+    console.log(`🔍 Conversation JSON length: ${jsonString.length} bytes`);
+    console.log(`🔍 Sample content:`, jsonString.substring(0, 300) + '...');
+
+    await redis.set(`conv:${conversationId}`, jsonString, {
       ex: 24 * 60 * 60 // 24 hour expiry
     });
     conversationMetadata.set(conversationId, Date.now());
-    console.log(`💾 Saved conversation ${conversationId} to Redis (${conversation.length} messages)`);
+    console.log(`💾 Saved conversation ${conversationId} to Redis (${sanitizedConversation.length} messages)`);
   } catch (error) {
     console.error(`❌ Error saving conversation ${conversationId}:`, error);
+    console.error('❌ Last message in conversation:', conversation[conversation.length - 1]);
   }
 }
 
