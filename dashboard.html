@@ -447,18 +447,39 @@
 
         // Load user info from JWT
         function loadUserInfo() {
-            const token = getCookie('auth_token');
+            let userData = null;
 
-            if (!token) {
-                // No token, redirect to login
-                window.location.href = '/login.html';
-                return;
+            // First check if user data is in URL hash (from OAuth callback)
+            if (window.location.hash) {
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                const userParam = hashParams.get('user');
+                if (userParam) {
+                    try {
+                        userData = JSON.parse(decodeURIComponent(userParam));
+                        // Store in localStorage for future visits
+                        localStorage.setItem('user_data', JSON.stringify(userData));
+                        // Clean up URL
+                        history.replaceState(null, '', '/dashboard.html');
+                    } catch (e) {
+                        console.error('Failed to parse user data from URL:', e);
+                    }
+                }
             }
 
-            const userData = parseJwt(token);
-
+            // If not in URL, try localStorage
             if (!userData) {
-                // Invalid token, redirect to login
+                const storedData = localStorage.getItem('user_data');
+                if (storedData) {
+                    try {
+                        userData = JSON.parse(storedData);
+                    } catch (e) {
+                        console.error('Failed to parse stored user data:', e);
+                    }
+                }
+            }
+
+            // If still no user data, redirect to login
+            if (!userData) {
                 window.location.href = '/login.html';
                 return;
             }
@@ -485,7 +506,10 @@
 
         // Sign out function
         function signOut() {
-            // Clear auth cookie
+            // Clear localStorage
+            localStorage.removeItem('user_data');
+
+            // Clear auth cookie (even though we can't read it)
             document.cookie = 'auth_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 
             // Redirect to login

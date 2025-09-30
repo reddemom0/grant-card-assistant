@@ -61,8 +61,13 @@ export default async function handler(req, res) {
       `auth_token=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
     );
 
-    // Redirect to dashboard
-    res.redirect('/dashboard.html');
+    // Redirect to dashboard with user info in URL hash (temporary display only)
+    const userDataEncoded = encodeURIComponent(JSON.stringify({
+      name: user.name,
+      email: user.email,
+      picture: user.picture
+    }));
+    res.redirect(`/dashboard.html#user=${userDataEncoded}`);
 
   } catch (error) {
     console.error('Auth callback error:', error);
