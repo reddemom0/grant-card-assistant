@@ -1,19 +1,15 @@
-// Create this file: api/auth-callback.js
+// api/auth-callback.js
 import { google } from 'googleapis';
 import jwt from 'jsonwebtoken';
-import pg from 'pg';
-
-const { Client } = pg;
+import { sql } from '@vercel/postgres';
 
 export default async function handler(req, res) {
   const { code } = req.query;
-  
+
   if (!code) {
     return res.status(400).json({ error: 'No authorization code provided' });
   }
 
-  let dbClient;
-  
   try {
     // Set up OAuth2 client
     const oauth2Client = new google.auth.OAuth2(
@@ -30,33 +26,27 @@ export default async function handler(req, res) {
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const { data: userInfo } = await oauth2.userinfo.get();
 
-    // Connect to database
-    dbClient = new Client({
-      connectionString: process.env.POSTGRES_URL,
-      ssl: { rejectUnauthorized: false }
-    });
-    await dbClient.connect();
-
-    // Create or update user in database
-    const userResult = await dbClient.query(`
+    // Create or update user in database using Vercel Postgres
+    const userResult = await sql`
       INSERT INTO users (google_id, email, name, picture, last_login)
-      VALUES ($1, $2, $3, $4, NOW())
-      ON CONFLICT (google_id) 
-      DO UPDATE SET 
-        name = $3,
-        picture = $4,
+      VALUES (${userInfo.id}, ${userInfo.email}, ${userInfo.name}, ${userInfo.picture}, NOW())
+      ON CONFLICT (google_id)
+      DO UPDATE SET
+        name = ${userInfo.name},
+        picture = ${userInfo.picture},
         last_login = NOW()
       RETURNING id, email, name, picture;
-    `, [userInfo.id, userInfo.email, userInfo.name, userInfo.picture]);
+    `;
 
     const user = userResult.rows[0];
 
-    // Create JWT token
+    // Create JWT token with picture included
     const token = jwt.sign(
-      { 
+      {
         userId: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        picture: user.picture
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
@@ -79,9 +69,5 @@ export default async function handler(req, res) {
       message: error.message,
       details: error.response?.data || null
     });
-  } finally {
-    if (dbClient) {
-      await dbClient.end();
-    }
   }
 }
