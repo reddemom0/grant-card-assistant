@@ -2874,25 +2874,25 @@ module.exports = async function handler(req, res) {
     // Enhanced health check endpoint
     if (url === '/api/health') {
       const totalDocs = Object.values(knowledgeBases).reduce((sum, docs) => sum + docs.length, 0);
-      const totalConversations = conversations.size;
-      const activeExchanges = Array.from(conversations.values())
-        .reduce((sum, conv) => sum + Math.floor(conv.length / 2), 0);
-      
-      res.json({ 
+      // Note: Conversations now in Redis, metadata tracked locally
+      const totalConversations = conversationMetadata.size;
+
+      res.json({
         status: 'healthy',
         knowledgeBaseSize: totalDocs,
         knowledgeBaseSource: 'google-drive-service-account',
         googleDriveConfigured: !!(GOOGLE_DRIVE_FOLDER_ID && GOOGLE_SERVICE_ACCOUNT_KEY),
         apiKeyConfigured: !!process.env.ANTHROPIC_API_KEY,
+        redisConfigured: !!(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN),
         apiCallsThisSession: apiCallCount,
         callsLastMinute: callTimestamps.length,
         rateLimitDelay: RATE_LIMIT_DELAY,
         authenticationEnabled: !!TEAM_PASSWORD,
         jwtEnabled: true,
+        conversationStorage: 'redis',
         contextManagement: {
           conversationLimits: CONVERSATION_LIMITS,
-          totalConversations: totalConversations,
-          totalActiveExchanges: activeExchanges,
+          activeConversations: totalConversations,
           warningThreshold: CONTEXT_WARNING_THRESHOLD,
           hardLimit: CONTEXT_HARD_LIMIT
         }
