@@ -313,8 +313,9 @@ function stripThinkingTags(text) {
 
 // Get conversation file context (from Redis)
 async function getConversationFileContext(conversationId) {
+  let data = null;
   try {
-    const data = await redis.get(`conv-meta:${conversationId}`);
+    data = await redis.get(`conv-meta:${conversationId}`);
     if (!data) {
       console.log(`📭 No file metadata found for ${conversationId}`);
       return {
@@ -340,7 +341,9 @@ async function getConversationFileContext(conversationId) {
     return parsed;
   } catch (error) {
     console.error(`❌ Error loading conversation metadata ${conversationId}:`, error);
-    console.error(`❌ Raw metadata from Redis:`, typeof data === 'string' ? data.substring(0, 200) : data);
+    if (data) {
+      console.error(`❌ Raw metadata from Redis:`, typeof data === 'string' ? data.substring(0, 200) : typeof data);
+    }
     console.log(`🔄 Deleting corrupted metadata and starting fresh...`);
     await redis.del(`conv-meta:${conversationId}`).catch(e => console.error('Failed to delete:', e));
     return {
@@ -518,8 +521,9 @@ function safeStringify(obj, label = 'object') {
 
 // Redis helper functions for conversation persistence
 async function getConversation(conversationId) {
+  let data = null;
   try {
-    const data = await redis.get(`conv:${conversationId}`);
+    data = await redis.get(`conv:${conversationId}`);
     if (!data) {
       console.log(`📭 No existing conversation found for ${conversationId}`);
       return [];
@@ -539,7 +543,9 @@ async function getConversation(conversationId) {
     return parsed;
   } catch (error) {
     console.error(`❌ Error loading conversation ${conversationId}:`, error);
-    console.error(`❌ Raw data from Redis:`, typeof data === 'string' ? data.substring(0, 200) : data);
+    if (data) {
+      console.error(`❌ Raw data from Redis:`, typeof data === 'string' ? data.substring(0, 200) : typeof data);
+    }
     console.log(`🔄 Deleting corrupted data and starting fresh...`);
     await redis.del(`conv:${conversationId}`).catch(e => console.error('Failed to delete:', e));
     return [];
