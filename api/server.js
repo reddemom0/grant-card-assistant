@@ -3305,15 +3305,6 @@ async function handleStreamingRequest(req, res, agentType) {
   // Add user message to conversation
   conversation.push({ role: 'user', content: messageContent });
 
-  // RESPONSE PREFILLING: For canexport-claims, guarantee structured output with <thinking> tag
-  if (agentType === 'canexport-claims') {
-    conversation.push({
-      role: 'assistant',
-      content: '<thinking>'
-    });
-    console.log('✨ Response prefilling enabled: Enforcing <thinking> tag structure');
-  }
-
   // Stream response with Files API integration
   console.log('📋 Streaming with full file memory integration');
   console.log(`   Files available: ${conversationMeta.uploadedFiles.length}`);
