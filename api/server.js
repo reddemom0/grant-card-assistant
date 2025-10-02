@@ -2690,6 +2690,7 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
             } catch (parseError) {
               continue;
            }
+          }  // closes if (line.startsWith('data: '))
         }  // closes the for loop (processing lines)
       }  // Closes the while (true) loop
 
