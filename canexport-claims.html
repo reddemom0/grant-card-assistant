@@ -772,7 +772,65 @@
         .citations a:hover {
             text-decoration: underline;
         }
-        
+
+        /* Thinking Section (Collapsible) */
+        .thinking-container {
+            margin: 1rem 0;
+            border: 1px solid rgba(109, 120, 129, 0.2);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .thinking-toggle {
+            background: rgba(109, 120, 129, 0.05);
+            border: none;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            transition: background 0.2s ease;
+        }
+
+        .thinking-toggle:hover {
+            background: rgba(109, 120, 129, 0.1);
+        }
+
+        .thinking-toggle-icon {
+            transition: transform 0.3s ease;
+        }
+
+        .thinking-toggle.expanded .thinking-toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .thinking-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: rgba(109, 120, 129, 0.02);
+        }
+
+        .thinking-content.expanded {
+            max-height: 2000px;
+            padding: 1rem;
+            border-top: 1px solid rgba(109, 120, 129, 0.2);
+        }
+
+        .thinking-content pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: var(--text-secondary);
+            margin: 0;
+        }
+
         /* Stop Generation Button */
         .stop-generation-btn {
             position: fixed;
@@ -1058,22 +1116,70 @@ function addStreamingMessage(role) {
 
 function updateStreamingMessage(messageDiv, content, isComplete = false) {
     if (!messageDiv) return;
-    
-    let processedContent = content;
+
+    // Extract <thinking> section if present
+    const thinkingMatch = content.match(/<thinking>([\s\S]*?)<\/thinking>/);
+    let thinkingContent = '';
+    let mainContent = content;
+
+    if (thinkingMatch) {
+        thinkingContent = thinkingMatch[1].trim();
+        // Remove <thinking> section from main content
+        mainContent = content.replace(/<thinking>[\s\S]*?<\/thinking>/, '').trim();
+    }
+
+    // Process main content (markdown-like formatting)
+    let processedContent = mainContent;
     processedContent = processedContent.replace(/\n/g, '<br>');
     processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
     processedContent = processedContent.replace(/`(.*?)`/g, '<code>$1</code>');
-    
-    if (isComplete) {
-        messageDiv.innerHTML = processedContent;
-    } else {
-        messageDiv.innerHTML = processedContent + '<span class="typing-cursor">▎</span>';
+
+    // Build HTML with collapsible thinking section
+    let html = '';
+
+    if (thinkingContent && isComplete) {
+        html += `
+            <div class="thinking-container">
+                <button class="thinking-toggle" onclick="toggleThinking(this)">
+                    <span>🧠 Show reasoning & analysis</span>
+                    <span class="thinking-toggle-icon">▼</span>
+                </button>
+                <div class="thinking-content">
+                    <pre>${thinkingContent}</pre>
+                </div>
+            </div>
+        `;
     }
-    
+
+    html += processedContent;
+
+    if (isComplete) {
+        messageDiv.innerHTML = html;
+    } else {
+        messageDiv.innerHTML = html + '<span class="typing-cursor">▎</span>';
+    }
+
     const messagesContainer = document.getElementById('messages');
     if (messagesContainer) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+}
+
+// Toggle thinking section visibility
+function toggleThinking(button) {
+    const container = button.parentElement;
+    const content = container.querySelector('.thinking-content');
+    const isExpanded = content.classList.contains('expanded');
+
+    if (isExpanded) {
+        content.classList.remove('expanded');
+        button.classList.remove('expanded');
+        button.querySelector('span:first-child').textContent = '🧠 Show reasoning & analysis';
+    } else {
+        content.classList.add('expanded');
+        button.classList.add('expanded');
+        button.querySelector('span:first-child').textContent = '🧠 Hide reasoning & analysis';
     }
 }
 
