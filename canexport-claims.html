@@ -893,7 +893,12 @@
                 <span>💰</span>
                 <span class="logo-text">CanExport Claims Assistant</span>
             </div>
-            <a href="index.html" class="nav-link">← Back to AI Hub</a>
+            <div style="display: flex; gap: 0.5rem;">
+                <button onclick="clearConversation()" class="nav-link" style="background: rgba(220, 38, 38, 0.1); color: #dc2626; border: 1px solid #dc2626; cursor: pointer;">
+                    🗑️ Clear Conversation
+                </button>
+                <a href="index.html" class="nav-link">← Back to AI Hub</a>
+            </div>
         </div>
     </div>
 
@@ -1281,10 +1286,38 @@ async function handleStreamingResponse(response, messageDiv) {
 }
 
         // Global functions for HTML onclick handlers
+
+        // Clear conversation history
+        function clearConversation() {
+            if (confirm('Are you sure you want to clear the conversation history? This will start a fresh conversation.')) {
+                // Clear session storage
+                sessionStorage.removeItem('canexport-claims-conversation-id');
+
+                // Clear messages display
+                const messagesContainer = document.getElementById('messages');
+                if (messagesContainer) {
+                    messagesContainer.innerHTML = '';
+                }
+
+                // Show welcome section
+                const welcomeSection = document.querySelector('.welcome-section');
+                if (welcomeSection) {
+                    welcomeSection.classList.remove('hidden');
+                }
+
+                // Reset uploaded files
+                uploadedFiles = [];
+                resetInputBox();
+
+                console.log('✅ Conversation cleared - starting fresh');
+                alert('Conversation cleared! You can now start a fresh conversation.');
+            }
+        }
+
         function insertQuickText(text) {
             const messageInput = document.getElementById('message-input');
             const quickBtn = event?.target.closest('.floating-quick-btn');
-            
+
             if (quickBtn) {
                 // Update selected task
                 document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
