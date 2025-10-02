@@ -2904,7 +2904,8 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
     await waitForRateLimit();
 
     const webSearchTool = getWebSearchTool(agentType);
-    console.log(`🔥 Making streaming Claude API call with Extended Thinking`);
+    const useExtendedThinking = agentType !== 'canexport-claims';
+    console.log(`🔥 Making streaming Claude API call${useExtendedThinking ? ' with Extended Thinking' : ''}`);
     console.log(`🤖 Agent: ${agentType}`);
     console.log(`🔧 Tools available: web_search (max ${webSearchTool.max_uses} uses)`);
     if (webSearchTool.allowed_domains) {
@@ -2978,11 +2979,14 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 16000,  // Increased for thinking
-        thinking: {         // ADDED: Extended Thinking
-          type: "enabled",
-          budget_tokens: 10000
-        },
+        max_tokens: 16000,
+        // Extended Thinking only for agents that need it (NOT canexport-claims - uses XML tags instead)
+        ...(agentType !== 'canexport-claims' && {
+          thinking: {
+            type: "enabled",
+            budget_tokens: 10000
+          }
+        }),
         system: systemPrompt,
         messages: apiMessages,
         stream: true,
@@ -3013,7 +3017,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
     let thinkingBuffer = '';  // Buffer thinking (don't show to user)
 let inThinkingBlock = false;
 
-console.log(`🚀 Starting streaming response with Extended Thinking...`);
+console.log(`🚀 Starting streaming response${useExtendedThinking ? ' with Extended Thinking' : ' (XML structured output)'}...`);
 
     try {
       while (true) {
