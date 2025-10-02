@@ -1672,7 +1672,15 @@ Historical precedent: Similar Amazon office supply claims have been rejected by 
 **Documentation Checklist:**
 - N/A - This expense type is ineligible
 </recommendations>
-</examples>`,
+</examples>
+
+<critical_reminders>
+- ALWAYS use <thinking> tags before responding
+- Structure your thinking with the 7-step analysis workflow
+- Your <thinking> is for internal reasoning - users see the analysis sections
+- Never skip the thinking process - it ensures compliance accuracy
+- After </thinking>, immediately provide the structured XML response
+</critical_reminders>`,
 
   'readiness-strategist': `You are an Applicant Readiness Strategist for Granted Consulting. Your role is to help the strategy team determine the readiness of a client company to apply for a specific grant by conducting interview questions, readiness assessments, executing research, and providing readiness scores.
 
@@ -2904,8 +2912,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
     await waitForRateLimit();
 
     const webSearchTool = getWebSearchTool(agentType);
-    const useExtendedThinking = agentType !== 'canexport-claims';
-    console.log(`🔥 Making streaming Claude API call${useExtendedThinking ? ' with Extended Thinking' : ''}`);
+    console.log(`🔥 Making streaming Claude API call with Extended Thinking`);
     console.log(`🤖 Agent: ${agentType}`);
     console.log(`🔧 Tools available: web_search (max ${webSearchTool.max_uses} uses)`);
     if (webSearchTool.allowed_domains) {
@@ -2987,21 +2994,15 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
           tools: [webSearchTool]
         };
 
-        // Extended Thinking only for agents that need it (NOT canexport-claims - uses XML tags instead)
-        if (agentType !== 'canexport-claims') {
-          requestBody.thinking = {
-            type: "enabled",
-            budget_tokens: 10000
-          };
-        }
+        // Extended Thinking enabled for all agents
+        // canexport-claims uses both Extended Thinking AND XML <thinking> tags (like ETG does)
+        requestBody.thinking = {
+          type: "enabled",
+          budget_tokens: 10000
+        };
 
         console.log(`🔍 API Request Body - Agent: ${agentType}`);
-        console.log(`   Has thinking param: ${!!requestBody.thinking}`);
-        if (requestBody.thinking) {
-          console.log(`   ⚠️ WARNING: Extended Thinking is ENABLED for ${agentType}`);
-        } else {
-          console.log(`   ✅ Extended Thinking DISABLED for ${agentType}`);
-        }
+        console.log(`   Extended Thinking: ENABLED (budget: 10000 tokens)`);
 
         return JSON.stringify(requestBody);
       })()
@@ -3030,7 +3031,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
     let thinkingBuffer = '';  // Buffer thinking (don't show to user)
 let inThinkingBlock = false;
 
-console.log(`🚀 Starting streaming response${useExtendedThinking ? ' with Extended Thinking' : ' (XML structured output)'}...`);
+console.log(`🚀 Starting streaming response with Extended Thinking + XML structured output...`);
 
     try {
       while (true) {
