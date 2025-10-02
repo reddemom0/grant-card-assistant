@@ -2977,21 +2977,34 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
         'anthropic-version': '2023-06-01',
         'anthropic-beta': 'files-api-2025-04-14'
       },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 16000,
+      body: (() => {
+        const requestBody = {
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 16000,
+          system: systemPrompt,
+          messages: apiMessages,
+          stream: true,
+          tools: [webSearchTool]
+        };
+
         // Extended Thinking only for agents that need it (NOT canexport-claims - uses XML tags instead)
-        ...(agentType !== 'canexport-claims' && {
-          thinking: {
+        if (agentType !== 'canexport-claims') {
+          requestBody.thinking = {
             type: "enabled",
             budget_tokens: 10000
-          }
-        }),
-        system: systemPrompt,
-        messages: apiMessages,
-        stream: true,
-        tools: [webSearchTool]
-      })
+          };
+        }
+
+        console.log(`🔍 API Request Body - Agent: ${agentType}`);
+        console.log(`   Has thinking param: ${!!requestBody.thinking}`);
+        if (requestBody.thinking) {
+          console.log(`   ⚠️ WARNING: Extended Thinking is ENABLED for ${agentType}`);
+        } else {
+          console.log(`   ✅ Extended Thinking DISABLED for ${agentType}`);
+        }
+
+        return JSON.stringify(requestBody);
+      })()
     });
 
     lastAPICall = Date.now();
