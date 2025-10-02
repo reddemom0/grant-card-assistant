@@ -1386,7 +1386,7 @@ async function handleStreamingResponse(response, messageDiv) {
                 formData.append('agentType', 'bcafe');
                 formData.append('orgType', document.getElementById('org-type').value || '');
                 formData.append('selectedMarkets', selectedMarkets.join(',') || '');
-                
+
                 uploadedFiles.forEach(file => {
                     formData.append('files', file);
                 });
@@ -1408,22 +1408,23 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 console.error('Send message error:', error);
                 removeLoadingMessage();
                 addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
-            }
+            } finally {
+                // ALWAYS re-enable UI, even if streaming hangs or fails
+                isLoading = false;
+                if (sendButton) sendButton.disabled = false;
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                    messageInput.placeholder = "Tell me about your agricultural business, target export markets, and BCAFE application goals...";
+                }
 
-            isLoading = false;
-            if (sendButton) sendButton.disabled = false;
-            if (messageInput) {
-                messageInput.value = '';
-                messageInput.style.height = '44px';
-                messageInput.placeholder = "Tell me about your agricultural business, target export markets, and BCAFE application goals...";
+                uploadedFiles = [];
+                resetInputBox();
+
+                // Clear task selection
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                selectedTask = '';
             }
-            
-            uploadedFiles = [];
-            resetInputBox();
-            
-            // Clear task selection
-            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
-            selectedTask = '';
         }
 
         async function sendMessageWithURL(url) {
@@ -1441,7 +1442,7 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 formData.append('task', selectedTask || 'bcafe-application');
                 formData.append('conversationId', 'bcafe-conversation');
                 formData.append('agentType', 'bcafe');
-                
+
                 const response = await fetch(`${API_BASE}/api/process-bcafe/stream`, {
                     method: 'POST',
                     body: formData
@@ -1458,14 +1459,15 @@ await handleStreamingResponse(response, streamingMessageDiv);
             } catch (error) {
                 removeLoadingMessage();
                 addMessage('assistant', `Error analyzing URL: ${error.message}`, false);
-            }
+            } finally {
+                // ALWAYS re-enable UI, even if streaming hangs or fails
+                isLoading = false;
+                if (sendButton) sendButton.disabled = false;
 
-            isLoading = false;
-            if (sendButton) sendButton.disabled = false;
-            
-            // Clear task selection
-            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
-            selectedTask = '';
+                // Clear task selection
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                selectedTask = '';
+            }
         }
 
         function stopGeneration() {

@@ -1260,7 +1260,7 @@ async function handleStreamingResponse(response, messageDiv) {
                 formData.append('task', selectedTask || 'grant-criteria');
                 formData.append('conversationId', 'grant-cards-conversation');
                 formData.append('agentType', 'grant-cards');
-                
+
                 uploadedFiles.forEach(file => {
                     formData.append('files', file);
                 });
@@ -1282,22 +1282,23 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 console.error('Send message error:', error);
                 removeLoadingMessage();
                 addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
-            }
+            } finally {
+                // ALWAYS re-enable UI, even if streaming hangs or fails
+                isLoading = false;
+                if (sendButton) sendButton.disabled = false;
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                    messageInput.placeholder = "Message Grant Card Assistant...";
+                }
 
-            isLoading = false;
-            if (sendButton) sendButton.disabled = false;
-            if (messageInput) {
-                messageInput.value = '';
-                messageInput.style.height = '44px';
-                messageInput.placeholder = "Message Grant Card Assistant...";
+                uploadedFiles = [];
+                resetInputBox();
+
+                // Clear task selection
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                selectedTask = '';
             }
-            
-            uploadedFiles = [];
-            resetInputBox();
-            
-            // Clear task selection
-            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
-            selectedTask = '';
         }
 
         async function handleURLMessage(url, originalMessage) {
@@ -1322,7 +1323,7 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 formData.append('task', selectedTask || 'grant-criteria');
                 formData.append('conversationId', 'grant-cards-conversation');
                 formData.append('agentType', 'grant-cards');
-                
+
                 const response = await fetch(`${API_BASE}/api/process-grant/stream`, {
                     method: 'POST',
                     body: formData
@@ -1339,18 +1340,19 @@ await handleStreamingResponse(response, streamingMessageDiv);
             } catch (error) {
                 removeLoadingMessage();
                 addMessage('assistant', `Error analyzing URL: ${error.message}`, false);
-            }
+            } finally {
+                // ALWAYS re-enable UI, even if streaming hangs or fails
+                isLoading = false;
+                if (sendButton) sendButton.disabled = false;
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                }
 
-            isLoading = false;
-            if (sendButton) sendButton.disabled = false;
-            if (messageInput) {
-                messageInput.value = '';
-                messageInput.style.height = '44px';
+                // Clear task selection
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                selectedTask = '';
             }
-            
-            // Clear task selection
-            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
-            selectedTask = '';
         }
 
         async function sendMessageWithURL(url) {

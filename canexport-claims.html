@@ -1295,7 +1295,7 @@ async function handleStreamingResponse(response, messageDiv) {
                 formData.append('task', selectedTask || 'claims-audit');
                 formData.append('conversationId', 'canexport-claims-conversation');
                 formData.append('agentType', 'canexport-claims');
-                
+
                 uploadedFiles.forEach(file => {
                     formData.append('files', file);
                 });
@@ -1311,28 +1311,29 @@ async function handleStreamingResponse(response, messageDiv) {
 
                 removeLoadingMessage();
 const streamingMessageDiv = addStreamingMessage('assistant');
-await handleStreamingResponse(response, streamingMessageDiv);;
+await handleStreamingResponse(response, streamingMessageDiv);
 
             } catch (error) {
                 console.error('Send message error:', error);
                 removeLoadingMessage();
                 addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`, false);
-            }
+            } finally {
+                // ALWAYS re-enable UI, even if streaming hangs or fails
+                isLoading = false;
+                if (sendButton) sendButton.disabled = false;
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                    messageInput.placeholder = "Describe your expense or ask about CanExport eligibility...";
+                }
 
-            isLoading = false;
-            if (sendButton) sendButton.disabled = false;
-            if (messageInput) {
-                messageInput.value = '';
-                messageInput.style.height = '44px';
-                messageInput.placeholder = "Describe your expense or ask about CanExport eligibility...";
+                uploadedFiles = [];
+                resetInputBox();
+
+                // Clear task selection
+                document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
+                selectedTask = '';
             }
-            
-            uploadedFiles = [];
-            resetInputBox();
-            
-            // Clear task selection
-            document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
-            selectedTask = '';
         }
 
         function stopGeneration() {

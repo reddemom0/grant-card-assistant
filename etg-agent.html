@@ -1118,7 +1118,7 @@ if (!conversationId) {
 }
 formData.append('conversationId', conversationId);
                 formData.append('agentType', 'etg-writer');
-                
+
                 uploadedFiles.forEach(file => {
                     formData.append('files', file);
                 });
@@ -1140,18 +1140,19 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 console.error('Send message error:', error);
                 removeLoadingMessage();
                 addMessage('assistant', `I apologize, but I'm having trouble connecting. Please try again.\n\nError: ${error.message}`);
-            }
+            } finally {
+                // ALWAYS re-enable UI, even if streaming hangs or fails
+                isLoading = false;
+                if (sendButton) sendButton.disabled = false;
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                    messageInput.placeholder = "Message ETG Specialist...";
+                }
 
-            isLoading = false;
-            if (sendButton) sendButton.disabled = false;
-            if (messageInput) {
-                messageInput.value = '';
-                messageInput.style.height = '44px';
-                messageInput.placeholder = "Message ETG Specialist...";
+                uploadedFiles = [];
+                resetInputBox();
             }
-            
-            uploadedFiles = [];
-            resetInputBox();
         }
 
         async function handleURLMessage(url, originalMessage) {
@@ -1175,7 +1176,7 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 formData.append('url', url);
                 formData.append('conversationId', 'etg-conversation');
                 formData.append('agentType', 'etg-writer');
-                
+
                 const response = await fetch(`${API_BASE}/api/process-etg/stream`, {
                     method: 'POST',
                     body: formData
@@ -1192,13 +1193,14 @@ await handleStreamingResponse(response, streamingMessageDiv);
             } catch (error) {
                 removeLoadingMessage();
                 addMessage('assistant', `Error analyzing URL: ${error.message}`);
-            }
-
-            isLoading = false;
-            if (sendButton) sendButton.disabled = false;
-            if (messageInput) {
-                messageInput.value = '';
-                messageInput.style.height = '44px';
+            } finally {
+                // ALWAYS re-enable UI, even if streaming hangs or fails
+                isLoading = false;
+                if (sendButton) sendButton.disabled = false;
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                }
             }
         }
 
