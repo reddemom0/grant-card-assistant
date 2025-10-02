@@ -3291,7 +3291,7 @@ async function handleStreamingRequest(req, res, agentType) {
   if (agentType === 'canexport-claims') {
     conversation.push({
       role: 'assistant',
-      content: '<thinking>\n'
+      content: '<thinking>'
     });
     console.log('✨ Response prefilling enabled: Enforcing <thinking> tag structure');
   }
@@ -4180,7 +4180,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       // RESPONSE PREFILLING: Guarantee structured output with <thinking> tag
       conversation.push({
         role: 'assistant',
-        content: '<thinking>\n'
+        content: '<thinking>'
       });
       console.log('✨ Response prefilling enabled: Enforcing <thinking> tag structure');
 
