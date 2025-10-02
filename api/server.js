@@ -2692,8 +2692,12 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
            }
         }  // Line 2512 - closes the for loop (processing lines)
       }  // Closes the while (true) loop
-      
-    } 
+
+      // Stream ended naturally without [DONE] signal - close it properly
+      console.log(`✅ Stream completed naturally (no [DONE] signal)`);
+      res.write('data: [DONE]\n\n');
+      res.end();
+
     } catch (streamError) {
       console.error('Streaming error:', streamError);
       res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
