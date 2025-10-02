@@ -2690,7 +2690,7 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
             } catch (parseError) {
               continue;
            }
-        }  // Line 2512 - closes the for loop (processing lines)
+        }  // closes the for loop (processing lines)
       }  // Closes the while (true) loop
 
       // Stream ended naturally without [DONE] signal - close it properly
