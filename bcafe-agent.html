@@ -772,7 +772,10 @@
                 <span>🌾</span>
                 <span class="logo-text">BC Agriculture Export Specialist</span>
             </div>
-            <a href="index.html" class="nav-link">← Back to AI Hub</a>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button onclick="startNewConversation()" class="nav-link" style="background: var(--granted-light); color: var(--granted-blue); border: none; cursor: pointer; font-family: inherit; font-size: 0.9rem;">🔄 New Conversation</button>
+                <a href="index.html" class="nav-link">← Back to AI Hub</a>
+            </div>
         </div>
     </div>
 
@@ -935,9 +938,56 @@
         let selectedMarkets = [];
         let currentStreamReader = null;
         let currentAbortController = null;
+        let conversationId = generateConversationId();
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+        // Generate unique conversation ID
+        function generateConversationId() {
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(2, 15);
+            return `bcafe-${timestamp}-${random}`;
+        }
+
+        // Start a new conversation
+        function startNewConversation() {
+            if (confirm('Start a new conversation? This will clear the current chat.')) {
+                // Generate new conversation ID
+                conversationId = generateConversationId();
+                console.log('New conversation started:', conversationId);
+
+                // Clear the chat UI
+                const messagesDiv = document.getElementById('messages');
+                if (messagesDiv) {
+                    messagesDiv.innerHTML = '';
+                }
+
+                // Reset state
+                hasStartedConversation = false;
+                uploadedFiles = [];
+                selectedTask = '';
+                selectedMarkets = [];
+
+                // Show welcome section again
+                const welcomeSection = document.getElementById('welcome-section');
+                const chatContainer = document.getElementById('chat-container');
+                const container = document.querySelector('.container');
+
+                if (welcomeSection) welcomeSection.style.display = 'block';
+                if (chatContainer) chatContainer.classList.remove('active');
+                if (container) container.classList.remove('chat-active');
+
+                // Reset input
+                const messageInput = document.getElementById('message-input');
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                }
+
+                resetInputBox();
+            }
+        }
 
         // ✅ Stop Generation Function
         function stopGeneration() {
@@ -1493,7 +1543,7 @@ async function handleStreamingResponse(response, messageDiv) {
                 const formData = new FormData();
                 formData.append('message', message || '');
                 formData.append('task', selectedTask || 'bcafe-application');
-                formData.append('conversationId', 'bcafe-conversation');
+                formData.append('conversationId', conversationId);
                 formData.append('agentType', 'bcafe');
                 formData.append('orgType', document.getElementById('org-type').value || '');
                 formData.append('selectedMarkets', selectedMarkets.join(',') || '');
@@ -1556,7 +1606,7 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 formData.append('message', 'Analyze this BCAFE-related URL');
                 formData.append('url', url);
                 formData.append('task', selectedTask || 'bcafe-application');
-                formData.append('conversationId', 'bcafe-conversation');
+                formData.append('conversationId', conversationId);
                 formData.append('agentType', 'bcafe');
 
                 currentAbortController = new AbortController();

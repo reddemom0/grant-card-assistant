@@ -580,7 +580,10 @@
                 <span>📋</span>
                 <span class="logo-text">ETG Business Case Specialist</span>
             </div>
-            <a href="index.html" class="nav-link">← Back to AI Hub</a>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button onclick="startNewConversation()" class="nav-link" style="background: var(--granted-light); color: var(--granted-blue); border: none; cursor: pointer; font-family: inherit; font-size: 0.9rem;">🔄 New Conversation</button>
+                <a href="index.html" class="nav-link">← Back to AI Hub</a>
+            </div>
         </div>
     </div>
 
@@ -701,9 +704,55 @@
         let hasStartedConversation = false;
         let currentStreamReader = null;
         let currentAbortController = null;
+        let conversationId = generateConversationId();
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+        // Generate unique conversation ID
+        function generateConversationId() {
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(2, 15);
+            return `etg-${timestamp}-${random}`;
+        }
+
+        // Start a new conversation
+        function startNewConversation() {
+            if (confirm('Start a new conversation? This will clear the current chat.')) {
+                // Generate new conversation ID
+                conversationId = generateConversationId();
+                sessionStorage.removeItem('etg-conversation-id');
+                console.log('New conversation started:', conversationId);
+
+                // Clear the chat UI
+                const messagesDiv = document.getElementById('messages');
+                if (messagesDiv) {
+                    messagesDiv.innerHTML = '';
+                }
+
+                // Reset state
+                hasStartedConversation = false;
+                uploadedFiles = [];
+
+                // Show welcome section again
+                const welcomeSection = document.getElementById('welcome-section');
+                const chatContainer = document.getElementById('chat-container');
+                const container = document.querySelector('.container');
+
+                if (welcomeSection) welcomeSection.style.display = 'block';
+                if (chatContainer) chatContainer.classList.remove('active');
+                if (container) container.classList.remove('chat-active');
+
+                // Reset input
+                const messageInput = document.getElementById('message-input');
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                }
+
+                resetInputBox();
+            }
+        }
 
 // ✅ Stop Generation Function
 function stopGeneration() {
@@ -1231,13 +1280,7 @@ async function handleStreamingResponse(response, messageDiv) {
             try {
                 const formData = new FormData();
                 formData.append('message', message || '');
-                // Generate or retrieve conversation ID
-let conversationId = sessionStorage.getItem('etg-conversation-id');
-if (!conversationId) {
-    conversationId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-    sessionStorage.setItem('etg-conversation-id', conversationId);
-}
-formData.append('conversationId', conversationId);
+                formData.append('conversationId', conversationId);
                 formData.append('agentType', 'etg-writer');
 
                 uploadedFiles.forEach(file => {
@@ -1300,7 +1343,7 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 const formData = new FormData();
                 formData.append('message', remainingMessage || 'Analyze this course URL');
                 formData.append('url', url);
-                formData.append('conversationId', 'etg-conversation');
+                formData.append('conversationId', conversationId);
                 formData.append('agentType', 'etg-writer');
 
                 // Create AbortController for this fetch

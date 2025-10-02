@@ -1028,9 +1028,17 @@
         let currentTypingTimeout = null;
         let currentStreamReader = null;
         let currentAbortController = null;
+        let conversationId = generateConversationId();
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+        // Generate unique conversation ID
+        function generateConversationId() {
+            const timestamp = Date.now();
+            const random = Math.random().toString(36).substring(2, 15);
+            return `canexport-claims-${timestamp}-${random}`;
+        }
 
         // ✅ Stop Generation Function
         function stopGeneration() {
@@ -1290,8 +1298,10 @@ async function handleStreamingResponse(response, messageDiv) {
         // Clear conversation history
         function clearConversation() {
             if (confirm('Are you sure you want to clear the conversation history? This will start a fresh conversation.')) {
-                // Clear session storage
+                // Generate new conversation ID
+                conversationId = generateConversationId();
                 sessionStorage.removeItem('canexport-claims-conversation-id');
+                console.log('New conversation started:', conversationId);
 
                 // Clear messages display
                 const messagesContainer = document.getElementById('messages');
@@ -1305,12 +1315,21 @@ async function handleStreamingResponse(response, messageDiv) {
                     welcomeSection.classList.remove('hidden');
                 }
 
-                // Reset uploaded files
+                // Reset state
+                hasStartedConversation = false;
                 uploadedFiles = [];
+                selectedTask = '';
+
+                // Reset input
+                const messageInput = document.getElementById('message-input');
+                if (messageInput) {
+                    messageInput.value = '';
+                    messageInput.style.height = '44px';
+                }
+
                 resetInputBox();
 
                 console.log('✅ Conversation cleared - starting fresh');
-                alert('Conversation cleared! You can now start a fresh conversation.');
             }
         }
 
@@ -1615,7 +1634,7 @@ async function handleStreamingResponse(response, messageDiv) {
                 const formData = new FormData();
                 formData.append('message', message || '');
                 formData.append('task', selectedTask || 'claims-audit');
-                formData.append('conversationId', 'canexport-claims-conversation');
+                formData.append('conversationId', conversationId);
                 formData.append('agentType', 'canexport-claims');
 
                 uploadedFiles.forEach(file => {
