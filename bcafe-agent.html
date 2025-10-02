@@ -584,6 +584,33 @@
             cursor: not-allowed;
             transform: translateY(-50%);
         }
+
+        .stop-button-inline {
+            width: auto;
+            height: 32px;
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 0.25rem;
+            padding: 0 0.75rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .stop-button-inline.visible {
+            display: flex;
+        }
+
+        .stop-button-inline:hover {
+            background: #b91c1c;
+            transform: translateY(-50%) scale(1.05);
+        }
         
         .upload-btn-welcome {
             padding: 0.5rem 1rem;
@@ -889,6 +916,9 @@
                             <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
                         </svg>
                     </button>
+                    <button id="stop-button" class="stop-button-inline" onclick="stopGeneration()" title="Stop generation">
+                        ⏹️ Stop
+                    </button>
                 </div>
             </div>
         </div>
@@ -903,9 +933,80 @@
         let isGenerating = false;
         let currentTypingTimeout = null;
         let selectedMarkets = [];
+        let currentStreamReader = null;
+        let currentAbortController = null;
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+
+        // ✅ Stop Generation Function
+        function stopGeneration() {
+            console.log('Stop generation requested');
+
+            if (currentStreamReader) {
+                try {
+                    currentStreamReader.cancel();
+                    console.log('Stream reader cancelled');
+                } catch (error) {
+                    console.error('Error cancelling stream reader:', error);
+                }
+                currentStreamReader = null;
+            }
+
+            if (currentAbortController) {
+                try {
+                    currentAbortController.abort();
+                    console.log('Fetch aborted');
+                } catch (error) {
+                    console.error('Error aborting fetch:', error);
+                }
+                currentAbortController = null;
+            }
+
+            cleanupAfterStream();
+        }
+
+        function showStopButton() {
+            const stopButton = document.getElementById('stop-button');
+            const sendButton = document.getElementById('send-button');
+            if (stopButton) stopButton.classList.add('visible');
+            if (sendButton) sendButton.style.display = 'none';
+        }
+
+        function hideStopButton() {
+            const stopButton = document.getElementById('stop-button');
+            const sendButton = document.getElementById('send-button');
+            if (stopButton) stopButton.classList.remove('visible');
+            if (sendButton) sendButton.style.display = 'flex';
+        }
+
+        function cleanupAfterStream() {
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+
+            removeLoadingMessage();
+
+            const typingCursor = document.querySelector('.typing-cursor');
+            if (typingCursor) {
+                typingCursor.remove();
+            }
+
+            isLoading = false;
+            if (sendButton) sendButton.disabled = false;
+            if (messageInput) {
+                messageInput.value = '';
+                messageInput.style.height = '44px';
+                messageInput.placeholder = "Message BC AgriFood Export Specialist...";
+            }
+
+            uploadedFiles = [];
+            resetInputBox();
+            hideStopButton();
+
+            currentStreamReader = null;
+            currentAbortController = null;
+        }
+
         // Streaming Functions - Define early to avoid ReferenceError
 function addStreamingMessage(role) {
     const messagesContainer = document.getElementById('messages');
@@ -952,6 +1053,9 @@ async function handleStreamingResponse(response, messageDiv) {
     let buffer = '';
     let fullContent = '';
     let streamCompleted = false;
+
+    currentStreamReader = reader;
+    showStopButton();
 
     try {
         while (true) {
@@ -1007,8 +1111,15 @@ async function handleStreamingResponse(response, messageDiv) {
         console.error('Streaming error:', error);
         if (!streamCompleted) {
             streamCompleted = true;
-            updateStreamingMessage(messageDiv, `Stream interrupted: ${error.message}`, true);
+            if (error.name !== 'AbortError') {
+                updateStreamingMessage(messageDiv, `Stream interrupted: ${error.message}`, true);
+            } else {
+                updateStreamingMessage(messageDiv, fullContent || 'Generation stopped.', true);
+            }
         }
+    } finally {
+        currentStreamReader = null;
+        hideStopButton();
     }
 }
 
@@ -1391,9 +1502,12 @@ async function handleStreamingResponse(response, messageDiv) {
                     formData.append('files', file);
                 });
 
+                currentAbortController = new AbortController();
+
                 const response = await fetch(`${API_BASE}/api/process-bcafe/stream`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: currentAbortController.signal
                 });
 
                 if (!response.ok) {
@@ -1424,6 +1538,8 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 // Clear task selection
                 document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
                 selectedTask = '';
+
+                currentAbortController = null;
             }
         }
 
@@ -1443,9 +1559,12 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 formData.append('conversationId', 'bcafe-conversation');
                 formData.append('agentType', 'bcafe');
 
+                currentAbortController = new AbortController();
+
                 const response = await fetch(`${API_BASE}/api/process-bcafe/stream`, {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: currentAbortController.signal
                 });
 
                 if (!response.ok) {
@@ -1467,30 +1586,8 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 // Clear task selection
                 document.querySelectorAll('.floating-quick-btn').forEach(btn => btn.classList.remove('active'));
                 selectedTask = '';
-            }
-        }
 
-        function stopGeneration() {
-            if (currentTypingTimeout) {
-                clearTimeout(currentTypingTimeout);
-                currentTypingTimeout = null;
-            }
-            
-            isGenerating = false;
-            hideStopButton();
-        }
-
-        function showStopButton() {
-            const stopButton = document.getElementById('stop-generation-btn');
-            if (stopButton) {
-                stopButton.classList.add('show');
-            }
-        }
-
-        function hideStopButton() {
-            const stopButton = document.getElementById('stop-generation-btn');
-            if (stopButton) {
-                stopButton.classList.remove('show');
+                currentAbortController = null;
             }
         }
 
