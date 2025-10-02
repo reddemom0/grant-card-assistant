@@ -721,6 +721,57 @@
         .typing-container {
             min-height: 1.2em;
         }
+
+        /* Web Search Indicators */
+        .web-search-indicator {
+            background: rgba(30, 58, 138, 0.1);
+            border-left: 3px solid var(--primary);
+            padding: 0.75rem 1rem;
+            margin: 0.5rem 0;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .web-search-indicator::before {
+            content: '🔍';
+            font-size: 1.1rem;
+        }
+
+        .search-query {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .citations {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: rgba(30, 58, 138, 0.05);
+            border-radius: 8px;
+            border: 1px solid rgba(30, 58, 138, 0.1);
+        }
+
+        .citations strong {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+        }
+
+        .citations a {
+            color: var(--primary);
+            text-decoration: none;
+            display: block;
+            padding: 0.25rem 0;
+            font-size: 0.85rem;
+        }
+
+        .citations a:hover {
+            text-decoration: underline;
+        }
         
         /* Stop Generation Button */
         .stop-generation-btn {
@@ -1071,6 +1122,27 @@ async function handleStreamingResponse(response, messageDiv) {
                         if (parsed.chunk) {
                             fullContent += parsed.chunk;
                             updateStreamingMessage(messageDiv, fullContent, false);
+                        }
+
+                        // Handle web search tool use
+                        if (parsed.tool_use && parsed.tool_use.name === 'web_search') {
+                            const searchDiv = document.createElement('div');
+                            searchDiv.className = 'web-search-indicator';
+                            searchDiv.innerHTML = `Searching: <span class="search-query">"${parsed.tool_use.query}"</span>`;
+                            messageDiv.appendChild(searchDiv);
+                            console.log('🔍 Web search initiated:', parsed.tool_use.query);
+                        }
+
+                        // Handle citations (automatically provided by API)
+                        if (parsed.citations && parsed.citations.length > 0) {
+                            const citationsDiv = document.createElement('div');
+                            citationsDiv.className = 'citations';
+                            citationsDiv.innerHTML = '<strong>Sources:</strong>' +
+                                parsed.citations.map(c =>
+                                    `<a href="${c.url}" target="_blank" rel="noopener noreferrer">${c.title || c.url}</a>`
+                                ).join('');
+                            messageDiv.appendChild(citationsDiv);
+                            console.log('📚 Citations received:', parsed.citations.length);
                         }
 
                         if (parsed.error) {
