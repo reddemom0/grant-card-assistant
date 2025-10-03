@@ -29,16 +29,18 @@ async function setupDatabase() {
   console.log('='.repeat(60) + '\n');
 
   // Check for required environment variable
-  if (!process.env.POSTGRES_URL) {
-    colorPrint('❌ Error: POSTGRES_URL environment variable not set', 'red');
+  const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  if (!dbUrl) {
+    colorPrint('❌ Error: DATABASE_URL or POSTGRES_URL environment variable not set', 'red');
     console.log('\nMake sure your .env file contains:');
-    console.log('POSTGRES_URL=postgresql://user:password@host/database\n');
+    console.log('DATABASE_URL=postgresql://user:password@host/database\n');
+    console.log('(or POSTGRES_URL if you prefer that naming)\n');
     process.exit(1);
   }
 
   // Create connection pool
   const pool = new Pool({
-    connectionString: process.env.POSTGRES_URL,
+    connectionString: dbUrl,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
   });
 
