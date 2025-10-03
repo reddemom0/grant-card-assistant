@@ -10,7 +10,7 @@
     },
     {
       "src": "/api/(.*)",
-      "dest": "/api/server.js"
+      "dest": "/api/server-with-db.js"
     },
     {
       "src": "/grant-cards",
