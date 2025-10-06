@@ -628,36 +628,7 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   console.log(`   conversation.length: ${conversation.length}`);
 
   try {
-    // Test database connection first with timeout
-    console.log(`🔍 Testing database connection...`);
-    console.log(`   DATABASE_URL exists: ${!!process.env.DATABASE_URL}`);
-    console.log(`   POSTGRES_URL exists: ${!!process.env.POSTGRES_URL}`);
-    console.log(`   Using URL: ${process.env.DATABASE_URL ? 'DATABASE_URL' : 'POSTGRES_URL'}`);
-
-    try {
-      const testPromise = pool.query('SELECT NOW()');
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Connection test timeout after 5 seconds')), 5000)
-      );
-
-      console.log(`   Attempting connection with 5 second timeout...`);
-      const testResult = await Promise.race([testPromise, timeoutPromise]);
-      console.log(`✅ Database connection OK. Current time: ${testResult.rows[0].now}`);
-    } catch (connError) {
-      console.error(`❌ Database connection FAILED:`, connError);
-      console.error(`❌ Connection error details:`, {
-        name: connError.name,
-        message: connError.message,
-        code: connError.code,
-        errno: connError.errno,
-        syscall: connError.syscall,
-        address: connError.address,
-        port: connError.port,
-        stack: connError.stack
-      });
-      console.error(`❌ Connection string format: ${process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 20) + '...' : 'NOT SET'}`);
-      throw connError;
-    }
+    // Pool is already connected (initialized at module level), skip connection test
 
     // Check if conversation exists
     console.log(`\n🔍 STEP 1: Checking if conversation exists`);
