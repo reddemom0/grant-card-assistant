@@ -1,20 +1,12 @@
-// api/server-with-db.js - Complete serverless function with PostgreSQL Database Storage
+// api/server.js - Complete serverless function with JWT Authentication, Context Management, and Enhanced File Memory
 const multer = require('multer');
 const mammoth = require('mammoth');
 const pdf = require('pdf-parse');
 const path = require('path');
 const crypto = require('crypto');
-const jwt = require('jsonwebtoken');
 const { Redis } = require('@upstash/redis');
-const { Pool } = require('pg');
 
-// Initialize PostgreSQL connection pool for conversation storage
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-
-// Initialize Redis client (still used for file context and knowledge base cache)
+// Initialize Redis client
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
@@ -141,31 +133,6 @@ function generateJWTToken() {
   return `${headerBase64}.${payloadBase64}.${signatureBase64}`;
 }
 
-/**
- * Extract user ID from JWT cookie (for database-backed conversations)
- * Returns null if no valid JWT found
- */
-function getUserIdFromJWT(req) {
-  const cookies = req.headers.cookie || '';
-  const tokenMatch = cookies.match(/granted_session=([^;]+)/);
-
-  if (!tokenMatch) {
-    return null;
-  }
-
-  try {
-    // For Google OAuth JWT tokens (from auth-callback.js)
-    const token = tokenMatch[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    // Return user ID (could be 'id', 'sub', or 'userId' depending on JWT structure)
-    return decoded.id || decoded.sub || decoded.userId || null;
-  } catch (error) {
-    console.error('JWT decode error:', error.message);
-    return null;
-  }
-}
-
 // Check if request is authenticated with JWT
 function isAuthenticated(req) {
   const sessionToken = req.headers.cookie?.split(';')
@@ -176,16 +143,16 @@ function isAuthenticated(req) {
 
   try {
     const [headerBase64, payloadBase64, signature] = sessionToken.split('.');
-
+    
     if (!headerBase64 || !payloadBase64 || !signature) return false;
-
+    
     // Verify signature
     const signData = `${headerBase64}.${payloadBase64}`;
     const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest();
     const expectedSignatureBase64 = base64UrlEncode(expectedSignature);
-
+    
     if (signature !== expectedSignatureBase64) return false;
-
+    
     // Check expiration
     const payload = JSON.parse(base64UrlDecode(payloadBase64).toString());
     if (Date.now() > payload.expires) return false;
@@ -552,116 +519,100 @@ function safeStringify(obj, label = 'object') {
   }
 }
 
-// Database helper functions for conversation persistence
-async function getConversation(conversationId, userId) {
+// Redis helper functions for conversation persistence
+async function getConversation(conversationId) {
+  let data = null;
   try {
-    console.log(`📂 Loading conversation from database: ${conversationId}`);
-
-    // First, check if conversation exists and belongs to user
-    const convResult = await pool.query(
-      'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
-      [conversationId, userId]
-    );
-
-    if (convResult.rows.length === 0) {
+    data = await redis.get(`conv:${conversationId}`);
+    if (!data) {
       console.log(`📭 No existing conversation found for ${conversationId}`);
       return [];
     }
 
-    // Load messages for this conversation
-    const messagesResult = await pool.query(
-      `SELECT role, content FROM messages
-       WHERE conversation_id = $1
-       ORDER BY created_at ASC`,
-      [conversationId]
-    );
+    // Upstash Redis auto-deserializes JSON, so data is already an object/array
+    // Check if it's a valid array
+    if (!Array.isArray(data)) {
+      console.error(`❌ Invalid conversation data type for ${conversationId}:`, typeof data);
+      console.error(`❌ Data:`, JSON.stringify(data).substring(0, 200));
+      console.log(`🔄 Deleting invalid data and starting fresh...`);
+      await redis.del(`conv:${conversationId}`);
+      return [];
+    }
 
-    const messages = messagesResult.rows.map(row => ({
-      role: row.role,
-      content: row.content
-    }));
-
-    console.log(`✅ Loaded conversation ${conversationId}: ${messages.length} messages`);
-    return messages;
-
+    console.log(`✅ Loaded conversation ${conversationId}: ${data.length} messages`);
+    return data;
   } catch (error) {
     console.error(`❌ Error loading conversation ${conversationId}:`, error);
+    if (data) {
+      console.error(`❌ Data type:`, typeof data, `Value:`, JSON.stringify(data).substring(0, 200));
+    }
+    console.log(`🔄 Deleting corrupted data and starting fresh...`);
+    await redis.del(`conv:${conversationId}`).catch(e => console.error('Failed to delete:', e));
     return [];
   }
 }
 
-async function saveConversation(conversationId, userId, conversation, agentType) {
+async function saveConversation(conversationId, conversation) {
   try {
-    console.log(`💾 Saving conversation to database: ${conversationId} (${conversation.length} messages)`);
+    console.log(`🔍 saveConversation - Saving ${conversation.length} messages for ${conversationId}`);
 
-    // Ensure conversation exists in database
-    const convCheck = await pool.query(
-      'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
-      [conversationId, userId]
-    );
+    // Deep validation and sanitization
+    const sanitizedConversation = conversation.map((msg, idx) => {
+      if (!msg || typeof msg !== 'object') {
+        console.error(`❌ Invalid message at index ${idx}:`, msg);
+        return { role: 'user', content: 'Invalid message' };
+      }
 
-    if (convCheck.rows.length === 0) {
-      // Create conversation record
-      await pool.query(
-        `INSERT INTO conversations (id, user_id, agent_type, title, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-         ON CONFLICT (id) DO NOTHING`,
-        [conversationId, userId, agentType, 'New Conversation']
-      );
-      console.log(`📝 Created new conversation record: ${conversationId}`);
-    }
-
-    // Get existing message count to know what's new
-    const existingCount = await pool.query(
-      'SELECT COUNT(*) as count FROM messages WHERE conversation_id = $1',
-      [conversationId]
-    );
-    const startIdx = parseInt(existingCount.rows[0].count);
-
-    // Save only new messages
-    for (let i = startIdx; i < conversation.length; i++) {
-      const msg = conversation[i];
-
-      // Sanitize content for database storage
+      // Handle different content types
       let sanitizedContent;
       if (typeof msg.content === 'string') {
         sanitizedContent = msg.content;
+      } else if (Array.isArray(msg.content)) {
+        // Content blocks array - ensure all are serializable
+        sanitizedContent = msg.content.map(block => {
+          if (typeof block === 'string') {
+            return block;
+          }
+          // For objects, ensure they're plain objects
+          const plainBlock = JSON.parse(JSON.stringify(block));
+          return plainBlock;
+        });
+      } else if (typeof msg.content === 'object') {
+        // Single content object
+        sanitizedContent = JSON.parse(JSON.stringify(msg.content));
       } else {
-        // Serialize complex content as JSON string
-        sanitizedContent = JSON.stringify(msg.content);
+        console.warn(`⚠️ Unexpected content type at index ${idx}:`, typeof msg.content);
+        sanitizedContent = String(msg.content);
       }
 
-      await pool.query(
-        `INSERT INTO messages (conversation_id, role, content, created_at)
-         VALUES ($1, $2, $3, CURRENT_TIMESTAMP)`,
-        [conversationId, msg.role, sanitizedContent]
-      );
-    }
+      return {
+        role: String(msg.role || 'user'),
+        content: sanitizedContent
+      };
+    });
 
-    const newMsgCount = conversation.length - startIdx;
-    console.log(`✅ Saved ${newMsgCount} new messages to database for ${conversationId}`);
+    // Validate JSON serializability using safeStringify
+    const jsonString = safeStringify(sanitizedConversation, `conversation ${conversationId}`);
 
+    console.log(`🔍 Conversation JSON length: ${jsonString.length} bytes`);
+    console.log(`🔍 Sample content:`, jsonString.substring(0, 300) + '...');
+
+    await redis.set(`conv:${conversationId}`, jsonString, {
+      ex: 24 * 60 * 60 // 24 hour expiry
+    });
+    conversationMetadata.set(conversationId, Date.now());
+    console.log(`💾 Saved conversation ${conversationId} to Redis (${sanitizedConversation.length} messages)`);
   } catch (error) {
     console.error(`❌ Error saving conversation ${conversationId}:`, error);
-    console.error('Error details:', error.message);
+    console.error('❌ Last message in conversation:', conversation[conversation.length - 1]);
   }
 }
 
-async function deleteConversation(conversationId, userId) {
+async function deleteConversation(conversationId) {
   try {
-    console.log(`🗑️ Deleting conversation from database: ${conversationId}`);
-
-    // Delete from database (messages will cascade delete)
-    const result = await pool.query(
-      'DELETE FROM conversations WHERE id = $1 AND user_id = $2 RETURNING id',
-      [conversationId, userId]
-    );
-
-    if (result.rows.length > 0) {
-      console.log(`✅ Deleted conversation ${conversationId} from database`);
-    } else {
-      console.log(`⚠️ Conversation ${conversationId} not found or access denied`);
-    }
+    await redis.del(`conv:${conversationId}`);
+    conversationMetadata.delete(conversationId);
+    console.log(`🗑️ Deleted conversation ${conversationId} from Redis`);
   } catch (error) {
     console.error(`❌ Error deleting conversation ${conversationId}:`, error);
   }
@@ -3257,17 +3208,10 @@ async function handleStreamingRequest(req, res, agentType) {
   });
 
   const { message, task, conversationId, url: courseUrl } = req.body;
-
-  // Extract user ID from JWT for database operations
-  const userId = getUserIdFromJWT(req);
-  if (!userId) {
-    res.status(401).json({ error: 'Authentication required for database-backed conversations' });
-    return;
-  }
-
+  
   // Build proper conversation ID with agent prefix
   const fullConversationId = `${agentType}-${conversationId}`;
-
+  
   // Get existing file context
   let conversationMeta = await getConversationFileContext(fullConversationId);
   console.log(`📋 STREAMING (${agentType}): ${conversationMeta.uploadedFiles.length} existing files`);
@@ -3293,8 +3237,8 @@ async function handleStreamingRequest(req, res, agentType) {
     }
   }
 
-  // Get/create conversation from database
-  let conversation = await getConversation(fullConversationId, userId);
+  // Get/create conversation from Redis
+  let conversation = await getConversation(fullConversationId);
   if (conversation.length === 0) {
     console.log(`🆕 Starting new conversation: ${fullConversationId}`);
   } else {
@@ -3374,8 +3318,8 @@ if (fullContentBlocks && fullContentBlocks.length > 0) {
   conversation.push({ role: 'assistant', content: fullContentBlocks });
   console.log(`💾 Stored response with ${fullContentBlocks.length} content blocks in conversation history`);
 
-  // Save conversation to database
-  await saveConversation(fullConversationId, userId, conversation, agentType);
+  // Save conversation to Redis
+  await saveConversation(fullConversationId, conversation);
 }
 }
 
@@ -3679,13 +3623,7 @@ module.exports = async function handler(req, res) {
       const conversationId = req.query?.conversationId || 'default';
       const agentType = req.query?.agentType || 'grant-cards';
 
-      const userId = getUserIdFromJWT(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-
-      const conversation = await getConversation(conversationId, userId);
+      const conversation = await getConversation(conversationId);
       const exchangeCount = Math.floor(conversation.length / 2);
       const limit = CONVERSATION_LIMITS[agentType];
       
@@ -3790,13 +3728,7 @@ module.exports = async function handler(req, res) {
       });
 
       const { message, task, conversationId } = req.body;
-
-      const userId = getUserIdFromJWT(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-
+      
       // Build proper conversation ID
       const fullConversationId = `grant-cards-${conversationId}`;
 
@@ -3820,8 +3752,8 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      // Get/create conversation from database
-      let conversation = await getConversation(fullConversationId, userId);
+      // Get/create conversation from Redis
+      let conversation = await getConversation(fullConversationId);
       if (conversation.length === 0) {
         console.log(`🆕 Starting new grant-cards conversation: ${fullConversationId}`);
       } else {
@@ -3868,15 +3800,15 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
       logContextUsage(agentType, estimatedContext, conversation.length);
       pruneConversation(conversation, agentType, estimatedContext);
-
+      
       conversation.push({ role: 'user', content: messageContent });
 
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
 
       conversation.push({ role: 'assistant', content: response });
 
-      // Save conversation to database
-      await saveConversation(fullConversationId, userId, conversation, agentType);
+      // Save conversation to Redis
+      await saveConversation(fullConversationId, conversation);
 
       res.json({ 
         response: response,
@@ -3901,15 +3833,9 @@ Always follow the exact workflows and instructions from the knowledge base docum
       });
 
       const { message, conversationId, url: courseUrl } = req.body;
-
-      const userId = getUserIdFromJWT(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-
+      
       console.log(`🎯 Processing enhanced ETG request for conversation: ${conversationId}`);
-
+      
       // Build proper conversation ID
       const fullConversationId = `etg-${conversationId}`;
 
@@ -3939,7 +3865,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       }
 
       // Get/create conversation from Redis
-      let conversation = await getConversation(fullConversationId, userId);
+      let conversation = await getConversation(fullConversationId);
       if (conversation.length === 0) {
         console.log(`🆕 Starting new ETG conversation: ${fullConversationId}`);
       } else {
@@ -4048,7 +3974,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to Redis
-      await saveConversation(fullConversationId, userId, conversation, 'etg-writer');
+      await saveConversation(fullConversationId, conversation);
 
       // Strip thinking tags for user display
       const cleanResponse = stripThinkingTags(response);
@@ -4074,16 +4000,10 @@ Always follow the exact workflows and instructions from the knowledge base docum
       });
 
       const { message, conversationId, orgType, selectedMarkets } = req.body;
-
-      const userId = getUserIdFromJWT(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-
+      
       console.log(`🌾 Processing BCAFE request for conversation: ${conversationId}`);
       console.log(`📊 Organization type: ${orgType}, Target markets: ${selectedMarkets}`);
-
+      
       // Build proper conversation ID
       const fullConversationId = `bcafe-${conversationId}`;
 
@@ -4109,8 +4029,8 @@ Always follow the exact workflows and instructions from the knowledge base docum
         }
       }
 
-      // Get/create conversation from database
-      let conversation = await getConversation(fullConversationId, userId);
+      // Get/create conversation from Redis
+      let conversation = await getConversation(fullConversationId);
       if (conversation.length === 0) {
         console.log(`🆕 Starting new BCAFE conversation: ${fullConversationId}`);
       } else {
@@ -4164,7 +4084,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to Redis
-      await saveConversation(fullConversationId, userId, conversation, 'bcafe-writer');
+      await saveConversation(fullConversationId, conversation);
 
       console.log(`✅ BCAFE response generated successfully`);
 
@@ -4187,18 +4107,12 @@ Always follow the exact workflows and instructions from the knowledge base docum
       });
 
       const { message, conversationId } = req.body;
-
-      const userId = getUserIdFromJWT(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-
+      
       console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
-
+      
       // Build proper conversation ID
       const fullConversationId = `claims-${conversationId}`;
-
+      
       // Get existing file context
       let conversationMeta = await getConversationFileContext(fullConversationId);
       
@@ -4229,7 +4143,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       }
       
       // Get/create conversation from Redis
-      let conversation = await getConversation(fullConversationId, userId);
+      let conversation = await getConversation(fullConversationId);
       if (conversation.length === 0) {
         console.log(`🆕 Starting new CanExport Claims conversation: ${fullConversationId}`);
       } else {
@@ -4285,7 +4199,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to Redis
-      await saveConversation(fullConversationId, userId, conversation, 'canexport-claims');
+      await saveConversation(fullConversationId, conversation);
 
       console.log(`✅ CanExport Claims response generated successfully`);
 
@@ -4303,28 +4217,16 @@ Always follow the exact workflows and instructions from the knowledge base docum
     
     // Get conversation history
     if (url.startsWith('/api/conversation/') && method === 'GET') {
-      const userId = getUserIdFromJWT(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-
       const conversationId = url.split('/api/conversation/')[1];
-      const conversation = await getConversation(conversationId, userId);
+      const conversation = await getConversation(conversationId);
       res.json({ messages: conversation });
       return;
     }
 
     // Clear conversation
     if (url.startsWith('/api/conversation/') && method === 'DELETE') {
-      const userId = getUserIdFromJWT(req);
-      if (!userId) {
-        res.status(401).json({ error: 'Authentication required' });
-        return;
-      }
-
       const conversationId = url.split('/api/conversation/')[1];
-      await deleteConversation(conversationId, userId);
+      await deleteConversation(conversationId);
       // Also clear file metadata
       await redis.del(`conv-meta:${conversationId}`);
       res.json({ message: 'Conversation cleared' });
