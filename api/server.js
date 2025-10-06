@@ -3730,8 +3730,45 @@ module.exports = async function handler(req, res) {
   } catch (authError) {
     return;
   }
-  
+
   try {
+    // GET conversation history endpoint
+    if (url.startsWith('/api/conversation/') && method === 'GET') {
+      const conversationId = url.split('/api/conversation/')[1];
+      const userId = getUserIdFromJWT(req);
+
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      if (!conversationId) {
+        res.status(400).json({ success: false, message: 'Missing conversationId' });
+        return;
+      }
+
+      console.log(`📖 Loading conversation: ${conversationId} for user: ${userId}`);
+
+      try {
+        const conversation = await getConversation(conversationId, userId);
+
+        res.json({
+          success: true,
+          conversationId: conversationId,
+          messages: conversation,
+          messageCount: conversation.length
+        });
+      } catch (error) {
+        console.error(`❌ Error loading conversation:`, error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to load conversation',
+          error: error.message
+        });
+      }
+      return;
+    }
+
     // Login endpoint
     if (url === '/api/login' && method === 'POST') {
       try {
