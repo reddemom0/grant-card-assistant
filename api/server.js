@@ -55,35 +55,45 @@ async function queryWithTimeout(sql, params, timeoutMs = 5000) {
   console.log(`   🔍 Pool state: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
 
   let client = null;
-  const clientAcquirePromise = pool.connect();
-  const clientTimeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Client acquisition timeout after ${timeoutMs}ms`)), timeoutMs)
-  );
+  let clientTimeoutId = null;
+  let queryTimeoutId = null;
 
   try {
     // Acquire client with timeout
     console.log(`   🔍 Acquiring database client...`);
+    const clientAcquirePromise = pool.connect();
+    const clientTimeoutPromise = new Promise((_, reject) => {
+      clientTimeoutId = setTimeout(() => reject(new Error(`Client acquisition timeout after ${timeoutMs}ms`)), timeoutMs);
+    });
+
     client = await Promise.race([clientAcquirePromise, clientTimeoutPromise]);
+    clearTimeout(clientTimeoutId);
     console.log(`   ✅ Client acquired`);
 
     // Execute query with timeout
     console.log(`   🔍 Executing query...`);
     const queryPromise = client.query(sql, params);
-    const queryTimeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => {
+    const queryTimeoutPromise = new Promise((_, reject) => {
+      queryTimeoutId = setTimeout(() => {
         console.error(`   ⏰ QUERY TIMEOUT TRIGGERED after ${timeoutMs}ms`);
         console.error(`   ⏰ Pool state at timeout: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
         reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`));
-      }, timeoutMs)
-    );
+      }, timeoutMs);
+    });
 
     const result = await Promise.race([queryPromise, queryTimeoutPromise]);
+    clearTimeout(queryTimeoutId);
     console.log(`   ✅ Query completed successfully`);
     return result;
   } catch (error) {
     console.error(`   ❌ Query failed:`, error.message);
     throw error;
   } finally {
+    // Clean up timeouts
+    if (clientTimeoutId) clearTimeout(clientTimeoutId);
+    if (queryTimeoutId) clearTimeout(queryTimeoutId);
+
+    // Release client
     if (client) {
       console.log(`   🔌 Releasing client...`);
       client.release();
