@@ -593,24 +593,61 @@ async function getConversation(conversationId, userId) {
 
 // Save conversation messages to PostgreSQL database (incremental saves)
 async function saveConversation(conversationId, userId, conversation, agentType) {
-  console.log(`🔍 saveConversation CALLED`);
-  console.log(`   conversationId: ${conversationId}`);
-  console.log(`   userId: ${userId}`);
-  console.log(`   agentType: ${agentType}`);
+  console.log(`\n========== saveConversation START ==========`);
+  console.log(`   conversationId: ${conversationId} (type: ${typeof conversationId})`);
+  console.log(`   userId: ${userId} (type: ${typeof userId})`);
+  console.log(`   agentType: ${agentType} (type: ${typeof agentType})`);
   console.log(`   conversation.length: ${conversation.length}`);
-  console.log(`   conversation messages:`, conversation.map(m => ({ role: m.role, contentType: typeof m.content })));
 
   try {
-    // Create conversation record if it doesn't exist
-    console.log(`🔍 Checking if conversation exists: ${conversationId}`);
-    const convCheck = await pool.query(
-      'SELECT id FROM conversations WHERE id = $1',
-      [conversationId]
-    );
-    console.log(`🔍 Conversation check result: ${convCheck.rows.length} rows`);
+    // Test database connection first
+    console.log(`🔍 Testing database connection...`);
+    try {
+      const testResult = await pool.query('SELECT NOW()');
+      console.log(`✅ Database connection OK. Current time: ${testResult.rows[0].now}`);
+    } catch (connError) {
+      console.error(`❌ Database connection FAILED:`, connError);
+      console.error(`❌ Connection error details:`, {
+        name: connError.name,
+        message: connError.message,
+        code: connError.code,
+        stack: connError.stack
+      });
+      throw connError;
+    }
+
+    // Check if conversation exists
+    console.log(`\n🔍 STEP 1: Checking if conversation exists`);
+    console.log(`   SQL: SELECT id FROM conversations WHERE id = $1`);
+    console.log(`   Params: [${conversationId}]`);
+
+    let convCheck;
+    try {
+      convCheck = await pool.query(
+        'SELECT id FROM conversations WHERE id = $1',
+        [conversationId]
+      );
+      console.log(`✅ Conversation check query completed`);
+      console.log(`   Result rows: ${convCheck.rows.length}`);
+      if (convCheck.rows.length > 0) {
+        console.log(`   Found conversation:`, convCheck.rows[0]);
+      }
+    } catch (checkError) {
+      console.error(`❌ Conversation check query FAILED:`, checkError);
+      console.error(`   Error details:`, {
+        name: checkError.name,
+        message: checkError.message,
+        code: checkError.code,
+        detail: checkError.detail,
+        stack: checkError.stack
+      });
+      throw checkError;
+    }
 
     if (convCheck.rows.length === 0) {
-      // Generate title from first user message (limit to 100 chars)
+      console.log(`\n🔍 STEP 2: Creating new conversation`);
+
+      // Generate title
       let title = 'New Conversation';
       const firstUserMsg = conversation.find(m => m.role === 'user');
       if (firstUserMsg) {
@@ -620,62 +657,136 @@ async function saveConversation(conversationId, userId, conversation, agentType)
         title = content.substring(0, 100);
       }
 
-      console.log(`🔍 Creating new conversation: ${conversationId}, userId: ${userId}, agentType: ${agentType}, title: ${title.substring(0, 50)}...`);
-      const insertResult = await pool.query(
-        'INSERT INTO conversations (id, user_id, agent_type, title) VALUES ($1, $2, $3, $4) RETURNING *',
-        [conversationId, userId, agentType, title]
-      );
-      console.log(`✅ Created conversation record:`, insertResult.rows[0]);
-    } else {
-      console.log(`✅ Conversation already exists: ${conversationId}`);
-    }
+      console.log(`   Title: "${title.substring(0, 50)}..."`);
+      console.log(`   SQL: INSERT INTO conversations (id, user_id, agent_type, title) VALUES ($1, $2, $3, $4) RETURNING *`);
+      console.log(`   Params: [${conversationId}, ${userId}, ${agentType}, "${title.substring(0, 30)}..."]`);
 
-    // Get count of existing messages to determine what's new
-    console.log(`🔍 Counting existing messages for: ${conversationId}`);
-    const countResult = await pool.query(
-      'SELECT COUNT(*) FROM messages WHERE conversation_id = $1',
-      [conversationId]
-    );
-    const existingCount = parseInt(countResult.rows[0].count);
-    console.log(`🔍 Existing message count: ${existingCount}`);
-
-    // Save only new messages
-    const newMessages = conversation.slice(existingCount);
-    console.log(`🔍 New messages to save: ${newMessages.length}`);
-
-    if (newMessages.length > 0) {
-      for (let i = 0; i < newMessages.length; i++) {
-        const msg = newMessages[i];
-        // Serialize content to JSON string
-        const content = typeof msg.content === 'string'
-          ? msg.content
-          : JSON.stringify(msg.content);
-
-        console.log(`🔍 Inserting message ${i + 1}/${newMessages.length}: role=${msg.role}, contentLength=${content.length}`);
-        const msgResult = await pool.query(
-          'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id',
-          [conversationId, msg.role, content]
+      try {
+        const insertResult = await pool.query(
+          'INSERT INTO conversations (id, user_id, agent_type, title) VALUES ($1, $2, $3, $4) RETURNING *',
+          [conversationId, userId, agentType, title]
         );
-        console.log(`✅ Inserted message with id: ${msgResult.rows[0].id}`);
+        console.log(`✅ Conversation created successfully`);
+        console.log(`   Created record:`, insertResult.rows[0]);
+      } catch (insertError) {
+        console.error(`❌ Conversation insert FAILED:`, insertError);
+        console.error(`   Error details:`, {
+          name: insertError.name,
+          message: insertError.message,
+          code: insertError.code,
+          detail: insertError.detail,
+          hint: insertError.hint,
+          constraint: insertError.constraint,
+          stack: insertError.stack
+        });
+        throw insertError;
       }
-      console.log(`💾 Saved ${newMessages.length} new messages to ${conversationId}`);
     } else {
-      console.log(`⚠️ No new messages to save (conversation already has ${existingCount} messages)`);
+      console.log(`✅ Conversation already exists, skipping creation`);
     }
 
-    // Update conversation timestamp
-    console.log(`🔍 Updating conversation timestamp: ${conversationId}`);
-    await pool.query(
-      'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-      [conversationId]
-    );
-    console.log(`✅ Updated conversation timestamp`);
+    // Count existing messages
+    console.log(`\n🔍 STEP 3: Counting existing messages`);
+    console.log(`   SQL: SELECT COUNT(*) FROM messages WHERE conversation_id = $1`);
+    console.log(`   Params: [${conversationId}]`);
+
+    let countResult;
+    try {
+      countResult = await pool.query(
+        'SELECT COUNT(*) FROM messages WHERE conversation_id = $1',
+        [conversationId]
+      );
+      const existingCount = parseInt(countResult.rows[0].count);
+      console.log(`✅ Message count query completed: ${existingCount} existing messages`);
+
+      // Save new messages
+      const newMessages = conversation.slice(existingCount);
+      console.log(`\n🔍 STEP 4: Saving new messages`);
+      console.log(`   Total conversation messages: ${conversation.length}`);
+      console.log(`   Existing messages: ${existingCount}`);
+      console.log(`   New messages to save: ${newMessages.length}`);
+
+      if (newMessages.length > 0) {
+        for (let i = 0; i < newMessages.length; i++) {
+          const msg = newMessages[i];
+          const content = typeof msg.content === 'string'
+            ? msg.content
+            : JSON.stringify(msg.content);
+
+          console.log(`\n   Message ${i + 1}/${newMessages.length}:`);
+          console.log(`     Role: ${msg.role}`);
+          console.log(`     Content length: ${content.length}`);
+          console.log(`     SQL: INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id`);
+          console.log(`     Params: [${conversationId}, ${msg.role}, <content ${content.length} chars>]`);
+
+          try {
+            const msgResult = await pool.query(
+              'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id',
+              [conversationId, msg.role, content]
+            );
+            console.log(`     ✅ Message inserted with id: ${msgResult.rows[0].id}`);
+          } catch (msgError) {
+            console.error(`     ❌ Message insert FAILED:`, msgError);
+            console.error(`     Error details:`, {
+              name: msgError.name,
+              message: msgError.message,
+              code: msgError.code,
+              detail: msgError.detail,
+              hint: msgError.hint,
+              constraint: msgError.constraint,
+              stack: msgError.stack
+            });
+            throw msgError;
+          }
+        }
+        console.log(`\n💾 Successfully saved ${newMessages.length} new messages`);
+      } else {
+        console.log(`   No new messages to save`);
+      }
+    } catch (countError) {
+      console.error(`❌ Message count query FAILED:`, countError);
+      console.error(`   Error details:`, {
+        name: countError.name,
+        message: countError.message,
+        code: countError.code,
+        stack: countError.stack
+      });
+      throw countError;
+    }
+
+    // Update timestamp
+    console.log(`\n🔍 STEP 5: Updating conversation timestamp`);
+    console.log(`   SQL: UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`);
+    console.log(`   Params: [${conversationId}]`);
+
+    try {
+      await pool.query(
+        'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
+        [conversationId]
+      );
+      console.log(`✅ Timestamp updated`);
+    } catch (updateError) {
+      console.error(`❌ Timestamp update FAILED:`, updateError);
+      console.error(`   Error details:`, {
+        name: updateError.name,
+        message: updateError.message,
+        code: updateError.code,
+        stack: updateError.stack
+      });
+      throw updateError;
+    }
+
+    console.log(`\n========== saveConversation SUCCESS ==========\n`);
 
   } catch (error) {
-    console.error(`❌ Error saving conversation ${conversationId}:`, error);
+    console.error(`\n========== saveConversation FAILED ==========`);
+    console.error(`❌ FATAL ERROR in saveConversation:`, error);
+    console.error(`❌ Error type: ${error.constructor.name}`);
+    console.error(`❌ Error message: ${error.message}`);
+    console.error(`❌ Error code: ${error.code}`);
     console.error(`❌ Error stack:`, error.stack);
-    console.error('❌ Last message in conversation:', conversation[conversation.length - 1]);
-    throw error; // Re-throw to see if it's being caught elsewhere
+    console.error(`========== saveConversation END ==========\n`);
+    throw error;
   }
 }
 
