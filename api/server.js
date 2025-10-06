@@ -15,13 +15,37 @@ const redis = new Redis({
 });
 
 // Initialize PostgreSQL connection pool (for conversation persistence)
+// Ensure connection string has sslmode=require for Neon
+const connectionString = (process.env.DATABASE_URL || process.env.POSTGRES_URL);
+const finalConnectionString = connectionString?.includes('sslmode=')
+  ? connectionString
+  : `${connectionString}${connectionString?.includes('?') ? '&' : '?'}sslmode=require`;
+
+console.log(`🔍 Initializing PostgreSQL pool...`);
+console.log(`   Connection string format: ${finalConnectionString?.substring(0, 40)}...`);
+console.log(`   Has sslmode: ${finalConnectionString?.includes('sslmode=')}`);
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
+  connectionString: finalConnectionString,
   ssl: { rejectUnauthorized: false },
   connectionTimeoutMillis: 5000,
   idleTimeoutMillis: 30000,
   max: 10,
-  query_timeout: 10000
+  query_timeout: 10000,
+  statement_timeout: 10000
+});
+
+// Add pool error handler
+pool.on('error', (err) => {
+  console.error('❌ Unexpected pool error:', err);
+});
+
+pool.on('connect', () => {
+  console.log('✅ Pool client connected');
+});
+
+pool.on('remove', () => {
+  console.log('🔌 Pool client removed');
 });
 
 // PDF text extraction (not base64, just text extraction)
