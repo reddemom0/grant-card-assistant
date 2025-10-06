@@ -175,28 +175,34 @@ function isAuthenticated(req) {
 // Extract user ID from JWT token (for database queries)
 function getUserIdFromJWT(req) {
   const cookies = req.headers.cookie || '';
+  console.log(`🔍 getUserIdFromJWT - cookies:`, cookies.substring(0, 100));
+
   const tokenMatch = cookies.match(/granted_session=([^;]+)/);
 
   if (!tokenMatch) {
-    console.log('No JWT token found in cookies');
+    console.log('❌ No JWT token found in cookies');
     return null;
   }
 
   try {
     const token = tokenMatch[1];
+    console.log(`🔍 JWT token found, length: ${token.length}`);
+
     const decoded = jwt.verify(token, JWT_SECRET);
+    console.log(`🔍 JWT decoded successfully:`, { userId: decoded.userId, email: decoded.email });
 
     // The token contains userId (database UUID) from auth-callback.js
     const userId = decoded.userId;
 
     if (!userId) {
-      console.error('JWT token missing userId field');
+      console.error('❌ JWT token missing userId field. Decoded:', decoded);
       return null;
     }
 
+    console.log(`✅ getUserIdFromJWT returning userId: ${userId}`);
     return userId;
   } catch (error) {
-    console.error('getUserIdFromJWT error:', error.message);
+    console.error('❌ getUserIdFromJWT error:', error.message);
     return null;
   }
 }
@@ -587,14 +593,21 @@ async function getConversation(conversationId, userId) {
 
 // Save conversation messages to PostgreSQL database (incremental saves)
 async function saveConversation(conversationId, userId, conversation, agentType) {
-  try {
-    console.log(`🔍 saveConversation - Saving ${conversation.length} messages for ${conversationId}`);
+  console.log(`🔍 saveConversation CALLED`);
+  console.log(`   conversationId: ${conversationId}`);
+  console.log(`   userId: ${userId}`);
+  console.log(`   agentType: ${agentType}`);
+  console.log(`   conversation.length: ${conversation.length}`);
+  console.log(`   conversation messages:`, conversation.map(m => ({ role: m.role, contentType: typeof m.content })));
 
+  try {
     // Create conversation record if it doesn't exist
+    console.log(`🔍 Checking if conversation exists: ${conversationId}`);
     const convCheck = await pool.query(
       'SELECT id FROM conversations WHERE id = $1',
       [conversationId]
     );
+    console.log(`🔍 Conversation check result: ${convCheck.rows.length} rows`);
 
     if (convCheck.rows.length === 0) {
       // Generate title from first user message (limit to 100 chars)
@@ -607,46 +620,62 @@ async function saveConversation(conversationId, userId, conversation, agentType)
         title = content.substring(0, 100);
       }
 
-      await pool.query(
-        'INSERT INTO conversations (id, user_id, agent_type, title) VALUES ($1, $2, $3, $4)',
+      console.log(`🔍 Creating new conversation: ${conversationId}, userId: ${userId}, agentType: ${agentType}, title: ${title.substring(0, 50)}...`);
+      const insertResult = await pool.query(
+        'INSERT INTO conversations (id, user_id, agent_type, title) VALUES ($1, $2, $3, $4) RETURNING *',
         [conversationId, userId, agentType, title]
       );
-      console.log(`✅ Created conversation record for ${conversationId}`);
+      console.log(`✅ Created conversation record:`, insertResult.rows[0]);
+    } else {
+      console.log(`✅ Conversation already exists: ${conversationId}`);
     }
 
     // Get count of existing messages to determine what's new
+    console.log(`🔍 Counting existing messages for: ${conversationId}`);
     const countResult = await pool.query(
       'SELECT COUNT(*) FROM messages WHERE conversation_id = $1',
       [conversationId]
     );
     const existingCount = parseInt(countResult.rows[0].count);
+    console.log(`🔍 Existing message count: ${existingCount}`);
 
     // Save only new messages
     const newMessages = conversation.slice(existingCount);
+    console.log(`🔍 New messages to save: ${newMessages.length}`);
+
     if (newMessages.length > 0) {
-      for (const msg of newMessages) {
+      for (let i = 0; i < newMessages.length; i++) {
+        const msg = newMessages[i];
         // Serialize content to JSON string
         const content = typeof msg.content === 'string'
           ? msg.content
           : JSON.stringify(msg.content);
 
-        await pool.query(
-          'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3)',
+        console.log(`🔍 Inserting message ${i + 1}/${newMessages.length}: role=${msg.role}, contentLength=${content.length}`);
+        const msgResult = await pool.query(
+          'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id',
           [conversationId, msg.role, content]
         );
+        console.log(`✅ Inserted message with id: ${msgResult.rows[0].id}`);
       }
       console.log(`💾 Saved ${newMessages.length} new messages to ${conversationId}`);
+    } else {
+      console.log(`⚠️ No new messages to save (conversation already has ${existingCount} messages)`);
     }
 
     // Update conversation timestamp
+    console.log(`🔍 Updating conversation timestamp: ${conversationId}`);
     await pool.query(
       'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
       [conversationId]
     );
+    console.log(`✅ Updated conversation timestamp`);
 
   } catch (error) {
     console.error(`❌ Error saving conversation ${conversationId}:`, error);
+    console.error(`❌ Error stack:`, error.stack);
     console.error('❌ Last message in conversation:', conversation[conversation.length - 1]);
+    throw error; // Re-throw to see if it's being caught elsewhere
   }
 }
 
@@ -3378,7 +3407,16 @@ if (fullContentBlocks && fullContentBlocks.length > 0) {
   console.log(`💾 Stored response with ${fullContentBlocks.length} content blocks in conversation history`);
 
   // Save conversation to database
+  console.log(`🔍 About to call saveConversation from streaming handler`);
+  console.log(`   fullConversationId: ${fullConversationId}`);
+  console.log(`   userId: ${userId}`);
+  console.log(`   agentType: ${agentType}`);
+  console.log(`   conversation.length: ${conversation.length}`);
+
   await saveConversation(fullConversationId, userId, conversation, agentType);
+  console.log(`✅ saveConversation completed from streaming handler`);
+} else {
+  console.log(`⚠️ No content blocks to save (fullContentBlocks: ${fullContentBlocks})`);
 }
 }
 
