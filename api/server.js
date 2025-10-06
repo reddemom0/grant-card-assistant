@@ -3631,6 +3631,15 @@ async function handleStreamingRequest(req, res, agentType) {
   // Add user message to conversation
   conversation.push({ role: 'user', content: messageContent });
 
+  // Save user message to Redis immediately (before streaming response)
+  // This ensures subsequent requests see the conversation even if streaming is still in progress
+  try {
+    await redis.set(`conv:${conversationId}`, conversation, { ex: 86400 });
+    console.log(`✅ User message saved to Redis (${conversation.length} messages)`);
+  } catch (redisError) {
+    console.error(`❌ Redis save failed:`, redisError.message);
+  }
+
   // Stream response with Files API integration
   console.log('📋 Streaming with full file memory integration');
   console.log(`   Files available: ${conversationMeta.uploadedFiles.length}`);
