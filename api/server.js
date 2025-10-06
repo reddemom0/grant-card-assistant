@@ -211,15 +211,38 @@ function generateJWTToken() {
     loginTime: Date.now(),
     expires: Date.now() + SESSION_DURATION
   };
-  
+
   const header = { alg: 'HS256', typ: 'JWT' };
   const headerBase64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
   const payloadBase64 = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
-  
+
   const signData = `${headerBase64}.${payloadBase64}`;
   const signature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest();
   const signatureBase64 = base64UrlEncode(signature);
-  
+
+  return `${headerBase64}.${payloadBase64}.${signatureBase64}`;
+}
+
+// Generate JWT token with user information (for legacy login and OAuth)
+function generateJWTTokenWithUser(userId, email, name = null, picture = null) {
+  const payload = {
+    userId: userId,
+    email: email,
+    name: name,
+    picture: picture,
+    authenticated: true,
+    loginTime: Date.now(),
+    expires: Date.now() + SESSION_DURATION
+  };
+
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const headerBase64 = base64UrlEncode(Buffer.from(JSON.stringify(header)));
+  const payloadBase64 = base64UrlEncode(Buffer.from(JSON.stringify(payload)));
+
+  const signData = `${headerBase64}.${payloadBase64}`;
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(signData).digest();
+  const signatureBase64 = base64UrlEncode(signature);
+
   return `${headerBase64}.${payloadBase64}.${signatureBase64}`;
 }
 
@@ -3776,49 +3799,78 @@ module.exports = async function handler(req, res) {
         req.on('data', chunk => {
           body += chunk.toString();
         });
-        
-        req.on('end', () => {
+
+        req.on('end', async () => {
           try {
             const { password } = JSON.parse(body);
-            
+
             if (!TEAM_PASSWORD) {
-              res.status(500).json({ 
-                success: false, 
-                message: 'Authentication not configured' 
+              res.status(500).json({
+                success: false,
+                message: 'Authentication not configured'
               });
               return;
             }
 
             if (password === TEAM_PASSWORD) {
-              const sessionToken = generateJWTToken();
+              // Create or retrieve legacy system user from database
+              let userId = null;
+              try {
+                const result = await queryWithTimeout(
+                  'SELECT id FROM users WHERE email = $1',
+                  ['legacy@granted.consulting'],
+                  2000
+                );
+
+                if (result.rows.length > 0) {
+                  userId = result.rows[0].id;
+                  console.log('✅ Legacy user found:', userId);
+                } else {
+                  // Create legacy system user
+                  const createResult = await queryWithTimeout(
+                    'INSERT INTO users (google_id, email, name, picture) VALUES ($1, $2, $3, $4) RETURNING id',
+                    ['legacy-system', 'legacy@granted.consulting', 'Legacy User', null],
+                    2000
+                  );
+                  userId = createResult.rows[0].id;
+                  console.log('✅ Legacy user created:', userId);
+                }
+              } catch (dbError) {
+                console.error('⚠️ Database error during legacy login:', dbError.message);
+                // Fallback: use a default UUID if database fails
+                userId = '00000000-0000-0000-0000-000000000000';
+              }
+
+              // Create JWT with userId
+              const sessionToken = generateJWTTokenWithUser(userId, 'legacy@granted.consulting');
 
               res.setHeader('Set-Cookie', [
                 `${SESSION_COOKIE_NAME}=${sessionToken}; HttpOnly; SameSite=Lax; Max-Age=${SESSION_DURATION/1000}; Path=/`
               ]);
 
-              res.json({ 
-                success: true, 
-                message: 'Authentication successful' 
+              res.json({
+                success: true,
+                message: 'Authentication successful'
               });
             } else {
-              res.status(401).json({ 
-                success: false, 
-                message: 'Invalid password' 
+              res.status(401).json({
+                success: false,
+                message: 'Invalid password'
               });
             }
           } catch (jsonError) {
-            res.status(400).json({ 
-              success: false, 
-              message: 'Invalid JSON in request body' 
+            res.status(400).json({
+              success: false,
+              message: 'Invalid JSON in request body'
             });
           }
         });
 
       } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ 
-          success: false, 
-          message: 'Server error during authentication' 
+        res.status(500).json({
+          success: false,
+          message: 'Server error during authentication'
         });
       }
       return;
