@@ -723,21 +723,45 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       if (newMessages.length > 0) {
         for (let i = 0; i < newMessages.length; i++) {
           const msg = newMessages[i];
-          const content = typeof msg.content === 'string'
-            ? msg.content
-            : JSON.stringify(msg.content);
 
           console.log(`\n   Message ${i + 1}/${newMessages.length}:`);
           console.log(`     Role: ${msg.role}`);
-          console.log(`     Content length: ${content.length}`);
-          console.log(`     SQL: INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id`);
-          console.log(`     Params: [${conversationId}, ${msg.role}, <content ${content.length} chars>]`);
+          console.log(`     Content type: ${typeof msg.content}`);
+          console.log(`     Content is array: ${Array.isArray(msg.content)}`);
+
+          // Serialize content
+          let content;
+          try {
+            if (typeof msg.content === 'string') {
+              content = msg.content;
+              console.log(`     Content is string, length: ${content.length}`);
+            } else {
+              console.log(`     Serializing content object/array...`);
+              content = JSON.stringify(msg.content);
+              console.log(`     Serialized to ${content.length} chars`);
+              console.log(`     First 200 chars: ${content.substring(0, 200)}`);
+            }
+          } catch (serializeError) {
+            console.error(`     ❌ Failed to serialize content:`, serializeError);
+            throw serializeError;
+          }
+
+          console.log(`     Preparing INSERT query...`);
+          console.log(`     conversationId: ${conversationId}`);
+          console.log(`     role: ${msg.role}`);
+          console.log(`     content length: ${content.length} bytes`);
 
           try {
-            const msgResult = await pool.query(
+            console.log(`     Executing INSERT with 8 second timeout...`);
+            const insertPromise = pool.query(
               'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id',
               [conversationId, msg.role, content]
             );
+            const timeoutPromise = new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Message INSERT timeout after 8 seconds')), 8000)
+            );
+
+            const msgResult = await Promise.race([insertPromise, timeoutPromise]);
             console.log(`     ✅ Message inserted with id: ${msgResult.rows[0].id}`);
           } catch (msgError) {
             console.error(`     ❌ Message insert FAILED:`, msgError);
@@ -748,8 +772,10 @@ async function saveConversation(conversationId, userId, conversation, agentType)
               detail: msgError.detail,
               hint: msgError.hint,
               constraint: msgError.constraint,
+              contentLength: content?.length,
               stack: msgError.stack
             });
+            console.error(`     Content preview (first 500 chars):`, content?.substring(0, 500));
             throw msgError;
           }
         }
