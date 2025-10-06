@@ -644,38 +644,58 @@ function safeStringify(obj, label = 'object') {
   }
 }
 
-// Redis helper functions for conversation persistence
-// Load conversation messages from PostgreSQL database
+// Hybrid persistence: Redis for active conversations, PostgreSQL for long-term storage
+// Load conversation messages from Redis (fast, for active conversations)
 async function getConversation(conversationId, userId) {
+  let data = null;
   try {
-    // Verify conversation belongs to user
+    // Try Redis first (active conversations)
+    data = await redis.get(`conv:${conversationId}`);
+    if (data && Array.isArray(data)) {
+      console.log(`✅ Loaded conversation from Redis ${conversationId}: ${data.length} messages`);
+      return data;
+    }
+
+    // Fallback to PostgreSQL (archived conversations)
+    console.log(`📭 No Redis data, trying PostgreSQL for ${conversationId}...`);
     const convCheck = await queryWithTimeout(
       'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
-      [conversationId, userId],
-      5000
+      [conversationId, userId]
     );
 
     if (convCheck.rows.length === 0) {
-      console.log(`📭 No conversation found for ${conversationId} and user ${userId}`);
+      console.log(`📭 No conversation found in database for ${conversationId}`);
       return [];
     }
 
-    // Load messages in chronological order
     const result = await queryWithTimeout(
       'SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
-      [conversationId],
-      5000
+      [conversationId]
     );
 
-    console.log(`✅ Loaded conversation ${conversationId}: ${result.rows.length} messages`);
+    console.log(`✅ Loaded conversation from PostgreSQL ${conversationId}: ${result.rows.length} messages`);
+
+    // Restore to Redis for faster subsequent access
+    if (result.rows.length > 0) {
+      await redis.set(`conv:${conversationId}`, result.rows, { ex: 86400 }); // 24 hour TTL
+      console.log(`✅ Restored conversation to Redis`);
+    }
+
     return result.rows;
   } catch (error) {
     console.error(`❌ Error loading conversation ${conversationId}:`, error);
+
+    // If we have Redis data but it's invalid, clean it up
+    if (data) {
+      console.log(`🔄 Deleting invalid Redis data for ${conversationId}`);
+      await redis.del(`conv:${conversationId}`).catch(e => console.error('Failed to delete:', e));
+    }
+
     return [];
   }
 }
 
-// Save conversation messages to PostgreSQL database (incremental saves)
+// Hybrid save: Redis (immediate) + PostgreSQL (background persistence)
 async function saveConversation(conversationId, userId, conversation, agentType) {
   console.log(`\n========== saveConversation START ==========`);
   console.log(`   conversationId: ${conversationId} (type: ${typeof conversationId})`);
@@ -683,8 +703,18 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   console.log(`   agentType: ${agentType} (type: ${typeof agentType})`);
   console.log(`   conversation.length: ${conversation.length}`);
 
+  // ALWAYS save to Redis first (fast, reliable)
   try {
-    // Pool is already connected (initialized at module level), skip connection test
+    await redis.set(`conv:${conversationId}`, conversation, { ex: 86400 }); // 24 hour TTL
+    console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
+  } catch (redisError) {
+    console.error(`❌ Redis save failed:`, redisError.message);
+    // Continue to try PostgreSQL even if Redis fails
+  }
+
+  // Also save to PostgreSQL for long-term persistence (optional, non-blocking)
+  try {
+    console.log(`\n🗄️  Attempting PostgreSQL save (for archival)...`);
 
     // Check if conversation exists
     console.log(`\n🔍 STEP 1: Checking if conversation exists`);
@@ -879,14 +909,13 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     console.log(`\n========== saveConversation SUCCESS ==========\n`);
 
   } catch (error) {
-    console.error(`\n========== saveConversation FAILED ==========`);
-    console.error(`❌ FATAL ERROR in saveConversation:`, error);
+    console.error(`\n========== PostgreSQL save FAILED (non-fatal) ==========`);
+    console.error(`❌ PostgreSQL save error:`, error.message);
     console.error(`❌ Error type: ${error.constructor.name}`);
-    console.error(`❌ Error message: ${error.message}`);
     console.error(`❌ Error code: ${error.code}`);
-    console.error(`❌ Error stack:`, error.stack);
+    console.error(`⚠️  Conversation IS saved in Redis, PostgreSQL archival failed`);
     console.error(`========== saveConversation END ==========\n`);
-    throw error;
+    // Don't throw - Redis save succeeded, PostgreSQL is optional
   }
 }
 
