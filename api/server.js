@@ -50,7 +50,7 @@ pool.on('remove', () => {
 
 // Helper function to execute queries with explicit timeout
 // Uses proper client acquisition/release for serverless compatibility
-async function queryWithTimeout(sql, params, timeoutMs = 5000) {
+async function queryWithTimeout(sql, params, timeoutMs = 2000) {
   console.log(`   🔍 queryWithTimeout: Starting query execution...`);
   console.log(`   🔍 Pool state: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
 
@@ -3622,8 +3622,13 @@ if (fullContentBlocks && fullContentBlocks.length > 0) {
   console.log(`   agentType: ${agentType}`);
   console.log(`   conversation.length: ${conversation.length}`);
 
-  await saveConversation(conversationId, userId, conversation, agentType);
-  console.log(`✅ saveConversation completed from streaming handler`);
+  try {
+    await saveConversation(conversationId, userId, conversation, agentType);
+    console.log(`✅ saveConversation completed successfully`);
+  } catch (saveError) {
+    // Log but don't fail the request if save fails
+    console.error(`❌ saveConversation failed (non-fatal):`, saveError.message);
+  }
 } else {
   console.log(`⚠️ No content blocks to save (fullContentBlocks: ${fullContentBlocks})`);
 }
