@@ -3296,12 +3296,10 @@ async function handleStreamingRequest(req, res, agentType) {
   });
 
   const { message, task, conversationId, url: courseUrl } = req.body;
-  
-  // Build proper conversation ID with agent prefix
-  const fullConversationId = `${agentType}-${conversationId}`;
-  
+
+  // Use conversationId as-is (frontend generates UUID)
   // Get existing file context
-  let conversationMeta = await getConversationFileContext(fullConversationId);
+  let conversationMeta = await getConversationFileContext(conversationId);
   console.log(`📋 STREAMING (${agentType}): ${conversationMeta.uploadedFiles.length} existing files`);
   
   // Process NEW uploaded files with Files API
@@ -3320,17 +3318,17 @@ async function handleStreamingRequest(req, res, agentType) {
     }
     
     if (newUploadResults.length > 0) {
-      conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
+      conversationMeta = await updateConversationFileContext(conversationId, newUploadResults);
       console.log(`✅ Added ${newUploadResults.length} files to ${agentType} conversation context`);
     }
   }
 
   // Get/create conversation from database
-  let conversation = await getConversation(fullConversationId, userId);
+  let conversation = await getConversation(conversationId, userId);
   if (conversation.length === 0) {
-    console.log(`🆕 Starting new conversation: ${fullConversationId}`);
+    console.log(`🆕 Starting new conversation: ${conversationId}`);
   } else {
-    console.log(`📜 Loaded conversation: ${fullConversationId} (${conversation.length} messages)`);
+    console.log(`📜 Loaded conversation: ${conversationId} (${conversation.length} messages)`);
   }
   
   // Load agent-specific knowledge base
@@ -3408,12 +3406,12 @@ if (fullContentBlocks && fullContentBlocks.length > 0) {
 
   // Save conversation to database
   console.log(`🔍 About to call saveConversation from streaming handler`);
-  console.log(`   fullConversationId: ${fullConversationId}`);
+  console.log(`   conversationId: ${conversationId}`);
   console.log(`   userId: ${userId}`);
   console.log(`   agentType: ${agentType}`);
   console.log(`   conversation.length: ${conversation.length}`);
 
-  await saveConversation(fullConversationId, userId, conversation, agentType);
+  await saveConversation(conversationId, userId, conversation, agentType);
   console.log(`✅ saveConversation completed from streaming handler`);
 } else {
   console.log(`⚠️ No content blocks to save (fullContentBlocks: ${fullContentBlocks})`);
@@ -3842,10 +3840,10 @@ module.exports = async function handler(req, res) {
       const { message, task, conversationId } = req.body;
 
       // Build proper conversation ID
-      const fullConversationId = `grant-cards-${conversationId}`;
+      // Use conversationId as-is (frontend generates UUID)
 
       // Get existing file context
-      let conversationMeta = await getConversationFileContext(fullConversationId);
+      let conversationMeta = await getConversationFileContext(conversationId);
 
       // Process NEW uploaded files
       let newUploadResults = [];
@@ -3860,16 +3858,16 @@ module.exports = async function handler(req, res) {
         }
 
         if (newUploadResults.length > 0) {
-          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(conversationId, newUploadResults);
         }
       }
 
       // Get/create conversation from database
-      let conversation = await getConversation(fullConversationId, userId);
+      let conversation = await getConversation(conversationId, userId);
       if (conversation.length === 0) {
-        console.log(`🆕 Starting new grant-cards conversation: ${fullConversationId}`);
+        console.log(`🆕 Starting new grant-cards conversation: ${conversationId}`);
       } else {
-        console.log(`📜 Loaded grant-cards conversation: ${fullConversationId} (${conversation.length} messages)`);
+        console.log(`📜 Loaded grant-cards conversation: ${conversationId} (${conversation.length} messages)`);
       }
       
       const agentDocs = await loadAgentSpecificKnowledgeBase('grant-cards');
@@ -3920,7 +3918,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to database
-      await saveConversation(fullConversationId, userId, conversation, 'grant-cards');
+      await saveConversation(conversationId, userId, conversation, 'grant-cards');
 
       res.json({
         response: response,
@@ -3957,11 +3955,10 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
       console.log(`🎯 Processing enhanced ETG request for conversation: ${conversationId}`);
 
-      // Build proper conversation ID
-      const fullConversationId = `etg-${conversationId}`;
+      // Use conversationId as-is (frontend generates UUID)
 
       // Get existing file context
-      let conversationMeta = await getConversationFileContext(fullConversationId);
+      let conversationMeta = await getConversationFileContext(conversationId);
       console.log(`📋 ETG Conversation Context: ${conversationMeta.uploadedFiles.length} existing files`);
 
       // Process NEW uploaded files with Files API
@@ -3980,17 +3977,17 @@ Always follow the exact workflows and instructions from the knowledge base docum
         }
 
         if (newUploadResults.length > 0) {
-          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(conversationId, newUploadResults);
           console.log(`✅ Added ${newUploadResults.length} files to ETG conversation context`);
         }
       }
 
       // Get/create conversation from database
-      let conversation = await getConversation(fullConversationId, userId);
+      let conversation = await getConversation(conversationId, userId);
       if (conversation.length === 0) {
-        console.log(`🆕 Starting new ETG conversation: ${fullConversationId}`);
+        console.log(`🆕 Starting new ETG conversation: ${conversationId}`);
       } else {
-        console.log(`📜 Loaded ETG conversation: ${fullConversationId} (${conversation.length} messages)`);
+        console.log(`📜 Loaded ETG conversation: ${conversationId} (${conversation.length} messages)`);
       }
       
       // Enhanced ETG Processing with Tools
@@ -4095,7 +4092,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to database
-      await saveConversation(fullConversationId, userId, conversation, 'etg-writer');
+      await saveConversation(conversationId, userId, conversation, 'etg-writer');
 
       // Strip thinking tags for user display
       const cleanResponse = stripThinkingTags(response);
@@ -4133,11 +4130,10 @@ Always follow the exact workflows and instructions from the knowledge base docum
       console.log(`🌾 Processing BCAFE request for conversation: ${conversationId}`);
       console.log(`📊 Organization type: ${orgType}, Target markets: ${selectedMarkets}`);
 
-      // Build proper conversation ID
-      const fullConversationId = `bcafe-${conversationId}`;
+      // Use conversationId as-is (frontend generates UUID)
 
       // Get existing file context
-      let conversationMeta = await getConversationFileContext(fullConversationId);
+      let conversationMeta = await getConversationFileContext(conversationId);
 
       // Process NEW uploaded files
       let newUploadResults = [];
@@ -4154,16 +4150,16 @@ Always follow the exact workflows and instructions from the knowledge base docum
         }
 
         if (newUploadResults.length > 0) {
-          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(conversationId, newUploadResults);
         }
       }
 
       // Get/create conversation from database
-      let conversation = await getConversation(fullConversationId, userId);
+      let conversation = await getConversation(conversationId, userId);
       if (conversation.length === 0) {
-        console.log(`🆕 Starting new BCAFE conversation: ${fullConversationId}`);
+        console.log(`🆕 Starting new BCAFE conversation: ${conversationId}`);
       } else {
-        console.log(`📜 Loaded BCAFE conversation: ${fullConversationId} (${conversation.length} messages)`);
+        console.log(`📜 Loaded BCAFE conversation: ${conversationId} (${conversation.length} messages)`);
       }
       
       const agentDocs = await loadAgentSpecificKnowledgeBase('bcafe-writer');
@@ -4213,7 +4209,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to database
-      await saveConversation(fullConversationId, userId, conversation, 'bcafe-writer');
+      await saveConversation(conversationId, userId, conversation, 'bcafe-writer');
 
       console.log(`✅ BCAFE response generated successfully`);
 
@@ -4247,11 +4243,10 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
       console.log(`📋 Processing CanExport Claims request for conversation: ${conversationId}`);
 
-      // Build proper conversation ID
-      const fullConversationId = `claims-${conversationId}`;
+      // Use conversationId as-is (frontend generates UUID)
 
       // Get existing file context
-      let conversationMeta = await getConversationFileContext(fullConversationId);
+      let conversationMeta = await getConversationFileContext(conversationId);
 
       // Process NEW uploaded files
       let newUploadResults = [];
@@ -4275,16 +4270,16 @@ Always follow the exact workflows and instructions from the knowledge base docum
         }
 
         if (newUploadResults.length > 0) {
-          conversationMeta = await updateConversationFileContext(fullConversationId, newUploadResults);
+          conversationMeta = await updateConversationFileContext(conversationId, newUploadResults);
         }
       }
 
       // Get/create conversation from database
-      let conversation = await getConversation(fullConversationId, userId);
+      let conversation = await getConversation(conversationId, userId);
       if (conversation.length === 0) {
-        console.log(`🆕 Starting new CanExport Claims conversation: ${fullConversationId}`);
+        console.log(`🆕 Starting new CanExport Claims conversation: ${conversationId}`);
       } else {
-        console.log(`📜 Loaded CanExport Claims conversation: ${fullConversationId} (${conversation.length} messages)`);
+        console.log(`📜 Loaded CanExport Claims conversation: ${conversationId} (${conversation.length} messages)`);
       }
       
       const agentDocs = await loadAgentSpecificKnowledgeBase('canexport-claims');
@@ -4336,7 +4331,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to database
-      await saveConversation(fullConversationId, userId, conversation, 'canexport-claims');
+      await saveConversation(conversationId, userId, conversation, 'canexport-claims');
 
       console.log(`✅ CanExport Claims response generated successfully`);
 

@@ -945,9 +945,7 @@
 
         // Generate unique conversation ID
         function generateConversationId() {
-            const timestamp = Date.now();
-            const random = Math.random().toString(36).substring(2, 15);
-            return `bcafe-${timestamp}-${random}`;
+            return crypto.randomUUID();
         }
 
         // Start a new conversation
