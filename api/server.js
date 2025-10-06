@@ -49,26 +49,46 @@ pool.on('remove', () => {
 });
 
 // Helper function to execute queries with explicit timeout
+// Uses proper client acquisition/release for serverless compatibility
 async function queryWithTimeout(sql, params, timeoutMs = 5000) {
   console.log(`   🔍 queryWithTimeout: Starting query execution...`);
   console.log(`   🔍 Pool state: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
 
-  const queryPromise = pool.query(sql, params);
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => {
-      console.error(`   ⏰ TIMEOUT TRIGGERED after ${timeoutMs}ms`);
-      console.error(`   ⏰ Pool state at timeout: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
-      reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`));
-    }, timeoutMs)
+  let client = null;
+  const clientAcquirePromise = pool.connect();
+  const clientTimeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Client acquisition timeout after ${timeoutMs}ms`)), timeoutMs)
   );
 
   try {
-    const result = await Promise.race([queryPromise, timeoutPromise]);
+    // Acquire client with timeout
+    console.log(`   🔍 Acquiring database client...`);
+    client = await Promise.race([clientAcquirePromise, clientTimeoutPromise]);
+    console.log(`   ✅ Client acquired`);
+
+    // Execute query with timeout
+    console.log(`   🔍 Executing query...`);
+    const queryPromise = client.query(sql, params);
+    const queryTimeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => {
+        console.error(`   ⏰ QUERY TIMEOUT TRIGGERED after ${timeoutMs}ms`);
+        console.error(`   ⏰ Pool state at timeout: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
+        reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`));
+      }, timeoutMs)
+    );
+
+    const result = await Promise.race([queryPromise, queryTimeoutPromise]);
     console.log(`   ✅ Query completed successfully`);
     return result;
   } catch (error) {
     console.error(`   ❌ Query failed:`, error.message);
     throw error;
+  } finally {
+    if (client) {
+      console.log(`   🔌 Releasing client...`);
+      client.release();
+      console.log(`   ✅ Client released`);
+    }
   }
 }
 
