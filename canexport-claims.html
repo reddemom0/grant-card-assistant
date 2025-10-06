@@ -1028,7 +1028,7 @@
         let currentTypingTimeout = null;
         let currentStreamReader = null;
         let currentAbortController = null;
-        let conversationId = generateConversationId();
+        let conversationId = null; // Will be initialized from localStorage or generated
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
@@ -1036,6 +1036,85 @@
         // Generate unique conversation ID
         function generateConversationId() {
             return crypto.randomUUID();
+        }
+
+        // Initialize conversation ID from localStorage or generate new one
+        function initializeConversationId() {
+            const stored = localStorage.getItem('canexport-conversation-id');
+            if (stored) {
+                console.log('📂 Restored conversationId from localStorage:', stored);
+                conversationId = stored;
+                return stored;
+            }
+
+            conversationId = generateConversationId();
+            localStorage.setItem('canexport-conversation-id', conversationId);
+            console.log('🆕 Generated new conversationId:', conversationId);
+            return conversationId;
+        }
+
+        // Load conversation history from backend
+        async function loadConversationHistory() {
+            if (!conversationId) return null;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/conversation/${conversationId}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.warn('⚠️ Unauthorized - user not logged in');
+                        return null;
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log('✅ Loaded conversation:', data.messageCount, 'messages');
+                return data;
+            } catch (error) {
+                console.error('❌ Failed to load conversation:', error);
+                return null;
+            }
+        }
+
+        // Restore conversation UI from loaded data
+        function restoreConversationUI(conversationData) {
+            if (!conversationData || !conversationData.messages || conversationData.messages.length === 0) {
+                return;
+            }
+
+            console.log('🔄 Restoring', conversationData.messages.length, 'messages to UI');
+
+            // Hide welcome screen, show chat
+            const welcomeSection = document.getElementById('welcome-section');
+            const chatContainer = document.getElementById('chat-container');
+            if (welcomeSection) welcomeSection.style.display = 'none';
+            if (chatContainer) chatContainer.classList.add('active');
+
+            // Render each message
+            conversationData.messages.forEach(msg => {
+                let content = '';
+
+                // Extract text content from content blocks
+                if (Array.isArray(msg.content)) {
+                    msg.content.forEach(block => {
+                        if (block.type === 'text') {
+                            content += block.text;
+                        }
+                    });
+                } else if (typeof msg.content === 'string') {
+                    content = msg.content;
+                }
+
+                if (content) {
+                    addMessage(msg.role, content);
+                }
+            });
+
+            hasStartedConversation = true;
+            console.log('✅ Conversation restored successfully');
         }
 
         // ✅ Stop Generation Function
@@ -1489,9 +1568,16 @@ async function handleStreamingResponse(response, messageDiv) {
         }
 
         // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             console.log('DOM loaded, initializing CanExport Claims interface...');
-            
+
+            // Initialize conversation ID and load history
+            initializeConversationId();
+            const conversationData = await loadConversationHistory();
+            if (conversationData) {
+                restoreConversationUI(conversationData);
+            }
+
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             const fileInput = document.getElementById('file-input');

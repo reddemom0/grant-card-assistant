@@ -938,7 +938,7 @@
         let selectedMarkets = [];
         let currentStreamReader = null;
         let currentAbortController = null;
-        let conversationId = generateConversationId();
+        let conversationId = null; // Will be initialized from localStorage or generated
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
@@ -948,11 +948,83 @@
             return crypto.randomUUID();
         }
 
+        // Initialize or restore conversation ID
+        function initializeConversationId() {
+            const stored = localStorage.getItem('bcafe-conversation-id');
+            if (stored) {
+                console.log('📂 Restored conversationId from localStorage:', stored);
+                conversationId = stored;
+                return stored;
+            }
+            conversationId = generateConversationId();
+            localStorage.setItem('bcafe-conversation-id', conversationId);
+            console.log('🆕 Generated new conversationId:', conversationId);
+            return conversationId;
+        }
+
+        // Load conversation history from backend
+        async function loadConversationHistory() {
+            if (!conversationId) return null;
+            try {
+                console.log('📥 Loading conversation history:', conversationId);
+                const response = await fetch(`${API_BASE}/api/conversation/${conversationId}`, {
+                    credentials: 'include'
+                });
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.warn('⚠️ Unauthorized - user not logged in');
+                        return null;
+                    }
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('✅ Loaded conversation:', data.messageCount, 'messages');
+                return data;
+            } catch (error) {
+                console.error('❌ Failed to load conversation:', error);
+                return null;
+            }
+        }
+
+        // Restore conversation UI from loaded data
+        function restoreConversationUI(conversationData) {
+            if (!conversationData || !conversationData.messages || conversationData.messages.length === 0) {
+                console.log('📭 No conversation history to restore');
+                return;
+            }
+            console.log('🔄 Restoring conversation UI...');
+            const welcomeSection = document.getElementById('welcome-section');
+            const chatContainer = document.getElementById('chat-container');
+            const container = document.querySelector('.container');
+            if (welcomeSection) welcomeSection.style.display = 'none';
+            if (chatContainer) chatContainer.classList.add('active');
+            if (container) container.classList.add('chat-active');
+            conversationData.messages.forEach(msg => {
+                const role = msg.role;
+                let content = '';
+                if (Array.isArray(msg.content)) {
+                    msg.content.forEach(block => {
+                        if (block.type === 'text') {
+                            content += block.text;
+                        }
+                    });
+                } else if (typeof msg.content === 'string') {
+                    content = msg.content;
+                }
+                if (content) {
+                    addMessage(role, content);
+                }
+            });
+            hasStartedConversation = true;
+            console.log('✅ Conversation restored:', conversationData.messageCount, 'messages');
+        }
+
         // Start a new conversation
         function startNewConversation() {
             if (confirm('Start a new conversation? This will clear the current chat.')) {
                 // Generate new conversation ID
                 conversationId = generateConversationId();
+                localStorage.setItem('bcafe-conversation-id', conversationId);
                 console.log('New conversation started:', conversationId);
 
                 // Clear the chat UI
@@ -1387,9 +1459,16 @@ async function handleStreamingResponse(response, messageDiv) {
         }
 
         // Initialize when DOM is ready
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             console.log('DOM loaded, initializing BCAFE interface...');
-            
+
+            // Initialize conversation ID and load history
+            initializeConversationId();
+            const conversationData = await loadConversationHistory();
+            if (conversationData) {
+                restoreConversationUI(conversationData);
+            }
+
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
             const fileInput = document.getElementById('file-input');
