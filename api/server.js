@@ -173,7 +173,7 @@ function isAuthenticated(req) {
 }
 
 // Extract user ID from JWT token (for database queries)
-async function getUserIdFromJWT(req) {
+function getUserIdFromJWT(req) {
   const cookies = req.headers.cookie || '';
   const tokenMatch = cookies.match(/granted_session=([^;]+)/);
 
@@ -186,26 +186,15 @@ async function getUserIdFromJWT(req) {
     const token = tokenMatch[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    // The token contains googleId from OAuth
-    const googleId = decoded.googleId || decoded.id;
+    // The token contains userId (database UUID) from auth-callback.js
+    const userId = decoded.userId;
 
-    if (!googleId) {
-      console.error('JWT token missing googleId field');
+    if (!userId) {
+      console.error('JWT token missing userId field');
       return null;
     }
 
-    // Look up user UUID in database by google_id
-    const result = await pool.query(
-      'SELECT id FROM users WHERE google_id = $1',
-      [googleId]
-    );
-
-    if (result.rows.length === 0) {
-      console.error(`User not found in database for googleId: ${googleId}`);
-      return null;
-    }
-
-    return result.rows[0].id;
+    return userId;
   } catch (error) {
     console.error('getUserIdFromJWT error:', error.message);
     return null;
@@ -3262,7 +3251,7 @@ async function handleStreamingRequest(req, res, agentType) {
   const startTime = Date.now();
 
   // Get user ID from JWT token
-  const userId = await getUserIdFromJWT(req);
+  const userId = getUserIdFromJWT(req);
   if (!userId) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized - invalid or missing authentication' }));
@@ -3690,7 +3679,7 @@ module.exports = async function handler(req, res) {
     
     // Context status endpoint
     if (url === '/api/context-status' && method === 'GET') {
-      const userId = await getUserIdFromJWT(req);
+      const userId = getUserIdFromJWT(req);
       if (!userId) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -3798,7 +3787,7 @@ module.exports = async function handler(req, res) {
       const startTime = Date.now();
 
       // Get user ID from JWT token
-      const userId = await getUserIdFromJWT(req);
+      const userId = getUserIdFromJWT(req);
       if (!userId) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -3912,7 +3901,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       const startTime = Date.now();
 
       // Get user ID from JWT token
-      const userId = await getUserIdFromJWT(req);
+      const userId = getUserIdFromJWT(req);
       if (!userId) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -4087,7 +4076,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
     // BCAFE endpoint
     if (url === '/api/process-bcafe' && method === 'POST') {
       // Get user ID from JWT token
-      const userId = await getUserIdFromJWT(req);
+      const userId = getUserIdFromJWT(req);
       if (!userId) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -4202,7 +4191,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       const startTime = Date.now();
 
       // Get user ID from JWT token
-      const userId = await getUserIdFromJWT(req);
+      const userId = getUserIdFromJWT(req);
       if (!userId) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -4327,7 +4316,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
     
     // Get conversation history
     if (url.startsWith('/api/conversation/') && method === 'GET') {
-      const userId = await getUserIdFromJWT(req);
+      const userId = getUserIdFromJWT(req);
       if (!userId) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
@@ -4342,7 +4331,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
     // Clear conversation
     if (url.startsWith('/api/conversation/') && method === 'DELETE') {
-      const userId = await getUserIdFromJWT(req);
+      const userId = getUserIdFromJWT(req);
       if (!userId) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));

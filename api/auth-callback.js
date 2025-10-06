@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
     // Set HTTP-only cookie
     res.setHeader('Set-Cookie',
-      `auth_token=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+      `granted_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
     );
 
     // Redirect to dashboard with user info in URL hash (temporary display only)
