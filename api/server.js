@@ -50,11 +50,26 @@ pool.on('remove', () => {
 
 // Helper function to execute queries with explicit timeout
 async function queryWithTimeout(sql, params, timeoutMs = 5000) {
+  console.log(`   🔍 queryWithTimeout: Starting query execution...`);
+  console.log(`   🔍 Pool state: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
+
   const queryPromise = pool.query(sql, params);
   const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`)), timeoutMs)
+    setTimeout(() => {
+      console.error(`   ⏰ TIMEOUT TRIGGERED after ${timeoutMs}ms`);
+      console.error(`   ⏰ Pool state at timeout: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
+      reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`));
+    }, timeoutMs)
   );
-  return Promise.race([queryPromise, timeoutPromise]);
+
+  try {
+    const result = await Promise.race([queryPromise, timeoutPromise]);
+    console.log(`   ✅ Query completed successfully`);
+    return result;
+  } catch (error) {
+    console.error(`   ❌ Query failed:`, error.message);
+    throw error;
+  }
 }
 
 // PDF text extraction (not base64, just text extraction)
