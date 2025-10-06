@@ -48,6 +48,15 @@ pool.on('remove', () => {
   console.log('🔌 Pool client removed');
 });
 
+// Helper function to execute queries with explicit timeout
+async function queryWithTimeout(sql, params, timeoutMs = 5000) {
+  const queryPromise = pool.query(sql, params);
+  const timeoutPromise = new Promise((_, reject) =>
+    setTimeout(() => reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`)), timeoutMs)
+  );
+  return Promise.race([queryPromise, timeoutPromise]);
+}
+
 // PDF text extraction (not base64, just text extraction)
 async function extractPDFText(buffer) {
   try {
@@ -595,9 +604,10 @@ function safeStringify(obj, label = 'object') {
 async function getConversation(conversationId, userId) {
   try {
     // Verify conversation belongs to user
-    const convCheck = await pool.query(
+    const convCheck = await queryWithTimeout(
       'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
-      [conversationId, userId]
+      [conversationId, userId],
+      5000
     );
 
     if (convCheck.rows.length === 0) {
@@ -606,9 +616,10 @@ async function getConversation(conversationId, userId) {
     }
 
     // Load messages in chronological order
-    const result = await pool.query(
+    const result = await queryWithTimeout(
       'SELECT role, content FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
-      [conversationId]
+      [conversationId],
+      5000
     );
 
     console.log(`✅ Loaded conversation ${conversationId}: ${result.rows.length} messages`);
@@ -637,9 +648,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
     let convCheck;
     try {
-      convCheck = await pool.query(
+      console.log(`   Executing with 5 second timeout...`);
+      convCheck = await queryWithTimeout(
         'SELECT id FROM conversations WHERE id = $1',
-        [conversationId]
+        [conversationId],
+        5000
       );
       console.log(`✅ Conversation check query completed`);
       console.log(`   Result rows: ${convCheck.rows.length}`);
@@ -676,9 +689,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       console.log(`   Params: [${conversationId}, ${userId}, ${agentType}, "${title.substring(0, 30)}..."]`);
 
       try {
-        const insertResult = await pool.query(
+        console.log(`   Executing INSERT with 5 second timeout...`);
+        const insertResult = await queryWithTimeout(
           'INSERT INTO conversations (id, user_id, agent_type, title) VALUES ($1, $2, $3, $4) RETURNING *',
-          [conversationId, userId, agentType, title]
+          [conversationId, userId, agentType, title],
+          5000
         );
         console.log(`✅ Conversation created successfully`);
         console.log(`   Created record:`, insertResult.rows[0]);
@@ -706,9 +721,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
     let countResult;
     try {
-      countResult = await pool.query(
+      console.log(`   Executing COUNT with 5 second timeout...`);
+      countResult = await queryWithTimeout(
         'SELECT COUNT(*) FROM messages WHERE conversation_id = $1',
-        [conversationId]
+        [conversationId],
+        5000
       );
       const existingCount = parseInt(countResult.rows[0].count);
       console.log(`✅ Message count query completed: ${existingCount} existing messages`);
@@ -752,16 +769,12 @@ async function saveConversation(conversationId, userId, conversation, agentType)
           console.log(`     content length: ${content.length} bytes`);
 
           try {
-            console.log(`     Executing INSERT with 8 second timeout...`);
-            const insertPromise = pool.query(
+            console.log(`     Executing INSERT with 5 second timeout...`);
+            const msgResult = await queryWithTimeout(
               'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id',
-              [conversationId, msg.role, content]
+              [conversationId, msg.role, content],
+              5000
             );
-            const timeoutPromise = new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Message INSERT timeout after 8 seconds')), 8000)
-            );
-
-            const msgResult = await Promise.race([insertPromise, timeoutPromise]);
             console.log(`     ✅ Message inserted with id: ${msgResult.rows[0].id}`);
           } catch (msgError) {
             console.error(`     ❌ Message insert FAILED:`, msgError);
@@ -800,9 +813,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     console.log(`   Params: [${conversationId}]`);
 
     try {
-      await pool.query(
+      console.log(`   Executing UPDATE with 5 second timeout...`);
+      await queryWithTimeout(
         'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-        [conversationId]
+        [conversationId],
+        5000
       );
       console.log(`✅ Timestamp updated`);
     } catch (updateError) {
