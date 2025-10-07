@@ -1082,6 +1082,7 @@
             }
 
             console.log('🔄 Restoring conversation UI...');
+            console.log('🔍 DEBUG: Raw conversation data:', JSON.stringify(conversationData, null, 2));
 
             // Hide welcome, show chat
             const welcomeSection = document.getElementById('welcome-section');
@@ -1093,7 +1094,14 @@
             if (container) container.classList.add('chat-active');
 
             // Render each message
-            conversationData.messages.forEach(msg => {
+            conversationData.messages.forEach((msg, index) => {
+                console.log(`🔍 DEBUG: Message ${index}:`, {
+                    role: msg.role,
+                    contentType: typeof msg.content,
+                    isArray: Array.isArray(msg.content),
+                    contentPreview: typeof msg.content === 'string' ? msg.content.substring(0, 200) : JSON.stringify(msg.content).substring(0, 200)
+                });
+
                 const role = msg.role;
                 let content = '';
 
@@ -1109,6 +1117,8 @@
                 } else if (typeof msg.content === 'string') {
                     content = msg.content;
                 }
+
+                console.log(`🔍 DEBUG: Extracted content for message ${index}:`, content.substring(0, 200));
 
                 if (content) {
                     addMessage(role, content);
