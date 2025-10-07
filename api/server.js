@@ -88,9 +88,8 @@ async function queryWithTimeout(sql, params, timeoutMs = 8000) {
     const queryPromise = client.query(sql, params);
     const queryTimeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
-        console.error(`   ⏰ QUERY TIMEOUT TRIGGERED after ${timeoutMs}ms`);
-        console.error(`   ⏰ Pool state at timeout: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
-        reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`));
+        // Timeout - will be caught and handled by caller
+        reject(new Error(`Query timeout after ${timeoutMs}ms`));
       }, timeoutMs);
     });
 
@@ -740,8 +739,20 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
 
     // Add conversation ID to user's set for sidebar listing
-    await redis.sadd(`user:${userId}:conversations`, conversationId);
-    console.log(`✅ Added conversation to user set: user:${userId}:conversations`);
+    try {
+      await redis.sadd(`user:${userId}:conversations`, conversationId);
+      console.log(`✅ Added conversation to user set: user:${userId}:conversations`);
+    } catch (setError) {
+      // If key exists as wrong type, delete and retry
+      if (setError.message.includes('WRONGTYPE')) {
+        console.warn(`⚠️  Deleting corrupted Redis key: user:${userId}:conversations`);
+        await redis.del(`user:${userId}:conversations`);
+        await redis.sadd(`user:${userId}:conversations`, conversationId);
+        console.log(`✅ Added conversation to user set (after cleanup): user:${userId}:conversations`);
+      } else {
+        throw setError;
+      }
+    }
   } catch (redisError) {
     console.error(`❌ Redis save failed:`, redisError.message);
     // Continue to try PostgreSQL even if Redis fails
@@ -3835,8 +3846,19 @@ module.exports = async function handler(req, res) {
         // Try to get from user-specific Redis set first
         console.log(`🔍 Loading conversations from Redis set for user: ${userId}`);
 
-        const convIds = await redis.smembers(`user:${userId}:conversations`);
-        console.log(`🔍 Found ${convIds.length} conversation IDs in Redis set`);
+        let convIds = [];
+        try {
+          convIds = await redis.smembers(`user:${userId}:conversations`);
+          console.log(`🔍 Found ${convIds.length} conversation IDs in Redis set`);
+        } catch (redisSetError) {
+          // If key exists as wrong type, delete and return empty (will fall back to PostgreSQL)
+          if (redisSetError.message.includes('WRONGTYPE')) {
+            console.warn(`⚠️  Deleting corrupted Redis key: user:${userId}:conversations`);
+            await redis.del(`user:${userId}:conversations`);
+            throw new Error('Redis set corrupted, cleaned up - falling back to PostgreSQL');
+          }
+          throw redisSetError;
+        }
 
         // Load each conversation's metadata
         for (const convId of convIds) {
