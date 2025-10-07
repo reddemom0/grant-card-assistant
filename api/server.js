@@ -676,6 +676,29 @@ function safeStringify(obj, label = 'object') {
 
 // Hybrid persistence: Redis for active conversations, PostgreSQL for long-term storage
 // Load conversation messages from Redis (fast, for active conversations)
+// Helper function to normalize message content for frontend display
+function normalizeMessageContent(message) {
+  const normalized = { ...message };
+
+  // If content is an array (Claude API format), extract text
+  if (Array.isArray(message.content)) {
+    let textContent = '';
+    message.content.forEach(block => {
+      if (block.type === 'text' && block.text) {
+        textContent += block.text;
+      }
+      // Skip thinking blocks and other non-text content
+    });
+    normalized.content = textContent;
+  }
+  // If content is already a string, return as-is
+  else if (typeof message.content === 'string') {
+    normalized.content = message.content;
+  }
+
+  return normalized;
+}
+
 async function getConversation(conversationId, userId) {
   let data = null;
   try {
@@ -683,7 +706,8 @@ async function getConversation(conversationId, userId) {
     data = await redis.get(`conv:${conversationId}`);
     if (data && Array.isArray(data)) {
       console.log(`✅ Loaded conversation from Redis ${conversationId}: ${data.length} messages`);
-      return data;
+      // Normalize content for frontend
+      return data.map(normalizeMessageContent);
     }
 
     // Fallback to PostgreSQL (archived conversations)
@@ -705,13 +729,16 @@ async function getConversation(conversationId, userId) {
 
     console.log(`✅ Loaded conversation from PostgreSQL ${conversationId}: ${result.rows.length} messages`);
 
+    // Normalize content for frontend
+    const normalizedMessages = result.rows.map(normalizeMessageContent);
+
     // Restore to Redis for faster subsequent access
-    if (result.rows.length > 0) {
-      await redis.set(`conv:${conversationId}`, result.rows, { ex: 86400 }); // 24 hour TTL
+    if (normalizedMessages.length > 0) {
+      await redis.set(`conv:${conversationId}`, normalizedMessages, { ex: 86400 }); // 24 hour TTL
       console.log(`✅ Restored conversation to Redis`);
     }
 
-    return result.rows;
+    return normalizedMessages;
   } catch (error) {
     console.error(`❌ Error loading conversation ${conversationId}:`, error);
 
@@ -3827,7 +3854,7 @@ module.exports = async function handler(req, res) {
     }
 
     // GET all conversations for user endpoint
-    if (url === '/api/conversations' && method === 'GET') {
+    if (url.startsWith('/api/conversations') && method === 'GET') {
       const userId = getUserIdFromJWT(req);
 
       if (!userId) {
@@ -3835,7 +3862,12 @@ module.exports = async function handler(req, res) {
         return;
       }
 
-      console.log(`📚 Loading all conversations for user: ${userId}`);
+      // Parse query parameters for filtering
+      const urlParts = url.split('?');
+      const queryParams = new URLSearchParams(urlParts[1] || '');
+      const agentTypeFilter = queryParams.get('agent_type');
+
+      console.log(`📚 Loading conversations for user: ${userId}${agentTypeFilter ? `, agent: ${agentTypeFilter}` : ''}`);
 
       // STRATEGY: Load from Redis user-specific set
       // Redis key: user:{userId}:conversations (sorted set with scores as timestamps)
@@ -3922,28 +3954,34 @@ module.exports = async function handler(req, res) {
           }
         }
 
-        // Sort by most recent (we'll use creation time, but ideally track update time)
-        conversations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        // Filter by agent type if specified
+        let filteredConversations = conversations;
+        if (agentTypeFilter) {
+          filteredConversations = conversations.filter(conv => conv.agentType === agentTypeFilter);
+          console.log(`🔍 Filtered to ${filteredConversations.length} conversations for agent: ${agentTypeFilter}`);
+        }
 
-        console.log(`✅ Loaded ${conversations.length} conversations from Redis`);
+        // Sort by most recent (we'll use creation time, but ideally track update time)
+        filteredConversations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        console.log(`✅ Loaded ${filteredConversations.length} conversations from Redis`);
 
         // If all conversations were corrupted/deleted, fall back to PostgreSQL
-        if (convIds.length > 0 && conversations.length === 0) {
+        if (convIds.length > 0 && filteredConversations.length === 0 && !agentTypeFilter) {
           console.log(`🔄 All ${convIds.length} Redis conversations cleaned up, loading from PostgreSQL`);
           throw new Error('Redis conversations cleaned up - falling back to PostgreSQL');
         }
 
         res.json({
           success: true,
-          conversations: conversations.slice(0, 100),
-          count: conversations.length
+          conversations: filteredConversations.slice(0, 100),
+          count: filteredConversations.length
         });
       } catch (error) {
         // Expected for cleanup scenarios - not an actual error
         console.log(`📊 ${error.message}, loading from PostgreSQL...`);
         try {
-          const result = await queryWithTimeout(
-            `SELECT
+          let query = `SELECT
               c.id,
               c.agent_type,
               c.title,
@@ -3952,13 +3990,20 @@ module.exports = async function handler(req, res) {
               COUNT(m.id) as message_count
             FROM conversations c
             LEFT JOIN messages m ON c.id = m.conversation_id
-            WHERE c.user_id = $1
-            GROUP BY c.id
+            WHERE c.user_id = $1`;
+
+          const params = [userId];
+
+          if (agentTypeFilter) {
+            query += ` AND c.agent_type = $2`;
+            params.push(agentTypeFilter);
+          }
+
+          query += ` GROUP BY c.id
             ORDER BY c.updated_at DESC
-            LIMIT 100`,
-            [userId],
-            5000
-          );
+            LIMIT 100`;
+
+          const result = await queryWithTimeout(query, params, 5000);
 
           const conversations = result.rows.map(row => ({
             id: row.id,
