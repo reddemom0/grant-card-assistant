@@ -3792,6 +3792,123 @@ module.exports = async function handler(req, res) {
       return;
     }
 
+    // GET all conversations for user endpoint
+    if (url === '/api/conversations' && method === 'GET') {
+      const userId = getUserIdFromJWT(req);
+
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      console.log(`📚 Loading all conversations for user: ${userId}`);
+
+      try {
+        // Query PostgreSQL for all conversations for this user
+        const result = await queryWithTimeout(
+          `SELECT
+            c.id,
+            c.agent_type,
+            c.title,
+            c.created_at,
+            c.updated_at,
+            COUNT(m.id) as message_count
+          FROM conversations c
+          LEFT JOIN messages m ON c.id = m.conversation_id
+          WHERE c.user_id = $1
+          GROUP BY c.id
+          ORDER BY c.updated_at DESC
+          LIMIT 100`,
+          [userId],
+          5000
+        );
+
+        const conversations = result.rows.map(row => ({
+          id: row.id,
+          agentType: row.agent_type,
+          title: row.title || 'Untitled Conversation',
+          messageCount: parseInt(row.message_count) || 0,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at
+        }));
+
+        console.log(`✅ Found ${conversations.length} conversations for user ${userId}`);
+
+        res.json({
+          success: true,
+          conversations: conversations,
+          count: conversations.length
+        });
+      } catch (error) {
+        console.error(`❌ Error loading conversations list:`, error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to load conversations',
+          error: error.message
+        });
+      }
+      return;
+    }
+
+    // DELETE conversation endpoint
+    if (url.startsWith('/api/conversation/') && method === 'DELETE') {
+      const conversationId = url.split('/api/conversation/')[1];
+      const userId = getUserIdFromJWT(req);
+
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'Unauthorized' });
+        return;
+      }
+
+      if (!conversationId) {
+        res.status(400).json({ success: false, message: 'Missing conversationId' });
+        return;
+      }
+
+      console.log(`🗑️  Deleting conversation: ${conversationId} for user: ${userId}`);
+
+      try {
+        // Delete from Redis first
+        try {
+          await redis.del(`conv:${conversationId}`);
+          console.log(`✅ Conversation deleted from Redis`);
+        } catch (redisError) {
+          console.warn(`⚠️ Redis delete failed:`, redisError.message);
+        }
+
+        // Delete from PostgreSQL (CASCADE will delete messages too)
+        const result = await queryWithTimeout(
+          'DELETE FROM conversations WHERE id = $1 AND user_id = $2 RETURNING id',
+          [conversationId, userId],
+          5000
+        );
+
+        if (result.rows.length === 0) {
+          res.status(404).json({
+            success: false,
+            message: 'Conversation not found or unauthorized'
+          });
+          return;
+        }
+
+        console.log(`✅ Conversation deleted from PostgreSQL`);
+
+        res.json({
+          success: true,
+          message: 'Conversation deleted successfully',
+          deletedId: conversationId
+        });
+      } catch (error) {
+        console.error(`❌ Error deleting conversation:`, error);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to delete conversation',
+          error: error.message
+        });
+      }
+      return;
+    }
+
     // Login endpoint
     if (url === '/api/login' && method === 'POST') {
       try {
