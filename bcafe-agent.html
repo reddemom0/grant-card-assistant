@@ -1934,7 +1934,7 @@ async function handleStreamingResponse(response, messageDiv) {
         // Auth check - redirect to login if not authenticated
         function checkAuth() {
             const cookies = document.cookie.split(';');
-            const authToken = cookies.find(c => c.trim().startsWith('auth_token='));
+            const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
 
             if (!authToken) {
                 console.log('No auth token found, redirecting to login...');
@@ -1948,7 +1948,7 @@ async function handleStreamingResponse(response, messageDiv) {
         // Get user info from JWT token
         function getUserInfo() {
             const cookies = document.cookie.split(';');
-            const authCookie = cookies.find(c => c.trim().startsWith('auth_token='));
+            const authCookie = cookies.find(c => c.trim().startsWith('granted_session='));
 
             if (!authCookie) return null;
 
@@ -1989,7 +1989,7 @@ async function handleStreamingResponse(response, messageDiv) {
                 console.error('Logout request failed:', e);
             }
             // Clear cookie and redirect
-            document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            document.cookie = 'granted_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
             window.location.href = '/';
         }
 

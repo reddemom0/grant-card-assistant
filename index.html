@@ -863,7 +863,7 @@
         // Check authentication on page load
         async function checkAuth() {
             const cookies = document.cookie.split(';');
-            const authToken = cookies.find(c => c.trim().startsWith('auth_token='));
+            const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
 
             if (authToken) {
                 // User is authenticated, redirect to dashboard
