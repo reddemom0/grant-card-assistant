@@ -1761,6 +1761,12 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 uploadedFiles = [];
                 resetInputBox();
                 currentAbortController = null;
+
+                // Refresh sidebar if it's open (to show new conversation)
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && sidebar.classList.contains('open')) {
+                    loadConversationsList();
+                }
             }
         }
 
@@ -1815,6 +1821,12 @@ await handleStreamingResponse(response, streamingMessageDiv);
                     messageInput.style.height = '44px';
                 }
                 currentAbortController = null;
+
+                // Refresh sidebar if it's open (to show new conversation)
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && sidebar.classList.contains('open')) {
+                    loadConversationsList();
+                }
             }
         }
 

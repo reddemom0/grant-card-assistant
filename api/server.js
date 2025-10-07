@@ -772,14 +772,31 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     if (convCheck.rows.length === 0) {
       console.log(`\n🔍 STEP 2: Creating new conversation`);
 
-      // Generate title
+      // Generate title from first user message
       let title = 'New Conversation';
       const firstUserMsg = conversation.find(m => m.role === 'user');
       if (firstUserMsg) {
-        const content = typeof firstUserMsg.content === 'string'
-          ? firstUserMsg.content
-          : JSON.stringify(firstUserMsg.content);
-        title = content.substring(0, 100);
+        let content = '';
+
+        // Extract text from content (handle both string and array formats)
+        if (typeof firstUserMsg.content === 'string') {
+          content = firstUserMsg.content;
+        } else if (Array.isArray(firstUserMsg.content)) {
+          // Extract text blocks only (skip thinking blocks)
+          firstUserMsg.content.forEach(block => {
+            if (block.type === 'text' && block.text) {
+              content += block.text;
+            }
+          });
+        } else if (typeof firstUserMsg.content === 'object' && firstUserMsg.content.text) {
+          // Handle single text object
+          content = firstUserMsg.content.text;
+        }
+
+        // Clean up and truncate
+        if (content) {
+          title = content.trim().substring(0, 100);
+        }
       }
 
       console.log(`   Title: "${title.substring(0, 50)}..."`);
