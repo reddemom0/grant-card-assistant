@@ -946,6 +946,44 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       throw updateError;
     }
 
+    // Generate smart title after first exchange (user + assistant messages)
+    if (conversation.length >= 2) {
+      const hasUserMessage = conversation.some(m => m.role === 'user');
+      const hasAssistantMessage = conversation.some(m => m.role === 'assistant');
+
+      if (hasUserMessage && hasAssistantMessage) {
+        // Check if title is still default or just first message
+        const currentTitleResult = await queryWithTimeout(
+          'SELECT title FROM conversations WHERE id = $1',
+          [conversationId],
+          2000
+        );
+
+        if (currentTitleResult.rows.length > 0) {
+          const currentTitle = currentTitleResult.rows[0].title;
+
+          // Only generate new title if current one is generic or very long
+          if (currentTitle === 'New Conversation' || currentTitle.length > 50) {
+            console.log(`\n🔍 STEP 6: Generating smart conversation title`);
+            try {
+              const smartTitle = await generateConversationTitle(conversation);
+              if (smartTitle) {
+                await queryWithTimeout(
+                  'UPDATE conversations SET title = $1 WHERE id = $2',
+                  [smartTitle, conversationId],
+                  2000
+                );
+                console.log(`✅ Smart title generated: "${smartTitle}"`);
+              }
+            } catch (titleError) {
+              console.error(`⚠️  Title generation failed (non-fatal):`, titleError.message);
+              // Don't throw - this is optional enhancement
+            }
+          }
+        }
+      }
+    }
+
     console.log(`\n========== saveConversation SUCCESS ==========\n`);
 
   } catch (error) {
@@ -956,6 +994,59 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     console.error(`⚠️  Conversation IS saved in Redis, PostgreSQL archival failed`);
     console.error(`========== saveConversation END ==========\n`);
     // Don't throw - Redis save succeeded, PostgreSQL is optional
+  }
+}
+
+// Generate a smart conversation title using Claude API
+async function generateConversationTitle(conversation) {
+  try {
+    // Extract first user message and first assistant response
+    const firstUserMsg = conversation.find(m => m.role === 'user');
+    const firstAssistantMsg = conversation.find(m => m.role === 'assistant');
+
+    if (!firstUserMsg) return null;
+
+    // Extract text content from messages
+    const extractText = (msg) => {
+      if (typeof msg.content === 'string') return msg.content;
+      if (Array.isArray(msg.content)) {
+        return msg.content
+          .filter(block => block.type === 'text')
+          .map(block => block.text)
+          .join(' ');
+      }
+      return '';
+    };
+
+    const userText = extractText(firstUserMsg).substring(0, 200);
+    const assistantText = firstAssistantMsg ? extractText(firstAssistantMsg).substring(0, 200) : '';
+
+    // Use Claude to generate a concise title
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 50,
+      messages: [{
+        role: 'user',
+        content: `Generate a concise 3-5 word title for this conversation:
+
+User: ${userText}
+${assistantText ? `Assistant: ${assistantText}` : ''}
+
+Title should capture the main topic. Reply with just the title, no quotes or punctuation.`
+      }]
+    });
+
+    const title = response.content[0].text.trim();
+
+    // Validate and clean title
+    if (title && title.length > 0 && title.length <= 60) {
+      return title;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error generating conversation title:', error);
+    return null;
   }
 }
 
