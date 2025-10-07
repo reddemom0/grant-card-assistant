@@ -749,16 +749,18 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       if (textBlock?.text) title = textBlock.text.substring(0, 100);
     }
 
+    const now = new Date().toISOString();
     const convMetadata = {
       id: conversationId,
       agentType,
       title,
       messageCount: conversation.length,
-      updatedAt: new Date().toISOString()
+      createdAt: now,  // Add timestamp for new conversations
+      updatedAt: now
     };
 
     await redis.hset(`user:${userId}:conversations`, conversationId, JSON.stringify(convMetadata));
-    console.log(`✅ Updated user conversation index in Redis`);
+    console.log(`✅ Updated user conversation index in Redis for conversation: ${conversationId}`);
   } catch (redisError) {
     console.error(`❌ Redis save failed:`, redisError.message);
     // Continue to try PostgreSQL even if Redis fails
@@ -3936,9 +3938,10 @@ module.exports = async function handler(req, res) {
 
       console.log(`📚 Loading all conversations for user: ${userId}`);
 
-      let conversations = [];
+      let pgConversations = [];
+      let redisConversations = [];
 
-      // Try PostgreSQL first
+      // Load from PostgreSQL (may be incomplete or stale)
       try {
         const result = await queryWithTimeout(
           `SELECT
@@ -3958,7 +3961,7 @@ module.exports = async function handler(req, res) {
           3000  // Short timeout - fail fast
         );
 
-        conversations = result.rows.map(row => ({
+        pgConversations = result.rows.map(row => ({
           id: row.id,
           agentType: row.agent_type,
           title: row.title || 'Untitled Conversation',
@@ -3967,28 +3970,43 @@ module.exports = async function handler(req, res) {
           updatedAt: row.updated_at
         }));
 
-        console.log(`✅ Found ${conversations.length} conversations from PostgreSQL`);
-
+        console.log(`✅ Found ${pgConversations.length} conversations from PostgreSQL`);
       } catch (pgError) {
-        console.warn(`⚠️  PostgreSQL query failed, falling back to Redis:`, pgError.message);
-
-        // Fallback to Redis index
-        try {
-          const redisData = await redis.hgetall(`user:${userId}:conversations`);
-          console.log(`📦 Redis conversation index:`, Object.keys(redisData || {}).length, 'conversations');
-
-          if (redisData && Object.keys(redisData).length > 0) {
-            conversations = Object.values(redisData)
-              .map(json => JSON.parse(json))
-              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-              .slice(0, 100);
-
-            console.log(`✅ Loaded ${conversations.length} conversations from Redis`);
-          }
-        } catch (redisError) {
-          console.error(`❌ Redis fallback failed:`, redisError.message);
-        }
+        console.warn(`⚠️  PostgreSQL query failed:`, pgError.message);
       }
+
+      // Always check Redis for latest conversations
+      try {
+        const redisData = await redis.hgetall(`user:${userId}:conversations`);
+        console.log(`📦 Redis conversation index:`, Object.keys(redisData || {}).length, 'conversations');
+
+        if (redisData && Object.keys(redisData).length > 0) {
+          redisConversations = Object.values(redisData).map(json => JSON.parse(json));
+          console.log(`✅ Loaded ${redisConversations.length} conversations from Redis index`);
+        }
+      } catch (redisError) {
+        console.error(`❌ Redis index load failed:`, redisError.message);
+      }
+
+      // Merge: Redis takes precedence (most up-to-date), PostgreSQL fills gaps
+      const conversationMap = new Map();
+
+      // Add PostgreSQL conversations first
+      pgConversations.forEach(conv => {
+        conversationMap.set(conv.id, conv);
+      });
+
+      // Override/add with Redis conversations (newer)
+      redisConversations.forEach(conv => {
+        conversationMap.set(conv.id, conv);
+      });
+
+      // Convert to array and sort by updatedAt
+      const conversations = Array.from(conversationMap.values())
+        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+        .slice(0, 100);
+
+      console.log(`✅ Merged result: ${conversations.length} total conversations (${pgConversations.length} from PG, ${redisConversations.length} from Redis)`);
 
       res.json({
         success: true,
