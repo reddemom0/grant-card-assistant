@@ -762,10 +762,12 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
   // ALWAYS save to Redis first (fast, reliable)
   try {
+    console.log(`🔵 DEBUG: About to save conversation to Redis...`);
     // Save conversation messages
     await redis.set(`conv:${conversationId}`, JSON.stringify(conversation), { ex: 86400 }); // 24 hour TTL
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
 
+    console.log(`🔵 DEBUG: About to save metadata to Redis...`);
     // Save conversation metadata (including agent_type for filtering)
     const metadata = {
       id: conversationId,
@@ -777,6 +779,7 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     await redis.set(`conv:${conversationId}:meta`, JSON.stringify(metadata), { ex: 86400 });
     console.log(`✅ Conversation metadata saved to Redis (agent: ${agentType})`);
 
+    console.log(`🔵 DEBUG: About to add to user conversations set...`);
     // Add conversation ID to user's set for sidebar listing
     try {
       await redis.sadd(`user:${userId}:conversations`, conversationId);
@@ -792,8 +795,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
         throw setError;
       }
     }
+    console.log(`✅ DEBUG: All Redis saves completed successfully`);
   } catch (redisError) {
-    console.error(`❌ Redis save failed:`, redisError.message);
+    console.error(`❌ Redis save FAILED:`, redisError);
+    console.error(`❌ Redis error message:`, redisError.message);
+    console.error(`❌ Redis error stack:`, redisError.stack);
     // Continue to try PostgreSQL even if Redis fails
   }
 
