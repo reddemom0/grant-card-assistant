@@ -110,9 +110,10 @@ export default async function handler(req, res) {
     );
     console.log('✅ JWT token created');
 
-    // Set HTTP-only cookie with explicit domain
+    // Set cookie WITHOUT HttpOnly so JavaScript can read it
+    // Note: HttpOnly would be more secure, but we need JavaScript to check auth on client side
     console.log('🔵 Setting cookie...');
-    const cookieHeader = `granted_session=${token}; Domain=grant-card-assistant.vercel.app; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+    const cookieHeader = `granted_session=${token}; Domain=grant-card-assistant.vercel.app; Path=/; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
     res.setHeader('Set-Cookie', cookieHeader);
     console.log('✅ Cookie set:', cookieHeader);
 
