@@ -776,30 +776,20 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
   // ALWAYS save to Redis first (fast, reliable)
   try {
-    console.log(`🔵 DEBUG: About to save conversation to Redis...`);
-    console.log(`🔵 DEBUG: Redis URL configured: ${!!process.env.UPSTASH_REDIS_REST_URL}`);
-    console.log(`🔵 DEBUG: Redis token configured: ${!!process.env.UPSTASH_REDIS_REST_TOKEN}`);
-
-    // Test Redis connectivity first
-    const startTime = Date.now();
-    console.log(`🔵 DEBUG: Testing Redis ping...`);
-    try {
-      await redisWithTimeout(redis.ping(), 2000);
-      console.log(`✅ Redis ping successful (${Date.now() - startTime}ms)`);
-    } catch (pingError) {
-      console.error(`❌ Redis ping failed:`, pingError.message);
-      throw pingError;
-    }
+    console.log(`🔵 DEBUG: Saving conversation to Redis (no ping test)...`);
 
     // Save conversation messages with timeout
-    console.log(`🔵 DEBUG: Saving conversation data (${JSON.stringify(conversation).length} bytes)...`);
+    const convDataSize = JSON.stringify(conversation).length;
+    console.log(`🔵 DEBUG: Conversation data size: ${convDataSize} bytes`);
+
+    const saveStart = Date.now();
     await redisWithTimeout(
       redis.set(`conv:${conversationId}`, JSON.stringify(conversation), { ex: 86400 }),
-      5000
+      10000  // Increased to 10 seconds
     );
-    console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
+    console.log(`✅ Conversation saved to Redis in ${Date.now() - saveStart}ms (${conversation.length} messages)`);
 
-    console.log(`🔵 DEBUG: About to save metadata to Redis...`);
+    console.log(`🔵 DEBUG: Saving metadata to Redis...`);
     // Save conversation metadata (including agent_type for filtering)
     const metadata = {
       id: conversationId,
@@ -808,17 +798,19 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+    const metaStart = Date.now();
     await redisWithTimeout(
       redis.set(`conv:${conversationId}:meta`, JSON.stringify(metadata), { ex: 86400 }),
-      5000
+      10000  // Increased to 10 seconds
     );
-    console.log(`✅ Conversation metadata saved to Redis (agent: ${agentType})`);
+    console.log(`✅ Metadata saved to Redis in ${Date.now() - metaStart}ms (agent: ${agentType})`);
 
-    console.log(`🔵 DEBUG: About to add to user conversations set...`);
+    console.log(`🔵 DEBUG: Adding to user conversations set...`);
     // Add conversation ID to user's set for sidebar listing
     try {
-      await redisWithTimeout(redis.sadd(`user:${userId}:conversations`, conversationId), 5000);
-      console.log(`✅ Added conversation to user set: user:${userId}:conversations`);
+      const setStart = Date.now();
+      await redisWithTimeout(redis.sadd(`user:${userId}:conversations`, conversationId), 10000);
+      console.log(`✅ Added to user set in ${Date.now() - setStart}ms: user:${userId}:conversations`);
     } catch (setError) {
       // If key exists as wrong type, delete and retry
       if (setError.message.includes('WRONGTYPE')) {
