@@ -28,9 +28,9 @@ console.log(`   Has sslmode: ${finalConnectionString?.includes('sslmode=')}`);
 const pool = new Pool({
   connectionString: finalConnectionString,
   ssl: { rejectUnauthorized: false },
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000, // Increased from 5s to 10s for Vercel cold starts
   idleTimeoutMillis: 30000,
-  max: 10,
+  max: 20, // Increased from 10 to 20 for concurrent requests
   query_timeout: 10000,
   statement_timeout: 10000
 });
@@ -50,31 +50,44 @@ pool.on('remove', () => {
 
 // Helper function to execute queries with explicit timeout
 // Uses proper client acquisition/release for serverless compatibility
-async function queryWithTimeout(sql, params, timeoutMs = 2000) {
+async function queryWithTimeout(sql, params, timeoutMs = 8000) {
   console.log(`   🔍 queryWithTimeout: Starting query execution...`);
   console.log(`   🔍 Pool state: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
 
   let client = null;
-  let clientTimeoutId = null;
-  let queryTimeoutId = null;
+  let clientAcquirePromise = null;
+  let timedOut = false;
 
   try {
     // Acquire client with timeout
     console.log(`   🔍 Acquiring database client...`);
-    const clientAcquirePromise = pool.connect();
+    clientAcquirePromise = pool.connect();
+
     const clientTimeoutPromise = new Promise((_, reject) => {
-      clientTimeoutId = setTimeout(() => reject(new Error(`Client acquisition timeout after ${timeoutMs}ms`)), timeoutMs);
+      setTimeout(() => {
+        timedOut = true;
+        reject(new Error(`Client acquisition timeout after ${timeoutMs}ms`));
+      }, timeoutMs);
     });
 
     client = await Promise.race([clientAcquirePromise, clientTimeoutPromise]);
-    clearTimeout(clientTimeoutId);
+
+    if (timedOut) {
+      // If we timed out, clean up the dangling promise
+      clientAcquirePromise.then(danglingClient => {
+        console.log(`   🧹 Releasing dangling client from timeout`);
+        danglingClient.release();
+      }).catch(() => {});
+      throw new Error(`Client acquisition timeout after ${timeoutMs}ms`);
+    }
+
     console.log(`   ✅ Client acquired`);
 
     // Execute query with timeout
     console.log(`   🔍 Executing query...`);
     const queryPromise = client.query(sql, params);
     const queryTimeoutPromise = new Promise((_, reject) => {
-      queryTimeoutId = setTimeout(() => {
+      setTimeout(() => {
         console.error(`   ⏰ QUERY TIMEOUT TRIGGERED after ${timeoutMs}ms`);
         console.error(`   ⏰ Pool state at timeout: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
         reject(new Error(`Query timeout after ${timeoutMs}ms: ${sql.substring(0, 100)}`));
@@ -82,18 +95,13 @@ async function queryWithTimeout(sql, params, timeoutMs = 2000) {
     });
 
     const result = await Promise.race([queryPromise, queryTimeoutPromise]);
-    clearTimeout(queryTimeoutId);
     console.log(`   ✅ Query completed successfully`);
     return result;
   } catch (error) {
     console.error(`   ❌ Query failed:`, error.message);
     throw error;
   } finally {
-    // Clean up timeouts
-    if (clientTimeoutId) clearTimeout(clientTimeoutId);
-    if (queryTimeoutId) clearTimeout(queryTimeoutId);
-
-    // Release client
+    // Release client if we have one
     if (client) {
       console.log(`   🔌 Releasing client...`);
       client.release();
