@@ -762,14 +762,207 @@
     0%, 50% { opacity: 1; }
     51%, 100% { opacity: 0; }
 }
+
+        /* Conversation History Sidebar */
+        .sidebar {
+            position: fixed;
+            left: -320px;
+            top: 0;
+            width: 320px;
+            height: 100vh;
+            background: var(--surface);
+            border-right: 1px solid var(--border);
+            transition: left 0.3s ease;
+            z-index: 150;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .sidebar-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            padding: 0.25rem;
+            line-height: 1;
+        }
+
+        .sidebar-close:hover {
+            color: var(--text-primary);
+        }
+
+        .conversation-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        .conversation-item {
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+            position: relative;
+        }
+
+        .conversation-item:hover {
+            background: var(--background);
+            border-color: var(--border);
+        }
+
+        .conversation-item.active {
+            background: rgba(45, 80, 22, 0.1);
+            border-color: var(--bc-green);
+        }
+
+        .conversation-title {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .conversation-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .conversation-date {
+            font-size: 0.7rem;
+        }
+
+        .conversation-delete {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+
+        .conversation-item:hover .conversation-delete {
+            opacity: 1;
+        }
+
+        .conversation-delete:hover {
+            background: #b91c1c;
+        }
+
+        .sidebar-toggle {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--background);
+            color: var(--text-primary);
+            border-color: var(--bc-green);
+        }
+
+        .empty-conversations {
+            padding: 2rem 1rem;
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.3);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            z-index: 140;
+        }
+
+        .sidebar-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 280px;
+                left: -280px;
+            }
+        }
     </style>
 </head>
 <body>
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Conversation History Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <span class="sidebar-title">💬 Conversations</span>
+            <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+        </div>
+        <div class="conversation-list" id="conversation-list">
+            <div class="empty-conversations">Loading conversations...</div>
+        </div>
+    </div>
+
     <!-- Header -->
     <div class="header">
         <div class="header-content">
             <div class="logo">
-                <span>🌾</span>
+                <button class="sidebar-toggle" onclick="toggleSidebar()">
+                    <span>☰</span>
+                    <span>History</span>
+                </button>
+                <span style="margin-left: 1rem;">🌾</span>
                 <span class="logo-text">BC Agriculture Export Specialist</span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
@@ -1019,6 +1212,151 @@
             console.log('✅ Conversation restored:', conversationData.messageCount, 'messages');
         }
 
+        // Sidebar functions
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+
+            if (sidebar && overlay) {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('visible');
+
+                // Load conversations when opening
+                if (sidebar.classList.contains('open')) {
+                    loadConversationsList();
+                }
+            }
+        }
+
+        async function loadConversationsList() {
+            const conversationList = document.getElementById('conversation-list');
+            if (!conversationList) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/api/conversations`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.conversations && data.conversations.length > 0) {
+                    renderConversationsList(data.conversations);
+                } else {
+                    conversationList.innerHTML = '<div class="empty-conversations">No conversations yet.<br>Start chatting to create one!</div>';
+                }
+            } catch (error) {
+                console.error('Failed to load conversations:', error);
+                conversationList.innerHTML = '<div class="empty-conversations">Failed to load conversations</div>';
+            }
+        }
+
+        function renderConversationsList(conversations) {
+            const conversationList = document.getElementById('conversation-list');
+            if (!conversationList) return;
+
+            conversationList.innerHTML = conversations.map(conv => {
+                const isActive = conv.id === conversationId;
+                const date = new Date(conv.updatedAt);
+                const dateStr = formatDate(date);
+
+                return `
+                    <div class="conversation-item ${isActive ? 'active' : ''}" onclick="switchConversation('${conv.id}')">
+                        <div class="conversation-title">${escapeHtml(conv.title)}</div>
+                        <div class="conversation-meta">
+                            <span>${conv.messageCount} messages</span>
+                            <span class="conversation-date">${dateStr}</span>
+                        </div>
+                        <button class="conversation-delete" onclick="event.stopPropagation(); deleteConversation('${conv.id}')" title="Delete conversation">
+                            🗑️
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function formatDate(date) {
+            const now = new Date();
+            const diff = now - date;
+            const minutes = Math.floor(diff / 60000);
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+
+            if (minutes < 1) return 'Just now';
+            if (minutes < 60) return `${minutes}m ago`;
+            if (hours < 24) return `${hours}h ago`;
+            if (days < 7) return `${days}d ago`;
+
+            return date.toLocaleDateString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function switchConversation(newConversationId) {
+            if (newConversationId === conversationId) {
+                toggleSidebar();
+                return;
+            }
+
+            console.log('Switching to conversation:', newConversationId);
+
+            // Update conversationId
+            conversationId = newConversationId;
+            localStorage.setItem('bcafe-conversation-id', conversationId);
+
+            // Clear current chat
+            const messagesDiv = document.getElementById('messages');
+            if (messagesDiv) {
+                messagesDiv.innerHTML = '';
+            }
+
+            // Load and restore the selected conversation
+            const conversationData = await loadConversationHistory();
+            if (conversationData) {
+                restoreConversationUI(conversationData);
+            }
+
+            // Close sidebar
+            toggleSidebar();
+        }
+
+        async function deleteConversation(convId) {
+            if (!confirm('Delete this conversation? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/api/conversation/${convId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+
+                console.log('✅ Conversation deleted:', convId);
+
+                // If deleted conversation was active, start new conversation
+                if (convId === conversationId) {
+                    startNewConversation();
+                }
+
+                // Reload conversations list
+                await loadConversationsList();
+            } catch (error) {
+                console.error('Failed to delete conversation:', error);
+                alert('Failed to delete conversation. Please try again.');
+            }
+        }
+
         // Start a new conversation
         function startNewConversation() {
             if (confirm('Start a new conversation? This will clear the current chat.')) {
@@ -1056,6 +1394,14 @@
                 }
 
                 resetInputBox();
+
+                // Close sidebar if open
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (sidebar && sidebar.classList.contains('open')) {
+                    sidebar.classList.remove('open');
+                    overlay.classList.remove('visible');
+                }
             }
         }
 
@@ -1667,6 +2013,12 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 selectedTask = '';
 
                 currentAbortController = null;
+
+                // Refresh sidebar if it's open (to show new conversation)
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && sidebar.classList.contains('open')) {
+                    loadConversationsList();
+                }
             }
         }
 
@@ -1715,6 +2067,12 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 selectedTask = '';
 
                 currentAbortController = null;
+
+                // Refresh sidebar if it's open (to show new conversation)
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && sidebar.classList.contains('open')) {
+                    loadConversationsList();
+                }
             }
         }
 
