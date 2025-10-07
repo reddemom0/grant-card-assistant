@@ -738,29 +738,7 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   try {
     await redis.set(`conv:${conversationId}`, conversation, { ex: 86400 }); // 24 hour TTL
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
-
-    // Also update user's conversation index in Redis for sidebar
-    const firstUserMsg = conversation.find(m => m.role === 'user');
-    let title = 'New Conversation';
-    if (firstUserMsg && typeof firstUserMsg.content === 'string') {
-      title = firstUserMsg.content.substring(0, 100);
-    } else if (firstUserMsg && Array.isArray(firstUserMsg.content)) {
-      const textBlock = firstUserMsg.content.find(b => b.type === 'text');
-      if (textBlock?.text) title = textBlock.text.substring(0, 100);
-    }
-
-    const now = new Date().toISOString();
-    const convMetadata = {
-      id: conversationId,
-      agentType,
-      title,
-      messageCount: conversation.length,
-      createdAt: now,  // Add timestamp for new conversations
-      updatedAt: now
-    };
-
-    await redis.hset(`user:${userId}:conversations`, conversationId, JSON.stringify(convMetadata));
-    console.log(`✅ Updated user conversation index in Redis for conversation: ${conversationId}`);
+    // Redis index disabled - was causing JSON parsing errors
   } catch (redisError) {
     console.error(`❌ Redis save failed:`, redisError.message);
     // Continue to try PostgreSQL even if Redis fails
@@ -3845,10 +3823,6 @@ module.exports = async function handler(req, res) {
 
       console.log(`📚 Loading all conversations for user: ${userId}`);
 
-      let pgConversations = [];
-      let redisConversations = [];
-
-      // Load from PostgreSQL (may be incomplete or stale)
       try {
         const result = await queryWithTimeout(
           `SELECT
@@ -3865,10 +3839,10 @@ module.exports = async function handler(req, res) {
           ORDER BY c.updated_at DESC
           LIMIT 100`,
           [userId],
-          3000  // Short timeout - fail fast
+          5000  // Longer timeout for reliability
         );
 
-        pgConversations = result.rows.map(row => ({
+        const conversations = result.rows.map(row => ({
           id: row.id,
           agentType: row.agent_type,
           title: row.title || 'Untitled Conversation',
@@ -3877,49 +3851,21 @@ module.exports = async function handler(req, res) {
           updatedAt: row.updated_at
         }));
 
-        console.log(`✅ Found ${pgConversations.length} conversations from PostgreSQL`);
-      } catch (pgError) {
-        console.warn(`⚠️  PostgreSQL query failed:`, pgError.message);
+        console.log(`✅ Found ${conversations.length} conversations from PostgreSQL`);
+
+        res.json({
+          success: true,
+          conversations: conversations,
+          count: conversations.length
+        });
+      } catch (error) {
+        console.error(`❌ Error loading conversations:`, error.message);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to load conversations',
+          error: error.message
+        });
       }
-
-      // Always check Redis for latest conversations
-      try {
-        const redisData = await redis.hgetall(`user:${userId}:conversations`);
-        console.log(`📦 Redis conversation index:`, Object.keys(redisData || {}).length, 'conversations');
-
-        if (redisData && Object.keys(redisData).length > 0) {
-          redisConversations = Object.values(redisData).map(json => JSON.parse(json));
-          console.log(`✅ Loaded ${redisConversations.length} conversations from Redis index`);
-        }
-      } catch (redisError) {
-        console.error(`❌ Redis index load failed:`, redisError.message);
-      }
-
-      // Merge: Redis takes precedence (most up-to-date), PostgreSQL fills gaps
-      const conversationMap = new Map();
-
-      // Add PostgreSQL conversations first
-      pgConversations.forEach(conv => {
-        conversationMap.set(conv.id, conv);
-      });
-
-      // Override/add with Redis conversations (newer)
-      redisConversations.forEach(conv => {
-        conversationMap.set(conv.id, conv);
-      });
-
-      // Convert to array and sort by updatedAt
-      const conversations = Array.from(conversationMap.values())
-        .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
-        .slice(0, 100);
-
-      console.log(`✅ Merged result: ${conversations.length} total conversations (${pgConversations.length} from PG, ${redisConversations.length} from Redis)`);
-
-      res.json({
-        success: true,
-        conversations: conversations,
-        count: conversations.length
-      });
       return;
     }
 
@@ -3934,9 +3880,8 @@ module.exports = async function handler(req, res) {
       }
 
       try {
-        // Delete from Redis
+        // Delete from Redis (conversation data only, no index)
         await redis.del(`conv:${conversationId}`);
-        await redis.hdel(`user:${userId}:conversations`, conversationId);
         console.log(`✅ Deleted conversation from Redis: ${conversationId}`);
 
         // Try to delete from PostgreSQL (best-effort)
