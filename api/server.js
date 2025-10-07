@@ -738,6 +738,27 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   try {
     await redis.set(`conv:${conversationId}`, conversation, { ex: 86400 }); // 24 hour TTL
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
+
+    // Also update user's conversation index in Redis for sidebar
+    const firstUserMsg = conversation.find(m => m.role === 'user');
+    let title = 'New Conversation';
+    if (firstUserMsg && typeof firstUserMsg.content === 'string') {
+      title = firstUserMsg.content.substring(0, 100);
+    } else if (firstUserMsg && Array.isArray(firstUserMsg.content)) {
+      const textBlock = firstUserMsg.content.find(b => b.type === 'text');
+      if (textBlock?.text) title = textBlock.text.substring(0, 100);
+    }
+
+    const convMetadata = {
+      id: conversationId,
+      agentType,
+      title,
+      messageCount: conversation.length,
+      updatedAt: new Date().toISOString()
+    };
+
+    await redis.hset(`user:${userId}:conversations`, conversationId, JSON.stringify(convMetadata));
+    console.log(`✅ Updated user conversation index in Redis`);
   } catch (redisError) {
     console.error(`❌ Redis save failed:`, redisError.message);
     // Continue to try PostgreSQL even if Redis fails
@@ -3915,8 +3936,10 @@ module.exports = async function handler(req, res) {
 
       console.log(`📚 Loading all conversations for user: ${userId}`);
 
+      let conversations = [];
+
+      // Try PostgreSQL first
       try {
-        // Query PostgreSQL for all conversations for this user
         const result = await queryWithTimeout(
           `SELECT
             c.id,
@@ -3932,10 +3955,10 @@ module.exports = async function handler(req, res) {
           ORDER BY c.updated_at DESC
           LIMIT 100`,
           [userId],
-          5000
+          3000  // Short timeout - fail fast
         );
 
-        const conversations = result.rows.map(row => ({
+        conversations = result.rows.map(row => ({
           id: row.id,
           agentType: row.agent_type,
           title: row.title || 'Untitled Conversation',
@@ -3944,21 +3967,34 @@ module.exports = async function handler(req, res) {
           updatedAt: row.updated_at
         }));
 
-        console.log(`✅ Found ${conversations.length} conversations for user ${userId}`);
+        console.log(`✅ Found ${conversations.length} conversations from PostgreSQL`);
 
-        res.json({
-          success: true,
-          conversations: conversations,
-          count: conversations.length
-        });
-      } catch (error) {
-        console.error(`❌ Error loading conversations list:`, error);
-        res.status(500).json({
-          success: false,
-          message: 'Failed to load conversations',
-          error: error.message
-        });
+      } catch (pgError) {
+        console.warn(`⚠️  PostgreSQL query failed, falling back to Redis:`, pgError.message);
+
+        // Fallback to Redis index
+        try {
+          const redisData = await redis.hgetall(`user:${userId}:conversations`);
+          console.log(`📦 Redis conversation index:`, Object.keys(redisData || {}).length, 'conversations');
+
+          if (redisData && Object.keys(redisData).length > 0) {
+            conversations = Object.values(redisData)
+              .map(json => JSON.parse(json))
+              .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+              .slice(0, 100);
+
+            console.log(`✅ Loaded ${conversations.length} conversations from Redis`);
+          }
+        } catch (redisError) {
+          console.error(`❌ Redis fallback failed:`, redisError.message);
+        }
       }
+
+      res.json({
+        success: true,
+        conversations: conversations,
+        count: conversations.length
+      });
       return;
     }
 
@@ -3972,38 +4008,26 @@ module.exports = async function handler(req, res) {
         return;
       }
 
-      if (!conversationId) {
-        res.status(400).json({ success: false, message: 'Missing conversationId' });
-        return;
-      }
-
-      console.log(`🗑️  Deleting conversation: ${conversationId} for user: ${userId}`);
-
       try {
-        // Delete from Redis first
+        // Delete from Redis
+        await redis.del(`conv:${conversationId}`);
+        await redis.hdel(`user:${userId}:conversations`, conversationId);
+        console.log(`✅ Deleted conversation from Redis: ${conversationId}`);
+
+        // Try to delete from PostgreSQL (best-effort)
         try {
-          await redis.del(`conv:${conversationId}`);
-          console.log(`✅ Conversation deleted from Redis`);
-        } catch (redisError) {
-          console.warn(`⚠️ Redis delete failed:`, redisError.message);
+          const result = await queryWithTimeout(
+            'DELETE FROM conversations WHERE id = $1 AND user_id = $2 RETURNING id',
+            [conversationId, userId],
+            3000
+          );
+
+          if (result.rows.length > 0) {
+            console.log(`✅ Deleted conversation from PostgreSQL: ${conversationId}`);
+          }
+        } catch (pgError) {
+          console.warn(`⚠️  PostgreSQL delete failed (non-fatal):`, pgError.message);
         }
-
-        // Delete from PostgreSQL (CASCADE will delete messages too)
-        const result = await queryWithTimeout(
-          'DELETE FROM conversations WHERE id = $1 AND user_id = $2 RETURNING id',
-          [conversationId, userId],
-          5000
-        );
-
-        if (result.rows.length === 0) {
-          res.status(404).json({
-            success: false,
-            message: 'Conversation not found or unauthorized'
-          });
-          return;
-        }
-
-        console.log(`✅ Conversation deleted from PostgreSQL`);
 
         res.json({
           success: true,
