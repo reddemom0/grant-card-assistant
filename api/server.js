@@ -813,26 +813,14 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     // Continue to try PostgreSQL even if Redis fails
   }
 
-  // Also save to PostgreSQL for long-term persistence (optional, non-blocking)
-  // Fire-and-forget pattern: Don't await, log errors but don't block
-  setImmediate(async () => {
-    try {
-      console.log(`\n🗄️  [ASYNC] Starting PostgreSQL save (for archival)...`);
-
-      // Check if conversation exists (short timeout for fail-fast)
-      console.log(`\n🔍 STEP 1: Checking if conversation exists`);
-      let convCheck;
-      try {
-        convCheck = await queryWithTimeout(
-          'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
-          [conversationId, userId],
-          3000  // Short timeout - fail fast if pool exhausted
-        );
-        console.log(`✅ Conversation check completed: ${convCheck.rows.length} rows`);
-      } catch (checkError) {
-        console.warn(`⚠️  [ASYNC] Skipping PostgreSQL save - check query failed:`, checkError.message);
-        return; // Exit early, don't block
-      }
+  // SYNCHRONOUS PostgreSQL save for new conversations (so they appear in sidebar immediately)
+  try {
+    console.log(`\n🗄️  Checking if conversation exists in PostgreSQL...`);
+    const convCheck = await queryWithTimeout(
+      'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
+      [conversationId, userId],
+      10000  // 10s timeout
+    );
 
     if (convCheck.rows.length === 0) {
       console.log(`\n🔍 STEP 2: Creating new conversation`);
@@ -1013,20 +1001,19 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
     // Smart title generation removed - was causing PostgreSQL timeouts
 
-    console.log(`\n========== [ASYNC] PostgreSQL save SUCCESS ==========\n`);
+    console.log(`\n========== PostgreSQL save SUCCESS ==========\n`);
 
   } catch (error) {
-    console.error(`\n========== [ASYNC] PostgreSQL save FAILED (non-fatal) ==========`);
+    console.error(`\n========== PostgreSQL save FAILED ==========`);
     console.error(`❌ PostgreSQL save error:`, error.message);
     console.error(`❌ Error type: ${error.constructor.name}`);
     console.error(`❌ Error code: ${error.code}`);
-    console.error(`⚠️  Conversation IS saved in Redis, PostgreSQL archival failed`);
-    console.error(`========== [ASYNC] PostgreSQL END ==========\n`);
-    // Don't throw - Redis save succeeded, PostgreSQL is optional
+    console.error(`⚠️  Conversation saved in Redis but not PostgreSQL - sidebar won't show it`);
+    console.error(`========== PostgreSQL END ==========\n`);
+    // Don't throw - Redis save succeeded, user can still chat
   }
-  }); // End of setImmediate async block
 
-  console.log(`\n========== saveConversation SUCCESS (Redis saved, PostgreSQL async) ==========\n`);
+  console.log(`\n========== saveConversation SUCCESS (Redis + PostgreSQL) ==========\n`);
 }
 
 // generateConversationTitle function removed - was causing PostgreSQL timeouts
