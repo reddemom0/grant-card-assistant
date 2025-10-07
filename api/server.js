@@ -12,7 +12,21 @@ const jwt = require('jsonwebtoken');
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  retry: {
+    retries: 2,
+    backoff: (retryCount) => Math.min(100 * 2 ** retryCount, 1000)
+  }
 });
+
+// Wrapper to add timeout to Redis operations
+async function redisWithTimeout(operation, timeoutMs = 5000) {
+  return Promise.race([
+    operation,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Redis operation timeout after ${timeoutMs}ms`)), timeoutMs)
+    )
+  ]);
+}
 
 // Initialize PostgreSQL connection pool (for conversation persistence)
 // Ensure connection string has sslmode=require for Neon
@@ -763,8 +777,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   // ALWAYS save to Redis first (fast, reliable)
   try {
     console.log(`🔵 DEBUG: About to save conversation to Redis...`);
-    // Save conversation messages
-    await redis.set(`conv:${conversationId}`, JSON.stringify(conversation), { ex: 86400 }); // 24 hour TTL
+    // Save conversation messages with timeout
+    await redisWithTimeout(
+      redis.set(`conv:${conversationId}`, JSON.stringify(conversation), { ex: 86400 }),
+      5000
+    );
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
 
     console.log(`🔵 DEBUG: About to save metadata to Redis...`);
@@ -776,20 +793,23 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
-    await redis.set(`conv:${conversationId}:meta`, JSON.stringify(metadata), { ex: 86400 });
+    await redisWithTimeout(
+      redis.set(`conv:${conversationId}:meta`, JSON.stringify(metadata), { ex: 86400 }),
+      5000
+    );
     console.log(`✅ Conversation metadata saved to Redis (agent: ${agentType})`);
 
     console.log(`🔵 DEBUG: About to add to user conversations set...`);
     // Add conversation ID to user's set for sidebar listing
     try {
-      await redis.sadd(`user:${userId}:conversations`, conversationId);
+      await redisWithTimeout(redis.sadd(`user:${userId}:conversations`, conversationId), 5000);
       console.log(`✅ Added conversation to user set: user:${userId}:conversations`);
     } catch (setError) {
       // If key exists as wrong type, delete and retry
       if (setError.message.includes('WRONGTYPE')) {
         console.warn(`⚠️  Deleting corrupted Redis key: user:${userId}:conversations`);
-        await redis.del(`user:${userId}:conversations`);
-        await redis.sadd(`user:${userId}:conversations`, conversationId);
+        await redisWithTimeout(redis.del(`user:${userId}:conversations`), 5000);
+        await redisWithTimeout(redis.sadd(`user:${userId}:conversations`, conversationId), 5000);
         console.log(`✅ Added conversation to user set (after cleanup): user:${userId}:conversations`);
       } else {
         throw setError;
