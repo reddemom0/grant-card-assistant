@@ -3936,17 +3936,33 @@ module.exports = async function handler(req, res) {
                 title = content.substring(0, 100);
               }
 
-              // Determine agent type from conversation ID prefix
-              const agentType = convId.includes('-') ? convId.split('-')[0] : 'unknown';
-
-              conversations.push({
-                id: convId,
-                agentType: agentType,
-                title: title,
-                messageCount: parsed.length,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-              });
+              // Get agent type from PostgreSQL metadata (Redis only stores messages)
+              let agentType = 'unknown';
+              try {
+                const metaResult = await queryWithTimeout(
+                  'SELECT agent_type, created_at, updated_at FROM conversations WHERE id = $1',
+                  [convId],
+                  1000
+                );
+                if (metaResult.rows.length > 0) {
+                  agentType = metaResult.rows[0].agent_type;
+                  conversations.push({
+                    id: convId,
+                    agentType: agentType,
+                    title: title,
+                    messageCount: parsed.length,
+                    createdAt: metaResult.rows[0].created_at || new Date().toISOString(),
+                    updatedAt: metaResult.rows[0].updated_at || new Date().toISOString()
+                  });
+                } else {
+                  // Conversation not in PostgreSQL yet, skip for now
+                  console.warn(`⚠️  Conversation ${convId} not in PostgreSQL yet, skipping`);
+                  continue;
+                }
+              } catch (dbError) {
+                console.warn(`⚠️  Failed to get metadata for ${convId}:`, dbError.message);
+                continue;
+              }
             }
           } catch (convError) {
             console.warn(`⚠️  Failed to load conversation ${convId}:`, convError.message);
