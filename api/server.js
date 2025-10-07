@@ -735,7 +735,7 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
   // ALWAYS save to Redis first (fast, reliable)
   try {
-    await redis.set(`conv:${conversationId}`, conversation, { ex: 86400 }); // 24 hour TTL
+    await redis.set(`conv:${conversationId}`, JSON.stringify(conversation), { ex: 86400 }); // 24 hour TTL
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
 
     // Add conversation ID to user's set for sidebar listing
