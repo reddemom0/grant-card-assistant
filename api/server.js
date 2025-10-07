@@ -762,8 +762,20 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
   // ALWAYS save to Redis first (fast, reliable)
   try {
+    // Save conversation messages
     await redis.set(`conv:${conversationId}`, JSON.stringify(conversation), { ex: 86400 }); // 24 hour TTL
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
+
+    // Save conversation metadata (including agent_type for filtering)
+    const metadata = {
+      id: conversationId,
+      userId: userId,
+      agentType: agentType,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await redis.set(`conv:${conversationId}:meta`, JSON.stringify(metadata), { ex: 86400 });
+    console.log(`✅ Conversation metadata saved to Redis (agent: ${agentType})`);
 
     // Add conversation ID to user's set for sidebar listing
     try {
@@ -3936,33 +3948,48 @@ module.exports = async function handler(req, res) {
                 title = content.substring(0, 100);
               }
 
-              // Get agent type from PostgreSQL metadata (Redis only stores messages)
+              // Get metadata from Redis (faster, always available)
               let agentType = 'unknown';
+              let createdAt = new Date().toISOString();
+              let updatedAt = new Date().toISOString();
+
               try {
-                const metaResult = await queryWithTimeout(
-                  'SELECT agent_type, created_at, updated_at FROM conversations WHERE id = $1',
-                  [convId],
-                  1000
-                );
-                if (metaResult.rows.length > 0) {
-                  agentType = metaResult.rows[0].agent_type;
-                  conversations.push({
-                    id: convId,
-                    agentType: agentType,
-                    title: title,
-                    messageCount: parsed.length,
-                    createdAt: metaResult.rows[0].created_at || new Date().toISOString(),
-                    updatedAt: metaResult.rows[0].updated_at || new Date().toISOString()
-                  });
+                const metaData = await redis.get(`conv:${convId}:meta`);
+                if (metaData) {
+                  const meta = JSON.parse(metaData);
+                  agentType = meta.agentType || 'unknown';
+                  createdAt = meta.createdAt || createdAt;
+                  updatedAt = meta.updatedAt || updatedAt;
                 } else {
-                  // Conversation not in PostgreSQL yet, skip for now
-                  console.warn(`⚠️  Conversation ${convId} not in PostgreSQL yet, skipping`);
-                  continue;
+                  // Fallback to PostgreSQL if metadata not in Redis
+                  console.log(`📭 No Redis metadata for ${convId}, trying PostgreSQL...`);
+                  const metaResult = await queryWithTimeout(
+                    'SELECT agent_type, created_at, updated_at FROM conversations WHERE id = $1',
+                    [convId],
+                    1000
+                  );
+                  if (metaResult.rows.length > 0) {
+                    agentType = metaResult.rows[0].agent_type;
+                    createdAt = metaResult.rows[0].created_at || createdAt;
+                    updatedAt = metaResult.rows[0].updated_at || updatedAt;
+                  } else {
+                    console.warn(`⚠️  Conversation ${convId} not found in Redis or PostgreSQL, skipping`);
+                    continue;
+                  }
                 }
-              } catch (dbError) {
-                console.warn(`⚠️  Failed to get metadata for ${convId}:`, dbError.message);
+              } catch (metaError) {
+                console.warn(`⚠️  Failed to get metadata for ${convId}:`, metaError.message);
                 continue;
               }
+
+              conversations.push({
+                id: convId,
+                agentType: agentType,
+                title: title,
+                messageCount: parsed.length,
+                createdAt: createdAt,
+                updatedAt: updatedAt
+              });
             }
           } catch (convError) {
             console.warn(`⚠️  Failed to load conversation ${convId}:`, convError.message);
