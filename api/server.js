@@ -3851,13 +3851,19 @@ module.exports = async function handler(req, res) {
           convIds = await redis.smembers(`user:${userId}:conversations`);
           console.log(`🔍 Found ${convIds.length} conversation IDs in Redis set`);
         } catch (redisSetError) {
-          // If key exists as wrong type, delete and return empty (will fall back to PostgreSQL)
+          // If key exists as wrong type, delete and fall back to PostgreSQL
           if (redisSetError.message.includes('WRONGTYPE')) {
             console.warn(`⚠️  Deleting corrupted Redis key: user:${userId}:conversations`);
             await redis.del(`user:${userId}:conversations`);
             throw new Error('Redis set corrupted, cleaned up - falling back to PostgreSQL');
           }
           throw redisSetError;
+        }
+
+        // If Redis set is empty, fall back to PostgreSQL to get existing conversations
+        if (convIds.length === 0) {
+          console.log(`📭 Redis set empty, falling back to PostgreSQL to rebuild`);
+          throw new Error('Redis set empty - falling back to PostgreSQL');
         }
 
         // Load each conversation's metadata
@@ -3951,6 +3957,20 @@ module.exports = async function handler(req, res) {
           }));
 
           console.log(`✅ PostgreSQL fallback returned ${conversations.length} conversations`);
+
+          // Rebuild Redis set from PostgreSQL data (background, non-blocking)
+          if (conversations.length > 0) {
+            setImmediate(async () => {
+              try {
+                console.log(`🔄 Rebuilding Redis set for user ${userId}...`);
+                const conversationIds = conversations.map(c => c.id);
+                await redis.sadd(`user:${userId}:conversations`, ...conversationIds);
+                console.log(`✅ Rebuilt Redis set with ${conversationIds.length} conversations`);
+              } catch (rebuildError) {
+                console.warn(`⚠️  Failed to rebuild Redis set:`, rebuildError.message);
+              }
+            });
+          }
 
           res.json({
             success: true,
