@@ -3875,7 +3875,16 @@ module.exports = async function handler(req, res) {
               continue;
             }
 
-            const parsed = JSON.parse(convData);
+            // Try to parse, if fails it's corrupted
+            let parsed;
+            try {
+              parsed = JSON.parse(convData);
+            } catch (parseError) {
+              console.warn(`⚠️  Corrupted conversation data for ${convId}, deleting and skipping`);
+              await redis.del(`conv:${convId}`);
+              await redis.srem(`user:${userId}:conversations`, convId);
+              continue;
+            }
 
             if (Array.isArray(parsed) && parsed.length > 0) {
               const firstUserMsg = parsed.find(msg => msg.role === 'user');
@@ -3917,6 +3926,12 @@ module.exports = async function handler(req, res) {
         conversations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         console.log(`✅ Loaded ${conversations.length} conversations from Redis`);
+
+        // If all conversations were corrupted/deleted, fall back to PostgreSQL
+        if (convIds.length > 0 && conversations.length === 0) {
+          console.warn(`⚠️  All ${convIds.length} conversations were corrupted, falling back to PostgreSQL`);
+          throw new Error('All Redis conversations corrupted - falling back to PostgreSQL');
+        }
 
         res.json({
           success: true,
