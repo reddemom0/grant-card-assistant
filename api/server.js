@@ -694,20 +694,37 @@ function safeStringify(obj, label = 'object') {
 function normalizeMessageContent(message) {
   const normalized = { ...message };
 
+  let content = message.content;
+
+  // If content is a string that looks like JSON, try to parse it
+  if (typeof content === 'string') {
+    // Check if it's a JSON array string (starts with '[')
+    if (content.trim().startsWith('[')) {
+      try {
+        content = JSON.parse(content);
+        console.log(`🔄 Parsed JSON string content for ${message.role} message`);
+      } catch (e) {
+        // Not JSON, treat as plain text
+        console.log(`📝 Content is plain text for ${message.role} message`);
+      }
+    }
+  }
+
   // If content is an array (Claude API format), extract text
-  if (Array.isArray(message.content)) {
+  if (Array.isArray(content)) {
     let textContent = '';
-    message.content.forEach(block => {
+    content.forEach(block => {
       if (block.type === 'text' && block.text) {
         textContent += block.text;
       }
       // Skip thinking blocks and other non-text content
     });
     normalized.content = textContent;
+    console.log(`✅ Extracted text from array content (${textContent.length} chars)`);
   }
-  // If content is already a string, return as-is
-  else if (typeof message.content === 'string') {
-    normalized.content = message.content;
+  // If content is already a plain string, return as-is
+  else if (typeof content === 'string') {
+    normalized.content = content;
   }
 
   return normalized;
