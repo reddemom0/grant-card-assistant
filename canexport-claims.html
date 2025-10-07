@@ -1709,7 +1709,7 @@ async function handleStreamingResponse(response, messageDiv) {
             if (!conversationList) return;
 
             try {
-                const response = await fetch(`${API_BASE}/api/conversations`, {
+                const response = await fetch(`${API_BASE}/api/conversations?agent_type=canexport-claims`, {
                     credentials: 'include'
                 });
 
