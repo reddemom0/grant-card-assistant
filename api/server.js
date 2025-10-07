@@ -805,24 +805,7 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     );
     console.log(`✅ Metadata saved to Redis in ${Date.now() - metaStart}ms (agent: ${agentType})`);
 
-    console.log(`🔵 DEBUG: Adding to user conversations set...`);
-    // Add conversation ID to user's set for sidebar listing
-    try {
-      const setStart = Date.now();
-      await redisWithTimeout(redis.sadd(`user:${userId}:conversations`, conversationId), 10000);
-      console.log(`✅ Added to user set in ${Date.now() - setStart}ms: user:${userId}:conversations`);
-    } catch (setError) {
-      // If key exists as wrong type, delete and retry
-      if (setError.message.includes('WRONGTYPE')) {
-        console.warn(`⚠️  Deleting corrupted Redis key: user:${userId}:conversations`);
-        await redisWithTimeout(redis.del(`user:${userId}:conversations`), 5000);
-        await redisWithTimeout(redis.sadd(`user:${userId}:conversations`, conversationId), 5000);
-        console.log(`✅ Added conversation to user set (after cleanup): user:${userId}:conversations`);
-      } else {
-        throw setError;
-      }
-    }
-    console.log(`✅ DEBUG: All Redis saves completed successfully`);
+    console.log(`✅ All Redis saves completed successfully (conversation + metadata)`);
   } catch (redisError) {
     console.error(`❌ Redis save FAILED:`, redisError);
     console.error(`❌ Redis error message:`, redisError.message);
@@ -3914,8 +3897,65 @@ module.exports = async function handler(req, res) {
 
       console.log(`📚 Loading conversations for user: ${userId}${agentTypeFilter ? `, agent: ${agentTypeFilter}` : ''}`);
 
-      // STRATEGY: Load from Redis user-specific set
-      // Redis key: user:{userId}:conversations (sorted set with scores as timestamps)
+      // SIMPLE APPROACH: Load directly from PostgreSQL (reliable, fast enough)
+      try {
+        let query = `SELECT
+            c.id,
+            c.agent_type,
+            c.title,
+            c.created_at,
+            c.updated_at,
+            COUNT(m.id) as message_count
+          FROM conversations c
+          LEFT JOIN messages m ON c.id = m.conversation_id
+          WHERE c.user_id = $1`;
+
+        const params = [userId];
+
+        if (agentTypeFilter) {
+          query += ` AND c.agent_type = $2`;
+          params.push(agentTypeFilter);
+        }
+
+        query += ` GROUP BY c.id
+          ORDER BY c.updated_at DESC
+          LIMIT 100`;
+
+        const result = await queryWithTimeout(query, params, 10000);  // 10s timeout
+
+        const conversations = result.rows.map(row => ({
+          id: row.id,
+          agentType: row.agent_type,
+          title: row.title || 'Untitled Conversation',
+          messageCount: parseInt(row.message_count) || 0,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at
+        }));
+
+        console.log(`✅ Found ${conversations.length} conversations from PostgreSQL`);
+
+        res.json({
+          success: true,
+          conversations: conversations,
+          count: conversations.length
+        });
+      } catch (error) {
+        console.error(`❌ Error loading conversations:`, error.message);
+        res.status(500).json({
+          success: false,
+          message: 'Failed to load conversations',
+          error: error.message
+        });
+      }
+      return;
+    }
+
+    // DEPRECATED Redis-based conversation loading - keeping for reference but not used
+    if (false && url.startsWith('/api/conversations-redis') && method === 'GET') {
+      const userId = getUserIdFromJWT(req);
+      const urlParts = url.split('?');
+      const queryParams = new URLSearchParams(urlParts[1] || '');
+      const agentTypeFilter = queryParams.get('agent_type');
 
       try {
         const conversations = [];
