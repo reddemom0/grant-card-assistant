@@ -7,14 +7,50 @@ const { Client } = pg;
 
 export default async function handler(req, res) {
   console.log('🔵 Auth callback started');
-  console.log('🔵 Query params:', req.query);
+  console.log('🔵 Full URL:', req.url);
+  console.log('🔵 Query params:', JSON.stringify(req.query, null, 2));
+  console.log('🔵 Method:', req.method);
 
-  const { code } = req.query;
+  const { code, error, error_description } = req.query;
 
-  if (!code) {
-    console.error('❌ No authorization code provided');
-    return res.status(400).json({ error: 'No authorization code provided' });
+  // Check if Google sent an error
+  if (error) {
+    console.error('❌ Google OAuth error:', error);
+    console.error('❌ Error description:', error_description);
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>OAuth Error</title></head>
+      <body>
+        <h1>Authentication Error</h1>
+        <p><strong>Error:</strong> ${error}</p>
+        <p><strong>Description:</strong> ${error_description || 'No description provided'}</p>
+        <p><a href="/">Return to home</a></p>
+      </body>
+      </html>
+    `);
   }
+
+  const { code: authCode } = req.query;
+
+  if (!authCode) {
+    console.error('❌ No authorization code provided');
+    console.error('❌ Available query params:', Object.keys(req.query));
+    return res.status(400).send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>OAuth Error</title></head>
+      <body>
+        <h1>Authentication Error</h1>
+        <p>No authorization code received from Google</p>
+        <p>Query params: ${JSON.stringify(req.query)}</p>
+        <p><a href="/">Return to home</a></p>
+      </body>
+      </html>
+    `);
+  }
+
+  console.log('✅ Authorization code received (length: ' + authCode.length + ')');
 
   const dbUrl = process.env.POSTGRES_URL || process.env.DATABASE_URL;
   console.log('🔵 Database URL present:', !!dbUrl);
@@ -35,7 +71,7 @@ export default async function handler(req, res) {
 
     // Exchange authorization code for tokens
     console.log('🔵 Exchanging code for tokens...');
-    const { tokens } = await oauth2Client.getToken(code);
+    const { tokens } = await oauth2Client.getToken(authCode);
     oauth2Client.setCredentials(tokens);
     console.log('✅ Got tokens');
 
