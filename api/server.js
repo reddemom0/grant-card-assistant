@@ -777,7 +777,22 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   // ALWAYS save to Redis first (fast, reliable)
   try {
     console.log(`🔵 DEBUG: About to save conversation to Redis...`);
+    console.log(`🔵 DEBUG: Redis URL configured: ${!!process.env.UPSTASH_REDIS_REST_URL}`);
+    console.log(`🔵 DEBUG: Redis token configured: ${!!process.env.UPSTASH_REDIS_REST_TOKEN}`);
+
+    // Test Redis connectivity first
+    const startTime = Date.now();
+    console.log(`🔵 DEBUG: Testing Redis ping...`);
+    try {
+      await redisWithTimeout(redis.ping(), 2000);
+      console.log(`✅ Redis ping successful (${Date.now() - startTime}ms)`);
+    } catch (pingError) {
+      console.error(`❌ Redis ping failed:`, pingError.message);
+      throw pingError;
+    }
+
     // Save conversation messages with timeout
+    console.log(`🔵 DEBUG: Saving conversation data (${JSON.stringify(conversation).length} bytes)...`);
     await redisWithTimeout(
       redis.set(`conv:${conversationId}`, JSON.stringify(conversation), { ex: 86400 }),
       5000
