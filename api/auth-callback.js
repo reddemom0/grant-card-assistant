@@ -74,21 +74,37 @@ export default async function handler(req, res) {
     );
     console.log('✅ JWT token created');
 
-    // Set HTTP-only cookie
+    // Set HTTP-only cookie with explicit domain
     console.log('🔵 Setting cookie...');
-    res.setHeader('Set-Cookie',
-      `granted_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
-    );
-    console.log('✅ Cookie set');
+    const cookieHeader = `granted_session=${token}; Domain=grant-card-assistant.vercel.app; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+    res.setHeader('Set-Cookie', cookieHeader);
+    console.log('✅ Cookie set:', cookieHeader);
 
-    // Redirect to dashboard with user info in URL hash (temporary display only)
+    // Use HTML redirect instead of server redirect to ensure cookie persists
     const userDataEncoded = encodeURIComponent(JSON.stringify({
       name: user.name,
       email: user.email,
       picture: user.picture
     }));
-    console.log('🔵 Redirecting to dashboard...');
-    res.redirect(`/dashboard.html#user=${userDataEncoded}`);
+    console.log('🔵 Sending HTML redirect to dashboard...');
+
+    res.status(200).setHeader('Content-Type', 'text/html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta http-equiv="refresh" content="0;url=/dashboard.html#user=${userDataEncoded}">
+        <script>
+          // Verify cookie was set
+          console.log('Auth callback: Cookies after login:', document.cookie);
+          // Immediate redirect as backup
+          window.location.href = '/dashboard.html#user=${userDataEncoded}';
+        </script>
+      </head>
+      <body>
+        <p>Login successful! Redirecting to dashboard...</p>
+      </body>
+      </html>
+    `);
 
   } catch (error) {
     console.error('Auth callback error:', error);
