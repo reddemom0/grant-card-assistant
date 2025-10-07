@@ -1914,8 +1914,27 @@ async function handleStreamingResponse(response, messageDiv) {
         }
 
         // Initialize when DOM is ready
+        // Auth check - redirect to login if not authenticated
+        function checkAuth() {
+            const cookies = document.cookie.split(';');
+            const authToken = cookies.find(c => c.trim().startsWith('auth_token='));
+
+            if (!authToken) {
+                console.log('No auth token found, redirecting to login...');
+                window.location.href = '/';
+                return false;
+            }
+
+            return true;
+        }
+
         document.addEventListener('DOMContentLoaded', async function() {
             console.log('DOM loaded, initializing CanExport Claims interface...');
+
+            // Check authentication first
+            if (!checkAuth()) {
+                return; // Stop initialization if not authenticated
+            }
 
             // Initialize conversation ID and load history
             initializeConversationId();

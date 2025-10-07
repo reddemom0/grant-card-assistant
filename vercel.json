@@ -29,6 +29,10 @@
       "dest": "/canexport-claims.html"
     },
     {
+      "src": "/dashboard",
+      "dest": "/dashboard.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }

@@ -769,8 +769,8 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       let convCheck;
       try {
         convCheck = await queryWithTimeout(
-          'SELECT id FROM conversations WHERE id = $1',
-          [conversationId],
+          'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
+          [conversationId, userId],
           3000  // Short timeout - fail fast if pool exhausted
         );
         console.log(`✅ Conversation check completed: ${convCheck.rows.length} rows`);
@@ -934,14 +934,14 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
     // Update timestamp
     console.log(`\n🔍 STEP 5: Updating conversation timestamp`);
-    console.log(`   SQL: UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`);
-    console.log(`   Params: [${conversationId}]`);
+    console.log(`   SQL: UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2`);
+    console.log(`   Params: [${conversationId}, ${userId}]`);
 
     try {
       console.log(`   Executing UPDATE with 5 second timeout...`);
       await queryWithTimeout(
-        'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1',
-        [conversationId],
+        'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2',
+        [conversationId, userId],
         5000
       );
       console.log(`✅ Timestamp updated`);
