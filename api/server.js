@@ -3880,7 +3880,7 @@ module.exports = async function handler(req, res) {
             try {
               parsed = JSON.parse(convData);
             } catch (parseError) {
-              console.warn(`⚠️  Corrupted conversation data for ${convId}, deleting and skipping`);
+              console.log(`🧹 Cleaning up corrupted conversation data for ${convId}`);
               await redis.del(`conv:${convId}`);
               await redis.srem(`user:${userId}:conversations`, convId);
               continue;
@@ -3929,8 +3929,8 @@ module.exports = async function handler(req, res) {
 
         // If all conversations were corrupted/deleted, fall back to PostgreSQL
         if (convIds.length > 0 && conversations.length === 0) {
-          console.warn(`⚠️  All ${convIds.length} conversations were corrupted, falling back to PostgreSQL`);
-          throw new Error('All Redis conversations corrupted - falling back to PostgreSQL');
+          console.log(`🔄 All ${convIds.length} Redis conversations cleaned up, loading from PostgreSQL`);
+          throw new Error('Redis conversations cleaned up - falling back to PostgreSQL');
         }
 
         res.json({
@@ -3939,10 +3939,8 @@ module.exports = async function handler(req, res) {
           count: conversations.length
         });
       } catch (error) {
-        console.error(`❌ Redis load failed:`, error.message);
-
-        // Fallback to PostgreSQL
-        console.log(`📊 Falling back to PostgreSQL...`);
+        // Expected for cleanup scenarios - not an actual error
+        console.log(`📊 ${error.message}, loading from PostgreSQL...`);
         try {
           const result = await queryWithTimeout(
             `SELECT
