@@ -80,12 +80,115 @@
             transition: all 0.2s ease;
             font-size: 0.9rem;
         }
-        
+
         .nav-link:hover {
             background: var(--granted-light);
             color: var(--granted-blue);
         }
-        
+
+        /* User Profile Dropdown */
+        .user-profile {
+            position: relative;
+        }
+
+        .user-profile-button {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .user-profile-button:hover {
+            background: var(--border);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border);
+        }
+
+        .user-name {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .dropdown-arrow {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            min-width: 200px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .user-dropdown.show {
+            display: block;
+        }
+
+        .dropdown-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .dropdown-user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .dropdown-user-email {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .dropdown-menu {
+            padding: 0.5rem 0;
+        }
+
+        .dropdown-item {
+            display: block;
+            padding: 0.75rem 1rem;
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: background 0.2s ease;
+            cursor: pointer;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+        }
+
+        .dropdown-item:hover {
+            background: var(--background);
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0.5rem 0;
+        }
+
         /* Main Container */
         .container {
             padding: 2rem 1.5rem;
@@ -886,6 +989,7 @@
     <div class="header">
         <div class="header-content">
             <div class="logo">
+                <a href="/dashboard" class="nav-link" style="padding: 0.5rem 0.75rem; margin-right: 1rem;">← Dashboard</a>
                 <button class="sidebar-toggle" onclick="toggleSidebar()">
                     <span>☰</span>
                     <span>History</span>
@@ -895,7 +999,26 @@
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
                 <button onclick="startNewConversation()" class="nav-link" style="background: var(--granted-light); color: var(--granted-blue); border: none; cursor: pointer; font-family: inherit; font-size: 0.9rem;">🔄 New Conversation</button>
-                <a href="index.html" class="nav-link">← Back to AI Hub</a>
+
+                <!-- User Profile Dropdown -->
+                <div class="user-profile">
+                    <button class="user-profile-button" onclick="toggleUserDropdown()" id="user-profile-btn">
+                        <img src="" alt="User" class="user-avatar" id="user-avatar" style="display: none;">
+                        <span class="user-name" id="user-name-display">Loading...</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="user-dropdown" id="user-dropdown">
+                        <div class="dropdown-header">
+                            <div class="dropdown-user-name" id="dropdown-user-name">User Name</div>
+                            <div class="dropdown-user-email" id="dropdown-user-email">user@example.com</div>
+                        </div>
+                        <div class="dropdown-menu">
+                            <a href="/dashboard" class="dropdown-item">📊 Dashboard</a>
+                            <div class="dropdown-divider"></div>
+                            <button onclick="logout()" class="dropdown-item">🚪 Logout</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1665,6 +1788,9 @@ async function handleStreamingResponse(response, messageDiv) {
         }
 
         // Initialize when DOM is ready
+        // Global user info
+        window.currentUser = null;
+
         // Auth check - redirect to login if not authenticated
         function checkAuth() {
             const cookies = document.cookie.split(';');
@@ -1679,12 +1805,93 @@ async function handleStreamingResponse(response, messageDiv) {
             return true;
         }
 
+        // Get user info from JWT token
+        function getUserInfo() {
+            const cookies = document.cookie.split(';');
+            const authCookie = cookies.find(c => c.trim().startsWith('auth_token='));
+
+            if (!authCookie) return null;
+
+            const token = authCookie.split('=')[1];
+            try {
+                const payload = token.split('.')[1];
+                const decoded = JSON.parse(atob(payload));
+                return decoded;
+            } catch (e) {
+                console.error('Failed to decode token:', e);
+                return null;
+            }
+        }
+
+        // Toggle user dropdown
+        function toggleUserDropdown() {
+            const dropdown = document.getElementById('user-dropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const userProfile = document.querySelector('.user-profile');
+            const dropdown = document.getElementById('user-dropdown');
+
+            if (userProfile && !userProfile.contains(event.target)) {
+                dropdown?.classList.remove('show');
+            }
+        });
+
+        // Logout function
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+            } catch (e) {
+                console.error('Logout request failed:', e);
+            }
+            document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            window.location.href = '/';
+        }
+
+        // Update user profile display
+        function updateUserProfile(userInfo) {
+            if (!userInfo) return;
+
+            window.currentUser = userInfo;
+
+            const userNameDisplay = document.getElementById('user-name-display');
+            const userAvatar = document.getElementById('user-avatar');
+
+            if (userNameDisplay) {
+                userNameDisplay.textContent = userInfo.name || userInfo.email?.split('@')[0] || 'User';
+            }
+
+            if (userAvatar && userInfo.picture) {
+                userAvatar.src = userInfo.picture;
+                userAvatar.style.display = 'block';
+            }
+
+            const dropdownUserName = document.getElementById('dropdown-user-name');
+            const dropdownUserEmail = document.getElementById('dropdown-user-email');
+
+            if (dropdownUserName) {
+                dropdownUserName.textContent = userInfo.name || 'User';
+            }
+
+            if (dropdownUserEmail) {
+                dropdownUserEmail.textContent = userInfo.email || '';
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async function() {
             console.log('DOM loaded, initializing Grant Card interface...');
 
             // Check authentication first
             if (!checkAuth()) {
                 return; // Stop initialization if not authenticated
+            }
+
+            // Get and display user info
+            const userInfo = getUserInfo();
+            if (userInfo) {
+                updateUserProfile(userInfo);
             }
 
             // Initialize conversation ID and load history
