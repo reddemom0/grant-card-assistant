@@ -947,25 +947,27 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     }
 
     // Generate smart title after first exchange (user + assistant messages)
-    if (conversation.length >= 2) {
-      const hasUserMessage = conversation.some(m => m.role === 'user');
-      const hasAssistantMessage = conversation.some(m => m.role === 'assistant');
+    try {
+      if (conversation.length >= 2) {
+        const hasUserMessage = conversation.some(m => m.role === 'user');
+        const hasAssistantMessage = conversation.some(m => m.role === 'assistant');
 
-      if (hasUserMessage && hasAssistantMessage) {
-        // Check if title is still default or just first message
-        const currentTitleResult = await queryWithTimeout(
-          'SELECT title FROM conversations WHERE id = $1',
-          [conversationId],
-          2000
-        );
+        if (hasUserMessage && hasAssistantMessage) {
+          console.log(`\n🔍 STEP 6: Checking if smart title generation needed`);
+          // Check if title is still default or just first message
+          const currentTitleResult = await queryWithTimeout(
+            'SELECT title FROM conversations WHERE id = $1',
+            [conversationId],
+            2000
+          );
 
-        if (currentTitleResult.rows.length > 0) {
-          const currentTitle = currentTitleResult.rows[0].title;
+          if (currentTitleResult.rows.length > 0) {
+            const currentTitle = currentTitleResult.rows[0].title;
+            console.log(`   Current title: "${currentTitle.substring(0, 50)}..."`);
 
-          // Only generate new title if current one is generic or very long
-          if (currentTitle === 'New Conversation' || currentTitle.length > 50) {
-            console.log(`\n🔍 STEP 6: Generating smart conversation title`);
-            try {
+            // Only generate new title if current one is generic or very long
+            if (currentTitle === 'New Conversation' || currentTitle.length > 50) {
+              console.log(`   Generating smart title (current is generic/long)...`);
               const smartTitle = await generateConversationTitle(conversation);
               if (smartTitle) {
                 await queryWithTimeout(
@@ -974,14 +976,18 @@ async function saveConversation(conversationId, userId, conversation, agentType)
                   2000
                 );
                 console.log(`✅ Smart title generated: "${smartTitle}"`);
+              } else {
+                console.log(`⚠️  Title generation returned null, keeping current title`);
               }
-            } catch (titleError) {
-              console.error(`⚠️  Title generation failed (non-fatal):`, titleError.message);
-              // Don't throw - this is optional enhancement
+            } else {
+              console.log(`   Title is good, skipping generation`);
             }
           }
         }
       }
+    } catch (titleError) {
+      console.error(`⚠️  Smart title generation failed (non-fatal):`, titleError.message);
+      // Don't throw - this is optional enhancement
     }
 
     console.log(`\n========== saveConversation SUCCESS ==========\n`);
