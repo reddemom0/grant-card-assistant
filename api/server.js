@@ -744,38 +744,25 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   }
 
   // Also save to PostgreSQL for long-term persistence (optional, non-blocking)
-  try {
-    console.log(`\n🗄️  Attempting PostgreSQL save (for archival)...`);
-
-    // Check if conversation exists
-    console.log(`\n🔍 STEP 1: Checking if conversation exists`);
-    console.log(`   SQL: SELECT id FROM conversations WHERE id = $1`);
-    console.log(`   Params: [${conversationId}]`);
-
-    let convCheck;
+  // Fire-and-forget pattern: Don't await, log errors but don't block
+  setImmediate(async () => {
     try {
-      console.log(`   Executing with 5 second timeout...`);
-      convCheck = await queryWithTimeout(
-        'SELECT id FROM conversations WHERE id = $1',
-        [conversationId],
-        5000
-      );
-      console.log(`✅ Conversation check query completed`);
-      console.log(`   Result rows: ${convCheck.rows.length}`);
-      if (convCheck.rows.length > 0) {
-        console.log(`   Found conversation:`, convCheck.rows[0]);
+      console.log(`\n🗄️  [ASYNC] Starting PostgreSQL save (for archival)...`);
+
+      // Check if conversation exists (short timeout for fail-fast)
+      console.log(`\n🔍 STEP 1: Checking if conversation exists`);
+      let convCheck;
+      try {
+        convCheck = await queryWithTimeout(
+          'SELECT id FROM conversations WHERE id = $1',
+          [conversationId],
+          3000  // Short timeout - fail fast if pool exhausted
+        );
+        console.log(`✅ Conversation check completed: ${convCheck.rows.length} rows`);
+      } catch (checkError) {
+        console.warn(`⚠️  [ASYNC] Skipping PostgreSQL save - check query failed:`, checkError.message);
+        return; // Exit early, don't block
       }
-    } catch (checkError) {
-      console.error(`❌ Conversation check query FAILED:`, checkError);
-      console.error(`   Error details:`, {
-        name: checkError.name,
-        message: checkError.message,
-        code: checkError.code,
-        detail: checkError.detail,
-        stack: checkError.stack
-      });
-      throw checkError;
-    }
 
     if (convCheck.rows.length === 0) {
       console.log(`\n🔍 STEP 2: Creating new conversation`);
@@ -998,17 +985,20 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       // Don't throw - this is optional enhancement
     }
 
-    console.log(`\n========== saveConversation SUCCESS ==========\n`);
+    console.log(`\n========== [ASYNC] PostgreSQL save SUCCESS ==========\n`);
 
   } catch (error) {
-    console.error(`\n========== PostgreSQL save FAILED (non-fatal) ==========`);
+    console.error(`\n========== [ASYNC] PostgreSQL save FAILED (non-fatal) ==========`);
     console.error(`❌ PostgreSQL save error:`, error.message);
     console.error(`❌ Error type: ${error.constructor.name}`);
     console.error(`❌ Error code: ${error.code}`);
     console.error(`⚠️  Conversation IS saved in Redis, PostgreSQL archival failed`);
-    console.error(`========== saveConversation END ==========\n`);
+    console.error(`========== [ASYNC] PostgreSQL END ==========\n`);
     // Don't throw - Redis save succeeded, PostgreSQL is optional
   }
+  }); // End of setImmediate async block
+
+  console.log(`\n========== saveConversation SUCCESS (Redis saved, PostgreSQL async) ==========\n`);
 }
 
 // Generate a smart conversation title using Claude API
