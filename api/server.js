@@ -738,7 +738,10 @@ async function saveConversation(conversationId, userId, conversation, agentType)
   try {
     await redis.set(`conv:${conversationId}`, conversation, { ex: 86400 }); // 24 hour TTL
     console.log(`✅ Conversation saved to Redis (${conversation.length} messages)`);
-    // Redis index disabled - was causing JSON parsing errors
+
+    // Add conversation ID to user's set for sidebar listing
+    await redis.sadd(`user:${userId}:conversations`, conversationId);
+    console.log(`✅ Added conversation to user set: user:${userId}:conversations`);
   } catch (redisError) {
     console.error(`❌ Redis save failed:`, redisError.message);
     // Continue to try PostgreSQL even if Redis fails
@@ -3823,48 +3826,123 @@ module.exports = async function handler(req, res) {
 
       console.log(`📚 Loading all conversations for user: ${userId}`);
 
+      // STRATEGY: Load from Redis user-specific set
+      // Redis key: user:{userId}:conversations (sorted set with scores as timestamps)
+
       try {
-        const result = await queryWithTimeout(
-          `SELECT
-            c.id,
-            c.agent_type,
-            c.title,
-            c.created_at,
-            c.updated_at,
-            COUNT(m.id) as message_count
-          FROM conversations c
-          LEFT JOIN messages m ON c.id = m.conversation_id
-          WHERE c.user_id = $1
-          GROUP BY c.id
-          ORDER BY c.updated_at DESC
-          LIMIT 100`,
-          [userId],
-          5000  // Longer timeout for reliability
-        );
+        const conversations = [];
 
-        const conversations = result.rows.map(row => ({
-          id: row.id,
-          agentType: row.agent_type,
-          title: row.title || 'Untitled Conversation',
-          messageCount: parseInt(row.message_count) || 0,
-          createdAt: row.created_at,
-          updatedAt: row.updated_at
-        }));
+        // Try to get from user-specific Redis set first
+        console.log(`🔍 Loading conversations from Redis set for user: ${userId}`);
 
-        console.log(`✅ Found ${conversations.length} conversations from PostgreSQL`);
+        const convIds = await redis.smembers(`user:${userId}:conversations`);
+        console.log(`🔍 Found ${convIds.length} conversation IDs in Redis set`);
+
+        // Load each conversation's metadata
+        for (const convId of convIds) {
+          try {
+            const convData = await redis.get(`conv:${convId}`);
+            if (!convData) {
+              console.warn(`⚠️  Conversation ${convId} not found in Redis, skipping`);
+              continue;
+            }
+
+            const parsed = JSON.parse(convData);
+
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const firstUserMsg = parsed.find(msg => msg.role === 'user');
+              if (!firstUserMsg) continue;
+
+              // Extract title from first user message
+              let title = 'Untitled Conversation';
+              if (typeof firstUserMsg.content === 'string') {
+                title = firstUserMsg.content.substring(0, 100);
+              } else if (Array.isArray(firstUserMsg.content)) {
+                let content = '';
+                firstUserMsg.content.forEach(block => {
+                  if (block.type === 'text' && block.text) {
+                    content += block.text;
+                  }
+                });
+                title = content.substring(0, 100);
+              }
+
+              // Determine agent type from conversation ID prefix
+              const agentType = convId.includes('-') ? convId.split('-')[0] : 'unknown';
+
+              conversations.push({
+                id: convId,
+                agentType: agentType,
+                title: title,
+                messageCount: parsed.length,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+              });
+            }
+          } catch (convError) {
+            console.warn(`⚠️  Failed to load conversation ${convId}:`, convError.message);
+            continue;
+          }
+        }
+
+        // Sort by most recent (we'll use creation time, but ideally track update time)
+        conversations.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+        console.log(`✅ Loaded ${conversations.length} conversations from Redis`);
 
         res.json({
           success: true,
-          conversations: conversations,
+          conversations: conversations.slice(0, 100),
           count: conversations.length
         });
       } catch (error) {
-        console.error(`❌ Error loading conversations:`, error.message);
-        res.status(500).json({
-          success: false,
-          message: 'Failed to load conversations',
-          error: error.message
-        });
+        console.error(`❌ Redis load failed:`, error.message);
+
+        // Fallback to PostgreSQL
+        console.log(`📊 Falling back to PostgreSQL...`);
+        try {
+          const result = await queryWithTimeout(
+            `SELECT
+              c.id,
+              c.agent_type,
+              c.title,
+              c.created_at,
+              c.updated_at,
+              COUNT(m.id) as message_count
+            FROM conversations c
+            LEFT JOIN messages m ON c.id = m.conversation_id
+            WHERE c.user_id = $1
+            GROUP BY c.id
+            ORDER BY c.updated_at DESC
+            LIMIT 100`,
+            [userId],
+            5000
+          );
+
+          const conversations = result.rows.map(row => ({
+            id: row.id,
+            agentType: row.agent_type,
+            title: row.title || 'Untitled Conversation',
+            messageCount: parseInt(row.message_count) || 0,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at
+          }));
+
+          console.log(`✅ PostgreSQL fallback returned ${conversations.length} conversations`);
+
+          res.json({
+            success: true,
+            conversations: conversations,
+            count: conversations.length
+          });
+        } catch (pgError) {
+          console.error(`❌ PostgreSQL fallback failed:`, pgError.message);
+          res.status(500).json({
+            success: false,
+            message: 'Failed to load conversations',
+            error: pgError.message
+          });
+        }
       }
       return;
     }
@@ -3880,9 +3958,13 @@ module.exports = async function handler(req, res) {
       }
 
       try {
-        // Delete from Redis (conversation data only, no index)
+        // Delete from Redis conversation data
         await redis.del(`conv:${conversationId}`);
         console.log(`✅ Deleted conversation from Redis: ${conversationId}`);
+
+        // Remove from user's conversation set
+        await redis.srem(`user:${userId}:conversations`, conversationId);
+        console.log(`✅ Removed conversation from user set`);
 
         // Try to delete from PostgreSQL (best-effort)
         try {
