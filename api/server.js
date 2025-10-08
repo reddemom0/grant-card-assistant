@@ -3269,7 +3269,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
         'anthropic-beta': 'files-api-2025-04-14'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
         system: systemPrompt,
         messages: apiMessages,
@@ -3422,7 +3422,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
       },
       body: (() => {
         const requestBody = {
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           max_tokens: 16000,
           system: systemPrompt,
           messages: apiMessages,
