@@ -5,12 +5,21 @@
  *
  * This bypasses the Agent SDK and uses Anthropic API directly
  * to validate that our system prompt and CLAUDE.md work correctly.
+ *
+ * Note: Uses the same ANTHROPIC_API_KEY as production (api/server.js)
+ * Two caching systems work together:
+ * - Anthropic Prompt Caching: Automatic 75% token reduction on large prompts
+ * - Upstash Redis: Session/conversation state storage (separate system)
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
+// Load environment variables from .env file
+dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -78,14 +87,66 @@ async function testGrantCardAgentDirect() {
     console.log('📈 Token Usage:');
     console.log(`   Input tokens: ${message.usage.input_tokens.toLocaleString()}`);
     console.log(`   Output tokens: ${message.usage.output_tokens.toLocaleString()}`);
+
+    // Check for cache hits (Anthropic's automatic prompt caching)
+    const cacheCreationTokens = message.usage.cache_creation_input_tokens || 0;
+    const cacheReadTokens = message.usage.cache_read_input_tokens || 0;
+
+    if (cacheCreationTokens > 0) {
+      console.log(`   Cache creation tokens: ${cacheCreationTokens.toLocaleString()} (first request - cached for 5min)`);
+    }
+    if (cacheReadTokens > 0) {
+      console.log(`   Cache read tokens: ${cacheReadTokens.toLocaleString()} (75% savings!)`);
+    }
+
     console.log(`   Total tokens: ${(message.usage.input_tokens + message.usage.output_tokens).toLocaleString()}`);
 
     // Calculate cost (Claude Sonnet 4 pricing: $3/MTok input, $15/MTok output)
-    const inputCost = (message.usage.input_tokens / 1000000) * 3;
+    // Cache reads cost $0.30/MTok (90% discount), cache writes cost $3.75/MTok (25% premium)
+    const regularInputCost = ((message.usage.input_tokens - cacheCreationTokens - cacheReadTokens) / 1000000) * 3;
+    const cacheCreationCost = (cacheCreationTokens / 1000000) * 3.75;
+    const cacheReadCost = (cacheReadTokens / 1000000) * 0.30;
+    const inputCost = regularInputCost + cacheCreationCost + cacheReadCost;
     const outputCost = (message.usage.output_tokens / 1000000) * 15;
     const totalCost = inputCost + outputCost;
+
     console.log(`   Estimated cost: $${totalCost.toFixed(4)}`);
     console.log(`     (Input: $${inputCost.toFixed(4)}, Output: $${outputCost.toFixed(4)})`);
+
+    if (cacheReadTokens > 0) {
+      const costWithoutCache = ((message.usage.input_tokens / 1000000) * 3) + outputCost;
+      const savings = costWithoutCache - totalCost;
+      console.log(`     Cache savings: $${savings.toFixed(4)} (${((savings / costWithoutCache) * 100).toFixed(1)}%)`);
+    }
+    console.log();
+
+    // Log for analytics tracking (as requested)
+    const analyticsLog = {
+      timestamp: new Date().toISOString(),
+      system: 'agent-sdk-test',  // Tag to distinguish from production
+      agent: 'grant-card',
+      model: message.model,
+      message_id: message.id,
+      duration_seconds: parseFloat(duration),
+      usage: {
+        input_tokens: message.usage.input_tokens,
+        output_tokens: message.usage.output_tokens,
+        cache_creation_tokens: cacheCreationTokens,
+        cache_read_tokens: cacheReadTokens,
+        total_tokens: message.usage.input_tokens + message.usage.output_tokens
+      },
+      cost_usd: {
+        input: parseFloat(inputCost.toFixed(6)),
+        output: parseFloat(outputCost.toFixed(6)),
+        total: parseFloat(totalCost.toFixed(6)),
+        cache_savings: cacheReadTokens > 0 ? parseFloat(savings.toFixed(6)) : 0
+      },
+      cache_hit: cacheReadTokens > 0,
+      cache_hit_percentage: cacheReadTokens > 0 ? parseFloat(((cacheReadTokens / message.usage.input_tokens) * 100).toFixed(2)) : 0
+    };
+
+    console.log('📊 Analytics Log (for comparison with production):');
+    console.log(JSON.stringify(analyticsLog, null, 2));
     console.log();
 
     // Extract text content

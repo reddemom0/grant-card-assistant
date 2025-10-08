@@ -270,11 +270,35 @@ The Agent SDK's `query()` function returned a transport object instead of the ac
 - **Output**: ~$0.06 per 4K tokens
 - **Total per Grant Card**: ~$0.12-$0.18 (with caching)
 
-### Prompt Caching Strategy
-Once integrated, the large system prompt (2,003 lines) will be automatically cached by Claude:
-- First request: Full token count
-- Subsequent requests (within 5 min): 75% token reduction
-- **Monthly savings**: Estimated 50-75% on input tokens
+### Two Caching Systems Working Together
+
+**Important**: This project uses TWO separate caching systems:
+
+1. **Anthropic Prompt Caching** (Automatic)
+   - Caches large system prompts (our 2,003 line grant-card.md)
+   - First request: Full token count + 25% premium ($3.75/MTok vs $3/MTok)
+   - Cache hits (within 5 min): 90% discount ($0.30/MTok vs $3/MTok)
+   - **Result**: 75% token reduction on cached prompts
+   - **No configuration needed** - happens automatically with Claude API
+   - **Monthly savings**: Estimated 50-75% on input tokens
+
+2. **Upstash Redis Caching** (Session Storage)
+   - Stores conversation history and context (separate from Anthropic)
+   - Used by production api/server.js for session management
+   - Configured via UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+   - **Purpose**: Maintain conversation state across requests
+   - **Does NOT** reduce Anthropic API costs (different system)
+
+**Both systems are complementary:**
+- Redis stores WHO said WHAT (conversation history)
+- Anthropic caches HOW to respond (system prompt/instructions)
+
+### API Key Usage
+- Same `ANTHROPIC_API_KEY` used for:
+  1. Production API (api/server.js)
+  2. Agent SDK testing (test-grant-card-direct.js)
+- Loaded from `.env` file (gitignored)
+- No separate keys needed for testing
 
 ---
 
