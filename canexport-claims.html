@@ -1356,16 +1356,11 @@
 
         // Initialize conversation ID from localStorage or generate new one
         function initializeConversationId() {
-            const stored = localStorage.getItem('canexport-conversation-id');
-            if (stored) {
-                console.log('📂 Restored conversationId from localStorage:', stored);
-                conversationId = stored;
-                return stored;
-            }
-
+            // Always start with a fresh conversation when visiting the agent page
+            // Previous conversations are available in the sidebar
             conversationId = generateConversationId();
             localStorage.setItem('canexport-conversation-id', conversationId);
-            console.log('🆕 Generated new conversationId:', conversationId);
+            console.log('🆕 Starting new conversation:', conversationId);
             return conversationId;
         }
 
@@ -2148,12 +2143,11 @@ async function handleStreamingResponse(response, messageDiv) {
                 updateUserProfile(userInfo);
             }
 
-            // Initialize conversation ID and load history
+            // Initialize new conversation (users can load previous ones from sidebar)
             initializeConversationId();
-            const conversationData = await loadConversationHistory();
-            if (conversationData) {
-                restoreConversationUI(conversationData);
-            }
+
+            // Don't auto-load previous conversation - start fresh
+            // Previous conversations are available in the sidebar
 
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
