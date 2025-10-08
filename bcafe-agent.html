@@ -1255,6 +1255,7 @@
         let currentStreamReader = null;
         let currentAbortController = null;
         let conversationId = null; // Will be initialized from localStorage or generated
+        let isFirstMessage = true; // Track if this is the first message for URL redirect
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
@@ -1264,14 +1265,62 @@
             return crypto.randomUUID();
         }
 
+        // Parse URL to determine conversation mode
+        function getConversationMode() {
+            const path = window.location.pathname;
+
+            // Check if we're in a specific conversation: /bcafe-writer/chat/abc123
+            if (path.includes('/chat/')) {
+                const conversationId = path.split('/chat/')[1].split('?')[0];
+                return { mode: 'existing', conversationId };
+            }
+
+            // Check if we're at /new
+            if (path.endsWith('/new')) {
+                return { mode: 'new', conversationId: null };
+            }
+
+            // Base URL - should have been redirected by vercel.json
+            if (path === '/bcafe-writer' || path === '/bcafe-writer/') {
+                return { mode: 'redirect', conversationId: null };
+            }
+
+            return { mode: 'new', conversationId: null };
+        }
+
         // Initialize or restore conversation ID
         function initializeConversationId() {
-            // Always start with a fresh conversation when visiting the agent page
-            // Previous conversations are available in the sidebar
-            conversationId = generateConversationId();
-            localStorage.setItem('bcafe-conversation-id', conversationId);
-            console.log('🆕 Starting new conversation:', conversationId);
-            return conversationId;
+            const { mode, conversationId: urlConversationId } = getConversationMode();
+
+            if (mode === 'redirect') {
+                console.log('🔀 Redirecting to /new');
+                window.location.href = '/bcafe-writer/new';
+                return null;
+            }
+
+            if (mode === 'existing') {
+                // Load existing conversation from URL
+                console.log('📂 Loading conversation from URL:', urlConversationId);
+                conversationId = urlConversationId;
+                localStorage.setItem('bcafe-conversation-id', conversationId);
+
+                // Load conversation history from server
+                loadConversationHistory().then(data => {
+                    if (data && data.messages) {
+                        restoreConversationUI(data);
+                    }
+                });
+
+                return conversationId;
+            }
+
+            if (mode === 'new') {
+                // Generate new conversation ID (not in URL yet)
+                conversationId = generateConversationId();
+                localStorage.setItem('bcafe-conversation-id', conversationId);
+                console.log('🆕 Starting new conversation:', conversationId);
+                return conversationId;
+            }
         }
 
         // Load conversation history from backend
@@ -1328,6 +1377,7 @@
                 }
             });
             hasStartedConversation = true;
+            isFirstMessage = false; // Existing conversation, so not first message
             console.log('✅ Conversation restored:', conversationData.messageCount, 'messages');
         }
 
@@ -1426,24 +1476,8 @@
 
             console.log('Switching to conversation:', newConversationId);
 
-            // Update conversationId
-            conversationId = newConversationId;
-            localStorage.setItem('bcafe-conversation-id', conversationId);
-
-            // Clear current chat
-            const messagesDiv = document.getElementById('messages');
-            if (messagesDiv) {
-                messagesDiv.innerHTML = '';
-            }
-
-            // Load and restore the selected conversation
-            const conversationData = await loadConversationHistory();
-            if (conversationData) {
-                restoreConversationUI(conversationData);
-            }
-
-            // Close sidebar
-            toggleSidebar();
+            // Navigate to the conversation URL (this will reload the page with the conversation)
+            window.location.href = `/bcafe-writer/chat/${newConversationId}`;
         }
 
         async function deleteConversation(convId) {
@@ -1479,48 +1513,8 @@
         // Start a new conversation
         function startNewConversation() {
             if (confirm('Start a new conversation? This will clear the current chat.')) {
-                // Generate new conversation ID
-                conversationId = generateConversationId();
-                localStorage.setItem('bcafe-conversation-id', conversationId);
-                console.log('New conversation started:', conversationId);
-
-                // Clear the chat UI
-                const messagesDiv = document.getElementById('messages');
-                if (messagesDiv) {
-                    messagesDiv.innerHTML = '';
-                }
-
-                // Reset state
-                hasStartedConversation = false;
-                uploadedFiles = [];
-                selectedTask = '';
-                selectedMarkets = [];
-
-                // Show welcome section again
-                const welcomeSection = document.getElementById('welcome-section');
-                const chatContainer = document.getElementById('chat-container');
-                const container = document.querySelector('.container');
-
-                if (welcomeSection) welcomeSection.style.display = 'block';
-                if (chatContainer) chatContainer.classList.remove('active');
-                if (container) container.classList.remove('chat-active');
-
-                // Reset input
-                const messageInput = document.getElementById('message-input');
-                if (messageInput) {
-                    messageInput.value = '';
-                    messageInput.style.height = '44px';
-                }
-
-                resetInputBox();
-
-                // Close sidebar if open
-                const sidebar = document.getElementById('sidebar');
-                const overlay = document.getElementById('sidebar-overlay');
-                if (sidebar && sidebar.classList.contains('open')) {
-                    sidebar.classList.remove('open');
-                    overlay.classList.remove('visible');
-                }
+                // Navigate to /new URL (this will create a fresh conversation)
+                window.location.href = '/bcafe-writer/new';
             }
         }
 
@@ -2216,6 +2210,16 @@ async function handleStreamingResponse(response, messageDiv) {
                 removeLoadingMessage();
 const streamingMessageDiv = addStreamingMessage('assistant');
 await handleStreamingResponse(response, streamingMessageDiv);
+
+                // After successful first message, redirect to permanent conversation URL
+                if (isFirstMessage) {
+                    const currentPath = window.location.pathname;
+                    if (currentPath.endsWith('/new')) {
+                        console.log('🔀 Redirecting to permanent conversation URL');
+                        window.history.replaceState({}, '', `/bcafe-writer/chat/${conversationId}`);
+                        isFirstMessage = false;
+                    }
+                }
 
             } catch (error) {
                 console.error('Send message error:', error);

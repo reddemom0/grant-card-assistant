@@ -13,20 +13,56 @@
       "dest": "/api/server.js"
     },
     {
-      "src": "/grant-cards",
+      "src": "/grant-cards/new",
       "dest": "/grant-cards.html"
     },
     {
-      "src": "/etg-writer",
+      "src": "/grant-cards/chat/([^/]+)",
+      "dest": "/grant-cards.html"
+    },
+    {
+      "src": "/grant-cards",
+      "dest": "/grant-cards/new",
+      "status": 301
+    },
+    {
+      "src": "/etg-writer/new",
       "dest": "/etg-agent.html"
     },
     {
-      "src": "/bcafe-writer",
+      "src": "/etg-writer/chat/([^/]+)",
+      "dest": "/etg-agent.html"
+    },
+    {
+      "src": "/etg-writer",
+      "dest": "/etg-writer/new",
+      "status": 301
+    },
+    {
+      "src": "/bcafe-writer/new",
       "dest": "/bcafe-agent.html"
     },
     {
-      "src": "/canexport-claims",
+      "src": "/bcafe-writer/chat/([^/]+)",
+      "dest": "/bcafe-agent.html"
+    },
+    {
+      "src": "/bcafe-writer",
+      "dest": "/bcafe-writer/new",
+      "status": 301
+    },
+    {
+      "src": "/canexport-claims/new",
       "dest": "/canexport-claims.html"
+    },
+    {
+      "src": "/canexport-claims/chat/([^/]+)",
+      "dest": "/canexport-claims.html"
+    },
+    {
+      "src": "/canexport-claims",
+      "dest": "/canexport-claims/new",
+      "status": 301
     },
     {
       "src": "/dashboard",
