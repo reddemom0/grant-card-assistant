@@ -19,7 +19,7 @@ const redis = new Redis({
 });
 
 // Wrapper to add timeout to Redis operations
-async function redisWithTimeout(operation, timeoutMs = 5000) {
+async function redisWithTimeout(operation, timeoutMs = 20000) {
   return Promise.race([
     operation,
     new Promise((_, reject) =>
