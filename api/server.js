@@ -42,11 +42,11 @@ console.log(`   Has sslmode: ${finalConnectionString?.includes('sslmode=')}`);
 const pool = new Pool({
   connectionString: finalConnectionString,
   ssl: { rejectUnauthorized: false },
-  connectionTimeoutMillis: 10000, // Increased from 5s to 10s for Vercel cold starts
+  connectionTimeoutMillis: 15000, // Increased for Vercel cold starts
   idleTimeoutMillis: 30000,
   max: 20, // Increased from 10 to 20 for concurrent requests
-  query_timeout: 10000,
-  statement_timeout: 10000
+  query_timeout: 20000, // Increased to 20s for slow Vercel connections
+  statement_timeout: 20000
 });
 
 // Add pool error handler
@@ -64,7 +64,7 @@ pool.on('remove', () => {
 
 // Helper function to execute queries with explicit timeout
 // Uses proper client acquisition/release for serverless compatibility
-async function queryWithTimeout(sql, params, timeoutMs = 8000) {
+async function queryWithTimeout(sql, params, timeoutMs = 15000) {
   console.log(`   🔍 queryWithTimeout: Starting query execution...`);
   console.log(`   🔍 Pool state: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
 
@@ -804,7 +804,7 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     const convCheck = await queryWithTimeout(
       'SELECT id FROM conversations WHERE id = $1 AND user_id = $2',
       [conversationId, userId],
-      10000  // 10s timeout
+      15000  // 15s timeout
     );
 
     if (convCheck.rows.length === 0) {
@@ -842,11 +842,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
       console.log(`   Params: [${conversationId}, ${userId}, ${agentType}, "${title.substring(0, 30)}..."]`);
 
       try {
-        console.log(`   Executing INSERT with 5 second timeout...`);
+        console.log(`   Executing INSERT with 15 second timeout...`);
         const insertResult = await queryWithTimeout(
           'INSERT INTO conversations (id, user_id, agent_type, title) VALUES ($1, $2, $3, $4) RETURNING *',
           [conversationId, userId, agentType, title],
-          5000
+          15000
         );
         console.log(`✅ Conversation created successfully`);
         console.log(`   Created record:`, insertResult.rows[0]);
@@ -874,11 +874,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
 
     let countResult;
     try {
-      console.log(`   Executing COUNT with 5 second timeout...`);
+      console.log(`   Executing COUNT with 15 second timeout...`);
       countResult = await queryWithTimeout(
         'SELECT COUNT(*) FROM messages WHERE conversation_id = $1',
         [conversationId],
-        5000
+        15000
       );
       const existingCount = parseInt(countResult.rows[0].count);
       console.log(`✅ Message count query completed: ${existingCount} existing messages`);
@@ -922,11 +922,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
           console.log(`     content length: ${content.length} bytes`);
 
           try {
-            console.log(`     Executing INSERT with 5 second timeout...`);
+            console.log(`     Executing INSERT with 15 second timeout...`);
             const msgResult = await queryWithTimeout(
               'INSERT INTO messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id',
               [conversationId, msg.role, content],
-              5000
+              15000
             );
             console.log(`     ✅ Message inserted with id: ${msgResult.rows[0].id}`);
           } catch (msgError) {
@@ -966,11 +966,11 @@ async function saveConversation(conversationId, userId, conversation, agentType)
     console.log(`   Params: [${conversationId}, ${userId}]`);
 
     try {
-      console.log(`   Executing UPDATE with 5 second timeout...`);
+      console.log(`   Executing UPDATE with 15 second timeout...`);
       await queryWithTimeout(
         'UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND user_id = $2',
         [conversationId, userId],
-        5000
+        15000
       );
       console.log(`✅ Timestamp updated`);
     } catch (updateError) {
