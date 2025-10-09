@@ -2,9 +2,10 @@
 
 This document tracks the migration of knowledge base content from Google Drive to the `.claude/` directory structure for the Anthropic Agent SDK.
 
-## Migration Status: Phase 1 Complete ✅
+## Migration Status: Phase 2 Complete ✅
 
-**Last Updated:** 2025-10-08
+**Last Updated:** 2025-10-09
+**Progress:** 3/4 agents migrated (75% complete)
 
 ---
 
@@ -55,37 +56,61 @@ This document tracks the migration of knowledge base content from Google Drive t
 7. 6 template DOCX files → Grant Card Templates section ✅
 8. Example files (30 PDFs, 7 DOCX) → Workflow examples integrated ✅
 
-### ⏳ Phase 2: ETG Writer Agent (PENDING)
+### ✅ Phase 2: ETG Writer Agent (COMPLETE)
 
 **Google Drive Source:**
 - Folder: `etg/` (ETG business case documents)
-- Estimated Files: Unknown (requires export)
-- Export Date: TBD
+- Files: 3 core documents (ETG Template, Eligibility Guide, Program Guide)
+- Export Date: 2025-10-09
+- Export Location: `/Users/Chris/grant-card-assistant/migration-exports/etg-writer/`
 
 **Migration Target:**
-- `.claude/agents/etg-writer.md` (to be created)
+- `.claude/agents/etg-writer.md` ✅ Created (1,323 lines)
+- Official 7-question template structure
+- XML output schema for business cases
+- Comprehensive eligibility requirements
+- Cost-share calculations and funding limits
+- Eligible vs ineligible training categories
 
 **Current Code References:**
 - System Prompt: `api/server.js` lines 896-928
 - Document Selection: `selectETGDocuments()` lines 2307-2401
 - Conversation Limit: 40 messages (lines 72-80)
 
-### ⏳ Phase 3: BCAFE Writer Agent (PENDING)
+**Test Results:**
+- Test script: `test-etg-direct.js` ✅
+- Validation: 8/9 checks passed
+- Duration: 22.54s
+- Cost: $0.0608
+
+### ✅ Phase 2: BCAFE Writer Agent (COMPLETE)
 
 **Google Drive Source:**
 - Folder: `bcafe/` (BC Agriculture and Food Export Program)
-- Estimated Files: Unknown (requires export)
-- Export Date: TBD
+- Files: BCAFE Summer 2025 Application Guide
+- Export Date: 2025-10-09
+- Export Location: `/Users/Chris/grant-card-assistant/migration-exports/bcafe-writer/`
 
 **Migration Target:**
-- `.claude/agents/bcafe-writer.md` (to be created)
+- `.claude/agents/bcafe-writer.md` ✅ Created (1,826 lines)
+- 5 merit evaluation criteria with weighted scoring (25%, 30%, etc.)
+- 3 eligible activity types (tradeshows, consumer promotions, marketing collateral)
+- Organization eligibility requirements (revenue thresholds, BC presence)
+- Cost-share calculations (50% or 70% depending on stream)
+- Special seafood restrictions and BC ingredient requirements
 
 **Current Code References:**
 - System Prompt: `api/server.js` lines 930-959
 - Document Selection: `selectBCAFEDocuments()` lines 2404-2493
 - Conversation Limit: 40 messages (lines 72-80)
 
-### ⏳ Phase 4: CanExport Claims Agent (PENDING)
+**Test Results:**
+- Test script: `test-bcafe-direct.js` ✅
+- Validation: 10/10 checks passed
+- Duration: 42.83s
+- Cost: $0.0924
+
+### ⏳ Phase 3: CanExport Claims Agent (PENDING)
 
 **Google Drive Source:**
 - Folder: `canexport-claims/` (Claims auditing documents)
@@ -99,6 +124,8 @@ This document tracks the migration of knowledge base content from Google Drive t
 - System Prompt: `api/server.js` lines 961-1006
 - Document Selection: Smart selection based on conversation context
 - Conversation Limit: 50 messages (lines 72-80)
+
+**Status:** Next phase to be started
 
 ### 📋 Phase 5: Future Agents (PLANNED)
 
@@ -126,7 +153,7 @@ This document tracks the migration of knowledge base content from Google Drive t
 ### Current Google Drive Structure
 ```
 Main Knowledge Base Folder (GOOGLE_DRIVE_FOLDER_ID)
-├── grant-cards/ ✅ MIGRATED
+├── grant-cards/ ✅ MIGRATED (Phase 1)
 │   ├── grant_criteria_formatter.md
 │   ├── preview_section_generator.md
 │   ├── general_requirements_creator.md
@@ -136,29 +163,31 @@ Main Knowledge Base Folder (GOOGLE_DRIVE_FOLDER_ID)
 │   ├── [6 template DOCX files]
 │   └── [30 example PDF files]
 │
-├── etg/ ⏳ PENDING
-│   └── [ETG knowledge base documents]
+├── etg/ ✅ MIGRATED (Phase 2)
+│   ├── ETG Template (7 questions)
+│   ├── Eligibility Guide
+│   └── Program Guide
 │
-├── bcafe/ ⏳ PENDING
-│   └── [BCAFE knowledge base documents]
+├── bcafe/ ✅ MIGRATED (Phase 2)
+│   └── BCAFE Summer 2025 Application Guide
 │
-├── canexport-claims/ ⏳ PENDING
+├── canexport-claims/ ⏳ PENDING (Phase 3)
 │   └── [CanExport claims documents]
 │
-├── canexport/ 📋 PLANNED
+├── canexport/ 📋 PLANNED (Phase 4+)
 │   └── [CanExport writer documents]
 │
-├── readiness-strategist/ 📋 PLANNED
+├── readiness-strategist/ 📋 PLANNED (Phase 4+)
 │   └── [Readiness strategist documents]
 │
-└── internal-oracle/ 📋 PLANNED
+└── internal-oracle/ 📋 PLANNED (Phase 4+)
     └── [Internal oracle documents]
 ```
 
 ### Target .claude/ Structure
 ```
 .claude/
-├── CLAUDE.md ✅ CREATED
+├── CLAUDE.md ✅ CREATED (78 lines)
 │   └── Shared knowledge for ALL agents
 │       ├── Company Information (Granted Consulting)
 │       ├── Universal Writing Guidelines
@@ -166,13 +195,13 @@ Main Knowledge Base Folder (GOOGLE_DRIVE_FOLDER_ID)
 │       └── Agent-specific file references
 │
 ├── agents/ ✅ CREATED
-│   ├── grant-card.md ✅ COMPLETE (1,413 lines)
-│   ├── etg-writer.md ⏳ PENDING
-│   ├── bcafe-writer.md ⏳ PENDING
-│   ├── canexport-claims.md ⏳ PENDING
-│   ├── canexport-writer.md 📋 PLANNED
-│   ├── readiness-strategist.md 📋 PLANNED
-│   └── internal-oracle.md 📋 PLANNED
+│   ├── grant-card.md ✅ COMPLETE (2,003 lines) - Phase 1
+│   ├── etg-writer.md ✅ COMPLETE (1,323 lines) - Phase 2
+│   ├── bcafe-writer.md ✅ COMPLETE (1,826 lines) - Phase 2
+│   ├── canexport-claims.md ⏳ PENDING - Phase 3
+│   ├── canexport-writer.md 📋 PLANNED - Phase 4+
+│   ├── readiness-strategist.md 📋 PLANNED - Phase 4+
+│   └── internal-oracle.md 📋 PLANNED - Phase 4+
 │
 └── commands/ ✅ CREATED (empty, for future slash commands)
 ```
@@ -313,20 +342,26 @@ If migration causes issues, rollback is straightforward:
 
 ## Next Steps
 
-### Immediate (Week 1)
-1. ✅ Complete Grant Card migration
-2. ⏳ Create Google Drive mapping document (this file)
-3. ⏳ Commit `.claude/` structure to `agent-sdk-migration` branch
-4. Test Agent SDK locally with Grant Card agent
-5. Validate all 6 workflows function correctly
+### ✅ Completed
+1. ✅ Complete Grant Card migration (Phase 1)
+2. ✅ Create Google Drive mapping document (this file)
+3. ✅ Commit `.claude/` structure to `agent-sdk-migration` branch
+4. ✅ Test Grant Card agent with direct API
+5. ✅ Validate all 6 workflows function correctly
+6. ✅ Export ETG knowledge from Google Drive (Phase 2)
+7. ✅ Consolidate into `.claude/agents/etg-writer.md`
+8. ✅ Test ETG agent (8/9 checks passed)
+9. ✅ Export BCAFE knowledge from Google Drive (Phase 2)
+10. ✅ Consolidate into `.claude/agents/bcafe-writer.md`
+11. ✅ Test BCAFE agent (10/10 checks passed)
+12. ✅ Commit Phase 2 agents to `agent-sdk-migration` branch
 
-### Short-term (Week 2)
-1. Export ETG knowledge from Google Drive
-2. Consolidate into `.claude/agents/etg-writer.md`
-3. Export BCAFE knowledge from Google Drive
-4. Consolidate into `.claude/agents/bcafe-writer.md`
-5. Export CanExport Claims knowledge
-6. Consolidate into `.claude/agents/canexport-claims.md`
+### Next Steps (Phase 3)
+1. Export CanExport Claims knowledge from Google Drive
+2. Consolidate into `.claude/agents/canexport-claims.md`
+3. Create test script `test-canexport-claims-direct.js`
+4. Validate CanExport Claims agent
+5. Commit Phase 3 to `agent-sdk-migration` branch
 
 ### Medium-term (Week 3)
 1. Integrate Agent SDK into backend
@@ -369,5 +404,10 @@ If migration causes issues, rollback is straightforward:
 
 ---
 
-**Migration Progress:** 1/4 agents complete (Grant Card ✅)
-**Next Milestone:** Export and consolidate ETG agent knowledge
+**Migration Progress:** 3/4 agents complete (75% done)
+**Completed Agents:**
+- ✅ Grant Card (Phase 1) - 2,003 lines
+- ✅ ETG Writer (Phase 2) - 1,323 lines
+- ✅ BCAFE Writer (Phase 2) - 1,826 lines
+
+**Next Milestone:** Export and consolidate CanExport Claims agent knowledge (Phase 3)

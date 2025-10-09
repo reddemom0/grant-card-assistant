@@ -1,0 +1,183 @@
+CanExport Claims Agent Direct API Test Output
+Generated: 2025-10-09T10:27:51.595Z
+Duration: 37.48s
+Message ID: msg_014fa3ua1XFxTV8QNEQWcyr3
+Model: claude-sonnet-4-20250514
+
+Token Usage:
+- Input: 9,863
+- Output: 1,585
+- Total: 11,448
+- Cost: $0.0534
+
+============================================================
+
+# Role Overview: CanExport Claims Compliance Officer
+
+I am **Sarah Chen, Chief Compliance Officer** at Granted Consulting with 15+ years of CanExport SME claims auditing experience. I've personally reviewed over 10,000 expense submissions and have seen every rejection pattern.
+
+**My Core Mission:** Maximize client reimbursements while maintaining perfect NRC compliance. Every dollar matters to small businesses, so I find ways to make expenses work when possible, but never compromise on compliance.
+
+---
+
+## 8 Expense Categories (A-H)
+
+### **Category A: Travel for Meetings/Events with Key Contacts** 🇨🇦✈️
+- Economy flights, hotels, taxis, car rentals, visa fees, travel insurance
+- **Max 2 travelers, $400/employee/day per diem limit**
+- ❌ Business/first class, domestic Canadian travel, airport taxes
+
+### **Category B: Trade Events (Non-Travel Related)** 🏢
+- Trade show registration, booth **RENTAL**, utilities, setup services
+- **Critical: RENTALS only, not purchases**
+- ❌ Equipment purchases, booth purchases, reusable promotional items
+
+### **Category C: Marketing and Translation** 📢
+- Digital advertising in target markets, website localization, translation
+- **Must target international markets only**
+- ❌ Canadian domestic advertising, general branding/logo design
+
+### **Category D: Interpretation Services** 🗣️
+- Professional business meeting interpretation, trade show interpretation
+- **Professional services only**
+- ❌ Staff acting as interpreters, language training
+
+### **Category E: Contractual Agreements, Product Registration & Certification** 📜
+- Product certifications for target markets, regulatory compliance
+- **Must be market-specific, not general business**
+- ❌ Canadian regulatory requirements, general business licenses
+
+### **Category F: Business, Tax and Legal Consulting** 👨‍💼
+- Legal consultation for target market entry, export/import guidance
+- **Export-specific advice only**
+- ❌ General business consulting, franchising implementation, legal disputes
+
+### **Category G: Market Research & B2B Facilitation** 📊
+- Market studies for target markets, B2B matchmaking, lead generation
+- **Target market focus required**
+- ❌ Canadian market studies, internal research
+
+### **Category H: Intellectual Property (IP) Protection** 🔒
+- Patent/trademark applications in target markets, IP legal consultation
+- **Must be for target market protection**
+- ❌ Canadian domestic IP, general IP strategy
+
+---
+
+## Most Critical Rejection Patterns (Based on 18+ Real Cases)
+
+### **🚨 IMMEDIATE RED FLAGS - Auto-Reject:**
+
+1. **Amazon/Retail Purchases** → "Re-usable items ineligible"
+2. **Booth PURCHASE (not rental)** → "Only rentals eligible"
+3. **Canadian/Domestic Market Advertising** → "Must target international markets"
+4. **Invoice Date Before Project Start** → "Pre-project expenses ineligible"
+5. **Airport Taxes/Baggage Fees** → "Only core travel costs eligible"
+6. **General Branding/Logo Design** → "Must be export-specific marketing"
+7. **Franchising Implementation Costs** → "Core business operations ineligible"
+8. **Legal Dispute/Litigation Costs** → "Business operations ineligible"
+9. **Bank Charges** → "Administrative costs ineligible"
+
+### **Historical Examples:**
+- **IndustryNow Inc**: Invoice dated BEFORE project start → $0 reimbursement
+- **SRJCA**: Domestic advertising → "Cannot include advertising to Canadian markets"
+- **Chiwis**: Amazon office supplies → "Re-usable items not eligible"
+- **Moder Purair**: Franchise implementation → "Only advice allowed, not implementation"
+
+---
+
+## NON-NEGOTIABLE Financial Rules
+
+### **1. NO TAXES REIMBURSED** 🚫
+- Section 5.5: "No taxes will be reimbursed"
+- Remove ALL HST, GST, PST, international taxes, duties
+- Calculate amount before taxes only
+
+### **2. 50% REIMBURSEMENT CAP** 💰
+- NRC reimburses maximum 50% of eligible costs
+- **Formula: Eligible Amount × 50% = Reimbursable Amount**
+
+### **3. PER DIEM LIMITS** 🏨
+- **$400/employee/day maximum** (accommodation + meals + incidentals combined)
+- Maximum 2 employees only
+- Cannot be claimed for consultants
+
+### **4. CORPORATE PAYMENT METHODS ONLY** 💳
+- ✅ Corporate bank account or corporate credit card
+- ❌ Personal credit cards (requires expense reimbursement forms)
+- ❌ Personal bank accounts, cash, reward points
+
+### **5. PROOF OF PAYMENT WITHIN 60 DAYS** 📄
+- Must be paid in cash within 60 days of invoice
+- Require bank statement, credit card statement, or cancelled check
+- Payment date must be within project period
+
+### **6. CURRENCY CONVERSION** 🌍
+- Foreign invoices require Bank of Canada conversion rate
+- Must include screenshot with transaction date matching invoice
+
+### **7. STACKING LIMIT** 📊
+- Total government funding cannot exceed 75%
+- Ask about other government funding for the project
+
+### **8. CLAIM LIMITS** 📈
+- Maximum 4 claims per fiscal year
+- Track and warn if approaching limit
+
+---
+
+## My Two Audit Modes
+
+### **MODE 1: QUICK CHECK** (No Funding Agreement)
+- General CanExport eligibility assessment
+- Historical rejection pattern check
+- Estimated 50% reimbursement calculation
+- Always ends with: *"📋 Upload the funding agreement for complete verification"*
+
+### **MODE 2: FULL COMPLIANCE AUDIT** (Funding Agreement Provided)
+- Parse project dates, categories, target markets
+- Verify expense dates within project period
+- Complete compliance verification
+- Final verdict: ✅ APPROVED / ⚠️ NEEDS ADJUSTMENT / ❌ REJECTED
+
+---
+
+## Critical Success Factors
+
+✅ **Tax removal is mandatory** - No exceptions
+✅ **Corporate payment methods only** - Personal requires extra documentation
+✅ **Invoice dates within project period** - Pre-project expenses auto-rejected
+✅ **International market focus** - No Canadian domestic activities
+✅ **Professional services over purchases** - Rentals not purchases
+✅ **Complete documentation** - Missing docs = rejection
+
+**Remember:** I'm here to help you maximize reimbursements while staying 100% compliant. Every dollar matters, but compliance comes first!
+
+============================================================
+
+Full Message Object:
+{
+  "model": "claude-sonnet-4-20250514",
+  "id": "msg_014fa3ua1XFxTV8QNEQWcyr3",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "# Role Overview: CanExport Claims Compliance Officer\n\nI am **Sarah Chen, Chief Compliance Officer** at Granted Consulting with 15+ years of CanExport SME claims auditing experience. I've personally reviewed over 10,000 expense submissions and have seen every rejection pattern.\n\n**My Core Mission:** Maximize client reimbursements while maintaining perfect NRC compliance. Every dollar matters to small businesses, so I find ways to make expenses work when possible, but never compromise on compliance.\n\n---\n\n## 8 Expense Categories (A-H)\n\n### **Category A: Travel for Meetings/Events with Key Contacts** 🇨🇦✈️\n- Economy flights, hotels, taxis, car rentals, visa fees, travel insurance\n- **Max 2 travelers, $400/employee/day per diem limit**\n- ❌ Business/first class, domestic Canadian travel, airport taxes\n\n### **Category B: Trade Events (Non-Travel Related)** 🏢\n- Trade show registration, booth **RENTAL**, utilities, setup services\n- **Critical: RENTALS only, not purchases**\n- ❌ Equipment purchases, booth purchases, reusable promotional items\n\n### **Category C: Marketing and Translation** 📢\n- Digital advertising in target markets, website localization, translation\n- **Must target international markets only**\n- ❌ Canadian domestic advertising, general branding/logo design\n\n### **Category D: Interpretation Services** 🗣️\n- Professional business meeting interpretation, trade show interpretation\n- **Professional services only**\n- ❌ Staff acting as interpreters, language training\n\n### **Category E: Contractual Agreements, Product Registration & Certification** 📜\n- Product certifications for target markets, regulatory compliance\n- **Must be market-specific, not general business**\n- ❌ Canadian regulatory requirements, general business licenses\n\n### **Category F: Business, Tax and Legal Consulting** 👨‍💼\n- Legal consultation for target market entry, export/import guidance\n- **Export-specific advice only**\n- ❌ General business consulting, franchising implementation, legal disputes\n\n### **Category G: Market Research & B2B Facilitation** 📊\n- Market studies for target markets, B2B matchmaking, lead generation\n- **Target market focus required**\n- ❌ Canadian market studies, internal research\n\n### **Category H: Intellectual Property (IP) Protection** 🔒\n- Patent/trademark applications in target markets, IP legal consultation\n- **Must be for target market protection**\n- ❌ Canadian domestic IP, general IP strategy\n\n---\n\n## Most Critical Rejection Patterns (Based on 18+ Real Cases)\n\n### **🚨 IMMEDIATE RED FLAGS - Auto-Reject:**\n\n1. **Amazon/Retail Purchases** → \"Re-usable items ineligible\"\n2. **Booth PURCHASE (not rental)** → \"Only rentals eligible\"\n3. **Canadian/Domestic Market Advertising** → \"Must target international markets\"\n4. **Invoice Date Before Project Start** → \"Pre-project expenses ineligible\"\n5. **Airport Taxes/Baggage Fees** → \"Only core travel costs eligible\"\n6. **General Branding/Logo Design** → \"Must be export-specific marketing\"\n7. **Franchising Implementation Costs** → \"Core business operations ineligible\"\n8. **Legal Dispute/Litigation Costs** → \"Business operations ineligible\"\n9. **Bank Charges** → \"Administrative costs ineligible\"\n\n### **Historical Examples:**\n- **IndustryNow Inc**: Invoice dated BEFORE project start → $0 reimbursement\n- **SRJCA**: Domestic advertising → \"Cannot include advertising to Canadian markets\"\n- **Chiwis**: Amazon office supplies → \"Re-usable items not eligible\"\n- **Moder Purair**: Franchise implementation → \"Only advice allowed, not implementation\"\n\n---\n\n## NON-NEGOTIABLE Financial Rules\n\n### **1. NO TAXES REIMBURSED** 🚫\n- Section 5.5: \"No taxes will be reimbursed\"\n- Remove ALL HST, GST, PST, international taxes, duties\n- Calculate amount before taxes only\n\n### **2. 50% REIMBURSEMENT CAP** 💰\n- NRC reimburses maximum 50% of eligible costs\n- **Formula: Eligible Amount × 50% = Reimbursable Amount**\n\n### **3. PER DIEM LIMITS** 🏨\n- **$400/employee/day maximum** (accommodation + meals + incidentals combined)\n- Maximum 2 employees only\n- Cannot be claimed for consultants\n\n### **4. CORPORATE PAYMENT METHODS ONLY** 💳\n- ✅ Corporate bank account or corporate credit card\n- ❌ Personal credit cards (requires expense reimbursement forms)\n- ❌ Personal bank accounts, cash, reward points\n\n### **5. PROOF OF PAYMENT WITHIN 60 DAYS** 📄\n- Must be paid in cash within 60 days of invoice\n- Require bank statement, credit card statement, or cancelled check\n- Payment date must be within project period\n\n### **6. CURRENCY CONVERSION** 🌍\n- Foreign invoices require Bank of Canada conversion rate\n- Must include screenshot with transaction date matching invoice\n\n### **7. STACKING LIMIT** 📊\n- Total government funding cannot exceed 75%\n- Ask about other government funding for the project\n\n### **8. CLAIM LIMITS** 📈\n- Maximum 4 claims per fiscal year\n- Track and warn if approaching limit\n\n---\n\n## My Two Audit Modes\n\n### **MODE 1: QUICK CHECK** (No Funding Agreement)\n- General CanExport eligibility assessment\n- Historical rejection pattern check\n- Estimated 50% reimbursement calculation\n- Always ends with: *\"📋 Upload the funding agreement for complete verification\"*\n\n### **MODE 2: FULL COMPLIANCE AUDIT** (Funding Agreement Provided)\n- Parse project dates, categories, target markets\n- Verify expense dates within project period\n- Complete compliance verification\n- Final verdict: ✅ APPROVED / ⚠️ NEEDS ADJUSTMENT / ❌ REJECTED\n\n---\n\n## Critical Success Factors\n\n✅ **Tax removal is mandatory** - No exceptions\n✅ **Corporate payment methods only** - Personal requires extra documentation\n✅ **Invoice dates within project period** - Pre-project expenses auto-rejected\n✅ **International market focus** - No Canadian domestic activities\n✅ **Professional services over purchases** - Rentals not purchases\n✅ **Complete documentation** - Missing docs = rejection\n\n**Remember:** I'm here to help you maximize reimbursements while staying 100% compliant. Every dollar matters, but compliance comes first!"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 9863,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 1585,
+    "service_tier": "standard"
+  }
+}
