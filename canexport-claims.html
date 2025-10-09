@@ -2315,6 +2315,10 @@ await handleStreamingResponse(response, streamingMessageDiv);
                         console.log('🔀 Redirecting to permanent conversation URL');
                         window.history.replaceState({}, '', `/canexport-claims/chat/${conversationId}`);
                         isFirstMessage = false;
+
+                        // ✅ INSTANT sidebar refresh - update immediately so users don't lose progress
+                        console.log('🔄 Refreshing sidebar instantly...');
+                        loadConversationsList();
                     }
                 }
 
