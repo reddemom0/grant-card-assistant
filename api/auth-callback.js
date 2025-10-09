@@ -61,12 +61,19 @@ export default async function handler(req, res) {
   });
 
   try {
+    // Use dynamic host to support preview deployments
+    const host = req.headers.host || req.headers['x-forwarded-host'];
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const redirectUri = `${protocol}://${host}/api/auth-callback`;
+
     console.log('🔵 Setting up OAuth2 client...');
+    console.log('🔵 Dynamic redirect_uri:', redirectUri);
+
     // Set up OAuth2 client
     const oauth2Client = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
       process.env.GOOGLE_CLIENT_SECRET,
-      'https://grant-card-assistant.vercel.app/api/auth-callback'
+      redirectUri
     );
 
     // Exchange authorization code for tokens
@@ -113,7 +120,17 @@ export default async function handler(req, res) {
     // Set cookie WITHOUT HttpOnly so JavaScript can read it
     // Note: HttpOnly would be more secure, but we need JavaScript to check auth on client side
     console.log('🔵 Setting cookie...');
-    const cookieHeader = `granted_session=${token}; Domain=grant-card-assistant.vercel.app; Path=/; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+
+    // Extract base domain for cookie (remove preview-specific prefixes)
+    // For preview: grant-card-assistant-git-agent-s-19b7d7-chris-projects-dd1ef6aa.vercel.app
+    // For production: grant-card-assistant.vercel.app
+    // We want the cookie to work on the specific host being accessed
+    const cookieDomain = host.includes('vercel.app') ? host : undefined;
+
+    const cookieHeader = cookieDomain
+      ? `granted_session=${token}; Domain=${cookieDomain}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`
+      : `granted_session=${token}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+
     res.setHeader('Set-Cookie', cookieHeader);
     console.log('✅ Cookie set:', cookieHeader);
 

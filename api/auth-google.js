@@ -18,9 +18,14 @@ export default function handler(req, res) {
     });
   }
 
-  const redirectUri = 'https://grant-card-assistant.vercel.app/api/auth-callback';
+  // Use dynamic host to support preview deployments
+  const host = req.headers.host || req.headers['x-forwarded-host'];
+  const protocol = req.headers['x-forwarded-proto'] || 'https';
+  const redirectUri = `${protocol}://${host}/api/auth-callback`;
 
   console.log('🔵 OAuth Parameters:');
+  console.log('   host:', host);
+  console.log('   protocol:', protocol);
   console.log('   redirect_uri:', redirectUri);
   console.log('   redirect_uri (encoded):', encodeURIComponent(redirectUri));
   console.log('   response_type:', 'code');
