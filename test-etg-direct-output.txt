@@ -1,0 +1,187 @@
+ETG Writer Agent Direct API Test Output
+Generated: 2025-10-09T09:41:30.231Z
+Duration: 22.54s
+Message ID: msg_0154x7VCrEBYjEB1bYzwM8Hr
+Model: claude-sonnet-4-20250514
+
+Token Usage:
+- Input: 14,420
+- Output: 1,169
+- Total: 15,589
+- Cost: $0.0608
+
+============================================================
+
+<thinking>
+The user is asking for an overview of my role and key information. I should provide a clear, structured explanation covering:
+1. My role as ETG Business Case Specialist
+2. The 7 workflow steps (actually 10 in my knowledge base)
+3. Ineligible training types
+4. "Better job" outcomes
+
+This is an introductory question, so I should be comprehensive but organized.
+</thinking>
+
+# ETG Business Case Specialist - Role Overview
+
+## My Role
+
+I'm an **ETG Business Case Specialist** for British Columbia's Employer Training Grant program. My mission is to transform employer training needs into **submission-ready ETG business cases** that maximize approval probability.
+
+**Core Expertise:**
+- ETG program requirements and eligibility criteria
+- BC training market landscape and provider research  
+- Business case development following the official 7-question template
+- "Better job" outcome definitions and compliance
+- Value for money justification and competitive analysis
+
+I create **complete, compliant business cases** in standardized XML format for system integration.
+
+---
+
+## The 10 Workflow Steps
+
+### Step 1: Eligibility Verification
+- Check training type against ineligible list
+- Verify participant eligibility (BC residents, work authorization)
+- Assess cost limits ($10K per participant)
+- Confirm "better job" outcome achievability
+
+### Step 2: Information Gathering
+- Company details for Q1 (Nature of Business)
+- Business challenges and urgency for Q2
+- Participant details and job relevance for Q3
+- Training provider and program details
+
+### Step 3: Draft Questions 1-3
+- Q1: Nature of Business (2-4 sentences)
+- Q2: Training Relevance to Business (urgent need)
+- Q3: Training Relevance to Job (individual participants)
+
+### Step 4: BC Alternatives Research
+- Find 2-3 comparable BC training providers
+- Document costs, duration, delivery method
+- Obtain working web links (required)
+
+### Step 5: Draft Question 4 (BC Alternatives)
+- Format alternatives with complete details
+- Include web links for each option
+
+### Step 6: Draft Question 5 (Provider Justification)
+- Explain selection rationale
+- Justify value for money
+- Demonstrate provider expertise
+
+### Step 7: Draft Question 6 (Out-of-Province)
+- N/A if BC provider
+- Justify "exceptional circumstances" if non-BC
+
+### Step 8: Draft Question 7 (Employee Outcome)
+- Select specific "better job" outcome
+- Individual details for each participant
+- Connect training to outcome
+
+### Step 9: Quality Review & XML Output
+- Verify all eligibility criteria met
+- Generate structured XML format
+
+### Step 10: Revisions & Refinements
+- Make requested changes
+- Strengthen weak sections
+
+---
+
+## Ineligible Training Types
+
+❌ **Automatically Ineligible:**
+- **Seminars** (any training called "seminar")
+- **Conferences and networking events**
+- **Trade shows and exhibitions**
+- **Coaching and mentoring programs** (unless part of certification)
+- **Consulting services**
+- **Paid practicums or internships**
+- **Diploma or degree programs** (including single courses)
+- **Annual meetings or retreats**
+
+❌ **Other Ineligible Criteria:**
+- Over 52 weeks duration
+- Over $10,000 per participant
+- Maintenance/recertification only (no "better job" outcome)
+- Training for general "professional development"
+- Starts before application date
+
+---
+
+## "Better Job" Outcomes (Official ETG Definitions)
+
+✅ **The 5 Eligible Outcomes:**
+
+### 1. Increased Job Security
+- **When:** Employee lacks full skills for current job
+- **Example:** Certification training to secure existing position
+
+### 2. Increased Pay  
+- **When:** Training leads to specific wage increase
+- **Must specify:** Percentage or dollar amount increase
+
+### 3. Promotion or Advancement
+- **When:** Training enables move to higher position
+- **Must specify:** Current title → New title
+
+### 4. Part-Time → Full-Time Employment
+- **When:** Additional skills enable increased hours
+- **Must specify:** Current hours → New hours
+
+### 5. Temporary → Permanent Employment
+- **When:** Training creates pathway to permanent role
+- **Example:** Contract to permanent position
+
+---
+
+## What Makes Applications Successful
+
+**Strong Applications Have:**
+- **Immediate urgent business need** (not "nice to have")
+- **Specific "better job" outcomes** for each individual
+- **Thorough BC alternatives research** (2+ options with links)
+- **Clear value for money justification**
+- **Professional prose style** (not bullet points)
+
+**Common Rejection Reasons:**
+- Vague "professional development" outcomes
+- Insufficient BC alternatives research
+- No urgent business justification
+- Training appears to be general upskilling
+
+---
+
+**Ready to help you create a winning ETG business case. What training are you considering?**
+
+============================================================
+
+Full Message Object:
+{
+  "model": "claude-sonnet-4-20250514",
+  "id": "msg_0154x7VCrEBYjEB1bYzwM8Hr",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "<thinking>\nThe user is asking for an overview of my role and key information. I should provide a clear, structured explanation covering:\n1. My role as ETG Business Case Specialist\n2. The 7 workflow steps (actually 10 in my knowledge base)\n3. Ineligible training types\n4. \"Better job\" outcomes\n\nThis is an introductory question, so I should be comprehensive but organized.\n</thinking>\n\n# ETG Business Case Specialist - Role Overview\n\n## My Role\n\nI'm an **ETG Business Case Specialist** for British Columbia's Employer Training Grant program. My mission is to transform employer training needs into **submission-ready ETG business cases** that maximize approval probability.\n\n**Core Expertise:**\n- ETG program requirements and eligibility criteria\n- BC training market landscape and provider research  \n- Business case development following the official 7-question template\n- \"Better job\" outcome definitions and compliance\n- Value for money justification and competitive analysis\n\nI create **complete, compliant business cases** in standardized XML format for system integration.\n\n---\n\n## The 10 Workflow Steps\n\n### Step 1: Eligibility Verification\n- Check training type against ineligible list\n- Verify participant eligibility (BC residents, work authorization)\n- Assess cost limits ($10K per participant)\n- Confirm \"better job\" outcome achievability\n\n### Step 2: Information Gathering\n- Company details for Q1 (Nature of Business)\n- Business challenges and urgency for Q2\n- Participant details and job relevance for Q3\n- Training provider and program details\n\n### Step 3: Draft Questions 1-3\n- Q1: Nature of Business (2-4 sentences)\n- Q2: Training Relevance to Business (urgent need)\n- Q3: Training Relevance to Job (individual participants)\n\n### Step 4: BC Alternatives Research\n- Find 2-3 comparable BC training providers\n- Document costs, duration, delivery method\n- Obtain working web links (required)\n\n### Step 5: Draft Question 4 (BC Alternatives)\n- Format alternatives with complete details\n- Include web links for each option\n\n### Step 6: Draft Question 5 (Provider Justification)\n- Explain selection rationale\n- Justify value for money\n- Demonstrate provider expertise\n\n### Step 7: Draft Question 6 (Out-of-Province)\n- N/A if BC provider\n- Justify \"exceptional circumstances\" if non-BC\n\n### Step 8: Draft Question 7 (Employee Outcome)\n- Select specific \"better job\" outcome\n- Individual details for each participant\n- Connect training to outcome\n\n### Step 9: Quality Review & XML Output\n- Verify all eligibility criteria met\n- Generate structured XML format\n\n### Step 10: Revisions & Refinements\n- Make requested changes\n- Strengthen weak sections\n\n---\n\n## Ineligible Training Types\n\n❌ **Automatically Ineligible:**\n- **Seminars** (any training called \"seminar\")\n- **Conferences and networking events**\n- **Trade shows and exhibitions**\n- **Coaching and mentoring programs** (unless part of certification)\n- **Consulting services**\n- **Paid practicums or internships**\n- **Diploma or degree programs** (including single courses)\n- **Annual meetings or retreats**\n\n❌ **Other Ineligible Criteria:**\n- Over 52 weeks duration\n- Over $10,000 per participant\n- Maintenance/recertification only (no \"better job\" outcome)\n- Training for general \"professional development\"\n- Starts before application date\n\n---\n\n## \"Better Job\" Outcomes (Official ETG Definitions)\n\n✅ **The 5 Eligible Outcomes:**\n\n### 1. Increased Job Security\n- **When:** Employee lacks full skills for current job\n- **Example:** Certification training to secure existing position\n\n### 2. Increased Pay  \n- **When:** Training leads to specific wage increase\n- **Must specify:** Percentage or dollar amount increase\n\n### 3. Promotion or Advancement\n- **When:** Training enables move to higher position\n- **Must specify:** Current title → New title\n\n### 4. Part-Time → Full-Time Employment\n- **When:** Additional skills enable increased hours\n- **Must specify:** Current hours → New hours\n\n### 5. Temporary → Permanent Employment\n- **When:** Training creates pathway to permanent role\n- **Example:** Contract to permanent position\n\n---\n\n## What Makes Applications Successful\n\n**Strong Applications Have:**\n- **Immediate urgent business need** (not \"nice to have\")\n- **Specific \"better job\" outcomes** for each individual\n- **Thorough BC alternatives research** (2+ options with links)\n- **Clear value for money justification**\n- **Professional prose style** (not bullet points)\n\n**Common Rejection Reasons:**\n- Vague \"professional development\" outcomes\n- Insufficient BC alternatives research\n- No urgent business justification\n- Training appears to be general upskilling\n\n---\n\n**Ready to help you create a winning ETG business case. What training are you considering?**"
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 14420,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 1169,
+    "service_tier": "standard"
+  }
+}
