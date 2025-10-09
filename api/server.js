@@ -69,40 +69,15 @@ async function queryWithTimeout(sql, params, timeoutMs = 8000) {
   console.log(`   🔍 Pool state: { totalCount: ${pool.totalCount}, idleCount: ${pool.idleCount}, waitingCount: ${pool.waitingCount} }`);
 
   let client = null;
-  let clientAcquirePromise = null;
   let timedOut = false;
 
   try {
-    // Acquire client with timeout
-    console.log(`   🔍 Acquiring database client...`);
-    clientAcquirePromise = pool.connect();
-
-    const clientTimeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => {
-        timedOut = true;
-        reject(new Error(`Client acquisition timeout after ${timeoutMs}ms`));
-      }, timeoutMs);
-    });
-
-    client = await Promise.race([clientAcquirePromise, clientTimeoutPromise]);
-
-    if (timedOut) {
-      // If we timed out, clean up the dangling promise
-      clientAcquirePromise.then(danglingClient => {
-        console.log(`   🧹 Releasing dangling client from timeout`);
-        danglingClient.release();
-      }).catch(() => {});
-      throw new Error(`Client acquisition timeout after ${timeoutMs}ms`);
-    }
-
-    console.log(`   ✅ Client acquired`);
-
-    // Execute query with timeout
-    console.log(`   🔍 Executing query...`);
-    const queryPromise = client.query(sql, params);
+    // Try pool.query first (simpler, no manual client management)
+    console.log(`   🔍 Executing query directly with pool.query()...`);
+    const queryPromise = pool.query(sql, params);
     const queryTimeoutPromise = new Promise((_, reject) => {
       setTimeout(() => {
-        // Timeout - will be caught and handled by caller
+        timedOut = true;
         reject(new Error(`Query timeout after ${timeoutMs}ms`));
       }, timeoutMs);
     });
@@ -113,13 +88,6 @@ async function queryWithTimeout(sql, params, timeoutMs = 8000) {
   } catch (error) {
     console.error(`   ❌ Query failed:`, error.message);
     throw error;
-  } finally {
-    // Release client if we have one
-    if (client) {
-      console.log(`   🔌 Releasing client...`);
-      client.release();
-      console.log(`   ✅ Client released`);
-    }
   }
 }
 
