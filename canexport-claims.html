@@ -1021,7 +1021,8 @@
             color: var(--text-primary);
         }
 
-        .sidebar-close {
+        .sidebar-close,
+        .sidebar-refresh {
             background: none;
             border: none;
             font-size: 1.5rem;
@@ -1029,10 +1030,32 @@
             color: var(--text-secondary);
             padding: 0.25rem;
             line-height: 1;
+            transition: all 0.2s ease;
         }
 
-        .sidebar-close:hover {
-            color: var(--text-primary);
+        .sidebar-refresh {
+            font-size: 1.2rem;
+            margin-right: 0.5rem;
+        }
+
+        .sidebar-refresh.spinning {
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .sidebar-close:hover,
+        .sidebar-refresh:hover {
+            color: var(--granted-blue);
+        }
+
+        .sidebar-actions {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
         .conversation-list {
@@ -1171,7 +1194,10 @@
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <span class="sidebar-title">💬 Conversations</span>
-            <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+            <div class="sidebar-actions">
+                <button class="sidebar-refresh" onclick="refreshConversationsList()" title="Refresh conversations">🔄</button>
+                <button class="sidebar-close" onclick="toggleSidebar()">×</button>
+            </div>
         </div>
         <div class="conversation-list" id="conversation-list">
             <div class="empty-conversations">Loading conversations...</div>
@@ -1772,6 +1798,33 @@ async function handleStreamingResponse(response, messageDiv) {
             } catch (error) {
                 console.error('Failed to load conversations:', error);
                 conversationList.innerHTML = '<div class="empty-conversations">Failed to load conversations</div>';
+            }
+        }
+
+        // Refresh conversations on demand with visual feedback
+        async function refreshConversationsList() {
+            const refreshButton = document.querySelector('.sidebar-refresh');
+            const conversationList = document.getElementById('conversation-list');
+
+            if (!conversationList) return;
+
+            // Add spinning animation
+            if (refreshButton) {
+                refreshButton.classList.add('spinning');
+            }
+
+            // Show loading state
+            conversationList.innerHTML = '<div class="empty-conversations">🔄 Refreshing...</div>';
+
+            try {
+                await loadConversationsList();
+            } finally {
+                // Remove spinning animation after a minimum time for visual feedback
+                setTimeout(() => {
+                    if (refreshButton) {
+                        refreshButton.classList.remove('spinning');
+                    }
+                }, 500);
             }
         }
 
