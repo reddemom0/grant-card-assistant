@@ -1261,6 +1261,124 @@ const GRANT_TYPE_CLASSIFICATION = `<grant_types>
   </type>
 </grant_types>`;
 
+// UNIVERSAL OUTPUT PHILOSOPHY - CRITICAL FOR ALL TASKS
+const OUTPUT_PHILOSOPHY = `<output_philosophy priority="CRITICAL">
+  <purpose>Grant Cards are DECISION-MAKING TOOLS, not comprehensive documentation</purpose>
+  <user_context>Users scan grant cards in 60-90 seconds to determine fit before reading source documents</user_context>
+  <design_principle>Extract CRITICAL information only - strategic highlights that enable go/no-go decisions, not exhaustive detail</design_principle>
+
+  <universal_constraints>
+    <constraint type="length">
+      - Total grant card output: 800-1200 words maximum (NOT 2000+ words)
+      - Individual fields: 50-200 words depending on field complexity
+      - Sentences: Clear, direct, active voice - maximum 20-25 words per sentence
+      - Paragraphs: Maximum 2-3 sentences each
+    </constraint>
+
+    <constraint type="format">
+      - Use bullet points for lists (NOT dense paragraphs)
+      - Maximum 2-3 sentences per paragraph block
+      - White space between sections for scannability
+      - Bold key terms sparingly for emphasis
+    </constraint>
+
+    <constraint type="content">
+      - Include MOST IMPORTANT details only - not everything available
+      - Omit redundant information that repeats across fields
+      - Avoid repetition - each field has unique purpose
+      - No exhaustive lists - show representative examples with "e.g."
+      - Prioritize: Must-know > Nice-to-know > Can-look-up-later
+    </constraint>
+  </universal_constraints>
+
+  <scannability_test>
+    After writing each field, ask: "Can a user understand the key point in 5-10 seconds?"
+    If no, the field is too long or poorly formatted. Revise before outputting.
+  </scannability_test>
+
+  <remember>
+    Users have access to the FULL source document if they need more detail.
+    Your job is to extract the ESSENCE, not document EVERYTHING.
+  </remember>
+</output_philosophy>`;
+
+// FIELD LENGTH LIMITS FOR GRANT-CRITERIA TASK
+const FIELD_LENGTH_LIMITS = `<field_length_limits priority="CRITICAL">
+  <field name="Program Name">1 line</field>
+  <field name="Funder">1 line</field>
+  <field name="Amount">1-2 lines</field>
+  <field name="Deadline">1-2 lines</field>
+
+  <field name="Program Details">
+    <max_words>150</max_words>
+    <format>3-5 bullet points OR 2-3 short paragraphs</format>
+    <focus>Application process, key timelines, standout features</focus>
+  </field>
+
+  <field name="Eligibility Criteria">
+    <max_words>100</max_words>
+    <format>Bullet points (5-8 items)</format>
+    <focus>Must-have requirements only</focus>
+  </field>
+
+  <field name="Eligible Activities">
+    <max_words>120</max_words>
+    <format>Categorized bullets with 2-3 examples per category</format>
+    <focus>Main activity categories, not exhaustive lists</focus>
+  </field>
+
+  <field name="Eligible Expenses">
+    <max_words>80</max_words>
+    <format>Bullet points (6-10 items)</format>
+    <focus>Top expense categories only</focus>
+  </field>
+
+  <field name="Ineligible Expenses">
+    <max_words>50</max_words>
+    <format>Bullet points (4-6 items)</format>
+    <focus>Most common restrictions</focus>
+  </field>
+
+  <field name="Application Requirements">
+    <max_words>100</max_words>
+    <format>Bullet points (6-8 items)</format>
+    <focus>Core documentation requirements</focus>
+  </field>
+
+  <field name="Evaluation Criteria">
+    <max_words>80</max_words>
+    <format>Bullet points with scoring weights if available</format>
+    <focus>Top 4-6 criteria</focus>
+  </field>
+
+  <field name="Other Important Details">
+    <max_words>100</max_words>
+    <format>Bullet points (3-5 items)</format>
+    <focus>Critical program-specific details not covered above</focus>
+  </field>
+</field_length_limits>`;
+
+// LENGTH ENFORCEMENT INSTRUCTIONS
+const LENGTH_ENFORCEMENT = `<length_enforcement priority="CRITICAL">
+  <instruction>Count words in each field as you write</instruction>
+  <instruction>If approaching limit, prioritize and cut less important details</instruction>
+  <instruction>Use "e.g." to show examples without exhaustive lists</instruction>
+  <instruction>Combine related items to save space</instruction>
+  <instruction>Remember: Users can read the full source document if they need more detail</instruction>
+</length_enforcement>`;
+
+// PRE-OUTPUT CHECKLIST
+const PRE_OUTPUT_CHECKLIST = `<pre_output_checklist priority="CRITICAL">
+  Before presenting the grant card, verify:
+  □ Total output is 800-1200 words (not 2000+)
+  □ Each field stays within its word limit
+  □ Information is in bullets or short paragraphs
+  □ No walls of text longer than 3 sentences
+  □ Most important details are included
+  □ Less critical details are omitted
+  □ User can scan the entire card in 60-90 seconds
+</pre_output_checklist>`;
+
 // TASK-SPECIFIC METHODOLOGIES WITH XML STRUCTURE
 const taskMethodologies = {
   'grant-criteria': `<task type="grant-criteria">
@@ -1309,25 +1427,38 @@ const taskMethodologies = {
     </phase>
 
     <phase number="3" name="Structured Extraction & Formatting">
-      <description>Extract all information following exact formatting requirements</description>
+      <description>Extract all information following exact formatting requirements WITH STRICT LENGTH CONSTRAINTS</description>
       <reference_document>GRANT-CRITERIA-Formatter Instructions</reference_document>
+
+      ${FIELD_LENGTH_LIMITS}
+
+      ${LENGTH_ENFORCEMENT}
+
       <steps>
         <step>Follow the GRANT-CRITERIA-Formatter Instructions from {{KNOWLEDGE_BASE}} EXACTLY</step>
         <step>Use ONLY the exact field names specified for the classified grant type</step>
-        <step>Search the ENTIRE {{GRANT_DOCUMENT}} for each field, extract ALL available information</step>
-        <step>Make "Program Details" the most comprehensive field with ALL available operational details</step>
+        <step>Extract CRITICAL information only - not exhaustive detail (see field length limits above)</step>
+        <step>ENFORCE word limits for each field - prioritize must-know over nice-to-know information</step>
+        <step>Use bullet points for lists (NOT dense paragraphs)</step>
         <step>For unavailable information, use exact phrase: "Information not available in source material"</step>
-        <step>Extract information verbatim - do not interpret, paraphrase, or infer details not explicitly stated</step>
+        <step>Extract information verbatim but concisely - strategic highlights only</step>
+        <step>Remember: Total grant card should be 800-1200 words maximum</step>
       </steps>
     </phase>
 
-    <phase number="4" name="Quality Assurance & Strategic Analysis">
-      <description>Verify completeness and accuracy</description>
+    <phase number="4" name="Quality Assurance & Length Verification">
+      <description>Verify completeness, accuracy, and conciseness</description>
       <reference_document>GRANT-CRITERIA-Formatter Instructions (Enhanced Final Check section)</reference_document>
+
+      ${PRE_OUTPUT_CHECKLIST}
+
       <steps>
         <step>Follow the Enhanced Final Check from GRANT-CRITERIA-Formatter Instructions</step>
         <step>Verify all required fields for the classified grant type are included</step>
-        <step>Ensure comprehensive extraction following the document search strategy</step>
+        <step>VERIFY each field stays within its word limit (see field_length_limits above)</step>
+        <step>Check total output is 800-1200 words (not 2000+)</step>
+        <step>Confirm no walls of text longer than 3 sentences</step>
+        <step>Ensure scannability - user should understand key points in 60-90 seconds</step>
         <step>Confirm no information was fabricated or assumed</step>
         <step>Validate that field names exactly match knowledge base specifications</step>
       </steps>
@@ -1335,12 +1466,28 @@ const taskMethodologies = {
   </methodology>
 
   <output_format>
+    <critical_rule>EVERY field must be scannable in under 10 seconds</critical_rule>
+    <critical_rule>If any field exceeds its word limit, revise and shorten before outputting</critical_rule>
+    <critical_rule>Quality = strategic extraction, not comprehensive documentation</critical_rule>
+
     <include>Only the structured grant criteria content in the exact format specified by GRANT-CRITERIA-Formatter Instructions</include>
     <include>Use the exact field names for the classified grant type</include>
+    <include>Use bullet points for lists (NOT dense paragraphs)</include>
+    <include>Maximum 2-3 sentences per paragraph block</include>
+
     <exclude>Do NOT include meta-commentary about your methodology or process</exclude>
     <exclude>Do NOT include references to knowledge base documents in the output</exclude>
     <exclude>Do NOT include explanatory footnotes about your extraction process</exclude>
     <exclude>Do NOT include preambles like "Here is the grant criteria..." - start directly with the content</exclude>
+
+    <what_to_exclude>
+      - Exhaustive lists of every possible item
+      - Repetitive information already stated in another field
+      - Generic boilerplate (unless critical to understanding)
+      - Minor procedural details
+      - Full paragraphs copied from source document
+    </what_to_exclude>
+
     <tone>Spartan: concise, direct, actionable. No marketing fluff or hedging language.</tone>
   </output_format>
 
@@ -1811,7 +1958,9 @@ function buildGrantCardSystemPrompt(task, knowledgeContext = '') {
 
 ${WORKFLOW_CONTEXT}
 
-${GRANT_TYPE_CLASSIFICATION}`;
+${GRANT_TYPE_CLASSIFICATION}
+
+${OUTPUT_PHILOSOPHY}`;
 
   const methodology = taskMethodologies[task] || taskMethodologies['grant-criteria'];
 
@@ -1822,12 +1971,15 @@ ${knowledgeContext}
 </knowledge_base>
 
 <critical_instructions>
+  <instruction priority="highest">Follow the OUTPUT PHILOSOPHY - Grant Cards are decision-making tools, not comprehensive documentation</instruction>
+  <instruction priority="highest">ENFORCE all length constraints: 800-1200 words total, field-specific limits must be respected</instruction>
   <instruction priority="highest">Follow the exact workflows and instructions from the {{KNOWLEDGE_BASE}} documents above</instruction>
   <instruction priority="highest">When knowledge base instructions conflict with general guidance, ALWAYS follow the knowledge base</instruction>
   <instruction priority="critical">Provide ONLY the requested output content - no preambles, no meta-commentary</instruction>
   <instruction priority="critical">Do NOT include references to knowledge base documents in your output</instruction>
   <instruction priority="critical">Do NOT include explanatory footnotes about your process or methodology</instruction>
   <instruction priority="critical">Do NOT start responses with phrases like "Here is..." or "I've created..." - begin directly with the content</instruction>
+  <instruction priority="critical">SCANNABILITY TEST: Can a user understand each field's key point in 5-10 seconds?</instruction>
 </critical_instructions>`;
 
   return {
