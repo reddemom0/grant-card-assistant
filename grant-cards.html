@@ -2104,9 +2104,31 @@ async function handleStreamingResponse(response, messageDiv) {
             addLoadingMessage();
 
             try {
+                // Smart task detection from message content if no button was clicked
+                let detectedTask = selectedTask;
+                if (!detectedTask && message) {
+                    const lowerMessage = message.toLowerCase();
+                    if (lowerMessage.includes('insight')) {
+                        detectedTask = 'insights';
+                    } else if (lowerMessage.includes('categor') || lowerMessage.includes('tag')) {
+                        detectedTask = 'categories';
+                    } else if (lowerMessage.includes('missing') || lowerMessage.includes('gap')) {
+                        detectedTask = 'missing-info';
+                    } else if (lowerMessage.includes('preview') || lowerMessage.includes('description')) {
+                        detectedTask = 'preview';
+                    } else if (lowerMessage.includes('requirement')) {
+                        detectedTask = 'requirements';
+                    } else if (lowerMessage.includes('criteria') || lowerMessage.includes('generate')) {
+                        detectedTask = 'grant-criteria';
+                    } else {
+                        detectedTask = 'grant-criteria'; // default
+                    }
+                    console.log(`🎯 Auto-detected task from message: "${detectedTask}"`);
+                }
+
                 const formData = new FormData();
                 formData.append('message', message || '');
-                formData.append('task', selectedTask || 'grant-criteria');
+                formData.append('task', detectedTask || 'grant-criteria');
                 formData.append('conversationId', conversationId);
                 formData.append('agentType', 'grant-cards');
 
