@@ -3722,11 +3722,13 @@ async function processFileContent(file) {
   }
 }
 
-// Fetch URL content
+// Fetch URL content (LEGACY - for ETG courseUrl parameter backward compatibility)
+// NOTE: This function returns mock data. Other agents now use the native web_fetch tool
+// which automatically fetches real content from URLs detected in conversation context.
 async function fetchURLContent(url) {
   try {
-    console.log(`🔗 Fetching content from: ${url}`);
-    
+    console.log(`🔗 Fetching content from: ${url} (LEGACY - mock data)`);
+
     return `Course Information from ${url}:
 
 Course Title: Professional Development Training
@@ -3737,7 +3739,7 @@ Content: Skills development, best practices, certification preparation
 Cost: $2,500 per participant
 
 This appears to be eligible training content suitable for ETG funding.`;
-    
+
   } catch (error) {
     console.error('URL fetch error:', error);
     throw new Error(`Error fetching URL content: ${error.message}`);
@@ -3846,6 +3848,18 @@ function getWebSearchTool(agentType) {
   return WEB_SEARCH_TOOL;
 }
 
+// WEB FETCH CONFIGURATION
+const WEB_FETCH_TOOL = {
+  type: "web_fetch_20250910",
+  name: "web_fetch",
+  max_uses: 5
+};
+
+// Get web fetch tool (same for all agents currently)
+function getWebFetchTool(agentType) {
+  return WEB_FETCH_TOOL;
+}
+
 // MEMORY TOOL: Currently disabled pending migration to serverful platform
 // Anthropic's memory tool (memory_20250818) requires client-side storage backend
 // (filesystem, database, Redis, etc.) which doesn't work in current serverless environment
@@ -3928,14 +3942,14 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27'
+        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27,web-fetch-2025-09-10'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
         system: systemPrompt,
         messages: apiMessages,
-        tools: [WEB_SEARCH_TOOL]
+        tools: [WEB_SEARCH_TOOL, WEB_FETCH_TOOL]
       })
     });
 
@@ -3953,34 +3967,49 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
     
     console.log('🔄 RESPONSE ANALYSIS:');
     console.log(`   Content blocks: ${data.content?.length || 0}`);
-    
+
     let toolUsageCount = 0;
+    let webSearchCount = 0;
+    let webFetchCount = 0;
     let textContent = '';
-    
+
     for (const block of data.content || []) {
       console.log(`   Block type: ${block.type}`);
-      
+
       if (block.type === 'text') {
         textContent += block.text;
         console.log(`   Text length: ${block.text?.length || 0} chars`);
-      } 
+      }
       else if (block.type === 'server_tool_use') {
         toolUsageCount++;
-        console.log(`   🌐 WEB SEARCH INITIATED: ${block.name || 'web_search'}`);
-        console.log(`   Tool ID: ${block.id}`);
-        if (block.input?.query) {
-          console.log(`   Query: "${block.input.query}"`);
+        if (block.name === 'web_search') {
+          webSearchCount++;
+          console.log(`   🌐 WEB SEARCH INITIATED: ${block.name}`);
+          console.log(`   Tool ID: ${block.id}`);
+          if (block.input?.query) {
+            console.log(`   Query: "${block.input.query}"`);
+          }
+        } else if (block.name === 'web_fetch') {
+          webFetchCount++;
+          console.log(`   🔗 WEB FETCH INITIATED: ${block.name}`);
+          console.log(`   Tool ID: ${block.id}`);
+          if (block.input?.url) {
+            console.log(`   URL: "${block.input.url}"`);
+          }
         }
       }
       else if (block.type === 'web_search_tool_result') {
         console.log(`   📄 WEB SEARCH RESULT: Found ${block.content?.length || 0} results`);
       }
+      else if (block.type === 'web_fetch_tool_result') {
+        console.log(`   📄 WEB FETCH RESULT: Fetched content (${block.content?.length || 0} chars)`);
+      }
     }
-    
+
     if (toolUsageCount > 0) {
-      console.log(`🌐 Web searches performed: ${toolUsageCount}`);
+      console.log(`🌐 Tools used: ${webSearchCount} searches, ${webFetchCount} fetches`);
     } else {
-      console.log(`📚 No web search used - Claude answered from knowledge base`);
+      console.log(`📚 No tools used - Claude answered from knowledge base`);
     }
 
     console.log(`📊 Usage: ${data.usage?.input_tokens || 0} in + ${data.usage?.output_tokens || 0} out tokens`);
@@ -4022,9 +4051,10 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
     await waitForRateLimit();
 
     const webSearchTool = getWebSearchTool(agentType);
+    const webFetchTool = getWebFetchTool(agentType);
     console.log(`🔥 Making streaming Claude API call with Extended Thinking`);
     console.log(`🤖 Agent: ${agentType}`);
-    console.log(`🔧 Tools available: web_search (max ${webSearchTool.max_uses} uses)`);
+    console.log(`🔧 Tools available: web_search (max ${webSearchTool.max_uses} uses), web_fetch (max ${webFetchTool.max_uses} uses)`);
     if (webSearchTool.allowed_domains) {
       console.log(`🔒 Allowed domains: ${webSearchTool.allowed_domains.join(', ')}`);
     }
@@ -4092,7 +4122,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27'
+        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27,web-fetch-2025-09-10'
       },
       body: (() => {
         const requestBody = {
@@ -4101,7 +4131,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
           system: systemPrompt,
           messages: apiMessages,
           stream: true,
-          tools: [webSearchTool]
+          tools: [webSearchTool, webFetchTool]
         };
 
         // Extended Thinking enabled for all agents
@@ -4162,7 +4192,7 @@ console.log(`🚀 Starting streaming response with Extended Thinking + XML struc
                 console.log(`🧠 Thinking used: ${thinkingBuffer.length} chars (hidden from user)`);
               }
               if (toolUsageCount > 0) {
-                console.log(`🌐 Total web searches used: ${toolUsageCount}`);
+                console.log(`🔧 Total tools used: ${toolUsageCount}`);
               }
               res.write('data: [DONE]\n\n');
               res.end();
@@ -4227,7 +4257,19 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
               
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
                 toolUsageCount++;
-                console.log(`🌐 STREAMING TOOL USED: ${parsed.content_block.name}`);
+
+                const toolName = parsed.content_block.name;
+                if (toolName === 'web_search') {
+                  console.log(`🌐 STREAMING TOOL USED: web_search`);
+                  if (parsed.content_block.input?.query) {
+                    console.log(`   Query: "${parsed.content_block.input.query}"`);
+                  }
+                } else if (toolName === 'web_fetch') {
+                  console.log(`🔗 STREAMING TOOL USED: web_fetch`);
+                  if (parsed.content_block.input?.url) {
+                    console.log(`   URL: "${parsed.content_block.input.url}"`);
+                  }
+                }
 
                 // Capture complete tool_use block for conversation history
                 currentToolUseBlock = {
@@ -4240,12 +4282,13 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
                 res.write(`data: ${JSON.stringify({
                   tool_use: {
                     name: parsed.content_block.name,
-                    query: parsed.content_block.input?.query
+                    query: parsed.content_block.input?.query,
+                    url: parsed.content_block.input?.url
                   }
                 })}\n\n`);
               }
 
-              // Handle tool result blocks from server tools (e.g., web_search)
+              // Handle tool result blocks from server tools (e.g., web_search, web_fetch)
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'web_search_tool_result') {
                 console.log(`📄 WEB SEARCH RESULT: Received results`);
 
@@ -4253,6 +4296,19 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
                 const toolResultBlock = {
                   type: 'web_search_tool_result',
                   content: parsed.content_block.content || []
+                };
+                fullContentBlocks.push(toolResultBlock);
+
+                // Note: Tool results are not streamed to user, only the final text response
+              }
+
+              if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'web_fetch_tool_result') {
+                console.log(`🔗 WEB FETCH RESULT: Received content`);
+
+                // Capture tool result block for conversation history
+                const toolResultBlock = {
+                  type: 'web_fetch_tool_result',
+                  content: parsed.content_block.content || ''
                 };
                 fullContentBlocks.push(toolResultBlock);
 
