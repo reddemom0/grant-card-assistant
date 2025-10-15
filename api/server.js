@@ -3965,94 +3965,48 @@ function getWebSearchTool(agentType) {
 // MEMORY TOOL CONFIGURATION
 // Client-side memory tool for persistent knowledge across conversations
 const MEMORY_TOOL = {
-  type: "memory_20250818",
+  type: "custom",
   name: "memory",
-  commands: [
-    {
-      command: "view",
-      description: "Read the contents of a memory file",
-      parameters: {
-        path: {
-          type: "string",
-          description: "Path to the memory file (e.g., /memories/user_feedback/corrections.xml)"
-        }
+  description: "Client-side memory tool for building persistent knowledge across conversations. Supports operations: view (read file), create (new file), str_replace (update content), insert (add at line), delete (remove file), rename (move/rename file). All paths start with /memories/",
+  input_schema: {
+    type: "object",
+    properties: {
+      command: {
+        type: "string",
+        enum: ["view", "create", "str_replace", "insert", "delete", "rename"],
+        description: "The memory operation to perform"
+      },
+      path: {
+        type: "string",
+        description: "Path to the memory file (e.g., /memories/user_feedback/corrections.xml)"
+      },
+      content: {
+        type: "string",
+        description: "Content for create/insert operations"
+      },
+      old_str: {
+        type: "string",
+        description: "String to find and replace (for str_replace command)"
+      },
+      new_str: {
+        type: "string",
+        description: "Replacement string (for str_replace command)"
+      },
+      line: {
+        type: "integer",
+        description: "Line number for insert operation (0-indexed)"
+      },
+      old_path: {
+        type: "string",
+        description: "Current path of the file (for rename command)"
+      },
+      new_path: {
+        type: "string",
+        description: "New path for the file (for rename command)"
       }
     },
-    {
-      command: "create",
-      description: "Create a new memory file",
-      parameters: {
-        path: {
-          type: "string",
-          description: "Path for the new memory file"
-        },
-        content: {
-          type: "string",
-          description: "Content to write to the file"
-        }
-      }
-    },
-    {
-      command: "str_replace",
-      description: "Replace content in a memory file",
-      parameters: {
-        path: {
-          type: "string",
-          description: "Path to the memory file"
-        },
-        old_str: {
-          type: "string",
-          description: "String to find and replace"
-        },
-        new_str: {
-          type: "string",
-          description: "Replacement string"
-        }
-      }
-    },
-    {
-      command: "insert",
-      description: "Insert content at a specific line",
-      parameters: {
-        path: {
-          type: "string",
-          description: "Path to the memory file"
-        },
-        line: {
-          type: "integer",
-          description: "Line number to insert at (0-indexed)"
-        },
-        content: {
-          type: "string",
-          description: "Content to insert"
-        }
-      }
-    },
-    {
-      command: "delete",
-      description: "Delete a memory file",
-      parameters: {
-        path: {
-          type: "string",
-          description: "Path to the memory file to delete"
-        }
-      }
-    },
-    {
-      command: "rename",
-      description: "Rename or move a memory file",
-      parameters: {
-        old_path: {
-          type: "string",
-          description: "Current path of the memory file"
-        },
-        new_path: {
-          type: "string",
-          description: "New path for the memory file"
-        }
-      }
-    }
-  ]
+    required: ["command"]
+  }
 };
 
 /**
