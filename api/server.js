@@ -1742,8 +1742,19 @@ const taskMethodologies = {
   </methodology>
 
   <output_format>
-    <include>3-4 strategic bullet points providing competitive intelligence and positioning advice</include>
+    <critical_instruction>OUTPUT ONLY THE INSIGHTS SECTION - DO NOT generate full Grant Criteria, Grant Card, or any other sections</critical_instruction>
+    <structure>
+## Granted Insights
+
+• [Strategic insight 1 - competitive advantage or positioning opportunity]
+• [Strategic insight 2 - insider knowledge or optimization strategy]
+• [Strategic insight 3 - non-obvious success factor or challenge mitigation]
+• **Next Steps**: Contact your Grant Consultant to [specific actionable advice]
+    </structure>
+    <include>Exactly 3-4 strategic bullet points providing competitive intelligence and positioning advice</include>
     <include>Final bullet point with "Next Steps" about contacting Grant Consultant</include>
+    <exclude>Do NOT generate Grant Criteria, Overview, Grant Value, Eligible Applicants, or any other grant card fields</exclude>
+    <exclude>Do NOT include full grant card structure - ONLY the insights bullets</exclude>
     <exclude>Do NOT include meta-commentary, preambles, or explanatory notes</exclude>
     <exclude>Do NOT exceed one sentence per bullet point</exclude>
     <format>3-4 strategic bullet points (1 sentence each maximum)</format>
@@ -2010,6 +2021,7 @@ ${GRANT_TYPE_CLASSIFICATION}
 ${OUTPUT_PHILOSOPHY}`;
 
   const methodology = taskMethodologies[task] || taskMethodologies['grant-criteria'];
+  console.log(`📝 Selected methodology for task: "${task}" (${methodology ? 'found' : 'using default'})`);
 
   const userPrompt = `${methodology}
 
@@ -4419,6 +4431,7 @@ async function handleStreamingRequest(req, res, agentType) {
   });
 
   const { message, task, conversationId, url: courseUrl } = req.body;
+  console.log(`🎯 TASK RECEIVED: "${task}" for agent: ${agentType}`);
 
   // Use conversationId as-is (frontend generates UUID)
   // Get existing file context
