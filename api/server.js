@@ -7,7 +7,6 @@ const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
-const { handleMemoryTool } = require('./memory-tool-handler');
 
 // Initialize Redis client (for file context and knowledge base cache)
 const redis = new Redis({
@@ -3963,98 +3962,12 @@ function getWebSearchTool(agentType) {
 }
 
 // MEMORY TOOL CONFIGURATION
-// Client-side memory tool for persistent knowledge across conversations
+// Using Anthropic's native memory feature for persistent knowledge across conversations
+// Requires beta header: context-management-2025-06-27 (already enabled)
 const MEMORY_TOOL = {
-  type: "custom",
-  name: "memory",
-  description: "Client-side memory tool for building persistent knowledge across conversations. Supports operations: view (read file), create (new file), str_replace (update content), insert (add at line), delete (remove file), rename (move/rename file). All paths start with /memories/",
-  input_schema: {
-    type: "object",
-    properties: {
-      command: {
-        type: "string",
-        enum: ["view", "create", "str_replace", "insert", "delete", "rename"],
-        description: "The memory operation to perform"
-      },
-      path: {
-        type: "string",
-        description: "Path to the memory file (e.g., /memories/user_feedback/corrections.xml)"
-      },
-      content: {
-        type: "string",
-        description: "Content for create/insert operations"
-      },
-      old_str: {
-        type: "string",
-        description: "String to find and replace (for str_replace command)"
-      },
-      new_str: {
-        type: "string",
-        description: "Replacement string (for str_replace command)"
-      },
-      line: {
-        type: "integer",
-        description: "Line number for insert operation (0-indexed)"
-      },
-      old_path: {
-        type: "string",
-        description: "Current path of the file (for rename command)"
-      },
-      new_path: {
-        type: "string",
-        description: "New path for the file (for rename command)"
-      }
-    },
-    required: ["command"]
-  }
+  type: "memory_20250818",
+  name: "memory"
 };
-
-/**
- * Process memory tool use blocks
- * Executes memory operations and returns tool_result blocks
- */
-async function processMemoryToolUse(contentBlocks) {
-  const memoryToolBlocks = contentBlocks.filter(
-    block => block.type === 'tool_use' && block.name === 'memory'
-  );
-
-  if (memoryToolBlocks.length === 0) {
-    return null; // No memory tools used
-  }
-
-  console.log(`🧠 Processing ${memoryToolBlocks.length} memory tool use(s)`);
-
-  const toolResults = [];
-  for (const toolBlock of memoryToolBlocks) {
-    console.log(`🧠 Memory tool: ${toolBlock.input?.command} at ${toolBlock.input?.path || 'unknown path'}`);
-
-    try {
-      const result = await handleMemoryTool(toolBlock.input?.command, toolBlock.input);
-
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: toolBlock.id,
-        content: JSON.stringify(result)
-      });
-
-      console.log(`✅ Memory operation completed: ${toolBlock.input?.command}`);
-    } catch (error) {
-      console.error(`❌ Memory tool error:`, error);
-
-      toolResults.push({
-        type: 'tool_result',
-        tool_use_id: toolBlock.id,
-        content: JSON.stringify({
-          success: false,
-          error: error.message
-        }),
-        is_error: true
-      });
-    }
-  }
-
-  return toolResults;
-}
 
 // Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
@@ -4189,28 +4102,8 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
 
     console.log(`📊 Usage: ${data.usage?.input_tokens || 0} in + ${data.usage?.output_tokens || 0} out tokens`);
 
-    // Check for memory tool usage (client-side tool)
-    const memoryToolResults = await processMemoryToolUse(data.content || []);
-
-    if (memoryToolResults && memoryToolResults.length > 0) {
-      // Memory tool was used - need to continue conversation with tool results
-      console.log(`🔄 Continuing conversation with ${memoryToolResults.length} memory tool result(s)`);
-
-      // Add assistant's tool use to conversation
-      messages.push({
-        role: 'assistant',
-        content: data.content
-      });
-
-      // Add tool results to conversation
-      messages.push({
-        role: 'user',
-        content: memoryToolResults
-      });
-
-      // Make another API call with tool results
-      return await callClaudeAPI(messages, systemPrompt, files);
-    }
+    // Native memory tool (memory_20250818) is handled automatically by Anthropic
+    // No manual processing required
 
     // Return full content blocks (including tool_use and tool_result blocks)
     // to preserve tool usage history in conversation
