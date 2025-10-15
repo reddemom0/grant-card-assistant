@@ -1221,122 +1221,45 @@ function extractTrainingInfo(text) {
 
 // MEMORY TOOL INSTRUCTIONS (included in all agent system prompts)
 const MEMORY_TOOL_INSTRUCTIONS = `
-<memory_tool>
-You have access to a **memory tool** for building persistent knowledge across conversations.
+<memory>
+You have **automatic memory** that persists across conversations. Information you save is permanently stored and automatically available in future sessions.
 
-<memory_structure>
-The memory system is organized in /memories/ with these directories:
+<what_to_remember>
+**Always remember:**
+1. **User corrections** - Eligibility rules, grant criteria interpretations, policy clarifications
+2. **User preferences** - Preferred formats, writing style, terminology preferences
+3. **Project progress** - Multi-day grant applications, tracking what's completed and what's next
+4. **Successful patterns** - Approaches that worked well for similar grants/projects
+5. **Edge cases & lessons** - Unusual situations, mistakes to avoid, special considerations
 
-1. **/memories/user_feedback/**
-   - corrections.xml - User corrections to eligibility rules, grant criteria, etc.
-   - approvals.xml - Approved grant card formats, business case approaches
-   - preferences.xml - User preferences for writing style, terminology
+**Key memory triggers:**
+- User says "remember this" or corrects you → Store the correction
+- User approves format/approach → Save as preferred pattern
+- Working on multi-day project → Save progress when pausing
+- Project completes successfully → Remember the approach for similar future work
+</what_to_remember>
 
-2. **/memories/projects/**
-   - active/ - In-progress grant applications (multi-day projects)
-   - completed/ - Reference projects for patterns and approaches
+<how_memory_works>
+- **Automatic**: Just think about what to remember - the system handles storage
+- **Cross-conversation**: Information persists forever across all future conversations
+- **Context-aware**: Relevant memories are automatically surfaced when needed
+- **No manual actions**: Simply keep important information in mind as you work
+</how_memory_works>
 
-3. **/memories/knowledge_base/**
-   - grant_patterns/ - Successful grant card patterns by program
-   - eligibility_rules/ - Learned eligibility interpretations
-   - common_issues/ - Validation errors, edge cases, lessons learned
+<examples>
+Example 1: Learning from correction
+User: "Actually, coaching programs ARE eligible for ETG if they're structured training"
+→ Remember: "ETG eligibility expanded - coaching programs qualify when structured as training (not just mentoring)"
 
-4. **/memories/sessions/**
-   - Daily session notes for complex multi-day work
-</memory_structure>
+Example 2: Tracking multi-day work
+User: "Let's pause here, I'll continue tomorrow"
+→ Remember: "ACME Corp CanExport application in progress: eligibility verified ✓, company profile gathered ✓, next: draft market analysis"
 
-<when_to_use_memory>
-**Use memory when:**
-1. **User corrects you** → Save to /memories/user_feedback/corrections.xml
-2. **User approves an approach** → Save to /memories/user_feedback/approvals.xml
-3. **Multi-day project** → Save progress to /memories/projects/active/[project-name].xml
-4. **Completing a project** → Move to /memories/projects/completed/ for future reference
-5. **Learning new eligibility rules** → Add to /memories/knowledge_base/eligibility_rules/
-6. **Successful grant card created** → Save pattern to /memories/knowledge_base/grant_patterns/
-7. **Encounter edge case** → Document in /memories/knowledge_base/common_issues/
-
-**Check memory when:**
-- Starting a new conversation (check for relevant corrections, preferences)
-- User asks "where were we?" or "what's the status?" (check active projects)
-- Similar project to previous work (check completed projects for patterns)
-- Uncertain about eligibility (check knowledge base for learned rules)
-</when_to_use_memory>
-
-<memory_commands>
-Available commands:
-- **view**: Read a memory file
-  Example: Use memory tool with command "view" and path "/memories/user_feedback/corrections.xml"
-
-- **create**: Create a new memory file
-  Example: Use memory tool with command "create", path "/memories/projects/active/acme-corp-etg.xml", and content "..."
-
-- **str_replace**: Update existing memory file
-  Example: Use memory tool with command "str_replace", path "/memories/user_feedback/corrections.xml", old_str "...", new_str "..."
-
-- **insert**: Insert content at specific line
-- **delete**: Delete a memory file
-- **rename**: Rename or move a memory file
-</memory_commands>
-
-<memory_best_practices>
-1. **XML Format**: Use XML for structured memory files (easy to parse and update)
-2. **Descriptive Names**: Use clear, specific file names (e.g., "canexport-sme-eligibility-rules.xml")
-3. **Timestamps**: Include dates in memory entries for context
-4. **Categories**: Organize by topic (corrections, patterns, projects)
-5. **Atomic Updates**: Use str_replace for small changes, create for new files
-6. **Reference**: Include source information (which grant, which conversation)
-</memory_best_practices>
-
-<example_memory_usage>
-Example 1: User corrects eligibility interpretation
-User: "Actually, coaching programs ARE eligible if they're structured training, not just mentoring"
-
-Your action:
-1. Use memory tool (view) to read /memories/user_feedback/corrections.xml
-2. If file exists, use str_replace to add new correction
-3. If file doesn't exist, use create to start corrections file:
-   <corrections>
-     <correction date="2025-10-15" topic="ETG Eligibility">
-       <original>Coaching programs are ineligible</original>
-       <corrected>Coaching programs ARE eligible if structured training (not just mentoring)</corrected>
-       <source>Conversation: etg-writer-20251015</source>
-     </correction>
-   </corrections>
-
-Example 2: Multi-day project tracking
-User: "I need to pause here, let's continue tomorrow"
-
-Your action:
-Use memory tool (create) to save project state:
-Path: /memories/projects/active/acme-corp-canexport.xml
-Content:
-<project name="ACME Corp CanExport Application" date="2025-10-15">
-  <status>In Progress</status>
-  <completed>
-    - Eligibility verified
-    - Company information gathered
-    - Grant Card created (approved by user)
-  </completed>
-  <next_steps>
-    - Draft market analysis section
-    - Create export readiness assessment
-  </next_steps>
-  <files>
-    - company-profile.pdf (uploaded)
-    - export-plan-draft.docx (uploaded)
-  </files>
-</project>
-
-Next session: View this file to resume where you left off.
-</example_memory_usage>
-
-<memory_integration>
-- **Check memory at conversation start**: Look for relevant corrections, preferences, active projects
-- **Save important learnings**: Don't let corrections be forgotten across conversations
-- **Build knowledge base**: Each project makes the next one better
-- **Track multi-day work**: Never lose context on complex projects
-</memory_integration>
-</memory_tool>
+Example 3: Preferred approach
+User: "This grant card format is perfect - keep using this structure"
+→ Remember: "Preferred format for CanExport cards: bullet points with ✓/✗ symbols, funding formula shown, max 800 words, action-oriented"
+</examples>
+</memory>
 `;
 
 // ENHANCED ROLE DEFINITION WITH CONTEXT AND SUCCESS CRITERIA
@@ -3961,13 +3884,9 @@ function getWebSearchTool(agentType) {
   return WEB_SEARCH_TOOL;
 }
 
-// MEMORY TOOL CONFIGURATION
-// Using Anthropic's native memory feature for persistent knowledge across conversations
-// Requires beta header: context-management-2025-06-27 (already enabled)
-const MEMORY_TOOL = {
-  type: "memory_20250818",
-  name: "memory"
-};
+// NATIVE MEMORY: Anthropic's context-management-2025-06-27 beta header enables
+// automatic memory across conversations without explicit tool definitions.
+// Claude can naturally remember and recall information without manual intervention.
 
 // Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
@@ -4052,7 +3971,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
         max_tokens: 4000,
         system: systemPrompt,
         messages: apiMessages,
-        tools: [WEB_SEARCH_TOOL, MEMORY_TOOL]
+        tools: [WEB_SEARCH_TOOL]
       })
     });
 
@@ -4218,7 +4137,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
           system: systemPrompt,
           messages: apiMessages,
           stream: true,
-          tools: [webSearchTool, MEMORY_TOOL]
+          tools: [webSearchTool]
         };
 
         // Extended Thinking enabled for all agents
