@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const { Redis } = require('@upstash/redis');
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
+const { handleMemoryTool } = require('./memory-tool-handler');
 
 // Initialize Redis client (for file context and knowledge base cache)
 const redis = new Redis({
@@ -1226,6 +1227,8 @@ You are a Senior Grant Intelligence Analyst at Granted Consulting with 10+ years
 You transform complex, jargon-heavy grant documentation into clear, structured grant cards that help applicants quickly assess funding fit and take immediate action.
 </role>
 
+${MEMORY_TOOL_INSTRUCTIONS}
+
 <context>
   <purpose>Your grant cards are published on the GetGranted platform where they serve as the first touchpoint for grant applicants evaluating funding opportunities</purpose>
   <audience>Small business owners, entrepreneurs, non-profit leaders, and consultants who need to quickly assess grant eligibility and requirements</audience>
@@ -2020,6 +2023,126 @@ ${knowledgeContext}
   };
 }
 
+// MEMORY TOOL INSTRUCTIONS (included in all agent system prompts)
+const MEMORY_TOOL_INSTRUCTIONS = `
+<memory_tool>
+You have access to a **memory tool** for building persistent knowledge across conversations.
+
+<memory_structure>
+The memory system is organized in /memories/ with these directories:
+
+1. **/memories/user_feedback/**
+   - corrections.xml - User corrections to eligibility rules, grant criteria, etc.
+   - approvals.xml - Approved grant card formats, business case approaches
+   - preferences.xml - User preferences for writing style, terminology
+
+2. **/memories/projects/**
+   - active/ - In-progress grant applications (multi-day projects)
+   - completed/ - Reference projects for patterns and approaches
+
+3. **/memories/knowledge_base/**
+   - grant_patterns/ - Successful grant card patterns by program
+   - eligibility_rules/ - Learned eligibility interpretations
+   - common_issues/ - Validation errors, edge cases, lessons learned
+
+4. **/memories/sessions/**
+   - Daily session notes for complex multi-day work
+</memory_structure>
+
+<when_to_use_memory>
+**Use memory when:**
+1. **User corrects you** → Save to /memories/user_feedback/corrections.xml
+2. **User approves an approach** → Save to /memories/user_feedback/approvals.xml
+3. **Multi-day project** → Save progress to /memories/projects/active/[project-name].xml
+4. **Completing a project** → Move to /memories/projects/completed/ for future reference
+5. **Learning new eligibility rules** → Add to /memories/knowledge_base/eligibility_rules/
+6. **Successful grant card created** → Save pattern to /memories/knowledge_base/grant_patterns/
+7. **Encounter edge case** → Document in /memories/knowledge_base/common_issues/
+
+**Check memory when:**
+- Starting a new conversation (check for relevant corrections, preferences)
+- User asks "where were we?" or "what's the status?" (check active projects)
+- Similar project to previous work (check completed projects for patterns)
+- Uncertain about eligibility (check knowledge base for learned rules)
+</when_to_use_memory>
+
+<memory_commands>
+Available commands:
+- **view**: Read a memory file
+  Example: Use memory tool with command "view" and path "/memories/user_feedback/corrections.xml"
+
+- **create**: Create a new memory file
+  Example: Use memory tool with command "create", path "/memories/projects/active/acme-corp-etg.xml", and content "..."
+
+- **str_replace**: Update existing memory file
+  Example: Use memory tool with command "str_replace", path "/memories/user_feedback/corrections.xml", old_str "...", new_str "..."
+
+- **insert**: Insert content at specific line
+- **delete**: Delete a memory file
+- **rename**: Rename or move a memory file
+</memory_commands>
+
+<memory_best_practices>
+1. **XML Format**: Use XML for structured memory files (easy to parse and update)
+2. **Descriptive Names**: Use clear, specific file names (e.g., "canexport-sme-eligibility-rules.xml")
+3. **Timestamps**: Include dates in memory entries for context
+4. **Categories**: Organize by topic (corrections, patterns, projects)
+5. **Atomic Updates**: Use str_replace for small changes, create for new files
+6. **Reference**: Include source information (which grant, which conversation)
+</memory_best_practices>
+
+<example_memory_usage>
+Example 1: User corrects eligibility interpretation
+User: "Actually, coaching programs ARE eligible if they're structured training, not just mentoring"
+
+Your action:
+1. Use memory tool (view) to read /memories/user_feedback/corrections.xml
+2. If file exists, use str_replace to add new correction
+3. If file doesn't exist, use create to start corrections file:
+   <corrections>
+     <correction date="2025-10-15" topic="ETG Eligibility">
+       <original>Coaching programs are ineligible</original>
+       <corrected>Coaching programs ARE eligible if structured training (not just mentoring)</corrected>
+       <source>Conversation: etg-writer-20251015</source>
+     </correction>
+   </corrections>
+
+Example 2: Multi-day project tracking
+User: "I need to pause here, let's continue tomorrow"
+
+Your action:
+Use memory tool (create) to save project state:
+Path: /memories/projects/active/acme-corp-canexport.xml
+Content:
+<project name="ACME Corp CanExport Application" date="2025-10-15">
+  <status>In Progress</status>
+  <completed>
+    - Eligibility verified
+    - Company information gathered
+    - Grant Card created (approved by user)
+  </completed>
+  <next_steps>
+    - Draft market analysis section
+    - Create export readiness assessment
+  </next_steps>
+  <files>
+    - company-profile.pdf (uploaded)
+    - export-plan-draft.docx (uploaded)
+  </files>
+</project>
+
+Next session: View this file to resume where you left off.
+</example_memory_usage>
+
+<memory_integration>
+- **Check memory at conversation start**: Look for relevant corrections, preferences, active projects
+- **Save important learnings**: Don't let corrections be forgotten across conversations
+- **Build knowledge base**: Each project makes the next one better
+- **Track multi-day work**: Never lose context on complex projects
+</memory_integration>
+</memory_tool>
+`;
+
 // ENHANCED AGENT PROMPTS
 const agentPrompts = {'etg-writer':`
 <role>
@@ -2032,6 +2155,8 @@ Expertise:
 - "Better job" outcome definitions and participant employment requirements
 - Maximizing approval likelihood
 </role>
+
+${MEMORY_TOOL_INSTRUCTIONS}
 
 <knowledge_base>
 <core_foundation_documents>
@@ -2216,6 +2341,8 @@ Always verify training and participant eligibility using the BC ETG Eligibility 
 
   'canexport-writer': `You are an expert CanExport SMEs grant writer specializing in helping Canadian enterprises across all industries secure maximum funding. You work collaboratively with Grant Strategists at Granted Consulting to draft high-quality, compliant applications that achieve the 36% approval rate benchmark.
 
+${MEMORY_TOOL_INSTRUCTIONS}
+
 CORE RESPONSIBILITIES:
 - Draft complete CanExport SME applications
 - Ensure full compliance with program requirements
@@ -2235,6 +2362,8 @@ Always aim for applications that exceed the 36% approval benchmark through strat
   'canexport-claims': `<role>
 You are Sarah Chen, Chief Compliance Officer at Granted Consulting with 15+ years of CanExport SME claims auditing experience. You've personally reviewed over 10,000 expense submissions and have seen every rejection pattern. You know the funding agreements inside and out.
 </role>
+
+${MEMORY_TOOL_INSTRUCTIONS}
 
 <core_mission>
 Maximize client reimbursements while maintaining perfect NRC compliance. Every dollar matters to small businesses, so your job is to find ways to make expenses work when possible, but never compromise on compliance.
@@ -2716,6 +2845,8 @@ APPROACH:
 Always provide comprehensive, helpful responses that leverage the full depth of Granted Consulting's institutional knowledge.`,
 
   'bcafe-writer': `You are a BC Agriculture and Food Export Program (BCAFE) specialist for Summer 2025 applications.
+
+${MEMORY_TOOL_INSTRUCTIONS}
 
 CORE IDENTITY:
 I AM the BCAFE application expert who takes full ownership of creating submission-ready applications that meet all compliance requirements and maximize merit scoring potential.
@@ -3749,14 +3880,154 @@ function getWebSearchTool(agentType) {
   return WEB_SEARCH_TOOL;
 }
 
+// MEMORY TOOL CONFIGURATION
+// Client-side memory tool for persistent knowledge across conversations
+const MEMORY_TOOL = {
+  type: "memory_20250818",
+  name: "memory",
+  commands: [
+    {
+      command: "view",
+      description: "Read the contents of a memory file",
+      parameters: {
+        path: {
+          type: "string",
+          description: "Path to the memory file (e.g., /memories/user_feedback/corrections.xml)"
+        }
+      }
+    },
+    {
+      command: "create",
+      description: "Create a new memory file",
+      parameters: {
+        path: {
+          type: "string",
+          description: "Path for the new memory file"
+        },
+        content: {
+          type: "string",
+          description: "Content to write to the file"
+        }
+      }
+    },
+    {
+      command: "str_replace",
+      description: "Replace content in a memory file",
+      parameters: {
+        path: {
+          type: "string",
+          description: "Path to the memory file"
+        },
+        old_str: {
+          type: "string",
+          description: "String to find and replace"
+        },
+        new_str: {
+          type: "string",
+          description: "Replacement string"
+        }
+      }
+    },
+    {
+      command: "insert",
+      description: "Insert content at a specific line",
+      parameters: {
+        path: {
+          type: "string",
+          description: "Path to the memory file"
+        },
+        line: {
+          type: "integer",
+          description: "Line number to insert at (0-indexed)"
+        },
+        content: {
+          type: "string",
+          description: "Content to insert"
+        }
+      }
+    },
+    {
+      command: "delete",
+      description: "Delete a memory file",
+      parameters: {
+        path: {
+          type: "string",
+          description: "Path to the memory file to delete"
+        }
+      }
+    },
+    {
+      command: "rename",
+      description: "Rename or move a memory file",
+      parameters: {
+        old_path: {
+          type: "string",
+          description: "Current path of the memory file"
+        },
+        new_path: {
+          type: "string",
+          description: "New path for the memory file"
+        }
+      }
+    }
+  ]
+};
+
+/**
+ * Process memory tool use blocks
+ * Executes memory operations and returns tool_result blocks
+ */
+async function processMemoryToolUse(contentBlocks) {
+  const memoryToolBlocks = contentBlocks.filter(
+    block => block.type === 'tool_use' && block.name === 'memory'
+  );
+
+  if (memoryToolBlocks.length === 0) {
+    return null; // No memory tools used
+  }
+
+  console.log(`🧠 Processing ${memoryToolBlocks.length} memory tool use(s)`);
+
+  const toolResults = [];
+  for (const toolBlock of memoryToolBlocks) {
+    console.log(`🧠 Memory tool: ${toolBlock.input?.command} at ${toolBlock.input?.path || 'unknown path'}`);
+
+    try {
+      const result = await handleMemoryTool(toolBlock.input?.command, toolBlock.input);
+
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: toolBlock.id,
+        content: JSON.stringify(result)
+      });
+
+      console.log(`✅ Memory operation completed: ${toolBlock.input?.command}`);
+    } catch (error) {
+      console.error(`❌ Memory tool error:`, error);
+
+      toolResults.push({
+        type: 'tool_result',
+        tool_use_id: toolBlock.id,
+        content: JSON.stringify({
+          success: false,
+          error: error.message
+        }),
+        is_error: true
+      });
+    }
+  }
+
+  return toolResults;
+}
+
 // Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
   try {
     checkRateLimit();
     await waitForRateLimit();
-    
+
     console.log(`🔥 Making Claude API call (${callTimestamps.length + 1}/${MAX_CALLS_PER_MINUTE} this minute)`);
-    console.log(`🔧 Tools available: web_search (max 5 uses)`);
+    console.log(`🔧 Tools available: web_search (max 5 uses), memory`);
     console.log(`📄 Files to process: ${files.length}`);
     
     let apiMessages = [...messages];
@@ -3825,14 +4096,14 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'files-api-2025-04-14'
+        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
         system: systemPrompt,
         messages: apiMessages,
-        tools: [WEB_SEARCH_TOOL]
+        tools: [WEB_SEARCH_TOOL, MEMORY_TOOL]
       })
     });
 
@@ -3881,6 +4152,29 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
     }
 
     console.log(`📊 Usage: ${data.usage?.input_tokens || 0} in + ${data.usage?.output_tokens || 0} out tokens`);
+
+    // Check for memory tool usage (client-side tool)
+    const memoryToolResults = await processMemoryToolUse(data.content || []);
+
+    if (memoryToolResults && memoryToolResults.length > 0) {
+      // Memory tool was used - need to continue conversation with tool results
+      console.log(`🔄 Continuing conversation with ${memoryToolResults.length} memory tool result(s)`);
+
+      // Add assistant's tool use to conversation
+      messages.push({
+        role: 'assistant',
+        content: data.content
+      });
+
+      // Add tool results to conversation
+      messages.push({
+        role: 'user',
+        content: memoryToolResults
+      });
+
+      // Make another API call with tool results
+      return await callClaudeAPI(messages, systemPrompt, files);
+    }
 
     // Return full content blocks (including tool_use and tool_result blocks)
     // to preserve tool usage history in conversation
@@ -3986,7 +4280,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'files-api-2025-04-14'
+        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27'
       },
       body: (() => {
         const requestBody = {
@@ -3995,7 +4289,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
           system: systemPrompt,
           messages: apiMessages,
           stream: true,
-          tools: [webSearchTool]
+          tools: [webSearchTool, MEMORY_TOOL]
         };
 
         // Extended Thinking enabled for all agents
