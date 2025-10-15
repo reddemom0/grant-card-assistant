@@ -1219,48 +1219,10 @@ function extractTrainingInfo(text) {
 // Following Anthropic's best practices for XML tags, role prompting, and clarity
 // ============================================================================
 
-// MEMORY TOOL INSTRUCTIONS (included in all agent system prompts)
-const MEMORY_TOOL_INSTRUCTIONS = `
-<memory>
-You have **automatic memory** that persists across conversations. Information you save is permanently stored and automatically available in future sessions.
-
-<what_to_remember>
-**Always remember:**
-1. **User corrections** - Eligibility rules, grant criteria interpretations, policy clarifications
-2. **User preferences** - Preferred formats, writing style, terminology preferences
-3. **Project progress** - Multi-day grant applications, tracking what's completed and what's next
-4. **Successful patterns** - Approaches that worked well for similar grants/projects
-5. **Edge cases & lessons** - Unusual situations, mistakes to avoid, special considerations
-
-**Key memory triggers:**
-- User says "remember this" or corrects you → Store the correction
-- User approves format/approach → Save as preferred pattern
-- Working on multi-day project → Save progress when pausing
-- Project completes successfully → Remember the approach for similar future work
-</what_to_remember>
-
-<how_memory_works>
-- **Automatic**: Just think about what to remember - the system handles storage
-- **Cross-conversation**: Information persists forever across all future conversations
-- **Context-aware**: Relevant memories are automatically surfaced when needed
-- **No manual actions**: Simply keep important information in mind as you work
-</how_memory_works>
-
-<examples>
-Example 1: Learning from correction
-User: "Actually, coaching programs ARE eligible for ETG if they're structured training"
-→ Remember: "ETG eligibility expanded - coaching programs qualify when structured as training (not just mentoring)"
-
-Example 2: Tracking multi-day work
-User: "Let's pause here, I'll continue tomorrow"
-→ Remember: "ACME Corp CanExport application in progress: eligibility verified ✓, company profile gathered ✓, next: draft market analysis"
-
-Example 3: Preferred approach
-User: "This grant card format is perfect - keep using this structure"
-→ Remember: "Preferred format for CanExport cards: bullet points with ✓/✗ symbols, funding formula shown, max 800 words, action-oriented"
-</examples>
-</memory>
-`;
+// MEMORY TOOL INSTRUCTIONS - Currently disabled
+// TODO: Re-enable when serverful platform with backend database is implemented
+// const MEMORY_TOOL_INSTRUCTIONS = `...`;
+const MEMORY_TOOL_INSTRUCTIONS = ``;
 
 // ENHANCED ROLE DEFINITION WITH CONTEXT AND SUCCESS CRITERIA
 const GRANT_CARD_SYSTEM_PROMPT = `<role>
@@ -3884,9 +3846,11 @@ function getWebSearchTool(agentType) {
   return WEB_SEARCH_TOOL;
 }
 
-// NATIVE MEMORY: Anthropic's context-management-2025-06-27 beta header enables
-// automatic memory across conversations without explicit tool definitions.
-// Claude can naturally remember and recall information without manual intervention.
+// MEMORY TOOL: Currently disabled pending migration to serverful platform
+// Anthropic's memory tool (memory_20250818) requires client-side storage backend
+// (filesystem, database, Redis, etc.) which doesn't work in current serverless environment
+// TODO: Implement when migrated to serverful platform with backend database
+// See: api/memory-tool-handler.js for implementation reference
 
 // Enhanced Claude API integration with Files API support
 async function callClaudeAPI(messages, systemPrompt = '', files = []) {
