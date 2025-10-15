@@ -52,6 +52,17 @@ function validatePath(requestedPath) {
     throw new Error('Invalid path: must start with /memories');
   }
 
+  // Check for invalid characters (command injection, null bytes, etc.)
+  const invalidChars = /[;&|`$()<>\\]/;
+  if (invalidChars.test(requestedPath)) {
+    throw new Error('Invalid characters in path');
+  }
+
+  // Check for null bytes
+  if (requestedPath.includes('\0')) {
+    throw new Error('Null bytes not allowed in path');
+  }
+
   // Convert to absolute path and resolve
   const absolutePath = path.join(MEMORY_BASE_DIR, requestedPath.replace('/memories', ''));
   const resolvedPath = path.resolve(absolutePath);
