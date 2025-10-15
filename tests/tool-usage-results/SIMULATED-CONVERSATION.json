@@ -1,0 +1,54 @@
+[
+  {
+    "role": "user",
+    "content": "What are the latest ETG grant requirements?"
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "I need to search for current ETG information..."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01ABC123",
+        "name": "web_search",
+        "input": {
+          "query": "BC Employee Training Grant requirements 2025"
+        }
+      },
+      {
+        "type": "web_search_tool_result",
+        "content": [
+          {
+            "url": "https://example.com/etg",
+            "title": "ETG Program Requirements",
+            "snippet": "Latest requirements..."
+          }
+        ]
+      },
+      {
+        "type": "text",
+        "text": "Based on the latest information, the ETG program requires..."
+      }
+    ]
+  },
+  {
+    "role": "user",
+    "content": "What are the application deadlines?"
+  },
+  {
+    "role": "assistant",
+    "content": [
+      {
+        "type": "thinking",
+        "thinking": "I can reference the previous search results..."
+      },
+      {
+        "type": "text",
+        "text": "According to the information I found, the deadlines are..."
+      }
+    ]
+  }
+]

@@ -1,0 +1,194 @@
+{
+  "timestamp": "2025-10-15T13:20:29.684Z",
+  "totalTests": 25,
+  "passed": 24,
+  "failed": 1,
+  "tests": [
+    {
+      "name": "extractTextFromResponse: String input",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "input": "string",
+      "output": "This is a simple text response"
+    },
+    {
+      "name": "extractTextFromResponse: Text blocks",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "input": "array of text blocks",
+      "output": "First paragraph. Second paragraph."
+    },
+    {
+      "name": "extractTextFromResponse: Mixed blocks (should skip tool blocks)",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "input": "mixed content blocks",
+      "output": "Answer based on search.",
+      "blocksSkipped": [
+        "thinking",
+        "tool_use",
+        "web_search_tool_result"
+      ]
+    },
+    {
+      "name": "Turn 1 (with tool use): History is array",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "length": 2
+    },
+    {
+      "name": "Turn 1 (with tool use): Has assistant message",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 1 (with tool use): Content is array (new format)",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "contentType": "object",
+      "isArray": true
+    },
+    {
+      "name": "Turn 1 (with tool use): Has content blocks",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "blockCount": 4,
+      "blockTypes": [
+        "thinking",
+        "tool_use",
+        "web_search_tool_result",
+        "text"
+      ]
+    },
+    {
+      "name": "Turn 1 (with tool use): Has text block",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 1: Has tool_use block",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 1: Has tool_result block",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 1: Has text block",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 1: tool_use has id",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "id": "toolu_01ABC123"
+    },
+    {
+      "name": "web_search",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 1: tool_use has input",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "input": {
+        "query": "BC Employee Training Grant requirements 2025"
+      }
+    },
+    {
+      "name": "Turn 2 (contextual follow-up): History is array",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "length": 4
+    },
+    {
+      "name": "Turn 2 (contextual follow-up): Has assistant message",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 2 (contextual follow-up): Content is array (new format)",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "contentType": "object",
+      "isArray": true
+    },
+    {
+      "name": "Turn 2 (contextual follow-up): Has content blocks",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "blockCount": 2,
+      "blockTypes": [
+        "thinking",
+        "text"
+      ]
+    },
+    {
+      "name": "Turn 2 (contextual follow-up): Has text block",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z"
+    },
+    {
+      "name": "Turn 2: No new tool use (uses previous context)",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.697Z",
+      "explanation": "Follow-up question answered from previous search"
+    },
+    {
+      "name": "Content block handling: Single text block",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.698Z",
+      "blocks": [
+        "text"
+      ],
+      "expectedText": "Simple response",
+      "extractedText": "Simple response"
+    },
+    {
+      "name": "Content block handling: Multiple text blocks",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.698Z",
+      "blocks": [
+        "text",
+        "text"
+      ],
+      "expectedText": "First. Second.",
+      "extractedText": "First. Second."
+    },
+    {
+      "name": "Content block handling: Text with thinking (should extract only text)",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.698Z",
+      "blocks": [
+        "thinking",
+        "text"
+      ],
+      "expectedText": "Visible response",
+      "extractedText": "Visible response"
+    },
+    {
+      "name": "Content block handling: Full tool use response",
+      "passed": true,
+      "timestamp": "2025-10-15T13:20:29.698Z",
+      "blocks": [
+        "thinking",
+        "tool_use",
+        "web_search_tool_result",
+        "text"
+      ],
+      "expectedText": "Based on the search, here is the answer.",
+      "extractedText": "Based on the search, here is the answer."
+    },
+    {
+      "name": "Real API Test",
+      "passed": null,
+      "timestamp": "2025-10-15T13:20:29.698Z",
+      "skipped": true,
+      "reason": "No API key"
+    }
+  ]
+}

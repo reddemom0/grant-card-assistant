@@ -435,14 +435,46 @@ function logContextUsage(agentType, estimatedTokens, conversationLength) {
  * @param {string} text - The full response text
  * @returns {string} - Text with thinking process removed
  */
+/**
+ * Extract text content from Claude response
+ * Handles both string responses and content block arrays (with tool use)
+ * @param {string|Array} response - Response from Claude API
+ * @returns {string} - Extracted text content for display
+ */
+function extractTextFromResponse(response) {
+  // If it's already a string, return as-is
+  if (typeof response === 'string') {
+    return response;
+  }
+
+  // If it's an array of content blocks, extract text from text blocks only
+  if (Array.isArray(response)) {
+    let textContent = '';
+    for (const block of response) {
+      if (block.type === 'text') {
+        textContent += block.text;
+      }
+      // Note: We intentionally skip tool_use, tool_result, and thinking blocks
+      // as they shouldn't be displayed to the user
+    }
+    return textContent;
+  }
+
+  // Fallback: convert to string
+  return String(response);
+}
+
 function stripThinkingTags(text) {
+  // Handle both string and content block array inputs
+  const textContent = extractTextFromResponse(text);
+
   // Pattern 1: Remove everything up to and including "Required Action Decision:" and its content until double newline
   const pattern1 = /^[\s\S]*?5\.\s*Required Action Decision:[\s\S]*?\n\n+/;
-  let cleaned = text.replace(pattern1, '');
-  
+  let cleaned = textContent.replace(pattern1, '');
+
   // Pattern 2: Also try XML tags in case Claude starts using them
   cleaned = cleaned.replace(/<thinking>[\s\S]*?<\/thinking>\s*/gi, '');
-  
+
   return cleaned.trim();
 }
 
@@ -3847,9 +3879,17 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
     } else {
       console.log(`📚 No web search used - Claude answered from knowledge base`);
     }
-    
+
     console.log(`📊 Usage: ${data.usage?.input_tokens || 0} in + ${data.usage?.output_tokens || 0} out tokens`);
-    
+
+    // Return full content blocks (including tool_use and tool_result blocks)
+    // to preserve tool usage history in conversation
+    // For backward compatibility with code expecting strings, also provide text extraction
+    if (data.content && data.content.length > 0) {
+      return data.content;
+    }
+
+    // Fallback to text-only if no content blocks (shouldn't happen)
     return textContent;
     
   } catch (error) {
@@ -3869,6 +3909,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
   let fullContentBlocks = [];
   let currentTextBlock = '';
   let currentThinkingBlock = null;
+  let currentToolUseBlock = null;
 
   try {
     checkRateLimit();
@@ -4081,13 +4122,42 @@ if (parsed.type === 'content_block_stop' && currentTextBlock !== '') {
               if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'tool_use') {
                 toolUsageCount++;
                 console.log(`🌐 STREAMING TOOL USED: ${parsed.content_block.name}`);
-                
-                res.write(`data: ${JSON.stringify({ 
+
+                // Capture complete tool_use block for conversation history
+                currentToolUseBlock = {
+                  type: 'tool_use',
+                  id: parsed.content_block.id,
+                  name: parsed.content_block.name,
+                  input: parsed.content_block.input
+                };
+
+                res.write(`data: ${JSON.stringify({
                   tool_use: {
                     name: parsed.content_block.name,
                     query: parsed.content_block.input?.query
                   }
                 })}\n\n`);
+              }
+
+              // Handle tool result blocks from server tools (e.g., web_search)
+              if (parsed.type === 'content_block_start' && parsed.content_block?.type === 'web_search_tool_result') {
+                console.log(`📄 WEB SEARCH RESULT: Received results`);
+
+                // Capture tool result block for conversation history
+                const toolResultBlock = {
+                  type: 'web_search_tool_result',
+                  content: parsed.content_block.content || []
+                };
+                fullContentBlocks.push(toolResultBlock);
+
+                // Note: Tool results are not streamed to user, only the final text response
+              }
+
+              // When a content block stops, finalize tool_use blocks
+              if (parsed.type === 'content_block_stop' && currentToolUseBlock) {
+                fullContentBlocks.push(currentToolUseBlock);
+                console.log(`🔧 Tool use block captured: ${currentToolUseBlock.name}`);
+                currentToolUseBlock = null;
               }
               
             } catch (parseError) {
@@ -5229,13 +5299,17 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
 
+      // Store full response (including tool blocks) in conversation history
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to database
       await saveConversation(conversationId, userId, conversation, 'grant-cards');
 
+      // Extract text for display (handles both string and content block array)
+      const displayText = extractTextFromResponse(response);
+
       res.json({
-        response: response,
+        response: displayText,
         conversationId: conversationId,
         performance: {
           documentsLoaded: agentDocs.length,
@@ -5520,6 +5594,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       console.log(`🤖 Calling Claude API for BCAFE specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
 
+      // Store full response (including tool blocks) in conversation history
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to database
@@ -5527,8 +5602,11 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
       console.log(`✅ BCAFE response generated successfully`);
 
+      // Extract text for display
+      const displayText = extractTextFromResponse(response);
+
       res.json({
-        response: response,
+        response: displayText,
         conversationId: conversationId
       });
       return;
@@ -5642,6 +5720,7 @@ Always follow the exact workflows and instructions from the knowledge base docum
       console.log(`🤖 Calling Claude API for CanExport Claims specialist response`);
       const response = await callClaudeAPI(conversation, systemPrompt, req.files || []);
 
+      // Store full response (including tool blocks) in conversation history
       conversation.push({ role: 'assistant', content: response });
 
       // Save conversation to database
@@ -5649,8 +5728,11 @@ Always follow the exact workflows and instructions from the knowledge base docum
 
       console.log(`✅ CanExport Claims response generated successfully`);
 
-      res.json({ 
-        response: response,
+      // Extract text for display
+      const displayText = extractTextFromResponse(response);
+
+      res.json({
+        response: displayText,
         conversationId: conversationId,
         performance: {
           documentsLoaded: agentDocs.length,
