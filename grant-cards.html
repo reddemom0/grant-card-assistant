@@ -2071,22 +2071,17 @@ async function handleStreamingResponse(response, messageDiv) {
         async function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
-            
+
             const message = messageInput ? messageInput.value.trim() : '';
-            
+
             if (!message && uploadedFiles.length === 0) return;
             if (isLoading) return;
 
             hideWelcomeElements();
 
-            // Check for URLs in message
-            const urlRegex = /(https?:\/\/[^\s]+)/g;
-            const urls = message.match(urlRegex);
-            
-            if (urls && urls.length > 0) {
-                await handleURLMessage(urls[0], message);
-                return;
-            }
+            // Let URLs flow naturally in messages for web_fetch tool to detect
+            // No special URL handling needed - Claude's web_fetch will automatically
+            // detect and fetch URLs that appear in conversation context
 
             // Handle files
             if (uploadedFiles.length > 0) {
