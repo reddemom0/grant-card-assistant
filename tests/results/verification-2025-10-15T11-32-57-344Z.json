@@ -1,0 +1,239 @@
+{
+  "hiring": {
+    "categories": {
+      "comparison": {
+        "task": "categories",
+        "old": {
+          "length": 692,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "startsDirectly": false,
+          "hasStructure": false,
+          "sectionCount": 0,
+          "meetsFormatReq": false
+        },
+        "new": {
+          "length": 389,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasStructure": true,
+          "sectionCount": 7,
+          "meetsFormatReq": true
+        },
+        "performance": {
+          "oldDuration": 3604,
+          "newDuration": 2246,
+          "durationDiff": -1358,
+          "oldTokens": 341,
+          "newTokens": 2885,
+          "tokenDiff": 2544
+        },
+        "improvementScore": 7,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Follows 7-section structure",
+          "Clear section labels"
+        ]
+      },
+      "oldContent": "Based on my analysis, here are the relevant categories for this grant:\n\nPrimary Categories:\n- Employment & Workforce Development\n- Small Business Support\n\nSecondary Categories:\n- Job Creation\n- Employee Training\n- Wage Subsidies\n\nTarget Beneficiary Categories:\n- Small Businesses (under 50 employees)\n- Unemployed/Underemployed Workers\n\nFunding Type Categories:\n- Wage Support\n- Direct Business Funding\n- Training Support\n\nI've organized these categories in order of relevance and importance to help identify the primary focus of this grant program. The main thrust appears to be workforce development through small business support, with specific emphasis on wage subsidies and job creation.",
+      "newContent": "PRIMARY GRANT TYPE: Hiring Grant (Type 1)\n\nSECONDARY TYPES: Training Grant (Type 3)\n\nINDUSTRIES: Small Business, Service Sector, Retail\n\nGEOGRAPHY: Canada-wide\n\nRECIPIENT TYPE: Small Business (under 50 employees), For-profit\n\nFUNDING FOCUS: Wage Subsidies, Job Creation, Employee Training, Workforce Development\n\nPROGRAM CHARACTERISTICS: 12-month Commitment, Fixed Deadline, New Hire Focus"
+    },
+    "missing-info": {
+      "comparison": {
+        "task": "missing-info",
+        "old": {
+          "length": 1327,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasTiers": false,
+          "bulletCount": 0,
+          "meetsCountReq": false
+        },
+        "new": {
+          "length": 975,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasTiers": true,
+          "bulletCount": 10,
+          "meetsCountReq": true
+        },
+        "performance": {
+          "oldDuration": 5655,
+          "newDuration": 4489,
+          "durationDiff": -1166,
+          "oldTokens": 462,
+          "newTokens": 3309,
+          "tokenDiff": 2847
+        },
+        "improvementScore": 5,
+        "improvementReasons": [
+          "3-tier priority structure",
+          "Meets 8-12 item count requirement"
+        ]
+      },
+      "oldContent": "MISSING INFORMATION ANALYSIS\n\nCritical Information Missing:\n\n1. Application Process\n- No details on how to apply\n- Missing required documentation list\n- No mention of application portal or submission method\n\n2. Payment Structure\n- Disbursement schedule not specified\n- No mention of payment frequency (monthly, quarterly, etc.)\n- Unclear if funding is provided upfront or as reimbursement\n\n3. Business Eligibility Details\n- Revenue requirements not specified\n- Industry restrictions/preferences not mentioned\n- Geographic limitations not stated\n- Years in business requirement missing\n\n4. Employee Eligibility Specifics\n- Definition of \"unemployed/underemployed\" not provided\n- Minimum hours per week not specified\n- Wage rate requirements missing\n- Whether part-time positions qualify not mentioned\n\n5. Program Contact Information\n- No program administrator contact details\n- Missing helpline or support contact\n- No website reference\n\n6. Reporting Requirements\n- No mention of progress reports\n- Financial reporting requirements not specified\n- Documentation needed for compliance\n\n7. Selection Criteria\n- Evaluation process not explained\n- Priority sectors not identified\n- Scoring or ranking system not provided\n\nThese missing elements are crucial for applicants to make informed decisions and submit complete applications.",
+      "newContent": "TIER 1: CRITICAL MISSING INFORMATION\n• Applicant Status: Are there restrictions on business structure (incorporated, sole proprietorship, non-profit)?\n• Financial Standing: Are there minimum revenue or years in operation requirements?\n• Employment Terms: Must new hires be full-time, or are part-time positions eligible?\n• Funding Timeline: When are funds disbursed - upfront or as reimbursement?\n\nTIER 2: IMPORTANT FOR STRATEGY\n• Employee Criteria: How is \"unemployed or underemployed\" defined specifically?\n• Stacking: Can this funding be combined with other wage subsidy programs?\n• Previous Recipients: Are businesses who have received this funding before eligible to apply again?\n• Position Types: Are there restrictions on job categories or salary levels eligible for funding?\n\nTIER 3: ADDITIONAL CLARIFICATIONS\n• Training Costs: What specific types of training expenses are eligible?\n• Documentation: What proof of previous employment status is required for new hires?"
+    }
+  },
+  "training": {
+    "categories": {
+      "comparison": {
+        "task": "categories",
+        "old": {
+          "length": 737,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "startsDirectly": false,
+          "hasStructure": false,
+          "sectionCount": 0,
+          "meetsFormatReq": false
+        },
+        "new": {
+          "length": 470,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasStructure": true,
+          "sectionCount": 7,
+          "meetsFormatReq": true
+        },
+        "performance": {
+          "oldDuration": 3893,
+          "newDuration": 2269,
+          "durationDiff": -1624,
+          "oldTokens": 319,
+          "newTokens": 2855,
+          "tokenDiff": 2536
+        },
+        "improvementScore": 7,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Follows 7-section structure",
+          "Clear section labels"
+        ]
+      },
+      "oldContent": "Based on my analysis of this grant document, here are the relevant categories:\n\nPRIMARY CATEGORIES:\n• Workforce Development\n• Professional Training\n• Employee Education\n• Business Support\n\nSUBCATEGORIES:\n• Technical Training\n• Safety Certification\n• Skills Development\n• Professional Development\n• Vocational Training\n\nFUNDING TYPE:\n• Matching Grant (requires 25% contribution)\n• Project-Based Grant\n\nBENEFICIARY CATEGORIES:\n• Businesses/Employers\n• Employees\n• Private Sector Organizations\n\nThis appears to be a classic workforce development grant with an emphasis on professional credentialing and technical skills advancement. The categories reflect both the training focus and the business-oriented nature of the funding opportunity.",
+      "newContent": "PRIMARY GRANT TYPE: Training Grant (Type 3)\n\nSECONDARY TYPES: None\n\nINDUSTRIES: Manufacturing, Technology, Professional Services, Construction, Industrial\n\nGEOGRAPHY: Not Specified\n\nRECIPIENT TYPE: Medium Business (10+ employees), For-profit Companies\n\nFUNDING FOCUS: Workforce Development, Professional Certification, Technical Skills Training, Safety Training, Employee Upskilling\n\nPROGRAM CHARACTERISTICS: Cost-sharing Required (25%), Credential-based, Fixed Deadline"
+    },
+    "missing-info": {
+      "comparison": {
+        "task": "missing-info",
+        "old": {
+          "length": 1251,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasTiers": false,
+          "bulletCount": 0,
+          "meetsCountReq": false
+        },
+        "new": {
+          "length": 1048,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasTiers": true,
+          "bulletCount": 10,
+          "meetsCountReq": true
+        },
+        "performance": {
+          "oldDuration": 5515,
+          "newDuration": 4937,
+          "durationDiff": -578,
+          "oldTokens": 429,
+          "newTokens": 3290,
+          "tokenDiff": 2861
+        },
+        "improvementScore": 5,
+        "improvementReasons": [
+          "3-tier priority structure",
+          "Meets 8-12 item count requirement"
+        ]
+      },
+      "oldContent": "MISSING INFORMATION ANALYSIS\n\nCritical information that appears to be missing from this grant document:\n\n1. Eligibility Criteria\n- Who can apply (business size, industry sectors, geographic location)\n- Business age/operational history requirements\n- Financial standing requirements\n\n2. Application Process\n- How to apply (online portal, mail, email)\n- Required documentation\n- Contact information for questions\n- Number of applications allowed per organization\n\n3. Timeline Details\n- Project start and end dates\n- When funding decisions will be made\n- When funds will be disbursed\n- Reporting deadlines\n\n4. Budget Specifics\n- Allowable vs. unallowable costs\n- Maximum cost per employee\n- Payment schedule\n- Reimbursement process\n\n5. Program Requirements\n- Specific types of credentials accepted\n- Maximum training duration\n- Instructor qualifications\n- Progress reporting requirements\n- Performance metrics/outcomes expected\n\n6. Administrative Details\n- Awarding agency/organization\n- DUNS/SAM registration requirements\n- Compliance requirements\n- Audit expectations\n\nRecommendation: These missing elements should be added to provide potential applicants with complete information needed to make an informed decision and submit a complete application.",
+      "newContent": "TIER 1: CRITICAL MISSING INFORMATION\n• Eligibility - Business Type: What types of business entities can apply (corporations, non-profits, sole proprietors)?\n• Eligibility - Location: Are there geographic restrictions for applicant businesses?\n• Duration: What is the maximum allowable timeframe for completing the training program?\n• Payment Structure: How are funds disbursed - reimbursement basis or upfront payment?\n\nTIER 2: IMPORTANT FOR STRATEGY\n• Eligible Training Providers: Must training be delivered by certified/pre-approved providers?\n• Employee Status: Do part-time employees count toward the 10-employee minimum requirement?\n• Credential Requirements: Which specific types of credentials or certifications are recognized?\n• Previous Recipients: Can organizations that received funding in past cycles apply again?\n\nTIER 3: ADDITIONAL CLARIFICATIONS\n• Program Metrics: What specific KPIs must be tracked and reported during/after training?\n• Employee Retention: Are there any requirements for retaining trained employees post-completion?"
+    }
+  },
+  "r&d": {
+    "categories": {
+      "comparison": {
+        "task": "categories",
+        "old": {
+          "length": 851,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "startsDirectly": false,
+          "hasStructure": false,
+          "sectionCount": 0,
+          "meetsFormatReq": false
+        },
+        "new": {
+          "length": 443,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasStructure": true,
+          "sectionCount": 7,
+          "meetsFormatReq": true
+        },
+        "performance": {
+          "oldDuration": 3960,
+          "newDuration": 2253,
+          "durationDiff": -1707,
+          "oldTokens": 322,
+          "newTokens": 2849,
+          "tokenDiff": 2527
+        },
+        "improvementScore": 7,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Follows 7-section structure",
+          "Clear section labels"
+        ]
+      },
+      "oldContent": "Based on my analysis, here are the relevant categories for this grant opportunity:\n\nPrimary Categories:\n- Research & Development\n- Technology\n- Innovation\n\nSecondary Categories:\n- Manufacturing\n- Product Development\n- Industry Partnerships\n- Applied Research\n- Commercialization\n\nThis grant would be particularly relevant for technology-focused organizations looking to advance research and development projects. The broad funding range and emphasis on both development and commercialization suggests it spans both early-stage and later-stage technology development efforts.\n\nThe collaborative aspect with research institutions also places this in the academic-industry partnership category, though it's not a primary requirement.\n\nWould you like me to elaborate on any of these categories or explain why I classified them as primary versus secondary?",
+      "newContent": "PRIMARY GRANT TYPE: R&D Grant (Type 4)\n\nSECONDARY TYPES: None\n\nINDUSTRIES: Technology, Manufacturing, Information Technology, Research & Development\n\nGEOGRAPHY: Not Specified\n\nRECIPIENT TYPE: Technology Companies, Research Organizations\n\nFUNDING FOCUS: Technology Development, Commercialization, Applied Research, Product Innovation, Process Improvement\n\nPROGRAM CHARACTERISTICS: Research Collaboration, Technology-focused, Multi-year Projects"
+    },
+    "missing-info": {
+      "comparison": {
+        "task": "missing-info",
+        "old": {
+          "length": 1484,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasTiers": false,
+          "bulletCount": 0,
+          "meetsCountReq": false
+        },
+        "new": {
+          "length": 1113,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "startsDirectly": true,
+          "hasTiers": true,
+          "bulletCount": 10,
+          "meetsCountReq": true
+        },
+        "performance": {
+          "oldDuration": 6399,
+          "newDuration": 4905,
+          "durationDiff": -1494,
+          "oldTokens": 456,
+          "newTokens": 3293,
+          "tokenDiff": 2837
+        },
+        "improvementScore": 5,
+        "improvementReasons": [
+          "3-tier priority structure",
+          "Meets 8-12 item count requirement"
+        ]
+      },
+      "oldContent": "MISSING INFORMATION ANALYSIS:\n\nCritical Information Missing:\n\n1. Application Process\n- No details on how to apply\n- Missing application forms or portal information\n- No mention of required documentation\n\n2. Matching Requirements\n- No indication if matching funds are required\n- If yes, what percentage match is needed\n- Acceptable sources of matching funds not specified\n\n3. Geographic Requirements\n- No mention of eligible locations/regions\n- Missing information about company location requirements\n\n4. Company Specifics\n- Company size/age requirements not specified\n- No revenue or employee number requirements\n- Missing ownership structure requirements\n\n5. Budget Details\n- Eligible vs. ineligible expenses not outlined\n- Payment schedule not mentioned\n- Budget format requirements missing\n\n6. Project Timeline\n- Maximum project duration not specified\n- Project start date requirements missing\n- Milestone requirements not detailed\n\n7. Reporting Requirements\n- Progress reporting frequency not mentioned\n- Final report requirements missing\n- Financial reporting expectations not outlined\n\n8. Contact Information\n- No program officer contact details\n- Missing technical support contacts\n- No address or department information\n\n9. Evaluation Criteria\n- Selection criteria not detailed\n- Scoring system not explained\n- Review process not outlined\n\n10. Additional Support\n- No mention of technical assistance\n- Workshop or information session details missing\n- FAQ section not included",
+      "newContent": "TIER 1: CRITICAL MISSING INFORMATION\n• Eligibility - Company Size: What are the minimum/maximum employee count or revenue requirements for applicant companies?\n• Eligible Expenses: Which specific cost categories are covered within the funding amount (labor, equipment, materials, overhead)?\n• Match Requirement: Is there a minimum cash or in-kind contribution required from applicants?\n• Project Timeline: What is the maximum allowed project duration from start to completion?\n\nTIER 2: IMPORTANT FOR STRATEGY\n• Research Partnership: How is \"collaboration with research institutions\" weighted in evaluation? Is it mandatory or preferred?\n• IP Rights: What intellectual property ownership structure is required for funded projects?\n• Review Criteria: What specific evaluation criteria are used to score applications?\n• Success Metrics: What performance indicators or commercialization outcomes must be achieved?\n\nTIER 3: ADDITIONAL CLARIFICATIONS\n• Payment Schedule: What is the disbursement timeline for approved funding?\n• Progress Reporting: What is the frequency and format of required project progress reports?"
+    }
+  }
+}

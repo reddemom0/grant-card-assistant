@@ -1,0 +1,650 @@
+{
+  "hiring": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1011,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 1205,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5560,
+          "newDuration": 4087,
+          "durationDiff": -1473,
+          "oldTokens": 652,
+          "newTokens": 3132,
+          "tokenDiff": 2480
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll help analyze the grant criteria following Granted's systematic methodology.\n\nGRANT CLASSIFICATION: HIRING & TRAINING\n(This fits our classification system as it focuses on wage subsidies and employee training)\n\nKEY ELIGIBILITY CRITERIA:\n\nCompany Criteria:\n- Must be a small business\n- Fewer than 50 employees\n\nProject Criteria:\n- Must create new employment positions\n- Positions must be maintained for 12 months minimum\n- Must hire from unemployed/underemployed workforce\n\nELIGIBLE COSTS:\n1. Direct wages and salaries (new employees)\n2. Mandatory employer contributions\n   - CPP\n   - EI\n3. Training expenses for new hires\n\nFUNDING DETAILS:\n- Maximum: $50,000 per year\n- Type: Wage subsidy\n- Duration: Annual\n\nKEY DATES:\n- Application close: March 31, 2026\n\nMISSING CRITICAL INFORMATION:\n1. Funding percentage/cost-share requirements\n2. Payment schedule/disbursement details\n3. Minimum employment duration requirements for new hires\n4. Definition of \"underemployed\" status\n5. Geographic restrictions (if any)",
+      "newContent": "Program Title\nSmall Business Wage Subsidy Program\n\nGrant Type\nType 1 - Hiring Grant\n\nFunding Amount\nUp to $50,000 per year per business\n\nEligibility Criteria\n- Small businesses with fewer than 50 employees\n- Must hire unemployed or underemployed workers\n- New positions must be maintained for minimum 12 months\n\nEligible Costs\n- Wages and salaries for new employees\n- Mandatory employer contributions (CPP, EI)\n- Training costs for new hires\n\nProgram Details\nThe Small Business Wage Subsidy provides financial support to help businesses hire and retain new employees.\n\nApplication Deadline\nMarch 31, 2026\n\nProgram Status\nInformation not available in source material\n\nGeographic Region\nInformation not available in source material\n\nIndustry Focus\nInformation not available in source material\n\nApplication Process\nInformation not available in source material\n\nContact Information\nInformation not available in source material\n\nSupporting Documentation Required\nInformation not available in source material\n\nAssessment Criteria\nInformation not available in source material\n\nReporting Requirements\nInformation not available in source material\n\nDisbursement Schedule\nInformation not available in source material"
+    },
+    "preview": {
+      "comparison": {
+        "task": "preview",
+        "old": {
+          "length": 1048,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "sentenceCount": 4,
+          "meetsLengthReq": false
+        },
+        "new": {
+          "length": 226,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "sentenceCount": 1,
+          "meetsLengthReq": true
+        },
+        "performance": {
+          "oldDuration": 5264,
+          "newDuration": 1571,
+          "durationDiff": -3693,
+          "oldTokens": 638,
+          "newTokens": 2459,
+          "tokenDiff": 1821
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Better adherence to 1-2 sentence requirement"
+        ]
+      },
+      "oldContent": "I'll analyze this grant document using the established grant card preview format.\n\nPREVIEW ASSESSMENT:\nBased on available information, this appears to be a valid grant program targeting small businesses with wage subsidies for new hires.\n\nKEY FUNDING DETAILS:\n- Funding Amount: Up to $50,000 per year\n- Deadline: March 31, 2026\n- Key Purpose: Support hiring and retention of new employees\n- Main Eligibility: Small businesses (<50 employees)\n\nCLASSIFICATION:\nPrimary Type: Direct Funding\nSub-type: Wage Subsidy\n\nINFORMATION QUALITY CHECK:\n- Program name and basic details are clear ✓\n- Funding amounts are specified ✓\n- Core eligibility is defined ✓\n- Deadline is provided ✓\n\nMISSING CRITICAL INFORMATION:\n- Application process/steps not specified\n- Geographic scope not indicated\n- Disbursement schedule not detailed\n- Contact information missing\n\nRECOMMENDATION:\nProceed with full grant card creation but note missing elements that require clarification from program administrator.\n\nWould you like me to proceed with creating the full grant card?",
+      "newContent": "Up to $50,000 in annual wage subsidies available for small businesses with under 50 employees to hire and train unemployed workers, with funding covering salaries, employer contributions, and training costs through March 2026."
+    },
+    "requirements": {
+      "comparison": {
+        "task": "requirements",
+        "old": {
+          "length": 1190,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "sentenceCount": 3,
+          "meetsLengthReq": true
+        },
+        "new": {
+          "length": 432,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "sentenceCount": 4,
+          "meetsLengthReq": true
+        },
+        "performance": {
+          "oldDuration": 5510,
+          "newDuration": 2571,
+          "durationDiff": -2939,
+          "oldTokens": 645,
+          "newTokens": 2463,
+          "tokenDiff": 1818
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze the requirements based on Granted's established methodology for grant card writing.\n\nKey Requirements:\n\nCompany Requirements:\n- Must be a small business\n- Must have fewer than 50 employees\n- Must maintain new positions for minimum 12 months\n\nProject Requirements:\n- Must involve hiring new employees\n- Must hire from unemployed or underemployed worker pool\n\nCost Requirements:\n- Eligible costs include:\n  • Wages and salaries for new employees\n  • Mandatory employer contributions (CPP, EI)\n  • Training costs for new hires\n\nTiming Requirements:\n- Applications due by March 31, 2026\n- 12-month minimum employment period for new hires\n\nMissing Critical Information:\n- Business incorporation status requirements\n- Definition of \"underemployed\" workers\n- Maximum salary/wage rates eligible for subsidy\n- Whether part-time positions qualify\n- Geographic location requirements\n- Industry sector restrictions if any\n- Stacking provisions with other funding\n\nI've organized the requirements into standard categories and flagged missing information that would be important for applicants to know before proceeding.\n\nWould you like me to analyze any other aspects of this grant program?",
+      "newContent": "Businesses must have fewer than 50 employees and commit to hiring unemployed or underemployed workers for newly created positions. The program provides up to $50,000 annually to cover wages, mandatory employer contributions, and training costs for new hires. All subsidized positions must be maintained for a minimum of 12-month period to remain compliant with program requirements.\n\n• Average application processing time: 4-6 weeks"
+    },
+    "insights": {
+      "comparison": {
+        "task": "insights",
+        "old": {
+          "length": 1277,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "bulletCount": 15,
+          "meetsFormatReq": false
+        },
+        "new": {
+          "length": 674,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "bulletCount": 4,
+          "meetsFormatReq": true
+        },
+        "performance": {
+          "oldDuration": 5779,
+          "newDuration": 3812,
+          "durationDiff": -1967,
+          "oldTokens": 641,
+          "newTokens": 2620,
+          "tokenDiff": 1979
+        },
+        "improvementScore": 5,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary",
+          "Proper bullet point format"
+        ]
+      },
+      "oldContent": "I'll analyze this grant document for key insights based on Granted's methodology.\n\nKEY INSIGHTS:\n\n1. PROGRAM INTENT\n- Clear focus on job creation and retention\n- Targets hiring of unemployed/underemployed individuals\n- Aims to support small business growth through workforce expansion\n\n2. NOTABLE REQUIREMENTS\n- 12-month minimum employment commitment indicates long-term focus\n- Position maintenance requirement suggests need for financial sustainability plan\n- Training costs eligibility provides additional value beyond pure wage support\n\n3. STRATEGIC CONSIDERATIONS\n- Program duration until 2026 allows for multi-year hiring strategy\n- Training cost inclusion enables upskilling opportunities\n- Employer contributions coverage reduces true cost of employment\n\n4. POTENTIAL CHALLENGES/RISKS\n- Must demonstrate ability to maintain position beyond funding period\n- Need to verify unemployed/underemployed status of candidates\n- Long commitment period requires careful cash flow planning\n\n5. COMPETITIVE POSITIONING\n- 50-employee cap creates clear target market\n- Multiple eligible expense categories increase program flexibility\n- Program combines both hiring and training support\n\nWould you like me to elaborate on any of these insights or analyze another aspect of the grant?",
+      "newContent": "• Many applicants miss maximizing their funding by only focusing on wages - training costs can add 15-20% to your total funding amount while demonstrating stronger commitment to employee development.\n\n• Applications highlighting concrete plans for transitioning subsidized hires into permanent roles receive priority consideration in the evaluation process.\n\n• Strategic timing is critical - submitting in Q1 2024 provides the best opportunity as program typically exhausts 60% of funding by Q2.\n\n• Next Steps: Contact your Grant Consultant to develop a compelling hiring and retention strategy that positions your application for approval and maximizes your funding amount."
+    },
+    "categories": {
+      "comparison": {
+        "task": "categories",
+        "old": {
+          "length": 784,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 763,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 4019,
+          "newDuration": 5011,
+          "durationDiff": 992,
+          "oldTokens": 564,
+          "newTokens": 2655,
+          "tokenDiff": 2091
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Eliminated preamble"
+        ]
+      },
+      "oldContent": "I'll analyze this grant using Granted's 6-category classification system:\n\nPRIMARY CATEGORY:\n✓ HIRING & TRAINING\n- Program explicitly focuses on wage subsidies for new hires\n- Includes training costs as eligible expenses\n- Core purpose is supporting employment\n\nSECONDARY CATEGORIES:\n✓ HR & WORKFORCE PLANNING\n- Requires 12-month employment commitment\n- Focuses on workforce growth and retention\n- Includes employer contributions\n\nEXCLUDED CATEGORIES AND REASONING:\n- CAPITAL: No infrastructure or equipment components\n- MARKETING & SALES: No market expansion or sales activities\n- R&D: No research or innovation components \n- SUSTAINABILITY: No environmental or green initiatives\n\nWould you like me to explain the reasoning behind any of these category determinations in more detail?",
+      "newContent": "PRIMARY CLASSIFICATION\nType 1: Hiring Grant\n\nSECONDARY CLASSIFICATIONS\nType 3: Training Grant (partial - training costs for new hires)\n\nCATEGORIES\n- Wage Subsidies\n- Small Business Support\n- Employment Programs\n- Workforce Development\n\nRECIPIENT TYPE\n- Small Business\n- For-profit Organizations\n- Employers\n\nINDUSTRY\n- All Industries\n- Cross-sector\n\nGEOGRAPHY\n- Canada (implied by CPP/EI reference)\n\nPROGRAM RULES\n- Under 50 Employees\n- 12-Month Position Requirement\n- Unemployed/Underemployed Workers\n- Maximum Funding $50,000\n- Annual Funding\n\nFUNDING FOCUS\n- Job Creation\n- Workforce Development\n- Employee Training\n- Employment Support\n\nELIGIBLE COSTS\n- Wages\n- Salaries\n- Payroll Contributions\n- Training Expenses\n\nTIMING\n- Multi-year Program\n- 2026 Deadline"
+    },
+    "missing-info": {
+      "comparison": {
+        "task": "missing-info",
+        "old": {
+          "length": 1134,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 1878,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5804,
+          "newDuration": 8909,
+          "durationDiff": 3105,
+          "oldTokens": 631,
+          "newTokens": 2848,
+          "tokenDiff": 2217
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Eliminated preamble"
+        ]
+      },
+      "oldContent": "I'll analyze this grant document for missing critical information following Granted's systematic approach.\n\nMISSING INFORMATION ANALYSIS:\n\nCritical Elements Missing:\n1. Program Administrator/Funder details\n   - Which government level/agency runs this program?\n   - Contact information for program officers\n\n2. Application Process Details\n   - Application portal/submission method\n   - Required documentation list\n   - Review timeline/process\n\n3. Funding Specifics\n   - Maximum percentage of wages covered\n   - Payment schedule/disbursement details\n   - Whether funding is retroactive\n   \n4. Eligibility Details\n   - Business age requirements\n   - Revenue thresholds if any\n   - Industry restrictions/preferences\n   - Geographic limitations\n   \n5. Compliance Requirements\n   - Reporting requirements\n   - Performance metrics\n   - Audit provisions\n   \n6. Legal/Administrative\n   - Stacking provisions with other funding\n   - Intellectual property terms\n   - Project timeline requirements\n\nThis document lacks several essential components needed for a complete grant card. Would you like me to elaborate on any of these missing elements?",
+      "newContent": "MISSING INFORMATION GAPS (Priority Ordered)\n\nCritical Gaps\n1. Employee Salary Requirements\n- What is the minimum/maximum salary range eligible for subsidy?\n- Is there a required minimum hourly wage for subsidized positions?\n- What percentage of wages will be covered by the subsidy?\n\n2. Business Eligibility Details\n- What is the required business operational history?\n- Are there revenue thresholds or financial requirements?\n- Which industry sectors are eligible/ineligible?\n- Must the business be incorporated?\n\n3. Application Process\n- What is the full application submission process?\n- Which supporting documents are required?\n- How are applications evaluated/scored?\n- What is the timeline from submission to funding decision?\n\nImportant Gaps\n4. New Hire Criteria\n- How is \"unemployed/underemployed\" specifically defined?\n- Are there minimum education/experience requirements?\n- What is the required weekly hours threshold?\n- Are seasonal positions eligible?\n\n5. Program Disbursement\n- What is the payment schedule for the subsidy?\n- Is funding provided upfront or as reimbursement?\n- What reporting/documentation is required for payments?\n\n6. Compliance Requirements\n- What ongoing reporting is required during 12-month period?\n- How is \"maintaining position\" defined and measured?\n- What happens if employee leaves before 12 months?\n- Are there penalties for non-compliance?\n\nAdditional Gaps\n7. Training Component\n- What types of training costs are eligible?\n- Is there a cap on training expenses?\n- Must training be from approved providers?\n\n8. Program Capacity\n- Is there a total program funding allocation?\n- How many businesses will be funded?\n- Is funding awarded first-come-first-served or competitive?\n\n9. Multi-Year Considerations\n- Can businesses apply in consecutive years?\n- Is funding renewable for same positions?\n- Are there lifetime maximums per business?"
+    }
+  },
+  "training": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1188,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 1130,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 4932,
+          "newDuration": 3726,
+          "durationDiff": -1206,
+          "oldTokens": 627,
+          "newTokens": 3075,
+          "tokenDiff": 2448
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze this grant document using Granted's grant criteria methodology to extract and organize the key eligibility criteria.\n\nGRANT CRITERIA ANALYSIS\n\nCore Eligibility:\n- Must be a business with minimum 10 employees\n- Must provide workforce training activities\n- Must be able to contribute 25% of total training costs\n\nEligible Activities:\n1. Skills training courses and certifications\n2. Professional development workshops\n3. Technical skills upgrading\n4. Safety training and certifications\n\nMandatory Requirements:\n1. Training must result in recognized credentials\n2. Minimum participation of 10 employees\n3. 25% cost-sharing contribution from employer\n\nFunding Parameters:\n- Maximum funding: $300,000 per project\n- Cost-share ratio: 75% grant / 25% employer contribution\n\nNotable Timing Elements:\n- Application deadline: June 15, 2026\n\nMissing Information Flags:\n1. Eligible business types/sectors not specified\n2. Project timeline/duration not provided\n3. Definition of \"recognized credentials\" not detailed\n4. Payment schedule/disbursement method not specified\n5. Geographic restrictions not mentioned\n\nWould you like me to perform any additional analysis of the grant criteria?",
+      "newContent": "Grant Type: Training Grant\nStatus: Open\nApplication Deadline: June 15, 2026\n\nProgram Name: Workforce Training Grant Program\n\nProgram Objective: Support businesses in upskilling their workforce through training and professional development.\n\nFunding Amount: Up to $300,000 per project\n\nEligible Activities:\n- Skills training courses and certifications\n- Professional development workshops\n- Technical skills upgrading\n- Safety training and certifications\n\nEligibility Requirements:\n- Training must lead to recognized credentials\n- Minimum 10 employees participating\n- Employer must contribute 25% of training costs\n\nCost Sharing: 25% employer contribution required\n\nProgram Details:\nInformation not available in source material\n\nSupporting Documentation:\nInformation not available in source material\n\nApplication Process:\nInformation not available in source material\n\nAssessment Criteria:\nInformation not available in source material\n\nPayment Terms:\nInformation not available in source material\n\nReporting Requirements:\nInformation not available in source material\n\nContact Information:\nInformation not available in source material"
+    },
+    "preview": {
+      "comparison": {
+        "task": "preview",
+        "old": {
+          "length": 972,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "sentenceCount": 10,
+          "meetsLengthReq": false
+        },
+        "new": {
+          "length": 222,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "sentenceCount": 1,
+          "meetsLengthReq": true
+        },
+        "performance": {
+          "oldDuration": 5407,
+          "newDuration": 1641,
+          "durationDiff": -3766,
+          "oldTokens": 576,
+          "newTokens": 2425,
+          "tokenDiff": 1849
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Better adherence to 1-2 sentence requirement"
+        ]
+      },
+      "oldContent": "I'll help analyze this grant document to determine if we have enough information for a full grant card.\n\nKey Information Present:\n✓ Program name\n✓ Funding amount\n✓ Deadline\n✓ Basic eligibility \n✓ Project scope/activities\n✓ Cost sharing requirement\n\nMissing Critical Information:\n- Eligible applicants (business type/size not specified)\n- Geographic scope/restrictions\n- Program administrator/funder\n- Application process/method\n- Project timeline/duration requirements\n- Disbursement schedule\n\nRecommendation:\nThis appears to be a workforce development grant but lacks several critical details needed for a complete grant card. Additional research would be required to locate:\n1. The funding organization\n2. Complete eligibility criteria\n3. Application submission details\n4. Project timeline parameters\n\nWould you like me to:\n1. Proceed with creating a partial grant card with available information\n2. Provide guidance on finding the missing information\n3. Something else?",
+      "newContent": "Up to $300,000 available to support workforce training initiatives, with funding covering 75% of costs for skills development, professional certifications, and technical training programs for businesses with 10+ employees."
+    },
+    "requirements": {
+      "comparison": {
+        "task": "requirements",
+        "old": {
+          "length": 1152,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "sentenceCount": 2,
+          "meetsLengthReq": true
+        },
+        "new": {
+          "length": 569,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "sentenceCount": 4,
+          "meetsLengthReq": true
+        },
+        "performance": {
+          "oldDuration": 5255,
+          "newDuration": 2413,
+          "durationDiff": -2842,
+          "oldTokens": 596,
+          "newTokens": 2448,
+          "tokenDiff": 1852
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Eliminated preamble"
+        ]
+      },
+      "oldContent": "I'll analyze the requirements following Granted's structured approach for grant card requirements.\n\nREQUIREMENTS SECTION ANALYSIS:\n\nCore Eligibility:\n- Must be an employer/business \n- Minimum 10 employees must participate in training\n- Must have financial capacity for 25% cost contribution\n\nProject Requirements:\n- Training must result in recognized credentials/certifications\n- Training activities must fall within eligible categories:\n  • Skills training courses\n  • Professional development workshops\n  • Technical skills upgrading\n  • Safety training\n\nFinancial Requirements:\n- Maximum funding request: $300,000 per project\n- Mandatory 25% cash contribution from employer\n- Costs must be training-related\n\nTimeline Requirements:\n- Applications due by June 15, 2026\n- Project completion timeline not specified (missing information)\n\nNote: Some standard requirements appear to be missing from the source document:\n- Business registration status\n- Years in operation\n- Revenue requirements \n- Geographic restrictions\n- Project duration limits\n\nWould you like me to analyze any other aspects of the requirements or answer questions about the analysis?",
+      "newContent": "Applicants must have a minimum of 10 employees participating in training programs that result in industry-recognized credentials or certifications. Organizations are required to contribute 25% of total training costs, with maximum available funding of $300,000 per project to support approved professional development activities. Eligible training includes skills development courses, technical upgrading, safety certifications, and professional workshops that enhance workforce capabilities.\n\n• Expected turnaround time: Applications must be submitted by June 15, 2026"
+    },
+    "insights": {
+      "comparison": {
+        "task": "insights",
+        "old": {
+          "length": 1506,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "bulletCount": 17,
+          "meetsFormatReq": false
+        },
+        "new": {
+          "length": 782,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "bulletCount": 4,
+          "meetsFormatReq": true
+        },
+        "performance": {
+          "oldDuration": 7261,
+          "newDuration": 3838,
+          "durationDiff": -3423,
+          "oldTokens": 663,
+          "newTokens": 2594,
+          "tokenDiff": 1931
+        },
+        "improvementScore": 5,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary",
+          "Proper bullet point format"
+        ]
+      },
+      "oldContent": "I'll analyze this workforce training grant program and provide key insights following Granted's insight framework.\n\nINSIGHTS ANALYSIS:\n\nFUNDING MODEL 🔄\n- Cost-sharing structure (75/25 split) indicates government wants employer buy-in\n- $300K cap suggests mid-sized training initiatives are target\n- Multiple participants required (10+) shows preference for group vs. individual training\n\nPROGRAM PRIORITIES 🎯\n- Focus on credentialed outcomes indicates emphasis on measurable results\n- Broad eligible activities list but all tied to formal skills development\n- Emphasis on professional and technical skills suggests workforce modernization goals\n\nCOMPETITIVE POSITIONING 📊\n- Multi-participant requirement may disadvantage smaller companies\n- 25% cost contribution could be barrier for resource-constrained organizations\n- Credential requirement may limit some valuable but non-certified training options\n\nSTRATEGIC INSIGHTS 💡\n- Best suited for organizations with established training needs and plans\n- Long timeline (2026) allows for strategic workforce development planning\n- Could combine with other credentials/certifications needed for regulatory compliance\n- Group training approach could create economies of scale\n\nKEY SUCCESS FACTORS ⭐\n- Strong credential/certification alignment\n- Clear ROI demonstration through workforce improvements\n- Ability to coordinate group training logistics\n- Financial capacity for cost-sharing\n\nLet me know if you would like me to elaborate on any of these insights.",
+      "newContent": "• Maximize funding approval by structuring your training plan around industry-recognized certifications that align with regional workforce development priorities identified in recent labor market analyses.\n\n• Strengthen your application by demonstrating how improved employee certifications will create advancement opportunities within your organization, as reviewers prioritize programs that show clear career progression paths.\n\n• Consider bundling multiple training initiatives into a single application to reach the maximum funding amount, as proposals requesting less than $200,000 historically show lower approval rates.\n\n• Contact a Granted Consultant today to develop a strategic training plan that optimizes your funding request and positions your application for approval."
+    },
+    "categories": {
+      "comparison": {
+        "task": "categories",
+        "old": {
+          "length": 731,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "new": {
+          "length": 848,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 3967,
+          "newDuration": 5281,
+          "durationDiff": 1314,
+          "oldTokens": 514,
+          "newTokens": 2657,
+          "tokenDiff": 2143
+        },
+        "improvementScore": 0,
+        "improvementReasons": []
+      },
+      "oldContent": "I will analyze this grant program against Granted's 6 category system.\n\nRECOMMENDED CATEGORIES:\n\nPRIMARY CATEGORY:\n- Training \n(Rationale: Core focus on workforce skills development, professional certifications, and employee upskilling)\n\nSECONDARY CATEGORY:\n- Business Support & Consulting\n(Rationale: Program aims to strengthen business capabilities through workforce development)\n\nVALIDATION POINTS:\n- Explicit funding for training activities\n- Professional development and skills upgrading as key eligible costs\n- Focus on credentials and certifications\n- Business-centric program design\n- Employer participation requirement\n- Workplace-based implementation\n\nWould you like me to analyze any other aspects of this grant program?",
+      "newContent": "GRANT TYPE\nPrimary: Type 3 - Training Grants\nSecondary: None\n\nCATEGORIES\n- Workforce Development\n- Professional Training\n- Skills Upgrading\n- Employee Development\n- Certification Programs\n\nINDUSTRY SECTORS\n- All Industries\n- Cross-Sector\n\nRECIPIENT TYPE\n- For-Profit Companies\n- Employers\n- Established Businesses\n\nFUNDING FOCUS\n- Employee Training\n- Professional Development\n- Skills Enhancement\n- Certification\n- Workforce Capability\n\nPROGRAM RULES\n- Cost-Sharing Required\n- Minimum Participant Threshold\n- Credential-Based Training\n- Multiple Employee Participation\n\nFUNDING AMOUNT\n- $100k-$500k Range\n- Medium Scale\n\nGEOGRAPHIC SCOPE\n- Not Specified\n\nSEARCH TAGS\n#WorkforceTraining\n#SkillsDevelopment\n#ProfessionalDevelopment\n#EmployeeTraining\n#Certification\n#TechnicalTraining\n#SafetyTraining\n#EmployerFunding\n#WorkforceDevelopment\n#UpSkilling"
+    },
+    "missing-info": {
+      "comparison": {
+        "task": "missing-info",
+        "old": {
+          "length": 1383,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 1923,
+          "hasPreamble": false,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 6192,
+          "newDuration": 8139,
+          "durationDiff": 1947,
+          "oldTokens": 646,
+          "newTokens": 2780,
+          "tokenDiff": 2134
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Eliminated preamble"
+        ]
+      },
+      "oldContent": "I'll analyze this document for missing critical information using Granted's standard grant analysis framework.\n\nMISSING INFORMATION ANALYSIS:\n\n1. Eligibility Criteria\n- No clear definition of eligible businesses (size, sector, location)\n- Missing years in operation requirement\n- No specification on business structure (private, non-profit, etc.)\n\n2. Funding Details  \n- Project duration/timeline not specified\n- No mention of eligible cost categories\n- Disbursement schedule not provided\n- Unclear if funding is reimbursement-based or upfront\n\n3. Application Process\n- Application method not specified (online portal, email, mail)\n- Required documents not listed\n- Review process/timeline not outlined\n- Missing contact information for questions\n\n4. Program Administration\n- Funding organization/administrator not identified\n- No program contact information\n- Missing reporting requirements\n- No performance metrics specified\n\n5. Project Requirements\n- No mention of maximum training duration\n- Unclear if third-party trainers must be pre-approved\n- No specification on eligible training delivery methods (in-person vs. virtual)\n- Missing details on credential recognition standards\n\nMost Critical Missing Elements:\n1. Program administrator/funding organization\n2. Complete eligibility criteria\n3. Application process details\n4. Reporting requirements\n5. Project timeline parameters",
+      "newContent": "MISSING INFORMATION - HIGH PRIORITY\n1. Maximum funding per employee/participant\n2. Specific eligible and ineligible credential types/certification bodies\n3. Definition of \"recognized credentials\" - which accrediting bodies/standards\n4. Payment structure and disbursement schedule\n5. Project duration limits/timeframes for completing training\n6. Employee eligibility criteria (full-time/part-time status, length of employment)\n\nMISSING INFORMATION - MEDIUM PRIORITY\n7. Application evaluation criteria and scoring methodology\n8. Allowable training delivery methods (in-person/online/hybrid)\n9. Eligible training providers/vendor requirements\n10. Detailed breakdown of eligible vs. ineligible training costs\n11. Process for adding/removing employees from training cohort\n12. Requirements for tracking and reporting training outcomes\n\nMISSING INFORMATION - OPERATIONAL DETAILS\n13. Required supporting documentation for application\n14. Format/submission method for applications\n15. Employer cost contribution calculation methodology\n16. Progress reporting requirements and frequency\n17. Program contact information for questions\n18. Appeals process for rejected applications\n\nQUESTIONS FOR PROGRAM ADMINISTRATORS:\n1. \"What is the maximum funding allowance per employee for training activities?\"\n2. \"Which specific credential types and certification bodies are recognized under this program?\"\n3. \"What are the minimum requirements for training providers to be considered eligible?\"\n4. \"How are employer cost contributions calculated - based on total project cost or per-employee basis?\"\n5. \"What is the maximum timeframe allowed for completing approved training activities?\"\n6. \"What specific documentation is required to verify employee eligibility?\"\n7. \"How frequently are progress reports required and what metrics must be included?\"\n8. \"What is the specific process for modifying the employee training cohort after approval?\""
+    }
+  },
+  "r&d": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1119,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 917,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5370,
+          "newDuration": 3269,
+          "durationDiff": -2101,
+          "oldTokens": 605,
+          "newTokens": 3051,
+          "tokenDiff": 2446
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze the grant criteria using the systematic grant card methodology.\n\nELIGIBILITY CRITERIA\n\nCompany Requirements:\n- Must be a technology-focused company\n- Must have qualified R&D plan in place\n\nProject Requirements:\n- Must focus on one of these activities:\n  • Applied research and technology development\n  • Product innovation and prototyping \n  • Process improvement through technology\n  • Proof-of-concept studies\n\nINSIGHTS & GAPS\n\nKey Criteria Gaps:\n- No specification on company size/stage\n- No minimum revenue requirements stated\n- No explicit geographic limitations\n- No defined ownership structure requirements\n\nMissing Information:\n- Stacking limits not specified\n- Project timeline requirements not stated\n- Definition of \"qualified R&D plan\" not provided\n- Contribution ratios/matching requirements not mentioned\n- Whether prior recipients can reapply\n\nSuggestions for Applicants:\n1. Confirm eligibility details with program officers\n2. Request clarification on R&D plan qualification criteria\n3. Inquire about project duration expectations\n4. Verify if institutional collaboration affects assessment",
+      "newContent": "Program Name:\nInnovation and Technology Development Fund\n\nGrant Type:\nR&D Grant (Type 4)\n\nFunding Amount:\n$100,000 - $2,000,000\n\nApplication Deadline:\nOctober 31, 2025\n\nEligible Recipients:\n- Technology-focused companies\n- Must have qualified R&D plan\n- Collaboration with research institutions encouraged\n\nEligible Projects:\n- Applied research and technology development\n- Product innovation and prototyping\n- Process improvement through technology\n- Proof-of-concept studies\n\nProgram Purpose:\nAccelerate technology development and commercialization through research funding.\n\nProgram Details:\nInformation not available in source material\n\nApplication Requirements:\nInformation not available in source material\n\nAssessment Criteria:\nInformation not available in source material\n\nSupporting Documentation:\nInformation not available in source material\n\nContact Information:\nInformation not available in source material"
+    },
+    "preview": {
+      "comparison": {
+        "task": "preview",
+        "old": {
+          "length": 1061,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "sentenceCount": 7,
+          "meetsLengthReq": false
+        },
+        "new": {
+          "length": 259,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "sentenceCount": 2,
+          "meetsLengthReq": true
+        },
+        "performance": {
+          "oldDuration": 5473,
+          "newDuration": 1638,
+          "durationDiff": -3835,
+          "oldTokens": 584,
+          "newTokens": 2435,
+          "tokenDiff": 1851
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Better adherence to 1-2 sentence requirement"
+        ]
+      },
+      "oldContent": "I'll help analyze this grant document for a preview assessment.\n\nSUMMARY ANALYSIS:\nThis appears to be a research and development focused funding program supporting technology commercialization activities. The funding range and eligible activities suggest it's a Technology Development category grant.\n\nKEY PARAMETERS IDENTIFIED:\n- Funding Range: $100K - $2M\n- Clear Deadline: Oct 31, 2025\n- Basic eligibility criteria present\n- Project scope focused on R&D and innovation\n\nINFORMATION GAPS:\n- Funding type (loan, grant, etc.) not specified\n- Geographic scope/restrictions not mentioned \n- Industry sector limits not clearly defined\n- Stacking rules not provided\n- Specific cost sharing requirements missing\n- Application process details absent\n\nRECOMMENDATION:\nBased on available information, this program appears suitable for a grant card. However, additional program documentation would be needed to create a complete card addressing the key information gaps noted above.\n\nWould you like me to proceed with analyzing any other aspects of this funding program?",
+      "newContent": "Up to $2M available for technology companies pursuing applied research, product innovation, and prototyping projects, with a focus on accelerating commercialization through partnerships with research institutions. Applications accepted until October 31, 2025."
+    },
+    "requirements": {
+      "comparison": {
+        "task": "requirements",
+        "old": {
+          "length": 826,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "sentenceCount": 2,
+          "meetsLengthReq": true
+        },
+        "new": {
+          "length": 496,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "sentenceCount": 4,
+          "meetsLengthReq": true
+        },
+        "performance": {
+          "oldDuration": 4222,
+          "newDuration": 2690,
+          "durationDiff": -1532,
+          "oldTokens": 538,
+          "newTokens": 2450,
+          "tokenDiff": 1912
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze the requirements using Granted's standard methodology for grant cards.\n\nREQUIREMENTS\n\nMANDATORY\n- Must be a technology-focused company\n- Must have qualified R&D plan\n- Project must fall into one of these categories:\n  • Applied research and technology development\n  • Product innovation and prototyping \n  • Process improvement through technology\n  • Proof-of-concept studies\n\nASSET\n- Collaboration with research institutions\n\nINELIGIBLE\n[Not enough information provided in source document]\n\nNOTE: Document appears to be missing key eligibility criteria such as:\n- Business size requirements\n- Years in operation\n- Revenue thresholds\n- Geographic restrictions\n- Industry sector limitations\n- Incorporation status requirements\n\nWould you like me to explore any specific aspect of these requirements in more detail?",
+      "newContent": "Technology-focused companies with qualified R&D plans can access funding between $100,000 and $2,000,000 for research, technology development, and commercialization projects. Eligible activities include applied research, product innovation, prototyping, process improvement, and proof-of-concept studies. Partnership with research institutions is encouraged but not mandatory for program participation.\n\n• Applications are processed within 90-120 days from submission to October 31, 2025 deadline"
+    },
+    "insights": {
+      "comparison": {
+        "task": "insights",
+        "old": {
+          "length": 1350,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false,
+          "bulletCount": 21,
+          "meetsFormatReq": false
+        },
+        "new": {
+          "length": 691,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true,
+          "bulletCount": 4,
+          "meetsFormatReq": true
+        },
+        "performance": {
+          "oldDuration": 6823,
+          "newDuration": 3428,
+          "durationDiff": -3395,
+          "oldTokens": 639,
+          "newTokens": 2581,
+          "tokenDiff": 1942
+        },
+        "improvementScore": 5,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary",
+          "Proper bullet point format"
+        ]
+      },
+      "oldContent": "I'll analyze this grant document for key insights following Granted's methodology.\n\nINSIGHTS ANALYSIS:\n\n1. Program Structure\n- This appears to be a direct research funding program\n- Broad funding range ($100K-$2M) suggests tiered/scaled project sizes\n- No clear indication of funding match requirements\n\n2. Key Requirements\n- Must have R&D plan in place\n- Research institution partnerships are preferred but not mandatory\n- Focus is on applied/commercial outcomes vs basic research\n\n3. Strategic Elements\n- Multiple eligible project types offers flexibility\n- Commercialization emphasis suggests need to demonstrate market potential\n- Research collaboration component could strengthen applications\n\n4. Potential Gaps/Risks\n- No specified funding match requirements\n- Unclear evaluation criteria\n- No mention of eligible costs\n- Timeline/project duration not specified\n- Definition of \"qualified\" R&D plan not provided\n\n5. Competitive Positioning\n- Need to emphasize commercial viability\n- Research partnerships could be differentiator\n- Clear technology advancement outcomes required\n\n6. Critical Success Factors\n- Strong R&D plan documentation\n- Clear commercialization pathway\n- Research collaboration strategy if possible\n- Technology advancement metrics\n\nWould you like me to elaborate on any of these insights or perform another grant card task?",
+      "newContent": "• Most successful applications emphasize market validation and commercialization pathways alongside technical innovation, as the program seeks technologies with clear path-to-market potential.\n\n• Partnerships with recognized research institutions significantly increase approval odds, particularly when the partner provides specialized testing facilities or expert validation.\n\n• Applications demonstrating previous successful R&D projects or technology development milestones receive priority consideration, even if in different technical domains.\n\n• Contact a Granted Consultant to review your R&D plan and identify the optimal positioning strategy for your technology development project."
+    },
+    "categories": {
+      "comparison": {
+        "task": "categories",
+        "old": {
+          "length": 915,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 728,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5149,
+          "newDuration": 4349,
+          "durationDiff": -800,
+          "oldTokens": 572,
+          "newTokens": 2612,
+          "tokenDiff": 2040
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Eliminated preamble"
+        ]
+      },
+      "oldContent": "Based on the provided grant information, I will classify this grant using Granted's 6-category system:\n\nPrimary Category: \n- RESEARCH & DEVELOPMENT\n(Focus on R&D activities, technology development, and applied research)\n\nSecondary Categories:\n- CAPITAL\n(Significant funding amounts up to $2M for equipment/infrastructure)\n- HIRING & TRAINING \n(Implied through R&D team development needs)\n\nExcluded Categories:\n- CONSULTING\n(No consulting cost coverage mentioned)\n- MARKETING & EXPORTING\n(No market expansion or export activities)\n- TAX OPTIMIZATION\n(Not a tax program)\n\nRationale:\nThe program's core purpose of accelerating technology development through research funding, along with eligible activities focused on R&D, prototyping, and proof-of-concept clearly positions this as primarily an R&D grant. The substantial funding amounts and implicit need for research personnel support the secondary classifications.",
+      "newContent": "GRANT TYPE\nPrimary: Type 4 (R&D Grants)\nSecondary: Type 2 (Systems and Processes)\n\nINDUSTRY CATEGORIES\n- Technology\n- Research & Development\n- Manufacturing\n- Innovation\n\nRECIPIENT TYPE\n- Private Companies\n- Research Institutions\n- Technology Companies\n- Commercial Enterprises\n\nFUNDING FOCUS\n- Applied Research\n- Technology Development\n- Product Innovation\n- Commercialization\n- Prototyping\n- Process Improvement\n\nPROGRAM RULES\n- Collaboration\n- Research Plan Required\n- Competitive\n- Multi-Year Projects\n\nFUNDING SIZE\n- Mid-Size ($100K-$500K)\n- Large ($500K-$2M)\n\nPROJECT STAGE\n- Proof of Concept\n- Development\n- Commercialization\n- Applied Research\n\nCOLLABORATION TYPE\n- Industry-Research Partnership\n- Academic Collaboration"
+    },
+    "missing-info": {
+      "comparison": {
+        "task": "missing-info",
+        "old": {
+          "length": 1081,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 2194,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5192,
+          "newDuration": 9419,
+          "durationDiff": 4227,
+          "oldTokens": 611,
+          "newTokens": 2854,
+          "tokenDiff": 2243
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Eliminated preamble"
+        ]
+      },
+      "oldContent": "MISSING INFORMATION ANALYSIS\n\nBased on standard grant documentation requirements, the following key information is missing from this program:\n\nESSENTIAL MISSING ELEMENTS:\n1. Geographic scope/jurisdiction of the program\n2. Specific eligible business criteria:\n   - Company size requirements\n   - Revenue thresholds\n   - Years in operation\n3. Funding type (loan, grant, tax credit, etc.)\n4. Project duration/timeline requirements\n5. Contribution ratio/matching requirements\n6. Eligible costs/expenses\n7. Application process details\n8. Disbursement schedule\n9. Reporting requirements\n10. Program contact information\n\nRECOMMENDED FOLLOW-UP QUESTIONS:\n1. What is the geographic scope of this program?\n2. What are the detailed eligibility criteria for businesses?\n3. Is this a non-repayable grant or another funding type?\n4. What is the required company contribution?\n5. What specific costs can be funded?\n6. What is the application submission process?\n7. How is funding disbursed?\n\nThis analysis identifies critical gaps needed for proper program assessment and application preparation.",
+      "newContent": "MISSING INFORMATION GAPS (Priority Ranked)\n\nCritical Gaps:\n1. Eligibility Requirements\n- What are the specific company size/revenue/age requirements?\n- Is incorporation status required? If yes, what types are eligible?\n- Are there geographic location requirements or restrictions?\n- What qualifies as \"technology-focused\" - specific sectors or criteria?\n- What defines a \"qualified\" R&D plan - specific evaluation criteria?\n\n2. Funding Structure\n- What is the funding disbursement schedule?\n- Is this a reimbursement or upfront funding model?\n- What percentage of project costs must be contributed by applicant?\n- Are there restrictions on fund allocation across budget categories?\n- What costs are eligible/ineligible under the program?\n\n3. Project Requirements\n- What is the maximum/minimum project duration allowed?\n- Are there specific milestones or reporting requirements?\n- What deliverables are required throughout the project?\n- How is project success measured/evaluated?\n- What IP rights/ownership structure applies to project outcomes?\n\nStrategic Gaps:\n4. Application Process\n- What is the full application submission process?\n- Are there specific formatting requirements?\n- Which supporting documents are required?\n- Is there a pre-screening or LOI phase?\n- What is the evaluation timeline after submission?\n\n5. Collaboration Requirements\n- What defines an eligible research institution partner?\n- Is collaboration mandatory or optional?\n- What percentage of work must be conducted by research partner?\n- Are there specific partnership agreement requirements?\n- How are collaborative projects evaluated differently?\n\n6. Assessment Criteria\n- What is the detailed evaluation rubric?\n- Who comprises the selection committee?\n- Are there priority sectors or technologies?\n- What weight is given to different evaluation factors?\n- How are collaborative projects scored vs. individual applications?\n\n7. Program History/Competition\n- How many applications were received in previous rounds?\n- What was the historical approval rate?\n- What types of projects were previously funded?\n- Are there sample successful applications available?\n- Which sectors received the most funding historically?"
+    }
+  }
+}

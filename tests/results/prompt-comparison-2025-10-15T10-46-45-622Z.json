@@ -1,0 +1,32 @@
+{
+  "hiring": {
+    "grant-criteria": {
+      "error": "Test failed"
+    }
+  },
+  "training": {
+    "grant-criteria": {
+      "error": "Test failed"
+    }
+  },
+  "r&d": {
+    "grant-criteria": {
+      "error": "Test failed"
+    }
+  },
+  "market-expansion": {
+    "grant-criteria": {
+      "error": "Test failed"
+    }
+  },
+  "loan": {
+    "grant-criteria": {
+      "error": "Test failed"
+    }
+  },
+  "investment": {
+    "grant-criteria": {
+      "error": "Test failed"
+    }
+  }
+}

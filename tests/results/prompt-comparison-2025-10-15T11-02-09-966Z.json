@@ -1,0 +1,216 @@
+{
+  "hiring": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 951,
+          "hasPreamble": false,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "new": {
+          "length": 1067,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 4622,
+          "newDuration": 3888,
+          "durationDiff": -734,
+          "oldTokens": 630,
+          "newTokens": 3119,
+          "tokenDiff": 2489
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "Let me analyze the grant criteria following the established methodology.\n\nGRANT CRITERIA ANALYSIS\n\nAPPLICANT CRITERIA:\n- Company size: <50 employees\n- Company type: Small businesses\n\nACTIVITY CRITERIA:\n- Must hire unemployed/underemployed workers\n- Must maintain new positions for 12 months minimum\n- Must provide training to new hires\n\nEXPENSE CRITERIA:\n- Wages and salaries for new employees\n- Mandatory employer contributions (CPP, EI)\n- Training costs for new hires\n\nFUNDING PARAMETERS:\n- Maximum funding: $50,000 per year\n- Cost sharing: Not specified\n- Funding type: Wage subsidy\n\nTIMING PARAMETERS:\n- Application deadline: March 31, 2026\n- Project duration: Minimum 12 months\n\nMISSING CRITICAL INFORMATION:\n1. Geographic restrictions\n2. Company revenue requirements\n3. Cost-sharing requirements\n4. Industry sector restrictions\n5. Application process details\n6. Disbursement schedule\n\nWould you like me to perform any other grant analysis tasks?",
+      "newContent": "Program Name: Small Business Wage Subsidy Program\n\nGrant Type: Hiring Grant\n\nStatus: Open\n\nApplication Deadline: March 31, 2026\n\nFunding Amount: Up to $50,000 per year\n\nEligible Applicants:\n- Small businesses with fewer than 50 employees\n\nEligible Activities:\n- Hiring unemployed or underemployed workers\n- Training new hires\n\nEligible Expenses:\n- Wages and salaries for new employees\n- Mandatory employer contributions (CPP, EI)\n- Training costs for new hires\n\nProgram Requirements:\n- New positions must be maintained for minimum 12 months\n\nProgram Details:\nThe Small Business Wage Subsidy provides financial support to help businesses hire and retain new employees.\n\nSupporting Documents:\nInformation not available in source material\n\nContact Information:\nInformation not available in source material\n\nApplication Process:\nInformation not available in source material\n\nAssessment Criteria:\nInformation not available in source material\n\nPayment Terms:\nInformation not available in source material\n\nReporting Requirements:\nInformation not available in source material"
+    }
+  },
+  "training": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1051,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 1172,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5730,
+          "newDuration": 4072,
+          "durationDiff": -1658,
+          "oldTokens": 625,
+          "newTokens": 3080,
+          "tokenDiff": 2455
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze the grant criteria using Granted's systematic methodology:\n\nELIGIBLE RECIPIENTS\n✓ Businesses/employers (implied by workforce focus)\n✗ Specific industry sectors not specified\n✗ Size requirements not specified beyond 10 employee minimum\n\nELIGIBLE ACTIVITIES \n✓ Skills training courses\n✓ Professional development\n✓ Technical training\n✓ Safety certifications\n✗ Must result in recognized credentials\n\nFUNDING AMOUNTS\n✓ Maximum: $300,000 per project\n✓ Cost sharing: 75/25 split (employer contributes 25%)\n✗ Minimum amount not specified\n\nKEY REQUIREMENTS\n✓ Minimum 10 employees must participate\n✓ Training must lead to recognized credentials\n✓ 25% cost contribution from employer\n✗ No specified reporting requirements\n✗ No specified project timeline requirements\n\nMISSING CRITICAL INFORMATION\n1. Eligible business types/sectors\n2. Minimum funding amount\n3. Project timeline requirements\n4. Reporting requirements\n5. Payment schedule\n6. Definition of \"recognized credentials\"\n\nWould you like me to analyze any other aspects of the grant criteria?",
+      "newContent": "GRANT TYPE: Training Grant\n\nFUNDING AMOUNT\nUp to $300,000 per project\n\nDEADLINE\nJune 15, 2026\n\nCONTRIBUTION REQUIREMENT\nEmployer must contribute 25% of training costs\n\nELIGIBLE ACTIVITIES\n- Skills training courses and certifications\n- Professional development workshops\n- Technical skills upgrading\n- Safety training and certifications\n\nPROGRAM OBJECTIVE\nSupport businesses in upskilling their workforce through training and professional development.\n\nELIGIBILITY REQUIREMENTS\n- Minimum 10 employees participating\n- Training must lead to recognized credentials\n\nPROGRAM DETAILS\nThe Workforce Training Grant Program provides funding for businesses to deliver workforce training and professional development. Training activities must result in recognized credentials. The program covers various types of training including skills courses, professional development, technical upgrading, and safety certifications.\n\nCONTACT INFORMATION\nInformation not available in source material\n\nAPPLICATION PROCESS\nInformation not available in source material\n\nELIGIBLE COSTS\nInformation not available in source material\n\nREPORTING REQUIREMENTS\nInformation not available in source material"
+    }
+  },
+  "r&d": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1205,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 1048,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5674,
+          "newDuration": 3067,
+          "durationDiff": -2607,
+          "oldTokens": 628,
+          "newTokens": 3069,
+          "tokenDiff": 2441
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze the grant criteria following Granted's systematic methodology:\n\nGRANT TYPE: Technology & Innovation (Primary), Research & Development (Secondary)\n[Based on focus on technology development and R&D activities]\n\nELIGIBILITY ASSESSMENT:\n\nRequired Company Criteria:\n- Must be technology-focused\n- Must have R&D capabilities/plan\n- Partnership with research institutions preferred but not mandatory\n\nProject Requirements:\n✓ Must align with at least one:\n- Applied research and technology development\n- Product innovation and prototyping\n- Process improvement via technology\n- Proof-of-concept studies\n\nFunding Parameters:\n- Minimum: $100,000\n- Maximum: $2,000,000\n- Focus: R&D projects\n\nMISSING INFORMATION FLAGS:\n1. Eligible company size/stage not specified\n2. No mention of matching requirements\n3. Unclear on eligible expenses\n4. Geographic restrictions not stated\n5. No specification on project timeline requirements\n\nADDITIONAL INSIGHTS:\n- Research institution partnerships could strengthen application\n- Broad range of funding suggests flexibility in project scope\n- Multiple eligible project types allows various entry points\n\nWould you like me to analyze any specific aspect in more detail?",
+      "newContent": "Program Name: Innovation and Technology Development Fund\n\nGrant Type: R&D Grant\n\nFunding Amount: $100,000 - $2,000,000\n\nApplication Deadline: October 31, 2025\n\nProgram Purpose:\nAccelerate technology development and commercialization through research funding.\n\nEligible Activities:\n- Applied research and technology development\n- Product innovation and prototyping\n- Process improvement through technology\n- Proof-of-concept studies\n\nEligibility Requirements:\n- Technology-focused companies\n- Must have qualified R&D plan\n- Collaboration with research institutions encouraged\n\nRequired Documentation:\nInformation not available in source material\n\nApplication Process:\nInformation not available in source material\n\nAssessment Criteria:\nInformation not available in source material\n\nProgram Details:\nInformation not available in source material\n\nDisbursement Structure:\nInformation not available in source material\n\nReporting Requirements:\nInformation not available in source material\n\nContact Information:\nInformation not available in source material"
+    }
+  },
+  "market-expansion": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1123,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 1085,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5426,
+          "newDuration": 4367,
+          "durationDiff": -1059,
+          "oldTokens": 588,
+          "newTokens": 3074,
+          "tokenDiff": 2486
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze this grant using Granted's criteria evaluation framework:\n\nELIGIBILITY CRITERIA\nPrimary Requirements:\n- Must be BC-based business\n- Must have export market strategy\n- Must be able to cost-share 50% of project costs\n\nGeographic Requirements:\n- Business must be located in British Columbia\n\nSize/Scale Requirements:\n- Not specified in document\n\nIndustry Requirements:\n- Not specified in document - appears open to multiple sectors\n\nStage Requirements:\n- Not specified in document - but implicit need for operational business ready to export\n\nNOTABLE GAPS IN CRITERIA INFORMATION:\n- Revenue requirements not specified\n- Employee count requirements not specified\n- No mention of years in business requirement\n- No specifics on acceptable corporate structures\n- Export readiness assessment criteria not detailed\n\nSUGGESTED CLARIFICATIONS NEEDED:\n1. Minimum/maximum revenue requirements\n2. Company size restrictions\n3. Years in business requirements\n4. Whether previous export experience required\n5. Definition of \"clear export market strategy\"\n\nWould you like me to proceed with any other grant card analysis tasks?",
+      "newContent": "Grant Type: Market Expansion/Capital Costs/Systems and Processes Grant\n\nProgram Name:\nExport Market Development Program\n\nFunding Amount:\nUp to $100,000 per company\n\nCost-Share Requirement:\n50% cost-sharing (applicant must contribute 50% of eligible costs)\n\nApplication Deadline:\nDecember 1, 2025\n\nEligible Applicants:\nBC-based businesses\n\nProgram Details:\n- Program supports businesses expanding into international markets\n- Eligible expenses include:\n  * International trade show participation\n  * Market research for foreign markets\n  * Export-focused marketing materials\n  * Travel to international markets\n  * Shipping costs for samples\n- Must have clear export market strategy\n\nSupporting Documentation:\nInformation not available in source material\n\nPayment Structure:\nInformation not available in source material\n\nApplication Process:\nInformation not available in source material\n\nAssessment Criteria:\nInformation not available in source material\n\nProgram Contact:\nInformation not available in source material\n\nAdditional Information:\nInformation not available in source material"
+    }
+  },
+  "loan": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1089,
+          "hasPreamble": true,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 863,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5472,
+          "newDuration": 3833,
+          "durationDiff": -1639,
+          "oldTokens": 657,
+          "newTokens": 3069,
+          "tokenDiff": 2412
+        },
+        "improvementScore": 2,
+        "improvementReasons": [
+          "Eliminated preamble"
+        ]
+      },
+      "oldContent": "Based on the provided document, I'll analyze the grant criteria following Granted's systematic approach:\n\nCATEGORY: DEBT FINANCING\n(This is a loan program with defined repayment terms and interest rates)\n\nAWARD RANGE: \n- Minimum: $25,000\n- Maximum: $500,000\n\nELIGIBLE COSTS:\n- Equipment financing (up to 10-year term)\n- Working capital (up to 5-year term)\n\nKEY CRITERIA:\n1. Business Operation Status\n- Must be established for 2+ years\n\n2. Financial Requirements\n- Good credit history required\n- Personal guarantee required\n- Collateral required for loans >$100,000\n\nRATES & TERMS:\n- Interest: Prime + 2% (currently 5%)\n- Repayment: 5-10 years depending on use\n- Rolling intake\n- 30-day processing time\n\nMISSING INFORMATION FLAGS:\n1. Definition of \"good\" credit history (specific credit score requirements)\n2. Detailed collateral requirements/specifications\n3. Industry restrictions or preferences (if any)\n4. Geographic limitations (if any)\n5. Application process details/required documentation\n\nWould you like me to elaborate on any of these aspects or proceed with another analysis task?",
+      "newContent": "Grant Type: Loan Grant (Type 5)\n\nProgram Name\nSmall Business Loan Program\n\nFunding Amount\n$25,000 to $500,000 \n\nInterest Rate\nPrime + 2% (currently 5% total)\n\nRepayment Terms\n- Equipment financing: Up to 10 years\n- Working capital: Up to 5 years\n\nEligibility Requirements\n- Minimum 2 years in business\n- Good credit history required\n- Personal guarantee required\n- Collateral required for loans over $100,000\n\nApplication Deadlines\nRolling intake\n\nProcessing Time\n30 days\n\nProgram Details\nLow-interest financing program providing support for:\n- Business expansion\n- Working capital needs\n\nDocumentation Requirements\nInformation not available in source material\n\nDisbursement Schedule\nInformation not available in source material\n\nContact Information\nInformation not available in source material\n\nAdditional Information\nInformation not available in source material"
+    }
+  },
+  "investment": {
+    "grant-criteria": {
+      "comparison": {
+        "task": "grant-criteria",
+        "old": {
+          "length": 1290,
+          "hasPreamble": true,
+          "hasMetaCommentary": true,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": false
+        },
+        "new": {
+          "length": 933,
+          "hasPreamble": false,
+          "hasMetaCommentary": false,
+          "hasKnowledgeBaseRefs": false,
+          "startsDirectly": true
+        },
+        "performance": {
+          "oldDuration": 5799,
+          "newDuration": 3774,
+          "durationDiff": -2025,
+          "oldTokens": 642,
+          "newTokens": 3067,
+          "tokenDiff": 2425
+        },
+        "improvementScore": 4,
+        "improvementReasons": [
+          "Eliminated preamble",
+          "Removed meta-commentary"
+        ]
+      },
+      "oldContent": "I'll analyze the grant criteria using Granted's standard methodology.\n\nFUNDING TYPE CLASSIFICATION: Venture Capital Investment\n(This is an equity investment program, not a traditional grant)\n\nKEY ELIGIBILITY CRITERIA:\n\nBusiness Characteristics:\n- Must be in clean technology sector\n- Must demonstrate high growth potential\n- Must have scalable business model\n- Must have experienced management team\n\nSector Focus:\n- Renewable energy\n- Energy efficiency\n- Waste reduction\n- Water technology\n\nInvestment Parameters:\n- Investment range: $500K to $5M\n- Requires private sector co-investment\n- Takes minority equity position\n\nNOTABLE GAPS/MISSING INFORMATION:\n- No specified company stage requirements\n- No defined revenue thresholds\n- No geographic restrictions mentioned\n- Co-investment ratio not specified\n- No mention of eligible use of funds\n- No timeline for investment decision\n\nRED FLAGS:\n- Co-investment requirement may limit accessibility\n- Management team experience criteria undefined\n\nRECOMMENDED FOLLOW-UP QUESTIONS:\n1. What are the minimum co-investment requirements?\n2. Are there specific company stage requirements?\n3. What is the expected timeline from application to investment?\n4. Are there geographic restrictions?\n5. What defines \"experienced\" for management team criteria?",
+      "newContent": "GRANT TYPE: Investment Grant (Type 6)\n\nINVESTMENT SIZE\n$500,000 to $5,000,000 per company\n\nINVESTMENT STRUCTURE\n- Equity investment (minority stake)\n- Co-investment with private sector required\n\nELIGIBILITY CRITERIA\n- Clean technology focus\n- High growth potential\n- Scalable business model\n- Experienced management team\n\nFOCUS SECTORS\n- Renewable energy\n- Energy efficiency\n- Waste reduction\n- Water technology\n\nAPPLICATION PROCESS\nRolling intake, pitch deck required\n\nPROGRAM DETAILS\nInvestment program providing equity funding for high-growth cleantech startups.\n\nSUBMISSION DEADLINE\nRolling intake\n\nPROGRAM STATUS\nInformation not available in source material\n\nINVESTMENT TERMS\nInformation not available in source material\n\nDUE DILIGENCE REQUIREMENTS\nInformation not available in source material\n\nINVESTMENT TIMELINE\nInformation not available in source material\n\nREPORTING REQUIREMENTS\nInformation not available in source material"
+    }
+  }
+}
