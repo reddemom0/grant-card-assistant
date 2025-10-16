@@ -1024,6 +1024,9 @@
                 <span class="logo-text">Grant Card Assistant</span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button onclick="exportConversationAsMarkdown()" class="nav-link" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid #2563eb; cursor: pointer; font-family: inherit; font-size: 0.9rem;">
+                    📥 Export
+                </button>
                 <button onclick="startNewConversation()" class="nav-link" style="background: var(--granted-light); color: var(--granted-blue); border: none; cursor: pointer; font-family: inherit; font-size: 0.9rem;">🔄 New Conversation</button>
 
                 <!-- User Profile Dropdown -->
@@ -1460,6 +1463,102 @@
                 console.error('Failed to delete conversation:', error);
                 alert('Failed to delete conversation. Please try again.');
             }
+        }
+
+        // Export conversation as Markdown
+        function exportConversationAsMarkdown() {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) {
+                alert('No conversation to export.');
+                return;
+            }
+
+            const messageElements = messagesContainer.querySelectorAll('.message');
+            if (messageElements.length === 0) {
+                alert('No messages to export. Start a conversation first!');
+                return;
+            }
+
+            // Build Markdown content
+            let markdown = '# Grant Card Assistant - Conversation Export\n\n';
+            markdown += `**Exported:** ${new Date().toLocaleString()}\n\n`;
+            markdown += `**Conversation ID:** ${conversationId || 'N/A'}\n\n`;
+            markdown += '---\n\n';
+
+            messageElements.forEach((messageEl, index) => {
+                const role = messageEl.classList.contains('user') ? 'user' : 'assistant';
+                const contentDiv = messageEl.querySelector('.message-content');
+
+                if (!contentDiv) return;
+
+                // Extract text content
+                let messageText = '';
+
+                // Check for file attachments
+                const fileGrid = contentDiv.querySelector('.file-grid');
+                if (fileGrid) {
+                    const fileItems = fileGrid.querySelectorAll('.file-grid-item');
+                    if (fileItems.length > 0) {
+                        markdown += `## ${role === 'user' ? 'User' : 'Assistant'}\n\n`;
+                        markdown += `**Attachments (${fileItems.length}):**\n\n`;
+                        fileItems.forEach(fileItem => {
+                            const fileName = fileItem.querySelector('.file-name')?.textContent || 'Unknown file';
+                            markdown += `- 📎 ${fileName}\n`;
+                        });
+                        markdown += '\n';
+                    }
+
+                    // Get remaining text after file grid
+                    const textNodes = Array.from(contentDiv.childNodes).filter(node =>
+                        node !== fileGrid && (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE)
+                    );
+                    messageText = textNodes.map(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            return node.textContent;
+                        } else {
+                            return node.textContent || node.innerText || '';
+                        }
+                    }).join('').trim();
+                } else {
+                    // No files, just get all text content
+                    messageText = contentDiv.textContent || contentDiv.innerText || '';
+                }
+
+                // Clean up the text
+                messageText = messageText.trim();
+
+                // Only add message if there's text content
+                if (messageText) {
+                    // Add appropriate header if not already added (for file messages)
+                    if (!fileGrid) {
+                        markdown += `## ${role === 'user' ? 'User' : 'Assistant'}\n\n`;
+                    }
+
+                    // Convert HTML line breaks back to markdown
+                    messageText = messageText.replace(/\n{3,}/g, '\n\n'); // Collapse multiple newlines
+
+                    markdown += `${messageText}\n\n`;
+                }
+
+                markdown += '---\n\n';
+            });
+
+            // Create downloadable file
+            const blob = new Blob([markdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            // Create filename with timestamp
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `grant-cards-conversation-${timestamp}.md`;
+
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('✅ Conversation exported as Markdown');
         }
 
         // Start a new conversation

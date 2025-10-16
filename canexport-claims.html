@@ -1217,6 +1217,9 @@
                 <span class="logo-text">CanExport Claims Assistant</span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button onclick="exportConversationAsMarkdown()" class="nav-link" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid #2563eb; cursor: pointer; font-family: inherit; font-size: 0.9rem;">
+                    📥 Export
+                </button>
                 <button onclick="clearConversation()" class="nav-link" style="background: rgba(220, 38, 38, 0.1); color: #dc2626; border: 1px solid #dc2626; cursor: pointer; font-family: inherit; font-size: 0.9rem;">
                     🔄 New Conversation
                 </button>
@@ -1915,6 +1918,102 @@ async function handleStreamingResponse(response, messageDiv) {
             }
         }
 
+        // Export conversation as Markdown
+        function exportConversationAsMarkdown() {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) {
+                alert('No conversation to export.');
+                return;
+            }
+
+            const messageElements = messagesContainer.querySelectorAll('.message');
+            if (messageElements.length === 0) {
+                alert('No messages to export. Start a conversation first!');
+                return;
+            }
+
+            // Build Markdown content
+            let markdown = '# CanExport Claims Assistant - Conversation Export\n\n';
+            markdown += `**Exported:** ${new Date().toLocaleString()}\n\n`;
+            markdown += `**Conversation ID:** ${conversationId || 'N/A'}\n\n`;
+            markdown += '---\n\n';
+
+            messageElements.forEach((messageEl, index) => {
+                const role = messageEl.classList.contains('user') ? 'user' : 'assistant';
+                const contentDiv = messageEl.querySelector('.message-content');
+
+                if (!contentDiv) return;
+
+                // Extract text content
+                let messageText = '';
+
+                // Check for file attachments
+                const fileGrid = contentDiv.querySelector('.file-grid');
+                if (fileGrid) {
+                    const fileItems = fileGrid.querySelectorAll('.file-grid-item');
+                    if (fileItems.length > 0) {
+                        markdown += `## ${role === 'user' ? 'User' : 'Assistant'}\n\n`;
+                        markdown += `**Attachments (${fileItems.length}):**\n\n`;
+                        fileItems.forEach(fileItem => {
+                            const fileName = fileItem.querySelector('.file-name')?.textContent || 'Unknown file';
+                            markdown += `- 📎 ${fileName}\n`;
+                        });
+                        markdown += '\n';
+                    }
+
+                    // Get remaining text after file grid
+                    const textNodes = Array.from(contentDiv.childNodes).filter(node =>
+                        node !== fileGrid && (node.nodeType === Node.TEXT_NODE || node.nodeType === Node.ELEMENT_NODE)
+                    );
+                    messageText = textNodes.map(node => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            return node.textContent;
+                        } else {
+                            return node.textContent || node.innerText || '';
+                        }
+                    }).join('').trim();
+                } else {
+                    // No files, just get all text content
+                    messageText = contentDiv.textContent || contentDiv.innerText || '';
+                }
+
+                // Clean up the text
+                messageText = messageText.trim();
+
+                // Only add message if there's text content
+                if (messageText) {
+                    // Add appropriate header if not already added (for file messages)
+                    if (!fileGrid) {
+                        markdown += `## ${role === 'user' ? 'User' : 'Assistant'}\n\n`;
+                    }
+
+                    // Convert HTML line breaks back to markdown
+                    messageText = messageText.replace(/\n{3,}/g, '\n\n'); // Collapse multiple newlines
+
+                    markdown += `${messageText}\n\n`;
+                }
+
+                markdown += '---\n\n';
+            });
+
+            // Create downloadable file
+            const blob = new Blob([markdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            // Create filename with timestamp
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `canexport-claims-conversation-${timestamp}.md`;
+
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            console.log('✅ Conversation exported as Markdown');
+        }
+
         // Clear conversation history
         function clearConversation() {
             if (confirm('Are you sure you want to clear the conversation history? This will start a fresh conversation.')) {
@@ -2314,29 +2413,15 @@ async function handleStreamingResponse(response, messageDiv) {
 
             hideWelcomeElements();
 
-            // Handle files and message together in ONE user message
-            let userMessageContent = '';
+            // Handle files and message together in ONE user message with file attachments
+            let userMessageContent = message || '';
 
-            if (uploadedFiles.length > 0) {
-                const fileList = uploadedFiles.map(file => {
-                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-                    const isImage = imageTypes.includes(fileExtension);
-                    return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
-                }).join('\n');
+            // Copy files array before clearing for display in chat
+            const filesToDisplay = uploadedFiles.length > 0 ? [...uploadedFiles] : [];
 
-                userMessageContent = `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`;
-            }
-
-            if (message) {
-                if (userMessageContent) {
-                    userMessageContent += '\n\n' + message;
-                } else {
-                    userMessageContent = message;
-                }
-            }
-
-            if (userMessageContent) {
+            if (filesToDisplay.length > 0) {
+                addMessage('user', userMessageContent, false, filesToDisplay);
+            } else if (userMessageContent) {
                 addMessage('user', userMessageContent);
             }
 
@@ -2417,15 +2502,61 @@ await handleStreamingResponse(response, streamingMessageDiv);
         }
 
 
-        function addMessage(role, content, shouldAnimate = false) {
-            console.log('Adding message:', role, content.substring(0, 100) + '...');
-            
+        // Helper function to create clickable file attachments
+        async function createFileAttachmentsHTML(files) {
+            if (!files || files.length === 0) return '';
+
+            let html = '<div class="file-grid" style="margin-bottom: 0.75rem;">';
+
+            for (const file of files) {
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                const isImage = imageTypes.includes(fileExtension);
+
+                // Create data URL for files
+                const dataUrl = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+
+                const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+
+                if (isImage) {
+                    html += `
+                        <a href="${dataUrl}" target="_blank" style="text-decoration: none; color: inherit;">
+                            <div class="file-grid-item">
+                                <img class="file-thumbnail" src="${dataUrl}" alt="${file.name}" />
+                                <div class="file-name">${truncatedName}</div>
+                            </div>
+                        </a>
+                    `;
+                } else {
+                    const icon = getFileTypeIcon(fileExtension);
+                    html += `
+                        <a href="${dataUrl}" download="${file.name}" style="text-decoration: none; color: inherit;">
+                            <div class="file-grid-item">
+                                <div class="file-icon-large">${icon}</div>
+                                <div class="file-name">${truncatedName}</div>
+                            </div>
+                        </a>
+                    `;
+                }
+            }
+
+            html += '</div>';
+            return html;
+        }
+
+        async function addMessage(role, content, shouldAnimate = false, files = null) {
+            console.log('Adding message:', role, content?.substring(0, 100) + '...', 'files:', files?.length || 0);
+
             const messagesContainer = document.getElementById('messages');
             if (!messagesContainer) return;
-            
+
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
-            
+
             const contentDiv = document.createElement('div');
             contentDiv.className = 'message-content';
             
@@ -2445,12 +2576,19 @@ await handleStreamingResponse(response, streamingMessageDiv);
                 
             } else {
                 // User messages or non-animated assistant messages appear immediately
-                let processedContent = content;
+                let processedContent = content || '';
                 processedContent = processedContent.replace(/\n/g, '<br>');
                 processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
                 processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
-                
-                contentDiv.innerHTML = processedContent;
+
+                // Add file attachments if present (for user messages)
+                if (files && files.length > 0 && role === 'user') {
+                    const filesHTML = await createFileAttachmentsHTML(files);
+                    contentDiv.innerHTML = filesHTML + (processedContent ? '<div style="margin-top: 0.5rem;">' + processedContent + '</div>' : '');
+                } else {
+                    contentDiv.innerHTML = processedContent;
+                }
+
                 messageDiv.appendChild(contentDiv);
                 messagesContainer.appendChild(messageDiv);
                 messagesContainer.scrollTop = messagesContainer.scrollHeight;
