@@ -598,7 +598,8 @@ function buildMessageContentWithFiles(message, conversationMeta) {
         source: {
           type: "file",
           file_id: fileInfo.file_id
-        }
+        },
+        cache_control: { type: "ephemeral" }
       });
     } else {
       contentBlocks.push({
@@ -607,7 +608,8 @@ function buildMessageContentWithFiles(message, conversationMeta) {
           type: "file",
           file_id: fileInfo.file_id
         },
-        title: fileInfo.filename
+        title: fileInfo.filename,
+        cache_control: { type: "ephemeral" }
       });
     }
   }
@@ -4106,7 +4108,8 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              }
+              },
+              cache_control: { type: "ephemeral" }
             });
             console.log(`🔸 Added image file: ${uploadResult.originalname}`);
           } else {
@@ -4115,7 +4118,8 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              }
+              },
+              cache_control: { type: "ephemeral" }
             });
             console.log(`📄 Added document file: ${uploadResult.originalname}`);
           }
@@ -4137,7 +4141,7 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27,web-fetch-2025-09-10'
+        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27,web-fetch-2025-09-10,prompt-caching-2024-07-31'
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-5-20250929',
@@ -4286,7 +4290,8 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              }
+              },
+              cache_control: { type: "ephemeral" }
             });
             console.log(`🔸 Added image file: ${uploadResult.originalname}`);
           } else {
@@ -4295,7 +4300,8 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              }
+              },
+              cache_control: { type: "ephemeral" }
             });
             console.log(`📄 Added document file: ${uploadResult.originalname}`);
           }
@@ -4317,7 +4323,7 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
         'Content-Type': 'application/json',
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27,web-fetch-2025-09-10'
+        'anthropic-beta': 'files-api-2025-04-14,context-management-2025-06-27,web-fetch-2025-09-10,prompt-caching-2024-07-31'
       },
       body: (() => {
         const requestBody = {
@@ -4560,7 +4566,7 @@ async function uploadFileToAnthropic(file) {
       headers: {
         'x-api-key': process.env.ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'files-api-2025-04-14'
+        'anthropic-beta': 'files-api-2025-04-14,prompt-caching-2024-07-31'
       },
       body: formData
     });
