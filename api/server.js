@@ -591,26 +591,38 @@ function buildMessageContentWithFiles(message, conversationMeta) {
   }
   
   // Add each file as a separate content block using file_id
+  // Claude allows max 4 cache_control blocks total. Only cache first 2 files.
+  let cacheControlCount = 0;
   for (const fileInfo of conversationMeta.uploadedFiles) {
+    const shouldCache = cacheControlCount < 2; // Only cache first 2 files
+
     if (fileInfo.isImage) {
-      contentBlocks.push({
+      const block = {
         type: "image",
         source: {
           type: "file",
           file_id: fileInfo.file_id
-        },
-        cache_control: { type: "ephemeral" }
-      });
+        }
+      };
+      if (shouldCache) {
+        block.cache_control = { type: "ephemeral" };
+        cacheControlCount++;
+      }
+      contentBlocks.push(block);
     } else {
-      contentBlocks.push({
+      const block = {
         type: "document",
         source: {
           type: "file",
           file_id: fileInfo.file_id
         },
-        title: fileInfo.filename,
-        cache_control: { type: "ephemeral" }
-      });
+        title: fileInfo.filename
+      };
+      if (shouldCache) {
+        block.cache_control = { type: "ephemeral" };
+        cacheControlCount++;
+      }
+      contentBlocks.push(block);
     }
   }
   
@@ -4096,32 +4108,43 @@ async function callClaudeAPI(messages, systemPrompt = '', files = []) {
       }
       
       // Then add new uploaded files
+      // Claude allows max 4 cache_control blocks total. Only cache first 2 files.
+      let fileCacheCount = 0;
       for (const file of files) {
         try {
           const uploadResult = await uploadFileToAnthropic(file);
-          
+
           const isImage = file.mimetype && file.mimetype.startsWith('image/');
-          
+          const shouldCache = fileCacheCount < 2; // Only cache first 2 files
+
           if (isImage) {
-            contentBlocks.push({
+            const block = {
               type: "image",
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              },
-              cache_control: { type: "ephemeral" }
-            });
-            console.log(`🔸 Added image file: ${uploadResult.originalname}`);
+              }
+            };
+            if (shouldCache) {
+              block.cache_control = { type: "ephemeral" };
+              fileCacheCount++;
+            }
+            contentBlocks.push(block);
+            console.log(`🔸 Added image file: ${uploadResult.originalname}${shouldCache ? ' (cached)' : ''}`);
           } else {
-            contentBlocks.push({
+            const block = {
               type: "document",
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              },
-              cache_control: { type: "ephemeral" }
-            });
-            console.log(`📄 Added document file: ${uploadResult.originalname}`);
+              }
+            };
+            if (shouldCache) {
+              block.cache_control = { type: "ephemeral" };
+              fileCacheCount++;
+            }
+            contentBlocks.push(block);
+            console.log(`📄 Added document file: ${uploadResult.originalname}${shouldCache ? ' (cached)' : ''}`);
           }
         } catch (uploadError) {
           console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
@@ -4278,32 +4301,43 @@ async function callClaudeAPIStream(messages, systemPrompt = '', res, files = [],
         }
       }
       
+      // Claude allows max 4 cache_control blocks total. Only cache first 2 files.
+      let fileCacheCount = 0;
       for (const file of files) {
         try {
           const uploadResult = await uploadFileToAnthropic(file);
-          
+
           const isImage = file.mimetype && file.mimetype.startsWith('image/');
-          
+          const shouldCache = fileCacheCount < 2; // Only cache first 2 files
+
           if (isImage) {
-            contentBlocks.push({
+            const block = {
               type: "image",
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              },
-              cache_control: { type: "ephemeral" }
-            });
-            console.log(`🔸 Added image file: ${uploadResult.originalname}`);
+              }
+            };
+            if (shouldCache) {
+              block.cache_control = { type: "ephemeral" };
+              fileCacheCount++;
+            }
+            contentBlocks.push(block);
+            console.log(`🔸 Added image file: ${uploadResult.originalname}${shouldCache ? ' (cached)' : ''}`);
           } else {
-            contentBlocks.push({
+            const block = {
               type: "document",
               source: {
                 type: "file",
                 file_id: uploadResult.file_id
-              },
-              cache_control: { type: "ephemeral" }
-            });
-            console.log(`📄 Added document file: ${uploadResult.originalname}`);
+              }
+            };
+            if (shouldCache) {
+              block.cache_control = { type: "ephemeral" };
+              fileCacheCount++;
+            }
+            contentBlocks.push(block);
+            console.log(`📄 Added document file: ${uploadResult.originalname}${shouldCache ? ' (cached)' : ''}`);
           }
         } catch (uploadError) {
           console.error(`❌ Failed to upload ${file.originalname}:`, uploadError);
