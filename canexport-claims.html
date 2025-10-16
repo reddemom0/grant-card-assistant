@@ -2314,7 +2314,9 @@ async function handleStreamingResponse(response, messageDiv) {
 
             hideWelcomeElements();
 
-            // Handle files
+            // Handle files and message together in ONE user message
+            let userMessageContent = '';
+
             if (uploadedFiles.length > 0) {
                 const fileList = uploadedFiles.map(file => {
                     const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
@@ -2322,12 +2324,20 @@ async function handleStreamingResponse(response, messageDiv) {
                     const isImage = imageTypes.includes(fileExtension);
                     return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
                 }).join('\n');
-                
-                addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
+
+                userMessageContent = `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`;
             }
 
             if (message) {
-                addMessage('user', message);
+                if (userMessageContent) {
+                    userMessageContent += '\n\n' + message;
+                } else {
+                    userMessageContent = message;
+                }
+            }
+
+            if (userMessageContent) {
+                addMessage('user', userMessageContent);
             }
 
             isLoading = true;
