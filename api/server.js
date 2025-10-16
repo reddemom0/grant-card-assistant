@@ -2346,7 +2346,7 @@ Example searches:
 - ✅ Calculate 50% reimbursement of eligible amount
 - ✅ Per diem check: Under $400/employee/day? (max 2 employees)
 - ✅ Foreign currency: Bank of Canada conversion proof included?
-- ✅ Proof of payment: Paid within 60 days with documentation?
+- ✅ Proof of payment: Incurred, invoiced and paid within fiscal year with documentation?
 
 **STEP 6: VERIFY PROJECT COMPLIANCE** (Full Audit only)
 - Invoice date ≥ Project Start Date?
@@ -2443,9 +2443,10 @@ User uploads 2 MORE invoices → You respond:
    - Must include transaction date
    - Verify date matches invoice date
 
-5. **PROOF OF PAYMENT**: Must be paid in cash within 60 days (Section 5.7)
+5. **PROOF OF PAYMENT**: Expenses must be incurred, invoiced and paid within the fiscal year (Section 5.7)
    - Require bank statement, credit card statement, or cancelled check
-   - Payment date must be within project period
+   - Payment date must be within project period (April 1 - March 31 fiscal year)
+   - Activities must be completed in the same fiscal year
 
 6. **STACKING LIMIT**: Total government funding cannot exceed 75% (Section 5.10)
    - Ask if other government funding received for this project
