@@ -1096,6 +1096,9 @@
                 <span class="logo-text">BC Agriculture Export Specialist</span>
             </div>
             <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <button onclick="exportConversationAsMarkdown()" class="nav-link" style="background: rgba(59, 130, 246, 0.1); color: #2563eb; border: 1px solid #2563eb; cursor: pointer; font-family: inherit; font-size: 0.9rem;">
+                    📥 Export
+                </button>
                 <button onclick="startNewConversation()" class="nav-link" style="background: var(--granted-light); color: var(--granted-blue); border: none; cursor: pointer; font-family: inherit; font-size: 0.9rem;">🔄 New Conversation</button>
 
                 <!-- User Profile Dropdown -->
@@ -1571,6 +1574,83 @@
             }
         }
 
+        // Export conversation as Markdown
+        function exportConversationAsMarkdown() {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) {
+                alert('No conversation to export.');
+                return;
+            }
+
+            const messageElements = messagesContainer.querySelectorAll('.message');
+            if (messageElements.length === 0) {
+                alert('No messages to export. Start a conversation first!');
+                return;
+            }
+
+            // Build Markdown content
+            let markdown = '# BC Agriculture Export Specialist - Conversation Export\n\n';
+            markdown += `**Exported:** ${new Date().toLocaleString()}\n\n`;
+            markdown += `**Conversation ID:** ${conversationId || 'N/A'}\n\n`;
+            markdown += '---\n\n';
+
+            messageElements.forEach((messageEl, index) => {
+                const role = messageEl.classList.contains('user') ? 'user' : 'assistant';
+                const contentDiv = messageEl.querySelector('.message-content');
+
+                if (!contentDiv) return;
+
+                // Extract text content
+                let textContent = '';
+
+                // Check if there's a file grid (file attachments)
+                const fileGrid = contentDiv.querySelector('.file-grid');
+                if (fileGrid) {
+                    const fileItems = fileGrid.querySelectorAll('.file-grid-item');
+                    if (fileItems.length > 0) {
+                        textContent += '\n**Attached Files:**\n';
+                        fileItems.forEach(item => {
+                            const fileName = item.querySelector('.file-name')?.textContent || 'Unknown file';
+                            textContent += `- ${fileName}\n`;
+                        });
+                        textContent += '\n';
+                    }
+                }
+
+                // Get the main text content (excluding the file grid)
+                const clonedContent = contentDiv.cloneNode(true);
+                const clonedFileGrid = clonedContent.querySelector('.file-grid');
+                if (clonedFileGrid) clonedFileGrid.remove();
+
+                // Remove export buttons if present
+                const exportButtons = clonedContent.querySelectorAll('.export-button');
+                exportButtons.forEach(btn => btn.remove());
+
+                textContent += clonedContent.innerText || clonedContent.textContent || '';
+
+                // Add to markdown
+                if (role === 'user') {
+                    markdown += `## 👤 User\n\n${textContent.trim()}\n\n---\n\n`;
+                } else {
+                    markdown += `## 🤖 BCAFE Specialist\n\n${textContent.trim()}\n\n---\n\n`;
+                }
+            });
+
+            // Create downloadable file
+            const blob = new Blob([markdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+            a.download = `bcafe-writer-conversation-${timestamp}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showNotification('✅ Conversation exported successfully!');
+        }
+
         // ✅ Stop Generation Function
         function stopGeneration() {
             console.log('Stop generation requested');
@@ -1945,6 +2025,52 @@ async function handleStreamingResponse(response, messageDiv) {
             return icons[extension] || '📄';
         }
 
+        // Create clickable file attachments HTML for displaying in messages
+        async function createFileAttachmentsHTML(files) {
+            if (!files || files.length === 0) return '';
+
+            let html = '<div class="file-grid" style="margin-bottom: 0.75rem;">';
+
+            for (const file of files) {
+                const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+                const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+                const isImage = imageTypes.includes(fileExtension);
+
+                // Create data URL for files
+                const dataUrl = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(file);
+                });
+
+                const truncatedName = file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name;
+
+                if (isImage) {
+                    html += `
+                        <a href="${dataUrl}" target="_blank" style="text-decoration: none; color: inherit;">
+                            <div class="file-grid-item">
+                                <img class="file-thumbnail" src="${dataUrl}" alt="${file.name}" />
+                                <div class="file-name">${truncatedName}</div>
+                            </div>
+                        </a>
+                    `;
+                } else {
+                    const icon = getFileTypeIcon(fileExtension);
+                    html += `
+                        <a href="${dataUrl}" download="${file.name}" style="text-decoration: none; color: inherit;">
+                            <div class="file-grid-item">
+                                <div class="file-icon-large">${icon}</div>
+                                <div class="file-name">${truncatedName}</div>
+                            </div>
+                        </a>
+                    `;
+                }
+            }
+
+            html += '</div>';
+            return html;
+        }
+
         function removeFile(index) {
             uploadedFiles.splice(index, 1);
             const fileInput = document.getElementById('file-input');
@@ -2215,16 +2341,11 @@ async function handleStreamingResponse(response, messageDiv) {
 
             hideWelcomeElements();
 
-            // Handle files
+            // Handle files with clickable thumbnails
             if (uploadedFiles.length > 0) {
-                const fileList = uploadedFiles.map(file => {
-                    const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-                    const imageTypes = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
-                    const isImage = imageTypes.includes(fileExtension);
-                    return `📎 **${file.name}**${isImage ? ' (OCR enabled)' : ''}`;
-                }).join('\n');
-                
-                addMessage('user', `**${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:**\n${fileList}`);
+                const fileAttachmentsHTML = await createFileAttachmentsHTML(uploadedFiles);
+                const messageContent = `<strong>${uploadedFiles.length} file${uploadedFiles.length !== 1 ? 's' : ''} uploaded:</strong><br>${fileAttachmentsHTML}`;
+                addMessage('user', messageContent);
             }
 
             if (message) {
