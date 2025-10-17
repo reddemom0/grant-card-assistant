@@ -325,6 +325,9 @@ export const pdfAPI = {
       {
         type: 'document',
         source: documentSource,
+        ...(config.title && { title: config.title }),
+        ...(config.context && { context: config.context }),
+        ...(config.enableCitations && { citations: { enabled: true } }),
         ...(config.enableCaching && { cache_control: { type: 'ephemeral' } })
       },
       {
@@ -347,10 +350,33 @@ export const pdfAPI = {
 
       console.log(`✅ PDF processed: ${message.usage.input_tokens} input, ${message.usage.output_tokens} output tokens`);
 
+      // Extract text and citations
+      const textBlocks = message.content.filter(block => block.type === 'text');
+      const text = textBlocks.map(block => block.text).join('');
+
+      // Collect all citations
+      const citations = [];
+      textBlocks.forEach((block, blockIndex) => {
+        if (block.citations && Array.isArray(block.citations)) {
+          block.citations.forEach(citation => {
+            citations.push({
+              blockIndex,
+              text: block.text,
+              citation
+            });
+          });
+        }
+      });
+
+      const hasCitations = citations.length > 0;
+      if (hasCitations) {
+        console.log(`📖 Found ${citations.length} citation(s)`);
+      }
+
       return {
-        text: message.content.filter(block => block.type === 'text')
-          .map(block => block.text)
-          .join('\n'),
+        text,
+        textBlocks: message.content, // Full content blocks with citations
+        citations: hasCitations ? citations : undefined,
         usage: message.usage,
         model: message.model,
         messageId: message.id
@@ -393,14 +419,19 @@ export const pdfAPI = {
               content: [
                 {
                   type: 'document',
-                  source: documentSource
+                  source: documentSource,
+                  ...(req.title && { title: req.title }),
+                  ...(req.context && { context: req.context }),
+                  ...(req.enableCitations && { citations: { enabled: true } }),
+                  ...(req.enableCaching && { cache_control: { type: 'ephemeral' } })
                 },
                 {
                   type: 'text',
                   text: req.prompt
                 }
               ]
-            }]
+            }],
+            ...(req.systemPrompt && { system: req.systemPrompt })
           }
         };
       });

@@ -4,6 +4,7 @@
  */
 import multer from 'multer';
 import { pdfAPI, filesAPI } from '../src/anthropic-client.js';
+import { formatCitations, getCitationSummary, getSourceDocuments } from '../src/citations-utils.js';
 
 // Configure multer for PDF uploads
 const storage = multer.memoryStorage();
@@ -40,7 +41,10 @@ export async function processPDF(req, res) {
       model,
       maxTokens,
       systemPrompt,
-      enableCaching
+      enableCaching,
+      enableCitations,
+      documentTitle,
+      documentContext
     } = req.body;
 
     if (!prompt) {
@@ -80,11 +84,15 @@ export async function processPDF(req, res) {
         model: model || 'claude-sonnet-4-20250514',
         maxTokens: maxTokens || 4096,
         systemPrompt,
-        enableCaching: enableCaching || false
+        enableCaching: enableCaching || false,
+        enableCitations: enableCitations || false,
+        title: documentTitle,
+        context: documentContext
       }
     });
 
-    res.json({
+    // Build response with citations if available
+    const response = {
       success: true,
       text: result.text,
       usage: result.usage,
@@ -95,7 +103,19 @@ export async function processPDF(req, res) {
         cacheReadTokens: result.usage.cache_read_input_tokens || 0,
         cacheCreateTokens: result.usage.cache_creation_input_tokens || 0
       }
-    });
+    };
+
+    // Add citations if enabled
+    if (result.citations && result.citations.length > 0) {
+      response.citations = {
+        raw: result.citations,
+        summary: getCitationSummary(result.citations),
+        sources: getSourceDocuments(result.citations),
+        formatted: formatCitations(result.citations)
+      };
+    }
+
+    res.json(response);
 
   } catch (error) {
     console.error('❌ PDF processing error:', error);
@@ -112,7 +132,7 @@ export async function processPDF(req, res) {
  */
 export async function uploadAndProcess(req, res) {
   try {
-    const { prompt, enableCaching } = req.body;
+    const { prompt, enableCaching, enableCitations, documentTitle, documentContext } = req.body;
 
     if (!req.file) {
       return res.status(400).json({
