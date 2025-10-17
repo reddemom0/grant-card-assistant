@@ -22,12 +22,16 @@ const pool = new Pool({
 export async function ensureUser(userId, email = null, name = null) {
   const client = await pool.connect();
   try {
+    // Use a default email if not provided (for test users)
+    const userEmail = email || `user-${userId}@test.local`;
+    const userName = name || 'Test User';
+
     const result = await client.query(
       `INSERT INTO users (id, email, name, created_at)
        VALUES ($1, $2, $3, NOW())
        ON CONFLICT (id) DO UPDATE SET updated_at = NOW()
        RETURNING *`,
-      [userId, email, name]
+      [userId, userEmail, userName]
     );
     return result.rows[0];
   } finally {
