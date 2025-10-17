@@ -49,6 +49,7 @@ export const agentSDKConfig = {
       'WebSearch',
       'WebFetch',
       'TodoWrite',
+      'Memory', // Cross-conversation memory persistence
     ],
 
     // Agent-specific tool restrictions
@@ -57,13 +58,14 @@ export const agentSDKConfig = {
     // Grep: Search content within documents
     // WebSearch: Research current information, alternatives, competitors
     // TodoWrite: Track multi-step workflow progress
+    // Memory: Store and retrieve information across conversations
     // Write/Edit: Create or modify output files (when needed)
 
-    'grant-card-generator': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
-    'etg-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite'],
-    'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite'],
-    'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
-    'orchestrator': ['Read', 'Glob', 'Grep', 'Agent', 'TodoWrite'], // Can spawn other agents
+    'grant-card-generator': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory'],
+    'etg-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
+    'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
+    'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory'],
+    'orchestrator': ['Read', 'Glob', 'Grep', 'Agent', 'TodoWrite', 'Memory'], // Can spawn other agents
   },
 
   // Vision Support
@@ -104,6 +106,15 @@ export const agentSDKConfig = {
 
   // Setting Sources (which config files to load)
   settingSources: ['project'], // Load .claude/CLAUDE.md
+
+  // Memory Tool Configuration
+  memory: {
+    enabled: true,
+    baseDir: '.memories', // Memory files stored in project root/.memories
+  },
+
+  // Beta Features
+  betaHeaders: ['context-management-2025-06-27'], // Required for memory tool
 };
 
 /**
