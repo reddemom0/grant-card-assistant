@@ -45,16 +45,18 @@ export default async function handler(req, res) {
     console.log(`🤖 Loading agent: ${agentType}`);
 
     // Ensure user exists in database (creates if doesn't exist)
-    await db.ensureUser(userId);
+    // userId is treated as google_id, returns user object with integer id
+    const user = await db.ensureUser(userId);
+    const dbUserId = user.id; // Get the integer ID for database foreign keys
 
     // Get or create conversation in database
     let conversation = await db.getConversation(conversationId);
 
     if (!conversation) {
-      // Create new conversation
+      // Create new conversation with integer user_id
       conversation = await db.createConversation(
         conversationId,
-        userId,
+        dbUserId,
         agentType,
         message.substring(0, 50) + '...' // Use first 50 chars as title
       );

@@ -17,31 +17,24 @@ const pool = new Pool({
 // ===== USER OPERATIONS =====
 
 /**
- * Create or get a user by ID (upsert)
+ * Create or get a user by google_id (for Railway schema)
+ * Returns the user's integer ID for foreign key references
  */
-export async function ensureUser(userId, email = null, name = null) {
+export async function ensureUser(googleId, email = null, name = null) {
   const client = await pool.connect();
   try {
     // Use a default email if not provided (for test users)
-    const userEmail = email || `user-${userId}@test.local`;
+    const userEmail = email || `user-${googleId}@test.local`;
     const userName = name || 'Test User';
 
     const result = await client.query(
-      `INSERT INTO users (id, email, name, created_at)
+      `INSERT INTO users (google_id, email, name, created_at)
        VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (id) DO NOTHING
+       ON CONFLICT (google_id) DO UPDATE
+       SET last_login = NOW()
        RETURNING *`,
-      [userId, userEmail, userName]
+      [googleId, userEmail, userName]
     );
-
-    // If conflict occurred, fetch the existing user
-    if (result.rows.length === 0) {
-      const existingUser = await client.query(
-        'SELECT * FROM users WHERE id = $1',
-        [userId]
-      );
-      return existingUser.rows[0];
-    }
 
     return result.rows[0];
   } finally {
