@@ -290,6 +290,9 @@ export default async function handler(req, res) {
 
             // Permission mode
             permissionMode: agentConfig.permissionMode,
+
+            // Beta headers for advanced features
+            betas: agentConfig.betaHeaders,
           }
         });
       }, agentSDKConfig.errorHandling.maxRetries, agentSDKConfig.errorHandling.retryDelay);

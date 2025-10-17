@@ -114,7 +114,28 @@ export const agentSDKConfig = {
   },
 
   // Beta Features
-  betaHeaders: ['context-management-2025-06-27'], // Required for memory tool
+  betaHeaders: [
+    'context-management-2025-06-27',      // Required for memory tool
+    'token-efficient-tools-2025-02-19',   // Token-efficient tool use (14% avg output token reduction)
+    'fine-grained-tool-streaming-2025-05-14' // Fine-grained parameter streaming (reduced latency)
+  ],
+
+  // Token Efficiency
+  tokenEfficiency: {
+    enabled: true,
+    // Note: Claude 4 models support token-efficient tools by default
+    // This header is only required for Claude Sonnet 3.7
+    averageSavings: 0.14, // 14% average output token reduction
+    maxSavings: 0.70,     // Up to 70% reduction possible
+  },
+
+  // Fine-Grained Streaming
+  fineGrainedStreaming: {
+    enabled: true,
+    // Streams tool parameters without buffering/JSON validation
+    // Reduces latency but may return invalid JSON if max_tokens reached
+    handleInvalidJSON: true, // Wrap invalid JSON in error response
+  },
 };
 
 /**
@@ -126,6 +147,7 @@ export function getAgentConfig(agentType) {
   return {
     ...agentSDKConfig,
     allowedTools: agentSDKConfig.tools[agentType] || agentSDKConfig.tools.default,
+    betaHeaders: agentSDKConfig.betaHeaders, // Pass beta headers to agent
   };
 }
 
