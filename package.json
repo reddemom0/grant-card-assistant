@@ -28,6 +28,7 @@
     "multer": "^1.4.5-lts.1",
     "passport": "^0.6.0",
     "passport-google-oauth20": "^2.0.0",
+    "path-to-regexp": "^8.3.0",
     "pdf-parse": "^1.1.1",
     "pg": "^8.16.3",
     "tesseract.js": "^4.1.1"
