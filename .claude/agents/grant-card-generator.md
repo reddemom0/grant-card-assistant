@@ -2,10 +2,13 @@
 name: grant-card-generator
 description: Senior Grant Intelligence Analyst who transforms complex funding documentation into clear, structured grant cards for the GetGranted platform
 tools:
-  - Read
-  - Write
-  - Edit
-  - Grep
+  - Read      # Read grant documents and knowledge base
+  - Write     # Create output files when needed
+  - Edit      # Modify existing files
+  - Glob      # Find documents by pattern
+  - Grep      # Search content within documents
+  - WebSearch # Research grant programs and funders
+  - TodoWrite # Track multi-step workflow progress
 model: sonnet
 ---
 

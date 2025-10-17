@@ -29,6 +29,13 @@ export const agentSDKConfig = {
     cacheTTL: '5m', // Cache time-to-live: 5 minutes
   },
 
+  // Tool Use Configuration
+  toolUse: {
+    enableParallelToolUse: true, // Allow multiple tool calls in single turn
+    maxParallelTools: 5, // Maximum concurrent tool calls
+    toolTimeout: 30000, // 30 second timeout per tool
+  },
+
   // Tool Configuration
   tools: {
     // Default tools available to all agents
@@ -45,10 +52,17 @@ export const agentSDKConfig = {
     ],
 
     // Agent-specific tool restrictions
-    'grant-card-generator': ['Read', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
-    'etg-writer': ['Read', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
-    'bcafe-writer': ['Read', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
-    'canexport-claims': ['Read', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
+    // Read: Read knowledge base documents and uploaded files
+    // Glob: Find files by pattern in knowledge base
+    // Grep: Search content within documents
+    // WebSearch: Research current information, alternatives, competitors
+    // TodoWrite: Track multi-step workflow progress
+    // Write/Edit: Create or modify output files (when needed)
+
+    'grant-card-generator': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
+    'etg-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite'],
+    'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite'],
+    'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite'],
     'orchestrator': ['Read', 'Glob', 'Grep', 'Agent', 'TodoWrite'], // Can spawn other agents
   },
 

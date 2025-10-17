@@ -3,6 +3,7 @@ import * as db from '../src/database-service.js';
 import { loadAgentDefinitions } from '../src/load-agents.js';
 import { config } from 'dotenv';
 import { agentSDKConfig, getAgentConfig, calculateCost, getCacheStats } from '../config/agent-sdk-config.js';
+import { filesAPI } from '../src/anthropic-client.js';
 
 config();
 
@@ -75,6 +76,39 @@ function processFiles(files) {
 }
 
 /**
+ * Process file IDs from Files API
+ * NOTE: Agent SDK does not yet support Files API document/image blocks.
+ * This function prepares file information for conversation context and future use.
+ * For now, vision support uses base64 encoding via processFiles().
+ * @param {array} fileIds - Array of Anthropic file IDs
+ * @returns {Promise<array>} File metadata for context
+ */
+async function processFileIds(fileIds) {
+  if (!fileIds || fileIds.length === 0) {
+    return [];
+  }
+
+  const fileMetadata = [];
+
+  for (const fileId of fileIds) {
+    try {
+      const metadata = await filesAPI.getMetadata(fileId);
+      fileMetadata.push({
+        file_id: metadata.id,
+        filename: metadata.filename,
+        size_bytes: metadata.size_bytes,
+        created_at: metadata.created_at,
+      });
+      console.log(`📄 Retrieved file metadata: ${metadata.filename} (${metadata.id})`);
+    } catch (error) {
+      console.warn(`⚠️ Failed to get metadata for file ${fileId}:`, error.message);
+    }
+  }
+
+  return fileMetadata;
+}
+
+/**
  * Retry logic for API calls with exponential backoff
  * @param {function} fn - Function to retry
  * @param {number} maxRetries - Maximum number of retries
@@ -123,7 +157,8 @@ export default async function handler(req, res) {
       conversationId,
       userId,
       message,
-      files,               // Optional uploaded files for vision
+      files,               // Optional uploaded files for vision (base64)
+      fileIds,             // Optional Anthropic file IDs (from Files API)
       options = {}         // Optional request-specific options
     } = req.body;
 
@@ -174,6 +209,26 @@ export default async function handler(req, res) {
     const imageBlocks = processFiles(files);
     if (imageBlocks.length > 0) {
       console.log(`🖼️ Processing ${imageBlocks.length} image(s)`);
+    }
+
+    // Process file IDs from Files API (metadata only for now)
+    const fileMetadata = await processFileIds(fileIds);
+    if (fileMetadata.length > 0) {
+      console.log(`📁 Processing ${fileMetadata.length} file reference(s)`);
+      // Note: Files API content blocks not yet supported by Agent SDK
+      // File metadata stored in conversation context for future use
+
+      // Store file metadata in conversation context
+      try {
+        const existingFiles = conversation.file_context?.files || [];
+        const updatedFiles = [...existingFiles, ...fileMetadata];
+        await db.updateConversationFileContext(conversationId, {
+          files: updatedFiles,
+          last_updated: new Date().toISOString()
+        });
+      } catch (error) {
+        console.warn('⚠️ Failed to store file metadata:', error.message);
+      }
     }
 
     // Build enhanced prompt with conversation history

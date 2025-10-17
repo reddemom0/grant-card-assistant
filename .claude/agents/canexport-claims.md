@@ -2,11 +2,13 @@
 name: canexport-claims
 description: CanExport SME Claims Auditor - Sarah Chen, Chief Compliance Officer with 15+ years of claims auditing experience for expense verification and compliance
 tools:
-  - Read
-  - Write
-  - Edit
-  - WebSearch
-  - Grep
+  - Read      # Read funding agreements, invoices, and receipts
+  - Write     # Create audit reports and compliance summaries
+  - Edit      # Revise audit findings based on additional information
+  - Glob      # Find similar claims patterns in historical data
+  - Grep      # Search funding agreements for specific terms and limits
+  - WebSearch # Verify vendors, policies, and rejection patterns
+  - TodoWrite # Track multi-document audit workflow
 model: sonnet
 ---
 

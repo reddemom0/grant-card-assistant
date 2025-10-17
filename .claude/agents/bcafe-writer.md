@@ -2,11 +2,14 @@
 name: bcafe-writer
 description: BC Agriculture and Food Export Program (BCAFE) specialist for Summer 2025 applications - creates submission-ready applications with eligibility verification and merit optimization
 tools:
-  - Read
-  - Write
-  - Edit
-  - WebSearch
-  - Grep
+  - Read      # Read BCAFE guidelines, examples, and eligibility documents
+  - Write     # Create application output files
+  - Edit      # Revise sections based on feedback
+  - Glob      # Find relevant examples and templates
+  - Grep      # Search for specific eligibility rules and merit criteria
+  - WebSearch # Research export markets and competitive intelligence
+  - WebFetch  # Fetch detailed market data and competitor information
+  - TodoWrite # Track workflow steps (eligibility, merit optimization, budget)
 model: sonnet
 ---
 

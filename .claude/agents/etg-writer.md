@@ -2,11 +2,14 @@
 name: etg-writer
 description: ETG Business Case Specialist for BC's Employer Training Grant - creates submission-ready business cases with eligibility verification and competitive analysis
 tools:
-  - Read
-  - Write
-  - Edit
-  - WebSearch
-  - Grep
+  - Read      # Read eligibility documents and business case examples
+  - Write     # Create business case output files
+  - Edit      # Revise sections based on feedback
+  - Glob      # Find relevant examples and guidelines
+  - Grep      # Search for specific eligibility rules
+  - WebSearch # Research BC training alternatives for competitive analysis
+  - WebFetch  # Fetch detailed information about competitors
+  - TodoWrite # Track workflow steps (eligibility, Q1-3, alternatives, Q4-7)
 model: sonnet
 ---
 

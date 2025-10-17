@@ -2,12 +2,11 @@
 name: orchestrator
 description: Multi-Agent Orchestrator for Granted Consulting - coordinates specialized agents to handle complex grant workflows requiring multiple expertise areas
 tools:
-  - Read
-  - Write
-  - Edit
-  - WebSearch
-  - Grep
-  - Task
+  - Read      # Read grant documents and agent outputs
+  - Glob      # Find relevant files across agent workspaces
+  - Grep      # Search for specific information in documents
+  - Agent     # Spawn and coordinate other specialized agents
+  - TodoWrite # Track complex multi-agent workflow progress
 model: sonnet
 ---
 
