@@ -29,10 +29,20 @@ export async function ensureUser(userId, email = null, name = null) {
     const result = await client.query(
       `INSERT INTO users (id, email, name, created_at)
        VALUES ($1, $2, $3, NOW())
-       ON CONFLICT (id) DO UPDATE SET updated_at = NOW()
+       ON CONFLICT (id) DO NOTHING
        RETURNING *`,
       [userId, userEmail, userName]
     );
+
+    // If conflict occurred, fetch the existing user
+    if (result.rows.length === 0) {
+      const existingUser = await client.query(
+        'SELECT * FROM users WHERE id = $1',
+        [userId]
+      );
+      return existingUser.rows[0];
+    }
+
     return result.rows[0];
   } finally {
     client.release();
