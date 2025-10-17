@@ -44,6 +44,9 @@ export default async function handler(req, res) {
 
     console.log(`🤖 Loading agent: ${agentType}`);
 
+    // Ensure user exists in database (creates if doesn't exist)
+    await db.ensureUser(userId);
+
     // Get or create conversation in database
     let conversation = await db.getConversation(conversationId);
 

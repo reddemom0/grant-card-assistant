@@ -14,6 +14,27 @@ const pool = new Pool({
   connectionTimeoutMillis: 2000,
 });
 
+// ===== USER OPERATIONS =====
+
+/**
+ * Create or get a user by ID (upsert)
+ */
+export async function ensureUser(userId, email = null, name = null) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `INSERT INTO users (id, email, name, created_at)
+       VALUES ($1, $2, $3, NOW())
+       ON CONFLICT (id) DO UPDATE SET updated_at = NOW()
+       RETURNING *`,
+      [userId, email, name]
+    );
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
 // ===== CONVERSATION OPERATIONS =====
 
 /**
@@ -195,6 +216,7 @@ export async function closePool() {
 }
 
 export default {
+  ensureUser,
   getConversation,
   createConversation,
   saveMessage,
