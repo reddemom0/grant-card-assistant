@@ -106,6 +106,28 @@ export async function setupGDriveCredentials() {
 
     console.log('✅ Google Drive credentials configured for production');
 
+    // Test Google Drive API access with the refreshed credentials
+    try {
+      console.log('🧪 Testing Google Drive API access...');
+      const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+      auth.setCredentials(credentials);
+
+      const drive = google.drive({ version: 'v3', auth });
+      const response = await drive.files.list({
+        pageSize: 1,
+        fields: 'files(id, name)',
+      });
+
+      console.log(`✅ Google Drive API test successful! Found ${response.data.files?.length || 0} files`);
+      if (response.data.files && response.data.files.length > 0) {
+        console.log(`📄 Sample file: ${response.data.files[0].name}`);
+      }
+    } catch (testError) {
+      console.error('❌ Google Drive API test failed:', testError.message);
+      if (testError.code) console.error(`   Error code: ${testError.code}`);
+      if (testError.errors) console.error(`   Details:`, JSON.stringify(testError.errors, null, 2));
+    }
+
     return {
       oauthPath,
       credentialsPath,
