@@ -2,6 +2,7 @@ node_modules
 .env
 .DS_Store
 dist
+!mcp-servers/gdrive/dist
 .vercel
 .memories
 *.log
@@ -9,4 +10,3 @@ dist
 # MCP Google Drive Credentials
 mcp-servers/gdrive/credentials/
 mcp-servers/gdrive/node_modules/
-mcp-servers/gdrive/dist/

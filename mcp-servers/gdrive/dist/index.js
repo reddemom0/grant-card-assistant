@@ -201,9 +201,34 @@ async function loadCredentialsAndRunServer() {
         console.error("Credentials not found. Please run with 'auth' argument first.");
         process.exit(1);
     }
+    // Load OAuth client credentials (client_id, client_secret) for token refresh
+    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(process.cwd(), "credentials", "gcp-oauth.keys.json");
+    const oauthKeys = JSON.parse(fs.readFileSync(keyPath, "utf-8"));
+    const { client_id, client_secret, redirect_uris } = oauthKeys.installed || oauthKeys.web;
+    // Load user credentials (access_token, refresh_token)
     const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
-    const auth = new google.auth.OAuth2();
+    // Initialize OAuth2 client with client credentials so it can refresh tokens
+    const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
     auth.setCredentials(credentials);
+    // Set up token refresh handler
+    auth.on('tokens', (tokens) => {
+        console.error('🔄 Token refreshed');
+        if (tokens.refresh_token) {
+            // If we got a new refresh_token, save it
+            credentials.refresh_token = tokens.refresh_token;
+        }
+        // Update access_token and expiry
+        credentials.access_token = tokens.access_token;
+        credentials.expiry_date = tokens.expiry_date;
+        // Save updated credentials to file
+        try {
+            fs.writeFileSync(credentialsPath, JSON.stringify(credentials, null, 2));
+            console.error('✅ Updated credentials saved');
+        }
+        catch (error) {
+            console.error('⚠️  Failed to save updated credentials:', error.message);
+        }
+    });
     google.options({ auth });
     const transport = new StdioServerTransport();
     await server.connect(transport);
