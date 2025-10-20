@@ -171,10 +171,26 @@ export async function initializeGoogleDriveCredentials() {
  * @returns {object} Agent-specific configuration
  */
 export function getAgentConfig(agentType) {
+  // Build MCP server config dynamically so env vars are evaluated at runtime
+  // This ensures credentials set by initializeGoogleDriveCredentials() are used
+  const mcpServers = {
+    'google-drive': {
+      type: 'stdio',
+      command: 'node',
+      args: ['./mcp-servers/gdrive/dist/index.js'],
+      env: {
+        GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || './mcp-servers/gdrive/credentials/gcp-oauth.keys.json',
+        MCP_GDRIVE_CREDENTIALS: process.env.MCP_GDRIVE_CREDENTIALS || './mcp-servers/gdrive/credentials/.gdrive-server-credentials.json',
+        NODE_ENV: process.env.NODE_ENV,
+      }
+    }
+  };
+
   return {
     ...agentSDKConfig,
     allowedTools: agentSDKConfig.tools[agentType] || agentSDKConfig.tools.default,
     betaHeaders: agentSDKConfig.betaHeaders, // Pass beta headers to agent
+    mcpServers, // Override with dynamically generated config
   };
 }
 
