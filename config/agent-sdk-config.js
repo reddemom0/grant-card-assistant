@@ -87,9 +87,13 @@ export const agentSDKConfig = {
       args: [
         './mcp-servers/gdrive/dist/index.js'
       ],
-      // Environment variables are set in process.env by setup-gdrive-credentials.js
-      // The subprocess will inherit them from the parent process
-      // No need to explicitly set env here
+      env: {
+        // Explicitly pass environment variables to MCP subprocess
+        // These are set by setup-gdrive-credentials.js before Agent SDK initialization
+        GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || './mcp-servers/gdrive/credentials/gcp-oauth.keys.json',
+        MCP_GDRIVE_CREDENTIALS: process.env.MCP_GDRIVE_CREDENTIALS || './mcp-servers/gdrive/credentials/.gdrive-server-credentials.json',
+        NODE_ENV: process.env.NODE_ENV,
+      }
     }
   },
 

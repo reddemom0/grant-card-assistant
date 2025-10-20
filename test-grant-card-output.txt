@@ -1,0 +1,355 @@
+Grant Card Agent Test Output
+Generated: 2025-10-08T11:29:19.692Z
+Duration: 0.00s
+Session ID: N/A
+
+
+============================================================
+
+{"transport":{"options":{"abortController":{},"additionalDirectories":[],"executable":"node","executableArgs":[],"extraArgs":{},"pathToClaudeCodeExecutable":"/Users/Chris/grant-card-assistant/node_modules/@anthropic-ai/claude-agent-sdk/cli.js","env":{"TERM_PROGRAM":"Apple_Terminal","NODE":"/usr/local/bin/node","INIT_CWD":"/Users/Chris/grant-card-assistant","SHELL":"/bin/zsh","TERM":"xterm-256color","HOMEBREW_REPOSITORY":"/opt/homebrew","TMPDIR":"/var/folders/c0/_t4lgbp91ln2f9qw9z3dyr8h0000gp/T/","npm_config_global_prefix":"/usr/local","TERM_PROGRAM_VERSION":"455.1","COLOR":"1","TERM_SESSION_ID":"EFE95BBF-4C00-4442-AB03-495E998BF17C","npm_config_noproxy":"","npm_config_local_prefix":"/Users/Chris/grant-card-assistant","USER":"Chris","npm_config_globalconfig":"/usr/local/etc/npmrc","SSH_AUTH_SOCK":"/private/tmp/com.apple.launchd.rL3ga95J5V/Listeners","__CF_USER_TEXT_ENCODING":"0x1F6:0x0:0x52","npm_execpath":"/usr/local/lib/node_modules/npm/bin/npm-cli.js","PATH":"/Users/Chris/.npm/_npx/becf7b9e49303068/node_modules/.bin:/Users/Chris/grant-card-assistant/node_modules/.bin:/Users/Chris/node_modules/.bin:/Users/node_modules/.bin:/node_modules/.bin:/usr/local/lib/node_modules/npm/node_modules/@npmcli/run-script/lib/node-gyp-bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin","npm_package_json":"/Users/Chris/grant-card-assistant/package.json","LaunchInstanceID":"D0B2FBA3-5D0A-40DA-8E1A-C99F75FAD5A7","npm_config_userconfig":"/Users/Chris/.npmrc","npm_config_init_module":"/Users/Chris/.npm-init.js","__CFBundleIdentifier":"com.apple.Terminal","npm_command":"exec","PWD":"/Users/Chris/grant-card-assistant","npm_lifecycle_event":"npx","EDITOR":"vi","npm_package_name":"grant-card-assistant","LANG":"en_CA.UTF-8","npm_config_npm_version":"10.9.3","XPC_FLAGS":"0x0","npm_package_engines_node":"22.x","npm_config_node_gyp":"/usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js","npm_package_version":"1.0.2","XPC_SERVICE_NAME":"0","SHLVL":"3","HOME":"/Users/Chris","HOMEBREW_PREFIX":"/opt/homebrew","npm_config_cache":"/Users/Chris/.npm","LOGNAME":"Chris","npm_lifecycle_script":"claude","npm_config_user_agent":"npm/10.9.3 node/v22.18.0 darwin arm64 workspaces/false","INFOPATH":"/opt/homebrew/share/info:/opt/homebrew/share/info:","HOMEBREW_CELLAR":"/opt/homebrew/Cellar","SECURITYSESSIONID":"186ab","npm_node_execpath":"/usr/local/bin/node","npm_config_prefix":"/usr/local","COREPACK_ENABLE_AUTO_PIN":"0","NoDefaultCurrentDirectoryInExePath":"1","CLAUDE_CODE_ENTRYPOINT":"cli","OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE":"delta","GIT_EDITOR":"true","CLAUDECODE":"1","OLDPWD":"/Users/Chris/grant-card-assistant","_":"/usr/local/bin/node","CLAUDE_AGENT_SDK_VERSION":"0.1.10"},"maxTurns":1,"model":"claude-sonnet-4-20250514","permissionMode":"default","settingSources":["project"],"allowedTools":[],"disallowedTools":[],"mcpServers":{},"canUseTool":false,"hooks":false},"child":{"_events":{},"_eventsCount":3,"_closesNeeded":2,"_closesGot":0,"connected":false,"signalCode":null,"exitCode":null,"killed":false,"spawnfile":"node","_handle":{"pid":99328},"spawnargs":["node","/Users/Chris/grant-card-assistant/node_modules/@anthropic-ai/claude-agent-sdk/cli.js","--output-format","stream-json","--verbose","--input-format","stream-json","--max-turns","1","--model","claude-sonnet-4-20250514","--setting-sources","project","--permission-mode","default"],"pid":99328,"stdin":{"connecting":false,"_hadError":false,"_parent":null,"_host":null,"_closeAfterHandlingError":false,"_events":{},"_readableState":{"highWaterMark":65536,"buffer":[],"bufferIndex":0,"length":0,"pipes":[],"awaitDrainWriters":null,"readable":false},"_writableState":{"highWaterMark":65536,"length":0,"corked":0,"writelen":0,"bufferedIndex":0,"pendingcb":0},"allowHalfOpen":false,"_eventsCount":1,"_sockname":null,"_pendingData":null,"_pendingEncoding":"","server":null,"_server":null},"stdout":{"connecting":false,"_hadError":false,"_parent":null,"_host":null,"_closeAfterHandlingError":false,"_events":{"end":[null,null]},"_readableState":{"highWaterMark":65536,"buffer":[],"bufferIndex":0,"length":0,"pipes":[],"awaitDrainWriters":null},"_writableState":{"highWaterMark":65536,"length":0,"corked":0,"writelen":0,"bufferedIndex":0,"pendingcb":0},"allowHalfOpen":false,"_eventsCount":4,"_sockname":null,"_pendingData":null,"_pendingEncoding":"","server":null,"_server":null},"stderr":null,"stdio":[{"connecting":false,"_hadError":false,"_parent":null,"_host":null,"_closeAfterHandlingError":false,"_events":{},"_readableState":{"highWaterMark":65536,"buffer":[],"bufferIndex":0,"length":0,"pipes":[],"awaitDrainWriters":null,"readable":false},"_writableState":{"highWaterMark":65536,"length":0,"corked":0,"writelen":0,"bufferedIndex":0,"pendingcb":0},"allowHalfOpen":false,"_eventsCount":1,"_sockname":null,"_pendingData":null,"_pendingEncoding":"","server":null,"_server":null},{"connecting":false,"_hadError":false,"_parent":null,"_host":null,"_closeAfterHandlingError":false,"_events":{"end":[null,null]},"_readableState":{"highWaterMark":65536,"buffer":[],"bufferIndex":0,"length":0,"pipes":[],"awaitDrainWriters":null},"_writableState":{"highWaterMark":65536,"length":0,"corked":0,"writelen":0,"bufferedIndex":0,"pendingcb":0},"allowHalfOpen":false,"_eventsCount":4,"_sockname":null,"_pendingData":null,"_pendingEncoding":"","server":null,"_server":null},null]},"childStdin":{"connecting":false,"_hadError":false,"_parent":null,"_host":null,"_closeAfterHandlingError":false,"_events":{},"_readableState":{"highWaterMark":65536,"buffer":[],"bufferIndex":0,"length":0,"pipes":[],"awaitDrainWriters":null,"readable":false},"_writableState":{"highWaterMark":65536,"length":0,"corked":0,"writelen":0,"bufferedIndex":0,"pendingcb":0},"allowHalfOpen":false,"_eventsCount":1,"_sockname":null,"_pendingData":null,"_pendingEncoding":"","server":null,"_server":null},"childStdout":{"connecting":false,"_hadError":false,"_parent":null,"_host":null,"_closeAfterHandlingError":false,"_events":{"end":[null,null]},"_readableState":{"highWaterMark":65536,"buffer":[],"bufferIndex":0,"length":0,"pipes":[],"awaitDrainWriters":null},"_writableState":{"highWaterMark":65536,"length":0,"corked":0,"writelen":0,"bufferedIndex":0,"pendingcb":0},"allowHalfOpen":false,"_eventsCount":4,"_sockname":null,"_pendingData":null,"_pendingEncoding":"","server":null,"_server":null},"ready":true,"abortController":{},"exitListeners":[]},"isSingleUserTurn":true,"abortController":{},"pendingControlResponses":{},"cleanupPerformed":false,"sdkMessages":{},"inputStream":{"queue":[],"isDone":false,"started":false},"initialization":{},"cancelControllers":{},"hookCallbacks":{},"nextCallbackId":0,"sdkMcpTransports":{},"pendingMcpResponses":{},"firstResultReceivedPromise":{}}
+
+============================================================
+
+DEBUG - Full Result Object:
+{
+  "transport": {
+    "options": {
+      "abortController": {},
+      "additionalDirectories": [],
+      "executable": "node",
+      "executableArgs": [],
+      "extraArgs": {},
+      "pathToClaudeCodeExecutable": "/Users/Chris/grant-card-assistant/node_modules/@anthropic-ai/claude-agent-sdk/cli.js",
+      "env": {
+        "TERM_PROGRAM": "Apple_Terminal",
+        "NODE": "/usr/local/bin/node",
+        "INIT_CWD": "/Users/Chris/grant-card-assistant",
+        "SHELL": "/bin/zsh",
+        "TERM": "xterm-256color",
+        "HOMEBREW_REPOSITORY": "/opt/homebrew",
+        "TMPDIR": "/var/folders/c0/_t4lgbp91ln2f9qw9z3dyr8h0000gp/T/",
+        "npm_config_global_prefix": "/usr/local",
+        "TERM_PROGRAM_VERSION": "455.1",
+        "COLOR": "1",
+        "TERM_SESSION_ID": "EFE95BBF-4C00-4442-AB03-495E998BF17C",
+        "npm_config_noproxy": "",
+        "npm_config_local_prefix": "/Users/Chris/grant-card-assistant",
+        "USER": "Chris",
+        "npm_config_globalconfig": "/usr/local/etc/npmrc",
+        "SSH_AUTH_SOCK": "/private/tmp/com.apple.launchd.rL3ga95J5V/Listeners",
+        "__CF_USER_TEXT_ENCODING": "0x1F6:0x0:0x52",
+        "npm_execpath": "/usr/local/lib/node_modules/npm/bin/npm-cli.js",
+        "PATH": "/Users/Chris/.npm/_npx/becf7b9e49303068/node_modules/.bin:/Users/Chris/grant-card-assistant/node_modules/.bin:/Users/Chris/node_modules/.bin:/Users/node_modules/.bin:/node_modules/.bin:/usr/local/lib/node_modules/npm/node_modules/@npmcli/run-script/lib/node-gyp-bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin",
+        "npm_package_json": "/Users/Chris/grant-card-assistant/package.json",
+        "LaunchInstanceID": "D0B2FBA3-5D0A-40DA-8E1A-C99F75FAD5A7",
+        "npm_config_userconfig": "/Users/Chris/.npmrc",
+        "npm_config_init_module": "/Users/Chris/.npm-init.js",
+        "__CFBundleIdentifier": "com.apple.Terminal",
+        "npm_command": "exec",
+        "PWD": "/Users/Chris/grant-card-assistant",
+        "npm_lifecycle_event": "npx",
+        "EDITOR": "vi",
+        "npm_package_name": "grant-card-assistant",
+        "LANG": "en_CA.UTF-8",
+        "npm_config_npm_version": "10.9.3",
+        "XPC_FLAGS": "0x0",
+        "npm_package_engines_node": "22.x",
+        "npm_config_node_gyp": "/usr/local/lib/node_modules/npm/node_modules/node-gyp/bin/node-gyp.js",
+        "npm_package_version": "1.0.2",
+        "XPC_SERVICE_NAME": "0",
+        "SHLVL": "3",
+        "HOME": "/Users/Chris",
+        "HOMEBREW_PREFIX": "/opt/homebrew",
+        "npm_config_cache": "/Users/Chris/.npm",
+        "LOGNAME": "Chris",
+        "npm_lifecycle_script": "claude",
+        "npm_config_user_agent": "npm/10.9.3 node/v22.18.0 darwin arm64 workspaces/false",
+        "INFOPATH": "/opt/homebrew/share/info:/opt/homebrew/share/info:",
+        "HOMEBREW_CELLAR": "/opt/homebrew/Cellar",
+        "SECURITYSESSIONID": "186ab",
+        "npm_node_execpath": "/usr/local/bin/node",
+        "npm_config_prefix": "/usr/local",
+        "COREPACK_ENABLE_AUTO_PIN": "0",
+        "NoDefaultCurrentDirectoryInExePath": "1",
+        "CLAUDE_CODE_ENTRYPOINT": "cli",
+        "OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE": "delta",
+        "GIT_EDITOR": "true",
+        "CLAUDECODE": "1",
+        "OLDPWD": "/Users/Chris/grant-card-assistant",
+        "_": "/usr/local/bin/node",
+        "CLAUDE_AGENT_SDK_VERSION": "0.1.10"
+      },
+      "maxTurns": 1,
+      "model": "claude-sonnet-4-20250514",
+      "permissionMode": "default",
+      "settingSources": [
+        "project"
+      ],
+      "allowedTools": [],
+      "disallowedTools": [],
+      "mcpServers": {},
+      "canUseTool": false,
+      "hooks": false
+    },
+    "child": {
+      "_events": {},
+      "_eventsCount": 3,
+      "_closesNeeded": 2,
+      "_closesGot": 0,
+      "connected": false,
+      "signalCode": null,
+      "exitCode": null,
+      "killed": false,
+      "spawnfile": "node",
+      "_handle": {
+        "pid": 99328
+      },
+      "spawnargs": [
+        "node",
+        "/Users/Chris/grant-card-assistant/node_modules/@anthropic-ai/claude-agent-sdk/cli.js",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "--input-format",
+        "stream-json",
+        "--max-turns",
+        "1",
+        "--model",
+        "claude-sonnet-4-20250514",
+        "--setting-sources",
+        "project",
+        "--permission-mode",
+        "default"
+      ],
+      "pid": 99328,
+      "stdin": {
+        "connecting": false,
+        "_hadError": false,
+        "_parent": null,
+        "_host": null,
+        "_closeAfterHandlingError": false,
+        "_events": {},
+        "_readableState": {
+          "highWaterMark": 65536,
+          "buffer": [],
+          "bufferIndex": 0,
+          "length": 0,
+          "pipes": [],
+          "awaitDrainWriters": null,
+          "readable": false
+        },
+        "_writableState": {
+          "highWaterMark": 65536,
+          "length": 0,
+          "corked": 0,
+          "writelen": 0,
+          "bufferedIndex": 0,
+          "pendingcb": 0
+        },
+        "allowHalfOpen": false,
+        "_eventsCount": 1,
+        "_sockname": null,
+        "_pendingData": null,
+        "_pendingEncoding": "",
+        "server": null,
+        "_server": null
+      },
+      "stdout": {
+        "connecting": false,
+        "_hadError": false,
+        "_parent": null,
+        "_host": null,
+        "_closeAfterHandlingError": false,
+        "_events": {
+          "end": [
+            null,
+            null
+          ]
+        },
+        "_readableState": {
+          "highWaterMark": 65536,
+          "buffer": [],
+          "bufferIndex": 0,
+          "length": 0,
+          "pipes": [],
+          "awaitDrainWriters": null
+        },
+        "_writableState": {
+          "highWaterMark": 65536,
+          "length": 0,
+          "corked": 0,
+          "writelen": 0,
+          "bufferedIndex": 0,
+          "pendingcb": 0
+        },
+        "allowHalfOpen": false,
+        "_eventsCount": 4,
+        "_sockname": null,
+        "_pendingData": null,
+        "_pendingEncoding": "",
+        "server": null,
+        "_server": null
+      },
+      "stderr": null,
+      "stdio": [
+        {
+          "connecting": false,
+          "_hadError": false,
+          "_parent": null,
+          "_host": null,
+          "_closeAfterHandlingError": false,
+          "_events": {},
+          "_readableState": {
+            "highWaterMark": 65536,
+            "buffer": [],
+            "bufferIndex": 0,
+            "length": 0,
+            "pipes": [],
+            "awaitDrainWriters": null,
+            "readable": false
+          },
+          "_writableState": {
+            "highWaterMark": 65536,
+            "length": 0,
+            "corked": 0,
+            "writelen": 0,
+            "bufferedIndex": 0,
+            "pendingcb": 0
+          },
+          "allowHalfOpen": false,
+          "_eventsCount": 1,
+          "_sockname": null,
+          "_pendingData": null,
+          "_pendingEncoding": "",
+          "server": null,
+          "_server": null
+        },
+        {
+          "connecting": false,
+          "_hadError": false,
+          "_parent": null,
+          "_host": null,
+          "_closeAfterHandlingError": false,
+          "_events": {
+            "end": [
+              null,
+              null
+            ]
+          },
+          "_readableState": {
+            "highWaterMark": 65536,
+            "buffer": [],
+            "bufferIndex": 0,
+            "length": 0,
+            "pipes": [],
+            "awaitDrainWriters": null
+          },
+          "_writableState": {
+            "highWaterMark": 65536,
+            "length": 0,
+            "corked": 0,
+            "writelen": 0,
+            "bufferedIndex": 0,
+            "pendingcb": 0
+          },
+          "allowHalfOpen": false,
+          "_eventsCount": 4,
+          "_sockname": null,
+          "_pendingData": null,
+          "_pendingEncoding": "",
+          "server": null,
+          "_server": null
+        },
+        null
+      ]
+    },
+    "childStdin": {
+      "connecting": false,
+      "_hadError": false,
+      "_parent": null,
+      "_host": null,
+      "_closeAfterHandlingError": false,
+      "_events": {},
+      "_readableState": {
+        "highWaterMark": 65536,
+        "buffer": [],
+        "bufferIndex": 0,
+        "length": 0,
+        "pipes": [],
+        "awaitDrainWriters": null,
+        "readable": false
+      },
+      "_writableState": {
+        "highWaterMark": 65536,
+        "length": 0,
+        "corked": 0,
+        "writelen": 0,
+        "bufferedIndex": 0,
+        "pendingcb": 0
+      },
+      "allowHalfOpen": false,
+      "_eventsCount": 1,
+      "_sockname": null,
+      "_pendingData": null,
+      "_pendingEncoding": "",
+      "server": null,
+      "_server": null
+    },
+    "childStdout": {
+      "connecting": false,
+      "_hadError": false,
+      "_parent": null,
+      "_host": null,
+      "_closeAfterHandlingError": false,
+      "_events": {
+        "end": [
+          null,
+          null
+        ]
+      },
+      "_readableState": {
+        "highWaterMark": 65536,
+        "buffer": [],
+        "bufferIndex": 0,
+        "length": 0,
+        "pipes": [],
+        "awaitDrainWriters": null
+      },
+      "_writableState": {
+        "highWaterMark": 65536,
+        "length": 0,
+        "corked": 0,
+        "writelen": 0,
+        "bufferedIndex": 0,
+        "pendingcb": 0
+      },
+      "allowHalfOpen": false,
+      "_eventsCount": 4,
+      "_sockname": null,
+      "_pendingData": null,
+      "_pendingEncoding": "",
+      "server": null,
+      "_server": null
+    },
+    "ready": true,
+    "abortController": {},
+    "exitListeners": []
+  },
+  "isSingleUserTurn": true,
+  "abortController": {},
+  "pendingControlResponses": {},
+  "cleanupPerformed": false,
+  "sdkMessages": {},
+  "inputStream": {
+    "queue": [],
+    "isDone": false,
+    "started": false
+  },
+  "initialization": {},
+  "cancelControllers": {},
+  "hookCallbacks": {},
+  "nextCallbackId": 0,
+  "sdkMcpTransports": {},
+  "pendingMcpResponses": {},
+  "firstResultReceivedPromise": {}
+}

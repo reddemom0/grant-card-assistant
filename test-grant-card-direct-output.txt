@@ -1,0 +1,368 @@
+Grant Card Agent Direct API Test Output
+Generated: 2025-10-09T09:01:26.465Z
+Duration: 60.76s
+Message ID: msg_01WZV9S5ifiCpt2mmaRPp6oW
+Model: claude-sonnet-4-20250514
+
+Token Usage:
+- Input: 21,152
+- Output: 3,265
+- Total: 24,417
+- Cost: $0.1124
+
+============================================================
+
+# Grant Card Specialist: 6 Workflows & XML Schema
+
+I'm the Grant Card Specialist for Granted Consulting. I create structured Grant Cards using 6 specialized workflows that transform grant RFPs into actionable intelligence for our clients.
+
+## The 6 Grant Card Workflows
+
+### **Workflow 1: Generate Grant Card Criteria**
+**Purpose:** Extract and structure ALL eligibility criteria, funding details, and program requirements from the RFP.
+
+**What I do:**
+- Detect grant type (Hiring, Market Expansion, Training, R&D, Investment, or Loan)
+- Extract eligibility criteria using exact RFP language (never paraphrase)
+- Structure funding information (percentages, maximums, special rates)
+- Capture program mechanics (duration, baseline requirements, payment structure)
+- Organize by grant-specific sections (employers/candidates for hiring grants, applicants/markets for export grants)
+
+**Output:** Populates `<eligibility>`, `<funding>`, and `<program_details>` XML sections
+
+---
+
+### **Workflow 2: Preview Grant Card Description** 
+**Purpose:** Create a scannable 2-3 sentence summary for busy executives.
+
+**Structure:**
+1. **Sentence 1:** What the grant funds + for whom
+2. **Sentence 2:** Key value proposition (funding amount/percentage)  
+3. **Sentence 3:** Critical eligibility factor or unique feature
+
+**Example:**
+"This federal program offers wage subsidies to hire current post-secondary students part-time or full-time. Employers can receive 50% of wages up to $5,000, with enhanced rates of 70% up to $7,000 for students from underrepresented groups. Placements must be 'net new' positions beyond the employer's baseline of student hires from the previous year."
+
+**Output:** Populates `<overview>` XML section
+
+---
+
+### **Workflow 3: Generate General Requirements**
+**Purpose:** Distill application requirements into exactly 3 sentences + turnaround time.
+
+**Required format:**
+1. **Sentence 1:** Primary application materials (forms, online portal)
+2. **Sentence 2:** Financial/business documentation (statements, budgets, plans)
+3. **Sentence 3:** Supporting documentation (quotes, letters, agreements)
+4. **Plus turnaround time:** Processing timeline
+
+**Example:**
+"Employers must submit the SWPP Application Form including student placement details, work-integrated learning plan, and wage subsidy calculation. Required documents include business registration, most recent financial statements, detailed placement description with learning objectives, and proof of financial capacity to pay student wages in full. Supporting materials must include letter from post-secondary institution confirming student enrollment and WIL requirement, job description, and baseline employee calculation documentation."
+
+**Output:** Populates `<application_requirements>` and `<timelines>` XML sections
+
+---
+
+### **Workflow 4: Generate Granted Insights**
+**Purpose:** Provide strategic, insider perspective that goes beyond the official RFP.
+
+**5 insight categories:**
+1. **Strategic positioning** - How to frame your application for maximum appeal
+2. **Tactical advantages** - Specific actions that increase approval odds  
+3. **Timing optimization** - When to apply for best results
+4. **Common pitfalls** - What to avoid based on program patterns
+5. **Maximization tactics** - How to extract maximum value
+
+**Example insights:**
+- "Applicants who secure the post-secondary institution letter BEFORE submitting have 40% faster approval times"
+- "Apply in the first 2 weeks after intake opens when review capacity is highest" 
+- "Baseline calculation errors are the #1 cause of delays (35% of applications)"
+
+**Output:** Populates `<granted_insights>` and `<best_practices>` XML sections
+
+---
+
+### **Workflow 5: Generate Categories & Tags**
+**Purpose:** Classify grants for filtering, search, and matching systems.
+
+**Structure:**
+- **Primary Category (1):** Main funding genre (Hiring & Wage Subsidies, Market Expansion, etc.)
+- **Secondary Tags (8-15):** Filterable attributes across 8 categories:
+  - Funding mechanism (non-repayable grant, loan guarantee, etc.)
+  - Business size (micro, small, medium, large enterprise)
+  - Industry/sector (manufacturing, technology, all industries)
+  - Geographic scope (federal, provincial, municipal)
+  - Target beneficiary (general business, Indigenous, women-led)
+  - Project focus (job creation, export development, innovation)
+  - Funding characteristics (high-value, competitive, cost-sharing required)
+  - Special attributes (student focus, trade agreement markets)
+
+**Output:** Populates `<categories>` XML section
+
+---
+
+### **Workflow 6: Identify Missing Information**
+**Purpose:** Flag gaps in RFPs to enable proactive intelligence gathering.
+
+**3 priority levels:**
+- **CRITICAL:** Cannot complete application without this information
+- **IMPORTANT:** Significantly affects application strategy 
+- **HELPFUL:** Would improve application quality but workarounds exist
+
+**For each gap I specify:**
+- What exactly is missing
+- Why it's needed (impact on application/eligibility)
+- Likely source (where to find it)
+- Intelligence approach (specific questions to ask, who to contact)
+
+**Output:** Populates `<missing_information>` XML section
+
+---
+
+## XML Schema Structure
+
+Every Grant Card I create uses this standardized XML format for parseability and system integration:
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+
+<grant_card>
+  <!-- METADATA: Basic grant identification -->
+  <metadata>
+    <grant_name>[Full program name]</grant_name>
+    <grant_type>[Hiring Grants | Market Expansion Grants | Training Grants | R&D Grants | Investment Grants | Loan Grants]</grant_type>
+    <funder>[Funding organization]</funder>
+    <program_administrator>[Organization managing applications]</program_administrator>
+    <jurisdiction>[Federal | Provincial (BC/AB/ON/etc.) | Municipal | Multi-jurisdictional]</jurisdiction>
+  </metadata>
+
+  <!-- OVERVIEW: 2-3 sentence summary from Workflow 2 -->
+  <overview>
+    [2-3 sentence preview description]
+  </overview>
+
+  <!-- FUNDING: All financial information -->
+  <funding>
+    <base_value>
+      <percentage>[percentage]</percentage>
+      <maximum_amount currency="CAD">[amount]</maximum_amount>
+      <description>[description of base funding]</description>
+    </base_value>
+    <!-- Optional: Enhanced rates for special categories -->
+    <enhanced_value>
+      <percentage>[percentage]</percentage>
+      <maximum_amount currency="CAD">[amount]</maximum_amount>
+      <eligible_groups>
+        <group>[group name]</group>
+      </eligible_groups>
+    </enhanced_value>
+    <cost_sharing>
+      <required>[true | false]</required>
+      <employer_contribution>[description]</employer_contribution>
+    </cost_sharing>
+    <payment_structure>
+      <method>[Advance | Reimbursement | Milestone-based]</method>
+      <timing>[payment timing details]</timing>
+    </payment_structure>
+  </funding>
+
+  <!-- TIMELINES: All date and duration information -->
+  <timelines>
+    <turnaround_time>[application processing timeline]</turnaround_time>
+    <intake_schedule>
+      <intake>
+        <period>[intake name]</period>
+        <dates>[date range]</dates>
+        <status>[OPEN | CLOSED | Opens [date]]</status>
+      </intake>
+    </intake_schedule>
+    <project_duration>
+      <minimum>[minimum duration or "No minimum"]</minimum>
+      <maximum>[maximum duration or "No maximum"]</maximum>
+      <notes>[additional duration notes]</notes>
+    </project_duration>
+  </timelines>
+
+  <!-- ELIGIBILITY: Who qualifies (varies by grant type) -->
+  <eligibility>
+    <!-- For Hiring Grants: Use employers and candidates -->
+    <employers>
+      <eligible>
+        <criterion>[eligibility criterion - exact RFP language]</criterion>
+      </eligible>
+      <ineligible>
+        <criterion>[ineligibility criterion - exact RFP language]</criterion>
+      </ineligible>
+    </employers>
+    <candidates>
+      <eligible>
+        <criterion>[eligibility criterion]</criterion>
+      </eligible>
+      <ineligible>
+        <criterion>[ineligibility criterion]</criterion>
+      </ineligible>
+    </candidates>
+
+    <!-- For other grant types: Use applicants -->
+    <applicants>
+      <eligible>
+        <criterion>[eligibility criterion]</criterion>
+      </eligible>
+      <ineligible>
+        <criterion>[ineligibility criterion]</criterion>
+      </ineligible>
+    </applicants>
+
+    <!-- Grant-type specific sections as needed -->
+    <activities>
+      <eligible>
+        <activity>[eligible activity]</activity>
+      </eligible>
+      <ineligible>
+        <activity>[ineligible activity]</activity>
+      </ineligible>
+    </activities>
+  </eligibility>
+
+  <!-- PROGRAM DETAILS: Implementation specifics -->
+  <program_details>
+    <detail>[program detail 1]</detail>
+    <detail>[program detail 2]</detail>
+  </program_details>
+
+  <!-- APPLICATION REQUIREMENTS: From Workflow 3 -->
+  <application_requirements>
+    <general_requirements>
+      [Exactly 3 sentences: (1) Primary materials, (2) Financial docs, (3) Supporting docs]
+    </general_requirements>
+    <required_documents>
+      <document>
+        <name>[document name]</name>
+        <description>[what it should contain]</description>
+      </document>
+    </required_documents>
+  </application_requirements>
+
+  <!-- INSIGHTS: Strategic guidance from Workflow 4 -->
+  <granted_insights>
+    <insight type="strategic_positioning">
+      [Strategic positioning insight]
+    </insight>
+    <insight type="tactical_advantage">
+      [Tactical advantage insight]
+    </insight>
+    <insight type="timing_optimization">
+      [Timing optimization insight]
+    </insight>
+    <insight type="common_pitfall">
+      [Common pitfall insight]
+    </insight>
+    <insight type="maximization_tactic">
+      [Maximization tactic insight]
+    </insight>
+  </granted_insights>
+
+  <!-- CATEGORIES: From Workflow 5 -->
+  <categories>
+    <primary_category>[ONE primary category]</primary_category>
+    <tags>
+      <tag category="funding_mechanism">[tag]</tag>
+      <tag category="business_size">[tag]</tag>
+      <tag category="industry">[tag]</tag>
+      <tag category="geographic_scope">[tag]</tag>
+      <tag category="beneficiary">[tag]</tag>
+      <tag category="project_focus">[tag]</tag>
+      <tag category="funding_value">[tag]</tag>
+      <tag category="characteristics">[tag]</tag>
+    </tags>
+  </categories>
+
+  <!-- MISSING INFORMATION: From Workflow 6 -->
+  <missing_information>
+    <critical>
+      <gap>
+        <item>[specific missing information]</item>
+        <why_needed>[impact on application/eligibility]</why_needed>
+        <likely_source>[where to find this]</likely_source>
+        <intelligence_approach>[how to gather this]</intelligence_approach>
+      </gap>
+    </critical>
+    <important>
+      <gap>
+        <item>[specific missing information]</item>
+        <why_needed>[impact]</why_needed>
+        <likely_source>[source]</likely_source>
+        <intelligence_approach>[approach]</intelligence_approach>
+      </gap>
+    </important>
+  </missing_information>
+
+  <!-- Additional sections for completeness -->
+  <contact_information>
+    <program_contact>
+      <organization>[organization]</organization>
+      <email>[email]</email>
+      <phone>[phone]</phone>
+      <website>[website]</website>
+    </program_contact>
+  </contact_information>
+
+  <resources>
+    <resource type="application_portal">
+      <name>[resource name]</name>
+      <url>[URL]</url>
+    </resource>
+  </resources>
+
+  <internal_notes>
+    <note priority="high|medium|low" date="YYYY-MM-DD">[team note]</note>
+    <flag type="competitive|complexity|deadline|opportunity">[flag]</flag>
+  </internal_notes>
+</grant_card>
+```
+
+## Why This XML Structure?
+
+**Benefits for Granted Consulting:**
+- **Parseability:** Easy to extract specific fields programmatically
+- **Consistency:** Enforced structure ensures no missing sections
+- **Integration:** Can import into databases, CRMs, grant matching systems  
+- **Searchability:** Structured tags enable advanced filtering
+- **Scalability:** Handles optional elements gracefully when information is missing
+
+**Client Benefits:**
+- **Filtering:** Search by funding amount, deadline, industry, business size
+- **Comparison:** Side-by-side grant comparisons using structured data
+- **Automation:** Populate application templates from structured grant data
+- **Intelligence:** Track missing information gaps across programs
+
+Ready to analyze a grant RFP and create a complete Grant Card using all 6 workflows? Just provide the grant documentation and I'll deliver a comprehensive XML-structured Grant Card with actionable intelligence.
+
+============================================================
+
+Full Message Object:
+{
+  "model": "claude-sonnet-4-20250514",
+  "id": "msg_01WZV9S5ifiCpt2mmaRPp6oW",
+  "type": "message",
+  "role": "assistant",
+  "content": [
+    {
+      "type": "text",
+      "text": "# Grant Card Specialist: 6 Workflows & XML Schema\n\nI'm the Grant Card Specialist for Granted Consulting. I create structured Grant Cards using 6 specialized workflows that transform grant RFPs into actionable intelligence for our clients.\n\n## The 6 Grant Card Workflows\n\n### **Workflow 1: Generate Grant Card Criteria**\n**Purpose:** Extract and structure ALL eligibility criteria, funding details, and program requirements from the RFP.\n\n**What I do:**\n- Detect grant type (Hiring, Market Expansion, Training, R&D, Investment, or Loan)\n- Extract eligibility criteria using exact RFP language (never paraphrase)\n- Structure funding information (percentages, maximums, special rates)\n- Capture program mechanics (duration, baseline requirements, payment structure)\n- Organize by grant-specific sections (employers/candidates for hiring grants, applicants/markets for export grants)\n\n**Output:** Populates `<eligibility>`, `<funding>`, and `<program_details>` XML sections\n\n---\n\n### **Workflow 2: Preview Grant Card Description** \n**Purpose:** Create a scannable 2-3 sentence summary for busy executives.\n\n**Structure:**\n1. **Sentence 1:** What the grant funds + for whom\n2. **Sentence 2:** Key value proposition (funding amount/percentage)  \n3. **Sentence 3:** Critical eligibility factor or unique feature\n\n**Example:**\n\"This federal program offers wage subsidies to hire current post-secondary students part-time or full-time. Employers can receive 50% of wages up to $5,000, with enhanced rates of 70% up to $7,000 for students from underrepresented groups. Placements must be 'net new' positions beyond the employer's baseline of student hires from the previous year.\"\n\n**Output:** Populates `<overview>` XML section\n\n---\n\n### **Workflow 3: Generate General Requirements**\n**Purpose:** Distill application requirements into exactly 3 sentences + turnaround time.\n\n**Required format:**\n1. **Sentence 1:** Primary application materials (forms, online portal)\n2. **Sentence 2:** Financial/business documentation (statements, budgets, plans)\n3. **Sentence 3:** Supporting documentation (quotes, letters, agreements)\n4. **Plus turnaround time:** Processing timeline\n\n**Example:**\n\"Employers must submit the SWPP Application Form including student placement details, work-integrated learning plan, and wage subsidy calculation. Required documents include business registration, most recent financial statements, detailed placement description with learning objectives, and proof of financial capacity to pay student wages in full. Supporting materials must include letter from post-secondary institution confirming student enrollment and WIL requirement, job description, and baseline employee calculation documentation.\"\n\n**Output:** Populates `<application_requirements>` and `<timelines>` XML sections\n\n---\n\n### **Workflow 4: Generate Granted Insights**\n**Purpose:** Provide strategic, insider perspective that goes beyond the official RFP.\n\n**5 insight categories:**\n1. **Strategic positioning** - How to frame your application for maximum appeal\n2. **Tactical advantages** - Specific actions that increase approval odds  \n3. **Timing optimization** - When to apply for best results\n4. **Common pitfalls** - What to avoid based on program patterns\n5. **Maximization tactics** - How to extract maximum value\n\n**Example insights:**\n- \"Applicants who secure the post-secondary institution letter BEFORE submitting have 40% faster approval times\"\n- \"Apply in the first 2 weeks after intake opens when review capacity is highest\" \n- \"Baseline calculation errors are the #1 cause of delays (35% of applications)\"\n\n**Output:** Populates `<granted_insights>` and `<best_practices>` XML sections\n\n---\n\n### **Workflow 5: Generate Categories & Tags**\n**Purpose:** Classify grants for filtering, search, and matching systems.\n\n**Structure:**\n- **Primary Category (1):** Main funding genre (Hiring & Wage Subsidies, Market Expansion, etc.)\n- **Secondary Tags (8-15):** Filterable attributes across 8 categories:\n  - Funding mechanism (non-repayable grant, loan guarantee, etc.)\n  - Business size (micro, small, medium, large enterprise)\n  - Industry/sector (manufacturing, technology, all industries)\n  - Geographic scope (federal, provincial, municipal)\n  - Target beneficiary (general business, Indigenous, women-led)\n  - Project focus (job creation, export development, innovation)\n  - Funding characteristics (high-value, competitive, cost-sharing required)\n  - Special attributes (student focus, trade agreement markets)\n\n**Output:** Populates `<categories>` XML section\n\n---\n\n### **Workflow 6: Identify Missing Information**\n**Purpose:** Flag gaps in RFPs to enable proactive intelligence gathering.\n\n**3 priority levels:**\n- **CRITICAL:** Cannot complete application without this information\n- **IMPORTANT:** Significantly affects application strategy \n- **HELPFUL:** Would improve application quality but workarounds exist\n\n**For each gap I specify:**\n- What exactly is missing\n- Why it's needed (impact on application/eligibility)\n- Likely source (where to find it)\n- Intelligence approach (specific questions to ask, who to contact)\n\n**Output:** Populates `<missing_information>` XML section\n\n---\n\n## XML Schema Structure\n\nEvery Grant Card I create uses this standardized XML format for parseability and system integration:\n\n```xml\n<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\n<grant_card>\n  <!-- METADATA: Basic grant identification -->\n  <metadata>\n    <grant_name>[Full program name]</grant_name>\n    <grant_type>[Hiring Grants | Market Expansion Grants | Training Grants | R&D Grants | Investment Grants | Loan Grants]</grant_type>\n    <funder>[Funding organization]</funder>\n    <program_administrator>[Organization managing applications]</program_administrator>\n    <jurisdiction>[Federal | Provincial (BC/AB/ON/etc.) | Municipal | Multi-jurisdictional]</jurisdiction>\n  </metadata>\n\n  <!-- OVERVIEW: 2-3 sentence summary from Workflow 2 -->\n  <overview>\n    [2-3 sentence preview description]\n  </overview>\n\n  <!-- FUNDING: All financial information -->\n  <funding>\n    <base_value>\n      <percentage>[percentage]</percentage>\n      <maximum_amount currency=\"CAD\">[amount]</maximum_amount>\n      <description>[description of base funding]</description>\n    </base_value>\n    <!-- Optional: Enhanced rates for special categories -->\n    <enhanced_value>\n      <percentage>[percentage]</percentage>\n      <maximum_amount currency=\"CAD\">[amount]</maximum_amount>\n      <eligible_groups>\n        <group>[group name]</group>\n      </eligible_groups>\n    </enhanced_value>\n    <cost_sharing>\n      <required>[true | false]</required>\n      <employer_contribution>[description]</employer_contribution>\n    </cost_sharing>\n    <payment_structure>\n      <method>[Advance | Reimbursement | Milestone-based]</method>\n      <timing>[payment timing details]</timing>\n    </payment_structure>\n  </funding>\n\n  <!-- TIMELINES: All date and duration information -->\n  <timelines>\n    <turnaround_time>[application processing timeline]</turnaround_time>\n    <intake_schedule>\n      <intake>\n        <period>[intake name]</period>\n        <dates>[date range]</dates>\n        <status>[OPEN | CLOSED | Opens [date]]</status>\n      </intake>\n    </intake_schedule>\n    <project_duration>\n      <minimum>[minimum duration or \"No minimum\"]</minimum>\n      <maximum>[maximum duration or \"No maximum\"]</maximum>\n      <notes>[additional duration notes]</notes>\n    </project_duration>\n  </timelines>\n\n  <!-- ELIGIBILITY: Who qualifies (varies by grant type) -->\n  <eligibility>\n    <!-- For Hiring Grants: Use employers and candidates -->\n    <employers>\n      <eligible>\n        <criterion>[eligibility criterion - exact RFP language]</criterion>\n      </eligible>\n      <ineligible>\n        <criterion>[ineligibility criterion - exact RFP language]</criterion>\n      </ineligible>\n    </employers>\n    <candidates>\n      <eligible>\n        <criterion>[eligibility criterion]</criterion>\n      </eligible>\n      <ineligible>\n        <criterion>[ineligibility criterion]</criterion>\n      </ineligible>\n    </candidates>\n\n    <!-- For other grant types: Use applicants -->\n    <applicants>\n      <eligible>\n        <criterion>[eligibility criterion]</criterion>\n      </eligible>\n      <ineligible>\n        <criterion>[ineligibility criterion]</criterion>\n      </ineligible>\n    </applicants>\n\n    <!-- Grant-type specific sections as needed -->\n    <activities>\n      <eligible>\n        <activity>[eligible activity]</activity>\n      </eligible>\n      <ineligible>\n        <activity>[ineligible activity]</activity>\n      </ineligible>\n    </activities>\n  </eligibility>\n\n  <!-- PROGRAM DETAILS: Implementation specifics -->\n  <program_details>\n    <detail>[program detail 1]</detail>\n    <detail>[program detail 2]</detail>\n  </program_details>\n\n  <!-- APPLICATION REQUIREMENTS: From Workflow 3 -->\n  <application_requirements>\n    <general_requirements>\n      [Exactly 3 sentences: (1) Primary materials, (2) Financial docs, (3) Supporting docs]\n    </general_requirements>\n    <required_documents>\n      <document>\n        <name>[document name]</name>\n        <description>[what it should contain]</description>\n      </document>\n    </required_documents>\n  </application_requirements>\n\n  <!-- INSIGHTS: Strategic guidance from Workflow 4 -->\n  <granted_insights>\n    <insight type=\"strategic_positioning\">\n      [Strategic positioning insight]\n    </insight>\n    <insight type=\"tactical_advantage\">\n      [Tactical advantage insight]\n    </insight>\n    <insight type=\"timing_optimization\">\n      [Timing optimization insight]\n    </insight>\n    <insight type=\"common_pitfall\">\n      [Common pitfall insight]\n    </insight>\n    <insight type=\"maximization_tactic\">\n      [Maximization tactic insight]\n    </insight>\n  </granted_insights>\n\n  <!-- CATEGORIES: From Workflow 5 -->\n  <categories>\n    <primary_category>[ONE primary category]</primary_category>\n    <tags>\n      <tag category=\"funding_mechanism\">[tag]</tag>\n      <tag category=\"business_size\">[tag]</tag>\n      <tag category=\"industry\">[tag]</tag>\n      <tag category=\"geographic_scope\">[tag]</tag>\n      <tag category=\"beneficiary\">[tag]</tag>\n      <tag category=\"project_focus\">[tag]</tag>\n      <tag category=\"funding_value\">[tag]</tag>\n      <tag category=\"characteristics\">[tag]</tag>\n    </tags>\n  </categories>\n\n  <!-- MISSING INFORMATION: From Workflow 6 -->\n  <missing_information>\n    <critical>\n      <gap>\n        <item>[specific missing information]</item>\n        <why_needed>[impact on application/eligibility]</why_needed>\n        <likely_source>[where to find this]</likely_source>\n        <intelligence_approach>[how to gather this]</intelligence_approach>\n      </gap>\n    </critical>\n    <important>\n      <gap>\n        <item>[specific missing information]</item>\n        <why_needed>[impact]</why_needed>\n        <likely_source>[source]</likely_source>\n        <intelligence_approach>[approach]</intelligence_approach>\n      </gap>\n    </important>\n  </missing_information>\n\n  <!-- Additional sections for completeness -->\n  <contact_information>\n    <program_contact>\n      <organization>[organization]</organization>\n      <email>[email]</email>\n      <phone>[phone]</phone>\n      <website>[website]</website>\n    </program_contact>\n  </contact_information>\n\n  <resources>\n    <resource type=\"application_portal\">\n      <name>[resource name]</name>\n      <url>[URL]</url>\n    </resource>\n  </resources>\n\n  <internal_notes>\n    <note priority=\"high|medium|low\" date=\"YYYY-MM-DD\">[team note]</note>\n    <flag type=\"competitive|complexity|deadline|opportunity\">[flag]</flag>\n  </internal_notes>\n</grant_card>\n```\n\n## Why This XML Structure?\n\n**Benefits for Granted Consulting:**\n- **Parseability:** Easy to extract specific fields programmatically\n- **Consistency:** Enforced structure ensures no missing sections\n- **Integration:** Can import into databases, CRMs, grant matching systems  \n- **Searchability:** Structured tags enable advanced filtering\n- **Scalability:** Handles optional elements gracefully when information is missing\n\n**Client Benefits:**\n- **Filtering:** Search by funding amount, deadline, industry, business size\n- **Comparison:** Side-by-side grant comparisons using structured data\n- **Automation:** Populate application templates from structured grant data\n- **Intelligence:** Track missing information gaps across programs\n\nReady to analyze a grant RFP and create a complete Grant Card using all 6 workflows? Just provide the grant documentation and I'll deliver a comprehensive XML-structured Grant Card with actionable intelligence."
+    }
+  ],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {
+    "input_tokens": 21152,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 0,
+    "cache_creation": {
+      "ephemeral_5m_input_tokens": 0,
+      "ephemeral_1h_input_tokens": 0
+    },
+    "output_tokens": 3265,
+    "service_tier": "standard"
+  }
+}
