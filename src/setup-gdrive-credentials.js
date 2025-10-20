@@ -1,10 +1,12 @@
 /**
  * Setup Google Drive MCP Credentials for Production
  * Writes credentials from environment variables to temporary files
+ * Refreshes access tokens if expired
  */
 
 import fs from 'fs/promises';
 import path from 'path';
+import { google } from 'googleapis';
 
 /**
  * Setup Google Drive credentials for production
@@ -41,16 +43,57 @@ export async function setupGDriveCredentials() {
   const credentialsPath = '/tmp/.gdrive-server-credentials.json';
 
   try {
-    // Validate JSON before writing
-    JSON.parse(oauthJSON);
-    JSON.parse(credentialsJSON);
+    // Parse credentials
+    const oauthKeys = JSON.parse(oauthJSON);
+    const credentials = JSON.parse(credentialsJSON);
+
+    // Extract OAuth client credentials
+    const { client_id, client_secret, redirect_uris } = oauthKeys.installed || oauthKeys.web;
+
+    // Check if access token is expired
+    const now = Date.now();
+    const isExpired = !credentials.expiry_date || credentials.expiry_date < now;
+
+    if (isExpired) {
+      console.log('🔄 Access token expired, refreshing...');
+
+      // Initialize OAuth2 client to refresh token
+      const oauth2Client = new google.auth.OAuth2(
+        client_id,
+        client_secret,
+        redirect_uris[0]
+      );
+
+      // Set existing credentials (including refresh_token)
+      oauth2Client.setCredentials(credentials);
+
+      try {
+        // Force token refresh
+        const { credentials: refreshedCredentials } = await oauth2Client.refreshAccessToken();
+
+        // Update credentials with fresh access token
+        credentials.access_token = refreshedCredentials.access_token;
+        credentials.expiry_date = refreshedCredentials.expiry_date;
+        if (refreshedCredentials.refresh_token) {
+          credentials.refresh_token = refreshedCredentials.refresh_token;
+        }
+
+        console.log(`✅ Token refreshed successfully (expires: ${new Date(credentials.expiry_date).toISOString()})`);
+      } catch (refreshError) {
+        console.error('⚠️  Token refresh failed:', refreshError.message);
+        console.log('⚠️  Continuing with existing credentials - MCP server will attempt refresh');
+      }
+    } else {
+      const expiresIn = Math.round((credentials.expiry_date - now) / 1000 / 60);
+      console.log(`✅ Access token valid (expires in ${expiresIn} minutes)`);
+    }
 
     // Write OAuth credentials
-    await fs.writeFile(oauthPath, oauthJSON, 'utf-8');
+    await fs.writeFile(oauthPath, JSON.stringify(oauthKeys, null, 2), 'utf-8');
     console.log(`✅ OAuth credentials written to: ${oauthPath}`);
 
-    // Write user credentials
-    await fs.writeFile(credentialsPath, credentialsJSON, 'utf-8');
+    // Write refreshed user credentials
+    await fs.writeFile(credentialsPath, JSON.stringify(credentials, null, 2), 'utf-8');
     console.log(`✅ User credentials written to: ${credentialsPath}`);
 
     // Verify files were written
