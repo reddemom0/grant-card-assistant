@@ -294,6 +294,27 @@ export default async function handler(req, res) {
             // Permission mode
             permissionMode: agentConfig.permissionMode,
 
+            // Auto-approve MCP tools (bypass interactive permission prompts)
+            canUseTool: async (toolName, input, options) => {
+              console.log(`🔐 [canUseTool] Permission check for: ${toolName}`);
+
+              // Auto-approve all MCP Google Drive tools
+              if (toolName.startsWith('mcp__google-drive__')) {
+                console.log(`✅ [canUseTool] Auto-approving MCP tool: ${toolName}`);
+                return {
+                  behavior: 'allow',
+                  updatedPermissions: options.suggestions || []
+                };
+              }
+
+              // Auto-approve built-in tools
+              console.log(`✅ [canUseTool] Auto-approving built-in tool: ${toolName}`);
+              return {
+                behavior: 'allow',
+                updatedPermissions: options.suggestions || []
+              };
+            },
+
             // Beta headers for advanced features
             betas: agentConfig.betaHeaders,
           }
