@@ -251,6 +251,9 @@ export default async function handler(req, res) {
     // Get agent-specific configuration
     const agentConfig = getAgentConfig(agentType);
 
+    // Debug: Log MCP configuration
+    console.log('🔍 MCP Servers config:', JSON.stringify(agentConfig.mcpServers, null, 2));
+
     try {
       // Use Agent SDK query with enhanced configuration
       const result = await retryWithBackoff(async () => {
