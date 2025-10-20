@@ -87,11 +87,9 @@ export const agentSDKConfig = {
       args: [
         './mcp-servers/gdrive/dist/index.js'
       ],
-      env: {
-        // For local development, use credentials from files
-        GOOGLE_APPLICATION_CREDENTIALS: './mcp-servers/gdrive/credentials/gcp-oauth.keys.json',
-        MCP_GDRIVE_CREDENTIALS: './mcp-servers/gdrive/credentials/.gdrive-server-credentials.json',
-      }
+      // Environment variables are set in process.env by setup-gdrive-credentials.js
+      // The subprocess will inherit them from the parent process
+      // No need to explicitly set env here
     }
   },
 
@@ -148,18 +146,14 @@ export const agentSDKConfig = {
 /**
  * Initialize Google Drive credentials for production
  * Call this ONCE on server startup before using any agents
+ * Sets process.env variables that MCP subprocess will inherit
  * @returns {Promise<void>}
  */
 export async function initializeGoogleDriveCredentials() {
   try {
-    const { oauthPath, credentialsPath } = await setupGDriveCredentials();
-
-    // Update MCP server configuration with production paths
-    agentSDKConfig.mcpServers['google-drive'].env = {
-      GOOGLE_APPLICATION_CREDENTIALS: oauthPath,
-      MCP_GDRIVE_CREDENTIALS: credentialsPath,
-    };
-
+    await setupGDriveCredentials();
+    // setupGDriveCredentials sets process.env.GOOGLE_APPLICATION_CREDENTIALS
+    // and process.env.MCP_GDRIVE_CREDENTIALS which the MCP subprocess inherits
     console.log('✅ Google Drive credentials initialized');
   } catch (error) {
     console.error('❌ Failed to initialize Google Drive credentials:', error.message);

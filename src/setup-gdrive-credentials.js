@@ -106,6 +106,13 @@ export async function setupGDriveCredentials() {
 
     console.log('✅ Google Drive credentials configured for production');
 
+    // Set environment variables so MCP subprocess can inherit them
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = oauthPath;
+    process.env.MCP_GDRIVE_CREDENTIALS = credentialsPath;
+    console.log(`🔧 Set process env vars for MCP server inheritance`);
+    console.log(`   GOOGLE_APPLICATION_CREDENTIALS=${oauthPath}`);
+    console.log(`   MCP_GDRIVE_CREDENTIALS=${credentialsPath}`);
+
     // Test Google Drive API access with the refreshed credentials
     try {
       console.log('🧪 Testing Google Drive API access...');
