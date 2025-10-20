@@ -234,17 +234,52 @@ mcpServers: {
 - **No additional infrastructure costs** (runs as subprocess)
 - **Token savings**: Reading from Drive vs. uploading full knowledge base saves context tokens
 
+### ✅ Phase 3: Production Credential Auto-Initialization (COMPLETED)
+
+1. **Created Credential Setup Script** (`src/setup-gdrive-credentials.js`)
+   - Detects production vs. local environment
+   - In production: Writes credentials from env vars to `/tmp/`
+   - In local: Uses existing credential files
+   - Validates JSON before writing
+   - Returns credential paths for MCP config
+
+2. **Added Initialization Function** (`config/agent-sdk-config.js`)
+   - `initializeGoogleDriveCredentials()` exported
+   - Calls `setupGDriveCredentials()` on server startup
+   - Updates MCP server config with production paths
+   - Graceful error handling with detailed logging
+
+3. **Integrated into Server Startup** (`server.js`)
+   - Async `startServer()` function wraps initialization
+   - Calls `initializeGoogleDriveCredentials()` before listening
+   - Server exits gracefully if initialization fails
+   - Automatic credential setup on every Railway deployment
+
+4. **Updated Test Script** (`test-gdrive-mcp.js`)
+   - Demonstrates proper initialization pattern
+   - Calls `initializeGoogleDriveCredentials()` at start
+   - Works with both local and production credentials
+
+5. **Security Improvements**
+   - Deployment guide uses placeholders (no credentials in git)
+   - GitHub secret scanning protection respected
+   - All credentials managed via Railway environment variables
+   - Ephemeral `/tmp/` storage in production
+
 ## Next Steps
 
-### Immediate (Before Deployment)
+### Immediate (Railway Dashboard)
 
 1. ✅ Configure MCP server in Agent SDK
 2. ✅ Add tools to agent configurations
-3. ⏳ Test with grant-card-generator agent
-4. ⏳ Verify search and read functionality
-5. ⏳ Commit changes to git
+3. ✅ Test with grant-card-generator agent
+4. ✅ Verify search and read functionality
+5. ✅ Commit changes to git
+6. ✅ Integrate credential auto-initialization
+7. ✅ Push to Railway (commit 763c355)
+8. ⏳ Add environment variables to Railway dashboard
 
-### Railway Deployment
+### Railway Environment Variables (Action Required)
 
 1. **Add Environment Variables**:
    ```bash
@@ -292,9 +327,11 @@ mcpServers: {
 - [x] Agent SDK configured with MCP server
 - [x] Tools added to all relevant agents
 - [x] Documentation complete
-- [ ] Integration tests passing (next step)
-- [ ] Deployed to Railway (future)
-- [ ] Production validation (future)
+- [x] Integration tests passing (10 files found from real Drive)
+- [x] Credential auto-initialization integrated
+- [x] Server startup initialization added
+- [x] Deployed to Railway (commit 763c355)
+- [ ] Production validation (pending environment variables)
 
 ## Team Access
 
