@@ -131,46 +131,74 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     };
 });
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    console.error(`🔧 [MCP] Tool call received: ${request.params.name}`);
+    console.error(`   Arguments:`, JSON.stringify(request.params.arguments));
     if (request.params.name === "gdrive_search") {
-        const userQuery = request.params.arguments?.query;
-        const escapedQuery = userQuery.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-        const formattedQuery = `fullText contains '${escapedQuery}'`;
-        const res = await drive.files.list({
-            q: formattedQuery,
-            pageSize: 10,
-            fields: "files(id, name, mimeType, modifiedTime, size)",
-        });
-        const fileList = res.data.files
-            ?.map((file) => `${file.name} (${file.mimeType}) - ID: ${file.id}`)
-            .join("\n");
-        return {
-            content: [
-                {
-                    type: "text",
-                    text: `Found ${res.data.files?.length ?? 0} files:\n${fileList}`,
-                },
-            ],
-            isError: false,
-        };
-    }
-    else if (request.params.name === "gdrive_read_file") {
-        const fileId = request.params.arguments?.file_id;
-        if (!fileId) {
-            throw new McpError(ErrorCode.InvalidParams, "File ID is required");
-        }
         try {
-            const result = await readFileContent(fileId);
+            const userQuery = request.params.arguments?.query;
+            console.error(`🔍 [MCP] Searching Google Drive for: "${userQuery}"`);
+            const escapedQuery = userQuery.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            const formattedQuery = `fullText contains '${escapedQuery}'`;
+            console.error(`   Formatted query: ${formattedQuery}`);
+            const res = await drive.files.list({
+                q: formattedQuery,
+                pageSize: 10,
+                fields: "files(id, name, mimeType, modifiedTime, size)",
+            });
+            console.error(`✅ [MCP] Search successful! Found ${res.data.files?.length ?? 0} files`);
+            const fileList = res.data.files
+                ?.map((file) => `${file.name} (${file.mimeType}) - ID: ${file.id}`)
+                .join("\n");
             return {
                 content: [
                     {
                         type: "text",
-                        text: result.content,
+                        text: `Found ${res.data.files?.length ?? 0} files:\n${fileList}`,
                     },
                 ],
                 isError: false,
             };
         }
         catch (error) {
+            console.error(`❌ [MCP] Search failed:`, error.message);
+            console.error(`   Error code:`, error.code);
+            console.error(`   Error details:`, error);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Error searching Google Drive: ${error.message}`,
+                    },
+                ],
+                isError: true,
+            };
+        }
+    }
+    else if (request.params.name === "gdrive_read_file") {
+        const fileId = request.params.arguments?.file_id;
+        if (!fileId) {
+            console.error(`❌ [MCP] Read file failed: No file ID provided`);
+            throw new McpError(ErrorCode.InvalidParams, "File ID is required");
+        }
+        try {
+            console.error(`📖 [MCP] Reading file: ${fileId}`);
+            const result = await readFileContent(fileId);
+            const contentStr = String(result.content);
+            console.error(`✅ [MCP] File read successful! Size: ${contentStr.length} chars`);
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: contentStr,
+                    },
+                ],
+                isError: false,
+            };
+        }
+        catch (error) {
+            console.error(`❌ [MCP] Read file failed:`, error.message);
+            console.error(`   Error code:`, error.code);
+            console.error(`   Error details:`, error);
             return {
                 content: [
                     {
@@ -182,6 +210,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             };
         }
     }
+    console.error(`❌ [MCP] Unknown tool: ${request.params.name}`);
     throw new Error("Tool not found");
 });
 // Resolve credentials path - can be absolute or relative
@@ -207,45 +236,94 @@ async function authenticateAndSaveCredentials() {
     console.log("Credentials saved. You can now run the server.");
 }
 async function loadCredentialsAndRunServer() {
-    if (!fs.existsSync(credentialsPath)) {
-        console.error("Credentials not found. Please run with 'auth' argument first.");
-        process.exit(1);
-    }
-    // Load OAuth client credentials (client_id, client_secret) for token refresh
-    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
-        ? (path.isAbsolute(process.env.GOOGLE_APPLICATION_CREDENTIALS)
-            ? process.env.GOOGLE_APPLICATION_CREDENTIALS
-            : path.resolve(process.cwd(), process.env.GOOGLE_APPLICATION_CREDENTIALS))
-        : path.join(path.dirname(new URL(import.meta.url).pathname), "credentials", "gcp-oauth.keys.json");
-    const oauthKeys = JSON.parse(fs.readFileSync(keyPath, "utf-8"));
-    const { client_id, client_secret, redirect_uris } = oauthKeys.installed || oauthKeys.web;
-    // Load user credentials (access_token, refresh_token)
-    const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
-    // Initialize OAuth2 client with client credentials so it can refresh tokens
-    const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
-    auth.setCredentials(credentials);
-    // Set up token refresh handler
-    auth.on('tokens', (tokens) => {
-        console.error('🔄 Token refreshed');
-        if (tokens.refresh_token) {
-            // If we got a new refresh_token, save it
-            credentials.refresh_token = tokens.refresh_token;
+    try {
+        console.error('🚀 [MCP] Starting Google Drive MCP server...');
+        console.error('🔍 [MCP] Environment variables:');
+        console.error(`   GOOGLE_APPLICATION_CREDENTIALS=${process.env.GOOGLE_APPLICATION_CREDENTIALS}`);
+        console.error(`   MCP_GDRIVE_CREDENTIALS=${process.env.MCP_GDRIVE_CREDENTIALS}`);
+        console.error(`   NODE_ENV=${process.env.NODE_ENV}`);
+        console.error(`   CWD=${process.cwd()}`);
+        console.error(`🔍 [MCP] Resolved credentials path: ${credentialsPath}`);
+        console.error(`🔍 [MCP] Credentials file exists: ${fs.existsSync(credentialsPath)}`);
+        if (!fs.existsSync(credentialsPath)) {
+            console.error(`❌ [MCP] Credentials not found at: ${credentialsPath}`);
+            console.error("   Please run with 'auth' argument first.");
+            process.exit(1);
         }
-        // Update access_token and expiry
-        credentials.access_token = tokens.access_token;
-        credentials.expiry_date = tokens.expiry_date;
-        // Save updated credentials to file
+        // Load OAuth client credentials (client_id, client_secret) for token refresh
+        const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+            ? (path.isAbsolute(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+                ? process.env.GOOGLE_APPLICATION_CREDENTIALS
+                : path.resolve(process.cwd(), process.env.GOOGLE_APPLICATION_CREDENTIALS))
+            : path.join(path.dirname(new URL(import.meta.url).pathname), "credentials", "gcp-oauth.keys.json");
+        console.error(`🔍 [MCP] Resolved OAuth keys path: ${keyPath}`);
+        console.error(`🔍 [MCP] OAuth keys file exists: ${fs.existsSync(keyPath)}`);
+        if (!fs.existsSync(keyPath)) {
+            console.error(`❌ [MCP] OAuth keys not found at: ${keyPath}`);
+            process.exit(1);
+        }
+        console.error('📖 [MCP] Reading OAuth keys...');
+        const oauthKeys = JSON.parse(fs.readFileSync(keyPath, "utf-8"));
+        const { client_id, client_secret, redirect_uris } = oauthKeys.installed || oauthKeys.web;
+        console.error(`✅ [MCP] OAuth keys loaded (client_id: ${client_id?.substring(0, 20)}...)`);
+        console.error('📖 [MCP] Reading user credentials...');
+        const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
+        console.error(`✅ [MCP] User credentials loaded (has access_token: ${!!credentials.access_token})`);
+        console.error(`   Token expiry: ${credentials.expiry_date ? new Date(credentials.expiry_date).toISOString() : 'unknown'}`);
+        // Initialize OAuth2 client with client credentials so it can refresh tokens
+        console.error('🔐 [MCP] Initializing OAuth2 client...');
+        const auth = new google.auth.OAuth2(client_id, client_secret, redirect_uris[0]);
+        auth.setCredentials(credentials);
+        console.error('✅ [MCP] OAuth2 client initialized');
+        // Set up token refresh handler
+        auth.on('tokens', (tokens) => {
+            console.error('🔄 [MCP] Token refresh event received');
+            if (tokens.refresh_token) {
+                console.error('   New refresh_token received');
+                credentials.refresh_token = tokens.refresh_token;
+            }
+            // Update access_token and expiry
+            credentials.access_token = tokens.access_token;
+            credentials.expiry_date = tokens.expiry_date;
+            console.error(`   New token expiry: ${tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : 'unknown'}`);
+            // Save updated credentials to file
+            try {
+                fs.writeFileSync(credentialsPath, JSON.stringify(credentials, null, 2));
+                console.error('✅ [MCP] Updated credentials saved');
+            }
+            catch (error) {
+                console.error('⚠️  [MCP] Failed to save updated credentials:', error.message);
+            }
+        });
+        google.options({ auth });
+        console.error('✅ [MCP] Google API client configured');
+        console.error('🧪 [MCP] Testing Google Drive API access...');
         try {
-            fs.writeFileSync(credentialsPath, JSON.stringify(credentials, null, 2));
-            console.error('✅ Updated credentials saved');
+            const testRes = await drive.files.list({
+                pageSize: 1,
+                fields: "files(id, name)",
+            });
+            console.error(`✅ [MCP] Google Drive API test successful! Found ${testRes.data.files?.length || 0} files`);
+            if (testRes.data.files && testRes.data.files.length > 0) {
+                console.error(`   Sample file: ${testRes.data.files[0].name}`);
+            }
         }
         catch (error) {
-            console.error('⚠️  Failed to save updated credentials:', error.message);
+            console.error(`❌ [MCP] Google Drive API test FAILED:`, error.message);
+            console.error(`   Error code: ${error.code}`);
+            console.error(`   Error details:`, error);
+            throw error;
         }
-    });
-    google.options({ auth });
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
+        console.error('🔌 [MCP] Connecting to STDIO transport...');
+        const transport = new StdioServerTransport();
+        await server.connect(transport);
+        console.error('✅ [MCP] Server connected and ready!');
+    }
+    catch (error) {
+        console.error('❌ [MCP] Fatal error during initialization:', error.message);
+        console.error('   Stack trace:', error.stack);
+        throw error;
+    }
 }
 if (process.argv[2] === "auth") {
     authenticateAndSaveCredentials().catch(console.error);
