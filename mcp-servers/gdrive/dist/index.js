@@ -184,9 +184,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
     throw new Error("Tool not found");
 });
-const credentialsPath = process.env.MCP_GDRIVE_CREDENTIALS || path.join(process.cwd(), "credentials", ".gdrive-server-credentials.json");
+// Resolve credentials path - can be absolute or relative
+// If relative, resolve relative to this script's directory, not cwd
+const credentialsPath = process.env.MCP_GDRIVE_CREDENTIALS
+    ? (path.isAbsolute(process.env.MCP_GDRIVE_CREDENTIALS)
+        ? process.env.MCP_GDRIVE_CREDENTIALS
+        : path.resolve(process.cwd(), process.env.MCP_GDRIVE_CREDENTIALS))
+    : path.join(path.dirname(new URL(import.meta.url).pathname), "credentials", ".gdrive-server-credentials.json");
 async function authenticateAndSaveCredentials() {
-    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(process.cwd(), "credentials", "gcp-oauth.keys.json");
+    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+        ? (path.isAbsolute(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+            ? process.env.GOOGLE_APPLICATION_CREDENTIALS
+            : path.resolve(process.cwd(), process.env.GOOGLE_APPLICATION_CREDENTIALS))
+        : path.join(path.dirname(new URL(import.meta.url).pathname), "credentials", "gcp-oauth.keys.json");
     console.log("Looking for keys at:", keyPath);
     console.log("Will save credentials to:", credentialsPath);
     const auth = await authenticate({
@@ -202,7 +212,11 @@ async function loadCredentialsAndRunServer() {
         process.exit(1);
     }
     // Load OAuth client credentials (client_id, client_secret) for token refresh
-    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS || path.join(process.cwd(), "credentials", "gcp-oauth.keys.json");
+    const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+        ? (path.isAbsolute(process.env.GOOGLE_APPLICATION_CREDENTIALS)
+            ? process.env.GOOGLE_APPLICATION_CREDENTIALS
+            : path.resolve(process.cwd(), process.env.GOOGLE_APPLICATION_CREDENTIALS))
+        : path.join(path.dirname(new URL(import.meta.url).pathname), "credentials", "gcp-oauth.keys.json");
     const oauthKeys = JSON.parse(fs.readFileSync(keyPath, "utf-8"));
     const { client_id, client_secret, redirect_uris } = oauthKeys.installed || oauthKeys.web;
     // Load user credentials (access_token, refresh_token)
