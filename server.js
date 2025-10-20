@@ -4,6 +4,7 @@ import agentHandler from './api/agent-sdk-handler.js';
 import filesHandler from './api/files-handler.js';
 import pdfHandler from './api/pdf-handler.js';
 import { config } from 'dotenv';
+import { initializeGoogleDriveCredentials } from './config/agent-sdk-config.js';
 
 config();
 
@@ -43,11 +44,24 @@ app.get('/api/pdf/batch/:batchId/results', pdfHandler.getBatchResults);
 // Serve static files (HTML pages)
 app.use(express.static('.'));
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚂 Railway server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🤖 Agent endpoint: http://localhost:${PORT}/api/agent`);
-  console.log(`📁 Files API: http://localhost:${PORT}/api/files`);
-  console.log(`📄 PDF Processing: http://localhost:${PORT}/api/pdf`);
-});
+// Initialize and start server
+async function startServer() {
+  try {
+    // Initialize Google Drive credentials (production only)
+    await initializeGoogleDriveCredentials();
+
+    // Start server
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚂 Railway server running on port ${PORT}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
+      console.log(`🤖 Agent endpoint: http://localhost:${PORT}/api/agent`);
+      console.log(`📁 Files API: http://localhost:${PORT}/api/files`);
+      console.log(`📄 PDF Processing: http://localhost:${PORT}/api/pdf`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();

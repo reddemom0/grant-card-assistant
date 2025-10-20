@@ -3,6 +3,8 @@
  * Centralized settings for all agent interactions
  */
 
+import { setupGDriveCredentials } from '../src/setup-gdrive-credentials.js';
+
 export const agentSDKConfig = {
   // Model Configuration
   model: 'claude-sonnet-4-20250514', // Latest Sonnet 4.5
@@ -143,6 +145,28 @@ export const agentSDKConfig = {
     handleInvalidJSON: true, // Wrap invalid JSON in error response
   },
 };
+
+/**
+ * Initialize Google Drive credentials for production
+ * Call this ONCE on server startup before using any agents
+ * @returns {Promise<void>}
+ */
+export async function initializeGoogleDriveCredentials() {
+  try {
+    const { oauthPath, credentialsPath } = await setupGDriveCredentials();
+
+    // Update MCP server configuration with production paths
+    agentSDKConfig.mcpServers['google-drive'].env = {
+      GOOGLE_APPLICATION_CREDENTIALS: oauthPath,
+      MCP_GDRIVE_CREDENTIALS: credentialsPath,
+    };
+
+    console.log('✅ Google Drive credentials initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize Google Drive credentials:', error.message);
+    throw error;
+  }
+}
 
 /**
  * Get configuration for a specific agent type
