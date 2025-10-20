@@ -7,8 +7,8 @@ import { setupGDriveCredentials } from '../src/setup-gdrive-credentials.js';
 
 export const agentSDKConfig = {
   // Model Configuration
-  model: 'claude-sonnet-4-20250514', // Latest Sonnet 4.5
-  fallbackModel: 'claude-3-5-sonnet-20241022', // Fallback if Sonnet 4.5 unavailable
+  model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 (Feb 2025)
+  fallbackModel: 'claude-sonnet-4-20250514', // Fallback to Sonnet 4 if 4.5 unavailable
 
   // Extended Thinking
   maxThinkingTokens: 10000, // Budget for internal reasoning
