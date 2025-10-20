@@ -14,7 +14,8 @@
     "test:agent": "node tests/run-tests.js agent",
     "test:report": "node tests/run-tests.js report",
     "fixtures:generate": "node tests/utils/fixture-generator-cli.js",
-    "db:setup": "node setup-database.js"
+    "db:setup": "node setup-database.js",
+    "postinstall": "cd mcp-servers/gdrive && npm install"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.21",

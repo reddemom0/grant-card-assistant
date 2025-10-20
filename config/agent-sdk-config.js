@@ -62,13 +62,12 @@ export const agentSDKConfig = {
     // TodoWrite: Track multi-step workflow progress
     // Memory: Store and retrieve information across conversations
     // Write/Edit: Create or modify output files (when needed)
-    // gdrive_search: Full-text search across Google Drive knowledge base
-    // gdrive_read_file: Read Google Drive files with automatic format conversion
+    // Note: MCP tools (gdrive_search, gdrive_read_file) are provided automatically by MCP servers
 
-    'grant-card-generator': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
-    'etg-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
-    'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
-    'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
+    'grant-card-generator': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory'],
+    'etg-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
+    'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
+    'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory'],
     'orchestrator': ['Read', 'Glob', 'Grep', 'Agent', 'TodoWrite', 'Memory'], // Can spawn other agents
   },
 
