@@ -347,6 +347,22 @@ export default async function handler(req, res) {
           if (thinkingContent) {
             console.log(`🧠 Thinking tokens used: ${thinkingContent.length} chars`);
           }
+
+          // Dump MCP server log for debugging
+          try {
+            const fs = await import('fs');
+            const mcpLogPath = '/tmp/mcp-server-debug.log';
+            if (fs.existsSync(mcpLogPath)) {
+              const mcpLog = fs.readFileSync(mcpLogPath, 'utf-8');
+              console.log('📋 === MCP SERVER LOG ===');
+              console.log(mcpLog);
+              console.log('📋 === END MCP LOG ===');
+            } else {
+              console.log('⚠️ MCP log file not found at /tmp/mcp-server-debug.log');
+            }
+          } catch (err) {
+            console.log(`⚠️ Error reading MCP log: ${err.message}`);
+          }
         } else if (msg.type === 'system' && msg.subtype === 'init') {
           // System initialization message
           console.log(`🚀 Agent initialized`);
