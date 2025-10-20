@@ -105,7 +105,8 @@ export const agentSDKConfig = {
   },
 
   // Permission Mode
-  permissionMode: 'default', // 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
+  // 'bypassPermissions' allows MCP tools to execute automatically without user confirmation
+  permissionMode: 'bypassPermissions', // 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
 
   // System Prompt Configuration
   systemPrompt: {
