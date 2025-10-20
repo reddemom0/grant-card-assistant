@@ -60,11 +60,13 @@ export const agentSDKConfig = {
     // TodoWrite: Track multi-step workflow progress
     // Memory: Store and retrieve information across conversations
     // Write/Edit: Create or modify output files (when needed)
+    // gdrive_search: Full-text search across Google Drive knowledge base
+    // gdrive_read_file: Read Google Drive files with automatic format conversion
 
-    'grant-card-generator': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory'],
-    'etg-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
-    'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
-    'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory'],
+    'grant-card-generator': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
+    'etg-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
+    'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
+    'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory', 'gdrive_search', 'gdrive_read_file'],
     'orchestrator': ['Read', 'Glob', 'Grep', 'Agent', 'TodoWrite', 'Memory'], // Can spawn other agents
   },
 
@@ -78,14 +80,18 @@ export const agentSDKConfig = {
 
   // MCP Server Configuration
   mcpServers: {
-    // Placeholder for Google Drive integration
-    // 'google-drive': {
-    //   type: 'sse',
-    //   url: process.env.GOOGLE_DRIVE_MCP_URL,
-    //   headers: {
-    //     'Authorization': `Bearer ${process.env.GOOGLE_DRIVE_MCP_TOKEN}`
-    //   }
-    // }
+    'google-drive': {
+      type: 'stdio',  // Local subprocess for development
+      command: 'node',
+      args: [
+        './mcp-servers/gdrive/dist/index.js'
+      ],
+      env: {
+        // For local development, use credentials from files
+        GOOGLE_APPLICATION_CREDENTIALS: './mcp-servers/gdrive/credentials/gcp-oauth.keys.json',
+        MCP_GDRIVE_CREDENTIALS: './mcp-servers/gdrive/credentials/.gdrive-server-credentials.json',
+      }
+    }
   },
 
   // Error Handling
