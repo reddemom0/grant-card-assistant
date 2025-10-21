@@ -109,13 +109,12 @@ export const agentSDKConfig = {
   permissionMode: 'bypassPermissions', // 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
 
   // System Prompt Configuration
-  systemPrompt: {
-    type: 'preset',
-    preset: 'claude_code',
-  },
+  // Don't use claude_code preset - it requires desktop Claude Code app
+  systemPrompt: undefined,
 
   // Setting Sources (which config files to load)
-  settingSources: ['project'], // Load .claude/CLAUDE.md
+  // Don't use 'project' - there's no .claude/CLAUDE.md file
+  settingSources: [], // Agent prompts come from .claude/agents/*.md instead
 
   // Memory Tool Configuration
   memory: {
