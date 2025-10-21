@@ -872,6 +872,9 @@
             }
         }
     </style>
+
+    <!-- Chat Client Library for Direct Claude API -->
+    <script src="/public/js/chat-client.js"></script>
 </head>
 <body>
     <!-- Sidebar Overlay -->
@@ -1054,6 +1057,7 @@
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+        const chatClient = new ChatClient(API_BASE);
 
         // Generate unique conversation ID
         function generateConversationId() {
@@ -2086,6 +2090,16 @@ async function handleStreamingResponse(response, messageDiv) {
             }, false);
         }
 
+        // Convert file to base64 for Direct API attachments
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
         async function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
@@ -2122,31 +2136,49 @@ async function handleStreamingResponse(response, messageDiv) {
             addLoadingMessage();
 
             try {
-                const formData = new FormData();
-                formData.append('message', message || '');
-                formData.append('conversationId', conversationId);
-                formData.append('agentType', 'etg-writer');
-
-                uploadedFiles.forEach(file => {
-                    formData.append('files', file);
-                });
-
-                // Create AbortController for this fetch
-                currentAbortController = new AbortController();
-
-                const response = await fetch(`${API_BASE}/api/process-etg/stream`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: currentAbortController.signal
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
+                // Convert files to base64 attachments
+                const attachments = [];
+                for (const file of uploadedFiles) {
+                    const base64Data = await fileToBase64(file);
+                    attachments.push({
+                        type: file.type.startsWith('image/') ? 'image' : 'document',
+                        mimeType: file.type,
+                        data: base64Data.split(',')[1] // Remove data:image/png;base64, prefix
+                    });
                 }
 
                 removeLoadingMessage();
-const streamingMessageDiv = addStreamingMessage('assistant');
-await handleStreamingResponse(response, streamingMessageDiv);
+                const streamingMessageDiv = addStreamingMessage('assistant');
+                let fullContent = '';
+
+                // Setup ChatClient callbacks
+                chatClient.onTextDelta = (text) => {
+                    fullContent += text;
+                    updateStreamingMessage(streamingMessageDiv, fullContent, false);
+                };
+
+                chatClient.onToolUse = (toolName, input) => {
+                    console.log(`🔧 Tool used: ${toolName}`, input);
+                };
+
+                chatClient.onComplete = () => {
+                    updateStreamingMessage(streamingMessageDiv, fullContent, true);
+                    hideStopButton();
+                };
+
+                chatClient.onError = (error) => {
+                    console.error('Chat error:', error);
+                    updateStreamingMessage(streamingMessageDiv, `Error: ${error}`, true);
+                    hideStopButton();
+                };
+
+                // Send message with new Direct API
+                await chatClient.sendMessage({
+                    message: message || '',
+                    agentType: 'etg-writer',
+                    conversationId: conversationId,
+                    attachments: attachments
+                });
 
                 // After successful first message, redirect to permanent conversation URL
                 if (isFirstMessage) {
@@ -2191,41 +2223,49 @@ await handleStreamingResponse(response, streamingMessageDiv);
         async function handleURLMessage(url, originalMessage) {
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
-            
+
             const remainingMessage = originalMessage.replace(url, '').trim();
-            
-            if (remainingMessage) {
-                addMessage('user', remainingMessage);
-            }
+
+            // URLs are handled automatically by web_fetch tool
+            const fullMessage = `${remainingMessage || 'Analyze this grant URL'}\n\n${url}`;
             addMessage('user', `🔗 Analyze course URL: ${url}`);
-            
+
             isLoading = true;
             if (sendButton) sendButton.disabled = true;
             addLoadingMessage('Analyzing course website...');
 
             try {
-                const formData = new FormData();
-                formData.append('message', remainingMessage || 'Analyze this course URL');
-                formData.append('url', url);
-                formData.append('conversationId', conversationId);
-                formData.append('agentType', 'etg-writer');
+                removeLoadingMessage();
+                const streamingMessageDiv = addStreamingMessage('assistant');
+                let fullContent = '';
 
-                // Create AbortController for this fetch
-                currentAbortController = new AbortController();
+                // Setup ChatClient callbacks
+                chatClient.onTextDelta = (text) => {
+                    fullContent += text;
+                    updateStreamingMessage(streamingMessageDiv, fullContent, false);
+                };
 
-                const response = await fetch(`${API_BASE}/api/process-etg/stream`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: currentAbortController.signal
+                chatClient.onToolUse = (toolName, input) => {
+                    console.log(`🔧 Tool used: ${toolName}`, input);
+                };
+
+                chatClient.onComplete = () => {
+                    updateStreamingMessage(streamingMessageDiv, fullContent, true);
+                    hideStopButton();
+                };
+
+                chatClient.onError = (error) => {
+                    console.error('Chat error:', error);
+                    updateStreamingMessage(streamingMessageDiv, `Error: ${error}`, true);
+                    hideStopButton();
+                };
+
+                // Send message with URL - web_fetch will automatically detect and fetch it
+                await chatClient.sendMessage({
+                    message: fullMessage,
+                    agentType: 'etg-writer',
+                    conversationId: conversationId
                 });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-
-               removeLoadingMessage();
-const streamingMessageDiv = addStreamingMessage('assistant');
-await handleStreamingResponse(response, streamingMessageDiv);
 
             } catch (error) {
                 removeLoadingMessage();

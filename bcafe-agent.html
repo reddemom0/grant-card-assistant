@@ -1064,6 +1064,9 @@
             }
         }
     </style>
+
+    <!-- Chat Client Library for Direct Claude API -->
+    <script src="/public/js/chat-client.js"></script>
 </head>
 <body>
     <!-- Sidebar Overlay -->
@@ -1288,6 +1291,7 @@
 
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
+        const chatClient = new ChatClient(API_BASE);
 
         // Generate unique conversation ID
         function generateConversationId() {
@@ -2330,6 +2334,16 @@ async function handleStreamingResponse(response, messageDiv) {
             }, false);
         }
 
+        // Convert file to base64 for Direct API attachments
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
         async function sendMessage() {
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
@@ -2357,33 +2371,49 @@ async function handleStreamingResponse(response, messageDiv) {
             addLoadingMessage();
 
             try {
-                const formData = new FormData();
-                formData.append('message', message || '');
-                formData.append('task', selectedTask || 'bcafe-application');
-                formData.append('conversationId', conversationId);
-                formData.append('agentType', 'bcafe');
-                formData.append('orgType', document.getElementById('org-type').value || '');
-                formData.append('selectedMarkets', selectedMarkets.join(',') || '');
-
-                uploadedFiles.forEach(file => {
-                    formData.append('files', file);
-                });
-
-                currentAbortController = new AbortController();
-
-                const response = await fetch(`${API_BASE}/api/process-bcafe/stream`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: currentAbortController.signal
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
+                // Convert files to base64 attachments
+                const attachments = [];
+                for (const file of uploadedFiles) {
+                    const base64Data = await fileToBase64(file);
+                    attachments.push({
+                        type: file.type.startsWith('image/') ? 'image' : 'document',
+                        mimeType: file.type,
+                        data: base64Data.split(',')[1] // Remove data:image/png;base64, prefix
+                    });
                 }
 
                 removeLoadingMessage();
-const streamingMessageDiv = addStreamingMessage('assistant');
-await handleStreamingResponse(response, streamingMessageDiv);
+                const streamingMessageDiv = addStreamingMessage('assistant');
+                let fullContent = '';
+
+                // Setup ChatClient callbacks
+                chatClient.onTextDelta = (text) => {
+                    fullContent += text;
+                    updateStreamingMessage(streamingMessageDiv, fullContent, false);
+                };
+
+                chatClient.onToolUse = (toolName, input) => {
+                    console.log(`🔧 Tool used: ${toolName}`, input);
+                };
+
+                chatClient.onComplete = () => {
+                    updateStreamingMessage(streamingMessageDiv, fullContent, true);
+                    hideStopButton();
+                };
+
+                chatClient.onError = (error) => {
+                    console.error('Chat error:', error);
+                    updateStreamingMessage(streamingMessageDiv, `Error: ${error}`, true);
+                    hideStopButton();
+                };
+
+                // Send message with new Direct API
+                await chatClient.sendMessage({
+                    message: message || '',
+                    agentType: 'bcafe-writer',
+                    conversationId: conversationId,
+                    attachments: attachments
+                });
 
                 // After successful first message, redirect to permanent conversation URL
                 if (isFirstMessage) {
@@ -2433,34 +2463,47 @@ await handleStreamingResponse(response, streamingMessageDiv);
         async function sendMessageWithURL(url) {
             const messageInput = document.getElementById('message-input');
             const sendButton = document.getElementById('send-button');
-            
+
+            // URLs are handled automatically by web_fetch tool
+            const fullMessage = `Analyze this BCAFE-related URL\n\n${url}`;
+            addMessage('user', `🔗 Analyze URL: ${url}`);
+
             isLoading = true;
             if (sendButton) sendButton.disabled = true;
             addLoadingMessage('Analyzing website...');
 
             try {
-                const formData = new FormData();
-                formData.append('message', 'Analyze this BCAFE-related URL');
-                formData.append('url', url);
-                formData.append('task', selectedTask || 'bcafe-application');
-                formData.append('conversationId', conversationId);
-                formData.append('agentType', 'bcafe');
-
-                currentAbortController = new AbortController();
-
-                const response = await fetch(`${API_BASE}/api/process-bcafe/stream`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: currentAbortController.signal
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-
                 removeLoadingMessage();
-const streamingMessageDiv = addStreamingMessage('assistant');
-await handleStreamingResponse(response, streamingMessageDiv);
+                const streamingMessageDiv = addStreamingMessage('assistant');
+                let fullContent = '';
+
+                // Setup ChatClient callbacks
+                chatClient.onTextDelta = (text) => {
+                    fullContent += text;
+                    updateStreamingMessage(streamingMessageDiv, fullContent, false);
+                };
+
+                chatClient.onToolUse = (toolName, input) => {
+                    console.log(`🔧 Tool used: ${toolName}`, input);
+                };
+
+                chatClient.onComplete = () => {
+                    updateStreamingMessage(streamingMessageDiv, fullContent, true);
+                    hideStopButton();
+                };
+
+                chatClient.onError = (error) => {
+                    console.error('Chat error:', error);
+                    updateStreamingMessage(streamingMessageDiv, `Error: ${error}`, true);
+                    hideStopButton();
+                };
+
+                // Send message with URL - web_fetch will automatically detect and fetch it
+                await chatClient.sendMessage({
+                    message: fullMessage,
+                    agentType: 'bcafe-writer',
+                    conversationId: conversationId
+                });
 
             } catch (error) {
                 removeLoadingMessage();
