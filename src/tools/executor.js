@@ -1,0 +1,206 @@
+/**
+ * Tool Executor
+ *
+ * Routes and executes tool calls from Claude API.
+ * Handles both client-side tools (executed locally) and server tools (executed by Anthropic).
+ */
+
+import * as memory from './memory.js';
+import * as hubspot from './hubspot.js';
+import * as googleDrive from './google-drive.js';
+import { isServerTool } from './definitions.js';
+
+/**
+ * Execute a tool call from Claude
+ * @param {string} toolName - Name of the tool to execute
+ * @param {Object} input - Tool input parameters
+ * @param {string} conversationId - UUID of the conversation
+ * @returns {Promise<Object>} Tool execution result
+ */
+export async function executeToolCall(toolName, input, conversationId) {
+  console.log(`🔧 Executing tool: ${toolName}`);
+  console.log(`   Input:`, JSON.stringify(input, null, 2));
+
+  // Check if this is a server tool (should not reach here)
+  if (isServerTool(toolName)) {
+    console.warn(`⚠️  Server tool ${toolName} was sent to client executor - this should not happen`);
+    return {
+      success: false,
+      error: `${toolName} is a server-side tool and cannot be executed on the client`
+    };
+  }
+
+  try {
+    let result;
+
+    // Route to appropriate tool implementation
+    switch (toolName) {
+      // ============================================================================
+      // MEMORY TOOLS
+      // ============================================================================
+
+      case 'memory_store':
+        result = await memory.storeMemory(conversationId, input.key, input.value);
+        break;
+
+      case 'memory_recall':
+        result = await memory.recallMemory(conversationId, input.key);
+        break;
+
+      case 'memory_list':
+        result = await memory.listMemories(conversationId);
+        break;
+
+      // ============================================================================
+      // HUBSPOT TOOLS
+      // ============================================================================
+
+      case 'search_hubspot_contacts':
+        result = await hubspot.searchHubSpotContacts(input.query, input.limit);
+        break;
+
+      case 'get_hubspot_contact':
+        result = await hubspot.getHubSpotContact(input.contact_id);
+        break;
+
+      case 'search_hubspot_companies':
+        result = await hubspot.searchHubSpotCompanies(
+          input.query,
+          input.min_revenue,
+          input.max_revenue
+        );
+        break;
+
+      case 'search_grant_applications':
+        result = await hubspot.searchGrantApplications(
+          input.grant_program,
+          input.status,
+          input.company_name
+        );
+        break;
+
+      case 'get_grant_application':
+        result = await hubspot.getGrantApplication(input.application_id);
+        break;
+
+      // ============================================================================
+      // GOOGLE DRIVE TOOLS
+      // ============================================================================
+
+      case 'search_google_drive':
+        result = await googleDrive.searchGoogleDrive(
+          input.query,
+          input.file_type,
+          input.limit
+        );
+        break;
+
+      case 'read_google_drive_file':
+        result = await googleDrive.readGoogleDriveFile(input.file_id);
+        break;
+
+      // ============================================================================
+      // UNKNOWN TOOL
+      // ============================================================================
+
+      default:
+        console.error(`❌ Unknown tool: ${toolName}`);
+        result = {
+          success: false,
+          error: `Unknown tool: ${toolName}`
+        };
+    }
+
+    console.log(`✅ Tool ${toolName} completed`);
+    console.log(`   Result:`, JSON.stringify(result, null, 2).substring(0, 500) + '...');
+
+    return result;
+
+  } catch (error) {
+    console.error(`❌ Tool ${toolName} failed:`, error);
+
+    return {
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    };
+  }
+}
+
+/**
+ * Execute multiple tool calls in parallel
+ * @param {Array} toolCalls - Array of {toolName, input, toolUseId}
+ * @param {string} conversationId - UUID of the conversation
+ * @returns {Promise<Array>} Array of tool results
+ */
+export async function executeToolCalls(toolCalls, conversationId) {
+  console.log(`🔧 Executing ${toolCalls.length} tool calls in parallel`);
+
+  const results = await Promise.all(
+    toolCalls.map(async ({ toolName, input, toolUseId }) => {
+      const result = await executeToolCall(toolName, input, conversationId);
+
+      return {
+        type: 'tool_result',
+        tool_use_id: toolUseId,
+        content: JSON.stringify(result)
+      };
+    })
+  );
+
+  console.log(`✅ All ${toolCalls.length} tool calls completed`);
+
+  return results;
+}
+
+/**
+ * Validate tool input against schema (optional utility)
+ * @param {string} toolName - Name of the tool
+ * @param {Object} input - Tool input to validate
+ * @param {Object} schema - Tool input schema
+ * @returns {Object} Validation result {valid: boolean, errors: Array}
+ */
+export function validateToolInput(toolName, input, schema) {
+  const errors = [];
+
+  // Check required properties
+  if (schema.required) {
+    for (const prop of schema.required) {
+      if (!(prop in input)) {
+        errors.push(`Missing required property: ${prop}`);
+      }
+    }
+  }
+
+  // Basic type checking
+  if (schema.properties) {
+    for (const [prop, propSchema] of Object.entries(schema.properties)) {
+      if (prop in input) {
+        const value = input[prop];
+        const expectedType = propSchema.type;
+
+        if (expectedType === 'string' && typeof value !== 'string') {
+          errors.push(`Property ${prop} should be a string`);
+        } else if (expectedType === 'number' && typeof value !== 'number') {
+          errors.push(`Property ${prop} should be a number`);
+        } else if (expectedType === 'boolean' && typeof value !== 'boolean') {
+          errors.push(`Property ${prop} should be a boolean`);
+        } else if (expectedType === 'object' && typeof value !== 'object') {
+          errors.push(`Property ${prop} should be an object`);
+        } else if (expectedType === 'array' && !Array.isArray(value)) {
+          errors.push(`Property ${prop} should be an array`);
+        }
+
+        // Check enum values
+        if (propSchema.enum && !propSchema.enum.includes(value)) {
+          errors.push(`Property ${prop} must be one of: ${propSchema.enum.join(', ')}`);
+        }
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
