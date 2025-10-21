@@ -273,27 +273,46 @@ export default async function handler(req, res) {
     console.log('🔍 MCP Servers config:', JSON.stringify(agentConfig.mcpServers, null, 2));
 
     try {
-      // Build MINIMAL options object for testing
-      const queryOptions = {
-        // Don't specify path - let SDK auto-detect
-        // pathToClaudeCodeExecutable: './node_modules/.bin/claude',
-
-        // API key
-        apiKey: process.env.ANTHROPIC_API_KEY,
-
-        // Simple config
-        maxTurns: 1,
-        permissionMode: 'bypassPermissions',
-      };
-
       // Use Agent SDK query with enhanced configuration
       const result = await retryWithBackoff(async () => {
         return query({
           prompt: enhancedPrompt,
           options: {
-            ...queryOptions,
-            // CRITICAL: Pass API key to Agent SDK
-            apiKey: process.env.ANTHROPIC_API_KEY
+            // CRITICAL: Agent definition (tells SDK which agent to use)
+            agents: {
+              [agentType]: agentDefinitions[agentType]
+            },
+
+            // API Configuration
+            apiKey: process.env.ANTHROPIC_API_KEY,
+
+            // Model configuration
+            model: options.model || agentConfig.model,
+            fallbackModel: agentConfig.fallbackModel,
+
+            // Extended thinking
+            maxThinkingTokens: options.maxThinkingTokens || agentConfig.maxThinkingTokens,
+
+            // Conversation limits
+            maxTurns: options.maxTurns || agentConfig.maxTurns,
+
+            // Tool permissions
+            allowedTools: agentConfig.allowedTools,
+
+            // MCP servers (currently disabled for testing)
+            mcpServers: agentConfig.mcpServers,
+
+            // Working directory
+            cwd: process.cwd(),
+
+            // Streaming configuration
+            includePartialMessages: agentConfig.includePartialMessages,
+
+            // Permission mode
+            permissionMode: agentConfig.permissionMode,
+
+            // Beta headers for advanced features
+            betas: agentConfig.betaHeaders,
           }
         });
       }, agentSDKConfig.errorHandling.maxRetries, agentSDKConfig.errorHandling.retryDelay);
