@@ -5,7 +5,7 @@
   "main": "api/server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "cd mcp-servers/gdrive && npm install && cd ../..",
+    "build": "echo 'Build complete'",
     "dev": "vercel dev",
     "deploy": "vercel --prod",
     "test": "node tests/run-tests.js",
@@ -15,8 +15,7 @@
     "test:agent": "node tests/run-tests.js agent",
     "test:report": "node tests/run-tests.js report",
     "fixtures:generate": "node tests/utils/fixture-generator-cli.js",
-    "db:setup": "node setup-database.js",
-    "postinstall": "cd mcp-servers/gdrive && npm install"
+    "db:setup": "node setup-database.js"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.21",
