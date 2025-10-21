@@ -287,6 +287,18 @@ export default async function handler(req, res) {
             // Explicitly set path to Claude Code CLI
             pathToClaudeCodeExecutable: claudeCliPath,
 
+            // Force non-interactive/headless mode
+            apiKey: process.env.ANTHROPIC_API_KEY,
+
+            // Enable stderr capture for debugging
+            stderr: true,
+
+            // Environment variables (enable DEBUG for verbose output)
+            env: {
+              ...process.env,
+              DEBUG: '*', // Enable all debug output
+            },
+
             // System prompt configuration
             settingSources: agentConfig.settingSources,
             systemPrompt: agentConfig.systemPrompt,
