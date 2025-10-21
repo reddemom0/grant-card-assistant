@@ -992,6 +992,9 @@
             }
         }
     </style>
+
+    <!-- Chat Client Library for Direct Claude API -->
+    <script src="/public/js/chat-client.js"></script>
 </head>
 <body>
     <!-- Sidebar Overlay -->
@@ -1186,9 +1189,22 @@
         // API configuration
         const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001' : '';
 
+        // Initialize ChatClient for Direct Claude API
+        const chatClient = new ChatClient(API_BASE);
+
         // Generate unique conversation ID
         function generateConversationId() {
             return crypto.randomUUID();
+        }
+
+        // Convert file to base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
         }
 
         // Initialize or restore conversation ID
@@ -2221,31 +2237,49 @@ async function handleStreamingResponse(response, messageDiv) {
                     console.log(`🎯 Auto-detected task from message: "${detectedTask}"`);
                 }
 
-                const formData = new FormData();
-                formData.append('message', message || '');
-                formData.append('task', detectedTask || 'grant-criteria');
-                formData.append('conversationId', conversationId);
-                formData.append('agentType', 'grant-cards');
-
-                uploadedFiles.forEach(file => {
-                    formData.append('files', file);
-                });
-
-                currentAbortController = new AbortController();
-
-                const response = await fetch(`${API_BASE}/api/process-grant/stream`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: currentAbortController.signal
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
+                // Convert files to base64 attachments
+                const attachments = [];
+                for (const file of uploadedFiles) {
+                    const base64Data = await fileToBase64(file);
+                    attachments.push({
+                        type: file.type.startsWith('image/') ? 'image' : 'document',
+                        mimeType: file.type,
+                        data: base64Data.split(',')[1] // Remove data:mime;base64, prefix
+                    });
                 }
 
                 removeLoadingMessage();
 const streamingMessageDiv = addStreamingMessage('assistant');
-await handleStreamingResponse(response, streamingMessageDiv);
+                let fullContent = '';
+
+                // Setup ChatClient callbacks
+                chatClient.onTextDelta = (text) => {
+                    fullContent += text;
+                    updateStreamingMessage(streamingMessageDiv, fullContent, false);
+                };
+
+                chatClient.onToolUse = (toolName, input) => {
+                    console.log(`🔧 Tool used: ${toolName}`, input);
+                };
+
+                chatClient.onComplete = () => {
+                    updateStreamingMessage(streamingMessageDiv, fullContent, true);
+                    hideStopButton();
+                };
+
+                chatClient.onError = (error) => {
+                    console.error('Chat error:', error);
+                    updateStreamingMessage(streamingMessageDiv, `Error: ${error}`, true);
+                    hideStopButton();
+                };
+
+                // Send message with new Direct API
+                await chatClient.sendMessage({
+                    message: message || '',
+                    agentType: 'grant-card-generator',
+                    conversationId: conversationId,
+                    attachments: attachments
+                });
 
                 // After successful first message, redirect to permanent conversation URL
                 if (isFirstMessage) {
@@ -2308,28 +2342,41 @@ await handleStreamingResponse(response, streamingMessageDiv);
             addLoadingMessage('Analyzing grant website...');
 
             try {
-                const formData = new FormData();
-                formData.append('message', remainingMessage || 'Analyze this grant URL');
-                formData.append('url', url);
-                formData.append('task', selectedTask || 'grant-criteria');
-                formData.append('conversationId', conversationId);
-                formData.append('agentType', 'grant-cards');
-
-                currentAbortController = new AbortController();
-
-                const response = await fetch(`${API_BASE}/api/process-grant/stream`, {
-                    method: 'POST',
-                    body: formData,
-                    signal: currentAbortController.signal
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
+                // URLs are handled automatically by web_fetch tool
+                // Just include the URL in the message text
+                const fullMessage = `${remainingMessage || 'Analyze this grant URL'}\n\n${url}`;
 
                 removeLoadingMessage();
 const streamingMessageDiv = addStreamingMessage('assistant');
-await handleStreamingResponse(response, streamingMessageDiv);
+                let fullContent = '';
+
+                // Setup ChatClient callbacks
+                chatClient.onTextDelta = (text) => {
+                    fullContent += text;
+                    updateStreamingMessage(streamingMessageDiv, fullContent, false);
+                };
+
+                chatClient.onToolUse = (toolName, input) => {
+                    console.log(`🔧 Tool used: ${toolName}`, input);
+                };
+
+                chatClient.onComplete = () => {
+                    updateStreamingMessage(streamingMessageDiv, fullContent, true);
+                    hideStopButton();
+                };
+
+                chatClient.onError = (error) => {
+                    console.error('Chat error:', error);
+                    updateStreamingMessage(streamingMessageDiv, `Error: ${error}`, true);
+                    hideStopButton();
+                };
+
+                // Send message with URL - web_fetch will automatically detect and fetch it
+                await chatClient.sendMessage({
+                    message: fullMessage,
+                    agentType: 'grant-card-generator',
+                    conversationId: conversationId
+                });
 
                 // After successful first message, redirect to permanent conversation URL
                 if (isFirstMessage) {
