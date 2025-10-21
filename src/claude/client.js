@@ -23,7 +23,7 @@ const anthropic = new Anthropic({
 // Configuration
 const MAX_AGENT_LOOPS = 20; // Safety limit to prevent infinite loops
 const MODEL = 'claude-sonnet-4-20250514'; // Latest Sonnet 4.5 model
-const MAX_TOKENS = 4096;
+const MAX_TOKENS = 16000; // Must be > thinking budget
 const THINKING_BUDGET = 10000; // Tokens for extended thinking
 
 /**
