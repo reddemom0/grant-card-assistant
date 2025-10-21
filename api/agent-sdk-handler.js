@@ -279,16 +279,22 @@ export default async function handler(req, res) {
       console.log(`🔑 ANTHROPIC_API_KEY present: ${!!process.env.ANTHROPIC_API_KEY}`);
       console.log(`📂 Current working directory: ${process.cwd()}`);
 
-      // Get the agent definition for this agent type
-      const agentDef = agentDefinitions[agentType];
+      // Build orchestrator prompt that automatically invokes the requested agent
+      const orchestratorPrompt = `You are an agent orchestrator for Granted Consulting's specialized AI agents.
 
-      if (!agentDef) {
-        throw new Error(`Agent definition not found for: ${agentType}`);
-      }
+Your ONLY job is to immediately invoke the "${agentType}" agent using the Task tool and pass the user's message to it.
 
-      console.log(`📋 Using agent prompt: ${agentDef.prompt.substring(0, 100)}...`);
+DO NOT respond yourself - invoke the agent immediately with this exact format:
 
-      // Use Agent SDK query with enhanced configuration
+Use the Task tool with:
+- subagent_type: "${agentType}"
+- prompt: "[the user's full message]"
+
+The user is expecting to interact with the ${agentType} agent, not you. Invoke it now.`;
+
+      console.log(`🎯 Orchestrator will invoke: ${agentType}`);
+
+      // Use Agent SDK query with orchestrator pattern
       const result = await retryWithBackoff(async () => {
         return query({
           prompt: enhancedPrompt,
@@ -314,15 +320,15 @@ export default async function handler(req, res) {
               // DEBUG: '*', // Disabled - too verbose for production
             },
 
-            // CRITICAL: Use the agent's specialized prompt as system prompt
-            customSystemPrompt: agentDef.prompt,
+            // Orchestrator system prompt
+            customSystemPrompt: orchestratorPrompt,
 
             // Setting sources - empty for server deployment
             settingSources: [],
 
-            // Don't define subagents - the current agent IS the active agent
-            // (agents parameter is for Task tool subagents, not the main session)
-            // agents: { ... },
+            // CRITICAL: Define specialized agents as subagents
+            // The orchestrator will invoke them using the Task tool
+            agents: agentDefinitions,
 
             // Model configuration
             model: options.model || agentConfig.model,
