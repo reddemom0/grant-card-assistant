@@ -273,11 +273,20 @@ export default async function handler(req, res) {
     console.log('🔍 MCP Servers config:', JSON.stringify(agentConfig.mcpServers, null, 2));
 
     try {
+      // Explicitly set path to Claude CLI
+      const claudeCliPath = './node_modules/.bin/claude';
+      console.log(`🔧 Claude CLI path: ${claudeCliPath}`);
+      console.log(`🔑 ANTHROPIC_API_KEY present: ${!!process.env.ANTHROPIC_API_KEY}`);
+      console.log(`📂 Current working directory: ${process.cwd()}`);
+
       // Use Agent SDK query with enhanced configuration
       const result = await retryWithBackoff(async () => {
         return query({
           prompt: enhancedPrompt,
           options: {
+            // Explicitly set path to Claude Code CLI
+            pathToClaudeCodeExecutable: claudeCliPath,
+
             // System prompt configuration
             settingSources: agentConfig.settingSources,
             systemPrompt: agentConfig.systemPrompt,
@@ -366,20 +375,48 @@ export default async function handler(req, res) {
             console.log(`🧠 Thinking tokens used: ${thinkingContent.length} chars`);
           }
 
-          // Dump MCP server log for debugging
+          // Dump any available logs for debugging
           try {
             const fs = await import('fs');
+
+            // Check for MCP log
             const mcpLogPath = '/tmp/mcp-server-debug.log';
             if (fs.existsSync(mcpLogPath)) {
               const mcpLog = fs.readFileSync(mcpLogPath, 'utf-8');
               console.log('📋 === MCP SERVER LOG ===');
               console.log(mcpLog);
               console.log('📋 === END MCP LOG ===');
-            } else {
-              console.log('⚠️ MCP log file not found at /tmp/mcp-server-debug.log');
+            }
+
+            // Check for Claude Code CLI logs
+            const homeDir = process.env.HOME || '/root';
+            const claudeLogPaths = [
+              `${homeDir}/.claude/logs`,
+              '/tmp/claude-code.log',
+              '/tmp/claude.log'
+            ];
+
+            for (const logPath of claudeLogPaths) {
+              if (fs.existsSync(logPath)) {
+                console.log(`📋 === CLAUDE CODE LOG: ${logPath} ===`);
+                if (fs.statSync(logPath).isDirectory()) {
+                  const files = fs.readdirSync(logPath);
+                  console.log('Log files:', files);
+                  // Read most recent log file
+                  const latestLog = files.sort().reverse()[0];
+                  if (latestLog) {
+                    const logContent = fs.readFileSync(`${logPath}/${latestLog}`, 'utf-8');
+                    console.log(logContent.slice(-2000)); // Last 2000 chars
+                  }
+                } else {
+                  const logContent = fs.readFileSync(logPath, 'utf-8');
+                  console.log(logContent.slice(-2000));
+                }
+                console.log('📋 === END LOG ===');
+              }
             }
           } catch (err) {
-            console.log(`⚠️ Error reading MCP log: ${err.message}`);
+            console.log(`⚠️ Error reading logs: ${err.message}`);
           }
         } else if (msg.type === 'system' && msg.subtype === 'init') {
           // System initialization message
