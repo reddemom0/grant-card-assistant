@@ -15,11 +15,9 @@ export const SERVER_TOOLS = [
   {
     type: 'web_search_20250305',
     name: 'web_search'
-  },
-  {
-    type: 'web_fetch_20250305',
-    name: 'web_fetch'
   }
+  // Note: web_fetch is not available as a server tool
+  // Available server tools: bash_20250124, text_editor_20250*, web_search_20250305
 ];
 
 // ============================================================================
