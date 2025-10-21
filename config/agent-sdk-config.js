@@ -105,8 +105,9 @@ export const agentSDKConfig = {
   },
 
   // Permission Mode
-  // 'bypassPermissions' allows MCP tools to execute automatically without user confirmation
-  permissionMode: 'bypassPermissions', // 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
+  // Cannot use 'bypassPermissions' when running as root (Railway containers run as root)
+  // Use 'acceptEdits' instead - auto-accepts file edits but still validates tool use
+  permissionMode: 'acceptEdits', // 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
 
   // System Prompt Configuration
   // Don't use claude_code preset - it requires desktop Claude Code app
