@@ -282,9 +282,21 @@ export default async function handler(req, res) {
       // Get the selected agent definition
       const selectedAgentDef = agentDefinitions[agentType];
 
+      // Create subagents object excluding the currently selected agent
+      // This prevents the main agent from having access to Task tool and assuming Claude Code identity
+      const subagents = Object.keys(agentDefinitions)
+        .filter(key => key !== agentType)
+        .reduce((acc, key) => {
+          acc[key] = agentDefinitions[key];
+          return acc;
+        }, {});
+
       console.log(`📋 Using agent: ${agentType}`);
       console.log(`📋 Agent prompt length: ${selectedAgentDef.prompt.length} chars`);
+      console.log(`📋 Agent prompt preview (first 200 chars): ${selectedAgentDef.prompt.substring(0, 200)}`);
       console.log(`📋 Agent tools: ${selectedAgentDef.tools?.join(', ') || 'default'}`);
+      console.log(`📋 Agent model: ${selectedAgentDef.model}`);
+      console.log(`📋 Available subagents for coordination: ${Object.keys(subagents).join(', ')}`);
 
       // Use Agent SDK query with selected agent as MAIN agent (not orchestrator delegation)
       // This allows users to interact directly with the specialized agent they selected
@@ -319,9 +331,10 @@ export default async function handler(req, res) {
             // Setting sources - empty for server deployment
             settingSources: [],
 
-            // Define all agents as subagents for coordination
-            // This allows any agent to coordinate with others via Task tool if needed
-            agents: agentDefinitions,
+            // Define other agents as subagents for coordination
+            // This allows the main agent to coordinate with others via Task tool if needed
+            // Note: Excluding the selected agent itself to prevent identity confusion
+            agents: subagents,
 
             // Model configuration - use agent's preferred model if specified
             model: options.model || selectedAgentDef.model || agentConfig.model,
