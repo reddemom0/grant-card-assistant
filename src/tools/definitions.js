@@ -13,10 +13,12 @@
 
 export const SERVER_TOOLS = [
   {
-    type: 'web_search_20250305'
+    type: 'web_search_20250305',
+    name: 'web_search'
   },
   {
-    type: 'web_fetch_20250305'
+    type: 'web_fetch_20250305',
+    name: 'web_fetch'
   }
 ];
 
