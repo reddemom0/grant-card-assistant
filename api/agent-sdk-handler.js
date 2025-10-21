@@ -280,6 +280,9 @@ export default async function handler(req, res) {
           [agentType]: agentDefinitions[agentType]
         },
 
+        // Path to Claude Code CLI executable (installed in node_modules)
+        pathToClaudeCodeExecutable: './node_modules/.bin/claude-code',
+
         // Model configuration
         model: options.model || agentConfig.model,
         fallbackModel: agentConfig.fallbackModel,
