@@ -80,8 +80,22 @@ export const agentSDKConfig = {
   },
 
   // MCP Server Configuration
-  // TEMPORARILY DISABLED - Testing if Agent SDK works without MCP first
-  mcpServers: {},
+  mcpServers: {
+    'google-drive': {
+      type: 'stdio',  // Local subprocess for development
+      command: 'node',
+      args: [
+        './mcp-servers/gdrive/dist/index.js'
+      ],
+      env: {
+        // Explicitly pass environment variables to MCP subprocess
+        // These are set by setup-gdrive-credentials.js before Agent SDK initialization
+        GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || './mcp-servers/gdrive/credentials/gcp-oauth.keys.json',
+        MCP_GDRIVE_CREDENTIALS: process.env.MCP_GDRIVE_CREDENTIALS || './mcp-servers/gdrive/credentials/.gdrive-server-credentials.json',
+        NODE_ENV: process.env.NODE_ENV,
+      }
+    }
+  },
 
   // Error Handling
   errorHandling: {
@@ -95,12 +109,13 @@ export const agentSDKConfig = {
   permissionMode: 'bypassPermissions', // 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan'
 
   // System Prompt Configuration
-  // Don't use 'claude_code' preset - it's for desktop app, not server API
-  // Agent prompts are loaded from .claude/agents/*.md files instead
-  systemPrompt: undefined,
+  systemPrompt: {
+    type: 'preset',
+    preset: 'claude_code',
+  },
 
   // Setting Sources (which config files to load)
-  settingSources: [], // Don't load .claude/CLAUDE.md - use agent-specific prompts
+  settingSources: ['project'], // Load .claude/CLAUDE.md
 
   // Memory Tool Configuration
   memory: {

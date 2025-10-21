@@ -278,13 +278,14 @@ export default async function handler(req, res) {
         return query({
           prompt: enhancedPrompt,
           options: {
+            // System prompt configuration
+            settingSources: agentConfig.settingSources,
+            systemPrompt: agentConfig.systemPrompt,
+
             // CRITICAL: Agent definition (tells SDK which agent to use)
             agents: {
               [agentType]: agentDefinitions[agentType]
             },
-
-            // API Configuration
-            apiKey: process.env.ANTHROPIC_API_KEY,
 
             // Model configuration
             model: options.model || agentConfig.model,
@@ -299,7 +300,7 @@ export default async function handler(req, res) {
             // Tool permissions
             allowedTools: agentConfig.allowedTools,
 
-            // MCP servers (currently disabled for testing)
+            // MCP servers
             mcpServers: agentConfig.mcpServers,
 
             // Working directory
