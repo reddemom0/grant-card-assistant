@@ -275,8 +275,8 @@ export default async function handler(req, res) {
     try {
       // Build MINIMAL options object for testing
       const queryOptions = {
-        // Path to Claude Code CLI executable (installed in node_modules)
-        pathToClaudeCodeExecutable: './node_modules/.bin/claude',
+        // Don't specify path - let SDK auto-detect
+        // pathToClaudeCodeExecutable: './node_modules/.bin/claude',
 
         // API key
         apiKey: process.env.ANTHROPIC_API_KEY,
