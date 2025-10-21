@@ -279,6 +279,15 @@ export default async function handler(req, res) {
       console.log(`🔑 ANTHROPIC_API_KEY present: ${!!process.env.ANTHROPIC_API_KEY}`);
       console.log(`📂 Current working directory: ${process.cwd()}`);
 
+      // Get the agent definition for this agent type
+      const agentDef = agentDefinitions[agentType];
+
+      if (!agentDef) {
+        throw new Error(`Agent definition not found for: ${agentType}`);
+      }
+
+      console.log(`📋 Using agent prompt: ${agentDef.prompt.substring(0, 100)}...`);
+
       // Use Agent SDK query with enhanced configuration
       const result = await retryWithBackoff(async () => {
         return query({
@@ -305,14 +314,15 @@ export default async function handler(req, res) {
               // DEBUG: '*', // Disabled - too verbose for production
             },
 
-            // System prompt configuration
-            settingSources: agentConfig.settingSources,
-            systemPrompt: agentConfig.systemPrompt,
+            // CRITICAL: Use the agent's specialized prompt as system prompt
+            customSystemPrompt: agentDef.prompt,
 
-            // CRITICAL: Agent definition (tells SDK which agent to use)
-            agents: {
-              [agentType]: agentDefinitions[agentType]
-            },
+            // Setting sources - empty for server deployment
+            settingSources: [],
+
+            // Don't define subagents - the current agent IS the active agent
+            // (agents parameter is for Task tool subagents, not the main session)
+            // agents: { ... },
 
             // Model configuration
             model: options.model || agentConfig.model,
