@@ -23,6 +23,9 @@ import {
   handleDeleteConversation
 } from './src/api/chat.js';
 
+// Authentication
+import authRouter from './src/api/auth.js';
+
 // Database
 import { testConnection, getPoolStats } from './src/database/connection.js';
 import { getAvailableAgents } from './src/agents/load-agents.js';
@@ -109,6 +112,9 @@ app.post('/api/chat', handleChatRequest);
 app.get('/api/conversations/:id', handleGetConversation);
 app.get('/api/conversations', handleListConversations);
 app.delete('/api/conversations/:id', handleDeleteConversation);
+
+// Authentication endpoints
+app.use('/api', authRouter);
 
 // Agent metadata
 app.get('/api/agents', async (req, res) => {
