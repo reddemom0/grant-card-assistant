@@ -63,8 +63,9 @@ app.get('/version', (req, res) => {
   res.json({
     version: '2.0.0-railway-migration',
     buildTimestamp: new Date().toISOString(),
-    commit: 'userId-uuid-validation-fix',
-    nodeVersion: process.version
+    commit: 'force-redeploy-v2',
+    nodeVersion: process.version,
+    serverFile: 'server.js (root)'
   });
 });
 
