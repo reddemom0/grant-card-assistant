@@ -273,48 +273,47 @@ export default async function handler(req, res) {
     console.log('🔍 MCP Servers config:', JSON.stringify(agentConfig.mcpServers, null, 2));
 
     try {
+      // Build options object, only including defined values
+      const queryOptions = {
+        // Agent definition (contains prompt for this specific agent)
+        agents: {
+          [agentType]: agentDefinitions[agentType]
+        },
+
+        // Model configuration
+        model: options.model || agentConfig.model,
+        fallbackModel: agentConfig.fallbackModel,
+
+        // Extended thinking
+        maxThinkingTokens: options.maxThinkingTokens || agentConfig.maxThinkingTokens,
+
+        // Conversation limits
+        maxTurns: options.maxTurns || agentConfig.maxTurns,
+
+        // Tool permissions
+        allowedTools: agentConfig.allowedTools,
+
+        // MCP servers
+        mcpServers: agentConfig.mcpServers,
+
+        // Working directory
+        cwd: process.cwd(),
+
+        // Streaming configuration
+        includePartialMessages: agentConfig.includePartialMessages,
+
+        // Permission mode - use from config (default: 'bypassPermissions')
+        permissionMode: agentConfig.permissionMode,
+
+        // Beta headers for advanced features
+        betas: agentConfig.betaHeaders,
+      };
+
       // Use Agent SDK query with enhanced configuration
       const result = await retryWithBackoff(async () => {
         return query({
           prompt: enhancedPrompt,
-          options: {
-            // System prompt configuration
-            settingSources: agentConfig.settingSources,
-            systemPrompt: agentConfig.systemPrompt,
-
-            // Agent definition
-            agents: {
-              [agentType]: agentDefinitions[agentType]
-            },
-
-            // Model configuration
-            model: options.model || agentConfig.model,
-            fallbackModel: agentConfig.fallbackModel,
-
-            // Extended thinking
-            maxThinkingTokens: options.maxThinkingTokens || agentConfig.maxThinkingTokens,
-
-            // Conversation limits
-            maxTurns: options.maxTurns || agentConfig.maxTurns,
-
-            // Tool permissions
-            allowedTools: agentConfig.allowedTools,
-
-            // MCP servers
-            mcpServers: agentConfig.mcpServers,
-
-            // Working directory
-            cwd: process.cwd(),
-
-            // Streaming configuration
-            includePartialMessages: agentConfig.includePartialMessages,
-
-            // Permission mode - use from config (default: 'bypassPermissions')
-            permissionMode: agentConfig.permissionMode,
-
-            // Beta headers for advanced features
-            betas: agentConfig.betaHeaders,
-          }
+          options: queryOptions
         });
       }, agentSDKConfig.errorHandling.maxRetries, agentSDKConfig.errorHandling.retryDelay);
 
