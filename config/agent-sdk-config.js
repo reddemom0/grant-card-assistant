@@ -80,8 +80,22 @@ export const agentSDKConfig = {
   },
 
   // MCP Server Configuration
-  // TEMPORARILY DISABLED to test if MCP is causing the crash
-  mcpServers: {},
+  mcpServers: {
+    'google-drive': {
+      type: 'stdio',  // Local subprocess for development
+      command: 'node',
+      args: [
+        './mcp-servers/gdrive/dist/index.js'
+      ],
+      env: {
+        // Explicitly pass environment variables to MCP subprocess
+        // These are set by setup-gdrive-credentials.js before Agent SDK initialization
+        GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS || './mcp-servers/gdrive/credentials/gcp-oauth.keys.json',
+        MCP_GDRIVE_CREDENTIALS: process.env.MCP_GDRIVE_CREDENTIALS || './mcp-servers/gdrive/credentials/.gdrive-server-credentials.json',
+        NODE_ENV: process.env.NODE_ENV,
+      }
+    }
+  },
 
   // Error Handling
   errorHandling: {
