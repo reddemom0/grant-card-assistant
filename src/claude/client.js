@@ -195,6 +195,11 @@ export async function runAgent({
 
         // Enable streaming
         stream: true
+      }, {
+        // Beta headers for web fetch tool
+        headers: {
+          'anthropic-beta': 'web-fetch-2025-09-10'
+        }
       });
 
       // Stream response to frontend and collect full response
