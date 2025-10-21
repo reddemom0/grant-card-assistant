@@ -313,7 +313,11 @@ export default async function handler(req, res) {
       const result = await retryWithBackoff(async () => {
         return query({
           prompt: enhancedPrompt,
-          options: queryOptions
+          options: {
+            ...queryOptions,
+            // CRITICAL: Pass API key to Agent SDK
+            apiKey: process.env.ANTHROPIC_API_KEY
+          }
         });
       }, agentSDKConfig.errorHandling.maxRetries, agentSDKConfig.errorHandling.retryDelay);
 
