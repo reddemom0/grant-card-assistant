@@ -290,8 +290,10 @@ export default async function handler(req, res) {
             // Force non-interactive/headless mode
             apiKey: process.env.ANTHROPIC_API_KEY,
 
-            // Enable stderr capture for debugging
-            stderr: true,
+            // Enable stderr capture for debugging (callback function)
+            stderr: (data) => {
+              console.error('🔴 Claude CLI stderr:', data.toString());
+            },
 
             // Environment variables (enable DEBUG for verbose output)
             env: {
