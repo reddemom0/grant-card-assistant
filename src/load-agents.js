@@ -42,8 +42,11 @@ function parseAgentFile(filePath) {
     // Parse YAML frontmatter (simple parsing - just extract key fields)
     const description = frontmatter.match(/description:\s*(.+)/)?.[1]?.trim() || '';
     const toolsMatch = frontmatter.match(/tools:\s*\n((?:\s+-\s+.+\n?)+)/);
-    const tools = toolsMatch 
-      ? toolsMatch[1].split('\n').map(t => t.trim().replace(/^-\s+/, '')).filter(Boolean)
+    const tools = toolsMatch
+      ? toolsMatch[1].split('\n')
+          .map(t => t.trim().replace(/^-\s+/, ''))  // Remove list marker
+          .map(t => t.split('#')[0].trim())           // Remove comments
+          .filter(Boolean)
       : undefined;
     const model = frontmatter.match(/model:\s*(\w+)/)?.[1] || 'sonnet';
 
