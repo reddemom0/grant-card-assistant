@@ -281,7 +281,7 @@ export default async function handler(req, res) {
         },
 
         // Path to Claude Code CLI executable (installed in node_modules)
-        pathToClaudeCodeExecutable: './node_modules/.bin/claude-code',
+        pathToClaudeCodeExecutable: './node_modules/.bin/claude',
 
         // Model configuration
         model: options.model || agentConfig.model,
