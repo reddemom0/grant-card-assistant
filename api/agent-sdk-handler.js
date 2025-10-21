@@ -294,6 +294,18 @@ export default async function handler(req, res) {
             // Permission mode
             permissionMode: agentConfig.permissionMode,
 
+            // Permission callback - auto-approve all tools for production
+            canUseTool: async (toolName, input) => {
+              console.log(`🔐 [canUseTool] Permission request for: ${toolName}`);
+
+              // Auto-approve all tools in production environment
+              console.log(`✅ [canUseTool] Auto-approving tool: ${toolName}`);
+              return {
+                behavior: 'allow',
+                updatedInput: input  // Correct field name per documentation
+              };
+            },
+
             // Beta headers for advanced features
             betas: agentConfig.betaHeaders,
           }
