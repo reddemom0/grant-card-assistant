@@ -71,7 +71,17 @@ export async function handleChatRequest(req, res) {
 
       // Use userId or null for anonymous users
       // userId must be a valid UUID if provided
-      const effectiveUserId = userId && userId !== 'anonymous' ? userId : null;
+      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      let effectiveUserId = null;
+
+      if (userId && userId !== 'anonymous') {
+        // Validate UUID format
+        if (UUID_REGEX.test(userId)) {
+          effectiveUserId = userId;
+        } else {
+          console.warn(`⚠️  Invalid userId format (not a UUID): ${userId}, treating as anonymous`);
+        }
+      }
 
       // Generate title from first message
       const title = message.substring(0, 100);
