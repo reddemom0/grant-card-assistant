@@ -2,7 +2,7 @@
   "name": "grant-card-assistant",
   "version": "1.0.4",
   "description": "AI-powered Grant Card Assistant for Granted Consulting",
-  "main": "api/server.js",
+  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "build": "echo 'Build complete'",
