@@ -120,6 +120,9 @@ export async function getConversation(conversationId) {
  */
 export async function createConversation(conversationId, userId, agentType, title = null) {
   try {
+    console.log(`🔍 Creating conversation: id=${conversationId}, userId=${userId}, agentType=${agentType}, title=${title}`);
+    console.log(`🔍 userId type: ${typeof userId}, value: ${JSON.stringify(userId)}`);
+
     const result = await query(
       `INSERT INTO conversations (id, user_id, agent_type, title)
        VALUES ($1, $2, $3, $4)
@@ -138,7 +141,11 @@ export async function createConversation(conversationId, userId, agentType, titl
       return existing;
     }
 
-    console.error('Error creating conversation:', error);
+    console.error('❌ Error creating conversation:', error);
+    console.error('   conversationId:', conversationId);
+    console.error('   userId:', userId, typeof userId);
+    console.error('   agentType:', agentType);
+    console.error('   title:', title);
     throw error;
   }
 }
