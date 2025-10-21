@@ -273,43 +273,17 @@ export default async function handler(req, res) {
     console.log('🔍 MCP Servers config:', JSON.stringify(agentConfig.mcpServers, null, 2));
 
     try {
-      // Build options object, only including defined values
+      // Build MINIMAL options object for testing
       const queryOptions = {
-        // Agent definition (contains prompt for this specific agent)
-        agents: {
-          [agentType]: agentDefinitions[agentType]
-        },
-
         // Path to Claude Code CLI executable (installed in node_modules)
         pathToClaudeCodeExecutable: './node_modules/.bin/claude',
 
-        // Model configuration
-        model: options.model || agentConfig.model,
-        fallbackModel: agentConfig.fallbackModel,
+        // API key
+        apiKey: process.env.ANTHROPIC_API_KEY,
 
-        // Extended thinking
-        maxThinkingTokens: options.maxThinkingTokens || agentConfig.maxThinkingTokens,
-
-        // Conversation limits
-        maxTurns: options.maxTurns || agentConfig.maxTurns,
-
-        // Tool permissions
-        allowedTools: agentConfig.allowedTools,
-
-        // MCP servers
-        mcpServers: agentConfig.mcpServers,
-
-        // Working directory
-        cwd: process.cwd(),
-
-        // Streaming configuration
-        includePartialMessages: agentConfig.includePartialMessages,
-
-        // Permission mode - use from config (default: 'bypassPermissions')
-        permissionMode: agentConfig.permissionMode,
-
-        // Beta headers for advanced features
-        betas: agentConfig.betaHeaders,
+        // Simple config
+        maxTurns: 1,
+        permissionMode: 'bypassPermissions',
       };
 
       // Use Agent SDK query with enhanced configuration
