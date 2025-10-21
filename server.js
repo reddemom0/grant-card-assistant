@@ -58,6 +58,10 @@ app.use((req, res, next) => {
 // HEALTH CHECK
 // ============================================================================
 
+// Migration endpoint (temporary, for Railway deployment)
+import { runMigrationEndpoint } from './run-migration-endpoint.js';
+app.get('/run-migration', runMigrationEndpoint);
+
 // Version endpoint to verify deployed code
 app.get('/version', (req, res) => {
   res.json({
