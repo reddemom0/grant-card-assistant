@@ -290,15 +290,19 @@ export default async function handler(req, res) {
             // Force non-interactive/headless mode
             apiKey: process.env.ANTHROPIC_API_KEY,
 
-            // Enable stderr capture for debugging (callback function)
+            // Capture stderr only for errors (not debug output)
             stderr: (data) => {
-              console.error('🔴 Claude CLI stderr:', data.toString());
+              const message = data.toString();
+              // Only log actual errors, not debug messages
+              if (message.includes('[ERROR]') || message.includes('Error:') || message.includes('exited with code')) {
+                console.error('🔴 Claude CLI stderr:', message);
+              }
             },
 
-            // Environment variables (enable DEBUG for verbose output)
+            // Environment variables - DEBUG disabled for production
             env: {
               ...process.env,
-              DEBUG: '*', // Enable all debug output
+              // DEBUG: '*', // Disabled - too verbose for production
             },
 
             // System prompt configuration
