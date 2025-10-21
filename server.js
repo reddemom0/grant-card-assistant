@@ -58,6 +58,16 @@ app.use((req, res, next) => {
 // HEALTH CHECK
 // ============================================================================
 
+// Version endpoint to verify deployed code
+app.get('/version', (req, res) => {
+  res.json({
+    version: '2.0.0-railway-migration',
+    buildTimestamp: new Date().toISOString(),
+    commit: 'userId-uuid-validation-fix',
+    nodeVersion: process.version
+  });
+});
+
 app.get('/health', async (req, res) => {
   try {
     // Test database connection
