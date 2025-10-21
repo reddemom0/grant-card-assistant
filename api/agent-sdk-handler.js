@@ -2,10 +2,25 @@ import { query } from '@anthropic-ai/claude-agent-sdk';
 import * as db from '../src/database-service.js';
 import { loadAgentDefinitions } from '../src/load-agents.js';
 import { config } from 'dotenv';
-import { agentSDKConfig, getAgentConfig, calculateCost, getCacheStats } from '../config/agent-sdk-config.js';
+import { agentSDKConfig, getAgentConfig, calculateCost, getCacheStats, initializeGoogleDriveCredentials } from '../config/agent-sdk-config.js';
 import { filesAPI } from '../src/anthropic-client.js';
 
 config();
+
+// Initialize Google Drive credentials for MCP server
+let credentialsInitialized = false;
+async function ensureCredentials() {
+  if (!credentialsInitialized) {
+    try {
+      await initializeGoogleDriveCredentials();
+      credentialsInitialized = true;
+      console.log('✅ Google Drive credentials initialized for MCP');
+    } catch (error) {
+      console.warn('⚠️ Could not initialize Google Drive credentials:', error.message);
+      // Don't throw - allow agent to work without MCP if credentials fail
+    }
+  }
+}
 
 // Load all agent definitions from .claude/agents/*.md files
 const agentDefinitions = loadAgentDefinitions();
@@ -152,6 +167,9 @@ export default async function handler(req, res) {
   const startTime = Date.now();
 
   try {
+    // Initialize Google Drive credentials before processing request
+    await ensureCredentials();
+
     const {
       agentType,           // 'grant-card-generator', 'etg-writer', etc.
       conversationId,
@@ -291,8 +309,8 @@ export default async function handler(req, res) {
             // Streaming configuration
             includePartialMessages: agentConfig.includePartialMessages,
 
-            // Permission mode - use acceptAll to auto-approve all tools
-            permissionMode: 'acceptAll',  // Try acceptAll instead of bypassPermissions
+            // Permission mode - use from config (default: 'bypassPermissions')
+            permissionMode: agentConfig.permissionMode,
 
             // Beta headers for advanced features
             betas: agentConfig.betaHeaders,
