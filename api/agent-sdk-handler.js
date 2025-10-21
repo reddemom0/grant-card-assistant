@@ -291,20 +291,8 @@ export default async function handler(req, res) {
             // Streaming configuration
             includePartialMessages: agentConfig.includePartialMessages,
 
-            // Permission mode
-            permissionMode: agentConfig.permissionMode,
-
-            // Permission callback - auto-approve all tools for production
-            canUseTool: async (toolName, input) => {
-              console.log(`🔐 [canUseTool] Permission request for: ${toolName}`);
-
-              // Auto-approve all tools in production environment
-              console.log(`✅ [canUseTool] Auto-approving tool: ${toolName}`);
-              return {
-                behavior: 'allow',
-                updatedInput: input  // Correct field name per documentation
-              };
-            },
+            // Permission mode - use acceptAll to auto-approve all tools
+            permissionMode: 'acceptAll',  // Try acceptAll instead of bypassPermissions
 
             // Beta headers for advanced features
             betas: agentConfig.betaHeaders,
