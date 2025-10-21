@@ -18,7 +18,7 @@
     "postinstall": "cd mcp-servers/gdrive && npm install"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.23",
+    "@anthropic-ai/claude-agent-sdk": "^0.1.21",
     "@upstash/redis": "^1.25.1",
     "cors": "^2.8.5",
     "express": "^4.21.2",
