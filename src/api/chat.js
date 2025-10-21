@@ -69,15 +69,16 @@ export async function handleChatRequest(req, res) {
       convId = uuidv4();
       isNewConversation = true;
 
-      // Use userId or default to 'anonymous'
-      const effectiveUserId = userId || 'anonymous';
+      // Use userId or null for anonymous users
+      // userId must be a valid UUID if provided
+      const effectiveUserId = userId && userId !== 'anonymous' ? userId : null;
 
       // Generate title from first message
       const title = message.substring(0, 100);
 
       await createConversation(convId, effectiveUserId, agentType, title);
 
-      console.log(`✓ New conversation created: ${convId}`);
+      console.log(`✓ New conversation created: ${convId} (user: ${effectiveUserId || 'anonymous'})`);
     } else {
       // Verify existing conversation
       const conversation = await getConversation(convId);
@@ -162,7 +163,7 @@ export async function handleChatRequest(req, res) {
       agentType,
       message,
       conversationId: convId,
-      userId: userId || 'anonymous',
+      userId: userId || null,
       sessionId,
       attachments: processedAttachments,
       res
