@@ -279,22 +279,15 @@ export default async function handler(req, res) {
       console.log(`🔑 ANTHROPIC_API_KEY present: ${!!process.env.ANTHROPIC_API_KEY}`);
       console.log(`📂 Current working directory: ${process.cwd()}`);
 
-      // Build orchestrator prompt that automatically invokes the requested agent
-      const orchestratorPrompt = `You are an agent orchestrator for Granted Consulting's specialized AI agents.
+      // Get the selected agent definition
+      const selectedAgentDef = agentDefinitions[agentType];
 
-Your ONLY job is to immediately invoke the "${agentType}" agent using the Task tool and pass the user's message to it.
+      console.log(`📋 Using agent: ${agentType}`);
+      console.log(`📋 Agent prompt length: ${selectedAgentDef.prompt.length} chars`);
+      console.log(`📋 Agent tools: ${selectedAgentDef.tools?.join(', ') || 'default'}`);
 
-DO NOT respond yourself - invoke the agent immediately with this exact format:
-
-Use the Task tool with:
-- subagent_type: "${agentType}"
-- prompt: "[the user's full message]"
-
-The user is expecting to interact with the ${agentType} agent, not you. Invoke it now.`;
-
-      console.log(`🎯 Orchestrator will invoke: ${agentType}`);
-
-      // Use Agent SDK query with orchestrator pattern
+      // Use Agent SDK query with selected agent as MAIN agent (not orchestrator delegation)
+      // This allows users to interact directly with the specialized agent they selected
       const result = await retryWithBackoff(async () => {
         return query({
           prompt: enhancedPrompt,
@@ -320,18 +313,18 @@ The user is expecting to interact with the ${agentType} agent, not you. Invoke i
               // DEBUG: '*', // Disabled - too verbose for production
             },
 
-            // Orchestrator system prompt
-            customSystemPrompt: orchestratorPrompt,
+            // Use the selected agent's specialized prompt as the MAIN agent
+            customSystemPrompt: selectedAgentDef.prompt,
 
             // Setting sources - empty for server deployment
             settingSources: [],
 
-            // CRITICAL: Define specialized agents as subagents
-            // The orchestrator will invoke them using the Task tool
+            // Define all agents as subagents for coordination
+            // This allows any agent to coordinate with others via Task tool if needed
             agents: agentDefinitions,
 
-            // Model configuration
-            model: options.model || agentConfig.model,
+            // Model configuration - use agent's preferred model if specified
+            model: options.model || selectedAgentDef.model || agentConfig.model,
             fallbackModel: agentConfig.fallbackModel,
 
             // Extended thinking
@@ -340,8 +333,8 @@ The user is expecting to interact with the ${agentType} agent, not you. Invoke i
             // Conversation limits
             maxTurns: options.maxTurns || agentConfig.maxTurns,
 
-            // Tool permissions
-            allowedTools: agentConfig.allowedTools,
+            // Tool permissions - use agent's specific tools
+            allowedTools: selectedAgentDef.tools || agentConfig.allowedTools,
 
             // MCP servers
             mcpServers: agentConfig.mcpServers,
