@@ -5,7 +5,7 @@
   "main": "api/server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "cd mcp-servers/gdrive && npm install && cd ../..",
+    "build": "npm install -g @anthropic-ai/claude-code && cd mcp-servers/gdrive && npm install && cd ../..",
     "dev": "vercel dev",
     "deploy": "vercel --prod",
     "test": "node tests/run-tests.js",
