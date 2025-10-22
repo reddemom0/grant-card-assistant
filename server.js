@@ -160,20 +160,20 @@ app.get('/api/pdf/batch/:batchId/results', pdfHandler.getBatchResults);
 // HTML PAGE ROUTES (Clean URLs)
 // ============================================================================
 
-// Serve agent HTML pages with clean URLs
-app.get('/grant-cards', (req, res) => {
+// Serve agent HTML pages with clean URLs (including sub-routes like /new and /chat/:id)
+app.get('/grant-cards*', (req, res) => {
   res.sendFile('grant-cards.html', { root: '.' });
 });
 
-app.get('/etg-writer', (req, res) => {
+app.get('/etg-writer*', (req, res) => {
   res.sendFile('etg-agent.html', { root: '.' });
 });
 
-app.get('/bcafe-writer', (req, res) => {
+app.get('/bcafe-writer*', (req, res) => {
   res.sendFile('bcafe-agent.html', { root: '.' });
 });
 
-app.get('/canexport-claims', (req, res) => {
+app.get('/canexport-claims*', (req, res) => {
   res.sendFile('canexport-claims.html', { root: '.' });
 });
 
