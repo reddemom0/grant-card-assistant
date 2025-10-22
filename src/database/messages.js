@@ -88,6 +88,7 @@ export async function getConversationMessages(conversationId) {
  */
 export async function getConversation(conversationId) {
   try {
+    console.log(`🔍 Looking up conversation: ${conversationId}`);
     const result = await query(
       `SELECT c.*,
               COUNT(m.id) as message_count,
@@ -99,13 +100,17 @@ export async function getConversation(conversationId) {
       [conversationId]
     );
 
+    console.log(`🔍 Query result: found ${result.rows.length} rows`);
+
     if (result.rows.length === 0) {
+      console.log(`❌ Conversation not found: ${conversationId}`);
       return null;
     }
 
+    console.log(`✓ Found conversation: ${result.rows[0].id}`);
     return result.rows[0];
   } catch (error) {
-    console.error('Error retrieving conversation:', error);
+    console.error('❌ Error retrieving conversation:', error);
     throw error;
   }
 }

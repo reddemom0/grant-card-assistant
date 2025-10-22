@@ -56,6 +56,7 @@ export async function handleChatRequest(req, res) {
     console.log(`✓ Agent type: ${agentType}`);
     console.log(`✓ Message length: ${message.length} characters`);
     console.log(`✓ Attachments: ${attachments.length}`);
+    console.log(`✓ ConversationId provided: ${conversationId ? conversationId : 'null (new conversation)'}`);
 
     // ============================================================================
     // 2. Get or create conversation
