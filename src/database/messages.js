@@ -62,9 +62,15 @@ export async function getConversationMessages(conversationId) {
         // Try to parse as JSON
         content = JSON.parse(row.content);
 
-        // Filter out thinking blocks (they require a signature field we don't have)
+        // Filter and clean content blocks
         if (Array.isArray(content)) {
-          content = content.filter(block => block.type !== 'thinking');
+          content = content
+            .filter(block => block.type !== 'thinking') // Remove thinking blocks
+            .map(block => {
+              // Remove index field (added by streaming but not accepted by Claude API)
+              const { index, ...cleanBlock } = block;
+              return cleanBlock;
+            });
         }
       } catch (e) {
         // If not valid JSON, treat as plain text
