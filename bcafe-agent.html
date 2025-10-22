@@ -2387,6 +2387,15 @@ async function handleStreamingResponse(response, messageDiv) {
                 let fullContent = '';
 
                 // Setup ChatClient callbacks
+                chatClient.onConnected = (data) => {
+                    console.log('✓ Connected to agent:', data);
+                    // Capture conversationId from backend
+                    if (data.conversationId && !conversationId) {
+                        conversationId = data.conversationId;
+                        console.log('✓ Captured conversationId from backend:', conversationId);
+                    }
+                };
+
                 chatClient.onTextDelta = (text) => {
                     fullContent += text;
                     updateStreamingMessage(streamingMessageDiv, fullContent, false);
@@ -2411,7 +2420,7 @@ async function handleStreamingResponse(response, messageDiv) {
                 await chatClient.sendMessage({
                     message: message || '',
                     agentType: 'bcafe-writer',
-                    conversationId: conversationId,
+                    conversationId: isFirstMessage ? null : conversationId,
                     attachments: attachments
                 });
 
@@ -2478,6 +2487,15 @@ async function handleStreamingResponse(response, messageDiv) {
                 let fullContent = '';
 
                 // Setup ChatClient callbacks
+                chatClient.onConnected = (data) => {
+                    console.log('✓ Connected to agent:', data);
+                    // Capture conversationId from backend
+                    if (data.conversationId && !conversationId) {
+                        conversationId = data.conversationId;
+                        console.log('✓ Captured conversationId from backend:', conversationId);
+                    }
+                };
+
                 chatClient.onTextDelta = (text) => {
                     fullContent += text;
                     updateStreamingMessage(streamingMessageDiv, fullContent, false);
