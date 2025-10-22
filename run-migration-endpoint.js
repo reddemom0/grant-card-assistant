@@ -15,8 +15,9 @@ export async function runMigrationEndpoint(req, res) {
   try {
     const { file, secret } = req.query;
 
-    // Simple security check
-    if (secret !== process.env.MIGRATION_SECRET) {
+    // Simple security check - use JWT_SECRET if MIGRATION_SECRET not set
+    const migrationSecret = process.env.MIGRATION_SECRET || process.env.JWT_SECRET;
+    if (secret !== migrationSecret) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
