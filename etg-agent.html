@@ -1101,7 +1101,7 @@
                 // Load existing conversation from URL
                 console.log('📂 Loading conversation from URL:', urlConversationId);
                 conversationId = urlConversationId;
-                localStorage.setItem('etg-conversation-id', conversationId);
+                localStorage.removeItem("etg-conversation-id"); // Clear any old ID
 
                 // Load conversation history from server
                 loadConversationHistory().then(data => {
@@ -1110,15 +1110,15 @@
                     }
                 });
 
-                return conversationId;
+                return null;
             }
 
             if (mode === 'new') {
                 // Generate new conversation ID (not in URL yet)
-                conversationId = generateConversationId();
-                localStorage.setItem('etg-conversation-id', conversationId);
-                console.log('🆕 Starting new conversation:', conversationId);
-                return conversationId;
+                conversationId = null;
+                localStorage.removeItem("etg-conversation-id"); // Clear any old ID
+                console.log("🆕 Starting new conversation (ID will be created by backend)");
+                return null;
             }
         }
 
@@ -2157,7 +2157,15 @@ async function handleStreamingResponse(response, messageDiv) {
                     // Capture conversationId from backend
                     if (data.conversationId && !conversationId) {
                         conversationId = data.conversationId;
+                        localStorage.setItem('etg-writer-conversation-id', conversationId);
                         console.log('✓ Captured conversationId from backend:', conversationId);
+
+                        // Update URL to include conversationId (for future refreshes)
+                        if (isFirstMessage) {
+                            const newUrl = `/etg-writer/chat/${conversationId}`;
+                            window.history.pushState({}, '', newUrl);
+                            console.log('✓ Updated URL to:', newUrl);
+                        }
                     }
                 };
 
@@ -2254,7 +2262,15 @@ async function handleStreamingResponse(response, messageDiv) {
                     // Capture conversationId from backend
                     if (data.conversationId && !conversationId) {
                         conversationId = data.conversationId;
+                        localStorage.setItem('etg-writer-conversation-id', conversationId);
                         console.log('✓ Captured conversationId from backend:', conversationId);
+
+                        // Update URL to include conversationId (for future refreshes)
+                        if (isFirstMessage) {
+                            const newUrl = `/etg-writer/chat/${conversationId}`;
+                            window.history.pushState({}, '', newUrl);
+                            console.log('✓ Updated URL to:', newUrl);
+                        }
                     }
                 };
 

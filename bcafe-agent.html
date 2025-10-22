@@ -1348,11 +1348,11 @@
             }
 
             if (mode === 'new') {
-                // Generate new conversation ID (not in URL yet)
-                conversationId = generateConversationId();
-                localStorage.setItem('bcafe-conversation-id', conversationId);
-                console.log('🆕 Starting new conversation:', conversationId);
-                return conversationId;
+                // Don't generate ID yet - let backend create it on first message
+                conversationId = null;
+                localStorage.removeItem('bcafe-conversation-id'); // Clear any old ID
+                console.log('🆕 Starting new conversation (ID will be created by backend)');
+                return null;
             }
         }
 
@@ -2392,7 +2392,15 @@ async function handleStreamingResponse(response, messageDiv) {
                     // Capture conversationId from backend
                     if (data.conversationId && !conversationId) {
                         conversationId = data.conversationId;
+                        localStorage.setItem('bcafe-conversation-id', conversationId);
                         console.log('✓ Captured conversationId from backend:', conversationId);
+
+                        // Update URL to include conversationId (for future refreshes)
+                        if (isFirstMessage) {
+                            const newUrl = `/bcafe-writer/chat/${conversationId}`;
+                            window.history.pushState({}, '', newUrl);
+                            console.log('✓ Updated URL to:', newUrl);
+                        }
                     }
                 };
 
@@ -2492,7 +2500,15 @@ async function handleStreamingResponse(response, messageDiv) {
                     // Capture conversationId from backend
                     if (data.conversationId && !conversationId) {
                         conversationId = data.conversationId;
+                        localStorage.setItem('bcafe-conversation-id', conversationId);
                         console.log('✓ Captured conversationId from backend:', conversationId);
+
+                        // Update URL to include conversationId (for future refreshes)
+                        if (isFirstMessage) {
+                            const newUrl = `/bcafe-writer/chat/${conversationId}`;
+                            window.history.pushState({}, '', newUrl);
+                            console.log('✓ Updated URL to:', newUrl);
+                        }
                     }
                 };
 
