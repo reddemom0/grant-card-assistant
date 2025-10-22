@@ -240,14 +240,21 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
 
-        // Filter out thinking blocks and remove index field from all blocks
-        // (thinking blocks need a signature field, index field not accepted by Claude API)
-        const cleanedContent = fullResponse.content
-          .filter(block => block.type !== 'thinking')
-          .map(block => {
-            const { index, ...cleanBlock } = block;
-            return cleanBlock;
-          });
+        // Clean content blocks: remove index field from all blocks
+        // Keep thinking blocks (required when extended thinking is enabled)
+        // but convert them to redacted_thinking (which doesn't need signature field)
+        const cleanedContent = fullResponse.content.map(block => {
+          const { index, ...cleanBlock } = block;
+
+          // Convert thinking blocks to redacted_thinking (no signature needed)
+          if (block.type === 'thinking') {
+            return {
+              type: 'redacted_thinking'
+            };
+          }
+
+          return cleanBlock;
+        });
 
         // Add assistant response to messages
         messages.push({
