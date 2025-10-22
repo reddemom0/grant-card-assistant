@@ -10,7 +10,7 @@
 import { Router } from 'express';
 import { google } from 'googleapis';
 import jwt from 'jsonwebtoken';
-import { query } from '../database/client.js';
+import { query } from '../database/connection.js';
 
 const router = Router();
 
