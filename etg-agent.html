@@ -2165,6 +2165,7 @@ async function handleStreamingResponse(response, messageDiv) {
                             const newUrl = `/etg-writer/chat/${conversationId}`;
                             window.history.pushState({}, '', newUrl);
                             console.log('✓ Updated URL to:', newUrl);
+                            isFirstMessage = false; // Mark that we've created a conversation
                         }
                     }
                 };
@@ -2270,6 +2271,7 @@ async function handleStreamingResponse(response, messageDiv) {
                             const newUrl = `/etg-writer/chat/${conversationId}`;
                             window.history.pushState({}, '', newUrl);
                             console.log('✓ Updated URL to:', newUrl);
+                            isFirstMessage = false; // Mark that we've created a conversation
                         }
                     }
                 };

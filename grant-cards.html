@@ -2266,6 +2266,7 @@ const streamingMessageDiv = addStreamingMessage('assistant');
                             const newUrl = `/grant-cards/chat/${conversationId}`;
                             window.history.pushState({}, '', newUrl);
                             console.log('✓ Updated URL to:', newUrl);
+                            isFirstMessage = false; // Mark that we've created a conversation
                         }
                     }
                 };
@@ -2382,6 +2383,7 @@ const streamingMessageDiv = addStreamingMessage('assistant');
                             const newUrl = `/grant-cards/chat/${conversationId}`;
                             window.history.pushState({}, '', newUrl);
                             console.log('✓ Updated URL to:', newUrl);
+                            isFirstMessage = false; // Mark that we've created a conversation
                         }
                     }
                 };
