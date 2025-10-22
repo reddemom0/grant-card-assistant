@@ -25,6 +25,7 @@ import {
 
 // Authentication
 import authRouter from './src/api/auth.js';
+import { authenticateUser } from './src/middleware/auth.js';
 
 // Database
 import { testConnection, getPoolStats } from './src/database/connection.js';
@@ -105,8 +106,8 @@ app.get('/health', async (req, res) => {
 // NEW DIRECT API ENDPOINTS
 // ============================================================================
 
-// Main chat endpoint (SSE streaming)
-app.post('/api/chat', handleChatRequest);
+// Main chat endpoint (SSE streaming) - with authentication
+app.post('/api/chat', authenticateUser, handleChatRequest);
 
 // Conversation management
 app.get('/api/conversations/:id', handleGetConversation);

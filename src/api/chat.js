@@ -70,26 +70,16 @@ export async function handleChatRequest(req, res) {
       convId = uuidv4();
       isNewConversation = true;
 
-      // Use userId or null for anonymous users
-      // userId must be a valid UUID if provided
-      const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      let effectiveUserId = null;
-
-      if (userId && userId !== 'anonymous') {
-        // Validate UUID format
-        if (UUID_REGEX.test(userId)) {
-          effectiveUserId = userId;
-        } else {
-          console.warn(`⚠️  Invalid userId format (not a UUID): ${userId}, treating as anonymous`);
-        }
-      }
+      // Get userId from authenticated user (set by middleware)
+      // If no user is authenticated, use null (anonymous)
+      const effectiveUserId = req.user?.id || null;
 
       // Generate title from first message
       const title = message.substring(0, 100);
 
       await createConversation(convId, effectiveUserId, agentType, title);
 
-      console.log(`✓ New conversation created: ${convId} (user: ${effectiveUserId || 'anonymous'})`);
+      console.log(`✓ New conversation created: ${convId} (user: ${req.user?.email || 'anonymous'})`);
     } else {
       // Verify existing conversation
       const conversation = await getConversation(convId);
