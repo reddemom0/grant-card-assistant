@@ -2253,6 +2253,15 @@ const streamingMessageDiv = addStreamingMessage('assistant');
                 let fullContent = '';
 
                 // Setup ChatClient callbacks
+                chatClient.onConnected = (data) => {
+                    console.log('✓ Connected to agent:', data);
+                    // Capture conversationId from backend
+                    if (data.conversationId && !conversationId) {
+                        conversationId = data.conversationId;
+                        console.log('✓ Captured conversationId from backend:', conversationId);
+                    }
+                };
+
                 chatClient.onTextDelta = (text) => {
                     fullContent += text;
                     updateStreamingMessage(streamingMessageDiv, fullContent, false);
@@ -2274,10 +2283,11 @@ const streamingMessageDiv = addStreamingMessage('assistant');
                 };
 
                 // Send message with new Direct API
+                // On first message, don't pass conversationId - let backend create it
                 await chatClient.sendMessage({
                     message: message || '',
                     agentType: 'grant-card-generator',
-                    conversationId: conversationId,
+                    conversationId: isFirstMessage ? null : conversationId,
                     attachments: attachments
                 });
 
@@ -2351,6 +2361,15 @@ const streamingMessageDiv = addStreamingMessage('assistant');
                 let fullContent = '';
 
                 // Setup ChatClient callbacks
+                chatClient.onConnected = (data) => {
+                    console.log('✓ Connected to agent:', data);
+                    // Capture conversationId from backend
+                    if (data.conversationId && !conversationId) {
+                        conversationId = data.conversationId;
+                        console.log('✓ Captured conversationId from backend:', conversationId);
+                    }
+                };
+
                 chatClient.onTextDelta = (text) => {
                     fullContent += text;
                     updateStreamingMessage(streamingMessageDiv, fullContent, false);
