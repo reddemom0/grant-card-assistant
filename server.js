@@ -157,6 +157,40 @@ app.get('/api/pdf/batch/:batchId', pdfHandler.getBatchStatus);
 app.get('/api/pdf/batch/:batchId/results', pdfHandler.getBatchResults);
 
 // ============================================================================
+// HTML PAGE ROUTES (Clean URLs)
+// ============================================================================
+
+// Serve agent HTML pages with clean URLs
+app.get('/grant-cards', (req, res) => {
+  res.sendFile('grant-cards.html', { root: '.' });
+});
+
+app.get('/etg-writer', (req, res) => {
+  res.sendFile('etg-agent.html', { root: '.' });
+});
+
+app.get('/bcafe-writer', (req, res) => {
+  res.sendFile('bcafe-agent.html', { root: '.' });
+});
+
+app.get('/canexport-claims', (req, res) => {
+  res.sendFile('canexport-claims.html', { root: '.' });
+});
+
+app.get('/dashboard', (req, res) => {
+  res.sendFile('dashboard.html', { root: '.' });
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile('login.html', { root: '.' });
+});
+
+// Serve root as login page
+app.get('/', (req, res) => {
+  res.sendFile('login.html', { root: '.' });
+});
+
+// ============================================================================
 // STATIC FILES
 // ============================================================================
 
