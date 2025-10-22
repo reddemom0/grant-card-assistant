@@ -61,6 +61,11 @@ export async function getConversationMessages(conversationId) {
       try {
         // Try to parse as JSON
         content = JSON.parse(row.content);
+
+        // Filter out thinking blocks (they require a signature field we don't have)
+        if (Array.isArray(content)) {
+          content = content.filter(block => block.type !== 'thinking');
+        }
       } catch (e) {
         // If not valid JSON, treat as plain text
         content = row.content;
