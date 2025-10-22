@@ -240,10 +240,15 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
 
+        // Filter out thinking blocks (they need a signature field that we don't have)
+        const contentWithoutThinking = fullResponse.content.filter(
+          block => block.type !== 'thinking'
+        );
+
         // Add assistant response to messages
         messages.push({
           role: 'assistant',
-          content: fullResponse.content
+          content: contentWithoutThinking
         });
 
         // Extract and execute tool calls
