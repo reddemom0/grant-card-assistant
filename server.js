@@ -30,6 +30,7 @@ import { authenticateUser } from './src/middleware/auth.js';
 // Database
 import { testConnection, getPoolStats } from './src/database/connection.js';
 import { getAvailableAgents } from './src/agents/load-agents.js';
+import { autoMigrate } from './src/database/auto-migrate.js';
 
 config();
 
@@ -235,6 +236,9 @@ async function startServer() {
 
     if (!dbHealthy) {
       console.warn('⚠️  Database connection test failed - continuing anyway');
+    } else {
+      // Run auto-migrations if database is healthy
+      await autoMigrate();
     }
 
     // Check required environment variables
