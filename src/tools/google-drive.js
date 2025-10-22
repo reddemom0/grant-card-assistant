@@ -103,11 +103,33 @@ export async function searchGoogleDrive(query, fileType = 'any', limit = 10) {
 }
 
 /**
+ * Extract file ID from Google Drive URL or return as-is if already an ID
+ * @param {string} fileIdOrUrl - Google Drive file ID or URL
+ * @returns {string} File ID
+ */
+function extractFileId(fileIdOrUrl) {
+  // If it looks like a URL, extract the file ID
+  if (fileIdOrUrl.includes('drive.google.com') || fileIdOrUrl.includes('docs.google.com')) {
+    // Match patterns like:
+    // https://drive.google.com/file/d/FILE_ID/...
+    // https://docs.google.com/document/d/FILE_ID/...
+    // https://docs.google.com/spreadsheets/d/FILE_ID/...
+    const match = fileIdOrUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (match) {
+      return match[1];
+    }
+  }
+
+  // Otherwise assume it's already a file ID
+  return fileIdOrUrl;
+}
+
+/**
  * Read Google Drive file content
- * @param {string} fileId - Google Drive file ID
+ * @param {string} fileIdOrUrl - Google Drive file ID or full URL
  * @returns {Object} File content and metadata
  */
-export async function readGoogleDriveFile(fileId) {
+export async function readGoogleDriveFile(fileIdOrUrl) {
   if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
     return {
       success: false,
@@ -116,6 +138,10 @@ export async function readGoogleDriveFile(fileId) {
   }
 
   try {
+    // Extract file ID if URL was provided
+    const fileId = extractFileId(fileIdOrUrl);
+    console.log(`Extracted file ID: ${fileId} from input: ${fileIdOrUrl.substring(0, 100)}...`);
+
     const drive = createDriveClient();
 
     // Get file metadata first

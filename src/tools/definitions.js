@@ -203,13 +203,13 @@ export const GOOGLE_DRIVE_TOOLS = [
   },
   {
     name: 'read_google_drive_file',
-    description: 'Read the contents of a specific Google Drive file by ID. Works with Google Docs, PDFs, and text files.',
+    description: 'Read the contents of a specific Google Drive file. Works with Google Docs, PDFs, and text files. Accepts either a Google Drive URL (e.g., https://docs.google.com/document/d/FILE_ID/...) or just the file ID.',
     input_schema: {
       type: 'object',
       properties: {
         file_id: {
           type: 'string',
-          description: 'Google Drive file ID'
+          description: 'Google Drive file ID or full URL (URL will be automatically parsed to extract the file ID)'
         }
       },
       required: ['file_id']
