@@ -240,15 +240,19 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
 
-        // Filter out thinking blocks (they need a signature field that we don't have)
-        const contentWithoutThinking = fullResponse.content.filter(
-          block => block.type !== 'thinking'
-        );
+        // Filter out thinking blocks and remove index field from all blocks
+        // (thinking blocks need a signature field, index field not accepted by Claude API)
+        const cleanedContent = fullResponse.content
+          .filter(block => block.type !== 'thinking')
+          .map(block => {
+            const { index, ...cleanBlock } = block;
+            return cleanBlock;
+          });
 
         // Add assistant response to messages
         messages.push({
           role: 'assistant',
-          content: contentWithoutThinking
+          content: cleanedContent
         });
 
         // Extract and execute tool calls
