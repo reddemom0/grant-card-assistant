@@ -8,30 +8,55 @@
 
 import { google } from 'googleapis';
 
-// OAuth2 credentials from environment
+// OAuth2 credentials from environment (for user access)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
 const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
 
+// Service Account credentials from environment (for knowledge base access)
+const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+
 /**
  * Create authenticated Google Drive client
+ * Tries OAuth2 first (user credentials), falls back to Service Account
  * @returns {Object} Google Drive API client
  */
 function createDriveClient() {
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
-    throw new Error('Google Drive credentials not configured. Set GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, and GOOGLE_DRIVE_REFRESH_TOKEN.');
+  // Try OAuth2 first (preferred for user file access)
+  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
+    console.log('Using OAuth2 credentials for Google Drive');
+    const oauth2Client = new google.auth.OAuth2(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      refresh_token: GOOGLE_REFRESH_TOKEN
+    });
+
+    return google.drive({ version: 'v3', auth: oauth2Client });
   }
 
-  const oauth2Client = new google.auth.OAuth2(
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET
-  );
+  // Fall back to Service Account (for knowledge base files)
+  if (GOOGLE_SERVICE_ACCOUNT_KEY) {
+    console.log('Using Service Account credentials for Google Drive');
+    try {
+      const serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
+      const auth = new google.auth.GoogleAuth({
+        credentials: serviceAccount,
+        scopes: [
+          'https://www.googleapis.com/auth/drive.readonly',
+          'https://www.googleapis.com/auth/documents.readonly'
+        ]
+      });
 
-  oauth2Client.setCredentials({
-    refresh_token: GOOGLE_REFRESH_TOKEN
-  });
+      return google.drive({ version: 'v3', auth });
+    } catch (error) {
+      throw new Error('Invalid Service Account JSON: ' + error.message);
+    }
+  }
 
-  return google.drive({ version: 'v3', auth: oauth2Client });
+  throw new Error('Google Drive credentials not configured. Set either (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN) or GOOGLE_SERVICE_ACCOUNT_KEY.');
 }
 
 /**
@@ -42,14 +67,6 @@ function createDriveClient() {
  * @returns {Object} Search results
  */
 export async function searchGoogleDrive(query, fileType = 'any', limit = 10) {
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
-    return {
-      success: false,
-      error: 'Google Drive credentials not configured',
-      files: []
-    };
-  }
-
   try {
     const drive = createDriveClient();
 
@@ -130,13 +147,6 @@ function extractFileId(fileIdOrUrl) {
  * @returns {Object} File content and metadata
  */
 export async function readGoogleDriveFile(fileIdOrUrl) {
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
-    return {
-      success: false,
-      error: 'Google Drive credentials not configured'
-    };
-  }
-
   try {
     // Extract file ID if URL was provided
     const fileId = extractFileId(fileIdOrUrl);
@@ -223,14 +233,6 @@ export async function readGoogleDriveFile(fileIdOrUrl) {
  * @returns {Object} List of files
  */
 export async function listFilesInFolder(folderId, limit = 20) {
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
-    return {
-      success: false,
-      error: 'Google Drive credentials not configured',
-      files: []
-    };
-  }
-
   try {
     const drive = createDriveClient();
 
