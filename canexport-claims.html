@@ -1429,9 +1429,15 @@
 
                 // Load conversation history from server
                 loadConversationHistory().then(data => {
+                    console.log('📦 Received conversation data:', data);
                     if (data && data.messages) {
+                        console.log(`✅ Found ${data.messages.length} messages, restoring UI...`);
                         restoreConversationUI(data);
+                    } else {
+                        console.warn('⚠️ No messages found in conversation data:', data);
                     }
+                }).catch(error => {
+                    console.error('❌ Failed to load conversation history:', error);
                 });
 
                 return null;
