@@ -18,26 +18,11 @@ const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
 /**
  * Create authenticated Google Drive client
- * Tries OAuth2 first (user credentials), falls back to Service Account
+ * Tries Service Account first (more reliable), falls back to OAuth2
  * @returns {Object} Google Drive API client
  */
 function createDriveClient() {
-  // Try OAuth2 first (preferred for user file access)
-  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
-    console.log('Using OAuth2 credentials for Google Drive');
-    const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET
-    );
-
-    oauth2Client.setCredentials({
-      refresh_token: GOOGLE_REFRESH_TOKEN
-    });
-
-    return google.drive({ version: 'v3', auth: oauth2Client });
-  }
-
-  // Fall back to Service Account (for knowledge base files)
+  // Try Service Account first (most reliable, works for shared files)
   if (GOOGLE_SERVICE_ACCOUNT_KEY) {
     console.log('Using Service Account credentials for Google Drive');
     try {
@@ -52,11 +37,27 @@ function createDriveClient() {
 
       return google.drive({ version: 'v3', auth });
     } catch (error) {
-      throw new Error('Invalid Service Account JSON: ' + error.message);
+      console.error('Service Account auth failed:', error.message);
+      // Fall through to OAuth2
     }
   }
 
-  throw new Error('Google Drive credentials not configured. Set either (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN) or GOOGLE_SERVICE_ACCOUNT_KEY.');
+  // Fall back to OAuth2 (requires valid refresh token)
+  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
+    console.log('Using OAuth2 credentials for Google Drive');
+    const oauth2Client = new google.auth.OAuth2(
+      GOOGLE_CLIENT_ID,
+      GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      refresh_token: GOOGLE_REFRESH_TOKEN
+    });
+
+    return google.drive({ version: 'v3', auth: oauth2Client });
+  }
+
+  throw new Error('Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_KEY or (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN).');
 }
 
 /**
