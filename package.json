@@ -21,6 +21,7 @@
     "@anthropic-ai/claude-agent-sdk": "^0.1.21",
     "@anthropic-ai/claude-code": "^2.0.24",
     "@anthropic-ai/sdk": "^0.32.0",
+    "@hubspot/api-client": "^13.4.0",
     "@upstash/redis": "^1.25.1",
     "axios": "^1.7.0",
     "axios-retry": "^4.5.0",

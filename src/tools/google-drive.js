@@ -18,23 +18,34 @@ const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
 /**
  * Create authenticated Google Drive client
- * Tries Service Account first (more reliable), falls back to OAuth2
+ * Tries Service Account with domain-wide delegation first, falls back to OAuth2
+ * @param {string} userEmail - Optional: User email to impersonate (for domain-wide delegation)
  * @returns {Object} Google Drive API client
  */
-function createDriveClient() {
-  // Try Service Account first (most reliable, works for shared files)
+function createDriveClient(userEmail = null) {
+  // Try Service Account first (most reliable, works with domain-wide delegation)
   if (GOOGLE_SERVICE_ACCOUNT_KEY) {
-    console.log('Using Service Account credentials for Google Drive');
     try {
       const serviceAccount = JSON.parse(GOOGLE_SERVICE_ACCOUNT_KEY);
-      const auth = new google.auth.GoogleAuth({
+
+      const authConfig = {
         credentials: serviceAccount,
         scopes: [
           'https://www.googleapis.com/auth/drive.readonly',
           'https://www.googleapis.com/auth/documents.readonly'
         ]
-      });
+      };
 
+      // If userEmail provided, use domain-wide delegation to impersonate that user
+      // This allows accessing files the user has access to without manual sharing
+      if (userEmail) {
+        console.log(`Using Service Account with domain-wide delegation (impersonating: ${userEmail})`);
+        authConfig.subject = userEmail;
+      } else {
+        console.log('Using Service Account credentials for Google Drive');
+      }
+
+      const auth = new google.auth.GoogleAuth(authConfig);
       return google.drive({ version: 'v3', auth });
     } catch (error) {
       console.error('Service Account auth failed:', error.message);
@@ -65,11 +76,12 @@ function createDriveClient() {
  * @param {string} query - Search query (file name or content keywords)
  * @param {string} fileType - Filter by file type: 'document', 'pdf', 'spreadsheet', or 'any'
  * @param {number} limit - Maximum number of results
+ * @param {string} userEmail - Optional: User email for domain-wide delegation
  * @returns {Object} Search results
  */
-export async function searchGoogleDrive(query, fileType = 'any', limit = 10) {
+export async function searchGoogleDrive(query, fileType = 'any', limit = 10, userEmail = null) {
   try {
-    const drive = createDriveClient();
+    const drive = createDriveClient(userEmail);
 
     // Build MIME type filter
     let mimeTypeQuery = '';
@@ -145,15 +157,16 @@ function extractFileId(fileIdOrUrl) {
 /**
  * Read Google Drive file content
  * @param {string} fileIdOrUrl - Google Drive file ID or full URL
+ * @param {string} userEmail - Optional: User email for domain-wide delegation
  * @returns {Object} File content and metadata
  */
-export async function readGoogleDriveFile(fileIdOrUrl) {
+export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
   try {
     // Extract file ID if URL was provided
     const fileId = extractFileId(fileIdOrUrl);
     console.log(`Extracted file ID: ${fileId} from input: ${fileIdOrUrl.substring(0, 100)}...`);
 
-    const drive = createDriveClient();
+    const drive = createDriveClient(userEmail);
 
     // Get file metadata first
     const metadata = await drive.files.get({
@@ -231,11 +244,12 @@ export async function readGoogleDriveFile(fileIdOrUrl) {
  * List files in a specific folder (utility function)
  * @param {string} folderId - Google Drive folder ID
  * @param {number} limit - Maximum number of results
+ * @param {string} userEmail - Optional: User email for domain-wide delegation
  * @returns {Object} List of files
  */
-export async function listFilesInFolder(folderId, limit = 20) {
+export async function listFilesInFolder(folderId, limit = 20, userEmail = null) {
   try {
-    const drive = createDriveClient();
+    const drive = createDriveClient(userEmail);
 
     const response = await drive.files.list({
       q: `'${folderId}' in parents and trashed=false`,

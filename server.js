@@ -133,6 +133,241 @@ app.get('/api/agents', async (req, res) => {
 });
 
 // ============================================================================
+// HUBSPOT CRM INTEGRATION (Read-Only)
+// ============================================================================
+
+import hubspotService from './services/hubspot-service.js';
+
+// HubSpot status check
+app.get('/api/hubspot/status', authenticateUser, async (req, res) => {
+  try {
+    const isConfigured = hubspotService.isConfigured();
+
+    res.json({
+      status: isConfigured ? 'configured' : 'not_configured',
+      message: isConfigured
+        ? 'HubSpot integration is active'
+        : 'HUBSPOT_ACCESS_TOKEN environment variable not set',
+      readOnly: true,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to check HubSpot status',
+      details: error.message
+    });
+  }
+});
+
+// Search contacts by email
+app.get('/api/hubspot/contacts/search', authenticateUser, async (req, res) => {
+  try {
+    const { email } = req.query;
+
+    if (!email) {
+      return res.status(400).json({
+        error: 'Email parameter is required',
+        usage: '/api/hubspot/contacts/search?email=user@example.com'
+      });
+    }
+
+    if (!hubspotService.isConfigured()) {
+      return res.status(503).json({
+        error: 'HubSpot integration not configured',
+        message: 'HUBSPOT_ACCESS_TOKEN environment variable not set'
+      });
+    }
+
+    const contact = await hubspotService.findContactByEmail(email);
+
+    if (!contact) {
+      return res.status(404).json({
+        error: 'Contact not found',
+        email
+      });
+    }
+
+    res.json({
+      success: true,
+      contact
+    });
+  } catch (error) {
+    console.error('Error searching contact by email:', error);
+    res.status(500).json({
+      error: 'Failed to search contact',
+      details: error.message
+    });
+  }
+});
+
+// Get contact by ID
+app.get('/api/hubspot/contacts/:contactId', authenticateUser, async (req, res) => {
+  try {
+    const { contactId } = req.params;
+
+    if (!hubspotService.isConfigured()) {
+      return res.status(503).json({
+        error: 'HubSpot integration not configured',
+        message: 'HUBSPOT_ACCESS_TOKEN environment variable not set'
+      });
+    }
+
+    const contact = await hubspotService.getContact(contactId);
+
+    res.json({
+      success: true,
+      contact
+    });
+  } catch (error) {
+    console.error('Error getting contact:', error);
+    res.status(500).json({
+      error: 'Failed to get contact',
+      details: error.message,
+      contactId: req.params.contactId
+    });
+  }
+});
+
+// Get recent contacts
+app.get('/api/hubspot/contacts/recent', authenticateUser, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+
+    if (limit > 100) {
+      return res.status(400).json({
+        error: 'Limit cannot exceed 100',
+        provided: limit
+      });
+    }
+
+    if (!hubspotService.isConfigured()) {
+      return res.status(503).json({
+        error: 'HubSpot integration not configured',
+        message: 'HUBSPOT_ACCESS_TOKEN environment variable not set'
+      });
+    }
+
+    const contacts = await hubspotService.getRecentContacts(limit);
+
+    res.json({
+      success: true,
+      count: contacts.length,
+      contacts
+    });
+  } catch (error) {
+    console.error('Error getting recent contacts:', error);
+    res.status(500).json({
+      error: 'Failed to get recent contacts',
+      details: error.message
+    });
+  }
+});
+
+// Search companies
+app.get('/api/hubspot/companies/search', authenticateUser, async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        error: 'Query parameter "q" is required',
+        usage: '/api/hubspot/companies/search?q=company+name'
+      });
+    }
+
+    if (!hubspotService.isConfigured()) {
+      return res.status(503).json({
+        error: 'HubSpot integration not configured',
+        message: 'HUBSPOT_ACCESS_TOKEN environment variable not set'
+      });
+    }
+
+    const limit = parseInt(req.query.limit) || 10;
+    const companies = await hubspotService.findCompany(q, limit);
+
+    res.json({
+      success: true,
+      count: companies.length,
+      query: q,
+      companies
+    });
+  } catch (error) {
+    console.error('Error searching companies:', error);
+    res.status(500).json({
+      error: 'Failed to search companies',
+      details: error.message
+    });
+  }
+});
+
+// Search deals
+app.get('/api/hubspot/deals/search', authenticateUser, async (req, res) => {
+  try {
+    const { q } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        error: 'Query parameter "q" is required',
+        usage: '/api/hubspot/deals/search?q=deal+name'
+      });
+    }
+
+    if (!hubspotService.isConfigured()) {
+      return res.status(503).json({
+        error: 'HubSpot integration not configured',
+        message: 'HUBSPOT_ACCESS_TOKEN environment variable not set'
+      });
+    }
+
+    const limit = parseInt(req.query.limit) || 10;
+    const deals = await hubspotService.searchDeals(q, limit);
+
+    res.json({
+      success: true,
+      count: deals.length,
+      query: q,
+      deals
+    });
+  } catch (error) {
+    console.error('Error searching deals:', error);
+    res.status(500).json({
+      error: 'Failed to search deals',
+      details: error.message
+    });
+  }
+});
+
+// Get deals for a contact
+app.get('/api/hubspot/contacts/:contactId/deals', authenticateUser, async (req, res) => {
+  try {
+    const { contactId } = req.params;
+
+    if (!hubspotService.isConfigured()) {
+      return res.status(503).json({
+        error: 'HubSpot integration not configured',
+        message: 'HUBSPOT_ACCESS_TOKEN environment variable not set'
+      });
+    }
+
+    const deals = await hubspotService.getContactDeals(contactId);
+
+    res.json({
+      success: true,
+      contactId,
+      count: deals.length,
+      deals
+    });
+  } catch (error) {
+    console.error('Error getting contact deals:', error);
+    res.status(500).json({
+      error: 'Failed to get contact deals',
+      details: error.message,
+      contactId: req.params.contactId
+    });
+  }
+});
+
+// ============================================================================
 // LEGACY AGENT SDK ENDPOINT (for backwards compatibility)
 // ============================================================================
 

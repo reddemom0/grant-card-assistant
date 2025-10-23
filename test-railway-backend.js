@@ -247,8 +247,6 @@ async function testMemoryTool() {
   try {
     log('Testing memory storage...', 'blue');
 
-    const conversationId = uuidv4();
-
     const response = await fetch(`${RAILWAY_URL}/api/chat`, {
       method: 'POST',
       headers: {
@@ -256,8 +254,8 @@ async function testMemoryTool() {
       },
       body: JSON.stringify({
         agentType: 'grant-card-generator',
-        message: 'Please use the memory_store tool to remember that my company is "TestCorp" and our revenue is $5M.',
-        conversationId
+        message: 'Please use the memory_store tool to remember that my company is "TestCorp" and our revenue is $5M.'
+        // conversationId omitted - will create new conversation
         // userId omitted - will be treated as anonymous
       })
     });

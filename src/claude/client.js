@@ -283,7 +283,8 @@ export async function runAgent({
             const result = await executeToolCall(
               block.name,
               block.input,
-              conversationId
+              conversationId,
+              userId  // Pass userId for domain-wide delegation
             );
 
             console.log(`  📤 Result:`, JSON.stringify(result, null, 2).substring(0, 200) + '...');

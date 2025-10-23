@@ -15,11 +15,27 @@ import { isServerTool } from './definitions.js';
  * @param {string} toolName - Name of the tool to execute
  * @param {Object} input - Tool input parameters
  * @param {string} conversationId - UUID of the conversation
+ * @param {number} userId - User ID (for domain-wide delegation)
  * @returns {Promise<Object>} Tool execution result
  */
-export async function executeToolCall(toolName, input, conversationId) {
+export async function executeToolCall(toolName, input, conversationId, userId = null) {
   console.log(`🔧 Executing tool: ${toolName}`);
   console.log(`   Input:`, JSON.stringify(input, null, 2));
+
+  // Get user email for domain-wide delegation (Google Drive tools)
+  let userEmail = null;
+  if (userId && (toolName.includes('google_drive') || toolName.includes('search_google'))) {
+    try {
+      const { query } = await import('../database/connection.js');
+      const result = await query('SELECT email FROM users WHERE id = $1', [userId]);
+      if (result.rows.length > 0) {
+        userEmail = result.rows[0].email;
+        console.log(`   User email for domain-wide delegation: ${userEmail}`);
+      }
+    } catch (error) {
+      console.warn(`   Could not fetch user email: ${error.message}`);
+    }
+  }
 
   // Check if this is a server tool (should not reach here)
   if (isServerTool(toolName)) {
@@ -91,12 +107,16 @@ export async function executeToolCall(toolName, input, conversationId) {
         result = await googleDrive.searchGoogleDrive(
           input.query,
           input.file_type,
-          input.limit
+          input.limit,
+          userEmail  // For domain-wide delegation
         );
         break;
 
       case 'read_google_drive_file':
-        result = await googleDrive.readGoogleDriveFile(input.file_id);
+        result = await googleDrive.readGoogleDriveFile(
+          input.file_id,
+          userEmail  // For domain-wide delegation
+        );
         break;
 
       // ============================================================================
