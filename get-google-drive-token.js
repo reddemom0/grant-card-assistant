@@ -9,10 +9,13 @@ import { google } from 'googleapis';
 import http from 'http';
 import { URL } from 'url';
 import { exec } from 'child_process';
+import dotenv from 'dotenv';
 
-// REPLACE THESE WITH YOUR VALUES FROM GOOGLE CLOUD CONSOLE
-const CLIENT_ID = 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com';
-const CLIENT_SECRET = 'YOUR_CLIENT_SECRET_HERE';
+// Load from .env or use command line arguments
+dotenv.config();
+
+const CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID || process.argv[2];
+const CLIENT_SECRET = process.env.GOOGLE_DRIVE_CLIENT_SECRET || process.argv[3];
 const REDIRECT_URI = 'http://localhost:3000/oauth2callback';
 
 console.log('\n' + '='.repeat(80));
@@ -20,14 +23,18 @@ console.log('🔐 Google Drive OAuth Token Generator');
 console.log('='.repeat(80) + '\n');
 
 // Validate credentials
-if (CLIENT_ID === 'YOUR_CLIENT_ID_HERE.apps.googleusercontent.com' ||
-    CLIENT_SECRET === 'YOUR_CLIENT_SECRET_HERE') {
-  console.error('❌ ERROR: You need to edit this file and add your credentials!');
-  console.error('\n📝 Steps:');
-  console.error('   1. Open this file: get-google-drive-token.js');
-  console.error('   2. Replace CLIENT_ID with your Client ID from Google Cloud');
-  console.error('   3. Replace CLIENT_SECRET with your Client Secret');
-  console.error('   4. Save the file and run again: node get-google-drive-token.js\n');
+if (!CLIENT_ID || !CLIENT_SECRET) {
+  console.error('❌ ERROR: Missing Google Cloud credentials!\n');
+  console.error('You can provide credentials in two ways:\n');
+  console.error('Option 1: Add to .env file');
+  console.error('  GOOGLE_DRIVE_CLIENT_ID=your-client-id');
+  console.error('  GOOGLE_DRIVE_CLIENT_SECRET=your-client-secret\n');
+  console.error('Option 2: Pass as command line arguments');
+  console.error('  node get-google-drive-token.js CLIENT_ID CLIENT_SECRET\n');
+  console.error('📝 Get these from Railway:');
+  console.error('  1. Go to Railway dashboard');
+  console.error('  2. Open Variables tab');
+  console.error('  3. Copy GOOGLE_DRIVE_CLIENT_ID and GOOGLE_DRIVE_CLIENT_SECRET\n');
   process.exit(1);
 }
 
