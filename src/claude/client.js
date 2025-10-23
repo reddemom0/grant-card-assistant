@@ -242,15 +242,15 @@ export async function runAgent({
 
         // Clean content blocks: remove index field from all blocks
         // Keep thinking blocks (required when extended thinking is enabled)
-        // but convert them to redacted_thinking with minimal data
+        // but convert them to redacted_thinking format
         const cleanedContent = fullResponse.content.map(block => {
           const { index, ...cleanBlock } = block;
 
-          // Convert thinking blocks to redacted_thinking (requires 'data' field)
+          // Convert thinking blocks to redacted_thinking
+          // Note: redacted_thinking has no additional fields, just the type
           if (block.type === 'thinking') {
             return {
-              type: 'redacted_thinking',
-              data: 'redacted'  // Required field with placeholder
+              type: 'redacted_thinking'
             };
           }
 

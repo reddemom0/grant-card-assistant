@@ -64,21 +64,15 @@ export async function getConversationMessages(conversationId) {
 
         // Clean content blocks
         if (Array.isArray(content)) {
-          content = content.map(block => {
-            // Remove index field (added by streaming but not accepted by Claude API)
-            const { index, ...cleanBlock } = block;
-
-            // Convert thinking blocks to redacted_thinking (no signature field needed)
-            // This is required when extended thinking is enabled with tool use
-            if (block.type === 'thinking') {
-              return {
-                type: 'redacted_thinking',
-                data: 'redacted'  // Required field with placeholder
-              };
-            }
-
-            return cleanBlock;
-          });
+          content = content
+            .map(block => {
+              // Remove index field (added by streaming but not accepted by Claude API)
+              const { index, ...cleanBlock } = block;
+              return cleanBlock;
+            })
+            // Filter out thinking/redacted_thinking blocks entirely
+            // They cause issues when reloaded from database and aren't needed for conversation continuity
+            .filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking');
         }
       } catch (e) {
         // If not valid JSON, treat as plain text
