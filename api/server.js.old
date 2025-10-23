@@ -4855,23 +4855,28 @@ module.exports = async function handler(req, res) {
   try {
     // GET conversation history endpoint
     if (url.startsWith('/api/conversation/') && method === 'GET') {
+      console.log(`🔍 [Handler 1] Matched GET /api/conversation/ - URL: ${url}`);
       const conversationId = url.split('/api/conversation/')[1];
       const userId = getUserIdFromJWT(req);
+      console.log(`🔍 [Handler 1] ConversationId: ${conversationId}, UserId: ${userId}`);
 
       if (!userId) {
+        console.log(`❌ [Handler 1] No userId - returning 401`);
         res.status(401).json({ success: false, message: 'Unauthorized' });
         return;
       }
 
       if (!conversationId) {
+        console.log(`❌ [Handler 1] No conversationId - returning 400`);
         res.status(400).json({ success: false, message: 'Missing conversationId' });
         return;
       }
 
-      console.log(`📖 Loading conversation: ${conversationId} for user: ${userId}`);
+      console.log(`📖 [Handler 1] Loading conversation: ${conversationId} for user: ${userId}`);
 
       try {
         const conversation = await getConversation(conversationId, userId);
+        console.log(`✅ [Handler 1] Got conversation with ${conversation.length} messages`);
 
         res.json({
           success: true,
@@ -4879,8 +4884,9 @@ module.exports = async function handler(req, res) {
           messages: conversation,
           messageCount: conversation.length
         });
+        console.log(`✅ [Handler 1] Response sent successfully`);
       } catch (error) {
-        console.error(`❌ Error loading conversation:`, error);
+        console.error(`❌ [Handler 1] Error loading conversation:`, error);
         res.status(500).json({
           success: false,
           message: 'Failed to load conversation',
@@ -6142,17 +6148,21 @@ Always follow the exact workflows and instructions from the knowledge base docum
       return;
     }
     
-    // Get conversation history
+    // Get conversation history (DUPLICATE - should not be reached if Handler 1 works)
     if (url.startsWith('/api/conversation/') && method === 'GET') {
+      console.log(`⚠️ [Handler 2] DUPLICATE HANDLER REACHED! URL: ${url}`);
       const userId = getUserIdFromJWT(req);
       if (!userId) {
+        console.log(`❌ [Handler 2] No userId - returning 401`);
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;
       }
 
       const conversationId = url.split('/api/conversation/')[1];
+      console.log(`📖 [Handler 2] Getting conversation: ${conversationId}`);
       const conversation = await getConversation(conversationId, userId);
+      console.log(`✅ [Handler 2] Got ${conversation.length} messages`);
       res.json({ messages: conversation });
       return;
     }
