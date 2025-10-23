@@ -1,0 +1,44 @@
+Subject: Quick Request - HubSpot Private App Setup (5 minutes)
+
+Hi [Super Admin Name],
+
+I'm working on enhancing our Granted AI Hub (the grant writing assistant) to pull client information from HubSpot. This will help it provide more personalized and accurate grant proposals.
+
+I need your help creating a "private app" in HubSpot - it's basically a secure, read-only connection that lets our AI assistant look up contacts, companies, and deals when needed.
+
+**What it does:**
+- Gives our AI assistant VIEW-ONLY access to HubSpot contact/company/deal data
+- Similar to giving someone a "read-only" user account, but for our software
+
+**What it CANNOT do:**
+- Change or delete anything
+- Send emails
+- Access settings or billing
+
+**Time needed:** About 5 minutes
+
+**Steps:**
+1. Go to HubSpot → Settings (⚙️) → Integrations → Private Apps
+   (Or: Development → Legacy apps)
+2. Click "Create private app"
+3. Name: "Granted AI Hub - Read Access"
+4. Description: "Read-only access for AI agents to query CRM data"
+5. Go to "Scopes" tab and select these READ permissions:
+   - crm.objects.contacts.read
+   - crm.objects.companies.read
+   - crm.objects.deals.read
+   - crm.lists.read
+6. Click "Create app"
+7. Copy the access token and send it to me securely
+
+**Security:**
+- This is read-only access - it can't modify anything
+- You can delete the app anytime to instantly revoke access
+- The token is stored securely in our encrypted environment variables
+
+I've attached a detailed guide (HUBSPOT-PRIVATE-APP-REQUEST.md) with screenshots and step-by-step instructions if you need more details.
+
+Let me know if you have any questions!
+
+Thanks,
+[Your Name]

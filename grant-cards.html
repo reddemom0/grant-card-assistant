@@ -1346,7 +1346,7 @@
             if (!conversationList) return;
 
             try {
-                const response = await fetch(`${API_BASE}/api/conversations?agent_type=grant-cards`, {
+                const response = await fetch(`${API_BASE}/api/conversations?agentType=grant-card-generator`, {
                     credentials: 'include'
                 });
 

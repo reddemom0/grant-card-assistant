@@ -110,10 +110,10 @@ app.get('/health', async (req, res) => {
 // Main chat endpoint (SSE streaming) - with authentication
 app.post('/api/chat', authenticateUser, handleChatRequest);
 
-// Conversation management
-app.get('/api/conversations/:id', handleGetConversation);
-app.get('/api/conversations', handleListConversations);
-app.delete('/api/conversations/:id', handleDeleteConversation);
+// Conversation management - with authentication
+app.get('/api/conversations/:id', authenticateUser, handleGetConversation);
+app.get('/api/conversations', authenticateUser, handleListConversations);
+app.delete('/api/conversations/:id', authenticateUser, handleDeleteConversation);
 
 // Authentication endpoints
 app.use('/api', authRouter);

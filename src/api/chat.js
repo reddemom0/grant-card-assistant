@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { runAgent } from '../claude/client.js';
 import { createConversation, getConversation } from '../database/messages.js';
 import { isValidAgentType, getAvailableAgents } from '../agents/load-agents.js';
+import { generateAndSaveTitle } from '../utils/conversation-titles.js';
 
 /**
  * Main chat endpoint handler
@@ -74,12 +75,16 @@ export async function handleChatRequest(req, res) {
       // If no user is authenticated, use null (anonymous)
       const effectiveUserId = req.user?.id || null;
 
-      // Generate title from first message
-      const title = message.substring(0, 100);
-
-      await createConversation(convId, effectiveUserId, agentType, title);
+      // Create conversation with placeholder title (will be updated with smart title)
+      const placeholderTitle = message.substring(0, 60).trim() + (message.length > 60 ? '...' : '');
+      await createConversation(convId, effectiveUserId, agentType, placeholderTitle);
 
       console.log(`✓ New conversation created: ${convId} (user: ${req.user?.email || 'anonymous'})`);
+
+      // Generate smart title asynchronously (don't await - happens in background)
+      generateAndSaveTitle(convId, message, agentType).catch(err => {
+        console.error('Failed to generate smart title:', err);
+      });
     } else {
       // Verify existing conversation
       const conversation = await getConversation(convId);
@@ -218,24 +223,38 @@ export async function handleGetConversation(req, res) {
 
 /**
  * List conversations endpoint handler
- * GET /api/conversations?userId=xxx&agentType=xxx
+ * GET /api/conversations?agentType=xxx
  */
 export async function handleListConversations(req, res) {
   try {
-    const { userId, agentType } = req.query;
+    // Get userId from authenticated session
+    const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(400).json({
-        error: 'Missing required query parameter: userId'
+      return res.status(401).json({
+        error: 'Unauthorized: Please log in'
       });
     }
+
+    const { agentType } = req.query;
 
     const { listConversations } = await import('../database/messages.js');
     const conversations = await listConversations(userId, agentType);
 
+    // Transform snake_case to camelCase for frontend
+    const formattedConversations = conversations.map(conv => ({
+      id: conv.id,
+      title: conv.title || 'New Conversation',
+      agentType: conv.agent_type,
+      messageCount: parseInt(conv.message_count || 0),
+      createdAt: conv.created_at,
+      updatedAt: conv.updated_at || conv.last_message_at || conv.created_at,
+      lastMessageAt: conv.last_message_at
+    }));
+
     res.json({
-      count: conversations.length,
-      conversations
+      count: formattedConversations.length,
+      conversations: formattedConversations
     });
   } catch (error) {
     console.error('List conversations error:', error);
