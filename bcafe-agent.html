@@ -2119,22 +2119,43 @@ async function handleStreamingResponse(response, messageDiv) {
         }
 
         // Get user info from JWT token
+        // Get user info from JWT token
         function getUserInfo() {
             const cookies = document.cookie.split(';');
             const authCookie = cookies.find(c => c.trim().startsWith('granted_session='));
 
-            if (!authCookie) return null;
+            if (!authCookie) {
+                console.log('No auth cookie found');
+                return null;
+            }
 
             const token = authCookie.split('=')[1];
             try {
-                // JWT has 3 parts separated by dots
                 const payload = token.split('.')[1];
-                // Decode base64
-                const decoded = JSON.parse(atob(payload));
+                // JWT uses base64url, convert to base64
+                const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+                // Add padding if needed
+                const padded = base64 + '==='.slice((base64.length + 3) % 4);
+                const decoded = JSON.parse(atob(padded));
+
+                // Check if token is expired
+                if (decoded.exp && decoded.exp * 1000 < Date.now()) {
+                    console.log('Token expired, redirecting to login...');
+                    document.cookie = 'granted_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                    window.location.href = '/';
+                    return null;
+                }
+
                 return decoded;
             } catch (e) {
                 console.error('Failed to decode token:', e);
+                // Clear bad token and redirect
+                document.cookie = 'granted_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+                window.location.href = '/';
                 return null;
+            }
+        }
+
             }
         }
 
