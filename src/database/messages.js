@@ -72,7 +72,8 @@ export async function getConversationMessages(conversationId) {
             // This is required when extended thinking is enabled with tool use
             if (block.type === 'thinking') {
               return {
-                type: 'redacted_thinking'
+                type: 'redacted_thinking',
+                data: 'redacted'  // Required field with placeholder
               };
             }
 
