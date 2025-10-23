@@ -2543,10 +2543,18 @@ async function handleStreamingResponse(response, messageDiv) {
 
                 currentAbortController = null;
 
-                // Refresh sidebar if it's open (to show new conversation)
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar && sidebar.classList.contains('open')) {
-                    loadConversationsList();
+                // Always refresh conversation list (whether sidebar is open or not)
+                // This ensures new conversations appear immediately when user opens sidebar
+                loadConversationsList();
+                // Always refresh conversation list (whether sidebar is open or not)
+                // This ensures new conversations appear immediately when user opens sidebar
+                loadConversationsList();
+                // Always refresh conversation list (whether sidebar is open or not)
+                // This ensures new conversations appear immediately when user opens sidebar
+                loadConversationsList();
+                // Always refresh conversation list (whether sidebar is open or not)
+                // This ensures new conversations appear immediately when user opens sidebar
+                loadConversationsList();
                 }
             }
         }
