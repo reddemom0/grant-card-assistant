@@ -1134,7 +1134,7 @@
 
             try {
                 console.log('📥 Loading conversation history:', conversationId);
-                const response = await fetch(`${API_BASE}/api/conversation/${conversationId}`, {
+                const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`, {
                     credentials: 'include'
                 });
 
@@ -1344,7 +1344,7 @@
             }
 
             try {
-                const response = await fetch(`${API_BASE}/api/conversation/${convId}`, {
+                const response = await fetch(`${API_BASE}/api/conversations/${convId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });

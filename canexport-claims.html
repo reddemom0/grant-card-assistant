@@ -1457,7 +1457,7 @@
             if (!conversationId) return null;
 
             try {
-                const response = await fetch(`${API_BASE}/api/conversation/${conversationId}`, {
+                const response = await fetch(`${API_BASE}/api/conversations/${conversationId}`, {
                     credentials: 'include'
                 });
 
@@ -1904,7 +1904,7 @@ async function handleStreamingResponse(response, messageDiv) {
             }
 
             try {
-                const response = await fetch(`${API_BASE}/api/conversation/${convId}`, {
+                const response = await fetch(`${API_BASE}/api/conversations/${convId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });
