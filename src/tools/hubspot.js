@@ -327,27 +327,30 @@ export async function searchGrantApplications(grantProgram = null, status = null
     // Filter by grant program if specified
     // Maps common terms to HubSpot grant_type values
     if (grantProgram) {
-      const programMap = {
-        'canexport': 'CanExport - SME (CanExport)',
-        'canexport sme': 'CanExport - SME (CanExport)',
-        'canexport innovation': 'CanExport - Innovation (CanEx Innovate)',
-        'canex innovate': 'CanExport - Innovation (CanEx Innovate)',
-        'etg': 'ETG - BC',
-        'bcafe': 'BCAFE (BC MDP)',
-        'bc mdp': 'BCAFE (BC MDP)',
-        'csjg': 'Canada-Saskatchewan Job Grant (CSJG) (CSJG)',
-        'csj': 'Canada Summer Jobs (CSJ) (CSJ)',
-        'mitacs': 'MITACS'
-      };
-
       const normalizedProgram = grantProgram.toLowerCase().trim();
-      const mappedValue = programMap[normalizedProgram] || grantProgram;
 
-      // Use CONTAINS_TOKEN for flexible matching
+      // For partial matching, just search for the key term
+      // HubSpot CONTAINS_TOKEN works with individual words
+      let searchTerm = grantProgram;
+
+      // Map common short forms to searchable terms
+      if (normalizedProgram === 'etg') {
+        searchTerm = 'ETG';
+      } else if (normalizedProgram === 'bcafe' || normalizedProgram === 'bc mdp') {
+        searchTerm = 'BCAFE';
+      } else if (normalizedProgram === 'csjg') {
+        searchTerm = 'CSJG';
+      } else if (normalizedProgram === 'csj') {
+        searchTerm = 'CSJ';
+      } else if (normalizedProgram.includes('canexport') || normalizedProgram === 'canex') {
+        searchTerm = 'CanExport';
+      }
+
+      // Use CONTAINS_TOKEN for flexible word matching
       filters.push({
         propertyName: 'grant_type',
         operator: 'CONTAINS_TOKEN',
-        value: mappedValue
+        value: searchTerm
       });
     }
 
@@ -407,7 +410,7 @@ export async function searchGrantApplications(grantProgram = null, status = null
       });
     }
 
-    const response = await client.post('/crm/v3/objects/deals/search', {
+    const searchBody = {
       filterGroups: filters.length > 0 ? [{ filters }] : [],
       properties: [
         'dealname',
@@ -432,9 +435,19 @@ export async function searchGrantApplications(grantProgram = null, status = null
           direction: 'DESCENDING'
         }
       ]
-    });
+    };
+
+    console.log('🔍 HubSpot search query:', JSON.stringify({ filters: searchBody.filterGroups }, null, 2));
+
+    const response = await client.post('/crm/v3/objects/deals/search', searchBody);
 
     console.log(`✓ HubSpot grant applications search: found ${response.data.results.length} results`);
+
+    // Log some sample grant_type values if we got results
+    if (response.data.results.length > 0 && grantProgram) {
+      const sampleTypes = response.data.results.slice(0, 3).map(d => d.properties.grant_type);
+      console.log(`  Sample grant_type values: ${sampleTypes.join(', ')}`);
+    }
 
     return {
       success: true,
