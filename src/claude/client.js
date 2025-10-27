@@ -276,7 +276,8 @@ export async function runAgent({
               block.name,
               block.input,
               conversationId,
-              userId  // Pass userId for domain-wide delegation
+              userId,  // Pass userId for domain-wide delegation
+              agentType  // Pass agentType for agent-specific tool behavior
             );
 
             console.log(`  📤 Result:`, JSON.stringify(result, null, 2).substring(0, 200) + '...');

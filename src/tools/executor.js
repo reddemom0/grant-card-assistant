@@ -16,9 +16,10 @@ import { isServerTool } from './definitions.js';
  * @param {Object} input - Tool input parameters
  * @param {string} conversationId - UUID of the conversation
  * @param {number} userId - User ID (for domain-wide delegation)
+ * @param {string} agentType - Agent type (for agent-specific tool behavior)
  * @returns {Promise<Object>} Tool execution result
  */
-export async function executeToolCall(toolName, input, conversationId, userId = null) {
+export async function executeToolCall(toolName, input, conversationId, userId = null, agentType = null) {
   console.log(`🔧 Executing tool: ${toolName}`);
   console.log(`   Input:`, JSON.stringify(input, null, 2));
 
@@ -91,12 +92,13 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.searchGrantApplications(
           input.grant_program,
           input.status,
-          input.company_name
+          input.company_name,
+          agentType
         );
         break;
 
       case 'get_grant_application':
-        result = await hubspot.getGrantApplication(input.application_id);
+        result = await hubspot.getGrantApplication(input.application_id, agentType);
         break;
 
       // ============================================================================
