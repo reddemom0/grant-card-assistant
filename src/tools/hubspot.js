@@ -305,8 +305,8 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
 
 /**
  * Search grant applications (deals in HubSpot)
- * @param {string|null} grantProgram - Filter by grant program type
- * @param {string|null} status - Filter by application status
+ * @param {string|null} grantProgram - Filter by grant program type (e.g., "CanExport", "ETG", "BCAFE")
+ * @param {string|null} status - Filter by application status (e.g., "approved", "submitted", "open")
  * @param {string|null} companyName - Filter by company name
  * @returns {Object} Search results
  */
@@ -325,30 +325,107 @@ export async function searchGrantApplications(grantProgram = null, status = null
     const filters = [];
 
     // Filter by grant program if specified
+    // Maps common terms to HubSpot grant_type values
     if (grantProgram) {
+      const programMap = {
+        'canexport': 'CanExport - SME (CanExport)',
+        'canexport sme': 'CanExport - SME (CanExport)',
+        'canexport innovation': 'CanExport - Innovation (CanEx Innovate)',
+        'canex innovate': 'CanExport - Innovation (CanEx Innovate)',
+        'etg': 'ETG - BC',
+        'bcafe': 'BCAFE (BC MDP)',
+        'bc mdp': 'BCAFE (BC MDP)',
+        'csjg': 'Canada-Saskatchewan Job Grant (CSJG) (CSJG)',
+        'csj': 'Canada Summer Jobs (CSJ) (CSJ)',
+        'mitacs': 'MITACS'
+      };
+
+      const normalizedProgram = grantProgram.toLowerCase().trim();
+      const mappedValue = programMap[normalizedProgram] || grantProgram;
+
+      // Use CONTAINS_TOKEN for flexible matching
       filters.push({
-        propertyName: 'grant_program',
-        operator: 'EQ',
-        value: grantProgram
+        propertyName: 'grant_type',
+        operator: 'CONTAINS_TOKEN',
+        value: mappedValue
       });
     }
 
     // Filter by status if specified
+    // Maps common status terms to HubSpot field values
     if (status) {
+      const statusLower = status.toLowerCase().trim();
+
+      if (statusLower.includes('approv')) {
+        // Filter by approved_on field being set (not null)
+        filters.push({
+          propertyName: 'approved_on',
+          operator: 'HAS_PROPERTY'
+        });
+      } else if (statusLower.includes('submit')) {
+        // Filter by application_submitted_on being set
+        filters.push({
+          propertyName: 'application_submitted_on',
+          operator: 'HAS_PROPERTY'
+        });
+      } else if (statusLower.includes('won') || statusLower.includes('invoice')) {
+        // Filter by state = Invoice Sent (Won)
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Invoice Sent (Won)'
+        });
+      } else if (statusLower.includes('open')) {
+        // Filter by state = Open
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Open'
+        });
+      } else if (statusLower.includes('lost')) {
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Lost'
+        });
+      } else {
+        // Try as dealstage value
+        filters.push({
+          propertyName: 'dealstage',
+          operator: 'EQ',
+          value: status
+        });
+      }
+    }
+
+    // Filter by company name if specified
+    if (companyName) {
       filters.push({
-        propertyName: 'dealstage',
-        operator: 'EQ',
-        value: status
+        propertyName: 'company_name',
+        operator: 'CONTAINS_TOKEN',
+        value: companyName
       });
     }
 
     const response = await client.post('/crm/v3/objects/deals/search', {
       filterGroups: filters.length > 0 ? [{ filters }] : [],
       properties: [
-        'dealname', 'amount', 'dealstage', 'closedate',
-        'grant_program', 'application_deadline', 'createdate'
+        'dealname',
+        'amount',
+        'dealstage',
+        'closedate',
+        'grant_type',
+        'application_submitted_on',
+        'approved_on',
+        'createdate',
+        'company_name',
+        'state',
+        'ref__',
+        'start_date',
+        'end_date',
+        'client_reimbursement'
       ],
-      limit: 20,
+      limit: 50,
       sorts: [
         {
           propertyName: 'createdate',
@@ -365,12 +442,19 @@ export async function searchGrantApplications(grantProgram = null, status = null
       applications: response.data.results.map(deal => ({
         id: deal.id,
         name: deal.properties.dealname,
-        program: deal.properties.grant_program,
+        program: deal.properties.grant_type,
         amount: deal.properties.amount,
         status: deal.properties.dealstage,
-        deadline: deal.properties.application_deadline,
+        state: deal.properties.state,
+        submittedDate: deal.properties.application_submitted_on,
+        approvedDate: deal.properties.approved_on,
         closeDate: deal.properties.closedate,
-        createdDate: deal.properties.createdate
+        createdDate: deal.properties.createdate,
+        companyName: deal.properties.company_name,
+        refNumber: deal.properties.ref__,
+        startDate: deal.properties.start_date,
+        endDate: deal.properties.end_date,
+        reimbursementAmount: deal.properties.client_reimbursement
       }))
     };
   } catch (error) {
@@ -402,9 +486,25 @@ export async function getGrantApplication(applicationId) {
     const response = await client.get(`/crm/v3/objects/deals/${applicationId}`, {
       params: {
         properties: [
-          'dealname', 'amount', 'dealstage', 'closedate',
-          'grant_program', 'application_deadline',
-          'eligibility_criteria_met', 'required_documents', 'createdate'
+          'dealname',
+          'amount',
+          'dealstage',
+          'closedate',
+          'grant_type',
+          'application_submitted_on',
+          'approved_on',
+          'createdate',
+          'company_name',
+          'state',
+          'ref__',
+          'start_date',
+          'end_date',
+          'client_reimbursement',
+          'claim_approved',
+          'claim_type',
+          'participant_name',
+          'hourly_wage',
+          'hours_per_week'
         ].join(','),
         associations: 'contacts,companies'
       }
