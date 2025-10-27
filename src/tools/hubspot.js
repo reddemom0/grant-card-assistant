@@ -413,20 +413,59 @@ export async function searchGrantApplications(grantProgram = null, status = null
     const searchBody = {
       filterGroups: filters.length > 0 ? [{ filters }] : [],
       properties: [
+        // Core deal info
         'dealname',
-        'amount',
         'dealstage',
+        'dealtype',
         'closedate',
-        'grant_type',
-        'application_submitted_on',
-        'approved_on',
         'createdate',
         'company_name',
         'state',
         'ref__',
+
+        // Grant program details
+        'grant_type',
+        'project_name',
+        'project_number',
+        'grant_reliant',
+        'waitlisted_',
+        'ghost_stage_',
+
+        // Timeline
+        'application_submitted_on',
+        'approved_on',
         'start_date',
         'end_date',
-        'client_reimbursement'
+
+        // Financial (IMPORTANT: Only client_reimbursement, NOT amount)
+        'client_reimbursement',
+        'actual_reimbursement',
+        'retainer',
+        'service_fee',
+
+        // Claims tracking
+        'next_claim_due',
+        'claim_1_due',
+        'claim_1_submitted',
+        'claim_2_due',
+        'claim_2_submitted',
+        'claim_approved',
+        'claimed_so_far',
+        'final_report_submitted',
+
+        // Team & workflow
+        'hubspot_owner_id',
+        'grant_coordinator',
+        'external_writer_assigned',
+        'ra_complete',
+        'budget_complete',
+        'writer_draft_review_completion_date',
+
+        // Additional details
+        'google_drive_link_to_docs',
+        'funding_contribution',
+        'invoice_sent_date',
+        'invoice_due'
       ],
       limit: 50,
       sorts: [
@@ -453,21 +492,64 @@ export async function searchGrantApplications(grantProgram = null, status = null
       success: true,
       count: response.data.results.length,
       applications: response.data.results.map(deal => ({
+        // Core info
         id: deal.id,
         name: deal.properties.dealname,
-        program: deal.properties.grant_type,
-        amount: deal.properties.amount,
-        status: deal.properties.dealstage,
-        state: deal.properties.state,
-        submittedDate: deal.properties.application_submitted_on,
-        approvedDate: deal.properties.approved_on,
-        closeDate: deal.properties.closedate,
-        createdDate: deal.properties.createdate,
         companyName: deal.properties.company_name,
         refNumber: deal.properties.ref__,
+
+        // Grant program
+        program: deal.properties.grant_type,
+        dealType: deal.properties.dealtype,
+        projectName: deal.properties.project_name,
+        projectNumber: deal.properties.project_number,
+        grantReliant: deal.properties.grant_reliant,
+        waitlisted: deal.properties.waitlisted_,
+        grantComplete: deal.properties.ghost_stage_,
+
+        // Status
+        status: deal.properties.dealstage,
+        state: deal.properties.state,
+
+        // Timeline
+        createdDate: deal.properties.createdate,
+        submittedDate: deal.properties.application_submitted_on,
+        approvedDate: deal.properties.approved_on,
         startDate: deal.properties.start_date,
         endDate: deal.properties.end_date,
-        reimbursementAmount: deal.properties.client_reimbursement
+        closeDate: deal.properties.closedate,
+
+        // Financial (ONLY reimbursement amounts, NO deal.amount field)
+        approvedFunding: deal.properties.client_reimbursement,
+        actualReimbursement: deal.properties.actual_reimbursement,
+        retainerAmount: deal.properties.retainer,
+        serviceFee: deal.properties.service_fee,
+
+        // Claims
+        nextClaimDue: deal.properties.next_claim_due,
+        claim1Due: deal.properties.claim_1_due,
+        claim1Submitted: deal.properties.claim_1_submitted,
+        claim2Due: deal.properties.claim_2_due,
+        claim2Submitted: deal.properties.claim_2_submitted,
+        claimApproved: deal.properties.claim_approved,
+        claimedSoFar: deal.properties.claimed_so_far,
+        finalReportSubmitted: deal.properties.final_report_submitted,
+
+        // Team
+        ownerId: deal.properties.hubspot_owner_id,
+        grantCoordinator: deal.properties.grant_coordinator,
+        externalWriter: deal.properties.external_writer_assigned,
+
+        // Workflow status
+        raComplete: deal.properties.ra_complete,
+        budgetComplete: deal.properties.budget_complete,
+        writerDraftReviewDate: deal.properties.writer_draft_review_completion_date,
+
+        // Additional
+        googleDriveLink: deal.properties.google_drive_link_to_docs,
+        fundingContribution: deal.properties.funding_contribution,
+        invoiceSentDate: deal.properties.invoice_sent_date,
+        invoiceDueDate: deal.properties.invoice_due
       }))
     };
   } catch (error) {
@@ -499,21 +581,67 @@ export async function getGrantApplication(applicationId) {
     const response = await client.get(`/crm/v3/objects/deals/${applicationId}`, {
       params: {
         properties: [
+          // Core deal info
           'dealname',
-          'amount',
           'dealstage',
+          'dealtype',
           'closedate',
-          'grant_type',
-          'application_submitted_on',
-          'approved_on',
           'createdate',
           'company_name',
           'state',
           'ref__',
+
+          // Grant program details
+          'grant_type',
+          'project_name',
+          'project_number',
+          'grant_reliant',
+          'waitlisted_',
+          'ghost_stage_',
+
+          // Timeline
+          'application_submitted_on',
+          'approved_on',
           'start_date',
           'end_date',
+
+          // Financial (IMPORTANT: Only client_reimbursement, NOT amount)
           'client_reimbursement',
+          'actual_reimbursement',
+          'retainer',
+          'service_fee',
+
+          // Claims tracking
+          'next_claim_due',
+          'claim_1_due',
+          'claim_1_submitted',
+          'claim_2_due',
+          'claim_2_submitted',
+          'claim_3_due',
+          'claim_3_submitted',
+          'claim_4_due',
+          'claim_4_submitted',
           'claim_approved',
+          'claimed_so_far',
+          'final_report_submitted',
+
+          // Team & workflow
+          'hubspot_owner_id',
+          'grant_coordinator',
+          'external_writer_assigned',
+          'ra_complete',
+          'budget_complete',
+          'writer_draft_review_completion_date',
+
+          // Additional details
+          'google_drive_link_to_docs',
+          'funding_contribution',
+          'invoice_sent_date',
+          'invoice_due',
+          'retainer_date_sent',
+          'retainer_date_paid',
+
+          // Legacy hiring program fields (kept for compatibility)
           'claim_type',
           'participant_name',
           'hourly_wage',

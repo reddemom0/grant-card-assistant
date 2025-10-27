@@ -133,7 +133,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'search_grant_applications',
-    description: 'Search for grant applications (HubSpot deals) by program type, status, company, or other criteria. Returns application details including IMPORTANT: reimbursementAmount (the actual approved funding amount from client_reimbursement field) and amount (deal value - ignore this). Always use reimbursementAmount when referring to approved funding amounts.',
+    description: 'Search for grant applications (HubSpot deals) by program type, status, company, or other criteria. Returns comprehensive application details including: approvedFunding (the ACTUAL approved funding amount - always use this for funding amounts), project details, team assignments, claim status, timeline, and workflow status. The results DO NOT include the misleading "amount" field - only the accurate approvedFunding field.',
     input_schema: {
       type: 'object',
       properties: {
@@ -156,7 +156,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'get_grant_application',
-    description: 'Get complete details for a specific grant application including all custom properties, associated contacts, and company information. IMPORTANT: Use client_reimbursement field for approved funding amounts, not the amount field.',
+    description: 'Get complete details for a specific grant application including all custom properties, associated contacts, company information, project details, team assignments, claim tracking, and financial information. Returns the actual approved funding amount in client_reimbursement field. The misleading "amount" field is NOT included in the response.',
     input_schema: {
       type: 'object',
       properties: {
