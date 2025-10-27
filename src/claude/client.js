@@ -241,22 +241,13 @@ export async function runAgent({
         console.log('🔧 Agent requested tool use');
 
         // Clean content blocks: remove index field from all blocks
-        // Keep thinking blocks (required when extended thinking is enabled)
-        // but convert them to redacted_thinking format
-        const cleanedContent = fullResponse.content.map(block => {
-          const { index, ...cleanBlock } = block;
-
-          // Convert thinking blocks to redacted_thinking
-          // redacted_thinking requires a 'data' field with the thinking content
-          if (block.type === 'thinking') {
-            return {
-              type: 'redacted_thinking',
-              data: block.thinking || '' // Use the thinking text or empty string
-            };
-          }
-
-          return cleanBlock;
-        });
+        // Filter out thinking blocks entirely - they cause issues when sent back to API
+        const cleanedContent = fullResponse.content
+          .map(block => {
+            const { index, ...cleanBlock } = block;
+            return cleanBlock;
+          })
+          .filter(block => block.type !== 'thinking');
 
         // Add assistant response to messages
         messages.push({
