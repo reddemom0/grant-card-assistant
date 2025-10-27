@@ -247,10 +247,11 @@ export async function runAgent({
           const { index, ...cleanBlock } = block;
 
           // Convert thinking blocks to redacted_thinking
-          // Note: redacted_thinking has no additional fields, just the type
+          // redacted_thinking requires a 'data' field with the thinking content
           if (block.type === 'thinking') {
             return {
-              type: 'redacted_thinking'
+              type: 'redacted_thinking',
+              data: block.thinking || '' // Use the thinking text or empty string
             };
           }
 
