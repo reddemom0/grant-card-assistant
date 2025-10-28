@@ -785,9 +785,9 @@ export async function getProjectEmailHistory(dealId, limit = 20) {
   try {
     const client = createHubSpotClient();
 
-    // Use Search API to find all emails associated with the deal
-    // This includes emails in the activity timeline, not just direct associations
-    const searchResponse = await client.post('/crm/v3/objects/emails/search', {
+    // STRATEGY 1: Try to get emails directly associated with the deal
+    console.log(`🔍 Searching for emails directly associated with deal ${dealId}...`);
+    const directSearchResponse = await client.post('/crm/v3/objects/emails/search', {
       filterGroups: [{
         filters: [{
           propertyName: 'associations.deal',
@@ -809,11 +809,83 @@ export async function getProjectEmailHistory(dealId, limit = 20) {
         propertyName: 'hs_timestamp',
         direction: 'DESCENDING'
       }],
-      limit: Math.min(limit, 100) // HubSpot max is 100
+      limit: Math.min(limit, 100)
     });
 
-    if (!searchResponse.data.results || searchResponse.data.results.length === 0) {
-      console.log(`ℹ️  No emails found for deal ${dealId} (checked activity timeline)`);
+    const directEmails = directSearchResponse.data.results || [];
+    console.log(`  Found ${directEmails.length} emails directly associated with deal`);
+
+    // STRATEGY 2: If no direct emails, get emails from deal's contacts
+    let contactEmails = [];
+    if (directEmails.length === 0) {
+      console.log(`🔍 No direct email associations found. Searching contacts...`);
+
+      // Get the deal with its contact associations
+      const dealResponse = await client.get(`/crm/v3/objects/deals/${dealId}`, {
+        params: {
+          associations: 'contacts'
+        }
+      });
+
+      const deal = dealResponse.data;
+      const contactAssociations = deal.associations?.contacts?.results || [];
+      console.log(`  Deal has ${contactAssociations.length} associated contact(s)`);
+
+      if (contactAssociations.length > 0) {
+        // Get emails from each contact
+        const emailPromises = contactAssociations.map(async (contactAssoc) => {
+          try {
+            const contactEmailsResponse = await client.get(
+              `/crm/v3/objects/contacts/${contactAssoc.id}/associations/emails`
+            );
+            return contactEmailsResponse.data.results || [];
+          } catch (error) {
+            console.error(`  ⚠️  Error fetching emails for contact ${contactAssoc.id}:`, error.message);
+            return [];
+          }
+        });
+
+        const contactEmailResults = await Promise.all(emailPromises);
+        const emailIds = [...new Set(contactEmailResults.flat().map(e => e.id))]; // Deduplicate
+        console.log(`  Found ${emailIds.length} unique email(s) from contacts`);
+
+        // Fetch full email details
+        if (emailIds.length > 0) {
+          const emailDetailsPromises = emailIds.map(async (emailId) => {
+            try {
+              const emailResponse = await client.get(`/crm/v3/objects/emails/${emailId}`, {
+                params: {
+                  properties: [
+                    'hs_email_subject',
+                    'hs_email_text',
+                    'hs_timestamp',
+                    'hs_email_from',
+                    'hs_email_to',
+                    'hs_email_status',
+                    'hs_email_direction',
+                    'hs_attachment_ids'
+                  ]
+                }
+              });
+              return emailResponse.data;
+            } catch (error) {
+              console.error(`  ⚠️  Error fetching email ${emailId}:`, error.message);
+              return null;
+            }
+          });
+
+          const emailDetails = await Promise.all(emailDetailsPromises);
+          contactEmails = emailDetails.filter(e => e !== null);
+          console.log(`  ✓ Retrieved ${contactEmails.length} email details from contacts`);
+        }
+      }
+    }
+
+    // Combine both sources
+    const allEmailResults = [...directEmails, ...contactEmails];
+
+    if (allEmailResults.length === 0) {
+      console.log(`ℹ️  No emails found for deal ${dealId} (checked both deal associations and contacts)`);
       return {
         success: true,
         count: 0,
@@ -829,7 +901,7 @@ export async function getProjectEmailHistory(dealId, limit = 20) {
 
     // Format email results with truncated bodies to prevent context overflow
     const MAX_EMAIL_BODY_LENGTH = 500; // Limit email body to 500 chars for context efficiency
-    const emails = searchResponse.data.results.map(email => {
+    const emails = allEmailResults.map(email => {
       const fullBody = email.properties.hs_email_text || '';
       const truncatedBody = fullBody.length > MAX_EMAIL_BODY_LENGTH
         ? fullBody.substring(0, MAX_EMAIL_BODY_LENGTH) + '...'
