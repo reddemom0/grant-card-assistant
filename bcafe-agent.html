@@ -1371,6 +1371,13 @@
             }
         }
 
+        // Start new conversation
+        function startNewConversation() {
+            if (confirm('Start a new conversation? This will clear the current chat.')) {
+                window.location.href = '/bcafe-writer/new';
+            }
+        }
+
         // Wrapper functions for HTML onclick handlers
         function toggleSidebar() { if (agentInterface) agentInterface.toggleSidebar(); }
         function toggleUserDropdown() { if (agentInterface) agentInterface.toggleUserDropdown(); }
