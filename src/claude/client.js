@@ -215,10 +215,35 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'end_turn') {
         console.log('✅ Agent completed successfully (end_turn)');
 
+        // Filter out thinking blocks from assistant content before saving
+        // This prevents empty messages that would cause API errors on next request
+        const contentToSave = Array.isArray(fullResponse.content)
+          ? fullResponse.content.filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking')
+          : fullResponse.content;
+
+        // Only save if there's actual content (not just thinking blocks)
+        if (Array.isArray(contentToSave) && contentToSave.length === 0) {
+          console.log('⚠️  Agent response contained only thinking blocks - not saving empty message');
+          console.log('   This typically happens when the agent uses memory_store as the final action');
+
+          // Close SSE but don't save empty assistant message
+          closeSSE(res);
+
+          console.log('\n' + '='.repeat(80));
+          console.log('🎉 Agent execution completed successfully');
+          console.log('='.repeat(80) + '\n');
+
+          return {
+            success: true,
+            response: fullResponse,
+            iterations: loopCount
+          };
+        }
+
         // Save final messages to database
         const { saveMessage } = await import('../database/messages.js');
         await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', fullResponse.content);
+        await saveMessage(conversationId, 'assistant', contentToSave);
 
         console.log('✓ Messages saved to database');
 
