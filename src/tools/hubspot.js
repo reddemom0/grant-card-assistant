@@ -1071,3 +1071,81 @@ export async function getEmailDetails(emailId) {
     };
   }
 }
+
+/**
+ * Get attachments for an email
+ * @param {string} emailId - HubSpot email engagement ID
+ * @returns {Object} List of attachments with download URLs
+ */
+export async function getEmailAttachments(emailId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured',
+      attachments: []
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    // First get the email to get attachment IDs
+    const emailResponse = await client.get(`/crm/v3/objects/emails/${emailId}`, {
+      params: {
+        properties: ['hs_attachment_ids']
+      }
+    });
+
+    const attachmentIds = emailResponse.data.properties.hs_attachment_ids;
+
+    if (!attachmentIds) {
+      console.log(`ℹ️  Email ${emailId} has no attachments`);
+      return {
+        success: true,
+        count: 0,
+        attachments: []
+      };
+    }
+
+    // Parse attachment IDs (comma-separated string)
+    const idList = attachmentIds.split(',').map(id => id.trim()).filter(id => id);
+    console.log(`  Found ${idList.length} attachment ID(s) for email ${emailId}`);
+
+    // Fetch file details for each attachment
+    const attachmentPromises = idList.map(async (fileId) => {
+      try {
+        const fileResponse = await client.get(`/files/v3/files/${fileId}`);
+        const file = fileResponse.data;
+
+        return {
+          id: file.id,
+          name: file.name || 'Unnamed file',
+          extension: file.extension || '',
+          type: file.type || '',
+          size: file.size || 0,
+          url: file.url || '',
+          createdAt: file.createdAt || ''
+        };
+      } catch (error) {
+        console.error(`  ⚠️  Error fetching file ${fileId}:`, error.message);
+        return null;
+      }
+    });
+
+    const attachments = (await Promise.all(attachmentPromises)).filter(a => a !== null);
+    console.log(`✓ Retrieved ${attachments.length} attachment(s) for email ${emailId}`);
+
+    return {
+      success: true,
+      count: attachments.length,
+      attachments
+    };
+  } catch (error) {
+    console.error('Get email attachments error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message,
+      attachments: []
+    };
+  }
+}

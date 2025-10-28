@@ -223,6 +223,20 @@ export const HUBSPOT_TOOLS = [
       },
       required: ['email_id']
     }
+  },
+  {
+    name: 'get_email_attachments',
+    description: 'Get list of attachments for a specific email, including file names, types, sizes, and download URLs. Use this when you need to access documents that were attached to an email (like funding agreements, invoices, etc.). Returns file metadata and URLs to access the actual files.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_id: {
+          type: 'string',
+          description: 'HubSpot email engagement ID (obtained from search results or email history)'
+        }
+      },
+      required: ['email_id']
+    }
   }
 ];
 
