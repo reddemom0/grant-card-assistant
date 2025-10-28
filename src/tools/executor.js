@@ -101,6 +101,25 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.getGrantApplication(input.application_id, agentType);
         break;
 
+      case 'get_project_email_history':
+        result = await hubspot.getProjectEmailHistory(
+          input.deal_id,
+          input.limit
+        );
+        break;
+
+      case 'search_project_emails':
+        result = await hubspot.searchProjectEmails(
+          input.deal_id,
+          input.search_term,
+          input.limit
+        );
+        break;
+
+      case 'get_email_details':
+        result = await hubspot.getEmailDetails(input.email_id);
+        break;
+
       // ============================================================================
       // GOOGLE DRIVE TOOLS
       // ============================================================================

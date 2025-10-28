@@ -762,3 +762,238 @@ export async function getGrantApplication(applicationId, agentType = null) {
     };
   }
 }
+
+// ============================================================================
+// EMAIL ENGAGEMENT TOOLS
+// ============================================================================
+
+/**
+ * Get email history for a deal/project
+ * @param {string} dealId - HubSpot deal ID
+ * @param {number} limit - Maximum number of emails to retrieve
+ * @returns {Object} Email history with summary
+ */
+export async function getProjectEmailHistory(dealId, limit = 20) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured',
+      emails: []
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    // Get email associations for the deal
+    const associationsResponse = await client.get(
+      `/crm/v4/objects/deals/${dealId}/associations/emails`
+    );
+
+    if (!associationsResponse.data.results || associationsResponse.data.results.length === 0) {
+      return {
+        success: true,
+        count: 0,
+        emails: [],
+        summary: {
+          totalEmails: 0,
+          inboundCount: 0,
+          outboundCount: 0,
+          mostRecentEmail: null
+        }
+      };
+    }
+
+    // Get email IDs
+    const emailIds = associationsResponse.data.results
+      .map(r => r.toObjectId)
+      .slice(0, limit);
+
+    // Batch fetch email details
+    const emailPromises = emailIds.map(async (emailId) => {
+      try {
+        const emailResponse = await client.get(`/crm/v3/objects/emails/${emailId}`, {
+          params: {
+            properties: [
+              'hs_email_subject',
+              'hs_email_text',
+              'hs_timestamp',
+              'hs_email_from',
+              'hs_email_to',
+              'hs_email_status',
+              'hs_email_direction',
+              'hs_attachment_ids'
+            ].join(',')
+          }
+        });
+
+        return {
+          id: emailResponse.data.id,
+          subject: emailResponse.data.properties.hs_email_subject || '(No Subject)',
+          textBody: emailResponse.data.properties.hs_email_text || '',
+          timestamp: emailResponse.data.properties.hs_timestamp || emailResponse.data.createdAt,
+          from: emailResponse.data.properties.hs_email_from || '',
+          to: emailResponse.data.properties.hs_email_to || '',
+          direction: emailResponse.data.properties.hs_email_direction || '',
+          hasAttachments: !!(emailResponse.data.properties.hs_attachment_ids)
+        };
+      } catch (emailError) {
+        console.warn(`Failed to retrieve email ${emailId}:`, emailError.message);
+        return null;
+      }
+    });
+
+    const emails = (await Promise.all(emailPromises)).filter(Boolean);
+
+    // Sort by timestamp descending
+    emails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    // Generate summary
+    const inbound = emails.filter(e => e.direction === 'INCOMING_EMAIL').length;
+    const outbound = emails.filter(e => e.direction === 'OUTGOING_EMAIL').length;
+    const mostRecent = emails[0] || null;
+
+    console.log(`✓ Retrieved ${emails.length} emails for deal ${dealId}`);
+
+    return {
+      success: true,
+      count: emails.length,
+      emails: emails.slice(0, limit),
+      summary: {
+        totalEmails: emails.length,
+        inboundCount: inbound,
+        outboundCount: outbound,
+        mostRecentEmail: mostRecent ? {
+          subject: mostRecent.subject,
+          from: mostRecent.from,
+          timestamp: mostRecent.timestamp,
+          direction: mostRecent.direction
+        } : null,
+        firstEmailDate: emails.length > 0 ? emails[emails.length - 1].timestamp : null,
+        lastEmailDate: mostRecent ? mostRecent.timestamp : null
+      }
+    };
+  } catch (error) {
+    console.error('Get project email history error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message,
+      emails: []
+    };
+  }
+}
+
+/**
+ * Search emails by keywords (e.g., "funding agreement", "claim")
+ * @param {string} dealId - HubSpot deal ID
+ * @param {string} searchTerm - Keywords to search for in subject or body
+ * @param {number} limit - Maximum results to return
+ * @returns {Object} Filtered email results
+ */
+export async function searchProjectEmails(dealId, searchTerm, limit = 10) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured',
+      emails: []
+    };
+  }
+
+  try {
+    // Get all emails first
+    const emailHistory = await getProjectEmailHistory(dealId, 100);
+
+    if (!emailHistory.success) {
+      return emailHistory;
+    }
+
+    // Filter by search term
+    const searchLower = searchTerm.toLowerCase();
+    const filtered = emailHistory.emails.filter(email => {
+      const subject = (email.subject || '').toLowerCase();
+      const textBody = (email.textBody || '').toLowerCase();
+      return subject.includes(searchLower) || textBody.includes(searchLower);
+    });
+
+    console.log(`✓ Found ${filtered.length} emails matching "${searchTerm}"`);
+
+    return {
+      success: true,
+      count: filtered.length,
+      searchTerm,
+      emails: filtered.slice(0, limit)
+    };
+  } catch (error) {
+    console.error('Search project emails error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      emails: []
+    };
+  }
+}
+
+/**
+ * Get detailed email content by ID
+ * @param {string} emailId - HubSpot email engagement ID
+ * @returns {Object} Full email details including HTML content
+ */
+export async function getEmailDetails(emailId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    const response = await client.get(`/crm/v3/objects/emails/${emailId}`, {
+      params: {
+        properties: [
+          'hs_email_subject',
+          'hs_email_text',
+          'hs_email_html',
+          'hs_timestamp',
+          'hs_email_from',
+          'hs_email_to',
+          'hs_email_cc',
+          'hs_email_bcc',
+          'hs_email_status',
+          'hs_email_direction',
+          'hs_attachment_ids',
+          'hs_email_thread_id'
+        ].join(',')
+      }
+    });
+
+    console.log(`✓ Retrieved email details: ${emailId}`);
+
+    return {
+      success: true,
+      email: {
+        id: response.data.id,
+        subject: response.data.properties.hs_email_subject || '(No Subject)',
+        textBody: response.data.properties.hs_email_text || '',
+        htmlBody: response.data.properties.hs_email_html || '',
+        timestamp: response.data.properties.hs_timestamp || response.data.createdAt,
+        from: response.data.properties.hs_email_from || '',
+        to: response.data.properties.hs_email_to || '',
+        cc: response.data.properties.hs_email_cc || '',
+        bcc: response.data.properties.hs_email_bcc || '',
+        status: response.data.properties.hs_email_status || '',
+        direction: response.data.properties.hs_email_direction || '',
+        attachmentIds: response.data.properties.hs_attachment_ids || '',
+        threadId: response.data.properties.hs_email_thread_id || '',
+        hasAttachments: !!(response.data.properties.hs_attachment_ids)
+      }
+    };
+  } catch (error) {
+    console.error('Get email details error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}

@@ -11,6 +11,9 @@ tools:
   - TodoWrite                 # Track multi-document audit workflow
   - searchGrantApplications   # Search HubSpot for client CanExport projects
   - getGrantApplication       # Load full project details from HubSpot
+  - getProjectEmailHistory    # Retrieve email communication history for the project
+  - searchProjectEmails       # Search emails by keywords (e.g., "funding agreement", "claim")
+  - getEmailDetails           # Get full email content including attachments info
 model: sonnet
 ---
 

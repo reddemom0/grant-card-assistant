@@ -301,6 +301,234 @@ class HubSpotService {
   }
 
   /**
+   * Get email engagements for a company/deal
+   * @param {string} objectType - 'company' or 'deal'
+   * @param {string} objectId - Company or Deal ID
+   * @param {number} limit - Maximum number of engagements to retrieve
+   * @returns {Promise<Array>} Array of email engagement objects
+   */
+  async getEmailEngagements(objectType, objectId, limit = 50) {
+    try {
+      const client = this.initClient();
+      await this.rateLimitDelay();
+
+      // Get all engagements associated with the object
+      const response = await client.crm.objects.associationsApi.getAll(
+        objectType,
+        objectId,
+        'emails'
+      );
+
+      if (!response.results || response.results.length === 0) {
+        return [];
+      }
+
+      // Get full email details for each engagement
+      const emailIds = response.results.slice(0, limit).map(r => r.toObjectId);
+      const emails = [];
+
+      for (const emailId of emailIds) {
+        try {
+          await this.rateLimitDelay();
+          const emailResponse = await client.crm.objects.emails.basicApi.getById(
+            emailId,
+            [
+              'hs_email_subject',
+              'hs_email_text',
+              'hs_email_html',
+              'hs_timestamp',
+              'hs_email_from',
+              'hs_email_to',
+              'hs_email_status',
+              'hs_email_direction',
+              'hs_attachment_ids'
+            ]
+          );
+
+          emails.push(this.formatEmailEngagement(emailResponse));
+        } catch (emailError) {
+          console.warn(`Failed to retrieve email ${emailId}:`, emailError.message);
+          continue;
+        }
+      }
+
+      // Sort by timestamp descending (most recent first)
+      return emails.sort((a, b) => {
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+        return dateB - dateA;
+      });
+    } catch (error) {
+      console.error(`Error getting email engagements for ${objectType} ${objectId}:`, error.message);
+      throw new Error(`HubSpot API error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get email engagements for a contact
+   * @param {string} contactId - Contact ID
+   * @param {number} limit - Maximum number of emails to retrieve
+   * @returns {Promise<Array>} Array of email engagement objects
+   */
+  async getContactEmailEngagements(contactId, limit = 50) {
+    try {
+      const client = this.initClient();
+      await this.rateLimitDelay();
+
+      const response = await client.crm.objects.associationsApi.getAll(
+        'contacts',
+        contactId,
+        'emails'
+      );
+
+      if (!response.results || response.results.length === 0) {
+        return [];
+      }
+
+      const emailIds = response.results.slice(0, limit).map(r => r.toObjectId);
+      const emails = [];
+
+      for (const emailId of emailIds) {
+        try {
+          await this.rateLimitDelay();
+          const emailResponse = await client.crm.objects.emails.basicApi.getById(
+            emailId,
+            [
+              'hs_email_subject',
+              'hs_email_text',
+              'hs_email_html',
+              'hs_timestamp',
+              'hs_email_from',
+              'hs_email_to',
+              'hs_email_status',
+              'hs_email_direction',
+              'hs_attachment_ids'
+            ]
+          );
+
+          emails.push(this.formatEmailEngagement(emailResponse));
+        } catch (emailError) {
+          console.warn(`Failed to retrieve email ${emailId}:`, emailError.message);
+          continue;
+        }
+      }
+
+      return emails.sort((a, b) => {
+        const dateA = new Date(a.timestamp);
+        const dateB = new Date(b.timestamp);
+        return dateB - dateA;
+      });
+    } catch (error) {
+      console.error(`Error getting contact email engagements:`, error.message);
+      throw new Error(`HubSpot API error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Search email engagements by keywords in subject or body
+   * @param {string} objectType - 'company', 'deal', or 'contact'
+   * @param {string} objectId - Object ID
+   * @param {string} searchTerm - Keywords to search for (e.g., "funding agreement", "claim")
+   * @param {number} limit - Maximum number of results
+   * @returns {Promise<Array>} Filtered array of email engagements
+   */
+  async searchEmailEngagements(objectType, objectId, searchTerm, limit = 20) {
+    try {
+      // Get all emails first
+      let emails;
+      if (objectType === 'contact') {
+        emails = await this.getContactEmailEngagements(objectId, 100);
+      } else {
+        emails = await this.getEmailEngagements(objectType, objectId, 100);
+      }
+
+      // Filter by search term
+      const searchLower = searchTerm.toLowerCase();
+      const filtered = emails.filter(email => {
+        const subject = (email.subject || '').toLowerCase();
+        const textBody = (email.textBody || '').toLowerCase();
+        return subject.includes(searchLower) || textBody.includes(searchLower);
+      });
+
+      return filtered.slice(0, limit);
+    } catch (error) {
+      console.error('Error searching email engagements:', error.message);
+      throw new Error(`HubSpot API error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get email summary for a deal/project
+   * Provides high-level overview of email communication
+   * @param {string} dealId - Deal ID
+   * @returns {Promise<Object>} Email communication summary
+   */
+  async getEmailSummary(dealId) {
+    try {
+      const emails = await this.getEmailEngagements('deal', dealId, 100);
+
+      // Analyze email patterns
+      const inbound = emails.filter(e => e.direction === 'INCOMING_EMAIL').length;
+      const outbound = emails.filter(e => e.direction === 'OUTGOING_EMAIL').length;
+
+      // Group by month
+      const emailsByMonth = {};
+      emails.forEach(email => {
+        const date = new Date(email.timestamp);
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+        if (!emailsByMonth[monthKey]) {
+          emailsByMonth[monthKey] = [];
+        }
+        emailsByMonth[monthKey].push(email);
+      });
+
+      // Get most recent email
+      const mostRecent = emails.length > 0 ? emails[0] : null;
+
+      return {
+        totalEmails: emails.length,
+        inboundCount: inbound,
+        outboundCount: outbound,
+        mostRecentEmail: mostRecent ? {
+          subject: mostRecent.subject,
+          from: mostRecent.from,
+          timestamp: mostRecent.timestamp,
+          direction: mostRecent.direction
+        } : null,
+        emailsByMonth,
+        firstEmailDate: emails.length > 0 ? emails[emails.length - 1].timestamp : null,
+        lastEmailDate: mostRecent ? mostRecent.timestamp : null
+      };
+    } catch (error) {
+      console.error('Error getting email summary:', error.message);
+      throw new Error(`HubSpot API error: ${error.message}`);
+    }
+  }
+
+  /**
+   * Format email engagement object
+   * @private
+   */
+  formatEmailEngagement(email) {
+    return {
+      id: email.id,
+      subject: email.properties.hs_email_subject || '(No Subject)',
+      textBody: email.properties.hs_email_text || '',
+      htmlBody: email.properties.hs_email_html || '',
+      timestamp: email.properties.hs_timestamp || email.createdAt,
+      from: email.properties.hs_email_from || '',
+      to: email.properties.hs_email_to || '',
+      status: email.properties.hs_email_status || '',
+      direction: email.properties.hs_email_direction || '',
+      attachmentIds: email.properties.hs_attachment_ids || '',
+      hasAttachments: !!(email.properties.hs_attachment_ids),
+      createdAt: email.createdAt,
+      updatedAt: email.updatedAt
+    };
+  }
+
+  /**
    * Format contact object for consistent API responses
    * @private
    */

@@ -167,6 +167,62 @@ export const HUBSPOT_TOOLS = [
       },
       required: ['application_id']
     }
+  },
+  {
+    name: 'get_project_email_history',
+    description: 'Retrieve email communication history for a grant project/deal. Returns all emails associated with the project, including subject lines, timestamps, sender/recipient info, and a summary of email activity (total emails, inbound/outbound counts, most recent email). Useful for understanding project communication patterns, finding specific correspondence, and providing context on client interactions.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_id: {
+          type: 'string',
+          description: 'HubSpot deal ID for the grant project'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of emails to retrieve (default: 20, recommended for performance)',
+          default: 20
+        }
+      },
+      required: ['deal_id']
+    }
+  },
+  {
+    name: 'search_project_emails',
+    description: 'Search email communication for a grant project using keywords. Find specific emails containing terms like "funding agreement", "claim", "approval", "invoice", etc. Returns matching emails with full text content. Extremely useful for locating important project documentation mentioned in emails.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_id: {
+          type: 'string',
+          description: 'HubSpot deal ID for the grant project'
+        },
+        search_term: {
+          type: 'string',
+          description: 'Keywords to search for in email subject lines and body text (e.g., "funding agreement", "claim", "approval")'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of matching emails to return (default: 10)',
+          default: 10
+        }
+      },
+      required: ['deal_id', 'search_term']
+    }
+  },
+  {
+    name: 'get_email_details',
+    description: 'Get complete details for a specific email including HTML content, all recipients (to/cc/bcc), thread information, and attachment indicators. Use this after finding an email of interest to get its full content.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email_id: {
+          type: 'string',
+          description: 'HubSpot email engagement ID (obtained from search results or email history)'
+        }
+      },
+      required: ['email_id']
+    }
   }
 ];
 
