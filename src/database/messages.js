@@ -55,35 +55,45 @@ export async function getConversationMessages(conversationId) {
     );
 
     // Parse content JSON and format for Claude API
-    const messages = result.rows.map(row => {
-      let content;
+    const messages = result.rows
+      .map(row => {
+        let content;
 
-      try {
-        // Try to parse as JSON
-        content = JSON.parse(row.content);
+        try {
+          // Try to parse as JSON
+          content = JSON.parse(row.content);
 
-        // Clean content blocks
-        if (Array.isArray(content)) {
-          content = content
-            .map(block => {
-              // Remove index field (added by streaming but not accepted by Claude API)
-              const { index, ...cleanBlock } = block;
-              return cleanBlock;
-            })
-            // Filter out thinking/redacted_thinking blocks entirely
-            // They cause issues when reloaded from database and aren't needed for conversation continuity
-            .filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking');
+          // Clean content blocks
+          if (Array.isArray(content)) {
+            content = content
+              .map(block => {
+                // Remove index field (added by streaming but not accepted by Claude API)
+                const { index, ...cleanBlock } = block;
+                return cleanBlock;
+              })
+              // Filter out thinking/redacted_thinking blocks entirely
+              // They cause issues when reloaded from database and aren't needed for conversation continuity
+              .filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking');
+          }
+        } catch (e) {
+          // If not valid JSON, treat as plain text
+          content = row.content;
         }
-      } catch (e) {
-        // If not valid JSON, treat as plain text
-        content = row.content;
-      }
 
-      return {
-        role: row.role,
-        content: content
-      };
-    });
+        return {
+          role: row.role,
+          content: content
+        };
+      })
+      // Filter out messages with empty content arrays
+      // This can happen when a message contained only thinking blocks
+      .filter(msg => {
+        if (Array.isArray(msg.content) && msg.content.length === 0) {
+          console.log(`⚠️  Skipping message with empty content (likely thinking-only response)`);
+          return false;
+        }
+        return true;
+      });
 
     console.log(`✓ Retrieved ${messages.length} messages for conversation ${conversationId}`);
 
