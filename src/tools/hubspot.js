@@ -1112,10 +1112,27 @@ export async function getEmailAttachments(emailId) {
     console.log(`  Found ${idList.length} attachment ID(s) for email ${emailId}`);
 
     // Fetch file details for each attachment
+    // Handle both public files and HIDDEN_PRIVATE files (email attachments)
     const attachmentPromises = idList.map(async (fileId) => {
       try {
+        // Try to get file metadata first
         const fileResponse = await client.get(`/files/v3/files/${fileId}`);
         const file = fileResponse.data;
+
+        let downloadUrl = file.url || '';
+
+        // If file is hidden/private, get signed URL
+        // Hidden files have empty or inaccessible URLs
+        if (!downloadUrl || file.hidden || file.access === 'PRIVATE' || file.access === 'HIDDEN_PRIVATE') {
+          try {
+            console.log(`  File ${fileId} is hidden/private, getting signed URL...`);
+            const signedUrlResponse = await client.get(`/files/v3/files/${fileId}/signed-url`);
+            downloadUrl = signedUrlResponse.data.url || downloadUrl;
+            console.log(`  ✓ Got signed URL for file ${fileId}`);
+          } catch (signedUrlError) {
+            console.error(`  ⚠️  Could not get signed URL for file ${fileId}:`, signedUrlError.message);
+          }
+        }
 
         return {
           id: file.id,
@@ -1123,11 +1140,36 @@ export async function getEmailAttachments(emailId) {
           extension: file.extension || '',
           type: file.type || '',
           size: file.size || 0,
-          url: file.url || '',
+          url: downloadUrl,
+          hidden: file.hidden || false,
+          access: file.access || 'PUBLIC',
           createdAt: file.createdAt || ''
         };
       } catch (error) {
+        // If getting file metadata fails, the file might be deleted or inaccessible
         console.error(`  ⚠️  Error fetching file ${fileId}:`, error.message);
+
+        // Try to get signed URL directly as last resort for hidden files
+        if (error.response?.status === 404 || error.response?.status === 403) {
+          try {
+            console.log(`  Attempting signed URL for potentially hidden file ${fileId}...`);
+            const signedUrlResponse = await client.get(`/files/v3/files/${fileId}/signed-url`);
+            return {
+              id: fileId,
+              name: 'Hidden file (metadata unavailable)',
+              extension: '',
+              type: '',
+              size: 0,
+              url: signedUrlResponse.data.url || '',
+              hidden: true,
+              access: 'HIDDEN_PRIVATE',
+              createdAt: ''
+            };
+          } catch (signedUrlError) {
+            console.error(`  ⚠️  Signed URL also failed for file ${fileId}:`, signedUrlError.message);
+          }
+        }
+
         return null;
       }
     });
@@ -1191,10 +1233,25 @@ export async function getDealFiles(dealId) {
     console.log(`   Found ${fileAssociations.length} file association(s)`);
 
     // Fetch details for each file
+    // Handle both public files and HIDDEN_PRIVATE files
     const filePromises = fileAssociations.map(async (assoc) => {
       try {
         const fileResponse = await client.get(`/files/v3/files/${assoc.id}`);
         const file = fileResponse.data;
+
+        let downloadUrl = file.url || '';
+
+        // If file is hidden/private, get signed URL
+        if (!downloadUrl || file.hidden || file.access === 'PRIVATE' || file.access === 'HIDDEN_PRIVATE') {
+          try {
+            console.log(`  File ${assoc.id} is hidden/private, getting signed URL...`);
+            const signedUrlResponse = await client.get(`/files/v3/files/${assoc.id}/signed-url`);
+            downloadUrl = signedUrlResponse.data.url || downloadUrl;
+            console.log(`  ✓ Got signed URL for file ${assoc.id}`);
+          } catch (signedUrlError) {
+            console.error(`  ⚠️  Could not get signed URL for file ${assoc.id}:`, signedUrlError.message);
+          }
+        }
 
         return {
           id: file.id,
@@ -1202,12 +1259,37 @@ export async function getDealFiles(dealId) {
           extension: file.extension || '',
           type: file.type || '',
           size: file.size || 0,
-          url: file.url || '',
+          url: downloadUrl,
+          hidden: file.hidden || false,
+          access: file.access || 'PUBLIC',
           createdAt: file.createdAt || '',
           updatedAt: file.updatedAt || ''
         };
       } catch (error) {
         console.error(`  ⚠️  Error fetching file ${assoc.id}:`, error.message);
+
+        // Try to get signed URL directly as last resort for hidden files
+        if (error.response?.status === 404 || error.response?.status === 403) {
+          try {
+            console.log(`  Attempting signed URL for potentially hidden file ${assoc.id}...`);
+            const signedUrlResponse = await client.get(`/files/v3/files/${assoc.id}/signed-url`);
+            return {
+              id: assoc.id,
+              name: 'Hidden file (metadata unavailable)',
+              extension: '',
+              type: '',
+              size: 0,
+              url: signedUrlResponse.data.url || '',
+              hidden: true,
+              access: 'HIDDEN_PRIVATE',
+              createdAt: '',
+              updatedAt: ''
+            };
+          } catch (signedUrlError) {
+            console.error(`  ⚠️  Signed URL also failed for file ${assoc.id}:`, signedUrlError.message);
+          }
+        }
+
         return null;
       }
     });
