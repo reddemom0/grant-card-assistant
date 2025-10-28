@@ -14,7 +14,6 @@ tools:
   - getProjectEmailHistory    # Retrieve email communication history for the project
   - searchProjectEmails       # Search emails by keywords (e.g., "funding agreement", "claim")
   - getEmailDetails           # Get full email content including attachments info
-model: sonnet
 ---
 
 <role>

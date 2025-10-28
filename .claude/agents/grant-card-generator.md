@@ -9,7 +9,6 @@ tools:
   - Grep      # Search content within documents
   - WebSearch # Research grant programs and funders
   - TodoWrite # Track multi-step workflow progress
-model: sonnet
 ---
 
 <role>

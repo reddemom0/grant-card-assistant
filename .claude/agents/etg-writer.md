@@ -10,7 +10,6 @@ tools:
   - WebSearch # Research BC training alternatives for competitive analysis
   - WebFetch  # Fetch detailed information about competitors
   - TodoWrite # Track workflow steps (eligibility, Q1-3, alternatives, Q4-7)
-model: sonnet
 ---
 
 <role>

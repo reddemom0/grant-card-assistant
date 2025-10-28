@@ -7,7 +7,6 @@ tools:
   - Grep      # Search for specific information in documents
   - Agent     # Spawn and coordinate other specialized agents
   - TodoWrite # Track complex multi-agent workflow progress
-model: sonnet
 ---
 
 <role>

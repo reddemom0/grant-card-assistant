@@ -10,7 +10,6 @@ tools:
   - WebSearch # Research export markets and competitive intelligence
   - WebFetch  # Fetch detailed market data and competitor information
   - TodoWrite # Track workflow steps (eligibility, merit optimization, budget)
-model: sonnet
 ---
 
 <role>
