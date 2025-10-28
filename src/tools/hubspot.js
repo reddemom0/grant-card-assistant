@@ -1149,3 +1149,95 @@ export async function getEmailAttachments(emailId) {
     };
   }
 }
+
+/**
+ * Get files associated with a deal (grant application)
+ * This retrieves files uploaded to or associated with the deal record,
+ * which may include funding agreements, contracts, and other documents
+ * that were uploaded separately from emails.
+ * @param {string} dealId - HubSpot deal ID
+ * @returns {Object} List of associated files with download URLs
+ */
+export async function getDealFiles(dealId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured',
+      files: []
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔍 Getting files associated with deal ${dealId}...`);
+
+    // Get file associations for the deal
+    const associationsResponse = await client.get(
+      `/crm/v3/objects/deals/${dealId}/associations/files`
+    );
+
+    const fileAssociations = associationsResponse.data.results || [];
+
+    if (fileAssociations.length === 0) {
+      console.log(`ℹ️  Deal ${dealId} has no associated files`);
+      return {
+        success: true,
+        count: 0,
+        files: []
+      };
+    }
+
+    console.log(`   Found ${fileAssociations.length} file association(s)`);
+
+    // Fetch details for each file
+    const filePromises = fileAssociations.map(async (assoc) => {
+      try {
+        const fileResponse = await client.get(`/files/v3/files/${assoc.id}`);
+        const file = fileResponse.data;
+
+        return {
+          id: file.id,
+          name: file.name || 'Unnamed file',
+          extension: file.extension || '',
+          type: file.type || '',
+          size: file.size || 0,
+          url: file.url || '',
+          createdAt: file.createdAt || '',
+          updatedAt: file.updatedAt || ''
+        };
+      } catch (error) {
+        console.error(`  ⚠️  Error fetching file ${assoc.id}:`, error.message);
+        return null;
+      }
+    });
+
+    const files = (await Promise.all(filePromises)).filter(f => f !== null);
+
+    console.log(`✓ Retrieved ${files.length} file(s) for deal ${dealId}`);
+
+    return {
+      success: true,
+      count: files.length,
+      dealId,
+      files
+    };
+  } catch (error) {
+    // 404 likely means no associations exist
+    if (error.response?.status === 404) {
+      console.log(`ℹ️  Deal ${dealId} has no file associations`);
+      return {
+        success: true,
+        count: 0,
+        files: []
+      };
+    }
+
+    console.error('Get deal files error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message,
+      files: []
+    };
+  }
+}

@@ -237,6 +237,20 @@ export const HUBSPOT_TOOLS = [
       },
       required: ['email_id']
     }
+  },
+  {
+    name: 'get_deal_files',
+    description: 'Get all files associated with a grant application deal, including funding agreements, contracts, invoices, and other documents that were uploaded to the deal record. This retrieves files that may not be attached to emails but are stored directly on the deal. Use this to find important documents like signed funding agreements that might be uploaded separately.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_id: {
+          type: 'string',
+          description: 'HubSpot deal ID for the grant application'
+        }
+      },
+      required: ['deal_id']
+    }
   }
 ];
 

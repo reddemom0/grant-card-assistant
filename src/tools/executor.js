@@ -124,6 +124,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.getEmailAttachments(input.email_id);
         break;
 
+      case 'get_deal_files':
+        result = await hubspot.getDealFiles(input.deal_id);
+        break;
+
       // ============================================================================
       // GOOGLE DRIVE TOOLS
       // ============================================================================
