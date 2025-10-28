@@ -590,6 +590,11 @@ class AgentInterface {
 
         // User messages or non-animated assistant messages appear immediately
         let processedContent = content || '';
+
+        // Strip thinking tags (Claude's internal reasoning)
+        processedContent = processedContent.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+
+        // Process markdown
         processedContent = processedContent.replace(/\n/g, '<br>');
         processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
@@ -635,6 +640,11 @@ class AgentInterface {
         if (!messageDiv) return;
 
         let processedContent = content;
+
+        // Strip thinking tags (Claude's internal reasoning)
+        processedContent = processedContent.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+
+        // Process markdown
         processedContent = processedContent.replace(/\n/g, '<br>');
         processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
