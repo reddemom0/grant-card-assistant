@@ -785,12 +785,35 @@ export async function getProjectEmailHistory(dealId, limit = 20) {
   try {
     const client = createHubSpotClient();
 
-    // Get email associations for the deal
-    const associationsResponse = await client.get(
-      `/crm/v4/objects/deals/${dealId}/associations/emails`
-    );
+    // Use Search API to find all emails associated with the deal
+    // This includes emails in the activity timeline, not just direct associations
+    const searchResponse = await client.post('/crm/v3/objects/emails/search', {
+      filterGroups: [{
+        filters: [{
+          propertyName: 'associations.deal',
+          operator: 'EQ',
+          value: dealId
+        }]
+      }],
+      properties: [
+        'hs_email_subject',
+        'hs_email_text',
+        'hs_timestamp',
+        'hs_email_from',
+        'hs_email_to',
+        'hs_email_status',
+        'hs_email_direction',
+        'hs_attachment_ids'
+      ],
+      sorts: [{
+        propertyName: 'hs_timestamp',
+        direction: 'DESCENDING'
+      }],
+      limit: Math.min(limit, 100) // HubSpot max is 100
+    });
 
-    if (!associationsResponse.data.results || associationsResponse.data.results.length === 0) {
+    if (!searchResponse.data.results || searchResponse.data.results.length === 0) {
+      console.log(`ℹ️  No emails found for deal ${dealId} (checked activity timeline)`);
       return {
         success: true,
         count: 0,
@@ -804,48 +827,19 @@ export async function getProjectEmailHistory(dealId, limit = 20) {
       };
     }
 
-    // Get email IDs
-    const emailIds = associationsResponse.data.results
-      .map(r => r.toObjectId)
-      .slice(0, limit);
+    // Format email results
+    const emails = searchResponse.data.results.map(email => ({
+      id: email.id,
+      subject: email.properties.hs_email_subject || '(No Subject)',
+      textBody: email.properties.hs_email_text || '',
+      timestamp: email.properties.hs_timestamp || email.createdAt,
+      from: email.properties.hs_email_from || '',
+      to: email.properties.hs_email_to || '',
+      direction: email.properties.hs_email_direction || '',
+      hasAttachments: !!(email.properties.hs_attachment_ids)
+    }));
 
-    // Batch fetch email details
-    const emailPromises = emailIds.map(async (emailId) => {
-      try {
-        const emailResponse = await client.get(`/crm/v3/objects/emails/${emailId}`, {
-          params: {
-            properties: [
-              'hs_email_subject',
-              'hs_email_text',
-              'hs_timestamp',
-              'hs_email_from',
-              'hs_email_to',
-              'hs_email_status',
-              'hs_email_direction',
-              'hs_attachment_ids'
-            ].join(',')
-          }
-        });
-
-        return {
-          id: emailResponse.data.id,
-          subject: emailResponse.data.properties.hs_email_subject || '(No Subject)',
-          textBody: emailResponse.data.properties.hs_email_text || '',
-          timestamp: emailResponse.data.properties.hs_timestamp || emailResponse.data.createdAt,
-          from: emailResponse.data.properties.hs_email_from || '',
-          to: emailResponse.data.properties.hs_email_to || '',
-          direction: emailResponse.data.properties.hs_email_direction || '',
-          hasAttachments: !!(emailResponse.data.properties.hs_attachment_ids)
-        };
-      } catch (emailError) {
-        console.warn(`Failed to retrieve email ${emailId}:`, emailError.message);
-        return null;
-      }
-    });
-
-    const emails = (await Promise.all(emailPromises)).filter(Boolean);
-
-    // Sort by timestamp descending
+    // Already sorted by API, but ensure descending order
     emails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
     // Generate summary
