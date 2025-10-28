@@ -180,8 +180,8 @@ export const HUBSPOT_TOOLS = [
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of emails to retrieve (default: 20, recommended for performance)',
-          default: 20
+          description: 'Maximum number of emails to retrieve (default: 10, optimized for context efficiency)',
+          default: 10
         }
       },
       required: ['deal_id']

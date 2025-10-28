@@ -827,17 +827,25 @@ export async function getProjectEmailHistory(dealId, limit = 20) {
       };
     }
 
-    // Format email results
-    const emails = searchResponse.data.results.map(email => ({
-      id: email.id,
-      subject: email.properties.hs_email_subject || '(No Subject)',
-      textBody: email.properties.hs_email_text || '',
-      timestamp: email.properties.hs_timestamp || email.createdAt,
-      from: email.properties.hs_email_from || '',
-      to: email.properties.hs_email_to || '',
-      direction: email.properties.hs_email_direction || '',
-      hasAttachments: !!(email.properties.hs_attachment_ids)
-    }));
+    // Format email results with truncated bodies to prevent context overflow
+    const MAX_EMAIL_BODY_LENGTH = 500; // Limit email body to 500 chars for context efficiency
+    const emails = searchResponse.data.results.map(email => {
+      const fullBody = email.properties.hs_email_text || '';
+      const truncatedBody = fullBody.length > MAX_EMAIL_BODY_LENGTH
+        ? fullBody.substring(0, MAX_EMAIL_BODY_LENGTH) + '...'
+        : fullBody;
+
+      return {
+        id: email.id,
+        subject: email.properties.hs_email_subject || '(No Subject)',
+        textBody: truncatedBody,
+        timestamp: email.properties.hs_timestamp || email.createdAt,
+        from: email.properties.hs_email_from || '',
+        to: email.properties.hs_email_to || '',
+        direction: email.properties.hs_email_direction || '',
+        hasAttachments: !!(email.properties.hs_attachment_ids)
+      };
+    });
 
     // Already sorted by API, but ensure descending order
     emails.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
