@@ -28,7 +28,11 @@ export const agentSDKConfig = {
     minTokensForCache: 1024, // Minimum tokens required for caching
     cacheSystemPrompt: true, // Cache system prompts
     cacheKnowledgeBase: true, // Cache knowledge base documents
-    cacheTTL: '5m', // Cache time-to-live: 5 minutes
+    cacheTTL: '1h', // Cache time-to-live: 1 hour (2x write cost, but better for longer sessions)
+    // Note: 1h cache is ideal for:
+    // - Multi-turn conversations spanning >5 minutes
+    // - Email histories that don't change frequently
+    // - Complex claim preparation sessions
   },
 
   // Tool Use Configuration
@@ -127,7 +131,8 @@ export const agentSDKConfig = {
   betaHeaders: [
     'context-management-2025-06-27',      // Required for memory tool
     'token-efficient-tools-2025-02-19',   // Token-efficient tool use (14% avg output token reduction)
-    'fine-grained-tool-streaming-2025-05-14' // Fine-grained parameter streaming (reduced latency)
+    'fine-grained-tool-streaming-2025-05-14', // Fine-grained parameter streaming (reduced latency)
+    'context-1m-2025-08-07'              // 1M token context window (usage tier 4 required)
   ],
 
   // Token Efficiency
