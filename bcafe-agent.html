@@ -358,10 +358,13 @@
         
         .message.assistant {
             justify-content: flex-start;
-        }
-        
-        .message-content {
+            flex-direction: column;
+            align-items: flex-start;
             max-width: 80%;
+        }
+
+        .message-content {
+            width: 100%;
             padding: 1.25rem 1.5rem;
             border-radius: 18px;
             font-size: 0.95rem;
@@ -446,10 +449,11 @@
 
         /* Extended Thinking Section */
         .thinking-container {
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
-            border: 1px solid #fbbf24;
+            background: linear-gradient(135deg, #f0f4ff, #e8eeff);
+            border: 1px solid #d1d9f0;
             border-radius: 12px;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
+            width: 100%;
             overflow: hidden;
             transition: all 0.3s ease;
         }
@@ -462,18 +466,18 @@
             cursor: pointer;
             user-select: none;
             font-weight: 500;
-            font-size: 0.9rem;
-            color: #92400e;
+            font-size: 0.85rem;
+            color: #4a5568;
             transition: background 0.2s ease;
         }
 
         .thinking-header:hover {
-            background: rgba(251, 191, 36, 0.1);
+            background: rgba(99, 102, 241, 0.05);
         }
 
         .thinking-icon {
             flex-shrink: 0;
-            color: #d97706;
+            color: #6366f1;
         }
 
         .thinking-header span {
@@ -483,7 +487,7 @@
         .chevron-icon {
             flex-shrink: 0;
             transition: transform 0.3s ease;
-            color: #d97706;
+            color: #6366f1;
         }
 
         .thinking-container.expanded .chevron-icon {
@@ -497,14 +501,14 @@
             padding: 0 1rem;
             font-size: 0.85rem;
             line-height: 1.5;
-            color: #78350f;
-            background: rgba(254, 243, 199, 0.5);
+            color: #4a5568;
+            background: rgba(240, 244, 255, 0.5);
         }
 
         .thinking-container.expanded .thinking-content {
             max-height: 1000px;
             padding: 1rem;
-            border-top: 1px solid #fbbf24;
+            border-top: 1px solid #d1d9f0;
         }
 
         .thinking-content br {
