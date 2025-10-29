@@ -14,6 +14,7 @@
     "test:coverage": "node tests/run-tests.js coverage",
     "test:agent": "node tests/run-tests.js agent",
     "test:report": "node tests/run-tests.js report",
+    "test:file-reading": "node test-file-reading.js",
     "fixtures:generate": "node tests/utils/fixture-generator-cli.js",
     "db:setup": "node setup-database.js"
   },
