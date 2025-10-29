@@ -160,24 +160,36 @@ When you need to read a funding agreement or other document that exists in HubSp
 **STEP 1: Find the email that references the file**
 Use `searchProjectEmails` with terms like "funding agreement", "contract", "signed agreement"
 
-**STEP 2: Extract the SENDER's email address**
+**STEP 2: Get the full email details including HTML body**
+Use `get_email_details` with the email ID from Step 1
+- Check the `htmlBody` field - it often contains file links with file IDs
+- Check the `textBody` field for file references
+- Look for URLs like "https://app.hubspot.com/file-preview/.../file/195210192980/"
+- Extract any file IDs from URLs in the email body
+
+**STEP 3: If file ID found in email, read it directly**
+If you found a file ID in the email HTML/text, skip to Step 6 and use `read_hubspot_file`
+
+**STEP 4: Extract the SENDER's email address** (if no file ID found in email)
 - Look at the email's "from" field to identify who sent the file
 - Example: If Tina Ippel (tina@spring.is) sent an email saying "Here's the funding agreement", you need HER contact record, not the company's
 
-**STEP 3: Search for the sender's contact record**
+**STEP 5: Search for the sender's contact record**
 Use `search_hubspot_contacts` with the SENDER'S EMAIL ADDRESS (not the company name!)
 ```javascript
 // ❌ WRONG: search_hubspot_contacts({query: "Spring Activator"})  // Company name
 // ✅ RIGHT: search_hubspot_contacts({query: "tina@spring.is"})    // Sender's email
 ```
 
-**STEP 4: Get files from the sender's contact**
-Use `get_contact_files` with the contact ID from Step 3
+**STEP 6: Get files from the sender's contact**
+Use `get_contact_files` with the contact ID from Step 5
 
-**STEP 5: Read the file content**
-Once you find the file ID, use `read_hubspot_file` to download and extract the text content
+**STEP 7: Read the file content**
+Once you find the file ID (from email HTML or contact files), use `read_hubspot_file` to download and extract the text content
 
 **CRITICAL RULES:**
+- ⚠️ **ALWAYS call `get_email_details` first** - The email HTML body often contains file URLs with IDs
+- ⚠️ Check email `htmlBody` and `textBody` for file IDs before searching contacts
 - ⚠️ Files are often attached to the SENDER's contact, not the company or deal
 - ⚠️ Always search by EMAIL ADDRESS when looking for a person who sent files
 - ⚠️ After finding a file with `get_contact_files`, you MUST call `read_hubspot_file` to read its contents
@@ -190,17 +202,30 @@ User: "Can you access the Spring Activator funding agreement?"
 1. searchProjectEmails(deal_id: "...", search_term: "funding agreement")
    → Found email 87368673370 from tina@spring.is
 
-2. search_hubspot_contacts(query: "tina@spring.is")
+2. get_email_details(email_id: "87368673370")
+   → Check htmlBody for file links
+   → Found URL: https://app.hubspot.com/file-preview/21088260/file/195210192980/
+   → Extracted file ID: 195210192980
+
+3. read_hubspot_file(file_id_or_url: "195210192980")
+   → Download and extract PDF text content
+
+4. memory_store(key: "spring_activator_funding_agreement", value: "[extracted text]")
+   → Store for later recall
+
+Alternative path (if no file ID in email):
+2. get_email_details(email_id: "87368673370")
+   → No file ID in email body
+   → From field: tina@spring.is
+
+3. search_hubspot_contacts(query: "tina@spring.is")
    → Found contact 550428 (Tina Ippel)
 
-3. get_contact_files(contact_id: "550428")
+4. get_contact_files(contact_id: "550428")
    → Found file 195210192980 (Funding_Agreement.pdf)
 
-4. read_hubspot_file(file_id_or_url: "195210192980")
+5. read_hubspot_file(file_id_or_url: "195210192980")
    → Extract PDF text content
-
-5. memory_store(key: "spring_activator_funding_agreement", value: "[extracted text]")
-   → Store for later recall
 ```
 
 **Why this matters:**
