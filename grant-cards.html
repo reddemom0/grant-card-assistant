@@ -248,73 +248,75 @@
             background: rgba(0, 138, 191, 0.05);
         }
         
-        /* Chat Container */
+        /* Chat Container - Clean centered design */
         .chat-container {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            border: 1px solid rgba(0, 138, 191, 0.1);
-            box-shadow: 0 8px 32px rgba(0, 138, 191, 0.08);
+            background: transparent;
+            border: none;
             min-height: 500px;
-            margin: 0 2rem;
             transition: all 0.3s ease;
+            margin: 0 auto;
+            max-width: 900px;
         }
-        
+
         .chat-container.expanded {
             min-height: calc(100vh - 160px);
-            margin: 0 2rem;
         }
-        
+
         .messages {
-            padding: 1.5rem;
+            padding: 2rem 1rem;
             display: flex;
             flex-direction: column;
-            gap: 1.5rem;
+            gap: 2rem;
             overflow-y: auto;
             max-height: calc(100vh - 160px);
         }
-        
+
         .message {
             display: flex;
+            justify-content: center;
             animation: fadeIn 0.3s ease;
         }
-        
+
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        
+
         .message.user {
-            justify-content: flex-end;
+            justify-content: center;
         }
-        
+
         .message.assistant {
-            justify-content: flex-start;
+            justify-content: center;
             flex-direction: column;
-            align-items: flex-start;
-            max-width: 80%;
+            align-items: center;
+            width: 100%;
         }
 
         .message-content {
+            max-width: 700px;
             width: 100%;
-            padding: 1.25rem 1.5rem;
-            border-radius: 18px;
+            padding: 1rem 1.5rem;
             font-size: 0.95rem;
             word-wrap: break-word;
             overflow-wrap: break-word;
-            line-height: 1.6;
+            line-height: 1.65;
         }
-        
+
+        /* User messages: dark rounded boxes */
         .message.user .message-content {
-            background: linear-gradient(135deg, var(--granted-blue), var(--granted-blue-dark));
-            color: white;
-            box-shadow: 0 4px 12px rgba(0, 138, 191, 0.3);
+            background: #2d2d2d;
+            color: #ffffff;
+            border-radius: 20px;
+            padding: 1rem 1.5rem;
         }
-        
+
+        /* Assistant messages: clean text, no box */
         .message.assistant .message-content {
-            background: var(--background);
+            background: transparent;
             color: var(--text-primary);
-            border: 1px solid var(--border);
+            border: none;
+            padding: 0.5rem 1.5rem;
         }
         
         /* Enhanced Grant Card styling */
