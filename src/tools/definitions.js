@@ -279,6 +279,20 @@ export const HUBSPOT_TOOLS = [
       },
       required: ['file_id_or_url']
     }
+  },
+  {
+    name: 'read_hubspot_file',
+    description: 'Download and read the actual content of a file from HubSpot. Extracts text from PDF, DOCX, and TXT files so you can analyze the content. Use this when you need to read funding agreements, contracts, invoices, or other documents. After finding a file (via get_contact_files, get_deal_files, or get_email_attachments), use this tool with the file ID to read its contents.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        file_id_or_url: {
+          type: 'string',
+          description: 'HubSpot file ID (e.g., "195210192980") or full URL. The file will be downloaded and text will be extracted based on file type (PDF, DOCX, or TXT).'
+        }
+      },
+      required: ['file_id_or_url']
+    }
   }
 ];
 

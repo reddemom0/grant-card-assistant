@@ -9,6 +9,8 @@
 
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
+import pdfParse from 'pdf-parse';
+import mammoth from 'mammoth';
 
 const HUBSPOT_API = 'https://api.hubapi.com';
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
@@ -1550,6 +1552,178 @@ export async function getFileById(fileIdOrUrl) {
     }
 
     console.error('Get file by ID error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Read and extract text content from a HubSpot file
+ * Downloads the file and extracts text based on file type (PDF, DOCX, TXT)
+ * @param {string} fileIdOrUrl - HubSpot file ID or full URL
+ * @returns {Object} Extracted text content
+ */
+export async function readHubSpotFile(fileIdOrUrl) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    // Extract file ID from URL if needed
+    let fileId = fileIdOrUrl;
+    if (fileIdOrUrl.includes('hubspot.com') || fileIdOrUrl.includes('/file/')) {
+      const match = fileIdOrUrl.match(/\/file\/(\d+)/);
+      if (match) {
+        fileId = match[1];
+        console.log(`  Extracted file ID ${fileId} from URL`);
+      }
+    }
+
+    const client = createHubSpotClient();
+
+    console.log(`📖 Reading file ${fileId}...`);
+
+    // Step 1: Get file metadata
+    console.log(`  1️⃣ Getting file metadata...`);
+    const fileResponse = await client.get(`/files/v3/files/${fileId}`);
+    const file = fileResponse.data;
+
+    const fileName = file.name || 'Unknown file';
+    const fileExtension = (file.extension || '').toLowerCase();
+    const fileSize = file.size || 0;
+
+    console.log(`  ✓ File: ${fileName}`);
+    console.log(`  ✓ Type: ${fileExtension}`);
+    console.log(`  ✓ Size: ${fileSize} bytes`);
+
+    // Check file size (Claude limit: 32MB for documents)
+    const MAX_FILE_SIZE = 32 * 1024 * 1024; // 32MB
+    if (fileSize > MAX_FILE_SIZE) {
+      return {
+        success: false,
+        error: `File too large for processing: ${fileSize} bytes (max: ${MAX_FILE_SIZE} bytes)`
+      };
+    }
+
+    // Step 2: Get signed URL (handles hidden/private files)
+    console.log(`  2️⃣ Getting download URL...`);
+    let downloadUrl = file.url || '';
+
+    if (!downloadUrl || file.hidden || file.access === 'PRIVATE' || file.access === 'HIDDEN_PRIVATE') {
+      try {
+        const signedUrlResponse = await client.get(`/files/v3/files/${fileId}/signed-url`);
+        downloadUrl = signedUrlResponse.data.url;
+        console.log(`  ✓ Got signed URL for ${file.hidden ? 'hidden' : 'private'} file`);
+      } catch (signedUrlError) {
+        return {
+          success: false,
+          error: `Could not get download URL: ${signedUrlError.message}`
+        };
+      }
+    } else {
+      console.log(`  ✓ Using public URL`);
+    }
+
+    // Step 3: Download file content
+    console.log(`  3️⃣ Downloading file...`);
+    const downloadResponse = await axios.get(downloadUrl, {
+      responseType: 'arraybuffer',
+      timeout: 30000 // 30 second timeout
+    });
+
+    const fileBuffer = Buffer.from(downloadResponse.data);
+    console.log(`  ✓ Downloaded ${fileBuffer.length} bytes`);
+
+    // Verify download size matches
+    if (fileSize > 0 && fileBuffer.length !== fileSize) {
+      console.warn(`  ⚠️ Downloaded size (${fileBuffer.length}) doesn't match expected (${fileSize})`);
+    }
+
+    // Step 4: Extract text based on file type
+    console.log(`  4️⃣ Extracting text...`);
+    let extractedText = '';
+
+    if (fileExtension === '.pdf' || fileExtension === 'pdf') {
+      // Extract text from PDF
+      const pdfData = await pdfParse(fileBuffer);
+      extractedText = pdfData.text;
+      console.log(`  ✓ Extracted ${extractedText.length} characters from PDF`);
+      console.log(`  ✓ PDF has ${pdfData.numpages} page(s)`);
+
+    } else if (fileExtension === '.docx' || fileExtension === 'docx') {
+      // Extract text from DOCX
+      const result = await mammoth.extractRawText({ buffer: fileBuffer });
+      extractedText = result.value;
+      console.log(`  ✓ Extracted ${extractedText.length} characters from DOCX`);
+
+    } else if (fileExtension === '.txt' || fileExtension === 'txt' || fileExtension === '.md' || fileExtension === 'md') {
+      // Plain text file
+      extractedText = fileBuffer.toString('utf-8');
+      console.log(`  ✓ Read ${extractedText.length} characters from text file`);
+
+    } else {
+      return {
+        success: false,
+        error: `Unsupported file type: ${fileExtension}. Supported types: PDF, DOCX, TXT`
+      };
+    }
+
+    // Check if we actually got text
+    if (!extractedText || extractedText.trim().length === 0) {
+      return {
+        success: false,
+        error: 'File appears to be empty or contains no extractable text'
+      };
+    }
+
+    console.log(`✓ Successfully read file ${fileName}`);
+    console.log(`  Total characters extracted: ${extractedText.length}`);
+
+    return {
+      success: true,
+      file: {
+        id: fileId,
+        name: fileName,
+        extension: fileExtension,
+        size: fileSize,
+        type: file.type || '',
+        hidden: file.hidden || false,
+        access: file.access || 'PUBLIC'
+      },
+      content: extractedText,
+      length: extractedText.length
+    };
+
+  } catch (error) {
+    console.error('Read HubSpot file error:', error.message);
+
+    // Provide helpful error messages
+    if (error.code === 'ECONNABORTED') {
+      return {
+        success: false,
+        error: 'Download timeout - file may be too large or connection is slow'
+      };
+    }
+
+    if (error.response?.status === 404) {
+      return {
+        success: false,
+        error: 'File not found or you do not have permission to access it'
+      };
+    }
+
+    if (error.response?.status === 403) {
+      return {
+        success: false,
+        error: 'Access denied - check that files.ui_hidden.read scope is enabled'
+      };
+    }
+
     return {
       success: false,
       error: error.message
