@@ -274,9 +274,37 @@ export async function runAgent({
             return cleanBlock;
           });
 
-        // CRITICAL: Remove thinking blocks from previous assistant messages
-        // The API only requires thinking blocks from the LAST assistant message
-        // Keeping all thinking blocks causes exponential token growth in tool use loops
+        // CRITICAL: Ensure last assistant message starts with a thinking block
+        // The API requires: "a final `assistant` message must start with a thinking block"
+        // If Claude didn't generate thinking in this turn, reuse from a previous turn
+        const hasThinkingBlock = cleanedContent.some(block =>
+          block.type === 'thinking' || block.type === 'redacted_thinking'
+        );
+
+        if (!hasThinkingBlock) {
+          // Find the most recent thinking block from previous assistant messages
+          let reusableThinking = null;
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i].role === 'assistant' && Array.isArray(messages[i].content)) {
+              const thinkingBlock = messages[i].content.find(block =>
+                block.type === 'thinking' || block.type === 'redacted_thinking'
+              );
+              if (thinkingBlock) {
+                reusableThinking = thinkingBlock;
+                break;
+              }
+            }
+          }
+
+          // Prepend thinking block to current content if found
+          if (reusableThinking) {
+            console.log('⚠️  No thinking in current turn, reusing previous thinking block');
+            cleanedContent.unshift(reusableThinking);
+          }
+        }
+
+        // Remove thinking blocks from ALL previous assistant messages to prevent token explosion
+        // Only the LAST assistant message (which we're about to add) keeps its thinking block
         for (const message of messages) {
           if (message.role === 'assistant' && Array.isArray(message.content)) {
             message.content = message.content.filter(block =>
@@ -285,7 +313,7 @@ export async function runAgent({
           }
         }
 
-        // Add assistant response to messages (with thinking blocks for current turn)
+        // Add assistant response to messages (with thinking block prepended if needed)
         messages.push({
           role: 'assistant',
           content: cleanedContent
