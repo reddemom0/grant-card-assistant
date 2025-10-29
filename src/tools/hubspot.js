@@ -9,8 +9,6 @@
 
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
-import pdfParse from 'pdf-parse';
-import mammoth from 'mammoth';
 
 const HUBSPOT_API = 'https://api.hubapi.com';
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
@@ -1649,14 +1647,16 @@ export async function readHubSpotFile(fileIdOrUrl) {
     let extractedText = '';
 
     if (fileExtension === '.pdf' || fileExtension === 'pdf') {
-      // Extract text from PDF
+      // Dynamic import to avoid initialization bug
+      const pdfParse = (await import('pdf-parse')).default;
       const pdfData = await pdfParse(fileBuffer);
       extractedText = pdfData.text;
       console.log(`  ✓ Extracted ${extractedText.length} characters from PDF`);
       console.log(`  ✓ PDF has ${pdfData.numpages} page(s)`);
 
     } else if (fileExtension === '.docx' || fileExtension === 'docx') {
-      // Extract text from DOCX
+      // Dynamic import
+      const mammoth = await import('mammoth');
       const result = await mammoth.extractRawText({ buffer: fileBuffer });
       extractedText = result.value;
       console.log(`  ✓ Extracted ${extractedText.length} characters from DOCX`);
