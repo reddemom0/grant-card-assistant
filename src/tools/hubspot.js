@@ -1647,19 +1647,50 @@ export async function readHubSpotFile(fileIdOrUrl) {
     let extractedText = '';
 
     if (fileExtension === '.pdf' || fileExtension === 'pdf') {
-      // Dynamic import to avoid initialization bug
-      const pdfParse = (await import('pdf-parse')).default;
-      const pdfData = await pdfParse(fileBuffer);
-      extractedText = pdfData.text;
-      console.log(`  ✓ Extracted ${extractedText.length} characters from PDF`);
-      console.log(`  ✓ PDF has ${pdfData.numpages} page(s)`);
+      // Dynamic import with error handling for pdf-parse initialization bug
+      // Import from lib/pdf-parse.js directly to avoid the buggy index.js debug code
+      try {
+        const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+        const pdfData = await pdfParse(fileBuffer);
+        extractedText = pdfData.text;
+        console.log(`  ✓ Extracted ${extractedText.length} characters from PDF`);
+        console.log(`  ✓ PDF has ${pdfData.numpages} page(s)`);
+      } catch (pdfError) {
+        console.error(`  ❌ PDF parsing failed:`, pdfError.message);
+        return {
+          success: false,
+          error: `PDF parsing not available: ${pdfError.message}. This is likely due to a pdf-parse library issue. Please use an alternative PDF viewer or contact support.`,
+          file: {
+            id: fileId,
+            name: fileName,
+            extension: fileExtension,
+            size: fileSize,
+            url: downloadUrl
+          }
+        };
+      }
 
     } else if (fileExtension === '.docx' || fileExtension === 'docx') {
       // Dynamic import
-      const mammoth = await import('mammoth');
-      const result = await mammoth.extractRawText({ buffer: fileBuffer });
-      extractedText = result.value;
-      console.log(`  ✓ Extracted ${extractedText.length} characters from DOCX`);
+      try {
+        const mammoth = await import('mammoth');
+        const result = await mammoth.extractRawText({ buffer: fileBuffer });
+        extractedText = result.value;
+        console.log(`  ✓ Extracted ${extractedText.length} characters from DOCX`);
+      } catch (docxError) {
+        console.error(`  ❌ DOCX parsing failed:`, docxError.message);
+        return {
+          success: false,
+          error: `DOCX parsing failed: ${docxError.message}`,
+          file: {
+            id: fileId,
+            name: fileName,
+            extension: fileExtension,
+            size: fileSize,
+            url: downloadUrl
+          }
+        };
+      }
 
     } else if (fileExtension === '.txt' || fileExtension === 'txt' || fileExtension === '.md' || fileExtension === 'md') {
       // Plain text file
