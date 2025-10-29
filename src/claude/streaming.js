@@ -54,6 +54,7 @@ export async function streamToSSE(stream, res, sessionId) {
             : event.content_block.input;
         } else if (event.content_block.type === 'thinking') {
           currentContent.thinking = '';
+          currentContent.signature = ''; // Initialize signature field
 
           // Notify frontend that thinking started
           res.write(`data: ${JSON.stringify({
@@ -93,6 +94,13 @@ export async function streamToSSE(stream, res, sessionId) {
             thinking: event.delta.thinking,
             sessionId
           })}\n\n`);
+        } else if (event.delta.type === 'signature_delta') {
+          // Capture signature for thinking blocks
+          // Signature is required when passing thinking blocks back to API
+          if (!currentContent.signature) {
+            currentContent.signature = '';
+          }
+          currentContent.signature += event.delta.signature;
         }
       }
 
