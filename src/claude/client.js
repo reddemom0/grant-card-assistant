@@ -187,11 +187,11 @@ export async function runAgent({
         messages,
         tools,
 
-        // Extended thinking enabled - provides internal reasoning transparency
-        thinking: {
-          type: 'enabled',
-          budget_tokens: THINKING_BUDGET
-        },
+        // Extended thinking disabled - caused issues with tool use loops
+        // thinking: {
+        //   type: 'enabled',
+        //   budget_tokens: THINKING_BUDGET
+        // },
 
         // Enable streaming
         stream: true
@@ -266,54 +266,13 @@ export async function runAgent({
         console.log('🔧 Agent requested tool use');
 
         // Clean content blocks: remove index field from all blocks
-        // IMPORTANT: Keep thinking blocks when Extended Thinking is enabled
-        // They are required by the API for maintaining reasoning continuity
         const cleanedContent = fullResponse.content
           .map(block => {
             const { index, ...cleanBlock } = block;
             return cleanBlock;
           });
 
-        // CRITICAL: Ensure last assistant message starts with a thinking block
-        // The API requires: "a final `assistant` message must start with a thinking block"
-        // If Claude didn't generate thinking in this turn, reuse from a previous turn
-        const hasThinkingBlock = cleanedContent.some(block =>
-          block.type === 'thinking' || block.type === 'redacted_thinking'
-        );
-
-        if (!hasThinkingBlock) {
-          // Find the most recent thinking block from previous assistant messages
-          let reusableThinking = null;
-          for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].role === 'assistant' && Array.isArray(messages[i].content)) {
-              const thinkingBlock = messages[i].content.find(block =>
-                block.type === 'thinking' || block.type === 'redacted_thinking'
-              );
-              if (thinkingBlock) {
-                reusableThinking = thinkingBlock;
-                break;
-              }
-            }
-          }
-
-          // Prepend thinking block to current content if found
-          if (reusableThinking) {
-            console.log('⚠️  No thinking in current turn, reusing previous thinking block');
-            cleanedContent.unshift(reusableThinking);
-          }
-        }
-
-        // Remove thinking blocks from ALL previous assistant messages to prevent token explosion
-        // Only the LAST assistant message (which we're about to add) keeps its thinking block
-        for (const message of messages) {
-          if (message.role === 'assistant' && Array.isArray(message.content)) {
-            message.content = message.content.filter(block =>
-              block.type !== 'thinking' && block.type !== 'redacted_thinking'
-            );
-          }
-        }
-
-        // Add assistant response to messages (with thinking block prepended if needed)
+        // Add assistant response to messages
         messages.push({
           role: 'assistant',
           content: cleanedContent
