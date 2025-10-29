@@ -274,7 +274,18 @@ export async function runAgent({
             return cleanBlock;
           });
 
-        // Add assistant response to messages
+        // CRITICAL: Remove thinking blocks from previous assistant messages
+        // The API only requires thinking blocks from the LAST assistant message
+        // Keeping all thinking blocks causes exponential token growth in tool use loops
+        for (const message of messages) {
+          if (message.role === 'assistant' && Array.isArray(message.content)) {
+            message.content = message.content.filter(block =>
+              block.type !== 'thinking' && block.type !== 'redacted_thinking'
+            );
+          }
+        }
+
+        // Add assistant response to messages (with thinking blocks for current turn)
         messages.push({
           role: 'assistant',
           content: cleanedContent
