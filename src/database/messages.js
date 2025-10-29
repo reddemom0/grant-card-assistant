@@ -69,6 +69,17 @@ export async function getConversationMessages(conversationId) {
               .map(block => {
                 // Remove index field (added by streaming but not accepted by Claude API)
                 const { index, ...cleanBlock } = block;
+
+                // Fix server_tool_use blocks: ensure input is an object, not a string
+                if (cleanBlock.type === 'server_tool_use' && typeof cleanBlock.input === 'string') {
+                  try {
+                    cleanBlock.input = JSON.parse(cleanBlock.input);
+                  } catch (e) {
+                    console.error('Failed to parse server_tool_use input:', e);
+                    cleanBlock.input = {};
+                  }
+                }
+
                 return cleanBlock;
               })
               // Filter out thinking/redacted_thinking blocks entirely

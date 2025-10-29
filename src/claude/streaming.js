@@ -48,7 +48,10 @@ export async function streamToSSE(stream, res, sessionId) {
           // Handle server-side tools (web_search, web_fetch)
           currentContent.id = event.content_block.id;
           currentContent.name = event.content_block.name;
-          currentContent.input = event.content_block.input;
+          // Input might be a string or object - ensure it's always an object
+          currentContent.input = typeof event.content_block.input === 'string'
+            ? JSON.parse(event.content_block.input)
+            : event.content_block.input;
         } else if (event.content_block.type === 'thinking') {
           currentContent.thinking = '';
 
