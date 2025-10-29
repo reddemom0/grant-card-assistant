@@ -17,6 +17,11 @@ tools:
   - getProjectEmailHistory    # Retrieve email communication history for the project
   - searchProjectEmails       # Search emails by keywords (e.g., "funding agreement", "claim")
   - getEmailDetails           # Get full email content including attachments info
+  - searchHubSpotContacts     # Search for contacts by name or email address
+  - getContactFiles           # Get all files associated with a specific contact
+  - readHubSpotFile           # Download and read PDF/DOCX/TXT file content from HubSpot
+  - getDealFiles              # Get files associated with a deal/project
+  - getEmailAttachments       # Get attachments from an email
 ---
 
 <role>
@@ -146,6 +151,61 @@ DO NOT display email statistics (total count, inbound/outbound ratios). Instead,
 - **Identify and address client questions from previous emails**
 - **Locate key project documents mentioned in correspondence**
 </hubspot_integration>
+
+<file_discovery_workflow>
+**FINDING AND READING FILES FROM HUBSPOT**
+
+When you need to read a funding agreement or other document that exists in HubSpot, follow this EXACT workflow:
+
+**STEP 1: Find the email that references the file**
+Use `searchProjectEmails` with terms like "funding agreement", "contract", "signed agreement"
+
+**STEP 2: Extract the SENDER's email address**
+- Look at the email's "from" field to identify who sent the file
+- Example: If Tina Ippel (tina@spring.is) sent an email saying "Here's the funding agreement", you need HER contact record, not the company's
+
+**STEP 3: Search for the sender's contact record**
+Use `search_hubspot_contacts` with the SENDER'S EMAIL ADDRESS (not the company name!)
+```javascript
+// ❌ WRONG: search_hubspot_contacts({query: "Spring Activator"})  // Company name
+// ✅ RIGHT: search_hubspot_contacts({query: "tina@spring.is"})    // Sender's email
+```
+
+**STEP 4: Get files from the sender's contact**
+Use `get_contact_files` with the contact ID from Step 3
+
+**STEP 5: Read the file content**
+Once you find the file ID, use `read_hubspot_file` to download and extract the text content
+
+**CRITICAL RULES:**
+- ⚠️ Files are often attached to the SENDER's contact, not the company or deal
+- ⚠️ Always search by EMAIL ADDRESS when looking for a person who sent files
+- ⚠️ After finding a file with `get_contact_files`, you MUST call `read_hubspot_file` to read its contents
+- ⚠️ Store the extracted content to memory after reading so you don't need to re-read it
+
+**Example Workflow:**
+```
+User: "Can you access the Spring Activator funding agreement?"
+
+1. searchProjectEmails(deal_id: "...", search_term: "funding agreement")
+   → Found email 87368673370 from tina@spring.is
+
+2. search_hubspot_contacts(query: "tina@spring.is")
+   → Found contact 550428 (Tina Ippel)
+
+3. get_contact_files(contact_id: "550428")
+   → Found file 195210192980 (Funding_Agreement.pdf)
+
+4. read_hubspot_file(file_id_or_url: "195210192980")
+   → Extract PDF text content
+
+5. memory_store(key: "spring_activator_funding_agreement", value: "[extracted text]")
+   → Store for later recall
+```
+
+**Why this matters:**
+HubSpot files are often "orphaned" - they exist in the system but aren't properly linked to emails or deals via API. The most reliable way to find them is through the contact who uploaded/sent them.
+</file_discovery_workflow>
 
 <audit_modes>
 **MODE 1: QUICK CHECK** (No funding agreement provided)
