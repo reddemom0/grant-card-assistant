@@ -44,6 +44,11 @@ export async function streamToSSE(stream, res, sessionId) {
           currentContent.id = event.content_block.id;
           currentContent.name = event.content_block.name;
           currentContent.input = '';
+        } else if (event.content_block.type === 'server_tool_use') {
+          // Handle server-side tools (web_search, web_fetch)
+          currentContent.id = event.content_block.id;
+          currentContent.name = event.content_block.name;
+          currentContent.input = event.content_block.input;
         } else if (event.content_block.type === 'thinking') {
           currentContent.thinking = '';
 
@@ -102,6 +107,16 @@ export async function streamToSSE(stream, res, sessionId) {
           // Notify frontend of complete tool use
           res.write(`data: ${JSON.stringify({
             type: 'tool_use_complete',
+            toolId: currentContent.id,
+            toolName: currentContent.name,
+            input: currentContent.input,
+            sessionId
+          })}\n\n`);
+        } else if (currentContent.type === 'server_tool_use') {
+          // Server tool complete (web_search, web_fetch)
+          // Input is already populated, no need to parse
+          res.write(`data: ${JSON.stringify({
+            type: 'server_tool_use_complete',
             toolId: currentContent.id,
             toolName: currentContent.name,
             input: currentContent.input,
