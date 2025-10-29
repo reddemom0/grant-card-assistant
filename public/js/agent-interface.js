@@ -39,6 +39,8 @@ class AgentInterface {
         // Streaming state
         this.streamingMessageDiv = null;
         this.streamingContent = '';
+        this.streamingThinkingDiv = null;
+        this.streamingThinkingContent = '';
 
         // Initialize ChatClient
         this.chatClient = new ChatClient(this.config.apiBase);
@@ -318,6 +320,11 @@ class AgentInterface {
         this.chatClient.onTextDelta = (text) => {
             this.streamingContent += text;
             this.updateStreamingMessage(this.streamingMessageDiv, this.streamingContent, false);
+        };
+
+        this.chatClient.onThinkingDelta = (thinking) => {
+            this.streamingThinkingContent += thinking;
+            this.updateThinkingContent(this.streamingThinkingDiv, this.streamingThinkingContent);
         };
 
         this.chatClient.onToolUse = (toolName, input) => {
@@ -622,13 +629,47 @@ class AgentInterface {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${role}`;
 
+        // Create thinking container (collapsible)
+        const thinkingContainer = document.createElement('div');
+        thinkingContainer.className = 'thinking-container';
+        thinkingContainer.style.display = 'none'; // Hidden until thinking starts
+
+        const thinkingHeader = document.createElement('div');
+        thinkingHeader.className = 'thinking-header';
+        thinkingHeader.innerHTML = `
+            <svg class="thinking-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path d="M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2zm0 11a5 5 0 1 1 0-10 5 5 0 0 1 0 10z" fill="currentColor"/>
+                <path d="M8 7a1 1 0 0 1 1 1v3a1 1 0 1 1-2 0V8a1 1 0 0 1 1-1zM8 5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z" fill="currentColor"/>
+            </svg>
+            <span>Extended Thinking</span>
+            <svg class="chevron-icon" width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+        `;
+
+        const thinkingContent = document.createElement('div');
+        thinkingContent.className = 'thinking-content';
+
+        thinkingHeader.onclick = () => {
+            thinkingContainer.classList.toggle('expanded');
+        };
+
+        thinkingContainer.appendChild(thinkingHeader);
+        thinkingContainer.appendChild(thinkingContent);
+
+        // Create main content container
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         contentDiv.innerHTML = '<span class="typing-cursor">▎</span>';
 
+        messageDiv.appendChild(thinkingContainer);
         messageDiv.appendChild(contentDiv);
         messagesContainer.appendChild(messageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        // Store reference to thinking content div
+        this.streamingThinkingDiv = thinkingContent;
+        this.streamingThinkingContent = '';
 
         return contentDiv;
     }
@@ -641,8 +682,7 @@ class AgentInterface {
 
         let processedContent = content;
 
-        // Strip thinking tags (Claude's internal reasoning)
-        processedContent = processedContent.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+        // NOTE: Don't strip thinking tags anymore - they're handled separately
 
         // Process markdown
         processedContent = processedContent.replace(/\n/g, '<br>');
@@ -655,6 +695,30 @@ class AgentInterface {
         } else {
             messageDiv.innerHTML = processedContent + '<span class="typing-cursor">▎</span>';
         }
+
+        const messagesContainer = document.getElementById('messages');
+        if (messagesContainer) {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    /**
+     * Update thinking content in the collapsible section
+     */
+    updateThinkingContent(thinkingDiv, content) {
+        if (!thinkingDiv || !content) return;
+
+        // Show the thinking container when we receive thinking content
+        const thinkingContainer = thinkingDiv.closest('.thinking-container');
+        if (thinkingContainer) {
+            thinkingContainer.style.display = 'block';
+        }
+
+        // Process thinking content (basic formatting)
+        let processedContent = content;
+        processedContent = processedContent.replace(/\n/g, '<br>');
+
+        thinkingDiv.innerHTML = processedContent;
 
         const messagesContainer = document.getElementById('messages');
         if (messagesContainer) {
