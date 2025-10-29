@@ -253,6 +253,20 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'get_contact_files',
+    description: 'Get all files associated with a specific contact. Useful when you need to find files sent by or associated with a person (e.g., funding agreements sent by a client\'s finance team). When an email mentions sending a file but has no attachments in the API, check the sender\'s contact files. You can get the contact ID by searching for the contact using their email address from the email\'s "from" field.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contact_id: {
+          type: 'string',
+          description: 'HubSpot contact ID of the person whose files you want to retrieve'
+        }
+      },
+      required: ['contact_id']
+    }
+  },
+  {
     name: 'get_file_by_id',
     description: 'Get a specific file directly by its HubSpot file ID or URL. Use this when you know the exact file ID (e.g., from a HubSpot file-preview URL like https://app.hubspot.com/file-preview/PORTAL/file/FILE_ID/) or when the user provides a file link. This is helpful when a file exists in HubSpot but isn\'t properly associated with emails or deals in the system.',
     input_schema: {

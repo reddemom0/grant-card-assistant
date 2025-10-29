@@ -1325,6 +1325,135 @@ export async function getDealFiles(dealId) {
 }
 
 /**
+ * Get files associated with a contact
+ * Useful for finding files sent by or associated with a specific person
+ * @param {string} contactId - HubSpot contact ID
+ * @returns {Object} List of associated files with download URLs
+ */
+export async function getContactFiles(contactId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured',
+      files: []
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔍 Getting files associated with contact ${contactId}...`);
+
+    // Get file associations for the contact
+    const associationsResponse = await client.get(
+      `/crm/v3/objects/contacts/${contactId}/associations/files`
+    );
+
+    const fileAssociations = associationsResponse.data.results || [];
+
+    if (fileAssociations.length === 0) {
+      console.log(`ℹ️  Contact ${contactId} has no associated files`);
+      return {
+        success: true,
+        count: 0,
+        files: []
+      };
+    }
+
+    console.log(`   Found ${fileAssociations.length} file association(s)`);
+
+    // Fetch details for each file (reuse same logic as getDealFiles)
+    const filePromises = fileAssociations.map(async (assoc) => {
+      try {
+        const fileResponse = await client.get(`/files/v3/files/${assoc.id}`);
+        const file = fileResponse.data;
+
+        let downloadUrl = file.url || '';
+
+        // If file is hidden/private, get signed URL
+        if (!downloadUrl || file.hidden || file.access === 'PRIVATE' || file.access === 'HIDDEN_PRIVATE') {
+          try {
+            console.log(`  File ${assoc.id} is hidden/private, getting signed URL...`);
+            const signedUrlResponse = await client.get(`/files/v3/files/${assoc.id}/signed-url`);
+            downloadUrl = signedUrlResponse.data.url || downloadUrl;
+            console.log(`  ✓ Got signed URL for file ${assoc.id}`);
+          } catch (signedUrlError) {
+            console.error(`  ⚠️  Could not get signed URL for file ${assoc.id}:`, signedUrlError.message);
+          }
+        }
+
+        return {
+          id: file.id,
+          name: file.name || 'Unnamed file',
+          extension: file.extension || '',
+          type: file.type || '',
+          size: file.size || 0,
+          url: downloadUrl,
+          hidden: file.hidden || false,
+          access: file.access || 'PUBLIC',
+          createdAt: file.createdAt || '',
+          updatedAt: file.updatedAt || ''
+        };
+      } catch (error) {
+        console.error(`  ⚠️  Error fetching file ${assoc.id}:`, error.message);
+
+        // Try to get signed URL directly as last resort for hidden files
+        if (error.response?.status === 404 || error.response?.status === 403) {
+          try {
+            console.log(`  Attempting signed URL for potentially hidden file ${assoc.id}...`);
+            const signedUrlResponse = await client.get(`/files/v3/files/${assoc.id}/signed-url`);
+            return {
+              id: assoc.id,
+              name: 'Hidden file (metadata unavailable)',
+              extension: '',
+              type: '',
+              size: 0,
+              url: signedUrlResponse.data.url || '',
+              hidden: true,
+              access: 'HIDDEN_PRIVATE',
+              createdAt: '',
+              updatedAt: ''
+            };
+          } catch (signedUrlError) {
+            console.error(`  ⚠️  Signed URL also failed for file ${assoc.id}:`, signedUrlError.message);
+          }
+        }
+
+        return null;
+      }
+    });
+
+    const files = (await Promise.all(filePromises)).filter(f => f !== null);
+
+    console.log(`✓ Retrieved ${files.length} file(s) for contact ${contactId}`);
+
+    return {
+      success: true,
+      count: files.length,
+      contactId,
+      files
+    };
+  } catch (error) {
+    // 404 likely means no associations exist
+    if (error.response?.status === 404) {
+      console.log(`ℹ️  Contact ${contactId} has no file associations`);
+      return {
+        success: true,
+        count: 0,
+        files: []
+      };
+    }
+
+    console.error('Get contact files error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message,
+      files: []
+    };
+  }
+}
+
+/**
  * Get a specific file by ID (from URL or known file ID)
  * Useful when file ID is known but file isn't associated with emails/deals
  * @param {string} fileIdOrUrl - HubSpot file ID or full URL (e.g., https://app.hubspot.com/file-preview/.../file/123456/...)
