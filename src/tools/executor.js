@@ -128,6 +128,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.getDealFiles(input.deal_id);
         break;
 
+      case 'get_file_by_id':
+        result = await hubspot.getFileById(input.file_id_or_url);
+        break;
+
       // ============================================================================
       // GOOGLE DRIVE TOOLS
       // ============================================================================

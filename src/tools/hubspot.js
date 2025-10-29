@@ -1323,3 +1323,107 @@ export async function getDealFiles(dealId) {
     };
   }
 }
+
+/**
+ * Get a specific file by ID (from URL or known file ID)
+ * Useful when file ID is known but file isn't associated with emails/deals
+ * @param {string} fileIdOrUrl - HubSpot file ID or full URL (e.g., https://app.hubspot.com/file-preview/.../file/123456/...)
+ * @returns {Object} File metadata with download URL
+ */
+export async function getFileById(fileIdOrUrl) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    // Extract file ID from URL if needed
+    let fileId = fileIdOrUrl;
+    if (fileIdOrUrl.includes('hubspot.com') || fileIdOrUrl.includes('/file/')) {
+      const match = fileIdOrUrl.match(/\/file\/(\d+)/);
+      if (match) {
+        fileId = match[1];
+        console.log(`  Extracted file ID ${fileId} from URL`);
+      }
+    }
+
+    const client = createHubSpotClient();
+
+    console.log(`🔍 Getting file ${fileId}...`);
+
+    // Get file metadata
+    const fileResponse = await client.get(`/files/v3/files/${fileId}`);
+    const file = fileResponse.data;
+
+    let downloadUrl = file.url || '';
+
+    // If file is hidden/private, get signed URL
+    if (!downloadUrl || file.hidden || file.access === 'PRIVATE' || file.access === 'HIDDEN_PRIVATE') {
+      try {
+        console.log(`  File ${fileId} is hidden/private, getting signed URL...`);
+        const signedUrlResponse = await client.get(`/files/v3/files/${fileId}/signed-url`);
+        downloadUrl = signedUrlResponse.data.url || downloadUrl;
+        console.log(`  ✓ Got signed URL for file ${fileId}`);
+      } catch (signedUrlError) {
+        console.error(`  ⚠️  Could not get signed URL for file ${fileId}:`, signedUrlError.message);
+      }
+    }
+
+    console.log(`✓ Retrieved file ${fileId}: ${file.name}`);
+
+    return {
+      success: true,
+      file: {
+        id: file.id,
+        name: file.name || 'Unnamed file',
+        extension: file.extension || '',
+        type: file.type || '',
+        size: file.size || 0,
+        url: downloadUrl,
+        hidden: file.hidden || false,
+        access: file.access || 'PUBLIC',
+        createdAt: file.createdAt || '',
+        updatedAt: file.updatedAt || ''
+      }
+    };
+  } catch (error) {
+    // Try signed URL as fallback for hidden files
+    if (error.response?.status === 404 || error.response?.status === 403) {
+      try {
+        const fileId = fileIdOrUrl.includes('/file/')
+          ? fileIdOrUrl.match(/\/file\/(\d+)/)?.[1]
+          : fileIdOrUrl;
+
+        console.log(`  Attempting signed URL for potentially hidden file ${fileId}...`);
+        const client = createHubSpotClient();
+        const signedUrlResponse = await client.get(`/files/v3/files/${fileId}/signed-url`);
+
+        return {
+          success: true,
+          file: {
+            id: fileId,
+            name: 'Hidden file (metadata unavailable)',
+            extension: '',
+            type: '',
+            size: 0,
+            url: signedUrlResponse.data.url || '',
+            hidden: true,
+            access: 'HIDDEN_PRIVATE',
+            createdAt: '',
+            updatedAt: ''
+          }
+        };
+      } catch (signedUrlError) {
+        console.error(`  ⚠️  Signed URL also failed for file:`, signedUrlError.message);
+      }
+    }
+
+    console.error('Get file by ID error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}

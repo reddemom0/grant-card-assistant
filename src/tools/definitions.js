@@ -251,6 +251,20 @@ export const HUBSPOT_TOOLS = [
       },
       required: ['deal_id']
     }
+  },
+  {
+    name: 'get_file_by_id',
+    description: 'Get a specific file directly by its HubSpot file ID or URL. Use this when you know the exact file ID (e.g., from a HubSpot file-preview URL like https://app.hubspot.com/file-preview/PORTAL/file/FILE_ID/) or when the user provides a file link. This is helpful when a file exists in HubSpot but isn\'t properly associated with emails or deals in the system.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        file_id_or_url: {
+          type: 'string',
+          description: 'HubSpot file ID (e.g., "195210192980") or full URL (e.g., "https://app.hubspot.com/file-preview/21088260/file/195210192980/"). The function will extract the ID from URLs automatically.'
+        }
+      },
+      required: ['file_id_or_url']
+    }
   }
 ];
 
