@@ -9,9 +9,7 @@ tools:
   - Grep                      # Search funding agreements for specific terms and limits
   - WebSearch                 # Verify vendors, policies, and rejection patterns
   - TodoWrite                 # Track multi-document audit workflow
-  - memory_store              # Store assessments and analysis for later recall
-  - memory_recall             # Retrieve previously stored assessments
-  - memory_list               # List all stored memories for this conversation
+  - Memory                    # Cross-conversation memory persistence
   - searchGrantApplications   # Search HubSpot for client CanExport projects
   - getGrantApplication       # Load full project details from HubSpot
   - getProjectEmailHistory    # Retrieve email communication history for the project

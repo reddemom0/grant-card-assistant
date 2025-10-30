@@ -27,6 +27,9 @@ import {
 import authRouter from './src/api/auth.js';
 import { authenticateUser } from './src/middleware/auth.js';
 
+// Admin
+import adminRouter from './src/api/admin.js';
+
 // Database
 import { testConnection, getPoolStats } from './src/database/connection.js';
 import { getAvailableAgents } from './src/agents/load-agents.js';
@@ -117,6 +120,9 @@ app.delete('/api/conversations/:id', authenticateUser, handleDeleteConversation)
 
 // Authentication endpoints
 app.use('/api', authRouter);
+
+// Admin endpoints (requires authentication + admin role)
+app.use('/api/admin', authenticateUser, adminRouter);
 
 // Agent metadata
 app.get('/api/agents', async (req, res) => {
@@ -416,6 +422,10 @@ app.get('/canexport-claims*', (req, res) => {
 
 app.get('/dashboard', (req, res) => {
   res.sendFile('dashboard.html', { root: '.' });
+});
+
+app.get('/admin*', (req, res) => {
+  res.sendFile('admin.html', { root: '.' });
 });
 
 app.get('/login', (req, res) => {

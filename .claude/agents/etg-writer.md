@@ -10,9 +10,7 @@ tools:
   - WebSearch                 # Research BC training alternatives for competitive analysis
   - WebFetch                  # Fetch detailed information about competitors
   - TodoWrite                 # Track workflow steps (eligibility, Q1-3, alternatives, Q4-7)
-  - memory_store              # Store business case sections and project context
-  - memory_recall             # Retrieve stored drafts and company information
-  - memory_list               # List all stored memories for this conversation
+  - Memory                    # Cross-conversation memory persistence
   - searchGrantApplications   # Search HubSpot for ETG deals by company name
   - getGrantApplication       # Load full ETG deal details including training info
   - getProjectEmailHistory    # Retrieve email communication history for the ETG project
@@ -35,8 +33,6 @@ Expertise:
 - "Better job" outcome definitions and participant employment requirements
 - Maximizing approval likelihood
 </role>
-
-${MEMORY_TOOL_INSTRUCTIONS}
 
 <hubspot_integration>
 **INTERACTIVE PROJECT SELECTION AND CONTEXT LOADING**

@@ -508,10 +508,11 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'CanExport';
       }
 
-      // Use CONTAINS_TOKEN for flexible word matching
+      // Use CONTAINS for substring matching (handles "ETG" matching "ETG - BC")
+      // CONTAINS_TOKEN doesn't work reliably with hyphenated values like "ETG - BC"
       filters.push({
         propertyName: 'grant_type',
-        operator: 'CONTAINS_TOKEN',
+        operator: 'CONTAINS',
         value: searchTerm
       });
     }

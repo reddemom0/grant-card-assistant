@@ -5,14 +5,17 @@
  */
 
 import jwt from 'jsonwebtoken';
+import { query } from '../database/connection.js';
 
 /**
  * Verify JWT token from cookie and attach user to request
+ * Loads user role and status from database
+ *
  * @param {Object} req - Express request
  * @param {Object} res - Express response
  * @param {Function} next - Next middleware
  */
-export function authenticateUser(req, res, next) {
+export async function authenticateUser(req, res, next) {
   try {
     // Get token from cookie
     const token = req.headers.cookie
@@ -29,15 +32,36 @@ export function authenticateUser(req, res, next) {
     // Verify and decode token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Attach user info to request
+    // Fetch user details including role and active status
+    const result = await query(
+      'SELECT id, email, name, picture, role, is_active, last_login FROM users WHERE id = $1',
+      [decoded.userId]
+    );
+
+    if (result.rows.length === 0) {
+      console.warn(`⚠️  User ID ${decoded.userId} from JWT not found in database`);
+      req.user = null;
+      return next();
+    }
+
+    const user = result.rows[0];
+
+    // Attach user info to request with role
     req.user = {
-      id: decoded.userId,
-      email: decoded.email,
-      name: decoded.name,
-      picture: decoded.picture
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      role: user.role || 'user',
+      is_active: user.is_active !== false,
+      last_login: user.last_login
     };
 
-    console.log(`🔐 Authenticated user: ${req.user.email} (ID: ${req.user.id})`);
+    // Update last_login timestamp (async, don't wait)
+    query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
+      .catch(err => console.error('Failed to update last_login:', err));
+
+    console.log(`🔐 Authenticated user: ${req.user.email} (ID: ${req.user.id}, Role: ${req.user.role})`);
     next();
 
   } catch (error) {
