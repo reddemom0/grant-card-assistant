@@ -52,12 +52,14 @@ export async function streamToSSE(stream, res, sessionId) {
           currentContent.input = '';
         } else if (event.content_block.type === 'web_fetch_tool_result') {
           // Handle WebFetch result from Claude
+          // The entire content object is provided in content_block_start (not streamed via deltas)
           currentContent.tool_use_id = event.content_block.tool_use_id;
-          currentContent.content = ''; // Will accumulate result content
+          currentContent.content = event.content_block.content; // Full content object from API
         } else if (event.content_block.type === 'web_search_tool_result') {
           // Handle WebSearch result from Claude
+          // The entire content object is provided in content_block_start (not streamed via deltas)
           currentContent.tool_use_id = event.content_block.tool_use_id;
-          currentContent.content = ''; // Will accumulate result content
+          currentContent.content = event.content_block.content; // Full content object from API
         } else if (event.content_block.type === 'thinking') {
           currentContent.thinking = '';
           currentContent.signature = ''; // Initialize signature field
@@ -91,12 +93,6 @@ export async function streamToSSE(stream, res, sessionId) {
             delta: event.delta.partial_json,
             sessionId
           })}\n\n`);
-        } else if (event.delta.type === 'content_delta') {
-          // Server tool result content (web_fetch_tool_result, web_search_tool_result)
-          if (!currentContent.content) {
-            currentContent.content = '';
-          }
-          currentContent.content += event.delta.content || '';
         } else if (event.delta.type === 'thinking_delta') {
           currentContent.thinking += event.delta.thinking;
 
