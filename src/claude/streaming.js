@@ -154,14 +154,7 @@ export async function streamToSSE(stream, res, sessionId) {
           })}\n\n`);
         } else if (currentContent.type === 'web_fetch_tool_result' || currentContent.type === 'web_search_tool_result') {
           // Server tool result complete
-          // Parse accumulated content if it's JSON
-          try {
-            currentContent.content = JSON.parse(currentContent.content);
-          } catch (error) {
-            // Content might be plain text, keep as is
-            console.log(`Server tool result content is not JSON, keeping as text`);
-          }
-
+          // Content field should remain as string (not parsed as JSON)
           res.write(`data: ${JSON.stringify({
             type: 'server_tool_result_complete',
             toolUseId: currentContent.tool_use_id,
