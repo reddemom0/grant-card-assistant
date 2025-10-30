@@ -508,13 +508,13 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'CanExport';
       }
 
-      // Use IN operator with known grant type variants
-      // CONTAINS and CONTAINS_TOKEN don't work reliably for hyphenated values
+      // Use IN operator with exact grant type values for each program
+      // ETG agent only handles BC's Employer Training Grant (ETG - BC)
       let grantTypeValues = [];
 
       if (normalizedProgram === 'etg') {
-        // Known ETG grant type values in HubSpot
-        grantTypeValues = ['ETG - BC', 'ETG - ON', 'ETG - AB', 'ETG - SK', 'ETG - MB', 'ETG - QC', 'ETG - NS', 'ETG - NB', 'ETG - PE', 'ETG - NL', 'ETG - YT', 'ETG - NT', 'ETG - NU'];
+        // BC Employer Training Grant only
+        grantTypeValues = ['ETG - BC'];
       } else if (normalizedProgram.includes('canexport')) {
         grantTypeValues = ['CanExport SME', 'CanExport Innovation'];
       } else if (normalizedProgram === 'bcafe') {
