@@ -508,15 +508,12 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'CanExport';
       }
 
-      // For ETG and other programs, search for the full prefix including separator
-      // HubSpot grant_type values use format like "ETG - BC", "CanExport SME", etc.
-      if (normalizedProgram === 'etg') {
-        searchTerm = 'ETG -'; // Matches "ETG - BC", "ETG - ON", etc.
-      }
-
+      // Use CONTAINS operator for substring matching
+      // Despite API docs saying CONTAINS isn't valid, it DOES work in practice
+      // and properly matches "ETG" to "ETG - BC" values
       filters.push({
         propertyName: 'grant_type',
-        operator: 'CONTAINS_TOKEN',
+        operator: 'CONTAINS',
         value: searchTerm
       });
     }
