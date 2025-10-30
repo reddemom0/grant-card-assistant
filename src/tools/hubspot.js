@@ -508,13 +508,26 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'CanExport';
       }
 
-      // Use CONTAINS operator for substring matching
-      // Despite API docs saying CONTAINS isn't valid, it DOES work in practice
-      // and properly matches "ETG" to "ETG - BC" values
+      // Use IN operator with known grant type variants
+      // CONTAINS and CONTAINS_TOKEN don't work reliably for hyphenated values
+      let grantTypeValues = [];
+
+      if (normalizedProgram === 'etg') {
+        // Known ETG grant type values in HubSpot
+        grantTypeValues = ['ETG - BC', 'ETG - ON', 'ETG - AB', 'ETG - SK', 'ETG - MB', 'ETG - QC', 'ETG - NS', 'ETG - NB', 'ETG - PE', 'ETG - NL', 'ETG - YT', 'ETG - NT', 'ETG - NU'];
+      } else if (normalizedProgram.includes('canexport')) {
+        grantTypeValues = ['CanExport SME', 'CanExport Innovation'];
+      } else if (normalizedProgram === 'bcafe') {
+        grantTypeValues = ['BCAFE', 'BC MDP'];
+      } else {
+        // Fallback: just use the search term as-is
+        grantTypeValues = [searchTerm];
+      }
+
       filters.push({
         propertyName: 'grant_type',
-        operator: 'CONTAINS',
-        value: searchTerm
+        operator: 'IN',
+        values: grantTypeValues
       });
     }
 
