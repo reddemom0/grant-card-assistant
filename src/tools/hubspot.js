@@ -91,7 +91,7 @@ const ETG_FIELDS = [
   ...COMMON_FIELDS,
 
   // ETG Training Specific
-  'candidate___name__job_title___email',  // Candidate info
+  'candidate_name_job_title_email',  // Candidate - Name, Job Title & Email field
   'tuition_fee_per_person',
   'training_hours_per_person',
   'training_delivery_method',
@@ -676,8 +676,8 @@ export async function searchGrantApplications(grantProgram = null, status = null
         if (deal.properties.final_report_submitted) app.finalReportSubmitted = deal.properties.final_report_submitted;
 
         // ETG-specific fields
-        if (deal.properties.candidate___name__job_title___email) {
-          app.candidateInfo = deal.properties.candidate___name__job_title___email;
+        if (deal.properties.candidate_name_job_title_email) {
+          app.candidateInfo = deal.properties.candidate_name_job_title_email;
         }
         if (deal.properties.tuition_fee_per_person) app.tuitionFeePerPerson = deal.properties.tuition_fee_per_person;
         if (deal.properties.training_hours_per_person) app.trainingHoursPerPerson = deal.properties.training_hours_per_person;
