@@ -508,11 +508,15 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'CanExport';
       }
 
-      // Use CONTAINS for substring matching (handles "ETG" matching "ETG - BC")
-      // CONTAINS_TOKEN doesn't work reliably with hyphenated values like "ETG - BC"
+      // For ETG and other programs, search for the full prefix including separator
+      // HubSpot grant_type values use format like "ETG - BC", "CanExport SME", etc.
+      if (normalizedProgram === 'etg') {
+        searchTerm = 'ETG -'; // Matches "ETG - BC", "ETG - ON", etc.
+      }
+
       filters.push({
         propertyName: 'grant_type',
-        operator: 'CONTAINS',
+        operator: 'CONTAINS_TOKEN',
         value: searchTerm
       });
     }

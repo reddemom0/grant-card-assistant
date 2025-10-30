@@ -48,10 +48,8 @@ export async function streamToSSE(stream, res, sessionId) {
           // Handle server-side tools (web_search, web_fetch)
           currentContent.id = event.content_block.id;
           currentContent.name = event.content_block.name;
-          // Input might be a string or object - ensure it's always an object
-          currentContent.input = typeof event.content_block.input === 'string'
-            ? JSON.parse(event.content_block.input)
-            : event.content_block.input;
+          // Initialize input as empty string - will be accumulated during delta events
+          currentContent.input = '';
         } else if (event.content_block.type === 'thinking') {
           currentContent.thinking = '';
           currentContent.signature = ''; // Initialize signature field
@@ -125,7 +123,14 @@ export async function streamToSSE(stream, res, sessionId) {
           })}\n\n`);
         } else if (currentContent.type === 'server_tool_use') {
           // Server tool complete (web_search, web_fetch)
-          // Input is already populated, no need to parse
+          // Parse accumulated JSON input
+          try {
+            currentContent.input = JSON.parse(currentContent.input);
+          } catch (error) {
+            console.error('Failed to parse server tool input JSON:', error);
+            currentContent.input = {};
+          }
+
           res.write(`data: ${JSON.stringify({
             type: 'server_tool_use_complete',
             toolId: currentContent.id,
