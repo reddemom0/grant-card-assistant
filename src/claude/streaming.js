@@ -50,6 +50,14 @@ export async function streamToSSE(stream, res, sessionId) {
           currentContent.name = event.content_block.name;
           // Initialize input as empty string - will be accumulated during delta events
           currentContent.input = '';
+        } else if (event.content_block.type === 'web_fetch_tool_result') {
+          // Handle WebFetch result from Claude
+          currentContent.tool_use_id = event.content_block.tool_use_id;
+          currentContent.content = ''; // Will accumulate result content
+        } else if (event.content_block.type === 'web_search_tool_result') {
+          // Handle WebSearch result from Claude
+          currentContent.tool_use_id = event.content_block.tool_use_id;
+          currentContent.content = ''; // Will accumulate result content
         } else if (event.content_block.type === 'thinking') {
           currentContent.thinking = '';
           currentContent.signature = ''; // Initialize signature field
@@ -83,6 +91,12 @@ export async function streamToSSE(stream, res, sessionId) {
             delta: event.delta.partial_json,
             sessionId
           })}\n\n`);
+        } else if (event.delta.type === 'content_delta') {
+          // Server tool result content (web_fetch_tool_result, web_search_tool_result)
+          if (!currentContent.content) {
+            currentContent.content = '';
+          }
+          currentContent.content += event.delta.content || '';
         } else if (event.delta.type === 'thinking_delta') {
           currentContent.thinking += event.delta.thinking;
 
@@ -136,6 +150,22 @@ export async function streamToSSE(stream, res, sessionId) {
             toolId: currentContent.id,
             toolName: currentContent.name,
             input: currentContent.input,
+            sessionId
+          })}\n\n`);
+        } else if (currentContent.type === 'web_fetch_tool_result' || currentContent.type === 'web_search_tool_result') {
+          // Server tool result complete
+          // Parse accumulated content if it's JSON
+          try {
+            currentContent.content = JSON.parse(currentContent.content);
+          } catch (error) {
+            // Content might be plain text, keep as is
+            console.log(`Server tool result content is not JSON, keeping as text`);
+          }
+
+          res.write(`data: ${JSON.stringify({
+            type: 'server_tool_result_complete',
+            toolUseId: currentContent.tool_use_id,
+            resultType: currentContent.type,
             sessionId
           })}\n\n`);
         } else if (currentContent.type === 'thinking') {
