@@ -1181,6 +1181,35 @@
         function stopGeneration() { if (agentInterface) agentInterface.stopGeneration(); }
         function logout() { if (agentInterface) agentInterface.logout(); }
 
+        function startNewConversation() {
+            if (confirm('Start a new conversation? This will clear the current chat.')) {
+                window.location.href = '/etg-writer/new';
+            }
+        }
+
+        function exportConversationAsMarkdown() {
+            const messagesContainer = document.getElementById('messages');
+            if (!messagesContainer) return;
+
+            const messages = messagesContainer.querySelectorAll('.message');
+            let markdown = '# ETG Business Case Conversation\n\n';
+
+            messages.forEach(msg => {
+                const role = msg.classList.contains('user-message') ? 'User' : 'Assistant';
+                const content = msg.querySelector('.message-content')?.innerText || '';
+                markdown += `## ${role}\n\n${content}\n\n`;
+            });
+
+            // Download as file
+            const blob = new Blob([markdown], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `etg-conversation-${new Date().toISOString().split('T')[0]}.md`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
         // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', async function() {
             console.log('🚀 Initializing ETG Business Case Writer...');
