@@ -32,9 +32,9 @@ export async function authenticateUser(req, res, next) {
     // Verify and decode token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Fetch user details from database
+    // Fetch user details including role and active status
     const result = await query(
-      'SELECT id, email, name, picture FROM users WHERE id = $1',
+      'SELECT id, email, name, picture, role, is_active, last_login FROM users WHERE id = $1',
       [decoded.userId]
     );
 
@@ -46,15 +46,22 @@ export async function authenticateUser(req, res, next) {
 
     const user = result.rows[0];
 
-    // Attach user info to request
+    // Attach user info to request with role
     req.user = {
       id: user.id,
       email: user.email,
       name: user.name,
-      picture: user.picture
+      picture: user.picture,
+      role: user.role || 'user',
+      is_active: user.is_active !== false,
+      last_login: user.last_login
     };
 
-    console.log(`🔐 Authenticated user: ${req.user.email} (ID: ${req.user.id})`);
+    // Update last_login timestamp (async, don't wait)
+    query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
+      .catch(err => console.error('Failed to update last_login:', err));
+
+    console.log(`🔐 Authenticated user: ${req.user.email} (ID: ${req.user.id}, Role: ${req.user.role})`);
     next();
 
   } catch (error) {

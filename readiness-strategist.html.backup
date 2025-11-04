@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grant Readiness Assessment Specialist - Granted Consulting</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #8b5cf6;
+            --primary-dark: #7c3aed;
+            --text-primary: #2c3e50;
+            --text-secondary: #6b7280;
+            --surface: #ffffff;
+            --background: #fafafa;
+            --border: #e5e7eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #dc2626;
+            --readiness-light: #ede9fe;
+        }
+
+        body {
+            font-family: 'Source Sans 3', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 22px;
+            background: var(--background);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding-bottom: 120px;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+            font-size: 0.9rem;
+        }
+
+        .nav-link:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        /* User Profile Dropdown */
+        .user-profile {
+            position: relative;
+        }
+
+        .user-profile-button {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+
+        .user-profile-button:hover {
+            background: var(--border);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid var(--border);
+        }
+
+        .user-name {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .dropdown-arrow {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+        }
+
+        .user-dropdown {
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            right: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            min-width: 200px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .user-dropdown.show {
+            display: block;
+        }
+
+        .dropdown-header {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .dropdown-user-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .dropdown-user-email {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .dropdown-menu {
+            padding: 0.5rem 0;
+        }
+
+        .dropdown-item {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: none;
+            background: none;
+            text-align: left;
+            font-size: 0.85rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: background 0.2s ease;
+            display: block;
+            text-decoration: none;
+        }
+
+        .dropdown-item:hover {
+            background: var(--background);
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0.5rem 0;
+        }
+
+        /* Container */
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* Welcome Section */
+        .welcome-section {
+            text-align: center;
+            padding: 3rem 0;
+        }
+
+        .welcome-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .welcome-subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .capability-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        .capability-tag {
+            background: var(--readiness-light);
+            color: var(--primary);
+            padding: 0.75rem 1.25rem;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+        }
+
+        .capability-tag:hover {
+            background: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* Chat Container */
+        .chat-container {
+            margin-top: 2rem;
+        }
+
+        .messages {
+            margin-bottom: 2rem;
+        }
+
+        /* Message Styles */
+        .message {
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            max-width: 80%;
+            padding: 1.25rem;
+            border-radius: 12px;
+            line-height: 1.6;
+        }
+
+        .message.assistant .message-content {
+            background: var(--surface);
+            border: 1px solid var(--border);
+        }
+
+        .message.user .message-content {
+            background: var(--primary);
+            color: white;
+        }
+
+        .welcome-message .message-content {
+            max-width: 100%;
+        }
+
+        /* Quick Buttons */
+        .quick-btn {
+            padding: 0.5rem 1rem;
+            background: var(--readiness-light);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .quick-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .upload-btn-welcome {
+            padding: 0.75rem 1.5rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .upload-btn-welcome:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+        }
+
+        /* Floating Input Area */
+        .floating-input {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 1rem;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.05);
+            z-index: 90;
+        }
+
+        .floating-quick-actions {
+            max-width: 900px;
+            margin: 0 auto 0.75rem;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            padding: 0 1rem;
+        }
+
+        .floating-quick-btn {
+            padding: 0.5rem 1rem;
+            background: var(--readiness-light);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .floating-quick-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .simple-input-box {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .message-input-simple {
+            width: 100%;
+            padding: 1rem 6rem 1rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: none;
+            min-height: 56px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .message-input-simple:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .input-buttons {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .file-button-inline {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: var(--background);
+            border-radius: 8px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .file-button-inline:hover {
+            background: var(--border);
+        }
+
+        .send-button-inline {
+            width: 36px;
+            height: 36px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-button-inline:hover {
+            background: var(--primary-dark);
+        }
+
+        .send-button-inline:disabled {
+            background: var(--border);
+            cursor: not-allowed;
+        }
+
+        .stop-button-inline {
+            width: auto;
+            padding: 0 1rem;
+            height: 36px;
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: none;
+        }
+
+        .stop-button-inline.show {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .welcome-title {
+                font-size: 1.5rem;
+            }
+
+            .welcome-subtitle {
+                font-size: 1rem;
+            }
+
+            .message-content {
+                max-width: 90%;
+            }
+
+            .floating-quick-actions {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <a href="/" class="nav-link" style="padding: 0;">
+                    <div class="logo-text">🎯 Granted Consulting</div>
+                </a>
+            </div>
+            <div style="display: flex; align-items: center; gap: 1rem;">
+                <a href="/dashboard" class="nav-link">Dashboard</a>
+
+                <!-- User Profile Dropdown -->
+                <div class="user-profile">
+                    <button class="user-profile-button" onclick="toggleUserDropdown()" id="user-profile-btn">
+                        <img src="" alt="User" class="user-avatar" id="user-avatar" style="display: none;">
+                        <span class="user-name" id="user-name-display">Loading...</span>
+                        <span class="dropdown-arrow">▼</span>
+                    </button>
+                    <div class="user-dropdown" id="user-dropdown">
+                        <div class="dropdown-header">
+                            <div class="dropdown-user-name" id="dropdown-user-name">User Name</div>
+                            <div class="dropdown-user-email" id="dropdown-user-email">user@example.com</div>
+                        </div>
+                        <div class="dropdown-menu">
+                            <a href="/dashboard" class="dropdown-item">📊 Dashboard</a>
+                            <div class="dropdown-divider"></div>
+                            <button onclick="logout()" class="dropdown-item">🚪 Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Welcome Section -->
+        <div class="welcome-section" id="welcome-section">
+            <h1 class="welcome-title">How can I help you assess grant readiness?</h1>
+            <p class="welcome-subtitle">Strategic grant readiness assessment and gap analysis specialist</p>
+
+            <div class="capability-tags">
+                <div class="capability-tag" onclick="insertQuickText('Analyze grant program')">🔍 Analyze Grant</div>
+                <div class="capability-tag" onclick="insertQuickText('Create assessment')">📋 New Assessment</div>
+                <div class="capability-tag" onclick="insertQuickText('Evaluate responses')">✅ Evaluate Client</div>
+                <div class="capability-tag" onclick="insertQuickText('Identify gaps')">⚠️ Gap Analysis</div>
+                <div class="capability-tag" onclick="insertQuickText('Review eligibility')">🎯 Check Eligibility</div>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div class="chat-container" id="chat-container">
+            <div class="messages" id="messages">
+                <div class="message assistant welcome-message" id="welcome-message">
+                    <div class="message-content">
+                        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">Welcome! I'm your Grant Readiness Strategist</div>
+
+                        <div style="margin-bottom: 1rem;">I create <strong>comprehensive readiness assessment documents</strong> that help you determine if clients are prepared to apply for specific grant programs. My assessments identify gaps, risks, and opportunities before investing weeks in full applications.</div>
+
+                        <div style="margin-bottom: 1rem;">
+                            <div><strong>My 3-Phase Process:</strong></div>
+                            <div style="margin-top: 0.5rem;">
+                                <strong>Phase 1: Research & Analysis</strong>
+                                <div style="margin-left: 1rem; color: var(--text-secondary); font-size: 0.95rem;">
+                                    • Investigate grant program thoroughly using WebSearch & WebFetch<br>
+                                    • Extract eligibility requirements, evaluation criteria, and success factors<br>
+                                    • Identify program-specific keywords and priority areas<br>
+                                    • Research past successful applications
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.75rem;">
+                                <strong>Phase 2: Generate Assessment Document</strong>
+                                <div style="margin-left: 1rem; color: var(--text-secondary); font-size: 0.95rem;">
+                                    • Create 12-section readiness assessment following Granted's template<br>
+                                    • Customize questions from Question Bank based on program focus<br>
+                                    • Design evaluation rubric aligned with funder priorities<br>
+                                    • Provide clear next steps and decision framework
+                                </div>
+                            </div>
+                            <div style="margin-top: 0.75rem;">
+                                <strong>Phase 3: Evaluation Support</strong>
+                                <div style="margin-left: 1rem; color: var(--text-secondary); font-size: 0.95rem;">
+                                    • Analyze completed client responses<br>
+                                    • Provide GO/NO-GO/CONDITIONAL GO recommendation<br>
+                                    • Identify strengths, gaps, and required actions<br>
+                                    • Assess competitive positioning and ROI
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(139, 92, 246, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
+                            <div style="font-weight: 600; color: var(--primary); margin-bottom: 0.5rem;">🎯 What I Assess</div>
+                            <div style="font-size: 0.9rem; color: #374151;">
+                                <div>• <strong>Capacity:</strong> Financial resources, human capital, physical infrastructure</div>
+                                <div>• <strong>Experience:</strong> Company history, past projects, project management</div>
+                                <div>• <strong>Finances:</strong> Viability, cash flow, co-funding availability</div>
+                                <div>• <strong>Strategic Fit:</strong> Alignment with program priorities and competitive positioning</div>
+                                <div>• <strong>Program-Specific:</strong> Innovation (TRL), Sustainability (GHG), Export Readiness, Supply Chain, DEI</div>
+                            </div>
+                        </div>
+
+                        <div style="background: rgba(251, 146, 60, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid var(--warning);">
+                            <div style="font-weight: 600; color: var(--warning); margin-bottom: 0.5rem;">💡 Strategic Principles</div>
+                            <div style="font-size: 0.9rem; color: #374151;">
+                                <div>• <strong>Be Thorough:</strong> Better to identify NO-GO early than fail after weeks of work</div>
+                                <div>• <strong>Be Honest:</strong> If it's a poor fit, say so clearly and suggest alternatives</div>
+                                <div>• <strong>Think Like a Reviewer:</strong> Frame everything from the funder's perspective</div>
+                                <div>• <strong>Assess Competitiveness:</strong> Not just eligibility - evaluate if client can win</div>
+                            </div>
+                        </div>
+
+                        <div>Share a grant program URL, name, or documentation to begin your comprehensive readiness assessment!</div>
+
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary); margin-bottom: 0.75rem;">Quick Actions:</div>
+                            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                                <button class="quick-btn" onclick="insertQuickText('Analyze this grant')">🔍 Analyze Grant</button>
+                                <button class="quick-btn" onclick="insertQuickText('Create assessment')">📋 New Assessment</button>
+                                <button class="quick-btn" onclick="insertQuickText('Evaluate client')">✅ Evaluate</button>
+                                <button class="quick-btn" onclick="insertQuickText('Gap analysis')">⚠️ Gaps</button>
+                                <button class="quick-btn" onclick="insertQuickText('Check eligibility')">🎯 Eligibility</button>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 1.5rem;">
+                            <div style="font-size: 0.9rem; font-weight: 600; color: var(--primary); margin-bottom: 0.75rem;">Upload Options:</div>
+                            <div style="display: flex; gap: 1rem;">
+                                <button class="upload-btn-welcome" onclick="document.getElementById('file-input').click()">
+                                    📄 Upload Grant Docs
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Input Area -->
+    <div class="floating-input">
+        <div class="floating-quick-actions">
+            <button class="floating-quick-btn" onclick="insertQuickText('Analyze this grant')">🔍 Analyze</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Create assessment')">📋 Assessment</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Evaluate client')">✅ Evaluate</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Gap analysis')">⚠️ Gaps</button>
+            <button class="floating-quick-btn" onclick="insertQuickText('Check eligibility')">🎯 Eligibility</button>
+        </div>
+        <div class="simple-input-box" id="input-box">
+            <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md" multiple style="display: none;">
+            <div style="position: relative;">
+                <textarea
+                    id="message-input"
+                    class="message-input-simple"
+                    placeholder="Message Readiness Strategist..."
+                    rows="1"
+                ></textarea>
+                <div class="input-buttons">
+                    <button class="file-button-inline" onclick="document.getElementById('file-input').click()" title="Upload files">
+                        📎
+                    </button>
+                    <button id="send-button" class="send-button-inline" title="Send message">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22,2 15,22 11,13 2,9 22,2"></polygon>
+                        </svg>
+                    </button>
+                    <button id="stop-button" class="stop-button-inline" onclick="stopGeneration()" title="Stop generation">
+                        ⏹️ Stop
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent SDK Scripts -->
+    <script src="/public/js/chat-client.js"></script>
+    <script src="/public/js/agent-interface.js"></script>
+
+    <script>
+        // Readiness Assessment Specialist - Agent Configuration
+        let agentInterface;
+
+        // Quick text insertion
+        function insertQuickText(text) {
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) {
+                messageInput.value = text + ': ';
+                messageInput.focus();
+                messageInput.style.height = 'auto';
+                messageInput.style.height = messageInput.scrollHeight + 'px';
+            }
+        }
+
+        // Wrapper functions for HTML onclick handlers
+        function toggleSidebar() { if (agentInterface) agentInterface.toggleSidebar(); }
+        function toggleUserDropdown() { if (agentInterface) agentInterface.toggleUserDropdown(); }
+        function stopGeneration() { if (agentInterface) agentInterface.stopGeneration(); }
+        function logout() { if (agentInterface) agentInterface.logout(); }
+
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 Initializing Grant Readiness Strategist...');
+
+            // Configure AgentInterface for Readiness Assessment
+            agentInterface = new AgentInterface({
+                agentType: 'readiness-strategist',
+                displayName: 'Grant Readiness Strategist',
+                placeholder: 'Share grant program details or documentation...',
+                welcomeTitle: 'How can I help you assess grant readiness?',
+                welcomeSubtitle: 'Strategic grant readiness assessment and gap analysis specialist',
+                enableURLDetection: true,
+                enableFileUploads: true
+            });
+
+            // Initialize the interface
+            await agentInterface.initialize();
+
+            // Make globally accessible
+            window.agentInterface = agentInterface;
+
+            console.log('✅ Grant Readiness Strategist initialized successfully');
+        });
+    </script>
+</body>
+</html>

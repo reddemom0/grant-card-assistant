@@ -51,7 +51,7 @@ export async function getUsers({ page = 1, limit = 50, role = null, isActive = n
   // Get users
   params.push(limit, offset);
   const usersResult = await query(
-    `SELECT id, google_id, email, name, picture, created_at, updated_at
+    `SELECT id, google_id, email, name, picture, role, is_active, last_login, created_at, updated_at
      FROM users
      ${whereClause}
      ORDER BY created_at DESC
