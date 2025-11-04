@@ -156,7 +156,7 @@ export function isAdmin(user) {
 export async function getAdminUser(userId) {
   try {
     const result = await query(
-      'SELECT id, email, name, picture, role, is_active, last_login FROM users WHERE id = $1',
+      'SELECT id, email, name, picture FROM users WHERE id = $1',
       [userId]
     );
 

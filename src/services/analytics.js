@@ -25,8 +25,8 @@ export async function getDashboardStats() {
     // Total users
     query('SELECT COUNT(*) as count FROM users'),
 
-    // Active users (logged in last 7 days)
-    query(`SELECT COUNT(*) as count FROM users WHERE last_login >= NOW() - INTERVAL '7 days'`),
+    // Active users (active in last 7 days)
+    query(`SELECT COUNT(*) as count FROM users WHERE updated_at >= NOW() - INTERVAL '7 days'`),
 
     // Total conversations
     query('SELECT COUNT(*) as count FROM conversations'),
