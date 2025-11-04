@@ -187,11 +187,11 @@ export async function runAgent({
         messages,
         tools,
 
-        // Extended thinking disabled - caused issues with tool use loops
-        // thinking: {
-        //   type: 'enabled',
-        //   budget_tokens: THINKING_BUDGET
-        // },
+        // Extended thinking enabled - separates reasoning from response
+        thinking: {
+          type: 'enabled',
+          budget_tokens: THINKING_BUDGET
+        },
 
         // Enable streaming
         stream: true
