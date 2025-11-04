@@ -8,8 +8,11 @@ CREATE TABLE IF NOT EXISTS users (
   email VARCHAR(255) NOT NULL,
   name VARCHAR(255),
   picture TEXT,
+  role VARCHAR(50) DEFAULT 'user',        -- 'user' or 'admin'
+  is_active BOOLEAN DEFAULT true,         -- Account active status
   last_login TIMESTAMP DEFAULT NOW(),
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
 );
 
 -- Indexes for users table
