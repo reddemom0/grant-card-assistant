@@ -420,6 +420,10 @@ app.get('/canexport-claims*', (req, res) => {
   res.sendFile('canexport-claims.html', { root: '.' });
 });
 
+app.get('/readiness-strategist*', (req, res) => {
+  res.sendFile('readiness-strategist.html', { root: '.' });
+});
+
 app.get('/dashboard', (req, res) => {
   res.sendFile('dashboard.html', { root: '.' });
 });
