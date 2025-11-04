@@ -65,6 +65,19 @@
       "status": 301
     },
     {
+      "src": "/readiness-strategist/new",
+      "dest": "/readiness-strategist.html"
+    },
+    {
+      "src": "/readiness-strategist/chat/([^/]+)",
+      "dest": "/readiness-strategist.html"
+    },
+    {
+      "src": "/readiness-strategist",
+      "dest": "/readiness-strategist/new",
+      "status": 301
+    },
+    {
       "src": "/dashboard",
       "dest": "/dashboard.html"
     },

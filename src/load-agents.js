@@ -17,6 +17,7 @@ export function loadAgentDefinitions() {
     'etg-writer': parseAgentFile(join(agentDir, 'etg-writer.md')),
     'bcafe-writer': parseAgentFile(join(agentDir, 'bcafe-writer.md')),
     'canexport-claims': parseAgentFile(join(agentDir, 'canexport-claims.md')),
+    'readiness-strategist': parseAgentFile(join(agentDir, 'readiness-strategist.md')),
     'orchestrator': parseAgentFile(join(agentDir, 'orchestrator.md')),
   };
 
