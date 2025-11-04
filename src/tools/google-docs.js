@@ -253,15 +253,29 @@ export async function createGoogleDoc(title, content, folderName = null, userEma
     const docsClient = await getDocsClient();
     const driveClient = await getDriveClient();
 
-    // Create a new document
-    const doc = await docsClient.documents.create({
-      requestBody: {
-        title: title
+    // Find or create folder first if specified
+    let folderId = null;
+    if (folderName) {
+      folderId = await findOrCreateFolder(driveClient, folderName);
+      if (!folderId) {
+        throw new Error(`Failed to access or create folder: ${folderName}`);
       }
+    }
+
+    // Create document directly in the folder using Drive API
+    const fileMetadata = {
+      name: title,
+      mimeType: 'application/vnd.google-apps.document',
+      ...(folderId && { parents: [folderId] })
+    };
+
+    const file = await driveClient.files.create({
+      requestBody: fileMetadata,
+      fields: 'id'
     });
 
-    const documentId = doc.data.documentId;
-    console.log(`   Document created with ID: ${documentId}`);
+    const documentId = file.data.id;
+    console.log(`   Document created with ID: ${documentId}${folderId ? ' in folder' : ''}`);
 
     // Convert markdown to Google Docs format and insert content
     const requests = markdownToDocsRequests(content);
@@ -274,19 +288,6 @@ export async function createGoogleDoc(title, content, folderName = null, userEma
         }
       });
       console.log(`   Content formatted and inserted`);
-    }
-
-    // Move to folder if specified
-    if (folderName) {
-      const folderId = await findOrCreateFolder(driveClient, folderName);
-      if (folderId) {
-        await driveClient.files.update({
-          fileId: documentId,
-          addParents: folderId,
-          fields: 'id, parents'
-        });
-        console.log(`   Document moved to folder: ${folderName}`);
-      }
     }
 
     // Make the document accessible to anyone with the link
