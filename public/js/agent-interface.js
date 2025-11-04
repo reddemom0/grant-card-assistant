@@ -583,6 +583,41 @@ class AgentInterface {
     }
 
     /**
+     * Process markdown content using marked.js
+     */
+    processMarkdown(content) {
+        if (!content) return '';
+
+        // Strip thinking tags (Claude's internal reasoning)
+        let processedContent = content.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
+
+        // Use marked.js if available, otherwise fall back to basic processing
+        if (typeof marked !== 'undefined') {
+            try {
+                // Configure marked for better rendering
+                marked.setOptions({
+                    breaks: true,  // Convert \n to <br>
+                    gfm: true,     // GitHub Flavored Markdown (tables, etc.)
+                    headerIds: false,
+                    mangle: false
+                });
+                return marked.parse(processedContent);
+            } catch (e) {
+                console.warn('Marked.js parsing error:', e);
+                // Fall through to basic processing
+            }
+        }
+
+        // Fallback: Basic markdown processing
+        processedContent = processedContent.replace(/\n/g, '<br>');
+        processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        processedContent = processedContent.replace(/`(.*?)`/g, '<code>$1</code>');
+
+        return processedContent;
+    }
+
+    /**
      * Add message to chat
      */
     async addMessage(role, content, shouldAnimate = false, files = null) {
@@ -595,16 +630,8 @@ class AgentInterface {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
 
-        // User messages or non-animated assistant messages appear immediately
-        let processedContent = content || '';
-
-        // Strip thinking tags (Claude's internal reasoning)
-        processedContent = processedContent.replace(/<thinking>[\s\S]*?<\/thinking>/gi, '');
-
         // Process markdown
-        processedContent = processedContent.replace(/\n/g, '<br>');
-        processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        const processedContent = this.processMarkdown(content || '');
 
         // Add file attachments if present (for user messages)
         if (files && files.length > 0 && role === 'user') {
@@ -680,15 +707,10 @@ class AgentInterface {
     updateStreamingMessage(messageDiv, content, isComplete = false) {
         if (!messageDiv) return;
 
-        let processedContent = content;
-
         // NOTE: Don't strip thinking tags anymore - they're handled separately
 
         // Process markdown
-        processedContent = processedContent.replace(/\n/g, '<br>');
-        processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        processedContent = processedContent.replace(/`(.*?)`/g, '<code>$1</code>');
+        const processedContent = this.processMarkdown(content);
 
         if (isComplete) {
             messageDiv.innerHTML = processedContent;

@@ -463,6 +463,69 @@
             margin: 0.5rem 0;
         }
 
+        /* Markdown Headers */
+        .message-content h1, .message-content h2, .message-content h3,
+        .message-content h4, .message-content h5, .message-content h6 {
+            font-weight: 600;
+            margin: 1rem 0 0.5rem 0;
+            color: var(--primary);
+        }
+
+        .message-content h1 { font-size: 1.5rem; }
+        .message-content h2 { font-size: 1.3rem; }
+        .message-content h3 { font-size: 1.1rem; }
+
+        /* Markdown Tables */
+        .message-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.9rem;
+        }
+
+        .message-content th {
+            background-color: var(--primary);
+            color: white;
+            padding: 0.75rem;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .message-content td {
+            padding: 0.75rem;
+            border: 1px solid #dde1e3;
+        }
+
+        .message-content tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .message-content tbody tr:hover {
+            background-color: #f0f4f8;
+        }
+
+        /* Markdown Code */
+        .message-content code {
+            background-color: #f1f5f9;
+            padding: 0.2rem 0.4rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .message-content pre {
+            background-color: #f1f5f9;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+
+        .message-content pre code {
+            background: none;
+            padding: 0;
+        }
+
         /* Extended Thinking Section */
         .thinking-container {
             background: linear-gradient(135deg, #f0f4ff, #e8eeff);
@@ -1262,6 +1325,9 @@
             }
         }
     </style>
+
+    <!-- Markdown Parser for Rich Text Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 
     <!-- Chat Client Library for Direct Claude API -->
     <script src="/public/js/chat-client.js"></script>
