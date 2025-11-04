@@ -709,9 +709,12 @@ class AgentInterface {
         if (!thinkingDiv || !content) return;
 
         // Show the thinking container when we receive thinking content
+        // But keep it collapsed (not expanded) by default
         const thinkingContainer = thinkingDiv.closest('.thinking-container');
         if (thinkingContainer) {
             thinkingContainer.style.display = 'block';
+            // Remove 'expanded' class to keep it collapsed initially
+            thinkingContainer.classList.remove('expanded');
         }
 
         // Process thinking content (basic formatting)

@@ -330,47 +330,54 @@
             margin: 0.25rem 0;
         }
 
-        /* Extended Thinking Section */
+        /* Extended Thinking Section - Collapsed by default */
         .thinking-container {
-            background: linear-gradient(135deg, #f0f4ff, #e8eeff);
-            border: 1px solid #d1d9f0;
+            display: none; /* Hidden until thinking content arrives */
+            background: linear-gradient(135deg, #fff9f0, #fff4e8);
+            border: 1px solid #ffd9a3;
             border-radius: 12px;
             margin-bottom: 0.75rem;
             width: 100%;
             overflow: hidden;
             transition: all 0.3s ease;
+            opacity: 0.7; /* Subtle by default */
+        }
+
+        .thinking-container:hover {
+            opacity: 1; /* Full opacity on hover */
         }
 
         .thinking-header {
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            padding: 0.75rem 1rem;
+            padding: 0.65rem 0.9rem;
             cursor: pointer;
             user-select: none;
             font-weight: 500;
-            font-size: 0.85rem;
-            color: #4a5568;
+            font-size: 0.8rem;
+            color: #8b6914;
             transition: background 0.2s ease;
         }
 
         .thinking-header:hover {
-            background: rgba(99, 102, 241, 0.05);
+            background: rgba(251, 191, 36, 0.1);
         }
 
         .thinking-icon {
             flex-shrink: 0;
-            color: #6366f1;
+            color: #f59e0b;
         }
 
         .thinking-header span {
             flex: 1;
+            font-style: italic;
         }
 
         .chevron-icon {
             flex-shrink: 0;
             transition: transform 0.3s ease;
-            color: #6366f1;
+            color: #f59e0b;
         }
 
         .thinking-container.expanded .chevron-icon {
@@ -382,16 +389,17 @@
             overflow: hidden;
             transition: max-height 0.3s ease, padding 0.3s ease;
             padding: 0 1rem;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             line-height: 1.5;
-            color: #4a5568;
-            background: rgba(240, 244, 255, 0.5);
+            color: #78350f;
+            background: rgba(255, 251, 235, 0.5);
+            font-family: 'Courier New', monospace;
         }
 
         .thinking-container.expanded .thinking-content {
             max-height: 1000px;
             padding: 1rem;
-            border-top: 1px solid #d1d9f0;
+            border-top: 1px solid #ffd9a3;
         }
 
         .thinking-content br {
