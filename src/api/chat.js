@@ -214,7 +214,16 @@ export async function handleGetConversation(req, res) {
       return res.status(404).json({ error: 'Conversation not found' });
     }
 
-    res.json(conversation);
+    // Load messages for this conversation
+    const { getConversationMessages } = await import('../database/messages.js');
+    const messages = await getConversationMessages(id);
+
+    // Return conversation with messages
+    res.json({
+      ...conversation,
+      messages,
+      messageCount: messages.length
+    });
   } catch (error) {
     console.error('Get conversation error:', error);
     res.status(500).json({ error: error.message });

@@ -15,6 +15,25 @@ const __dirname = path.dirname(__filename);
 const appliedMigrations = new Set();
 
 /**
+ * Check if the conversations table exists
+ */
+async function checkTablesExist() {
+  try {
+    const result = await query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables
+        WHERE table_schema = 'public'
+        AND table_name = 'conversations'
+      );
+    `);
+    return result.rows[0].exists;
+  } catch (error) {
+    console.error('Error checking if tables exist:', error);
+    return false;
+  }
+}
+
+/**
  * Check if a migration has been applied by checking if the schema matches
  */
 async function checkUserIdType() {
@@ -68,6 +87,18 @@ async function runMigration(migrationFile) {
 export async function autoMigrate() {
   try {
     console.log('\n🔍 Checking database schema...');
+
+    // Check if initial schema exists
+    const tablesExist = await checkTablesExist();
+
+    if (!tablesExist) {
+      console.log('⚠️  Database tables not found - creating initial schema...');
+      await runMigration('000_initial_schema.sql');
+      console.log('✅ Initial schema created successfully');
+      return true;
+    }
+
+    console.log('✅ Database tables exist');
 
     // Check if user_id needs to be fixed
     const userIdType = await checkUserIdType();
