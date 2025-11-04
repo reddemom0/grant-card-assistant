@@ -384,9 +384,11 @@ export function getToolsForAgent(agentType) {
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'readiness-strategist':
-      // Readiness strategist gets server tools for grant research and Google Drive for example assessments
-      // No HubSpot needed - focuses on public grant programs, not client data
-      return [...baseTools, ...GOOGLE_DRIVE_TOOLS];
+      // Readiness strategist gets full toolset:
+      // - Server tools (WebSearch/WebFetch) for grant program research
+      // - Google Drive for example assessments and Question Bank
+      // - HubSpot for client context, deal integration, and assessment storage
+      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'orchestrator':
       // Orchestrator gets everything
