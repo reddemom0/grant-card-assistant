@@ -17,38 +17,34 @@ try {
 }
 
 /**
- * Get authenticated Google Docs client
- * @param {string} userEmail - User email for domain-wide delegation (optional)
+ * Get authenticated Google Docs client (uses service account directly)
  * @returns {Object} Google Docs API client
  */
-async function getDocsClient(userEmail = null) {
+async function getDocsClient() {
   const auth = new google.auth.GoogleAuth({
     credentials: serviceAccountKey,
     scopes: [
       'https://www.googleapis.com/auth/documents',
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/drive.file'
-    ],
-    ...(userEmail && { subject: userEmail })
+    ]
   });
 
   return google.docs({ version: 'v1', auth });
 }
 
 /**
- * Get authenticated Google Drive client
- * @param {string} userEmail - User email for domain-wide delegation (optional)
+ * Get authenticated Google Drive client (uses service account directly)
  * @returns {Object} Google Drive API client
  */
-async function getDriveClient(userEmail = null) {
+async function getDriveClient() {
   const auth = new google.auth.GoogleAuth({
     credentials: serviceAccountKey,
     scopes: [
       'https://www.googleapis.com/auth/documents',
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/drive.file'
-    ],
-    ...(userEmail && { subject: userEmail })
+    ]
   });
 
   return google.drive({ version: 'v3', auth });
@@ -243,18 +239,19 @@ async function findOrCreateFolder(driveClient, folderName) {
 
 /**
  * Create a Google Doc with formatted content
+ * Documents are created in the service account's Drive and shared publicly with "anyone with the link"
  * @param {string} title - Document title
  * @param {string} content - Markdown formatted content
  * @param {string} folderName - Optional folder name to organize the document
- * @param {string} userEmail - User email for domain-wide delegation
+ * @param {string} userEmail - User email (not used, kept for API compatibility)
  * @returns {Promise<Object>} Result with document link
  */
 export async function createGoogleDoc(title, content, folderName = null, userEmail = null) {
   try {
     console.log(`📄 Creating Google Doc: ${title}`);
 
-    const docsClient = await getDocsClient(userEmail);
-    const driveClient = await getDriveClient(userEmail);
+    const docsClient = await getDocsClient();
+    const driveClient = await getDriveClient();
 
     // Create a new document
     const doc = await docsClient.documents.create({
