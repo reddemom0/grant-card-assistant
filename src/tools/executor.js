@@ -8,6 +8,7 @@
 import * as memory from './memory.js';
 import * as hubspot from './hubspot.js';
 import * as googleDrive from './google-drive.js';
+import * as googleDocs from './google-docs.js';
 import { isServerTool } from './definitions.js';
 
 /**
@@ -156,6 +157,19 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       case 'read_google_drive_file':
         result = await googleDrive.readGoogleDriveFile(
           input.file_id,
+          userEmail  // For domain-wide delegation
+        );
+        break;
+
+      // ============================================================================
+      // GOOGLE DOCS TOOLS
+      // ============================================================================
+
+      case 'create_google_doc':
+        result = await googleDocs.createGoogleDoc(
+          input.title,
+          input.content,
+          input.folder_name,
           userEmail  // For domain-wide delegation
         );
         break;

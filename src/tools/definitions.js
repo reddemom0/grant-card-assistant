@@ -344,6 +344,36 @@ export const GOOGLE_DRIVE_TOOLS = [
 ];
 
 // ============================================================================
+// GOOGLE DOCS TOOLS
+// Create and format Google Docs
+// ============================================================================
+
+export const GOOGLE_DOCS_TOOLS = [
+  {
+    name: 'create_google_doc',
+    description: 'Create a formatted Google Doc with readiness assessment content. Returns a shareable link. Use this AFTER generating the complete assessment to create a professional document that can be shared with clients.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Document title (e.g., "BCIC Ignite Readiness Assessment - TechVentures Inc.")'
+        },
+        content: {
+          type: 'string',
+          description: 'The complete assessment content with markdown formatting. Use ## for headings, ### for subheadings, - for bullet lists, **bold** for emphasis, and tables where appropriate.'
+        },
+        folder_name: {
+          type: 'string',
+          description: 'Optional: Folder name to organize the document (e.g., "Readiness Assessments 2025"). If folder doesn\'t exist, it will be created.'
+        }
+      },
+      required: ['title', 'content']
+    }
+  }
+];
+
+// ============================================================================
 // TOOL AGGREGATION
 // ============================================================================
 
@@ -354,7 +384,8 @@ export const ALL_TOOLS = [
   ...SERVER_TOOLS,
   ...MEMORY_TOOLS,
   ...HUBSPOT_TOOLS,
-  ...GOOGLE_DRIVE_TOOLS
+  ...GOOGLE_DRIVE_TOOLS,
+  ...GOOGLE_DOCS_TOOLS
 ];
 
 /**
@@ -388,7 +419,8 @@ export function getToolsForAgent(agentType) {
       // - Server tools (WebSearch/WebFetch) for grant program research
       // - Google Drive for example assessments and Question Bank
       // - HubSpot for client context, deal integration, and assessment storage
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
+      // - Google Docs for creating formatted readiness assessment documents
+      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'orchestrator':
       // Orchestrator gets everything
