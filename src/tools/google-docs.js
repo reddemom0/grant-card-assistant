@@ -107,7 +107,37 @@ async function getDriveClient(userId) {
 }
 
 /**
- * Convert markdown content to Google Docs requests
+ * Brand colors (Granted Consulting)
+ */
+const BRAND_COLORS = {
+  // Dark blue for headers (RGB: 0, 71, 171)
+  HEADER_BLUE: {
+    rgbColor: {
+      red: 0,
+      green: 0.278,  // 71/255
+      blue: 0.671    // 171/255
+    }
+  }
+};
+
+/**
+ * Document styling constants
+ */
+const STYLES = {
+  BODY_FONT: 'Arial',
+  BODY_SIZE: 11,
+  HEADING_SIZE: 14,
+  TITLE_SIZE: 18,
+  MARGINS: {
+    top: 72,    // 1 inch = 72 points
+    bottom: 72,
+    left: 72,
+    right: 72
+  }
+};
+
+/**
+ * Convert markdown content to Google Docs requests with Granted Consulting branding
  * @param {string} content - Markdown formatted content
  * @returns {Array} Array of Google Docs API requests
  */
@@ -131,9 +161,11 @@ function markdownToDocsRequests(content) {
       continue;
     }
 
-    // Heading 1 (##)
+    // Section Header (## ) - Blue, bold, larger (like template)
     if (line.startsWith('## ')) {
       const text = line.substring(3) + '\n';
+      const startIndex = currentIndex;
+
       requests.push({
         insertText: {
           location: { index: currentIndex },
@@ -141,24 +173,55 @@ function markdownToDocsRequests(content) {
         }
       });
 
+      // Make it blue, bold, and larger
+      requests.push({
+        updateTextStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length - 1
+          },
+          textStyle: {
+            bold: true,
+            fontSize: {
+              magnitude: STYLES.HEADING_SIZE,
+              unit: 'PT'
+            },
+            foregroundColor: {
+              color: BRAND_COLORS.HEADER_BLUE
+            }
+          },
+          fields: 'bold,fontSize,foregroundColor'
+        }
+      });
+
+      // Add spacing after header
       requests.push({
         updateParagraphStyle: {
           range: {
-            startIndex: currentIndex,
-            endIndex: currentIndex + text.length - 1
+            startIndex: startIndex,
+            endIndex: startIndex + text.length
           },
           paragraphStyle: {
-            namedStyleType: 'HEADING_1'
+            spaceAbove: {
+              magnitude: 12,
+              unit: 'PT'
+            },
+            spaceBelow: {
+              magnitude: 6,
+              unit: 'PT'
+            }
           },
-          fields: 'namedStyleType'
+          fields: 'spaceAbove,spaceBelow'
         }
       });
 
       currentIndex += text.length;
     }
-    // Heading 2 (###)
+    // Subsection (### ) - Bold, regular size
     else if (line.startsWith('### ')) {
       const text = line.substring(4) + '\n';
+      const startIndex = currentIndex;
+
       requests.push({
         insertText: {
           location: { index: currentIndex },
@@ -167,15 +230,19 @@ function markdownToDocsRequests(content) {
       });
 
       requests.push({
-        updateParagraphStyle: {
+        updateTextStyle: {
           range: {
-            startIndex: currentIndex,
-            endIndex: currentIndex + text.length - 1
+            startIndex: startIndex,
+            endIndex: startIndex + text.length - 1
           },
-          paragraphStyle: {
-            namedStyleType: 'HEADING_2'
+          textStyle: {
+            bold: true,
+            fontSize: {
+              magnitude: 12,
+              unit: 'PT'
+            }
           },
-          fields: 'namedStyleType'
+          fields: 'bold,fontSize'
         }
       });
 
@@ -184,6 +251,8 @@ function markdownToDocsRequests(content) {
     // Bullet list (- )
     else if (line.trim().startsWith('- ')) {
       const text = line.trim().substring(2) + '\n';
+      const startIndex = currentIndex;
+
       requests.push({
         insertText: {
           location: { index: currentIndex },
@@ -194,8 +263,8 @@ function markdownToDocsRequests(content) {
       requests.push({
         createParagraphBullets: {
           range: {
-            startIndex: currentIndex,
-            endIndex: currentIndex + text.length - 1
+            startIndex: startIndex,
+            endIndex: startIndex + text.length - 1
           },
           bulletPreset: 'BULLET_DISC_CIRCLE_SQUARE'
         }
@@ -203,26 +272,43 @@ function markdownToDocsRequests(content) {
 
       currentIndex += text.length;
     }
-    // Regular text
+    // Regular text with inline formatting
     else {
-      // Handle bold (**text**)
       const text = line + '\n';
       let processedText = text;
-      const boldMatches = [];
-      let match;
-      const boldRegex = /\*\*([^*]+)\*\*/g;
+      const formatRanges = [];
 
+      // Find all **bold** matches
+      const boldRegex = /\*\*([^*]+)\*\*/g;
+      let match;
       while ((match = boldRegex.exec(text)) !== null) {
-        boldMatches.push({
+        formatRanges.push({
+          type: 'bold',
           start: match.index,
           end: match.index + match[0].length,
-          text: match[1]
+          text: match[1],
+          markupLength: 4  // ** at start and end
+        });
+      }
+
+      // Find all *italic* matches (but not **)
+      const italicRegex = /(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g;
+      while ((match = italicRegex.exec(text)) !== null) {
+        formatRanges.push({
+          type: 'italic',
+          start: match.index,
+          end: match.index + match[0].length,
+          text: match[1],
+          markupLength: 2  // * at start and end
         });
       }
 
       // Remove markdown syntax
-      processedText = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+      processedText = text
+        .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove **bold**
+        .replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '$1');  // Remove *italic*
 
+      // Insert the processed text
       requests.push({
         insertText: {
           location: { index: currentIndex },
@@ -230,23 +316,41 @@ function markdownToDocsRequests(content) {
         }
       });
 
-      // Apply bold formatting
-      for (const bold of boldMatches) {
-        const adjustedStart = currentIndex + bold.start - (boldMatches.indexOf(bold) * 4);
-        const adjustedEnd = adjustedStart + bold.text.length;
+      // Apply formatting
+      let offset = 0;
+      for (const range of formatRanges.sort((a, b) => a.start - b.start)) {
+        const adjustedStart = currentIndex + range.start - offset;
+        const adjustedEnd = adjustedStart + range.text.length;
 
-        requests.push({
-          updateTextStyle: {
-            range: {
-              startIndex: adjustedStart,
-              endIndex: adjustedEnd
-            },
-            textStyle: {
-              bold: true
-            },
-            fields: 'bold'
-          }
-        });
+        if (range.type === 'bold') {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: adjustedStart,
+                endIndex: adjustedEnd
+              },
+              textStyle: {
+                bold: true
+              },
+              fields: 'bold'
+            }
+          });
+        } else if (range.type === 'italic') {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: adjustedStart,
+                endIndex: adjustedEnd
+              },
+              textStyle: {
+                italic: true
+              },
+              fields: 'italic'
+            }
+          });
+        }
+
+        offset += range.markupLength;
       }
 
       currentIndex += processedText.length;
@@ -337,18 +441,187 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
     const documentId = file.data.id;
     console.log(`   Document created with ID: ${documentId}${folderId ? ' in folder' : ''}`);
 
-    // Convert markdown to Google Docs format and insert content
+    // Step 1: Add Granted Consulting header and title
+    const headerRequests = [
+      // Insert header text "GRANTED CONSULTING" at top
+      {
+        insertText: {
+          location: { index: 1 },
+          text: 'GRANTED CONSULTING\n\n'
+        }
+      },
+      // Style the header (gray, 14pt, right-aligned)
+      {
+        updateTextStyle: {
+          range: {
+            startIndex: 1,
+            endIndex: 19  // Length of "GRANTED CONSULTING"
+          },
+          textStyle: {
+            fontSize: {
+              magnitude: 14,
+              unit: 'PT'
+            },
+            foregroundColor: {
+              color: {
+                rgbColor: {
+                  red: 0.4,
+                  green: 0.4,
+                  blue: 0.4
+                }
+              }
+            },
+            weightedFontFamily: {
+              fontFamily: STYLES.BODY_FONT
+            }
+          },
+          fields: 'fontSize,foregroundColor,weightedFontFamily'
+        }
+      },
+      // Right-align the header
+      {
+        updateParagraphStyle: {
+          range: {
+            startIndex: 1,
+            endIndex: 20
+          },
+          paragraphStyle: {
+            alignment: 'END'  // Right-align
+          },
+          fields: 'alignment'
+        }
+      },
+      // Insert title
+      {
+        insertText: {
+          location: { index: 21 },
+          text: title + '\n\n'
+        }
+      },
+      // Style the title (bold, larger, black)
+      {
+        updateTextStyle: {
+          range: {
+            startIndex: 21,
+            endIndex: 21 + title.length
+          },
+          textStyle: {
+            bold: true,
+            fontSize: {
+              magnitude: STYLES.TITLE_SIZE,
+              unit: 'PT'
+            },
+            weightedFontFamily: {
+              fontFamily: STYLES.BODY_FONT
+            }
+          },
+          fields: 'bold,fontSize,weightedFontFamily'
+        }
+      }
+    ];
+
+    await docsClient.documents.batchUpdate({
+      documentId: documentId,
+      requestBody: {
+        requests: headerRequests
+      }
+    });
+    console.log(`   Header and title added`);
+
+    // Step 2: Convert markdown to Google Docs format and insert content
+    const contentStartIndex = 21 + title.length + 2; // After header + title + 2 newlines
     const requests = markdownToDocsRequests(content);
 
-    if (requests.length > 0) {
+    // Adjust all indices in requests to account for header and title
+    const adjustedRequests = requests.map(req => {
+      if (req.insertText) {
+        return {
+          ...req,
+          insertText: {
+            ...req.insertText,
+            location: { index: req.insertText.location.index + contentStartIndex - 1 }
+          }
+        };
+      } else if (req.updateTextStyle) {
+        return {
+          ...req,
+          updateTextStyle: {
+            ...req.updateTextStyle,
+            range: {
+              startIndex: req.updateTextStyle.range.startIndex + contentStartIndex - 1,
+              endIndex: req.updateTextStyle.range.endIndex + contentStartIndex - 1
+            }
+          }
+        };
+      } else if (req.updateParagraphStyle) {
+        return {
+          ...req,
+          updateParagraphStyle: {
+            ...req.updateParagraphStyle,
+            range: {
+              startIndex: req.updateParagraphStyle.range.startIndex + contentStartIndex - 1,
+              endIndex: req.updateParagraphStyle.range.endIndex + contentStartIndex - 1
+            }
+          }
+        };
+      } else if (req.createParagraphBullets) {
+        return {
+          ...req,
+          createParagraphBullets: {
+            ...req.createParagraphBullets,
+            range: {
+              startIndex: req.createParagraphBullets.range.startIndex + contentStartIndex - 1,
+              endIndex: req.createParagraphBullets.range.endIndex + contentStartIndex - 1
+            }
+          }
+        };
+      }
+      return req;
+    });
+
+    if (adjustedRequests.length > 0) {
       await docsClient.documents.batchUpdate({
         documentId: documentId,
         requestBody: {
-          requests: requests
+          requests: adjustedRequests
         }
       });
       console.log(`   Content formatted and inserted`);
     }
+
+    // Step 3: Set document-wide styles (margins, default font, line spacing)
+    await docsClient.documents.batchUpdate({
+      documentId: documentId,
+      requestBody: {
+        requests: [
+          {
+            updateDocumentStyle: {
+              documentStyle: {
+                marginTop: {
+                  magnitude: STYLES.MARGINS.top,
+                  unit: 'PT'
+                },
+                marginBottom: {
+                  magnitude: STYLES.MARGINS.bottom,
+                  unit: 'PT'
+                },
+                marginLeft: {
+                  magnitude: STYLES.MARGINS.left,
+                  unit: 'PT'
+                },
+                marginRight: {
+                  magnitude: STYLES.MARGINS.right,
+                  unit: 'PT'
+                }
+              },
+              fields: 'marginTop,marginBottom,marginLeft,marginRight'
+            }
+          }
+        ]
+      }
+    });
+    console.log(`   Document styles applied`);
+
 
     // Make the document accessible to anyone with the link
     await driveClient.permissions.create({
