@@ -102,7 +102,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trigger_update_user_timestamp
+DROP TRIGGER IF EXISTS trigger_update_user_timestamp ON users;
+CREATE TRIGGER trigger_update_user_timestamp
 BEFORE UPDATE ON users
 FOR EACH ROW
 EXECUTE FUNCTION update_user_timestamp();
@@ -116,7 +117,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trigger_update_conversation_timestamp
+DROP TRIGGER IF EXISTS trigger_update_conversation_timestamp ON conversations;
+CREATE TRIGGER trigger_update_conversation_timestamp
 BEFORE UPDATE ON conversations
 FOR EACH ROW
 EXECUTE FUNCTION update_conversation_timestamp();
@@ -130,7 +132,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trigger_update_memory_timestamp
+DROP TRIGGER IF EXISTS trigger_update_memory_timestamp ON conversation_memory;
+CREATE TRIGGER trigger_update_memory_timestamp
 BEFORE UPDATE ON conversation_memory
 FOR EACH ROW
 EXECUTE FUNCTION update_memory_timestamp();
