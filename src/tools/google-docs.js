@@ -272,14 +272,68 @@ function markdownToDocsRequests(content) {
 
       currentIndex += text.length;
     }
+    // Checkbox (☐, [ ], ●, □)
+    else if (line.trim().match(/^(☐|●|\[\s?\]|□)/)) {
+      // Extract text after checkbox marker
+      const text = line.trim()
+        .replace(/^(☐|●|\[\s?\]|□)\s*/, '')
+        .trim() + '\n';
+      const startIndex = currentIndex;
+
+      // Insert checkbox symbol + text (using ☐ consistently)
+      const checkboxText = '☐  ' + text;
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: checkboxText
+        }
+      });
+
+      // Make the checkbox slightly larger and blue for visibility
+      requests.push({
+        updateTextStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + 1  // Just the checkbox character
+          },
+          textStyle: {
+            fontSize: {
+              magnitude: 14,
+              unit: 'PT'
+            },
+            foregroundColor: {
+              color: BRAND_COLORS.HEADER_BLUE
+            }
+          },
+          fields: 'fontSize,foregroundColor'
+        }
+      });
+
+      currentIndex += checkboxText.length;
+    }
+    // Table rows (|)
+    else if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      // Simple table handling - convert to plain text with spacing
+      const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell.length > 0);
+      const tableText = cells.join('  |  ') + '\n';
+
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: tableText
+        }
+      });
+
+      currentIndex += tableText.length;
+    }
     // Regular text with inline formatting
     else {
       const text = line + '\n';
       let processedText = text;
       const formatRanges = [];
 
-      // Find all **bold** matches
-      const boldRegex = /\*\*([^*]+)\*\*/g;
+      // Find all **bold** matches (non-greedy, handles multiple on same line)
+      const boldRegex = /\*\*(.+?)\*\*/g;
       let match;
       while ((match = boldRegex.exec(text)) !== null) {
         formatRanges.push({
@@ -291,22 +345,27 @@ function markdownToDocsRequests(content) {
         });
       }
 
-      // Find all *italic* matches (but not **)
-      const italicRegex = /(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g;
+      // Find all *italic* matches (but not **), non-greedy
+      const italicRegex = /(?<!\*)\*(.+?)\*(?!\*)/g;
       while ((match = italicRegex.exec(text)) !== null) {
-        formatRanges.push({
-          type: 'italic',
-          start: match.index,
-          end: match.index + match[0].length,
-          text: match[1],
-          markupLength: 2  // * at start and end
-        });
+        // Skip if this is part of a ** bold marker
+        const beforeChar = text[match.index - 1];
+        const afterChar = text[match.index + match[0].length];
+        if (beforeChar !== '*' && afterChar !== '*') {
+          formatRanges.push({
+            type: 'italic',
+            start: match.index,
+            end: match.index + match[0].length,
+            text: match[1],
+            markupLength: 2  // * at start and end
+          });
+        }
       }
 
       // Remove markdown syntax
       processedText = text
-        .replace(/\*\*([^*]+)\*\*/g, '$1')  // Remove **bold**
-        .replace(/(?<!\*)\*(?!\*)([^*]+)\*(?!\*)/g, '$1');  // Remove *italic*
+        .replace(/\*\*(.+?)\*\*/g, '$1')  // Remove **bold** (non-greedy)
+        .replace(/(?<!\*)\*(.+?)\*(?!\*)/g, '$1');  // Remove *italic* (non-greedy)
 
       // Insert the processed text
       requests.push({
