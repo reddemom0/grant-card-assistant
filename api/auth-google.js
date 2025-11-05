@@ -26,21 +26,29 @@ export default function handler(req, res) {
   console.log('🔵 Detected host:', host);
   console.log('🔵 Protocol:', protocol);
 
+  // Include Google Drive and Docs scopes for document creation
+  const scopes = [
+    'profile',
+    'email',
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/documents'
+  ].join(' ');
+
   console.log('🔵 OAuth Parameters:');
   console.log('   redirect_uri:', redirectUri);
   console.log('   redirect_uri (encoded):', encodeURIComponent(redirectUri));
   console.log('   response_type:', 'code');
-  console.log('   scope:', 'profile email');
+  console.log('   scope:', scopes);
   console.log('   access_type:', 'offline');
-  console.log('   prompt:', 'select_account');
+  console.log('   prompt:', 'consent'); // Changed to 'consent' to force refresh token
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(clientId)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `response_type=code&` +
-    `scope=${encodeURIComponent('profile email')}&` +
+    `scope=${encodeURIComponent(scopes)}&` +
     `access_type=offline&` +
-    `prompt=select_account`;
+    `prompt=consent`;
 
   console.log('🔵 Full OAuth URL:', googleAuthUrl);
   console.log('🔵 URL length:', googleAuthUrl.length);

@@ -95,12 +95,25 @@ export default async function handler(req, res) {
     await client.connect();
     console.log('✅ Connected to database');
 
-    // Create or update user in database
-    console.log('🔵 Creating/updating user in database...');
+    // Create or update user in database with OAuth tokens
+    console.log('🔵 Creating/updating user in database with OAuth tokens...');
+    const tokenExpiry = tokens.expiry_date ? new Date(tokens.expiry_date) : null;
+
     const userResult = await client.query(
-      'INSERT INTO users (google_id, email, name, picture) VALUES ($1, $2, $3, $4) ON CONFLICT (google_id) DO UPDATE SET name = $3, picture = $4 RETURNING id, email, name, picture',
-      [userInfo.id, userInfo.email, userInfo.name, userInfo.picture]
+      `INSERT INTO users (google_id, email, name, picture, google_access_token, google_refresh_token, google_token_expiry)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (google_id)
+       DO UPDATE SET
+         name = $3,
+         picture = $4,
+         google_access_token = $5,
+         google_refresh_token = COALESCE($6, users.google_refresh_token),
+         google_token_expiry = $7
+       RETURNING id, email, name, picture`,
+      [userInfo.id, userInfo.email, userInfo.name, userInfo.picture, tokens.access_token, tokens.refresh_token, tokenExpiry]
     );
+
+    console.log('✅ Stored OAuth tokens (refresh_token present:', !!tokens.refresh_token, ')');
 
     const user = userResult.rows[0];
     console.log('✅ User created/updated:', { id: user.id, email: user.email });

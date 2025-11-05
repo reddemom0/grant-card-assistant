@@ -8,54 +8,101 @@ import { config } from 'dotenv';
 
 config();
 
-// Parse Google Service Account credentials
-let serviceAccountKey;
-try {
-  serviceAccountKey = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_KEY);
-} catch (error) {
-  console.error('Failed to parse GOOGLE_SERVICE_ACCOUNT_KEY:', error.message);
+/**
+ * Get user's OAuth tokens from database
+ * @param {number} userId - User ID
+ * @returns {Promise<Object>} OAuth tokens
+ */
+async function getUserOAuthTokens(userId) {
+  const { query } = await import('../database/connection.js');
+  const result = await query(
+    'SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE id = $1',
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error('User not found');
+  }
+
+  const user = result.rows[0];
+  if (!user.google_refresh_token) {
+    throw new Error('User has not authorized Google Drive access. Please log out and log back in to grant permissions.');
+  }
+
+  return {
+    access_token: user.google_access_token,
+    refresh_token: user.google_refresh_token,
+    expiry_date: user.google_token_expiry ? new Date(user.google_token_expiry).getTime() : null
+  };
 }
 
 /**
- * Get authenticated Google Docs client (uses domain-wide delegation)
- * Documents are created as writers@granted.ca to use their storage quota
- * @returns {Object} Google Docs API client
+ * Save refreshed OAuth tokens to database
+ * @param {number} userId - User ID
+ * @param {Object} tokens - New OAuth tokens
  */
-async function getDocsClient() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: serviceAccountKey,
-    scopes: [
-      'https://www.googleapis.com/auth/documents',
-      'https://www.googleapis.com/auth/drive',
-      'https://www.googleapis.com/auth/drive.file'
-    ],
-    // Impersonate writers@granted.ca for document creation
-    clientOptions: {
-      subject: 'writers@granted.ca'
+async function saveUserOAuthTokens(userId, tokens) {
+  const { query } = await import('../database/connection.js');
+  const tokenExpiry = tokens.expiry_date ? new Date(tokens.expiry_date) : null;
+
+  await query(
+    'UPDATE users SET google_access_token = $1, google_token_expiry = $2 WHERE id = $3',
+    [tokens.access_token, tokenExpiry, userId]
+  );
+}
+
+/**
+ * Get authenticated OAuth2 client for user
+ * Automatically refreshes tokens if expired
+ * @param {number} userId - User ID
+ * @returns {Promise<Object>} Authenticated OAuth2 client
+ */
+async function getUserOAuth2Client(userId) {
+  const tokens = await getUserOAuthTokens(userId);
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    'https://grant-card-assistant-production.up.railway.app/api/auth-callback'
+  );
+
+  oauth2Client.setCredentials(tokens);
+
+  // Set up automatic token refresh
+  oauth2Client.on('tokens', (newTokens) => {
+    console.log('   OAuth tokens refreshed automatically');
+    if (newTokens.refresh_token) {
+      tokens.refresh_token = newTokens.refresh_token;
     }
+    tokens.access_token = newTokens.access_token;
+    tokens.expiry_date = newTokens.expiry_date;
+
+    // Save refreshed tokens to database
+    saveUserOAuthTokens(userId, tokens).catch(err => {
+      console.error('   Failed to save refreshed tokens:', err.message);
+    });
   });
 
+  return oauth2Client;
+}
+
+/**
+ * Get authenticated Google Docs client using user's OAuth credentials
+ * @param {number} userId - User ID
+ * @returns {Promise<Object>} Google Docs API client
+ */
+async function getDocsClient(userId) {
+  const auth = await getUserOAuth2Client(userId);
   return google.docs({ version: 'v1', auth });
 }
 
 /**
- * Get authenticated Google Drive client (uses domain-wide delegation)
- * @returns {Object} Google Drive API client
+ * Get authenticated Google Drive client using user's OAuth credentials
+ * @param {number} userId - User ID
+ * @returns {Promise<Object>} Google Drive API client
  */
-async function getDriveClient() {
-  const auth = new google.auth.GoogleAuth({
-    credentials: serviceAccountKey,
-    scopes: [
-      'https://www.googleapis.com/auth/documents',
-      'https://www.googleapis.com/auth/drive',
-      'https://www.googleapis.com/auth/drive.file'
-    ],
-    // Impersonate writers@granted.ca for document creation
-    clientOptions: {
-      subject: 'writers@granted.ca'
-    }
-  });
-
+async function getDriveClient(userId) {
+  const auth = await getUserOAuth2Client(userId);
   return google.drive({ version: 'v3', auth });
 }
 
@@ -248,20 +295,23 @@ async function findOrCreateFolder(driveClient, folderName) {
 
 /**
  * Create a Google Doc with formatted content
- * Uses domain-wide delegation to create documents as writers@granted.ca
- * Documents are created in writers@granted.ca's Drive and shared with "anyone with the link"
+ * Uses user's OAuth credentials to create documents in their Google Drive
  * @param {string} title - Document title
  * @param {string} content - Markdown formatted content
  * @param {string} folderName - Optional folder name to organize the document
- * @param {string} userEmail - User email (not used, kept for API compatibility)
+ * @param {number} userId - User ID from database
  * @returns {Promise<Object>} Result with document link
  */
-export async function createGoogleDoc(title, content, folderName = null, userEmail = null) {
+export async function createGoogleDoc(title, content, folderName = null, userId = null) {
   try {
     console.log(`📄 Creating Google Doc: ${title}`);
 
-    const docsClient = await getDocsClient();
-    const driveClient = await getDriveClient();
+    if (!userId) {
+      throw new Error('userId is required for Google Docs creation');
+    }
+
+    const docsClient = await getDocsClient(userId);
+    const driveClient = await getDriveClient(userId);
 
     // Find or create folder first if specified
     let folderId = null;

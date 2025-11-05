@@ -24,9 +24,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
   console.log(`🔧 Executing tool: ${toolName}`);
   console.log(`   Input:`, JSON.stringify(input, null, 2));
 
-  // Get user email for domain-wide delegation (Google Drive tools)
+  // Get user email for domain-wide delegation (Google Drive search tool)
+  // Note: Google Docs creation now uses userId directly with OAuth
   let userEmail = null;
-  if (userId && (toolName.includes('google_drive') || toolName.includes('search_google'))) {
+  if (userId && toolName.includes('search_google')) {
     try {
       const { query } = await import('../database/connection.js');
       const result = await query('SELECT email FROM users WHERE id = $1', [userId]);
@@ -170,7 +171,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           input.title,
           input.content,
           input.folder_name,
-          userEmail  // For domain-wide delegation
+          userId  // User ID for OAuth
         );
         break;
 
