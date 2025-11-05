@@ -413,8 +413,25 @@ async function uploadLogo(driveClient, logoPath) {
     });
 
     if (searchResponse.data.files && searchResponse.data.files.length > 0) {
+      const fileId = searchResponse.data.files[0].id;
       console.log(`   Using existing logo from Drive`);
-      return searchResponse.data.files[0].id;
+
+      // Ensure the existing logo has public access
+      try {
+        await driveClient.permissions.create({
+          fileId: fileId,
+          requestBody: {
+            role: 'reader',
+            type: 'anyone'
+          }
+        });
+        console.log(`   Logo permissions verified/updated`);
+      } catch (err) {
+        // Permission might already exist, that's ok
+        console.log(`   Logo permissions already set`);
+      }
+
+      return fileId;
     }
 
     // Upload new logo
@@ -441,8 +458,20 @@ async function uploadLogo(driveClient, logoPath) {
       fields: 'id'
     });
 
-    console.log(`   Logo uploaded with ID: ${file.data.id}`);
-    return file.data.id;
+    const fileId = file.data.id;
+    console.log(`   Logo uploaded with ID: ${fileId}`);
+
+    // Make the logo publicly accessible (required for insertInlineImage)
+    await driveClient.permissions.create({
+      fileId: fileId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone'
+      }
+    });
+    console.log(`   Logo set to public access`);
+
+    return fileId;
   } catch (error) {
     console.error(`   Failed to upload logo:`, error.message);
     return null;
