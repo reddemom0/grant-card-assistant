@@ -398,15 +398,68 @@ async function findOrCreateFolder(driveClient, folderName) {
 }
 
 /**
+ * Upload logo image to Google Drive and cache it
+ * @param {Object} driveClient - Google Drive API client
+ * @param {string} logoPath - Path to logo file on local system
+ * @returns {Promise<string>} Google Drive file ID
+ */
+async function uploadLogo(driveClient, logoPath) {
+  try {
+    // Check if logo already exists in Drive
+    const searchResponse = await driveClient.files.list({
+      q: "name='granted-consulting-logo.png' and trashed=false",
+      fields: 'files(id, name)',
+      spaces: 'drive'
+    });
+
+    if (searchResponse.data.files && searchResponse.data.files.length > 0) {
+      console.log(`   Using existing logo from Drive`);
+      return searchResponse.data.files[0].id;
+    }
+
+    // Upload new logo
+    const fs = await import('fs');
+    const path = await import('path');
+
+    const fileExtension = path.default.extname(logoPath).toLowerCase();
+    const mimeType = fileExtension === '.png' ? 'image/png' : 'image/jpeg';
+
+    console.log(`   Uploading logo to Drive...`);
+    const fileMetadata = {
+      name: 'granted-consulting-logo.png',
+      mimeType: mimeType
+    };
+
+    const media = {
+      mimeType: mimeType,
+      body: fs.default.createReadStream(logoPath)
+    };
+
+    const file = await driveClient.files.create({
+      requestBody: fileMetadata,
+      media: media,
+      fields: 'id'
+    });
+
+    console.log(`   Logo uploaded with ID: ${file.data.id}`);
+    return file.data.id;
+  } catch (error) {
+    console.error(`   Failed to upload logo:`, error.message);
+    return null;
+  }
+}
+
+/**
  * Create a Google Doc with formatted content
  * Uses user's OAuth credentials to create documents in their Google Drive
  * @param {string} title - Document title
  * @param {string} content - Markdown formatted content
  * @param {string} folderName - Optional folder name to organize the document
  * @param {number} userId - User ID from database
+ * @param {string} logoPath - Optional path to logo image file
  * @returns {Promise<Object>} Result with document link
  */
-export async function createGoogleDoc(title, content, folderName = null, userId = null) {
+export async function createGoogleDoc(title, content, folderName = null, userId = null, logoPath = null) {
   try {
     console.log(`📄 Creating Google Doc: ${title}`);
 
@@ -441,60 +494,125 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
     const documentId = file.data.id;
     console.log(`   Document created with ID: ${documentId}${folderId ? ' in folder' : ''}`);
 
-    // Step 1: Add Granted Consulting header and title
-    const headerRequests = [
-      // Insert header text "GRANTED CONSULTING" at top
-      {
-        insertText: {
-          location: { index: 1 },
-          text: 'GRANTED CONSULTING\n\n'
-        }
-      },
-      // Style the header (gray, 14pt, right-aligned)
-      {
-        updateTextStyle: {
-          range: {
-            startIndex: 1,
-            endIndex: 19  // Length of "GRANTED CONSULTING"
-          },
-          textStyle: {
-            fontSize: {
-              magnitude: 14,
-              unit: 'PT'
+    // Step 1: Add Granted Consulting header (logo or text) and title
+    let headerLength = 0;
+    const headerRequests = [];
+
+    if (logoPath) {
+      // Upload logo and insert as image
+      const logoFileId = await uploadLogo(driveClient, logoPath);
+
+      if (logoFileId) {
+        // Insert newline for the logo
+        headerRequests.push({
+          insertText: {
+            location: { index: 1 },
+            text: '\n\n'
+          }
+        });
+
+        // Insert logo image at the beginning
+        headerRequests.push({
+          insertInlineImage: {
+            location: { index: 1 },
+            uri: `https://drive.google.com/uc?export=view&id=${logoFileId}`,
+            objectSize: {
+              height: {
+                magnitude: 60,
+                unit: 'PT'
+              },
+              width: {
+                magnitude: 240,
+                unit: 'PT'
+              }
+            }
+          }
+        });
+
+        // Right-align the logo paragraph
+        headerRequests.push({
+          updateParagraphStyle: {
+            range: {
+              startIndex: 1,
+              endIndex: 3
             },
-            foregroundColor: {
-              color: {
-                rgbColor: {
-                  red: 0.4,
-                  green: 0.4,
-                  blue: 0.4
+            paragraphStyle: {
+              alignment: 'END'  // Right-align
+            },
+            fields: 'alignment'
+          }
+        });
+
+        headerLength = 3; // 1 char for image + 2 newlines
+        console.log(`   Logo inserted`);
+      } else {
+        // Fallback to text header if logo upload failed
+        logoPath = null;
+      }
+    }
+
+    if (!logoPath) {
+      // Use text-based header
+      headerRequests.push(
+        // Insert header text "GRANTED CONSULTING" at top
+        {
+          insertText: {
+            location: { index: 1 },
+            text: 'GRANTED CONSULTING\n\n'
+          }
+        },
+        // Style the header (gray, 14pt, right-aligned)
+        {
+          updateTextStyle: {
+            range: {
+              startIndex: 1,
+              endIndex: 19  // Length of "GRANTED CONSULTING"
+            },
+            textStyle: {
+              fontSize: {
+                magnitude: 14,
+                unit: 'PT'
+              },
+              foregroundColor: {
+                color: {
+                  rgbColor: {
+                    red: 0.4,
+                    green: 0.4,
+                    blue: 0.4
+                  }
                 }
+              },
+              weightedFontFamily: {
+                fontFamily: STYLES.BODY_FONT
               }
             },
-            weightedFontFamily: {
-              fontFamily: STYLES.BODY_FONT
-            }
-          },
-          fields: 'fontSize,foregroundColor,weightedFontFamily'
+            fields: 'fontSize,foregroundColor,weightedFontFamily'
+          }
+        },
+        // Right-align the header
+        {
+          updateParagraphStyle: {
+            range: {
+              startIndex: 1,
+              endIndex: 20
+            },
+            paragraphStyle: {
+              alignment: 'END'  // Right-align
+            },
+            fields: 'alignment'
+          }
         }
-      },
-      // Right-align the header
-      {
-        updateParagraphStyle: {
-          range: {
-            startIndex: 1,
-            endIndex: 20
-          },
-          paragraphStyle: {
-            alignment: 'END'  // Right-align
-          },
-          fields: 'alignment'
-        }
-      },
+      );
+      headerLength = 21; // "GRANTED CONSULTING\n\n"
+    }
+
+    // Add title after header
+    const titleStartIndex = headerLength + 1;
+    headerRequests.push(
       // Insert title
       {
         insertText: {
-          location: { index: 21 },
+          location: { index: titleStartIndex },
           text: title + '\n\n'
         }
       },
@@ -502,8 +620,8 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
       {
         updateTextStyle: {
           range: {
-            startIndex: 21,
-            endIndex: 21 + title.length
+            startIndex: titleStartIndex,
+            endIndex: titleStartIndex + title.length
           },
           textStyle: {
             bold: true,
@@ -518,7 +636,7 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
           fields: 'bold,fontSize,weightedFontFamily'
         }
       }
-    ];
+    );
 
     await docsClient.documents.batchUpdate({
       documentId: documentId,
@@ -529,7 +647,7 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
     console.log(`   Header and title added`);
 
     // Step 2: Convert markdown to Google Docs format and insert content
-    const contentStartIndex = 21 + title.length + 2; // After header + title + 2 newlines
+    const contentStartIndex = headerLength + title.length + 2; // After header + title + 2 newlines
     const requests = markdownToDocsRequests(content);
 
     // Adjust all indices in requests to account for header and title

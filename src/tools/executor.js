@@ -10,6 +10,11 @@ import * as hubspot from './hubspot.js';
 import * as googleDrive from './google-drive.js';
 import * as googleDocs from './google-docs.js';
 import { isServerTool } from './definitions.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Execute a tool call from Claude
@@ -167,11 +172,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       // ============================================================================
 
       case 'create_google_doc':
+        // Path to Granted Consulting logo (relative to this file)
+        const logoPath = path.join(__dirname, '../assets/granted-logo.jpeg');
+
         result = await googleDocs.createGoogleDoc(
           input.title,
           input.content,
           input.folder_name,
-          userId  // User ID for OAuth
+          userId,  // User ID for OAuth
+          logoPath  // Logo file path
         );
         break;
 
