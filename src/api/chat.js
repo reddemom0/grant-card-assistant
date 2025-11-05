@@ -26,9 +26,11 @@ export async function handleChatRequest(req, res) {
       agentType,
       message,
       conversationId,
-      userId,
       attachments = []
     } = req.body;
+
+    // Get userId from authenticated user (set by middleware), not from request body
+    const userId = req.user?.id || null;
 
     // ============================================================================
     // 1. Validate required fields
