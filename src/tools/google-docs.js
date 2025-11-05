@@ -17,7 +17,8 @@ try {
 }
 
 /**
- * Get authenticated Google Docs client (uses service account directly)
+ * Get authenticated Google Docs client (uses domain-wide delegation)
+ * Documents are created as writers@granted.ca to use their storage quota
  * @returns {Object} Google Docs API client
  */
 async function getDocsClient() {
@@ -27,14 +28,18 @@ async function getDocsClient() {
       'https://www.googleapis.com/auth/documents',
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/drive.file'
-    ]
+    ],
+    // Impersonate writers@granted.ca for document creation
+    clientOptions: {
+      subject: 'writers@granted.ca'
+    }
   });
 
   return google.docs({ version: 'v1', auth });
 }
 
 /**
- * Get authenticated Google Drive client (uses service account directly)
+ * Get authenticated Google Drive client (uses domain-wide delegation)
  * @returns {Object} Google Drive API client
  */
 async function getDriveClient() {
@@ -44,7 +49,11 @@ async function getDriveClient() {
       'https://www.googleapis.com/auth/documents',
       'https://www.googleapis.com/auth/drive',
       'https://www.googleapis.com/auth/drive.file'
-    ]
+    ],
+    // Impersonate writers@granted.ca for document creation
+    clientOptions: {
+      subject: 'writers@granted.ca'
+    }
   });
 
   return google.drive({ version: 'v3', auth });
@@ -239,7 +248,8 @@ async function findOrCreateFolder(driveClient, folderName) {
 
 /**
  * Create a Google Doc with formatted content
- * Documents are created in the service account's Drive and shared publicly with "anyone with the link"
+ * Uses domain-wide delegation to create documents as writers@granted.ca
+ * Documents are created in writers@granted.ca's Drive and shared with "anyone with the link"
  * @param {string} title - Document title
  * @param {string} content - Markdown formatted content
  * @param {string} folderName - Optional folder name to organize the document
