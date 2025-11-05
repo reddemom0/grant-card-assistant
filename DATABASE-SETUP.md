@@ -1,189 +1,212 @@
-# Database Setup Guide
+# Database Setup Guide for Railway
 
-This guide explains how to set up the PostgreSQL database schema for persistent authentication and conversation storage.
+This guide explains how to set up the PostgreSQL database for a new Railway environment (staging, production, etc.).
+
+## Problem
+
+When creating a new Railway environment, the PostgreSQL database starts empty. The application needs:
+- **users** table with OAuth token columns
+- **conversations** table
+- **messages** table
+- **conversation_memory** table
+
+Without these tables, you'll see errors like:
+```
+column "google_access_token" of relation "users" does not exist
+```
 
 ## Prerequisites
 
-- Access to your Neon PostgreSQL database
-- Database connection string (from `POSTGRES_URL` environment variable)
-- Existing `users` table from OAuth setup
+- Railway CLI installed (`npm install -g @railway/cli`)
+- Access to your Railway project
+- PostgreSQL database service created in Railway
 
 ## Setup Steps
 
-### Option 1: Using Neon Console (Recommended)
+### Option 1: Automated Script (Recommended)
 
-1. Log in to your Neon dashboard at https://console.neon.tech
-2. Select your project
-3. Navigate to the SQL Editor tab
-4. Copy the contents of `database-schema.sql`
-5. Paste into the SQL Editor
-6. Click "Run" to execute
+1. **Switch to staging environment in Railway:**
+   ```bash
+   railway environment
+   # Select "staging"
+   ```
 
-### Option 2: Using psql Command Line
+2. **Run the setup script:**
+   ```bash
+   ./scripts/setup-staging-database.sh
+   ```
 
-```bash
-# Connect to your database
-psql "YOUR_POSTGRES_URL"
+   This script will:
+   - Check if Railway CLI is installed
+   - Prompt you to confirm
+   - Run the complete database schema on staging
+   - Create all necessary tables with correct columns
 
-# Execute the schema file
-\i database-schema.sql
+### Option 2: Manual Setup via Railway Dashboard
 
-# Verify tables were created
-\dt
+1. **Go to Railway Dashboard**
+   - Open your project at https://railway.app
+   - Select the **staging** environment
+   - Click on the **PostgreSQL** service
 
-# Verify indexes
-\di
+2. **Open the Data tab**
+   - Click "Query" at the top
+   - Copy the entire contents of `migrations/setup-railway-complete.sql`
+   - Paste into the query editor
+   - Click "Run Query"
 
-# Exit
-\q
-```
+3. **Verify tables were created:**
+   ```sql
+   SELECT table_name FROM information_schema.tables
+   WHERE table_schema = 'public';
+   ```
 
-### Option 3: Using Node.js Script
+   You should see:
+   - users
+   - conversations
+   - messages
+   - conversation_memory
 
-```javascript
-// setup-database.js
-const { Pool } = require('pg');
-const fs = require('fs');
-require('dotenv').config();
+### Option 3: Manual Setup via psql CLI
 
-const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
-  ssl: { rejectUnauthorized: false }
-});
+1. **Get database connection string from Railway:**
+   ```bash
+   railway variables --environment staging | grep DATABASE_URL
+   ```
 
-async function setupDatabase() {
-  const schema = fs.readFileSync('./database-schema.sql', 'utf8');
+2. **Connect with psql:**
+   ```bash
+   psql "<DATABASE_URL>"
+   ```
 
-  try {
-    await pool.query(schema);
-    console.log('✅ Database schema created successfully');
+3. **Run the setup script:**
+   ```bash
+   \i migrations/setup-railway-complete.sql
+   ```
 
-    // Verify
-    const tables = await pool.query(`
-      SELECT table_name FROM information_schema.tables
-      WHERE table_schema = 'public'
-      AND table_name IN ('conversations', 'messages')
-    `);
-    console.log('Tables created:', tables.rows);
+## What Gets Created
 
-  } catch (error) {
-    console.error('❌ Error creating schema:', error);
-  } finally {
-    await pool.end();
-  }
-}
+### Tables
 
-setupDatabase();
-```
+1. **users** - User accounts via Google OAuth
+   - `id` (SERIAL PRIMARY KEY)
+   - `google_id`, `email`, `name`, `picture`
+   - `google_access_token`, `google_refresh_token`, `google_token_expiry` (OAuth tokens)
+   - `role`, `is_active`, `last_login`
+   - Timestamps: `created_at`, `updated_at`
 
-Run with: `node setup-database.js`
+2. **conversations** - User conversations with AI agents
+   - `id` (UUID PRIMARY KEY)
+   - `user_id` (INTEGER, references users.id)
+   - `agent_type` (VARCHAR)
+   - `title` (VARCHAR)
+   - Timestamps: `created_at`, `updated_at`
 
-## Verification
+3. **messages** - Individual messages within conversations
+   - `id` (UUID PRIMARY KEY)
+   - `conversation_id` (UUID, references conversations.id)
+   - `role` (VARCHAR: user/assistant/system)
+   - `content` (TEXT)
+   - `created_at` (TIMESTAMP)
 
-After running the schema, verify everything is set up correctly:
+4. **conversation_memory** - Key-value storage for agent memory tool
+   - `id` (SERIAL PRIMARY KEY)
+   - `conversation_id` (UUID, references conversations.id)
+   - `key`, `value` (TEXT)
+   - Timestamps: `created_at`, `updated_at`
 
-```sql
--- Check tables exist
-SELECT table_name FROM information_schema.tables
-WHERE table_schema = 'public'
-AND table_name IN ('conversations', 'messages');
+### Indexes
 
--- Check columns in conversations table
-SELECT column_name, data_type FROM information_schema.columns
-WHERE table_name = 'conversations';
+Performance indexes are created on:
+- User lookups: `google_id`, `email`, `refresh_token`
+- Conversation queries: `user_id`, `agent_type`, `created_at`, `updated_at`
+- Message queries: `conversation_id`, `created_at`
+- Memory queries: `conversation_id`, `(conversation_id, key)`
 
--- Check columns in messages table
-SELECT column_name, data_type FROM information_schema.columns
-WHERE table_name = 'messages';
+### Triggers
 
--- Check indexes
-SELECT indexname, tablename FROM pg_indexes
-WHERE tablename IN ('conversations', 'messages');
+Automatic timestamp updates:
+- `users.updated_at` updated on any user record change
+- `conversations.updated_at` updated on any conversation change
+- `conversation_memory.updated_at` updated on any memory change
 
--- Check trigger exists
-SELECT trigger_name FROM information_schema.triggers
-WHERE event_object_table = 'messages';
-```
+## Verifying Setup
 
-Expected output:
-- **Tables**: `conversations`, `messages`
-- **Indexes**: `idx_conversations_user_id`, `idx_conversations_updated_at`, `idx_messages_conversation_id`, `idx_conversations_user_agent`
-- **Trigger**: `trigger_update_conversation_timestamp`
+After running the setup, test the staging environment:
 
-## Schema Details
+1. **Try logging in:**
+   ```
+   https://grant-card-assistant-staging.up.railway.app
+   ```
 
-### Conversations Table
-- `id` - UUID primary key (auto-generated)
-- `user_id` - UUID foreign key to users table
-- `agent_type` - VARCHAR(50) for agent identifier
-- `title` - VARCHAR(255) optional conversation title
-- `created_at` - Timestamp (auto-set)
-- `updated_at` - Timestamp (auto-updated by trigger)
+2. **Create a test conversation:**
+   - Select any agent (e.g., Grant Cards)
+   - Send a test message
+   - Verify it works without database errors
 
-### Messages Table
-- `id` - UUID primary key (auto-generated)
-- `conversation_id` - UUID foreign key to conversations
-- `role` - VARCHAR(20) with CHECK constraint ('user', 'assistant', 'system')
-- `content` - TEXT for message content
-- `created_at` - Timestamp (auto-set)
-
-### Automatic Timestamp Updates
-A trigger automatically updates `conversations.updated_at` whenever a new message is inserted, ensuring conversations are sorted by most recent activity.
+3. **Test Google Docs creation:**
+   - Use the Grant Cards agent
+   - Request it to create a Google Doc
+   - Verify OAuth tokens are saved
 
 ## Troubleshooting
 
-### Error: relation "users" does not exist
-**Cause**: The `conversations` table references a `users` table that doesn't exist yet.
-
-**Solution**: Create the users table first:
-```sql
-CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
-  name VARCHAR(255),
-  picture TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-### Error: permission denied
-**Cause**: Your database user doesn't have sufficient privileges.
-
-**Solution**: Make sure you're using the database owner credentials from your Neon connection string.
-
-### Indexes not created
-**Cause**: The `IF NOT EXISTS` clause may silently skip if there's a naming conflict.
-
-**Solution**: Drop existing indexes with similar names first:
-```sql
-DROP INDEX IF EXISTS idx_conversations_user_id CASCADE;
--- Then re-run schema
-```
-
-## Next Steps
-
-After successfully creating the schema:
-
-1. ✅ Verify tables and indexes exist
-2. 📝 Create API endpoints (`/api/verify-auth.js`, `/api/conversations.js`, `/api/messages.js`)
-3. 🔧 Update `/api/chat` to use database instead of in-memory storage
-4. 🎨 Create frontend auth module (`/public/auth.js`)
-5. 🖥️ Update agent pages with conversation sidebar
-
-## Development vs Production
-
-**IMPORTANT**: Set up separate databases for development and production:
-
-- **Development**: Use a separate Neon branch or database
-- **Production**: Use your production Neon database
-
-Update your `.env` files accordingly:
+### "railway: command not found"
+Install Railway CLI:
 ```bash
-# .env.development
-POSTGRES_URL=postgresql://user:pass@dev-host/db
-
-# .env.production
-POSTGRES_URL=postgresql://user:pass@prod-host/db
+npm install -g @railway/cli
+railway login
 ```
 
-Run schema on **development database first**, test thoroughly, then apply to production.
+### "relation already exists"
+This is OK! The script uses `CREATE TABLE IF NOT EXISTS`, so it's safe to run multiple times.
+
+### Still getting "column does not exist" errors
+1. Verify you're connected to the correct environment:
+   ```bash
+   railway status
+   ```
+
+2. Check which tables exist:
+   ```bash
+   railway run -- psql $DATABASE_URL -c "\dt"
+   ```
+
+3. Check users table schema:
+   ```bash
+   railway run -- psql $DATABASE_URL -c "\d users"
+   ```
+
+   Should show `google_access_token`, `google_refresh_token`, and `google_token_expiry` columns.
+
+## Environment Variables Required
+
+Make sure your Railway environment has these variables set:
+
+```
+DATABASE_URL=postgresql://... (automatically set by Railway Postgres)
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_SERVICE_ACCOUNT_KEY={"type":"service_account",...}
+GOOGLE_DRIVE_FOLDER_ID=...
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+JWT_SECRET=...
+```
+
+## Migration from Old Schema
+
+If you have an existing database without OAuth columns:
+
+```sql
+-- Add OAuth columns to existing users table
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS google_access_token TEXT,
+ADD COLUMN IF NOT EXISTS google_refresh_token TEXT,
+ADD COLUMN IF NOT EXISTS google_token_expiry TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_users_refresh_token ON users(google_refresh_token);
+```
+
+This is what `migrations/004_add_oauth_tokens.sql` does.
