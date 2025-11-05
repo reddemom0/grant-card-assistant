@@ -63,21 +63,29 @@ router.get('/auth-google', (req, res) => {
   console.log('🔵 Detected host:', host);
   console.log('🔵 Protocol:', protocol);
 
+  // Include Google Drive and Docs scopes for document creation
+  const scopes = [
+    'profile',
+    'email',
+    'https://www.googleapis.com/auth/drive.file',
+    'https://www.googleapis.com/auth/documents'
+  ].join(' ');
+
   console.log('🔵 OAuth Parameters:');
   console.log('   redirect_uri:', redirectUri);
   console.log('   redirect_uri (encoded):', encodeURIComponent(redirectUri));
   console.log('   response_type:', 'code');
-  console.log('   scope:', 'profile email');
+  console.log('   scope:', scopes);
   console.log('   access_type:', 'offline');
-  console.log('   prompt:', 'select_account');
+  console.log('   prompt:', 'consent'); // Changed to 'consent' to force refresh token
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(clientId)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `response_type=code&` +
-    `scope=${encodeURIComponent('profile email')}&` +
+    `scope=${encodeURIComponent(scopes)}&` +
     `access_type=offline&` +
-    `prompt=select_account`;
+    `prompt=consent`;
 
   console.log('🔵 Full OAuth URL:', googleAuthUrl);
   console.log('🔵 URL length:', googleAuthUrl.length);
@@ -167,15 +175,28 @@ router.get('/auth-callback', async (req, res) => {
     const { data: userInfo } = await oauth2.userinfo.get();
     console.log('✅ Got user info:', { id: userInfo.id, email: userInfo.email, name: userInfo.name });
 
-    // Create or update user in database
-    console.log('🔵 Creating/updating user in database...');
+    // Create or update user in database with OAuth tokens
+    console.log('🔵 Creating/updating user in database with OAuth tokens...');
+    const tokenExpiry = tokens.expiry_date ? new Date(tokens.expiry_date) : null;
+
     const userResult = await query(
-      'INSERT INTO users (google_id, email, name, picture) VALUES ($1, $2, $3, $4) ON CONFLICT (google_id) DO UPDATE SET name = $3, picture = $4, updated_at = CURRENT_TIMESTAMP RETURNING id, email, name, picture',
-      [userInfo.id, userInfo.email, userInfo.name, userInfo.picture]
+      `INSERT INTO users (google_id, email, name, picture, google_access_token, google_refresh_token, google_token_expiry)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (google_id)
+       DO UPDATE SET
+         name = $3,
+         picture = $4,
+         google_access_token = $5,
+         google_refresh_token = COALESCE($6, users.google_refresh_token),
+         google_token_expiry = $7,
+         updated_at = CURRENT_TIMESTAMP
+       RETURNING id, email, name, picture`,
+      [userInfo.id, userInfo.email, userInfo.name, userInfo.picture, tokens.access_token, tokens.refresh_token, tokenExpiry]
     );
 
     const user = userResult.rows[0];
     console.log('✅ User created/updated:', { id: user.id, email: user.email });
+    console.log('✅ Stored OAuth tokens (refresh_token present:', !!tokens.refresh_token, ')');
 
     // Create JWT token with picture included
     console.log('🔵 Creating JWT token...');
