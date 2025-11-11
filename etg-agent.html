@@ -1308,12 +1308,16 @@
 
             console.log('✅ ETG Business Case Writer initialized successfully');
 
-            // Initialize Feedback Panel
-            const conversationId = agentInterface.conversationId;
-            if (conversationId) {
-                window.feedbackPanel = new FeedbackPanel(conversationId);
-                console.log('✅ Feedback Panel initialized');
-            }
+            // Initialize Feedback Panel when conversation is ready
+            window.addEventListener('conversationReady', (event) => {
+                const conversationId = event.detail.conversationId;
+                console.log('🎯 Conversation ready, initializing feedback panel:', conversationId);
+
+                if (!window.feedbackPanel && conversationId) {
+                    window.feedbackPanel = new FeedbackPanel(conversationId);
+                    console.log('✅ Feedback Panel initialized');
+                }
+            });
         });
     </script>
 </body>

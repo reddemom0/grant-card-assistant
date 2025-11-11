@@ -314,6 +314,11 @@ class AgentInterface {
                     console.log('✓ Updated URL to:', newUrl);
                     this.isFirstMessage = false;
                 }
+
+                // Dispatch custom event for feedback panel initialization
+                window.dispatchEvent(new CustomEvent('conversationReady', {
+                    detail: { conversationId: this.conversationId }
+                }));
             }
         };
 
