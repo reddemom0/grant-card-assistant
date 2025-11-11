@@ -9,7 +9,7 @@
 
 CREATE TABLE IF NOT EXISTS conversation_feedback (
     id SERIAL PRIMARY KEY,
-    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
     -- Explicit feedback from user
@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS conversation_feedback (
 
 CREATE TABLE IF NOT EXISTS feedback_notes (
     id SERIAL PRIMARY KEY,
-    conversation_id TEXT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+    conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
     -- Note content
