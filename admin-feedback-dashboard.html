@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feedback Learning Dashboard | Grant Writers</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --background: #fafaf9;
+            --surface: #ffffff;
+            --border: #e7e5e4;
+            --text-primary: #1c1917;
+            --text-secondary: #78716c;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #3b82f6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1.5rem 2rem;
+            margin: -2rem -2rem 2rem -2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+        }
+
+        .back-link {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .back-link:hover {
+            color: var(--primary-hover);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 0;
+            color: var(--text-secondary);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 3rem;
+            height: 3rem;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .agent-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .agent-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .agent-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .agent-card.selected {
+            border-color: var(--primary);
+            background: #eff6ff;
+        }
+
+        .agent-name {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: var(--text-primary);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        .quality-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-top: 0.5rem;
+        }
+
+        .quality-excellent {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .quality-good {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .quality-needs-work {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .section {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1.5rem;
+        }
+
+        .tab {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            background: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: var(--text-primary);
+        }
+
+        .tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .feedback-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .feedback-item {
+            background: var(--background);
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+        }
+
+        .feedback-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .feedback-rating {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .rating-positive {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .rating-negative {
+            color: var(--danger);
+            font-weight: 600;
+        }
+
+        .quality-score {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .feedback-content {
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin-bottom: 0.75rem;
+            background: var(--surface);
+            padding: 0.75rem;
+            border-radius: 0.375rem;
+            border-left: 3px solid var(--primary);
+        }
+
+        .feedback-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .chart-container {
+            height: 300px;
+            margin-top: 1rem;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-hover);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.25rem 0.625rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .badge-warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .badge-danger {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .correction-item {
+            background: #fef3c7;
+            border-left: 3px solid #f59e0b;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .correction-text {
+            font-size: 0.875rem;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .correction-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div>
+                <h1>📊 Feedback Learning Dashboard</h1>
+                <p class="subtitle">Track agent improvements and learning patterns</p>
+            </div>
+            <a href="/dashboard" class="back-link">
+                ← Back to Dashboard
+            </a>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <p style="margin-top: 1rem;">Loading feedback data...</p>
+        </div>
+
+        <div id="content" style="display: none;">
+            <!-- Agent Selection -->
+            <div class="section">
+                <h2 class="section-title">Select Agent</h2>
+                <div id="agent-grid" class="agent-grid"></div>
+            </div>
+
+            <!-- Agent Details -->
+            <div id="agent-details" style="display: none;">
+                <!-- Tabs -->
+                <div class="tabs">
+                    <button class="tab active" data-tab="overview">Overview</button>
+                    <button class="tab" data-tab="high-quality">High Quality (Learn From)</button>
+                    <button class="tab" data-tab="negative">Negative (Avoid)</button>
+                    <button class="tab" data-tab="corrections">User Corrections</button>
+                    <button class="tab" data-tab="trends">Trends</button>
+                </div>
+
+                <!-- Tab Content -->
+                <div id="tab-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedAgent = null;
+        let overviewData = [];
+
+        // Initialize
+        async function init() {
+            await loadOverview();
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('content').style.display = 'block';
+
+            // Setup tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    loadTabContent(tab.dataset.tab);
+                });
+            });
+        }
+
+        // Load overview of all agents
+        async function loadOverview() {
+            try {
+                const response = await fetch('/api/admin/feedback-learning/overview', {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load overview');
+                }
+
+                const data = await response.json();
+                overviewData = data.data;
+
+                renderAgentGrid();
+            } catch (error) {
+                console.error('Error loading overview:', error);
+                document.getElementById('loading').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Failed to load feedback data</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Render agent cards
+        function renderAgentGrid() {
+            const grid = document.getElementById('agent-grid');
+
+            if (overviewData.length === 0) {
+                grid.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>No feedback data available yet</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = overviewData.map(agent => {
+                const qualityClass = agent.avgQualityScore >= 0.75 ? 'quality-excellent' :
+                                   agent.avgQualityScore >= 0.6 ? 'quality-good' : 'quality-needs-work';
+                const qualityLabel = agent.avgQualityScore >= 0.75 ? 'Excellent' :
+                                   agent.avgQualityScore >= 0.6 ? 'Good' : 'Needs Work';
+
+                return `
+                    <div class="agent-card" onclick="selectAgent('${agent.agentType}')">
+                        <div class="agent-name">${formatAgentName(agent.agentType)}</div>
+                        <div class="stats-grid">
+                            <div class="stat">
+                                <div class="stat-value">${agent.totalRatings}</div>
+                                <div class="stat-label">Total Ratings</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${agent.positiveRate}%</div>
+                                <div class="stat-label">Positive</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${agent.avgQualityScore.toFixed(2)}</div>
+                                <div class="stat-label">Quality Score</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-value">${agent.totalMessages}</div>
+                                <div class="stat-label">Messages</div>
+                            </div>
+                        </div>
+                        <div class="quality-badge ${qualityClass}">${qualityLabel}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Select agent
+        function selectAgent(agentType) {
+            selectedAgent = agentType;
+
+            // Highlight selected card
+            document.querySelectorAll('.agent-card').forEach(card => {
+                card.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+
+            // Show agent details
+            document.getElementById('agent-details').style.display = 'block';
+
+            // Load overview tab
+            loadTabContent('overview');
+        }
+
+        // Load tab content
+        async function loadTabContent(tab) {
+            if (!selectedAgent) return;
+
+            const content = document.getElementById('tab-content');
+            content.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+            try {
+                switch (tab) {
+                    case 'overview':
+                        await loadOverviewTab();
+                        break;
+                    case 'high-quality':
+                        await loadHighQualityTab();
+                        break;
+                    case 'negative':
+                        await loadNegativeTab();
+                        break;
+                    case 'corrections':
+                        await loadCorrectionsTab();
+                        break;
+                    case 'trends':
+                        await loadTrendsTab();
+                        break;
+                }
+            } catch (error) {
+                content.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Failed to load ${tab} data</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Load overview tab
+        async function loadOverviewTab() {
+            const response = await fetch(`/api/admin/feedback-learning/stats/${selectedAgent}`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            const stats = data.stats;
+
+            document.getElementById('tab-content').innerHTML = `
+                <div class="section">
+                    <h3 class="section-title">Performance Metrics</h3>
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        <div class="stat">
+                            <div class="stat-value">${stats.totalRatings}</div>
+                            <div class="stat-label">Total Ratings</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${stats.positiveRate}%</div>
+                            <div class="stat-label">Positive Rate</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${stats.avgQualityScore.toFixed(2)}</div>
+                            <div class="stat-label">Avg Quality</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${stats.feedbackRate}%</div>
+                            <div class="stat-label">Feedback Rate</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${stats.avgRevisionCount.toFixed(1)}</div>
+                            <div class="stat-label">Avg Revisions</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${Math.round(stats.avgCompletionTime / 60)}</div>
+                            <div class="stat-label">Avg Time (min)</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${stats.totalNotes}</div>
+                            <div class="stat-label">Total Notes</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${stats.totalMessages}</div>
+                            <div class="stat-label">Total Messages</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">Feedback Distribution</h3>
+                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--success);">${stats.positiveCount}</div>
+                            <div class="stat-label">👍 Positive</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--danger);">${stats.negativeCount}</div>
+                            <div class="stat-label">👎 Negative</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--text-secondary);">${stats.totalMessages - stats.totalRatings}</div>
+                            <div class="stat-label">No Rating</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3 class="section-title">Notes Sentiment</h3>
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--success);">${stats.positiveNotes}</div>
+                            <div class="stat-label">Positive</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--danger);">${stats.negativeNotes}</div>
+                            <div class="stat-label">Negative</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--warning);">${stats.mixedNotes}</div>
+                            <div class="stat-label">Mixed</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--text-secondary);">${stats.neutralNotes}</div>
+                            <div class="stat-label">Neutral</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load high-quality feedback tab
+        async function loadHighQualityTab() {
+            const response = await fetch(`/api/admin/feedback-learning/high-quality/${selectedAgent}?limit=20`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+
+            if (data.feedback.length === 0) {
+                document.getElementById('tab-content').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>No high-quality feedback yet</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Quality score threshold: 0.75+</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('tab-content').innerHTML = `
+                <div class="section">
+                    <div class="section-header">
+                        <h3 class="section-title">High Quality Responses (Learn From These)</h3>
+                        <span class="badge badge-success">${data.count} messages</span>
+                    </div>
+                    <div class="feedback-list">
+                        ${data.feedback.map(item => `
+                            <div class="feedback-item">
+                                <div class="feedback-header">
+                                    <div class="feedback-rating rating-positive">
+                                        👍 ${item.rating}
+                                    </div>
+                                    <div class="quality-score">
+                                        Quality: <strong>${item.quality_score.toFixed(2)}</strong>
+                                    </div>
+                                </div>
+                                <div class="feedback-content">
+                                    ${truncate(item.message_content, 300)}
+                                </div>
+                                <div class="feedback-meta">
+                                    <span>📊 Revisions: ${item.revision_count}</span>
+                                    <span>⏱️ Time: ${Math.round(item.completion_time_seconds / 60)}m</span>
+                                    <span>💬 Messages: ${item.message_count}</span>
+                                    <span>📅 ${formatDate(item.created_at)}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load negative feedback tab
+        async function loadNegativeTab() {
+            const response = await fetch(`/api/admin/feedback-learning/negative/${selectedAgent}?limit=10`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+
+            if (data.feedback.length === 0) {
+                document.getElementById('tab-content').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✨</div>
+                        <p>No negative feedback - Great work!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('tab-content').innerHTML = `
+                <div class="section">
+                    <div class="section-header">
+                        <h3 class="section-title">Negative Patterns (Avoid These)</h3>
+                        <span class="badge badge-danger">${data.count} messages</span>
+                    </div>
+                    <div class="feedback-list">
+                        ${data.feedback.map(item => `
+                            <div class="feedback-item" style="border-left: 3px solid var(--danger);">
+                                <div class="feedback-header">
+                                    <div class="feedback-rating rating-negative">
+                                        👎 ${item.rating}
+                                    </div>
+                                    <div class="quality-score">
+                                        Quality: <strong>${item.quality_score.toFixed(2)}</strong>
+                                    </div>
+                                </div>
+                                <div class="feedback-content">
+                                    ${truncate(item.message_content, 300)}
+                                </div>
+                                ${item.feedback_text ? `
+                                    <div style="background: #fef2f2; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; font-size: 0.875rem;">
+                                        <strong>User Feedback:</strong> ${item.feedback_text}
+                                    </div>
+                                ` : ''}
+                                <div class="feedback-meta">
+                                    <span>📊 Revisions: ${item.revision_count}</span>
+                                    <span>⏱️ Time: ${Math.round(item.completion_time_seconds / 60)}m</span>
+                                    <span>💬 Messages: ${item.message_count}</span>
+                                    <span>📅 ${formatDate(item.created_at)}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load corrections tab
+        async function loadCorrectionsTab() {
+            const response = await fetch(`/api/admin/feedback-learning/corrections/${selectedAgent}?limit=50`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+
+            if (data.corrections.length === 0) {
+                document.getElementById('tab-content').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">✅</div>
+                        <p>No user corrections yet</p>
+                    </div>
+                `;
+                return;
+            }
+
+            document.getElementById('tab-content').innerHTML = `
+                <div class="section">
+                    <div class="section-header">
+                        <h3 class="section-title">User Corrections (Critical Learning)</h3>
+                        <span class="badge badge-warning">${data.count} corrections</span>
+                    </div>
+                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.875rem;">
+                        These notes contain correction keywords like "actually", "incorrect", "wrong", etc.
+                    </p>
+                    <div class="feedback-list">
+                        ${data.corrections.map(item => `
+                            <div class="correction-item">
+                                <div class="correction-text">
+                                    ${item.note_text}
+                                </div>
+                                <div class="correction-meta">
+                                    <span>Sentiment: <strong>${item.sentiment}</strong></span>
+                                    <span>• Message Index: ${item.message_index}</span>
+                                    <span>• ${formatDate(item.created_at)}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load trends tab
+        async function loadTrendsTab() {
+            const response = await fetch(`/api/admin/feedback-learning/trends/${selectedAgent}?days=30`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+
+            if (data.trends.length === 0) {
+                document.getElementById('tab-content').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📈</div>
+                        <p>Not enough data for trends yet</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Calculate trend summary
+            const avgQuality = (data.trends.reduce((sum, day) => sum + parseFloat(day.avg_quality_score), 0) / data.trends.length).toFixed(2);
+            const totalRatings = data.trends.reduce((sum, day) => sum + parseInt(day.total_ratings), 0);
+            const totalPositive = data.trends.reduce((sum, day) => sum + parseInt(day.positive_count), 0);
+            const positiveRate = ((totalPositive / totalRatings) * 100).toFixed(1);
+
+            document.getElementById('tab-content').innerHTML = `
+                <div class="section">
+                    <h3 class="section-title">30-Day Trends</h3>
+                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
+                        <div class="stat">
+                            <div class="stat-value">${avgQuality}</div>
+                            <div class="stat-label">Avg Quality Score</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${totalRatings}</div>
+                            <div class="stat-label">Total Ratings</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value">${positiveRate}%</div>
+                            <div class="stat-label">Positive Rate</div>
+                        </div>
+                    </div>
+
+                    <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem;">
+                        ${data.trends.slice(0, 10).map(day => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border);">
+                                <div style="font-weight: 500;">${formatDate(day.date)}</div>
+                                <div style="display: flex; gap: 2rem; align-items: center;">
+                                    <span style="color: var(--success);">👍 ${day.positive_count}</span>
+                                    <span style="color: var(--danger);">👎 ${day.negative_count}</span>
+                                    <span style="color: var(--primary); font-weight: 600;">Quality: ${parseFloat(day.avg_quality_score).toFixed(2)}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Helper functions
+        function formatAgentName(agentType) {
+            const names = {
+                'etg-writer': 'ETG Business Case',
+                'grant-cards': 'Grant Card Generator',
+                'bcafe-writer': 'BCAFE Writer',
+                'canexport-claims': 'CanExport Claims',
+                'readiness-strategist': 'Readiness Strategist'
+            };
+            return names[agentType] || agentType;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+            if (diffDays === 0) return 'Today';
+            if (diffDays === 1) return 'Yesterday';
+            if (diffDays < 7) return `${diffDays} days ago`;
+
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+
+        function truncate(text, maxLength) {
+            if (text.length <= maxLength) return text;
+            return text.substring(0, maxLength) + '...';
+        }
+
+        // Initialize on load
+        init();
+    </script>
+</body>
+</html>

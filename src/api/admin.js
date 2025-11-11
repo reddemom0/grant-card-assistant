@@ -8,6 +8,7 @@ import express from 'express';
 import { requireAdmin, logAdminAction } from '../middleware/admin.js';
 import * as adminQueries from '../database/admin-queries.js';
 import * as analytics from '../services/analytics.js';
+import * as feedbackRetrieval from '../feedback-learning/retrieval.js';
 
 const router = express.Router();
 
@@ -443,6 +444,271 @@ router.get('/system/database', async (req, res) => {
     res.status(500).json({
       success: false,
       error: 'Failed to retrieve database statistics'
+    });
+  }
+});
+
+// ============================================================================
+// FEEDBACK LEARNING SYSTEM
+// ============================================================================
+
+/**
+ * GET /api/admin/feedback-learning/overview
+ * Get overview of feedback for all agents
+ */
+router.get('/feedback-learning/overview', async (req, res) => {
+  try {
+    const agentsList = await feedbackRetrieval.getAgentTypesWithFeedback();
+    const overviewData = await Promise.all(
+      agentsList.map(async (agent) => {
+        const stats = await feedbackRetrieval.getFeedbackStats(agent.agent_type);
+        return {
+          agentType: agent.agent_type,
+          feedbackCount: parseInt(agent.feedback_count),
+          ...stats
+        };
+      })
+    );
+
+    res.json({ success: true, data: overviewData });
+  } catch (error) {
+    console.error('Failed to get feedback overview:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve feedback overview'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/stats/:agentType
+ * Get detailed stats for specific agent
+ */
+router.get('/feedback-learning/stats/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    const stats = await feedbackRetrieval.getFeedbackStats(agentType);
+
+    res.json({
+      success: true,
+      agentType,
+      stats
+    });
+  } catch (error) {
+    console.error('Failed to get agent stats:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve agent statistics'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/high-quality/:agentType
+ * Get high-quality feedback for learning
+ */
+router.get('/feedback-learning/high-quality/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    const { limit } = req.query;
+
+    const highQuality = await feedbackRetrieval.getHighQualityFeedback(
+      agentType,
+      parseInt(limit) || 20,
+      0.75
+    );
+
+    res.json({
+      success: true,
+      agentType,
+      count: highQuality.length,
+      feedback: highQuality
+    });
+  } catch (error) {
+    console.error('Failed to get high-quality feedback:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve high-quality feedback'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/negative/:agentType
+ * Get negative feedback patterns to avoid
+ */
+router.get('/feedback-learning/negative/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    const { limit } = req.query;
+
+    const negative = await feedbackRetrieval.getNegativeFeedback(
+      agentType,
+      parseInt(limit) || 10,
+      0.4
+    );
+
+    res.json({
+      success: true,
+      agentType,
+      count: negative.length,
+      feedback: negative
+    });
+  } catch (error) {
+    console.error('Failed to get negative feedback:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve negative feedback'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/corrections/:agentType
+ * Get user corrections for learning
+ */
+router.get('/feedback-learning/corrections/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    const { limit } = req.query;
+
+    const corrections = await feedbackRetrieval.getUserCorrections(
+      agentType,
+      parseInt(limit) || 50
+    );
+
+    res.json({
+      success: true,
+      agentType,
+      count: corrections.length,
+      corrections
+    });
+  } catch (error) {
+    console.error('Failed to get corrections:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve user corrections'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/recent
+ * Get recent feedback across all agents
+ */
+router.get('/feedback-learning/recent', async (req, res) => {
+  try {
+    const { limit } = req.query;
+    const recent = await feedbackRetrieval.getRecentFeedback(
+      parseInt(limit) || 20
+    );
+
+    res.json({
+      success: true,
+      count: recent.length,
+      feedback: recent
+    });
+  } catch (error) {
+    console.error('Failed to get recent feedback:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve recent feedback'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/trends/:agentType
+ * Get feedback trends over time
+ */
+router.get('/feedback-learning/trends/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    const { days } = req.query;
+
+    const trends = await feedbackRetrieval.getFeedbackTrends(
+      agentType,
+      parseInt(days) || 30
+    );
+
+    res.json({
+      success: true,
+      agentType,
+      days: parseInt(days) || 30,
+      trends
+    });
+  } catch (error) {
+    console.error('Failed to get trends:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve feedback trends'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/top-messages/:agentType
+ * Get top performing messages
+ */
+router.get('/feedback-learning/top-messages/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    const { limit } = req.query;
+
+    const topMessages = await feedbackRetrieval.getTopPerformingMessages(
+      agentType,
+      parseInt(limit) || 10
+    );
+
+    res.json({
+      success: true,
+      agentType,
+      count: topMessages.length,
+      messages: topMessages
+    });
+  } catch (error) {
+    console.error('Failed to get top messages:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve top messages'
+    });
+  }
+});
+
+/**
+ * GET /api/admin/feedback-learning/search/:agentType
+ * Search feedback by content
+ */
+router.get('/feedback-learning/search/:agentType', async (req, res) => {
+  try {
+    const { agentType } = req.params;
+    const { q, limit } = req.query;
+
+    if (!q) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing search query parameter "q"'
+      });
+    }
+
+    const searchResults = await feedbackRetrieval.searchFeedback(
+      agentType,
+      q,
+      parseInt(limit) || 20
+    );
+
+    res.json({
+      success: true,
+      agentType,
+      searchTerm: q,
+      count: searchResults.length,
+      results: searchResults
+    });
+  } catch (error) {
+    console.error('Failed to search feedback:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to search feedback'
     });
   }
 });
