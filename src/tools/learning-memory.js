@@ -78,6 +78,15 @@ export async function loadLearningMemory(agentType, conversationId, userId) {
 
     // Track that learning was applied to this conversation
     try {
+      console.log(`📊 Tracking learning application:`, {
+        agentType,
+        conversationId,
+        userId,
+        userIdType: typeof userId,
+        filesLoaded,
+        lastUpdated
+      });
+
       await saveLearningApplication(
         agentType,
         conversationId,
@@ -85,8 +94,16 @@ export async function loadLearningMemory(agentType, conversationId, userId) {
         filesLoaded,
         lastUpdated
       );
+
+      console.log(`✓ Learning application tracked successfully`);
     } catch (trackingError) {
-      console.warn('Failed to track learning application:', trackingError.message);
+      console.error('❌ Failed to track learning application:', trackingError);
+      console.error('   Error details:', {
+        message: trackingError.message,
+        code: trackingError.code,
+        detail: trackingError.detail,
+        stack: trackingError.stack
+      });
       // Don't fail the whole request if tracking fails
     }
 
