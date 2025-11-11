@@ -68,16 +68,25 @@ export async function getConversation(conversationId) {
       [conversationId]
     );
 
-    // Get file attachments
-    const filesResult = await client.query(
-      'SELECT * FROM file_attachments WHERE conversation_id = $1 ORDER BY upload_timestamp ASC',
-      [conversationId]
-    );
+    // Get file attachments (optional - table may not exist)
+    let files = [];
+    try {
+      const filesResult = await client.query(
+        'SELECT * FROM file_attachments WHERE conversation_id = $1 ORDER BY upload_timestamp ASC',
+        [conversationId]
+      );
+      files = filesResult.rows;
+    } catch (error) {
+      // Table doesn't exist yet - that's okay, just skip file attachments
+      if (error.code !== '42P01') { // 42P01 = undefined_table
+        throw error; // Re-throw if it's a different error
+      }
+    }
 
     return {
       ...conversation,
       messages: messagesResult.rows,
-      files: filesResult.rows,
+      files: files,
     };
   } finally {
     client.release();
