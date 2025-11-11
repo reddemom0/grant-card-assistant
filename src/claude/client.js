@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { loadAgentPromptCached } from '../agents/load-agents.js';
 import { loadConversationMemories } from '../tools/memory.js';
+import { loadLearningMemory } from '../tools/learning-memory.js';
 import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE } from './streaming.js';
@@ -86,6 +87,19 @@ export async function runAgent({
       console.log(`✓ Loaded ${memoryCount} memories into context`);
     } else {
       console.log(`✓ No memories found for this conversation`);
+    }
+
+    // ============================================================================
+    // 2.5. Load learning memory from feedback analysis
+    // ============================================================================
+
+    console.log(`📚 Loading learned patterns from user feedback...`);
+    const learningMemory = await loadLearningMemory(agentType, conversationId, userId);
+    if (learningMemory) {
+      systemPrompt += learningMemory;
+      console.log(`✓ Injected learned patterns from feedback into system prompt`);
+    } else {
+      console.log(`✓ No learned patterns available yet (feedback learning will run as feedback is collected)`);
     }
 
     // ============================================================================

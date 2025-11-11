@@ -507,6 +507,10 @@ async function startServer() {
     } else {
       // Run auto-migrations if database is healthy
       await autoMigrate();
+
+      // Ensure learning applications table exists
+      const { ensureLearningApplicationsTable } = await import('./src/database/learning-tracking.js');
+      await ensureLearningApplicationsTable();
     }
 
     // Check required environment variables

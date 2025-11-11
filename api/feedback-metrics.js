@@ -5,6 +5,7 @@
  */
 
 import * as feedbackRetrieval from '../src/feedback-learning/retrieval.js';
+import { getLearningApplications, getLearningApplicationStats } from '../src/database/learning-tracking.js';
 
 export default async function handler(req, res) {
   // Handle OPTIONS for CORS
@@ -200,6 +201,35 @@ export default async function handler(req, res) {
           results: searchResults
         });
 
+      case 'learning-history':
+        // Get learning application history
+        if (!agentType) {
+          return res.status(400).json({
+            error: 'Missing agentType parameter'
+          });
+        }
+
+        const applications = await getLearningApplications(
+          agentType,
+          parseInt(limit) || 50
+        );
+
+        const appStats = await getLearningApplicationStats(agentType);
+
+        return res.status(200).json({
+          success: true,
+          agentType,
+          count: applications.length,
+          applications,
+          stats: {
+            totalApplications: parseInt(appStats.total_applications),
+            uniqueConversations: parseInt(appStats.unique_conversations),
+            uniqueUsers: parseInt(appStats.unique_users),
+            lastApplied: appStats.last_applied,
+            firstApplied: appStats.first_applied
+          }
+        });
+
       default:
         return res.status(400).json({
           error: 'Invalid action parameter',
@@ -212,7 +242,8 @@ export default async function handler(req, res) {
             'recent',
             'trends',
             'top-messages',
-            'search'
+            'search',
+            'learning-history'
           ]
         });
     }
