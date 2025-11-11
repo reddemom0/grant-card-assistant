@@ -395,6 +395,7 @@
                 <!-- Tabs -->
                 <div class="tabs">
                     <button class="tab active" data-tab="overview">Overview</button>
+                    <button class="tab" data-tab="learning-insights">🧠 Learning Insights</button>
                     <button class="tab" data-tab="high-quality">High Quality (Learn From)</button>
                     <button class="tab" data-tab="negative">Negative (Avoid)</button>
                     <button class="tab" data-tab="corrections">User Corrections</button>
@@ -551,6 +552,9 @@
                     case 'overview':
                         await loadOverviewTab();
                         break;
+                    case 'learning-insights':
+                        await loadLearningInsightsTab();
+                        break;
                     case 'high-quality':
                         await loadHighQualityTab();
                         break;
@@ -571,6 +575,186 @@
                         <p>Failed to load ${tab} data</p>
                     </div>
                 `;
+            }
+        }
+
+        // Load learning insights tab
+        async function loadLearningInsightsTab() {
+            const response = await fetch(`/api/feedback-learning?agentType=${selectedAgent}`, {
+                credentials: 'include'
+            });
+            const data = await response.json();
+
+            if (!data.hasData) {
+                document.getElementById('tab-content').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🧠</div>
+                        <p>No learning insights yet</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Feedback learning will run automatically as feedback is collected</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const insights = data.insights;
+            const lastUpdated = new Date(data.lastGenerated);
+
+            document.getElementById('tab-content').innerHTML = `
+                <div class="section">
+                    <div class="section-header">
+                        <h3 class="section-title">🧠 AI Learning Summary</h3>
+                        <button class="btn btn-primary" onclick="triggerLearningUpdate()">
+                            Update Learning Now
+                        </button>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1.5rem;">
+                        Last updated: <strong>${lastUpdated.toLocaleString()}</strong>
+                    </p>
+
+                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--success);">${data.counts.successPatterns}</div>
+                            <div class="stat-label">Success Patterns Learned</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--danger);">${data.counts.errorPatterns}</div>
+                            <div class="stat-label">Error Patterns Identified</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-value" style="color: var(--warning);">${data.counts.corrections}</div>
+                            <div class="stat-label">User Corrections Applied</div>
+                        </div>
+                    </div>
+                </div>
+
+                ${insights.topThemes.length > 0 ? `
+                    <div class="section">
+                        <h3 class="section-title">🎯 Top Themes in Successful Responses</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                            The AI has identified these recurring themes in highly-rated responses
+                        </p>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
+                            ${insights.topThemes.slice(0, 10).map((theme, idx) => `
+                                <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border);">
+                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">#${idx + 1}</div>
+                                    <div style="font-weight: 600; margin-top: 0.25rem;">${theme.theme}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                        ${theme.count} occurrences
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${insights.successExamples.length > 0 ? `
+                    <div class="section">
+                        <h3 class="section-title">✅ Success Pattern Examples</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                            Highly-rated responses the AI should emulate
+                        </p>
+                        <div class="feedback-list">
+                            ${insights.successExamples.slice(0, 5).map(example => `
+                                <div style="background: #ecfdf5; border-left: 3px solid #10b981; padding: 1rem; border-radius: 0.5rem;">
+                                    <div style="font-size: 0.875rem; color: var(--text-primary); margin-bottom: 0.5rem;">
+                                        <strong>Quality Score: ${example.qualityScore.toFixed(2)}</strong>
+                                    </div>
+                                    ${example.userNote ? `
+                                        <div style="font-size: 0.875rem; font-style: italic; margin-bottom: 0.5rem;">
+                                            "${example.userNote}"
+                                        </div>
+                                    ` : ''}
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                                        ${new Date(example.timestamp).toLocaleDateString()}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${insights.commonErrors.length > 0 ? `
+                    <div class="section">
+                        <h3 class="section-title">❌ Common Error Patterns</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                            Issues the AI has learned to avoid
+                        </p>
+                        <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
+                            ${insights.commonErrors.map(error => `
+                                <div style="background: #fef2f2; border-left: 3px solid #ef4444; padding: 1rem; border-radius: 0.5rem;">
+                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${error.type}</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                        ${error.count} occurrences
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${insights.corrections.length > 0 ? `
+                    <div class="section">
+                        <h3 class="section-title">🔧 Active User Corrections</h3>
+                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                            Direct corrections from users that shaped AI behavior
+                        </p>
+                        <div class="feedback-list">
+                            ${insights.corrections.slice(0, 5).map(correction => `
+                                <div class="correction-item">
+                                    <div class="correction-text">
+                                        ${correction.issue || correction.note}
+                                    </div>
+                                    <div class="correction-meta">
+                                        <span>Sentiment: <strong>${correction.sentiment}</strong></span>
+                                        <span>• ${new Date(correction.timestamp || correction.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        // Trigger learning update
+        async function triggerLearningUpdate() {
+            if (!selectedAgent) return;
+
+            const button = event.currentTarget;
+            button.disabled = true;
+            button.textContent = 'Updating...';
+
+            try {
+                const response = await fetch('/api/feedback-learning', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        agentType: selectedAgent
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Reload the tab
+                    await loadLearningInsightsTab();
+
+                    // Show success message
+                    alert(`✅ Learning updated successfully!\n\n` +
+                          `Success Patterns: ${result.report.successPatterns}\n` +
+                          `Error Patterns: ${result.report.errorPatterns}\n` +
+                          `Corrections: ${result.report.corrections}`);
+                } else {
+                    alert(`Failed to update learning: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Update Learning Now';
             }
         }
 

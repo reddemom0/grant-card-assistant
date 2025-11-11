@@ -150,9 +150,9 @@ export async function runFeedbackLearningForAllAgents() {
 }
 
 /**
- * Get learning status for an agent
+ * Get learning status and insights for an agent
  * @param {string} agentType - Agent type
- * @returns {Promise<Object>} Learning status
+ * @returns {Promise<Object>} Learning status with detailed insights
  */
 export async function getLearningStatus(agentType) {
   try {
@@ -167,6 +167,13 @@ export async function getLearningStatus(agentType) {
         successPatterns: report.successPatterns.count,
         errorPatterns: report.errorPatterns.count,
         corrections: report.corrections.count
+      },
+      insights: {
+        topThemes: report.successPatterns.topThemes || [],
+        successExamples: report.successPatterns.examples || [],
+        errorExamples: report.errorPatterns.examples || [],
+        corrections: report.corrections.corrections || [],
+        commonErrors: report.errorPatterns.commonErrors || []
       }
     };
 
