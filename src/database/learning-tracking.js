@@ -47,7 +47,7 @@ export async function saveLearningApplication(
         agentType,
         conversationId,
         userId,
-        filesLoaded, // Will be stored as JSON array
+        JSON.stringify(filesLoaded), // Convert array to JSON string for JSONB column
         learningTimestamp
       ]
     );
