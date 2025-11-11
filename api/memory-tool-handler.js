@@ -118,12 +118,15 @@ async function handleView(input) {
 /**
  * CREATE command: Create a new memory file
  *
- * @param {object} input - { path: "/memories/...", content: "..." }
+ * @param {object} input - { path: "/memories/...", file_text: "..." }
  * @returns {object} - { success: true } or error
  */
 async function handleCreate(input) {
   try {
     const filePath = validatePath(input.path);
+
+    // Extract content - Anthropic uses 'file_text' field name
+    const content = input.file_text || input.content || '';
 
     // Check if file already exists
     try {
@@ -141,7 +144,7 @@ async function handleCreate(input) {
     await fs.mkdir(dirPath, { recursive: true });
 
     // Check content size
-    if (input.content.length > MAX_FILE_SIZE) {
+    if (content.length > MAX_FILE_SIZE) {
       return {
         success: false,
         error: `Content exceeds maximum file size (${MAX_FILE_SIZE} bytes)`
@@ -149,7 +152,7 @@ async function handleCreate(input) {
     }
 
     // Write file
-    await fs.writeFile(filePath, input.content, 'utf-8');
+    await fs.writeFile(filePath, content, 'utf-8');
 
     console.log(`📝 Memory created: ${input.path}`);
 
@@ -224,12 +227,15 @@ async function handleStrReplace(input) {
 /**
  * INSERT command: Insert content at a specific line
  *
- * @param {object} input - { path: "...", line: 5, content: "..." }
+ * @param {object} input - { path: "...", line: 5, insert_text: "..." }
  * @returns {object} - { success: true } or error
  */
 async function handleInsert(input) {
   try {
     const filePath = validatePath(input.path);
+
+    // Extract insert text - Anthropic may use different field names
+    const insertText = input.insert_text || input.content || '';
 
     // Check if file exists
     let content;
@@ -254,7 +260,7 @@ async function handleInsert(input) {
     }
 
     // Insert content
-    lines.splice(input.line, 0, input.content);
+    lines.splice(input.line, 0, insertText);
     const newContent = lines.join('\n');
 
     // Check new content size
