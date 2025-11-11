@@ -365,13 +365,23 @@ async function createFromTemplate(title, userId, template, budgetData, parentFol
   const spreadsheetId = spreadsheet.data.spreadsheetId;
   console.log(`✓ Created spreadsheet: ${spreadsheetId}`);
 
-  // TODO: Populate each sheet based on template configuration
-  // This will involve:
-  // 1. Adding headers to budget/tracking sheets
-  // 2. Populating eligible/ineligible reference sheets
-  // 3. Adding instructions
-  // 4. Setting up formulas and formatting
-  // 5. Applying budgetData if provided
+  // Populate each sheet based on template configuration
+  console.log('Populating sheets...');
+
+  for (let i = 0; i < template.sheets.length; i++) {
+    const sheetConfig = template.sheets[i];
+    const sheetId = spreadsheet.data.sheets[i].properties.sheetId;
+
+    console.log(`  → Populating ${sheetConfig.name} (${sheetConfig.type})`);
+
+    try {
+      await populateSheet(sheets, spreadsheetId, sheetId, sheetConfig, template);
+    } catch (error) {
+      console.error(`  ✗ Error populating ${sheetConfig.name}:`, error.message);
+    }
+  }
+
+  console.log('✓ All sheets populated');
 
   // Move to parent folder if specified
   if (parentFolderId) {
@@ -400,6 +410,809 @@ async function createFromTemplate(title, userId, template, budgetData, parentFol
       template: template.programName
     }
   };
+}
+
+/**
+ * Populate a sheet based on its type and configuration
+ * @private
+ */
+async function populateSheet(sheets, spreadsheetId, sheetId, sheetConfig, template) {
+  const requests = [];
+
+  switch (sheetConfig.type) {
+    case 'instructions':
+      requests.push(...createInstructionsSheet(sheetConfig, sheetId));
+      break;
+    case 'budget':
+      requests.push(...createBudgetSheet(sheetConfig, sheetId));
+      break;
+    case 'reference':
+      requests.push(...createReferenceSheet(sheetConfig, sheetId, template));
+      break;
+    case 'export_sales':
+      requests.push(...createExportSalesSheet(sheetConfig, sheetId));
+      break;
+    case 'targets':
+      requests.push(...createTargetsSheet(sheetConfig, sheetId));
+      break;
+    case 'claims':
+      requests.push(...createClaimsSheet(sheetConfig, sheetId));
+      break;
+    case 'quote':
+      requests.push(...createQuoteSheet(sheetConfig, sheetId));
+      break;
+    default:
+      console.log(`    ⚠️  Unknown sheet type: ${sheetConfig.type}`);
+      return;
+  }
+
+  if (requests.length > 0) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: { requests }
+    });
+  }
+}
+
+/**
+ * Create Instructions sheet
+ * @private
+ */
+function createInstructionsSheet(sheetConfig, sheetId) {
+  const requests = [];
+  const content = sheetConfig.content;
+
+  let row = 0;
+
+  // Title
+  requests.push({
+    updateCells: {
+      range: {
+        sheetId,
+        startRowIndex: row,
+        endRowIndex: row + 1,
+        startColumnIndex: 0,
+        endColumnIndex: 8
+      },
+      rows: [{
+        values: [{
+          userEnteredValue: { stringValue: content.title },
+          userEnteredFormat: {
+            textFormat: { bold: true, fontSize: 14 },
+            horizontalAlignment: 'LEFT'
+          }
+        }]
+      }],
+      fields: 'userEnteredValue,userEnteredFormat'
+    }
+  });
+
+  row += 2;
+
+  // Sections
+  if (content.sections) {
+    for (const section of content.sections) {
+      // Section header
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: row,
+            endRowIndex: row + 1,
+            startColumnIndex: 0,
+            endColumnIndex: 1
+          },
+          rows: [{
+            values: [{
+              userEnteredValue: { stringValue: section.header },
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.9, green: 0.9, blue: 0.9 }
+              }
+            }]
+          }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      });
+
+      row++;
+
+      // Instructions
+      for (const instruction of section.instructions) {
+        requests.push({
+          updateCells: {
+            range: {
+              sheetId,
+              startRowIndex: row,
+              endRowIndex: row + 1,
+              startColumnIndex: 0,
+              endColumnIndex: 8
+            },
+            rows: [{
+              values: [{
+                userEnteredValue: { stringValue: instruction },
+                userEnteredFormat: { wrapStrategy: 'WRAP' }
+              }]
+            }],
+            fields: 'userEnteredValue,userEnteredFormat'
+          }
+        });
+        row++;
+      }
+
+      row += 1; // Space between sections
+    }
+  } else if (content.instructions) {
+    // Simple list format
+    for (const instruction of content.instructions) {
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: row,
+            endRowIndex: row + 1,
+            startColumnIndex: 0,
+            endColumnIndex: 8
+          },
+          rows: [{
+            values: [{
+              userEnteredValue: { stringValue: instruction },
+              userEnteredFormat: { wrapStrategy: 'WRAP' }
+            }]
+          }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      });
+      row++;
+    }
+  }
+
+  return requests;
+}
+
+/**
+ * Create Budget sheet with headers and category rows
+ * @private
+ */
+function createBudgetSheet(sheetConfig, sheetId) {
+  const requests = [];
+
+  // Add column headers
+  const headerRow = sheetConfig.columns.map(col => ({
+    userEnteredValue: { stringValue: col.header },
+    userEnteredFormat: {
+      textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+      backgroundColor: { red: 0.2, green: 0.5, blue: 0.8 },
+      horizontalAlignment: 'CENTER',
+      wrapStrategy: 'WRAP'
+    }
+  }));
+
+  requests.push({
+    updateCells: {
+      range: {
+        sheetId,
+        startRowIndex: 0,
+        endRowIndex: 1,
+        startColumnIndex: 0,
+        endColumnIndex: sheetConfig.columns.length
+      },
+      rows: [{ values: headerRow }],
+      fields: 'userEnteredValue,userEnteredFormat'
+    }
+  });
+
+  // Set column widths
+  for (let i = 0; i < sheetConfig.columns.length; i++) {
+    const col = sheetConfig.columns[i];
+    if (col.width) {
+      requests.push({
+        updateDimensionProperties: {
+          range: {
+            sheetId,
+            dimension: 'COLUMNS',
+            startIndex: i,
+            endIndex: i + 1
+          },
+          properties: {
+            pixelSize: col.width
+          },
+          fields: 'pixelSize'
+        }
+      });
+    }
+  }
+
+  // Add category rows if defined
+  if (sheetConfig.categories) {
+    let row = 1;
+
+    for (const category of sheetConfig.categories) {
+      const categoryText = category.code
+        ? `${category.code} | ${category.name}`
+        : category.name;
+
+      const description = [
+        category.description,
+        category.includes ? `Includes: ${category.includes}` : null,
+        category.excludes ? `Excludes: ${category.excludes}` : null
+      ].filter(Boolean).join('\n');
+
+      const rowValues = [{
+        userEnteredValue: { stringValue: category.code || '' }
+      }, {
+        userEnteredValue: { stringValue: '' }
+      }, {
+        userEnteredValue: { stringValue: description },
+        userEnteredFormat: {
+          wrapStrategy: 'WRAP',
+          textFormat: { fontSize: 9 }
+        }
+      }];
+
+      // Fill remaining columns with empty cells
+      while (rowValues.length < sheetConfig.columns.length) {
+        rowValues.push({ userEnteredValue: { stringValue: '' } });
+      }
+
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: row,
+            endRowIndex: row + 1,
+            startColumnIndex: 0,
+            endColumnIndex: sheetConfig.columns.length
+          },
+          rows: [{ values: rowValues }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      });
+
+      row++;
+
+      // Add subcategory rows
+      if (category.subcategories) {
+        for (const sub of category.subcategories) {
+          const subRowValues = [{
+            userEnteredValue: { stringValue: '' }
+          }, {
+            userEnteredValue: { stringValue: '' }
+          }, {
+            userEnteredValue: { stringValue: sub },
+            userEnteredFormat: {
+              wrapStrategy: 'WRAP',
+              textFormat: { fontSize: 9, italic: true }
+            }
+          }];
+
+          while (subRowValues.length < sheetConfig.columns.length) {
+            subRowValues.push({ userEnteredValue: { stringValue: '' } });
+          }
+
+          requests.push({
+            updateCells: {
+              range: {
+                sheetId,
+                startRowIndex: row,
+                endRowIndex: row + 1,
+                startColumnIndex: 0,
+                endColumnIndex: sheetConfig.columns.length
+              },
+              rows: [{ values: subRowValues }],
+              fields: 'userEnteredValue,userEnteredFormat'
+            }
+          });
+
+          row++;
+        }
+      }
+    }
+  }
+
+  return requests;
+}
+
+/**
+ * Create Reference sheet (Eligible/Ineligible Activities)
+ * @private
+ */
+function createReferenceSheet(sheetConfig, sheetId, template) {
+  const requests = [];
+
+  // Title
+  const title = sheetConfig.name;
+  requests.push({
+    updateCells: {
+      range: {
+        sheetId,
+        startRowIndex: 0,
+        endRowIndex: 1,
+        startColumnIndex: 0,
+        endColumnIndex: 1
+      },
+      rows: [{
+        values: [{
+          userEnteredValue: { stringValue: title },
+          userEnteredFormat: {
+            textFormat: { bold: true, fontSize: 14 }
+          }
+        }]
+      }],
+      fields: 'userEnteredValue,userEnteredFormat'
+    }
+  });
+
+  let row = 2;
+
+  // For Eligible Activities
+  if (title.toLowerCase().includes('eligible') && !title.toLowerCase().includes('ineligible')) {
+    const categories = template.sheets.find(s => s.type === 'budget')?.categories || [];
+
+    for (const category of categories) {
+      // Category header
+      const categoryHeader = category.code
+        ? `Category ${category.code}: ${category.name}`
+        : category.name;
+
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: row,
+            endRowIndex: row + 1,
+            startColumnIndex: 0,
+            endColumnIndex: 1
+          },
+          rows: [{
+            values: [{
+              userEnteredValue: { stringValue: categoryHeader },
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.85, green: 0.92, blue: 0.83 }
+              }
+            }]
+          }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      });
+
+      row++;
+
+      // Description
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: row,
+            endRowIndex: row + 1,
+            startColumnIndex: 0,
+            endColumnIndex: 4
+          },
+          rows: [{
+            values: [{
+              userEnteredValue: { stringValue: category.description },
+              userEnteredFormat: { wrapStrategy: 'WRAP' }
+            }]
+          }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      });
+
+      row++;
+
+      // Includes
+      if (category.includes) {
+        requests.push({
+          updateCells: {
+            range: {
+              sheetId,
+              startRowIndex: row,
+              endRowIndex: row + 1,
+              startColumnIndex: 0,
+              endColumnIndex: 4
+            },
+            rows: [{
+              values: [{
+                userEnteredValue: { stringValue: `✓ Includes: ${category.includes}` },
+                userEnteredFormat: {
+                  wrapStrategy: 'WRAP',
+                  textFormat: { foregroundColor: { red: 0, green: 0.6, blue: 0 } }
+                }
+              }]
+            }],
+            fields: 'userEnteredValue,userEnteredFormat'
+          }
+        });
+        row++;
+      }
+
+      // Excludes
+      if (category.excludes) {
+        requests.push({
+          updateCells: {
+            range: {
+              sheetId,
+              startRowIndex: row,
+              endRowIndex: row + 1,
+              startColumnIndex: 0,
+              endColumnIndex: 4
+            },
+            rows: [{
+              values: [{
+                userEnteredValue: { stringValue: `✗ Excludes: ${category.excludes}` },
+                userEnteredFormat: {
+                  wrapStrategy: 'WRAP',
+                  textFormat: { foregroundColor: { red: 0.8, green: 0, blue: 0 } }
+                }
+              }]
+            }],
+            fields: 'userEnteredValue,userEnteredFormat'
+          }
+        });
+        row++;
+      }
+
+      // Subcategories
+      if (category.subcategories) {
+        for (const sub of category.subcategories) {
+          requests.push({
+            updateCells: {
+              range: {
+                sheetId,
+                startRowIndex: row,
+                endRowIndex: row + 1,
+                startColumnIndex: 0,
+                endColumnIndex: 4
+              },
+              rows: [{
+                values: [{
+                  userEnteredValue: { stringValue: `  • ${sub}` },
+                  userEnteredFormat: {
+                    wrapStrategy: 'WRAP',
+                    textFormat: { italic: true }
+                  }
+                }]
+              }],
+              fields: 'userEnteredValue,userEnteredFormat'
+            }
+          });
+          row++;
+        }
+      }
+
+      row += 1; // Space between categories
+    }
+  }
+
+  // For Ineligible Activities
+  else if (title.toLowerCase().includes('ineligible')) {
+    const ineligibleList = [
+      { category: 'Land & Building Purchase', reason: 'Capital asset purchases not eligible' },
+      { category: 'Existing Debt', reason: 'Refinancing or paying off existing loans' },
+      { category: 'Operating Expenses (General)', reason: 'General overhead not directly related to project' },
+      { category: 'Entertainment', reason: 'Entertainment expenses not project-related' },
+      { category: 'Political Activities', reason: 'Lobbying or political contributions' },
+      { category: 'Contingencies', reason: 'Unspecified contingency reserves' },
+      { category: 'Interest & Bank Charges', reason: 'Financing costs and interest payments' },
+      { category: 'Depreciation', reason: 'Depreciation of assets' },
+      { category: 'Previous Project Costs', reason: 'Expenses incurred before project approval' },
+      { category: 'GST/HST (Recoverable)', reason: 'Taxes that can be recovered through input tax credits' }
+    ];
+
+    // Header row
+    requests.push({
+      updateCells: {
+        range: {
+          sheetId,
+          startRowIndex: row,
+          endRowIndex: row + 1,
+          startColumnIndex: 0,
+          endColumnIndex: 2
+        },
+        rows: [{
+          values: [
+            {
+              userEnteredValue: { stringValue: 'Expense Category' },
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.95, green: 0.8, blue: 0.8 }
+              }
+            },
+            {
+              userEnteredValue: { stringValue: 'Reason' },
+              userEnteredFormat: {
+                textFormat: { bold: true },
+                backgroundColor: { red: 0.95, green: 0.8, blue: 0.8 }
+              }
+            }
+          ]
+        }],
+        fields: 'userEnteredValue,userEnteredFormat'
+      }
+    });
+
+    row++;
+
+    // Ineligible items
+    for (const item of ineligibleList) {
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: row,
+            endRowIndex: row + 1,
+            startColumnIndex: 0,
+            endColumnIndex: 2
+          },
+          rows: [{
+            values: [
+              {
+                userEnteredValue: { stringValue: item.category },
+                userEnteredFormat: { wrapStrategy: 'WRAP' }
+              },
+              {
+                userEnteredValue: { stringValue: item.reason },
+                userEnteredFormat: { wrapStrategy: 'WRAP' }
+              }
+            ]
+          }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      });
+      row++;
+    }
+  }
+
+  // Set column widths for reference sheets
+  requests.push({
+    updateDimensionProperties: {
+      range: {
+        sheetId,
+        dimension: 'COLUMNS',
+        startIndex: 0,
+        endIndex: 1
+      },
+      properties: {
+        pixelSize: 300
+      },
+      fields: 'pixelSize'
+    }
+  }, {
+    updateDimensionProperties: {
+      range: {
+        sheetId,
+        dimension: 'COLUMNS',
+        startIndex: 1,
+        endIndex: 2
+      },
+      properties: {
+        pixelSize: 400
+      },
+      fields: 'pixelSize'
+    }
+  });
+
+  return requests;
+}
+
+/**
+ * Create Export Sales sheet
+ * @private
+ */
+function createExportSalesSheet(sheetConfig, sheetId) {
+  const requests = [];
+
+  // Add column headers
+  const headerRow = sheetConfig.columns.map(col => ({
+    userEnteredValue: { stringValue: col.header },
+    userEnteredFormat: {
+      textFormat: { bold: true },
+      backgroundColor: { red: 0.85, green: 0.85, blue: 0.85 }
+    }
+  }));
+
+  requests.push({
+    updateCells: {
+      range: {
+        sheetId,
+        startRowIndex: 0,
+        endRowIndex: 1,
+        startColumnIndex: 0,
+        endColumnIndex: sheetConfig.columns.length
+      },
+      rows: [{ values: headerRow }],
+      fields: 'userEnteredValue,userEnteredFormat'
+    }
+  });
+
+  // Set column widths
+  for (let i = 0; i < sheetConfig.columns.length; i++) {
+    const col = sheetConfig.columns[i];
+    if (col.width) {
+      requests.push({
+        updateDimensionProperties: {
+          range: {
+            sheetId,
+            dimension: 'COLUMNS',
+            startIndex: i,
+            endIndex: i + 1
+          },
+          properties: {
+            pixelSize: col.width
+          },
+          fields: 'pixelSize'
+        }
+      });
+    }
+  }
+
+  return requests;
+}
+
+/**
+ * Create Targets sheet
+ * @private
+ */
+function createTargetsSheet(sheetConfig, sheetId) {
+  const requests = [];
+
+  // Add column headers
+  const headerRow = sheetConfig.columns.map(col => ({
+    userEnteredValue: { stringValue: col.header },
+    userEnteredFormat: {
+      textFormat: { bold: true },
+      backgroundColor: { red: 0.85, green: 0.85, blue: 0.85 }
+    }
+  }));
+
+  requests.push({
+    updateCells: {
+      range: {
+        sheetId,
+        startRowIndex: 0,
+        endRowIndex: 1,
+        startColumnIndex: 0,
+        endColumnIndex: sheetConfig.columns.length
+      },
+      rows: [{ values: headerRow }],
+      fields: 'userEnteredValue,userEnteredFormat'
+    }
+  });
+
+  // Add numbered rows
+  if (sheetConfig.rowCount) {
+    for (let i = 1; i <= sheetConfig.rowCount; i++) {
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: i,
+            endRowIndex: i + 1,
+            startColumnIndex: 0,
+            endColumnIndex: 1
+          },
+          rows: [{
+            values: [{
+              userEnteredValue: { numberValue: i }
+            }]
+          }],
+          fields: 'userEnteredValue'
+        }
+      });
+    }
+  }
+
+  // Set column widths
+  for (let i = 0; i < sheetConfig.columns.length; i++) {
+    const col = sheetConfig.columns[i];
+    if (col.width) {
+      requests.push({
+        updateDimensionProperties: {
+          range: {
+            sheetId,
+            dimension: 'COLUMNS',
+            startIndex: i,
+            endIndex: i + 1
+          },
+          properties: {
+            pixelSize: col.width
+          },
+          fields: 'pixelSize'
+        }
+      });
+    }
+  }
+
+  return requests;
+}
+
+/**
+ * Create Claims sheet
+ * @private
+ */
+function createClaimsSheet(sheetConfig, sheetId) {
+  const requests = [];
+
+  // Add column headers
+  const headerRow = sheetConfig.columns.map(col => ({
+    userEnteredValue: { stringValue: col.header },
+    userEnteredFormat: {
+      textFormat: { bold: true },
+      backgroundColor: { red: 0.3, green: 0.6, blue: 0.9 },
+      horizontalAlignment: 'CENTER',
+      wrapStrategy: 'WRAP'
+    }
+  }));
+
+  requests.push({
+    updateCells: {
+      range: {
+        sheetId,
+        startRowIndex: 0,
+        endRowIndex: 1,
+        startColumnIndex: 0,
+        endColumnIndex: sheetConfig.columns.length
+      },
+      rows: [{ values: headerRow }],
+      fields: 'userEnteredValue,userEnteredFormat'
+    }
+  });
+
+  // Set column widths
+  for (let i = 0; i < sheetConfig.columns.length; i++) {
+    const col = sheetConfig.columns[i];
+    if (col.width) {
+      requests.push({
+        updateDimensionProperties: {
+          range: {
+            sheetId,
+            dimension: 'COLUMNS',
+            startIndex: i,
+            endIndex: i + 1
+          },
+          properties: {
+            pixelSize: col.width
+          },
+          fields: 'pixelSize'
+        }
+      });
+    }
+  }
+
+  return requests;
+}
+
+/**
+ * Create Quote sheet
+ * @private
+ */
+function createQuoteSheet(sheetConfig, sheetId) {
+  const requests = [];
+
+  // Add instruction text
+  requests.push({
+    updateCells: {
+      range: {
+        sheetId,
+        startRowIndex: 1,
+        endRowIndex: 2,
+        startColumnIndex: 0,
+        endColumnIndex: 1
+      },
+      rows: [{
+        values: [{
+          userEnteredValue: { stringValue: sheetConfig.instructions || 'Please paste quote image or text below.' },
+          userEnteredFormat: {
+            textFormat: { italic: true }
+          }
+        }]
+      }],
+      fields: 'userEnteredValue,userEnteredFormat'
+    }
+  });
+
+  return requests;
 }
 
 /**
