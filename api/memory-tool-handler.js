@@ -8,8 +8,13 @@
  * All operations are restricted to /memories directory.
  */
 
-const fs = require('fs').promises;
-const path = require('path');
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Memory base directory (in project root)
 const MEMORY_BASE_DIR = path.join(__dirname, '..', 'memories');
@@ -408,7 +413,7 @@ async function handleMemoryTool(command, input) {
 // Initialize memory directories on module load
 initializeMemoryDirectories().catch(console.error);
 
-module.exports = {
+export {
   handleMemoryTool,
   validatePath,
   MEMORY_BASE_DIR

@@ -78,11 +78,11 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
 
       // ============================================================================
       // ANTHROPIC FILE-BASED MEMORY TOOL
-      // Cross-conversation persistent memory in .memories/ directory
+      // Cross-conversation persistent memory in /memories/ directory
       // ============================================================================
 
       case 'memory':
-        // Import the memory tool handler (CommonJS module)
+        // Import the memory tool handler
         const { handleMemoryTool } = await import('../../api/memory-tool-handler.js');
 
         // Extract command from input
