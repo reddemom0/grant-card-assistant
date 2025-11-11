@@ -199,6 +199,196 @@ export async function updateConversationTitle(conversationId, title) {
   }
 }
 
+// ===== FEEDBACK OPERATIONS =====
+
+/**
+ * Save conversation feedback (thumbs up/down rating)
+ * @param {string} conversationId
+ * @param {number} userId
+ * @param {string} rating - 'positive' or 'negative'
+ * @param {string} feedbackText - Optional text explanation
+ * @param {object} implicitSignals - { revisionCount, completionTime, messageCount }
+ * @returns {object} Saved feedback record
+ */
+export async function saveConversationFeedback(
+  conversationId,
+  userId,
+  rating,
+  feedbackText = null,
+  implicitSignals = {}
+) {
+  const client = await pool.connect();
+  try {
+    // Calculate quality score
+    const qualityScore = calculateQualityScore(rating, implicitSignals);
+
+    const result = await client.query(
+      `INSERT INTO conversation_feedback
+       (conversation_id, user_id, rating, feedback_text, revision_count, completion_time_seconds, message_count, quality_score, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+       ON CONFLICT (conversation_id)
+       DO UPDATE SET
+         rating = EXCLUDED.rating,
+         feedback_text = EXCLUDED.feedback_text,
+         revision_count = EXCLUDED.revision_count,
+         completion_time_seconds = EXCLUDED.completion_time_seconds,
+         message_count = EXCLUDED.message_count,
+         quality_score = EXCLUDED.quality_score,
+         created_at = NOW()
+       RETURNING *`,
+      [
+        conversationId,
+        userId,
+        rating,
+        feedbackText,
+        implicitSignals.revisionCount || 0,
+        implicitSignals.completionTime || null,
+        implicitSignals.messageCount || 0,
+        qualityScore
+      ]
+    );
+
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Save a feedback note (ongoing feedback during conversation)
+ * @param {string} conversationId
+ * @param {number} userId
+ * @param {string} noteText
+ * @param {number} messageIndex - Which message # when note was written
+ * @returns {object} Saved note record
+ */
+export async function saveFeedbackNote(conversationId, userId, noteText, messageIndex = null) {
+  const client = await pool.connect();
+  try {
+    // Detect sentiment from note text
+    const sentiment = detectSentiment(noteText);
+
+    const result = await client.query(
+      `INSERT INTO feedback_notes
+       (conversation_id, user_id, note_text, message_index, sentiment, created_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       RETURNING *`,
+      [conversationId, userId, noteText, messageIndex, sentiment]
+    );
+
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get all feedback for a conversation
+ * @param {string} conversationId
+ * @returns {object} { rating, notes }
+ */
+export async function getConversationFeedback(conversationId) {
+  const client = await pool.connect();
+  try {
+    // Get overall rating
+    const ratingResult = await client.query(
+      'SELECT * FROM conversation_feedback WHERE conversation_id = $1',
+      [conversationId]
+    );
+
+    // Get all notes
+    const notesResult = await client.query(
+      'SELECT * FROM feedback_notes WHERE conversation_id = $1 ORDER BY created_at ASC',
+      [conversationId]
+    );
+
+    return {
+      rating: ratingResult.rows[0] || null,
+      notes: notesResult.rows,
+    };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Get feedback notes for a conversation
+ * @param {string} conversationId
+ * @returns {array} Array of feedback notes
+ */
+export async function getFeedbackNotes(conversationId) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      'SELECT * FROM feedback_notes WHERE conversation_id = $1 ORDER BY created_at DESC',
+      [conversationId]
+    );
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Calculate quality score from rating and implicit signals
+ * Score ranges from 0.0 (worst) to 1.0 (best)
+ */
+function calculateQualityScore(rating, signals = {}) {
+  // Base score from rating
+  let score = rating === 'positive' ? 0.75 : 0.25;
+
+  // Bonus for zero revisions (first draft accepted)
+  if (signals.revisionCount === 0 && rating === 'positive') {
+    score += 0.15;
+  }
+
+  // Penalty for many revisions
+  if (signals.revisionCount > 2) {
+    score -= 0.15;
+  }
+
+  // Bonus for fast completion (< 10 minutes)
+  if (signals.completionTime && signals.completionTime < 600 && rating === 'positive') {
+    score += 0.10;
+  }
+
+  // Cap between 0 and 1
+  return Math.max(0, Math.min(1, score));
+}
+
+/**
+ * Simple sentiment detection from note text
+ * Uses keyword matching for basic classification
+ */
+function detectSentiment(text) {
+  const lowerText = text.toLowerCase();
+
+  const positiveKeywords = [
+    'great', 'good', 'excellent', 'perfect', 'helpful', 'useful',
+    'love', 'amazing', 'awesome', 'fantastic', 'nice', 'thanks',
+    'appreciate', 'well done', 'clear', 'concise'
+  ];
+
+  const negativeKeywords = [
+    'bad', 'poor', 'confusing', 'unclear', 'wrong', 'incorrect',
+    'missing', 'unhelpful', 'frustrating', 'difficult', 'too long',
+    'verbose', 'complicated', 'needs work', 'not good', 'disappointing'
+  ];
+
+  const positiveCount = positiveKeywords.filter(word => lowerText.includes(word)).length;
+  const negativeCount = negativeKeywords.filter(word => lowerText.includes(word)).length;
+
+  if (positiveCount > negativeCount && positiveCount > 0) {
+    return 'positive';
+  } else if (negativeCount > positiveCount && negativeCount > 0) {
+    return 'negative';
+  } else if (positiveCount > 0 && negativeCount > 0) {
+    return 'mixed';
+  } else {
+    return 'neutral';
+  }
+}
+
 // ===== HELPER FUNCTIONS =====
 
 /**
@@ -231,6 +421,10 @@ export default {
   getUserConversations,
   deleteConversation,
   updateConversationTitle,
+  saveConversationFeedback,
+  saveFeedbackNote,
+  getConversationFeedback,
+  getFeedbackNotes,
   testConnection,
   closePool,
 };

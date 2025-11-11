@@ -1306,7 +1306,17 @@
             window.agentInterface = agentInterface;
 
             console.log('✅ ETG Business Case Writer initialized successfully');
+
+            // Initialize Feedback Panel
+            const conversationId = agentInterface.conversationId;
+            if (conversationId) {
+                window.feedbackPanel = new FeedbackPanel(conversationId);
+                console.log('✅ Feedback Panel initialized');
+            }
         });
     </script>
+
+    <!-- Feedback Panel Component -->
+    <script src="/feedback-panel.js"></script>
 </body>
 </html>

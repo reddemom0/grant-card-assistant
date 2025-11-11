@@ -9,6 +9,14 @@
       "dest": "/api/auth-callback.js"
     },
     {
+      "src": "/api/feedback-note",
+      "dest": "/api/feedback-note.js"
+    },
+    {
+      "src": "/api/feedback",
+      "dest": "/api/feedback.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/server.js"
     },
