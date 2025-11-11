@@ -137,6 +137,52 @@ const STYLES = {
 };
 
 /**
+ * Process inline markdown formatting (bold, italic) in text
+ * @param {string} text - Text with inline markdown
+ * @returns {Object} { processedText, formatRanges }
+ */
+function processInlineFormatting(text) {
+  const formatRanges = [];
+
+  // Find all **bold** matches (non-greedy, handles multiple on same line)
+  const boldRegex = /\*\*(.+?)\*\*/g;
+  let match;
+  while ((match = boldRegex.exec(text)) !== null) {
+    formatRanges.push({
+      type: 'bold',
+      start: match.index,
+      end: match.index + match[0].length,
+      text: match[1],
+      markupLength: 4  // ** at start and end
+    });
+  }
+
+  // Find all *italic* matches (but not **), non-greedy
+  const italicRegex = /(?<!\*)\*(.+?)\*(?!\*)/g;
+  while ((match = italicRegex.exec(text)) !== null) {
+    // Skip if this is part of a ** bold marker
+    const beforeChar = text[match.index - 1];
+    const afterChar = text[match.index + match[0].length];
+    if (beforeChar !== '*' && afterChar !== '*') {
+      formatRanges.push({
+        type: 'italic',
+        start: match.index,
+        end: match.index + match[0].length,
+        text: match[1],
+        markupLength: 2  // * at start and end
+      });
+    }
+  }
+
+  // Remove markdown syntax
+  const processedText = text
+    .replace(/\*\*(.+?)\*\*/g, '$1')  // Remove **bold**
+    .replace(/(?<!\*)\*(.+?)\*(?!\*)/g, '$1');  // Remove *italic*
+
+  return { processedText, formatRanges };
+}
+
+/**
  * Convert markdown content to Google Docs requests with Granted Consulting branding
  * @param {string} content - Markdown formatted content
  * @returns {Array} Array of Google Docs API requests
@@ -148,7 +194,8 @@ function markdownToDocsRequests(content) {
   // Split content into lines
   const lines = content.split('\n');
 
-  for (const line of lines) {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (!line.trim()) {
       // Empty line - add a newline
       requests.push({
@@ -163,7 +210,9 @@ function markdownToDocsRequests(content) {
 
     // Section Header (## ) - Blue, bold, larger (like template)
     if (line.startsWith('## ')) {
-      const text = line.substring(3) + '\n';
+      const rawText = line.substring(3);
+      const { processedText, formatRanges } = processInlineFormatting(rawText);
+      const text = processedText + '\n';
       const startIndex = currentIndex;
 
       requests.push({
@@ -219,7 +268,9 @@ function markdownToDocsRequests(content) {
     }
     // Subsection (### ) - Bold, regular size
     else if (line.startsWith('### ')) {
-      const text = line.substring(4) + '\n';
+      const rawText = line.substring(4);
+      const { processedText, formatRanges } = processInlineFormatting(rawText);
+      const text = processedText + '\n';
       const startIndex = currentIndex;
 
       requests.push({
@@ -250,7 +301,9 @@ function markdownToDocsRequests(content) {
     }
     // Bullet list (- )
     else if (line.trim().startsWith('- ')) {
-      const text = line.trim().substring(2) + '\n';
+      const rawText = line.trim().substring(2);
+      const { processedText, formatRanges } = processInlineFormatting(rawText);
+      const text = processedText + '\n';
       const startIndex = currentIndex;
 
       requests.push({
@@ -270,115 +323,10 @@ function markdownToDocsRequests(content) {
         }
       });
 
-      currentIndex += text.length;
-    }
-    // Checkbox (☐, [ ], ●, □)
-    else if (line.trim().match(/^(☐|●|\[\s?\]|□)/)) {
-      // Extract text after checkbox marker
-      const text = line.trim()
-        .replace(/^(☐|●|\[\s?\]|□)\s*/, '')
-        .trim() + '\n';
-      const startIndex = currentIndex;
-
-      // Insert checkbox symbol + text (using ☐ consistently)
-      const checkboxText = '☐  ' + text;
-      requests.push({
-        insertText: {
-          location: { index: currentIndex },
-          text: checkboxText
-        }
-      });
-
-      // Make the checkbox slightly larger and blue for visibility
-      requests.push({
-        updateTextStyle: {
-          range: {
-            startIndex: startIndex,
-            endIndex: startIndex + 1  // Just the checkbox character
-          },
-          textStyle: {
-            fontSize: {
-              magnitude: 14,
-              unit: 'PT'
-            },
-            foregroundColor: {
-              color: BRAND_COLORS.HEADER_BLUE
-            }
-          },
-          fields: 'fontSize,foregroundColor'
-        }
-      });
-
-      currentIndex += checkboxText.length;
-    }
-    // Table rows (|)
-    else if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
-      // Simple table handling - convert to plain text with spacing
-      const cells = line.split('|').map(cell => cell.trim()).filter(cell => cell.length > 0);
-      const tableText = cells.join('  |  ') + '\n';
-
-      requests.push({
-        insertText: {
-          location: { index: currentIndex },
-          text: tableText
-        }
-      });
-
-      currentIndex += tableText.length;
-    }
-    // Regular text with inline formatting
-    else {
-      const text = line + '\n';
-      let processedText = text;
-      const formatRanges = [];
-
-      // Find all **bold** matches (non-greedy, handles multiple on same line)
-      const boldRegex = /\*\*(.+?)\*\*/g;
-      let match;
-      while ((match = boldRegex.exec(text)) !== null) {
-        formatRanges.push({
-          type: 'bold',
-          start: match.index,
-          end: match.index + match[0].length,
-          text: match[1],
-          markupLength: 4  // ** at start and end
-        });
-      }
-
-      // Find all *italic* matches (but not **), non-greedy
-      const italicRegex = /(?<!\*)\*(.+?)\*(?!\*)/g;
-      while ((match = italicRegex.exec(text)) !== null) {
-        // Skip if this is part of a ** bold marker
-        const beforeChar = text[match.index - 1];
-        const afterChar = text[match.index + match[0].length];
-        if (beforeChar !== '*' && afterChar !== '*') {
-          formatRanges.push({
-            type: 'italic',
-            start: match.index,
-            end: match.index + match[0].length,
-            text: match[1],
-            markupLength: 2  // * at start and end
-          });
-        }
-      }
-
-      // Remove markdown syntax
-      processedText = text
-        .replace(/\*\*(.+?)\*\*/g, '$1')  // Remove **bold** (non-greedy)
-        .replace(/(?<!\*)\*(.+?)\*(?!\*)/g, '$1');  // Remove *italic* (non-greedy)
-
-      // Insert the processed text
-      requests.push({
-        insertText: {
-          location: { index: currentIndex },
-          text: processedText
-        }
-      });
-
-      // Apply formatting
+      // Apply inline formatting (bold/italic) within the bullet
       let offset = 0;
       for (const range of formatRanges.sort((a, b) => a.start - b.start)) {
-        const adjustedStart = currentIndex + range.start - offset;
+        const adjustedStart = startIndex + range.start - offset;
         const adjustedEnd = adjustedStart + range.text.length;
 
         if (range.type === 'bold') {
@@ -412,7 +360,233 @@ function markdownToDocsRequests(content) {
         offset += range.markupLength;
       }
 
-      currentIndex += processedText.length;
+      currentIndex += text.length;
+    }
+    // Checkbox (☐, [ ], ●, □)
+    else if (line.trim().match(/^(☐|●|\[\s?\]|□)/)) {
+      // Extract text after checkbox marker
+      const rawText = line.trim()
+        .replace(/^(☐|●|\[\s?\]|□)\s*/, '')
+        .trim();
+      const { processedText, formatRanges } = processInlineFormatting(rawText);
+      const text = processedText + '\n';
+      const startIndex = currentIndex;
+
+      // Insert checkbox symbol + text (using ☐ consistently)
+      const checkboxText = '☐  ' + text;
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: checkboxText
+        }
+      });
+
+      // Make the checkbox slightly larger and blue for visibility
+      requests.push({
+        updateTextStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + 1  // Just the checkbox character
+          },
+          textStyle: {
+            fontSize: {
+              magnitude: 14,
+              unit: 'PT'
+            },
+            foregroundColor: {
+              color: BRAND_COLORS.HEADER_BLUE
+            }
+          },
+          fields: 'fontSize,foregroundColor'
+        }
+      });
+
+      // Apply inline formatting (bold/italic) within the checkbox text
+      let offset = 0;
+      for (const range of formatRanges.sort((a, b) => a.start - b.start)) {
+        const adjustedStart = startIndex + 3 + range.start - offset; // +3 for "☐  "
+        const adjustedEnd = adjustedStart + range.text.length;
+
+        if (range.type === 'bold') {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: adjustedStart,
+                endIndex: adjustedEnd
+              },
+              textStyle: {
+                bold: true
+              },
+              fields: 'bold'
+            }
+          });
+        } else if (range.type === 'italic') {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: adjustedStart,
+                endIndex: adjustedEnd
+              },
+              textStyle: {
+                italic: true
+              },
+              fields: 'italic'
+            }
+          });
+        }
+
+        offset += range.markupLength;
+      }
+
+      currentIndex += checkboxText.length;
+    }
+    // Table rows (|) - collect table data first, then insert as actual table
+    else if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
+      // Start collecting table rows
+      const tableRows = [];
+      let lineIndex = i;
+
+      // Collect all consecutive table rows
+      while (lineIndex < lines.length &&
+             lines[lineIndex].trim().startsWith('|') &&
+             lines[lineIndex].trim().endsWith('|')) {
+        const tableLine = lines[lineIndex];
+
+        // Skip separator rows (|---|---|)
+        if (!tableLine.match(/^\|[\s\-:]+\|$/)) {
+          const cells = tableLine.split('|')
+            .map(cell => cell.trim())
+            .filter(cell => cell.length > 0);
+          tableRows.push(cells);
+        }
+
+        lineIndex++;
+      }
+
+      // Skip ahead in the main loop (we've processed multiple lines)
+      i = lineIndex - 1; // -1 because the for loop will increment
+
+      // Insert actual Google Docs table
+      if (tableRows.length > 0) {
+        const numRows = tableRows.length;
+        const numCols = Math.max(...tableRows.map(row => row.length));
+
+        requests.push({
+          insertTable: {
+            rows: numRows,
+            columns: numCols,
+            location: {
+              index: currentIndex
+            }
+          }
+        });
+
+        // Calculate table size: each cell is 2 chars, plus row endings and table end
+        // Formula: (rows * cols * 2) + rows + 1
+        const tableSize = (numRows * numCols * 2) + numRows + 1;
+
+        // Populate table cells with content
+        // Table structure: [table_start][row1_col1_start]content[row1_col1_end][row1_col2_start]...
+        let cellIndex = currentIndex + 1; // First cell content position
+
+        for (let row = 0; row < tableRows.length; row++) {
+          for (let col = 0; col < numCols; col++) {
+            const cellContent = tableRows[row][col] || '';
+
+            if (cellContent) {
+              // Insert cell content
+              requests.push({
+                insertText: {
+                  location: { index: cellIndex + 1 }, // +1 to skip cell start marker
+                  text: cellContent
+                }
+              });
+
+              // Bold and style the header row (first row)
+              if (row === 0) {
+                requests.push({
+                  updateTextStyle: {
+                    range: {
+                      startIndex: cellIndex + 1,
+                      endIndex: cellIndex + 1 + cellContent.length
+                    },
+                    textStyle: {
+                      bold: true,
+                      foregroundColor: {
+                        color: BRAND_COLORS.HEADER_BLUE
+                      }
+                    },
+                    fields: 'bold,foregroundColor'
+                  }
+                });
+              }
+            }
+
+            // Move to next cell: each cell takes 2 chars + content length
+            cellIndex += 2 + (cellContent ? cellContent.length : 0);
+          }
+          // Row end marker
+          cellIndex += 1;
+        }
+
+        currentIndex += tableSize + (tableRows.reduce((sum, row) =>
+          sum + row.reduce((rowSum, cell) => rowSum + cell.length, 0), 0
+        ));
+      }
+    }
+    // Regular text with inline formatting
+    else {
+      const rawText = line;
+      const { processedText, formatRanges } = processInlineFormatting(rawText);
+      const text = processedText + '\n';
+      const startIndex = currentIndex;
+
+      // Insert the processed text
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: text
+        }
+      });
+
+      // Apply formatting
+      let offset = 0;
+      for (const range of formatRanges.sort((a, b) => a.start - b.start)) {
+        const adjustedStart = startIndex + range.start - offset;
+        const adjustedEnd = adjustedStart + range.text.length;
+
+        if (range.type === 'bold') {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: adjustedStart,
+                endIndex: adjustedEnd
+              },
+              textStyle: {
+                bold: true
+              },
+              fields: 'bold'
+            }
+          });
+        } else if (range.type === 'italic') {
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: adjustedStart,
+                endIndex: adjustedEnd
+              },
+              textStyle: {
+                italic: true
+              },
+              fields: 'italic'
+            }
+          });
+        }
+
+        offset += range.markupLength;
+      }
+
+      currentIndex += text.length;
     }
   }
 
