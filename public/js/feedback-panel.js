@@ -404,7 +404,9 @@ class FeedbackPanel {
 
     async loadExistingNotes() {
         try {
-            const response = await fetch(`/api/feedback-note?conversationId=${this.conversationId}`);
+            const response = await fetch(`/api/feedback-note?conversationId=${this.conversationId}`, {
+                credentials: 'include'
+            });
             const data = await response.json();
 
             if (data.success && data.notes.length > 0) {
@@ -427,6 +429,7 @@ class FeedbackPanel {
         try {
             const response = await fetch('/api/feedback-note', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -494,6 +497,7 @@ class FeedbackPanel {
 
             const response = await fetch('/api/feedback', {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
                 },
