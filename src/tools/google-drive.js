@@ -20,9 +20,10 @@ const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
  * Create authenticated Google Drive client
  * Tries Service Account with domain-wide delegation first, falls back to OAuth2
  * @param {string} userEmail - Optional: User email to impersonate (for domain-wide delegation)
+ * @param {boolean} readOnly - If true, use read-only scopes. If false, use full drive access
  * @returns {Object} Google Drive API client
  */
-function createDriveClient(userEmail = null) {
+function createDriveClient(userEmail = null, readOnly = false) {
   // Try Service Account first (most reliable, works with domain-wide delegation)
   if (GOOGLE_SERVICE_ACCOUNT_KEY) {
     try {
@@ -30,9 +31,13 @@ function createDriveClient(userEmail = null) {
 
       const authConfig = {
         credentials: serviceAccount,
-        scopes: [
+        scopes: readOnly ? [
           'https://www.googleapis.com/auth/drive.readonly',
           'https://www.googleapis.com/auth/documents.readonly'
+        ] : [
+          'https://www.googleapis.com/auth/drive',
+          'https://www.googleapis.com/auth/documents',
+          'https://www.googleapis.com/auth/spreadsheets'
         ]
       };
 
@@ -81,7 +86,7 @@ function createDriveClient(userEmail = null) {
  */
 export async function searchGoogleDrive(query, fileType = 'any', limit = 10, userEmail = null) {
   try {
-    const drive = createDriveClient(userEmail);
+    const drive = createDriveClient(userEmail, true); // Read-only access
 
     // Build MIME type filter
     let mimeTypeQuery = '';
@@ -166,7 +171,7 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
     const fileId = extractFileId(fileIdOrUrl);
     console.log(`Extracted file ID: ${fileId} from input: ${fileIdOrUrl.substring(0, 100)}...`);
 
-    const drive = createDriveClient(userEmail);
+    const drive = createDriveClient(userEmail, true); // Read-only access
 
     // Get file metadata first
     const metadata = await drive.files.get({
@@ -249,7 +254,7 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
  */
 export async function listFilesInFolder(folderId, limit = 20, userEmail = null) {
   try {
-    const drive = createDriveClient(userEmail);
+    const drive = createDriveClient(userEmail, true); // Read-only access
 
     const response = await drive.files.list({
       q: `'${folderId}' in parents and trashed=false`,
@@ -277,6 +282,78 @@ export async function listFilesInFolder(folderId, limit = 20, userEmail = null) 
       success: false,
       error: error.message,
       files: []
+    };
+  }
+}
+
+/**
+ * Create a new folder in Google Drive
+ * @param {string} folderName - Name for the new folder
+ * @param {number} userId - User ID (for OAuth-based access)
+ * @returns {Object} Created folder information
+ */
+export async function createGoogleDriveFolder(folderName, userId) {
+  try {
+    console.log(`Creating Google Drive folder: "${folderName}" for user ID: ${userId}`);
+
+    // Get user's OAuth credentials
+    const { query } = await import('../database/connection.js');
+    const result = await query(
+      'SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const user = result.rows[0];
+
+    if (!user.google_access_token) {
+      throw new Error('User has not connected Google account');
+    }
+
+    // Create OAuth2 client with user's tokens
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      access_token: user.google_access_token,
+      refresh_token: user.google_refresh_token,
+      expiry_date: user.google_token_expiry ? new Date(user.google_token_expiry).getTime() : null
+    });
+
+    // Create Drive client with write permissions
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    // Create the folder
+    const folderMetadata = {
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder'
+    };
+
+    const folder = await drive.files.create({
+      resource: folderMetadata,
+      fields: 'id, name, webViewLink'
+    });
+
+    console.log(`✓ Created Google Drive folder: ${folder.data.name} (ID: ${folder.data.id})`);
+
+    return {
+      success: true,
+      folder: {
+        id: folder.data.id,
+        name: folder.data.name,
+        url: folder.data.webViewLink
+      }
+    };
+  } catch (error) {
+    console.error('Google Drive create folder error:', error.message);
+    return {
+      success: false,
+      error: error.message
     };
   }
 }

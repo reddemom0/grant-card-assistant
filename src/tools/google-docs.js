@@ -542,12 +542,13 @@ async function uploadLogo(driveClient, logoPath) {
  * Uses user's OAuth credentials to create documents in their Google Drive
  * @param {string} title - Document title
  * @param {string} content - Markdown formatted content
- * @param {string} folderName - Optional folder name to organize the document
+ * @param {string} folderName - Optional folder name to organize the document (legacy, use parentFolderId instead)
  * @param {number} userId - User ID from database
  * @param {string} logoPath - Optional path to logo image file
+ * @param {string} parentFolderId - Optional folder ID to place document in (takes precedence over folderName)
  * @returns {Promise<Object>} Result with document link
  */
-export async function createGoogleDoc(title, content, folderName = null, userId = null, logoPath = null) {
+export async function createGoogleDoc(title, content, folderName = null, userId = null, logoPath = null, parentFolderId = null) {
   try {
     console.log(`📄 Creating Google Doc: ${title}`);
 
@@ -558,9 +559,12 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
     const docsClient = await getDocsClient(userId);
     const driveClient = await getDriveClient(userId);
 
-    // Find or create folder first if specified
+    // Determine folder ID - parentFolderId takes precedence over folderName
     let folderId = null;
-    if (folderName) {
+    if (parentFolderId) {
+      folderId = parentFolderId;
+      console.log(`   Using provided folder ID: ${folderId}`);
+    } else if (folderName) {
       folderId = await findOrCreateFolder(driveClient, folderName);
       if (!folderId) {
         throw new Error(`Failed to access or create folder: ${folderName}`);

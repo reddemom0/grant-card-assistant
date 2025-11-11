@@ -350,8 +350,22 @@ export const GOOGLE_DRIVE_TOOLS = [
 
 export const GOOGLE_DOCS_TOOLS = [
   {
+    name: 'create_google_drive_folder',
+    description: 'Create a new folder in Google Drive to organize project documents. Returns the folder ID and URL. Use this FIRST when creating a multi-document project to organize all related files together.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        folder_name: {
+          type: 'string',
+          description: 'Name for the folder (e.g., "Caliber Projects - BCIC Ignite Readiness"). Be descriptive - include company name and grant program for easy identification.'
+        }
+      },
+      required: ['folder_name']
+    }
+  },
+  {
     name: 'create_google_doc',
-    description: 'Create a formatted Google Doc with readiness assessment content. Returns a shareable link. Use this AFTER generating the complete assessment to create a professional document that can be shared with clients.',
+    description: 'Create a formatted Google Doc with readiness assessment content. Returns a shareable link. Use this AFTER generating the complete assessment to create a professional document that can be shared with clients. Can be placed in a specific folder by providing parent_folder_id.',
     input_schema: {
       type: 'object',
       properties: {
@@ -365,10 +379,36 @@ export const GOOGLE_DOCS_TOOLS = [
         },
         folder_name: {
           type: 'string',
-          description: 'Optional: Folder name to organize the document (e.g., "Readiness Assessments 2025"). If folder doesn\'t exist, it will be created.'
+          description: 'Optional (LEGACY): Folder name to organize the document. Prefer using parent_folder_id instead for better control.'
+        },
+        parent_folder_id: {
+          type: 'string',
+          description: 'Optional: ID of the parent folder to place this document in (from create_google_drive_folder result). Takes precedence over folder_name.'
         }
       },
       required: ['title', 'content']
+    }
+  },
+  {
+    name: 'create_google_sheet',
+    description: 'Create a Google Sheet with budget template for grant applications. Creates a spreadsheet with two tabs: "Eligible Expenses" (pre-populated with categories for client to fill amounts) and "Ineligible Expenses" (reference list). Returns shareable link.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Sheet title (e.g., "BCIC Ignite Budget Template - TechVentures Inc.")'
+        },
+        grant_program: {
+          type: 'string',
+          description: 'Optional: Grant program name to customize eligible expense categories (e.g., "BCIC Ignite", "ETG"). If not provided, uses default categories.'
+        },
+        parent_folder_id: {
+          type: 'string',
+          description: 'Optional: ID of the parent folder to place this sheet in (from create_google_drive_folder result).'
+        }
+      },
+      required: ['title']
     }
   }
 ];

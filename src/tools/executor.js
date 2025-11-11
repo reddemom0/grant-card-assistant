@@ -9,6 +9,7 @@ import * as memory from './memory.js';
 import * as hubspot from './hubspot.js';
 import * as googleDrive from './google-drive.js';
 import * as googleDocs from './google-docs.js';
+import * as googleSheets from './google-sheets.js';
 import { isServerTool } from './definitions.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -168,8 +169,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       // ============================================================================
-      // GOOGLE DOCS TOOLS
+      // GOOGLE DOCS & SHEETS TOOLS
       // ============================================================================
+
+      case 'create_google_drive_folder':
+        result = await googleDrive.createGoogleDriveFolder(
+          input.folder_name,
+          userId  // User ID for OAuth
+        );
+        break;
 
       case 'create_google_doc':
         // Path to Granted Consulting logo (relative to this file)
@@ -180,7 +188,17 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           input.content,
           input.folder_name,
           userId,  // User ID for OAuth
-          logoPath  // Logo file path
+          logoPath,  // Logo file path
+          input.parent_folder_id  // Parent folder ID (optional)
+        );
+        break;
+
+      case 'create_google_sheet':
+        result = await googleSheets.createGoogleSheet(
+          input.title,
+          userId,  // User ID for OAuth
+          input.parent_folder_id,  // Parent folder ID (optional)
+          input.grant_program  // Grant program for custom categories (optional)
         );
         break;
 
