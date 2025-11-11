@@ -26,12 +26,13 @@ export default function handler(req, res) {
   console.log('🔵 Detected host:', host);
   console.log('🔵 Protocol:', protocol);
 
-  // Include Google Drive and Docs scopes for document creation
+  // Include Google Drive, Docs, and Sheets scopes for document creation
   const scopes = [
     'profile',
     'email',
-    'https://www.googleapis.com/auth/drive.file',
-    'https://www.googleapis.com/auth/documents'
+    'https://www.googleapis.com/auth/drive',        // Full drive access for folder creation
+    'https://www.googleapis.com/auth/documents',    // Google Docs creation
+    'https://www.googleapis.com/auth/spreadsheets'  // Google Sheets creation
   ].join(' ');
 
   console.log('🔵 OAuth Parameters:');
