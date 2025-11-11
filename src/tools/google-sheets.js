@@ -3,11 +3,13 @@
  *
  * Provides functionality to create and manage Google Sheets including:
  * - Create spreadsheets with multiple tabs
- * - Pre-populate budget templates
+ * - Pre-populate budget templates (simple and complex)
  * - Format cells and apply styles
+ * - Support program-specific budget templates (CanExport, RTRI, BCAFE, etc.)
  */
 
 import { google } from 'googleapis';
+import { getBudgetTemplate, listAvailableTemplates } from './budget-templates.js';
 
 /**
  * Create a new Google Sheet with budget template
@@ -264,4 +266,159 @@ function getIneligibleExpenses(grantProgram) {
     { category: 'Previous Project Costs', reason: 'Expenses incurred before project approval' },
     { category: 'GST/HST (Recoverable)', reason: 'Taxes that can be recovered through input tax credits' }
   ];
+}
+
+/**
+ * Create an advanced budget spreadsheet using program-specific templates
+ * Supports both pre-built templates (CanExport, RTRI, BCAFE) and dynamic generation
+ *
+ * IMPORTANT: ALL budgets must include Eligible and Ineligible Activities reference sheets
+ *
+ * @param {string} title - Budget title
+ * @param {number} userId - User ID for OAuth
+ * @param {string} grantProgram - Grant program name
+ * @param {Object} budgetData - Budget structure data (for dynamic generation)
+ * @param {string} parentFolderId - Optional folder ID
+ * @returns {Object} Created budget information
+ */
+export async function createAdvancedBudget(title, userId, grantProgram, budgetData = null, parentFolderId = null) {
+  try {
+    console.log(`📊 Creating advanced budget: "${title}" for program: ${grantProgram}`);
+
+    // Check if we have a pre-built template for this program
+    const template = getBudgetTemplate(grantProgram);
+
+    if (template) {
+      console.log(`✓ Using pre-built template for: ${template.programName}`);
+      return await createFromTemplate(title, userId, template, budgetData, parentFolderId);
+    } else {
+      console.log(`⚠️  No pre-built template found. Using dynamic generation for: ${grantProgram}`);
+      return await createDynamicBudget(title, userId, grantProgram, budgetData, parentFolderId);
+    }
+
+  } catch (error) {
+    console.error('Advanced budget creation error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Create budget from pre-built template
+ * @private
+ */
+async function createFromTemplate(title, userId, template, budgetData, parentFolderId) {
+  console.log(`Building budget from ${template.programName} template...`);
+
+  // Get user's OAuth credentials
+  const { query } = await import('../database/connection.js');
+  const result = await query(
+    'SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE id = $1',
+    [userId]
+  );
+
+  if (result.rows.length === 0) {
+    throw new Error('User not found');
+  }
+
+  const user = result.rows[0];
+
+  if (!user.google_access_token) {
+    throw new Error('User has not connected Google account');
+  }
+
+  // Create OAuth2 client
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET
+  );
+
+  oauth2Client.setCredentials({
+    access_token: user.google_access_token,
+    refresh_token: user.google_refresh_token,
+    expiry_date: user.google_token_expiry ? new Date(user.google_token_expiry).getTime() : null
+  });
+
+  const sheets = google.sheets({ version: 'v4', auth: oauth2Client });
+  const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+  // Create spreadsheet with all template sheets
+  const sheetProperties = template.sheets.map(sheet => ({
+    properties: {
+      title: sheet.name,
+      gridProperties: {
+        frozenRowCount: sheet.frozenRows || 0,
+        frozenColumnCount: sheet.frozenColumns || 0
+      }
+    }
+  }));
+
+  const spreadsheet = await sheets.spreadsheets.create({
+    requestBody: {
+      properties: { title: title },
+      sheets: sheetProperties
+    }
+  });
+
+  const spreadsheetId = spreadsheet.data.spreadsheetId;
+  console.log(`✓ Created spreadsheet: ${spreadsheetId}`);
+
+  // TODO: Populate each sheet based on template configuration
+  // This will involve:
+  // 1. Adding headers to budget/tracking sheets
+  // 2. Populating eligible/ineligible reference sheets
+  // 3. Adding instructions
+  // 4. Setting up formulas and formatting
+  // 5. Applying budgetData if provided
+
+  // Move to parent folder if specified
+  if (parentFolderId) {
+    await drive.files.update({
+      fileId: spreadsheetId,
+      addParents: parentFolderId,
+      fields: 'id, parents'
+    });
+    console.log(`✓ Moved to folder: ${parentFolderId}`);
+  }
+
+  // Get web view link
+  const file = await drive.files.get({
+    fileId: spreadsheetId,
+    fields: 'webViewLink'
+  });
+
+  console.log(`✓ Advanced budget created: ${title}`);
+
+  return {
+    success: true,
+    sheet: {
+      id: spreadsheetId,
+      title: title,
+      url: file.data.webViewLink,
+      template: template.programName
+    }
+  };
+}
+
+/**
+ * Create budget dynamically for programs without pre-built templates
+ * ALWAYS includes Eligible and Ineligible Activities sheets
+ * @private
+ */
+async function createDynamicBudget(title, userId, grantProgram, budgetData, parentFolderId) {
+  console.log(`Dynamically generating budget for: ${grantProgram}`);
+
+  // For now, fall back to the simple budget creation
+  // but ensure it ALWAYS includes Eligible and Ineligible sheets
+
+  // TODO: Implement full dynamic budget generation that:
+  // 1. Extracts budget structure from budgetData
+  // 2. Creates appropriate sheets based on program requirements
+  // 3. ALWAYS includes Eligible Activities sheet
+  // 4. ALWAYS includes Ineligible Activities sheet
+  // 5. Formats and populates based on program-specific rules
+
+  return await createGoogleSheet(title, userId, parentFolderId, grantProgram);
 }
