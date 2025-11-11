@@ -658,6 +658,12 @@ class AgentInterface {
         }
 
         messageDiv.appendChild(contentDiv);
+
+        // Add feedback buttons to assistant messages
+        if (role === 'assistant') {
+            this.addFeedbackButtons(contentDiv);
+        }
+
         messagesContainer.appendChild(messageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
