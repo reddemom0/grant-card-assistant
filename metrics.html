@@ -408,6 +408,22 @@
     </div>
 
     <script>
+        // Authentication check
+        function checkAuth() {
+            const token = document.cookie.split('; ').find(row => row.startsWith('token='));
+            if (!token) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            return true;
+        }
+
+        // Run auth check immediately
+        if (!checkAuth()) {
+            // Will redirect to login
+            throw new Error('Not authenticated');
+        }
+
         let selectedAgent = null;
         let overviewData = [];
 
