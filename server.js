@@ -511,6 +511,10 @@ async function startServer() {
       // Ensure learning applications table exists
       const { ensureLearningApplicationsTable } = await import('./src/database/learning-tracking.js');
       await ensureLearningApplicationsTable();
+
+      // Ensure learning memory files table exists
+      const { ensureLearningMemoryFilesTable } = await import('./src/database/learning-memory-storage.js');
+      await ensureLearningMemoryFilesTable();
     }
 
     // Check required environment variables

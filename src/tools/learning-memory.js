@@ -5,14 +5,8 @@
  * This completes the learning loop by making agents aware of user feedback.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { saveLearningApplication } from '../database/learning-tracking.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const PROJECT_ROOT = path.resolve(__dirname, '../..');
+import { getLearningMemoryFiles, getLearningMemoryStats } from '../database/learning-memory-storage.js';
 
 /**
  * Load learning memory files for an agent
@@ -23,47 +17,33 @@ const PROJECT_ROOT = path.resolve(__dirname, '../..');
  */
 export async function loadLearningMemory(agentType, conversationId, userId) {
   try {
-    const memoryDir = path.join(PROJECT_ROOT, 'memories', 'agents', agentType);
+    // Load memory files from database
+    const memoryFiles = await getLearningMemoryFiles(agentType);
 
-    // Check if memory directory exists
-    if (!fs.existsSync(memoryDir)) {
+    if (!memoryFiles || memoryFiles.length === 0) {
       console.log(`ℹ️  No learning memory found for ${agentType} yet`);
       return null;
     }
 
-    // Read all learning files
-    const learnedPatternsPath = path.join(memoryDir, 'learned-patterns.md');
-    const commonErrorsPath = path.join(memoryDir, 'common-errors.md');
-    const userCorrectionsPath = path.join(memoryDir, 'user-corrections.md');
-    const readmePath = path.join(memoryDir, 'README.md');
-
+    // Build content from database files
     let memoryContent = '';
     let filesLoaded = [];
     let lastUpdated = null;
 
-    // Load learned success patterns
-    if (fs.existsSync(learnedPatternsPath)) {
-      const content = fs.readFileSync(learnedPatternsPath, 'utf-8');
-      memoryContent += `\n\n${content}`;
-      filesLoaded.push('learned-patterns.md');
+    // Load files in specific order (excluding README)
+    const fileOrder = ['learned-patterns.md', 'common-errors.md', 'user-corrections.md'];
 
-      // Get last modified time
-      const stats = fs.statSync(learnedPatternsPath);
-      lastUpdated = stats.mtime;
-    }
+    for (const fileName of fileOrder) {
+      const file = memoryFiles.find(f => f.file_name === fileName);
+      if (file) {
+        memoryContent += `\n\n${file.content}`;
+        filesLoaded.push(fileName);
 
-    // Load common errors to avoid
-    if (fs.existsSync(commonErrorsPath)) {
-      const content = fs.readFileSync(commonErrorsPath, 'utf-8');
-      memoryContent += `\n\n${content}`;
-      filesLoaded.push('common-errors.md');
-    }
-
-    // Load user corrections
-    if (fs.existsSync(userCorrectionsPath)) {
-      const content = fs.readFileSync(userCorrectionsPath, 'utf-8');
-      memoryContent += `\n\n${content}`;
-      filesLoaded.push('user-corrections.md');
+        // Track most recent update
+        if (!lastUpdated || new Date(file.updated_at) > new Date(lastUpdated)) {
+          lastUpdated = file.updated_at;
+        }
+      }
     }
 
     if (filesLoaded.length === 0) {
@@ -73,7 +53,7 @@ export async function loadLearningMemory(agentType, conversationId, userId) {
 
     console.log(`✓ Loaded ${filesLoaded.length} learning files for ${agentType}:`, filesLoaded);
     if (lastUpdated) {
-      console.log(`  Last updated: ${lastUpdated.toLocaleString()}`);
+      console.log(`  Last updated: ${new Date(lastUpdated).toLocaleString()}`);
     }
 
     // Track that learning was applied to this conversation
@@ -136,44 +116,9 @@ ${memoryContent}
 /**
  * Check if learning memory exists for an agent
  * @param {string} agentType - Type of agent
- * @returns {boolean} True if learning memory exists
+ * @returns {Promise<boolean>} True if learning memory exists
  */
-export function hasLearningMemory(agentType) {
-  const memoryDir = path.join(PROJECT_ROOT, 'memories', 'agents', agentType);
-  return fs.existsSync(memoryDir);
-}
-
-/**
- * Get learning memory stats for an agent
- * @param {string} agentType - Type of agent
- * @returns {Object|null} Stats object or null
- */
-export function getLearningMemoryStats(agentType) {
-  try {
-    const memoryDir = path.join(PROJECT_ROOT, 'memories', 'agents', agentType);
-
-    if (!fs.existsSync(memoryDir)) {
-      return null;
-    }
-
-    const readmePath = path.join(memoryDir, 'README.md');
-    if (!fs.existsSync(readmePath)) {
-      return null;
-    }
-
-    const readmeContent = fs.readFileSync(readmePath, 'utf-8');
-
-    // Parse README to extract stats
-    const lastUpdatedMatch = readmeContent.match(/\*\*Last Updated\*\*:\s*(.+)/);
-    const totalFeedbackMatch = readmeContent.match(/\*\*Total Feedback\*\*:\s*(\d+)/);
-
-    return {
-      lastUpdated: lastUpdatedMatch ? lastUpdatedMatch[1] : null,
-      totalFeedback: totalFeedbackMatch ? parseInt(totalFeedbackMatch[1]) : 0,
-      exists: true
-    };
-  } catch (error) {
-    console.error('Error getting learning memory stats:', error);
-    return null;
-  }
+export async function hasLearningMemory(agentType) {
+  const stats = await getLearningMemoryStats(agentType);
+  return stats !== null && stats.fileCount > 0;
 }

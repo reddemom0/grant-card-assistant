@@ -5,7 +5,7 @@
  * that agents can read to improve their performance.
  */
 
-import { handleMemoryTool } from '../../api/memory-tool-handler.js';
+import { saveLearningMemoryFile } from '../database/learning-memory-storage.js';
 
 /**
  * Generate and write learned patterns to agent memory
@@ -26,37 +26,14 @@ export async function writeLearnedPatterns(agentType, learningReport) {
   if (learningReport.successPatterns.count > 0) {
     try {
       const content = formatSuccessPatterns(learningReport);
-      const path = `/memories/agents/${agentType}/learned-patterns.md`;
+      const fileName = 'learned-patterns.md';
 
-      const result = await handleMemoryTool('create', {
-        path,
-        file_text: content
-      });
-
-      if (result.success) {
-        results.filesWritten.push(path);
-        console.log(`✅ Wrote success patterns to ${path}`);
-      } else {
-        // If file exists, try to update it instead
-        if (result.error.includes('already exists')) {
-          const updateResult = await handleMemoryTool('str_replace', {
-            path,
-            old_str: '<!-- AUTO-GENERATED -->',
-            new_str: content
-          });
-
-          if (updateResult.success) {
-            results.filesWritten.push(`${path} (updated)`);
-            console.log(`✅ Updated success patterns at ${path}`);
-          } else {
-            results.errors.push({ path, error: updateResult.error });
-          }
-        } else {
-          results.errors.push({ path, error: result.error });
-        }
-      }
+      await saveLearningMemoryFile(agentType, fileName, content);
+      results.filesWritten.push(fileName);
+      console.log(`✅ Wrote success patterns to database: ${fileName}`);
     } catch (error) {
-      results.errors.push({ path: 'learned-patterns.md', error: error.message });
+      results.errors.push({ file: 'learned-patterns.md', error: error.message });
+      console.error(`❌ Failed to write success patterns:`, error);
     }
   }
 
@@ -64,38 +41,14 @@ export async function writeLearnedPatterns(agentType, learningReport) {
   if (learningReport.errorPatterns.count > 0) {
     try {
       const content = formatErrorPatterns(learningReport);
-      const path = `/memories/agents/${agentType}/common-errors.md`;
+      const fileName = 'common-errors.md';
 
-      const result = await handleMemoryTool('create', {
-        path,
-        file_text: content
-      });
-
-      if (result.success) {
-        results.filesWritten.push(path);
-        console.log(`✅ Wrote error patterns to ${path}`);
-      } else {
-        if (result.error.includes('already exists')) {
-          // Try to replace entire file content
-          const viewResult = await handleMemoryTool('view', { path });
-          if (viewResult.success) {
-            const updateResult = await handleMemoryTool('str_replace', {
-              path,
-              old_str: viewResult.content,
-              new_str: content
-            });
-
-            if (updateResult.success) {
-              results.filesWritten.push(`${path} (updated)`);
-              console.log(`✅ Updated error patterns at ${path}`);
-            }
-          }
-        } else {
-          results.errors.push({ path, error: result.error });
-        }
-      }
+      await saveLearningMemoryFile(agentType, fileName, content);
+      results.filesWritten.push(fileName);
+      console.log(`✅ Wrote error patterns to database: ${fileName}`);
     } catch (error) {
-      results.errors.push({ path: 'common-errors.md', error: error.message });
+      results.errors.push({ file: 'common-errors.md', error: error.message });
+      console.error(`❌ Failed to write error patterns:`, error);
     }
   }
 
@@ -103,72 +56,28 @@ export async function writeLearnedPatterns(agentType, learningReport) {
   if (learningReport.corrections.count > 0) {
     try {
       const content = formatUserCorrections(learningReport);
-      const path = `/memories/agents/${agentType}/user-corrections.md`;
+      const fileName = 'user-corrections.md';
 
-      const result = await handleMemoryTool('create', {
-        path,
-        file_text: content
-      });
-
-      if (result.success) {
-        results.filesWritten.push(path);
-        console.log(`✅ Wrote user corrections to ${path}`);
-      } else {
-        if (result.error.includes('already exists')) {
-          const viewResult = await handleMemoryTool('view', { path });
-          if (viewResult.success) {
-            const updateResult = await handleMemoryTool('str_replace', {
-              path,
-              old_str: viewResult.content,
-              new_str: content
-            });
-
-            if (updateResult.success) {
-              results.filesWritten.push(`${path} (updated)`);
-              console.log(`✅ Updated user corrections at ${path}`);
-            }
-          }
-        } else {
-          results.errors.push({ path, error: result.error });
-        }
-      }
+      await saveLearningMemoryFile(agentType, fileName, content);
+      results.filesWritten.push(fileName);
+      console.log(`✅ Wrote user corrections to database: ${fileName}`);
     } catch (error) {
-      results.errors.push({ path: 'user-corrections.md', error: error.message });
+      results.errors.push({ file: 'user-corrections.md', error: error.message });
+      console.error(`❌ Failed to write user corrections:`, error);
     }
   }
 
   // 4. Write summary/index file
   try {
     const content = formatSummary(learningReport);
-    const path = `/memories/agents/${agentType}/README.md`;
+    const fileName = 'README.md';
 
-    const result = await handleMemoryTool('create', {
-      path,
-      file_text: content
-    });
-
-    if (result.success) {
-      results.filesWritten.push(path);
-      console.log(`✅ Wrote summary to ${path}`);
-    } else {
-      if (result.error.includes('already exists')) {
-        const viewResult = await handleMemoryTool('view', { path });
-        if (viewResult.success) {
-          const updateResult = await handleMemoryTool('str_replace', {
-            path,
-            old_str: viewResult.content,
-            new_str: content
-          });
-
-          if (updateResult.success) {
-            results.filesWritten.push(`${path} (updated)`);
-            console.log(`✅ Updated summary at ${path}`);
-          }
-        }
-      }
-    }
+    await saveLearningMemoryFile(agentType, fileName, content);
+    results.filesWritten.push(fileName);
+    console.log(`✅ Wrote summary to database: ${fileName}`);
   } catch (error) {
-    results.errors.push({ path: 'README.md', error: error.message });
+    results.errors.push({ file: 'README.md', error: error.message });
+    console.error(`❌ Failed to write summary:`, error);
   }
 
   console.log(`✅ Wrote ${results.filesWritten.length} memory files for ${agentType}`);
