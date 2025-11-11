@@ -1223,15 +1223,46 @@ function createQuoteSheet(sheetConfig, sheetId) {
 async function createDynamicBudget(title, userId, grantProgram, budgetData, parentFolderId) {
   console.log(`Dynamically generating budget for: ${grantProgram}`);
 
-  // For now, fall back to the simple budget creation
-  // but ensure it ALWAYS includes Eligible and Ineligible sheets
+  // If no budget data provided, use fallback to simple budget
+  if (!budgetData || !budgetData.sheets) {
+    console.log('  ⚠️  No budget structure provided, using simple fallback');
+    return await createGoogleSheet(title, userId, parentFolderId, grantProgram);
+  }
 
-  // TODO: Implement full dynamic budget generation that:
-  // 1. Extracts budget structure from budgetData
-  // 2. Creates appropriate sheets based on program requirements
-  // 3. ALWAYS includes Eligible Activities sheet
-  // 4. ALWAYS includes Ineligible Activities sheet
-  // 5. Formats and populates based on program-specific rules
+  // Build dynamic template from budgetData
+  const dynamicTemplate = {
+    programName: grantProgram,
+    sheets: budgetData.sheets
+  };
 
-  return await createGoogleSheet(title, userId, parentFolderId, grantProgram);
+  console.log(`  ✓ Using custom budget structure with ${dynamicTemplate.sheets.length} sheets`);
+
+  // Ensure Eligible and Ineligible sheets exist
+  const hasEligible = dynamicTemplate.sheets.some(s =>
+    s.name.toLowerCase().includes('eligible') && !s.name.toLowerCase().includes('ineligible')
+  );
+  const hasIneligible = dynamicTemplate.sheets.some(s =>
+    s.name.toLowerCase().includes('ineligible')
+  );
+
+  if (!hasEligible) {
+    console.log('  ⚠️  Adding missing Eligible Activities sheet');
+    dynamicTemplate.sheets.push({
+      name: 'Eligible Activities',
+      type: 'reference',
+      content: { title: 'Eligible Expense Categories' }
+    });
+  }
+
+  if (!hasIneligible) {
+    console.log('  ⚠️  Adding missing Ineligible Activities sheet');
+    dynamicTemplate.sheets.push({
+      name: 'Ineligible Activities',
+      type: 'reference',
+      content: { title: 'Ineligible Expenses' }
+    });
+  }
+
+  // Use the same creation logic as pre-built templates
+  return await createFromTemplate(title, userId, dynamicTemplate, budgetData, parentFolderId);
 }

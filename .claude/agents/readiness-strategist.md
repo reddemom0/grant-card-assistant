@@ -718,7 +718,7 @@ From program guidelines, create comprehensive lists:
 - Examples (if helpful)
 
 **Step 4: Define Budget Structure**
-Based on program analysis, specify:
+Based on program analysis, build the budgetData object to pass to `createAdvancedBudget()`:
 
 ```javascript
 {
@@ -726,42 +726,49 @@ Based on program analysis, specify:
     {
       name: "Budget",
       type: "budget",
-      frozenRows: X,
+      frozenRows: 1,  // Freeze header row
       columns: [
-        { header: "Column Name", width: 120, format: "currency|date|percent|number|text" },
-        // ... more columns
+        { header: "Activity Type", width: 250 },
+        { header: "Description", width: 400 },
+        { header: "Cost (CAD)", width: 120, format: "currency" },
+        { header: "Funding %", width: 100, format: "percent" },
+        { header: "Funding Request", width: 140, format: "currency" }
       ],
       categories: [
         {
-          code: "A",  // or null if no codes
+          code: null,  // or "A", "B", etc. if program uses codes
           name: "Category Name",
-          description: "Full description",
-          includes: "List of included items",
-          excludes: "List of excluded items",
-          subcategories: ["Sub 1", "Sub 2"] // optional
+          description: "Full description of eligible activity",
+          includes: "List what's included: item1, item2, item3",
+          excludes: "List what's excluded: item1, item2",
+          subcategories: ["Sub-category 1", "Sub-category 2"]  // optional
         }
+        // ... more categories
       ]
     },
     {
       name: "Eligible Activities",
       type: "reference",
       content: {
-        title: "Eligible Expense Categories",
-        categories: [/* extracted from program */]
+        title: "Eligible Expense Categories"
       }
     },
     {
       name: "Ineligible Activities",
       type: "reference",
       content: {
-        title: "Ineligible Expenses",
-        categories: [/* extracted from program */]
+        title: "Ineligible Expenses"
       }
     }
-    // Additional sheets as needed: Instructions, Claims, Targets, etc.
+    // Optional additional sheets based on program:
+    // - Instructions sheet with program-specific guidance
+    // - Claims tracking sheet
+    // - Quote sheets for large purchases
   ]
 }
 ```
+
+**CRITICAL**: The Eligible/Ineligible Activities sheets will be automatically populated from the categories you define in the Budget sheet. Each category's includes/excludes will be formatted into the reference sheet.
 
 </budget_creation_methodology>
 
@@ -794,41 +801,119 @@ Based on program analysis, specify:
 
 1. **Analyze program** to understand budget requirements
 2. **Extract eligible/ineligible activities** from program knowledge
-3. **Create budget** using appropriate method:
+3. **Build budgetData structure** from extracted information
+4. **Create budget** using `createAdvancedBudget` tool
+
+**EXAMPLE: Creating Budget for NEW Program (IRAP)**
 
 ```xml
 <thinking>
-Program: [Program Name]
-Pre-built template available: [Yes/No - CanExport/RTRI/BCAFE]
-Budget structure needed:
-- Sheets: [List]
-- Main columns: [List]
-- Categories/Activity Types: [List]
-- Special requirements: [List]
+Program: NRC IRAP
+Pre-built template: No - need dynamic generation
+
+From program guidelines, I extract:
+- Budget columns: Project Activity, Description, Timeline, Cost, IRAP Share (80%), IRAP Funding
+- Eligible categories:
+  * Personnel (salaries, wages for R&D staff)
+  * Equipment (R&D equipment, software)
+  * Materials (consumables for R&D)
+  * Contractors (external R&D services)
+  * Overhead (up to 25% of direct costs)
+- Ineligible: general operations, marketing, sales activities, land/buildings
+- Special: 80% funding rate, pre-approval required
 </thinking>
 
 <budget_creation>
-I'll create a comprehensive budget template for [Program Name] with the following structure:
+I'll create a comprehensive budget template for NRC IRAP with the following structure:
 
 **Sheets**:
-1. **Budget** - Main planning sheet with columns: [list columns]
-2. **Eligible Activities** - Reference sheet with all eligible expense categories
-3. **Ineligible Activities** - Reference sheet with ineligible expenses and reasons
-4. [Additional sheets as needed]
+1. **Budget** - Project planning with 6 columns
+2. **Eligible Activities** - R&D expense categories with includes/excludes
+3. **Ineligible Activities** - Non-R&D expenses not eligible
 
 **Budget Categories**:
-[List main categories with brief description]
+- Personnel Costs - R&D salaries and wages
+- Equipment & Software - R&D-specific equipment
+- Materials & Supplies - Consumables for R&D activities
+- Contractor Services - External R&D expertise
+- Overhead - Allocated overhead (max 25%)
 
 **Key Features**:
-- [Cost-share calculations]
-- [Required tracking fields]
-- [Special requirements]
+- 80% IRAP funding calculation
+- Timeline tracking for R&D milestones
+- Emphasis on innovation and technical risk
 </budget_creation>
 
-I'm creating this budget now using the `create_google_sheet` or `createAdvancedBudget` tool...
+Now creating the budget with extracted structure...
 ```
 
-4. **Create the budget** using appropriate tool call
+**Tool Call**:
+```javascript
+createAdvancedBudget(
+  "IRAP Budget Template",
+  userId,
+  "NRC IRAP",
+  {
+    sheets: [
+      {
+        name: "Budget",
+        type: "budget",
+        frozenRows: 1,
+        columns: [
+          { header: "Project Activity", width: 200 },
+          { header: "Description", width: 350 },
+          { header: "Timeline", width: 120 },
+          { header: "Total Cost (CAD)", width: 140, format: "currency" },
+          { header: "IRAP Share (80%)", width: 140, format: "currency" },
+          { header: "Company Share (20%)", width: 140, format: "currency" }
+        ],
+        categories: [
+          {
+            name: "Personnel Costs",
+            description: "Salaries and wages for R&D personnel directly involved in the project",
+            includes: "salaries, wages, benefits for R&D staff, technical employees",
+            excludes: "sales staff, general management, administrative personnel"
+          },
+          {
+            name: "Equipment & Software",
+            description: "R&D-specific equipment and software necessary for the project",
+            includes: "lab equipment, testing apparatus, R&D software licenses, prototyping tools",
+            excludes: "general office equipment, general-purpose software, furniture"
+          },
+          {
+            name: "Materials & Supplies",
+            description: "Consumable materials and supplies used in R&D activities",
+            includes: "raw materials for prototypes, testing materials, lab consumables",
+            excludes: "general office supplies, marketing materials"
+          },
+          {
+            name: "Contractor Services",
+            description: "External expertise for R&D aspects of the project",
+            includes: "technical consultants, specialized R&D services, testing services",
+            excludes: "general business consulting, marketing services, legal fees"
+          },
+          {
+            name: "Overhead",
+            description: "Allocated overhead costs (maximum 25% of direct costs)",
+            includes: "proportional rent, utilities, general admin (max 25%)",
+            excludes: "costs already claimed under other categories, unrelated business expenses"
+          }
+        ]
+      },
+      {
+        name: "Eligible Activities",
+        type: "reference"
+      },
+      {
+        name: "Ineligible Activities",
+        type: "reference"
+      }
+    ]
+  },
+  parentFolderId
+)
+```
+
 5. **Confirm creation** with user and provide link
 
 </budget_creation_template>
