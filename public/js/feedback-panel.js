@@ -82,30 +82,6 @@ class FeedbackPanel {
                     <p class="no-notes" id="no-notes-message">No notes yet. Add your first note above!</p>
                 </div>
             </div>
-
-            <!-- Separator -->
-            <hr class="feedback-divider">
-
-            <!-- Overall Rating (appears after 3+ messages) -->
-            <div id="overall-rating" class="overall-rating hidden">
-                <h4>How's this conversation?</h4>
-                <div class="rating-buttons">
-                    <button class="btn-thumb thumbs-up" id="thumbs-up-btn">
-                        <span class="thumb-icon">👍</span>
-                        <span>Helpful</span>
-                    </button>
-                    <button class="btn-thumb thumbs-down" id="thumbs-down-btn">
-                        <span class="thumb-icon">👎</span>
-                        <span>Not Helpful</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Thank you message -->
-            <div id="rating-thanks" class="rating-thanks hidden">
-                <p>✓ Thanks for your feedback!</p>
-                <p class="rating-thanks-detail">Your input helps improve this agent.</p>
-            </div>
         `;
     }
 
@@ -397,18 +373,6 @@ class FeedbackPanel {
                 }
             });
         }
-
-        // Thumbs up/down
-        const thumbsUpBtn = document.getElementById('thumbs-up-btn');
-        const thumbsDownBtn = document.getElementById('thumbs-down-btn');
-
-        if (thumbsUpBtn) {
-            thumbsUpBtn.addEventListener('click', () => this.rateConversation('positive'));
-        }
-
-        if (thumbsDownBtn) {
-            thumbsDownBtn.addEventListener('click', () => this.rateConversation('negative'));
-        }
     }
 
     async loadExistingNotes() {
@@ -523,16 +487,11 @@ class FeedbackPanel {
 
             if (data.success) {
                 this.hasRated = true;
-
-                // Hide rating buttons
-                document.getElementById('overall-rating').classList.add('hidden');
-
-                // Show thank you
-                document.getElementById('rating-thanks').classList.remove('hidden');
-
                 console.log(`✅ Conversation rated: ${rating} (quality: ${data.feedback.quality_score})`);
+                return true;
             } else {
-                alert('Failed to save rating: ' + (data.error || 'Unknown error'));
+                console.error('Failed to save rating:', data.error);
+                return false;
             }
         } catch (error) {
             console.error('Error saving rating:', error);
@@ -543,11 +502,6 @@ class FeedbackPanel {
     // Public methods to track conversation stats
     incrementMessageCount() {
         this.messageCount++;
-
-        // Show rating after 3+ messages
-        if (this.messageCount >= 3 && !this.hasRated) {
-            document.getElementById('overall-rating').classList.remove('hidden');
-        }
     }
 
     incrementRevisionCount() {

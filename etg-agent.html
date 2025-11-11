@@ -1026,6 +1026,56 @@
                 left: -280px;
             }
         }
+
+        /* Message Feedback Buttons */
+        .message-feedback-buttons {
+            display: flex;
+            gap: 0.25rem;
+            margin-top: 0.75rem;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .message.assistant:hover .message-feedback-buttons {
+            opacity: 1;
+        }
+
+        .feedback-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            padding: 0;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .feedback-btn:hover:not(:disabled) {
+            background: var(--background);
+            border-color: var(--text-secondary);
+            color: var(--text-primary);
+        }
+
+        .feedback-btn.selected {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        .feedback-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .feedback-btn svg {
+            width: 16px;
+            height: 16px;
+        }
     </style>
 
     <!-- Markdown Parser for Rich Text Rendering -->

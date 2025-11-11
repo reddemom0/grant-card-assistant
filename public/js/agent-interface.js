@@ -719,6 +719,12 @@ class AgentInterface {
 
         if (isComplete) {
             messageDiv.innerHTML = processedContent;
+
+            // Add feedback buttons to assistant messages only
+            const parentMessage = messageDiv.closest('.message');
+            if (parentMessage && parentMessage.classList.contains('assistant')) {
+                this.addFeedbackButtons(messageDiv);
+            }
         } else {
             messageDiv.innerHTML = processedContent + '<span class="typing-cursor">▎</span>';
         }
@@ -726,6 +732,66 @@ class AgentInterface {
         const messagesContainer = document.getElementById('messages');
         if (messagesContainer) {
             messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    }
+
+    /**
+     * Add feedback buttons (thumbs up/down) to message
+     */
+    addFeedbackButtons(messageDiv) {
+        // Create feedback buttons container
+        const feedbackContainer = document.createElement('div');
+        feedbackContainer.className = 'message-feedback-buttons';
+        feedbackContainer.innerHTML = `
+            <button class="feedback-btn feedback-btn-up" data-rating="positive" title="Good response">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 12V5M8 5L5 8M8 5L11 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+            <button class="feedback-btn feedback-btn-down" data-rating="negative" title="Bad response">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <path d="M8 4V11M8 11L5 8M8 11L11 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </button>
+        `;
+
+        // Add click handlers
+        const upBtn = feedbackContainer.querySelector('.feedback-btn-up');
+        const downBtn = feedbackContainer.querySelector('.feedback-btn-down');
+
+        upBtn.addEventListener('click', () => this.handleMessageFeedback('positive', upBtn, downBtn));
+        downBtn.addEventListener('click', () => this.handleMessageFeedback('negative', upBtn, downBtn));
+
+        messageDiv.appendChild(feedbackContainer);
+    }
+
+    /**
+     * Handle message-level feedback (thumbs up/down)
+     */
+    async handleMessageFeedback(rating, upBtn, downBtn) {
+        // Check if feedback panel exists and has rateConversation method
+        if (!window.feedbackPanel) {
+            console.warn('Feedback panel not initialized');
+            return;
+        }
+
+        // Prevent rating twice
+        if (window.feedbackPanel.hasRated) {
+            return;
+        }
+
+        // Call the feedback panel's rateConversation method
+        const success = await window.feedbackPanel.rateConversation(rating);
+
+        if (success) {
+            // Visual feedback: highlight the selected button
+            if (rating === 'positive') {
+                upBtn.classList.add('selected');
+                downBtn.disabled = true;
+            } else {
+                downBtn.classList.add('selected');
+                upBtn.disabled = true;
+            }
         }
     }
 
