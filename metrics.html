@@ -789,7 +789,8 @@
                         ${data.applications.map(app => {
                             const appliedDate = new Date(app.applied_at);
                             const learningDate = app.learning_updated_at ? new Date(app.learning_updated_at) : null;
-                            const filesLoaded = JSON.parse(app.files_loaded || '[]');
+                            // files_loaded is already an array from the API
+                            const filesLoaded = Array.isArray(app.files_loaded) ? app.files_loaded : [];
 
                             return `
                                 <div style="padding: 0.75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
