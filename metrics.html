@@ -408,13 +408,18 @@
     </div>
 
     <script>
-        // Authentication check
+        // Authentication check (matches dashboard.html)
         function checkAuth() {
-            const token = document.cookie.split('; ').find(row => row.startsWith('token='));
-            if (!token) {
-                window.location.href = '/login.html';
+            const cookies = document.cookie.split(';');
+            const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
+
+            if (!authToken) {
+                console.log('No auth token, redirecting to login...');
+                window.location.href = '/';
                 return false;
             }
+
+            console.log('✅ User authenticated');
             return true;
         }
 
