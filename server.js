@@ -19,6 +19,7 @@ import pdfHandler from './api/pdf-handler.js';
 import feedbackHandler from './api/feedback.js';
 import feedbackNoteHandler from './api/feedback-note.js';
 import feedbackMetricsHandler from './api/feedback-metrics.js';
+import feedbackLearningHandler from './api/feedback-learning.js';
 
 // New direct API handlers
 import {
@@ -131,6 +132,10 @@ app.get('/api/feedback-note', authenticateUser, feedbackNoteHandler);
 
 // Feedback metrics (non-admin) - with authentication
 app.get('/api/feedback-metrics', authenticateUser, feedbackMetricsHandler);
+
+// Feedback learning - trigger analysis and memory file generation
+app.get('/api/feedback-learning', authenticateUser, feedbackLearningHandler);
+app.post('/api/feedback-learning', authenticateUser, feedbackLearningHandler);
 
 // Authentication endpoints
 app.use('/api', authRouter);
