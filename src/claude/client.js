@@ -196,9 +196,9 @@ export async function runAgent({
         // Enable streaming
         stream: true
       }, {
-        // Beta headers for web fetch tool and interleaved thinking
+        // Beta headers for web fetch tool, interleaved thinking, and memory tool
         headers: {
-          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14'
+          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27'
         }
       });
 

@@ -77,6 +77,28 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       // ============================================================================
+      // ANTHROPIC FILE-BASED MEMORY TOOL
+      // Cross-conversation persistent memory in .memories/ directory
+      // ============================================================================
+
+      case 'memory':
+        // Import the memory tool handler (CommonJS module)
+        const { handleMemoryTool } = await import('../../api/memory-tool-handler.js');
+
+        // Extract command from input
+        const { command, ...memoryInput } = input;
+
+        if (!command) {
+          result = {
+            success: false,
+            error: 'Memory tool requires a "command" field (view, create, str_replace, insert, delete, rename)'
+          };
+        } else {
+          result = await handleMemoryTool(command, memoryInput);
+        }
+        break;
+
+      // ============================================================================
       // HUBSPOT TOOLS
       // ============================================================================
 

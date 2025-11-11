@@ -23,7 +23,17 @@ export const SERVER_TOOLS = [
 ];
 
 // ============================================================================
-// MEMORY TOOLS
+// ANTHROPIC FILE-BASED MEMORY TOOL (Client-Side Execution)
+// Cross-conversation persistent memory in .memories/ directory
+// ============================================================================
+
+export const ANTHROPIC_MEMORY_TOOL = {
+  type: 'memory_20250818',
+  name: 'memory'
+};
+
+// ============================================================================
+// DATABASE MEMORY TOOLS (Legacy - per-conversation key-value)
 // Store and recall information across the conversation
 // ============================================================================
 
@@ -422,6 +432,7 @@ export const GOOGLE_DOCS_TOOLS = [
  */
 export const ALL_TOOLS = [
   ...SERVER_TOOLS,
+  ANTHROPIC_MEMORY_TOOL,
   ...MEMORY_TOOLS,
   ...HUBSPOT_TOOLS,
   ...GOOGLE_DRIVE_TOOLS,
@@ -434,8 +445,8 @@ export const ALL_TOOLS = [
  * @returns {Array} Array of tool definitions for this agent
  */
 export function getToolsForAgent(agentType) {
-  // All agents get server tools and memory
-  const baseTools = [...SERVER_TOOLS, ...MEMORY_TOOLS];
+  // All agents get server tools and memory (file-based + database)
+  const baseTools = [...SERVER_TOOLS, ANTHROPIC_MEMORY_TOOL, ...MEMORY_TOOLS];
 
   switch (agentType) {
     case 'grant-card-generator':
