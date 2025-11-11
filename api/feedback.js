@@ -60,8 +60,8 @@ export default async function handler(req, res) {
   // POST - Save conversation feedback
   if (req.method === 'POST') {
     try {
-      // Get user from JWT
-      const user = getUserFromToken(req);
+      // User is already authenticated by middleware and attached to req.user
+      const user = req.user;
       if (!user) {
         return res.status(401).json({
           error: 'Unauthorized - Please log in'
@@ -91,13 +91,13 @@ export default async function handler(req, res) {
         });
       }
 
-      // Get user's database ID
-      const dbUser = await db.ensureUser(user.google_id, user.email, user.name);
+      // User ID is directly available from req.user (middleware already fetched from DB)
+      const userId = user.id;
 
       // Save feedback with implicit signals
       const savedFeedback = await db.saveConversationFeedback(
         conversationId,
-        dbUser.id,
+        userId,
         rating,
         feedbackText,
         {
