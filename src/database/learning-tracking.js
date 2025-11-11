@@ -151,7 +151,7 @@ export async function ensureLearningApplicationsTable() {
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         agent_type VARCHAR(100) NOT NULL,
         conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
         files_loaded JSONB NOT NULL,
         learning_updated_at TIMESTAMP,
         applied_at TIMESTAMP NOT NULL DEFAULT NOW(),
