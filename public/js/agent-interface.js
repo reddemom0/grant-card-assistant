@@ -542,8 +542,19 @@ class AgentInterface {
             const attachments = [];
             for (const file of this.uploadedFiles) {
                 const base64Data = await this.fileToBase64(file);
+
+                // Determine attachment type
+                let attachmentType;
+                if (file.type.startsWith('image/')) {
+                    attachmentType = 'image';
+                } else if (file.type === 'application/pdf') {
+                    attachmentType = 'pdf';
+                } else {
+                    attachmentType = 'document';
+                }
+
                 attachments.push({
-                    type: file.type.startsWith('image/') ? 'image' : 'document',
+                    type: attachmentType,
                     mimeType: file.type,
                     data: base64Data.split(',')[1] // Remove data:mime;base64, prefix
                 });
