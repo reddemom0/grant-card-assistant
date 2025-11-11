@@ -216,11 +216,19 @@ export default async function handler(req, res) {
 
         const appStats = await getLearningApplicationStats(agentType);
 
+        // Parse files_loaded from JSON string to array
+        const parsedApplications = applications.map(app => ({
+          ...app,
+          files_loaded: typeof app.files_loaded === 'string'
+            ? JSON.parse(app.files_loaded)
+            : app.files_loaded
+        }));
+
         return res.status(200).json({
           success: true,
           agentType,
-          count: applications.length,
-          applications,
+          count: parsedApplications.length,
+          applications: parsedApplications,
           stats: {
             totalApplications: parseInt(appStats.total_applications),
             uniqueConversations: parseInt(appStats.unique_conversations),
