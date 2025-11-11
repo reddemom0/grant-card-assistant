@@ -35,7 +35,7 @@ export async function getHighQualityFeedback(agentType, limit = 20, minQualitySc
         cf.conversation_id,
         cf.message_id,
         cf.rating,
-        cf.feedback_text,
+        cf.feedback_text as note,
         cf.quality_score,
         cf.revision_count,
         cf.completion_time_seconds,
@@ -44,20 +44,29 @@ export async function getHighQualityFeedback(agentType, limit = 20, minQualitySc
         m.content as message_content,
         m.role as message_role,
         c.agent_type,
-        c.title as conversation_title
+        c.title as conversation_title,
+        STRING_AGG(fn.note_text, ' | ') as sidebar_notes
       FROM conversation_feedback cf
       JOIN messages m ON cf.message_id = m.id
       JOIN conversations c ON cf.conversation_id = c.id
+      LEFT JOIN feedback_notes fn ON cf.conversation_id = fn.conversation_id
       WHERE c.agent_type = $1
         AND cf.quality_score >= $2
         AND cf.rating = 'positive'
         AND m.role = 'assistant'
+      GROUP BY cf.id, cf.conversation_id, cf.message_id, cf.rating, cf.feedback_text,
+               cf.quality_score, cf.revision_count, cf.completion_time_seconds,
+               cf.message_count, cf.created_at, m.content, m.role, c.agent_type, c.title
       ORDER BY cf.quality_score DESC, cf.created_at DESC
       LIMIT $3`,
       [agentType, minQualityScore, limit]
     );
 
-    return result.rows;
+    // Combine feedback_text and sidebar_notes into a single note field
+    return result.rows.map(row => ({
+      ...row,
+      note: [row.note, row.sidebar_notes].filter(Boolean).join(' | ')
+    }));
   } finally {
     client.release();
   }
@@ -81,7 +90,7 @@ export async function getNegativeFeedback(agentType, limit = 10, maxQualityScore
         cf.conversation_id,
         cf.message_id,
         cf.rating,
-        cf.feedback_text,
+        cf.feedback_text as note,
         cf.quality_score,
         cf.revision_count,
         cf.completion_time_seconds,
@@ -90,20 +99,29 @@ export async function getNegativeFeedback(agentType, limit = 10, maxQualityScore
         m.content as message_content,
         m.role as message_role,
         c.agent_type,
-        c.title as conversation_title
+        c.title as conversation_title,
+        STRING_AGG(fn.note_text, ' | ') as sidebar_notes
       FROM conversation_feedback cf
       JOIN messages m ON cf.message_id = m.id
       JOIN conversations c ON cf.conversation_id = c.id
+      LEFT JOIN feedback_notes fn ON cf.conversation_id = fn.conversation_id
       WHERE c.agent_type = $1
         AND cf.quality_score <= $2
         AND cf.rating = 'negative'
         AND m.role = 'assistant'
+      GROUP BY cf.id, cf.conversation_id, cf.message_id, cf.rating, cf.feedback_text,
+               cf.quality_score, cf.revision_count, cf.completion_time_seconds,
+               cf.message_count, cf.created_at, m.content, m.role, c.agent_type, c.title
       ORDER BY cf.created_at DESC
       LIMIT $3`,
       [agentType, maxQualityScore, limit]
     );
 
-    return result.rows;
+    // Combine feedback_text and sidebar_notes into a single note field
+    return result.rows.map(row => ({
+      ...row,
+      note: [row.note, row.sidebar_notes].filter(Boolean).join(' | ')
+    }));
   } finally {
     client.release();
   }
@@ -124,7 +142,7 @@ export async function getUserCorrections(agentType, limit = 50) {
       `SELECT
         fn.id,
         fn.conversation_id,
-        fn.note_text,
+        fn.note_text as note,
         fn.message_index,
         fn.sentiment,
         fn.created_at,
@@ -140,8 +158,8 @@ export async function getUserCorrections(agentType, limit = 50) {
     );
 
     // Filter for correction keywords
-    const corrections = result.rows.filter(note => {
-      const text = note.note_text.toLowerCase();
+    const corrections = result.rows.filter(item => {
+      const text = item.note.toLowerCase();
       const correctionKeywords = [
         'actually', 'incorrect', 'wrong', 'should be', 'not right',
         'mistake', 'error', 'fix', 'correction', 'clarification',
