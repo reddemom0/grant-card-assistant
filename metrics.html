@@ -673,18 +673,26 @@
                     </div>
                 ` : ''}
 
-                ${insights.commonErrors.length > 0 ? `
+                ${insights.errorExamples && insights.errorExamples.length > 0 ? `
                     <div class="section">
-                        <h3 class="section-title">❌ Common Error Patterns</h3>
+                        <h3 class="section-title">❌ Error Patterns to Avoid</h3>
                         <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
-                            Issues the AI has learned to avoid
+                            Issues identified in low-rated responses that the AI should avoid
                         </p>
-                        <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
-                            ${insights.commonErrors.map(error => `
+                        <div class="feedback-list">
+                            ${insights.errorExamples.slice(0, 5).map(error => `
                                 <div style="background: #fef2f2; border-left: 3px solid #ef4444; padding: 1rem; border-radius: 0.5rem;">
-                                    <div style="font-weight: 600; margin-bottom: 0.25rem;">${error.type}</div>
-                                    <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                                        ${error.count} occurrences
+                                    <div style="font-size: 0.875rem; color: var(--text-primary); margin-bottom: 0.5rem;">
+                                        <strong>Quality Score: ${error.qualityScore.toFixed(2)}</strong>
+                                        ${error.errorType && error.errorType !== 'other' ? `<span style="margin-left: 0.5rem; color: var(--text-secondary);">(${error.errorType})</span>` : ''}
+                                    </div>
+                                    ${error.issue ? `
+                                        <div style="font-size: 0.875rem; margin-bottom: 0.5rem; font-style: italic;">
+                                            "${error.issue}"
+                                        </div>
+                                    ` : ''}
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                                        ${new Date(error.timestamp).toLocaleDateString()}
                                     </div>
                                 </div>
                             `).join('')}
