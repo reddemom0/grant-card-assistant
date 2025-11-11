@@ -15,6 +15,10 @@ import agentHandler from './api/agent-sdk-handler.js';
 import filesHandler from './api/files-handler.js';
 import pdfHandler from './api/pdf-handler.js';
 
+// Feedback system
+import feedbackHandler from './api/feedback.js';
+import feedbackNoteHandler from './api/feedback-note.js';
+
 // New direct API handlers
 import {
   handleChatRequest,
@@ -117,6 +121,12 @@ app.post('/api/chat', authenticateUser, handleChatRequest);
 app.get('/api/conversations/:id', authenticateUser, handleGetConversation);
 app.get('/api/conversations', authenticateUser, handleListConversations);
 app.delete('/api/conversations/:id', authenticateUser, handleDeleteConversation);
+
+// Feedback system - with authentication
+app.post('/api/feedback', authenticateUser, feedbackHandler);
+app.get('/api/feedback', authenticateUser, feedbackHandler);
+app.post('/api/feedback-note', authenticateUser, feedbackNoteHandler);
+app.get('/api/feedback-note', authenticateUser, feedbackNoteHandler);
 
 // Authentication endpoints
 app.use('/api', authRouter);
