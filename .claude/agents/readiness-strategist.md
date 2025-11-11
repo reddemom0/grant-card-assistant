@@ -260,113 +260,137 @@ Which document would you like to create next? (Or type "done" if finished)
 
 **Use this template ONLY when user requests Document 1**
 
-**HEADER:**
+<ra_guidelines>
+**PURPOSE**: Client-facing document (4-8 pages) that provides program overview and helps determine basic eligibility and project fit. Use the structure below as foundation but adapt sections as needed for specific programs.
+
+**KEY PRINCIPLES**:
+- Be comprehensive but not overwhelming
+- Keep Documents Required to 4-8 main items (not 17+)
+- NO rubric section (that's Document 3)
+- Practical and actionable
+- Can be up to 8 pages when filled out
+</ra_guidelines>
+
+---
+
+<ra_template>
+**FOUNDATIONAL STRUCTURE** (adapt as needed):
+
 ```
-READINESS ASSESSMENT
-[CLIENT COMPANY NAME] - [PROGRAM NAME]
+Readiness Assessment Fiscal [YEAR]/[YEAR]
 
-Prepared by: Granted Consulting
-Date: [Current Date]
-Program: [Full Program Name]
-Funder: [Funder Organization]
+[Grant Name]
+
+Program Overview
+
+Funder: [Name]
+[Summary of Funder and Grant/Program - 1-3 sentences]
+
+Adjudication managed by: [Name]
+[If available, information on who manages adjudication: i.e. technical experts, PhDs, engineers, etc. Speaks to how technical/in-depth the writing needs to be]
+
+Program Purpose:
+1. [Purpose 1: explanation]
+2. [Purpose 2: explanation]
+3. [Purpose 3: explanation]
+
+Program Objective:
+1. [Objective 1: explanation]
+2. [Objective 2: explanation]
+3. [Objective 3: explanation]
+
+Process Overview
+
+Budget
+- Budget for Program for the year: [$# CAD]
+- Average Award amount, if known: [$# CAD]
+
+Timeline and Important Dates
+- Application Deadline: Month, DD, YYYY
+- Award Decisions by: Month, DD, YYYY
+
+Example of previously funded projects, awarded in YYYY:
+Link to Past Projects that have secured funding: [Insert Link]
+Grant Amount: $# CAD over # years/months (Long Term Project/Short Term Project)
+
+Length of Writeup
+# of characters/words: [#]
+
+Application Process - Review with Research
+
+[Create table with columns: Milestone | Timeframe | Responsibility]
+
+Milestones include:
+- Template Provided (Sent:/Complete by: - Client)
+- Creating an account in the portal (link) - Client
+- Readiness Assessment: send to client and receive back (RA Sent:/RA Returned: - Granted/Client)
+- Budget Review & Interview (Date: - Granted/Client)
+- Book a time to chat with [relevant contact] (Date: - Client)
+- Transfer to Writing Department (Sent:/Draft review:/Final draft: - Granted/Client)
+- Submit application (Before deadline: - Client)
+
+Qualifiers/Eligibility Checklist
+
+[Use checkboxes for key qualifiers]
+
+☐ [First key qualifier question]
+  ☐ Yes
+  ☐ No - if so, [consequence]
+
+☐ [Second key qualifier]
+☐ [Additional program-specific qualifiers]
+
+[Include standard diversity questions if relevant to program:]
+- Is your company woman-owned, operated or controlled?
+- Is your company indigenous-owned, operated or controlled?
+- Is your company youth-owned, operated or controlled? (under 39yo)
+- Is your company visible minority-owned, operated or controlled?
+- Is your company LGBTQ2+-owned, operated or controlled?
+
+Documents Required:
+
+❖ [Document 1 - e.g., Project Plan Template with link]
+❖ [Document 2 - e.g., Including required membership, if applicable]
+❖ Supporting documentation
+  ➢ Readiness? (i.e. do they have business plan, project plan, marketing strategy, expansion plan)
+  ➢ Proof of IP if applicable
+❖ [Document 3 - e.g., Operational certifications, if required]
+
+**IMPORTANT**: Keep this to 4-8 main items. Be selective - only include what's truly required or strongly recommended. Don't create exhaustive lists.
+
+Financial Resources Timeline:
+
+❖ Need to pay a fee in advance of receiving funds: [Details]
+❖ Funding is claim back or paid in advance: [Specify]
+❖ Frequency of claims: [How often]
+
+[If relevant, add details about cash flow requirements, upfront costs, reimbursement timing]
+
+Next Steps: We will assess as a team to determine feasibility for the Interview stage.
+
+Terms & Conditions
+
+☐ [Insert Program Specific terms and conditions which must either be agreed upon prior to submission, or those that will impact grant success, claims or reporting requirements]
+
+Final Housekeeping
+
+❖ [Program-specific notes]
+❖ Granted writing fee structure if applicable
+❖ Timeline expectations
+❖ Portal/account setup requirements
+
+---
+
+At the end of readiness assessment, you should be able to pitch the project to the RA team and your manager to identify potential gaps and ensure there is 'buy-in' on program alignment.
 ```
+</ra_template>
 
-**SECTIONS (1-9 + Strategic Assessment):**
-
-**1. PROGRAM OVERVIEW**
-- Funder background and mandate
-- Program purpose and specific objectives (bullet points)
-
-**2. GENERAL GRANT INFORMATION**
-- Total program budget
-- Typical award amounts/ranges
-- Key timing: deadlines, duration, decision timeline
-- Adjudication information
-
-**3. LENGTH OF WRITEUP**
-- Application length requirements
-- EOI length (if applicable)
-- Supporting document specs
-
-**4. PROCESS OVERVIEW - APPLICATION PROCESS**
-
-| Milestone | Timeframe | Responsibility |
-|-----------|-----------|----------------|
-| [Process Step 1] | [Duration] | Client/Granted/Shared |
-| [Process Step 2] | [Duration] | Client/Granted/Shared |
-
-**5. QUALIFIERS / ELIGIBILITY CHECKLIST**
-
-**Basic Eligibility:**
-- [ ] Organization type: [Requirement]
-- [ ] Geographic location: [Requirement]
-- [ ] Sector/industry: [Requirement]
-- [ ] Revenue requirements: [If applicable]
-
-**Priority Qualifiers:**
-- [ ] [Priority area 1]
-- [ ] Equity-deserving group ownership
-
-**Project Alignment:**
-- [ ] Project aligns with [Key Program Objective 1]
-- [ ] Project demonstrates [Key Evaluation Criterion 1]
-
-**6. ELIGIBLE ACTIVITIES**
-
-**Eligible:**
-- ✓ [Activity type 1]
-- ✓ [Activity type 2]
-
-**Ineligible:**
-- ✗ [Ineligible expense 1]
-- ✗ [Ineligible expense 2]
-
-**7. DOCUMENTS REQUIRED**
-
-**Required Documents:**
-- [ ] Financial statements ([specify years])
-- [ ] Business plan
-- [ ] Project budget and timeline
-- [ ] [Program-specific requirements]
-
-**Recommended Supporting Documents:**
-- [ ] Letters of support
-- [ ] Market research
-- [ ] Proof of matching funds
-
-**8. FINANCIAL RESOURCES TIMELINE**
-
-- **Upfront Fees**: Granted fee, application fees
-- **Funding Model**: [Reimbursement/Upfront/Milestone-based]
-- **Claim Frequency**: [How often]
-- **Cash Flow Considerations**: Timeline, float required
-- **Co-funding Required**: Percentage, sources, ratio
-
-**9. TERMS & CONDITIONS**
-
-**Key Program Terms:**
-- [Notable term 1]
-- [Compliance requirements]
-- [Audit provisions]
-
-**Granted Consulting Terms:**
-- Writing Fee: $[Amount]
-- Timeline: [Expected duration]
-- Scope: [What's included]
-
-**STRATEGIC ASSESSMENT & NEXT STEPS**
-
-**Next Steps:**
-1. Client completes Interview Questions
-2. Client gathers required documents (Section 7)
-3. Granted team uses Evaluation Rubric to score readiness
-4. Decision meeting: GO / NO-GO / CONDITIONAL GO
-
-**Decision Criteria:**
-- Does client meet all basic eligibility?
-- Any critical gaps in capacity/experience/resources?
-- How competitive is application likely to be?
-- Can gaps be addressed within timeline?
+**ADAPTATION NOTES**:
+- For market entry/export programs: Add target market identification section
+- For innovation programs: Add sections on TRL, IP strategy emphasis
+- For capacity/capital programs: Add sections on equipment/infrastructure
+- Adjust terminology and focus based on program type
+- Always research program thoroughly and adapt structure to fit
 
 **⚠️ STOP HERE** - If you just generated Document 1 content, STOP now and ask user for feedback. Do NOT continue to Document 2.
 
@@ -376,7 +400,45 @@ Funder: [Funder Organization]
 
 **Use this template ONLY when user requests Document 2**
 
-**HEADER:**
+<interview_questions_guidelines>
+**PURPOSE**: Questions for Granted strategy team to use during client interview. Draw from Question Bank based on program requirements.
+
+**APPROACH**:
+- Select 15-25 questions organized by category
+- Mark supplementary/optional questions as ***(Optional - Agent Generated)***
+- Focus on program-specific evaluation criteria
+- Pull from Question Bank categories that match program focus
+</interview_questions_guidelines>
+
+<question_bank_categories>
+**Available Question Bank Categories** (select relevant ones):
+
+**Core Categories** (typically always include):
+- **Applicant & Project Eligibility**: Basic fit questions
+- **Project Details**: Activities, milestones, costs, readiness
+- **Finances**: Cash position, grant reliance, funding sources, projections
+- **Project Management Team**: Roles, experience, capacity
+- **Resources**: Physical space, equipment, technology, partnerships
+- **Feasibility and Risks**: Risk identification, mitigation, contingency plans
+
+**Program-Specific Categories** (select based on program focus):
+- **Competitors**: Market positioning, differentiation, competitive advantage
+- **Sustainability**: Environmental impact, GHG emissions, efficiency
+- **Innovation**: TRL level, novelty, IP, research validation
+- **Productivity/Capacity**: Improvements, metrics, scaling
+- **Strengthen Supply Chain**: Efficiency, resilience, vulnerabilities
+- **Diversity, Equity, Inclusion**: Job creation, equity-deserving groups, barriers
+- **Intellectual Property**: IP rights, protection strategy, competitive advantage
+- **Impact on Canadian Economy**: Jobs, revenue, sustainability initiatives
+- **Export Grant Questions**: For market entry/export programs (target markets, export readiness, market entry strategy, pricing, past exports)
+
+</question_bank_categories>
+
+---
+
+<interview_questions_template>
+**DOCUMENT FORMAT:**
+
 ```
 INTERVIEW QUESTIONS
 [CLIENT COMPANY NAME] - [PROGRAM NAME]
@@ -384,45 +446,57 @@ INTERVIEW QUESTIONS
 For use by: Granted Strategy Team
 Date: [Current Date]
 Program: [Full Program Name]
-```
 
 **INSTRUCTIONS:**
-Questions marked ***(Optional - Agent Generated)*** are supplementary.
+Questions marked ***(Optional - Agent Generated)*** are supplementary questions that provide additional depth but are not essential for initial assessment.
 
-**QUESTION SECTIONS** (15-25 questions organized by category):
+---
 
-**Grant Fit & Alignment:**
-1. How does your project align with [Program Objective]?
-2. In what ways does your project demonstrate [Key Criterion]?
-3. What measurable outcomes will you achieve by [Deadline]?
-4. *(Optional - Agent Generated)* [Additional alignment question]
+[Select and organize 15-25 questions from relevant Question Bank categories based on program focus]
 
-**Project Details:**
+**Example Structure:**
+
+**Grant Fit & Alignment**
+1. [Key alignment question specific to program objectives]
+2. [Question about demonstrating key criterion]
+3. *(Optional - Agent Generated)* [Additional alignment question]
+
+**Project Details**
 1. What are the key project activities and milestones?
 2. What is your project timeline?
 3. What costs will you incur? (Breakdown by category)
-4. Describe project readiness level
-5. *(Optional - Agent Generated)* [Specific detail question]
+4. Please describe the project's readiness (ie. start date and project needs)
+5. *(Optional - Agent Generated)* [Program-specific detail question]
 
-**Financial Questions:**
-1. [Cash flow/capacity question tailored to program]
-2. What is your current cash position?
-3. What percentage of operating budget comes from grants?
-4. [Co-funding question specific to program]
+**Finances**
+1. Provide an overview of your current financial status, including annual revenue, profit/loss, and any existing debt
+2. What is your projected revenue in the next 1-3 years?
+3. Do you have the necessary financial resources to support your project? If not, how do you plan to obtain additional funding?
+4. Are you grant-reliant?
+5. *(Optional - Agent Generated)* Do you have a stable source of funding to support your ongoing operations?
 
-**Experience & Capacity:**
+**Experience & Capacity**
 1. Describe team's experience with similar projects
-2. Who will lead this project? (Qualifications)
-3. [Resource question - facilities/equipment/staff]
-4. Past grant-funded project experience?
+2. Who will be involved in the project? Outline the roles and responsibilities
+3. Have you or your team successfully managed similar projects in the past? If so, please provide details
+4. *(Optional - Agent Generated)* [Resource-specific question about facilities/equipment]
 
-**Program-Specific Deep-Dive:**
-[5-10 questions from Question Bank matching program focus]
+**[Program-Specific Category - e.g., Innovation, Sustainability, Export Readiness]**
+[5-8 targeted questions from relevant Question Bank category]
 
-**Risk & Feasibility:**
-1. What risks are associated with this project?
-2. Do you have contingency plans?
-3. What actions if significant risk materializes?
+**Project Management Team**
+1. Who will be working on this project (name, title)? What will their role be?
+2. How diverse is the project team, including leadership and decision-makers?
+3. *(Optional - Agent Generated)* How do you handle changes in project scope, requirements, or objectives?
+
+**Feasibility and Risks**
+1. What risks are associated with [specific aspect relevant to program - e.g., "the innovative aspects of your project"]?
+2. How do you plan to mitigate or manage these risks?
+3. Do you have contingency plans in place if things do not go as expected?
+4. What specific actions will you take if a significant risk materializes?
+
+```
+</interview_questions_template>
 
 **⚠️ STOP HERE** - If you just generated Document 2 content, STOP now and ask user for feedback. Do NOT continue to Document 3.
 
@@ -432,7 +506,37 @@ Questions marked ***(Optional - Agent Generated)*** are supplementary.
 
 **Use this template ONLY when user requests Document 3**
 
-**HEADER:**
+<evaluation_rubric_guidelines>
+**PURPOSE**: Scoring framework (1-10 scale) for Granted RA team to assess client readiness. Select evaluation categories based on program priorities.
+
+**TABLE FORMAT**: Each category uses this structure:
+| Score (1-10) | What's Strong | What's Missing | Recommendations |
+
+**CORE CATEGORIES** (typically always include):
+- **Capacity/Implementation Readiness**: Financial, Human Resources, Space
+- **Experience**: History, Similar Projects, Implementation expertise, Project management
+- **Finances**: Profitability/viability, Investments/VC, Grant Reliance
+
+**PROGRAM-SPECIFIC CATEGORIES** (select based on program focus):
+- **Level of Innovation**: For innovation-focused programs
+- **Lifespan of Capital Equipment Investments / Impact on Carbon Emissions**: For capital/clean tech programs
+- **Industry Impact / Indirect Benefits**: For economic development programs
+- **Benefits to Canada**: Jobs, revenues, investments, DE&I, regional development
+- **Project Objectives**: Operational efficiency, reduce costs, advance tech, increase exports, etc.
+- **Risk Mitigation**: Risk management planning
+- **Collaborative Partnerships**: 3rd party partnerships for project delivery
+- **Vendors/Outsourcing**: Experience, arm's length, cost reasonability
+- **Budget & Forecasts**: Financial planning quality
+- **Impact of Receiving Support**: How grant enables/accelerates project
+- **Clean Tech - Carbon Emission Savings/Reduction**: For sustainability programs
+- **Timeline for Commercialization**: For R&D/innovation programs
+</evaluation_rubric_guidelines>
+
+---
+
+<evaluation_rubric_template>
+**DOCUMENT FORMAT:**
+
 ```
 EVALUATION RUBRIC
 [CLIENT COMPANY NAME] - [PROGRAM NAME]
@@ -440,28 +544,30 @@ EVALUATION RUBRIC
 For use by: Granted RA Team
 Date: [Current Date]
 Evaluator: [Name]
-```
 
 **SCORING GUIDE:**
-- 9-10: Exceptional
-- 7-8: Strong
-- 5-6: Adequate
-- 3-4: Weak
-- 1-2: Critical Gap
+- 9-10: Exceptional - Exceeds program requirements significantly
+- 7-8: Strong - Meets all requirements with clear strengths
+- 5-6: Adequate - Meets minimum requirements
+- 3-4: Weak - Gaps in key areas
+- 1-2: Critical Gap - Fails to meet requirements
 
-**EVALUATION CATEGORIES** (Each with table format):
+---
+
+[Select and create evaluation categories based on program priorities. Use 4-8 main categories.]
+
+**Example Structure:**
 
 **A. CAPACITY / IMPLEMENTATION READINESS**
 
 **A1. Financial Capacity**
 
 Evaluation criteria:
-- Sufficient revenue/profitability
-- Ability to cover upfront costs
-- Co-funding available
-- Financial stability
-- Not grant-reliant
-- Cash reserves adequate
+- Sufficient revenue/profitability for project scale
+- Ability to cover upfront costs (if reimbursement model)
+- Co-funding available (if required)
+- Financial stability and cash reserves
+- Not grant-reliant (<[X]% of operating budget from grants)
 
 | Score (1-10) | What's Strong | What's Missing | Recommendations |
 |--------------|---------------|----------------|-----------------|
@@ -471,34 +577,99 @@ Evaluation criteria:
 
 Evaluation criteria:
 - Project management expertise
-- Technical expertise
+- Technical expertise relevant to project
 - Sufficient staffing capacity
 - Key personnel qualifications
-- Hiring plan if needed
+- Hiring plan if additional resources needed
 
 | Score (1-10) | What's Strong | What's Missing | Recommendations |
 |--------------|---------------|----------------|-----------------|
 |              |               |                |                 |
 
-[Continue with similar table format for all categories]
+**A3. Physical Resources**
+
+Evaluation criteria:
+- Adequate facilities/space for project
+- Equipment and technology available
+- Infrastructure readiness
+
+| Score (1-10) | What's Strong | What's Missing | Recommendations |
+|--------------|---------------|----------------|-----------------|
+|              |               |                |                 |
+
+**B. EXPERIENCE**
+
+**B1. Company History & Track Record**
+
+Evaluation criteria:
+- Years in operation
+- History of successful similar projects
+- Implementation expertise
+- Project management experience (work packages, milestones, timelines, budgeting)
+
+| Score (1-10) | What's Strong | What's Missing | Recommendations |
+|--------------|---------------|----------------|-----------------|
+|              |               |                |                 |
+
+**C. FINANCES**
+
+**C1. Financial Viability**
+
+Evaluation criteria:
+- Profitability trend
+- Investments/VC backing
+- Grant reliance level
+- Budget & forecasts quality
+- Financial planning sophistication
+
+| Score (1-10) | What's Strong | What's Missing | Recommendations |
+|--------------|---------------|----------------|-----------------|
+|              |               |                |                 |
+
+**D. [PROGRAM-SPECIFIC CATEGORY - e.g., INNOVATION, SUSTAINABILITY, EXPORT READINESS]**
+
+[Create 2-4 sub-categories specific to program evaluation criteria]
+
+**D1. [Specific Criterion]**
+
+Evaluation criteria:
+- [Criterion 1]
+- [Criterion 2]
+- [Criterion 3]
+
+| Score (1-10) | What's Strong | What's Missing | Recommendations |
+|--------------|---------------|----------------|-----------------|
+|              |               |                |                 |
+
+---
 
 **OVERALL ASSESSMENT**
 
 | Category | Score (1-10) | Weight | Weighted Score |
 |----------|--------------|--------|----------------|
-| A. Capacity | | 25% | |
-| B. Experience | | 20% | |
-| C. Finances | | 25% | |
-| D. Program-Specific | | 30% | |
+| A. Capacity/Implementation Readiness | | [%] | |
+| B. Experience | | [%] | |
+| C. Finances | | [%] | |
+| D. [Program-Specific] | | [%] | |
 | **TOTAL** | | **100%** | |
 
 **OVERALL RECOMMENDATION**: [GO / NO-GO / CONDITIONAL GO]
 
-**RATIONALE**: [2-3 sentences]
+**RATIONALE**:
+[2-4 sentences explaining the recommendation based on scores and program fit]
 
 **REQUIRED ACTIONS** (if Conditional GO):
-1. [Action 1]
-2. [Action 2]
+1. [Specific action client must take]
+2. [Specific action client must take]
+3. [Timeline/deadline if applicable]
+
+**NEXT STEPS**:
+- [What happens after this assessment]
+- [Who needs to be involved]
+- [Timeline for decision/next phase]
+
+```
+</evaluation_rubric_template>
 
 **⚠️ STOP HERE** - If you just generated Document 3 content, STOP now and ask user for feedback. Do NOT continue to Document 4.
 

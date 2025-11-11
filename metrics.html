@@ -699,8 +699,13 @@
                                     </div>
                                 </div>
                                 <div class="feedback-content">
-                                    ${truncate(item.message_content, 300)}
+                                    ${truncate(parseMessageContent(item.message_content), 300)}
                                 </div>
+                                ${item.note && item.note.trim() ? `
+                                    <div style="background: #ecfdf5; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; border-left: 3px solid #10b981; font-size: 0.875rem;">
+                                        <strong>💬 User Feedback:</strong> ${item.note}
+                                    </div>
+                                ` : ''}
                                 <div class="feedback-meta">
                                     <span>📊 Revisions: ${item.revision_count}</span>
                                     <span>⏱️ Time: ${Math.round(item.completion_time_seconds / 60)}m</span>
@@ -749,11 +754,11 @@
                                     </div>
                                 </div>
                                 <div class="feedback-content">
-                                    ${truncate(item.message_content, 300)}
+                                    ${truncate(parseMessageContent(item.message_content), 300)}
                                 </div>
-                                ${item.feedback_text ? `
-                                    <div style="background: #fef2f2; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; font-size: 0.875rem;">
-                                        <strong>User Feedback:</strong> ${item.feedback_text}
+                                ${item.note && item.note.trim() ? `
+                                    <div style="background: #fef2f2; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; border-left: 3px solid #ef4444; font-size: 0.875rem;">
+                                        <strong>💬 User Feedback:</strong> ${item.note}
                                     </div>
                                 ` : ''}
                                 <div class="feedback-meta">
@@ -898,6 +903,26 @@
         function truncate(text, maxLength) {
             if (text.length <= maxLength) return text;
             return text.substring(0, maxLength) + '...';
+        }
+
+        function parseMessageContent(content) {
+            // Handle JSON array format from Claude API
+            if (typeof content === 'string' && content.trim().startsWith('[')) {
+                try {
+                    const parsed = JSON.parse(content);
+                    if (Array.isArray(parsed)) {
+                        // Extract text from all content blocks
+                        return parsed
+                            .filter(block => block.type === 'text')
+                            .map(block => block.text)
+                            .join('\n');
+                    }
+                } catch (e) {
+                    // If parsing fails, return as-is
+                    return content;
+                }
+            }
+            return content;
         }
 
         // Initialize on load
