@@ -703,6 +703,10 @@ class AgentInterface {
         this.streamingThinkingDiv = thinkingContent;
         this.streamingThinkingContent = '';
 
+        // Store a temporary message index (will be updated with real ID if available)
+        const messageIndex = messagesContainer.querySelectorAll('.message.assistant').length - 1;
+        messageDiv.setAttribute('data-message-index', messageIndex);
+
         return contentDiv;
     }
 
@@ -775,15 +779,23 @@ class AgentInterface {
             return;
         }
 
-        // Prevent rating twice
-        if (window.feedbackPanel.hasRated) {
+        // Get the message element and its index
+        const messageDiv = upBtn.closest('.message');
+        const messageIndex = parseInt(messageDiv.getAttribute('data-message-index'));
+
+        // Check if this specific message has been rated
+        const isRated = messageDiv.hasAttribute('data-rated');
+        if (isRated) {
             return;
         }
 
-        // Call the feedback panel's rateConversation method
-        const success = await window.feedbackPanel.rateConversation(rating);
+        // Call the feedback panel's rateConversation method with message index
+        const success = await window.feedbackPanel.rateConversation(rating, messageIndex);
 
         if (success) {
+            // Mark this message as rated
+            messageDiv.setAttribute('data-rated', 'true');
+
             // Visual feedback: highlight the selected button
             if (rating === 'positive') {
                 upBtn.classList.add('selected');

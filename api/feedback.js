@@ -70,6 +70,8 @@ export default async function handler(req, res) {
 
       const {
         conversationId,
+        messageId,       // UUID of the specific message being rated (optional if messageIndex provided)
+        messageIndex,    // Index of message (0-based) - alternative to messageId
         rating,          // 'positive' | 'negative'
         feedbackText,    // Optional text explanation
         revisionCount,   // How many times user asked for changes
@@ -84,6 +86,12 @@ export default async function handler(req, res) {
         });
       }
 
+      if (!messageId && messageIndex === undefined) {
+        return res.status(400).json({
+          error: 'Either messageId or messageIndex must be provided'
+        });
+      }
+
       // Validate rating value
       if (!['positive', 'negative'].includes(rating)) {
         return res.status(400).json({
@@ -94,9 +102,23 @@ export default async function handler(req, res) {
       // User ID is directly available from req.user (middleware already fetched from DB)
       const userId = user.id;
 
-      // Save feedback with implicit signals
+      // If messageIndex provided instead of messageId, look up the message ID
+      let actualMessageId = messageId;
+      if (!actualMessageId && messageIndex !== undefined) {
+        const messages = await db.getConversationMessages(conversationId);
+        const message = messages[messageIndex];
+        if (!message) {
+          return res.status(400).json({
+            error: `Message at index ${messageIndex} not found`
+          });
+        }
+        actualMessageId = message.id;
+      }
+
+      // Save feedback with implicit signals (now per-message)
       const savedFeedback = await db.saveConversationFeedback(
         conversationId,
+        actualMessageId,
         userId,
         rating,
         feedbackText,

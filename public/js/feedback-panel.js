@@ -460,11 +460,7 @@ class FeedbackPanel {
         `).join('');
     }
 
-    async rateConversation(rating) {
-        if (this.hasRated) {
-            return;
-        }
-
+    async rateConversation(rating, messageIndex) {
         try {
             const completionTime = Math.floor((Date.now() - this.conversationStartTime) / 1000);
 
@@ -476,6 +472,7 @@ class FeedbackPanel {
                 },
                 body: JSON.stringify({
                     conversationId: this.conversationId,
+                    messageIndex: messageIndex,
                     rating: rating,
                     revisionCount: this.revisionCount,
                     completionTime: completionTime,
@@ -486,8 +483,7 @@ class FeedbackPanel {
             const data = await response.json();
 
             if (data.success) {
-                this.hasRated = true;
-                console.log(`✅ Conversation rated: ${rating} (quality: ${data.feedback.quality_score})`);
+                console.log(`✅ Message ${messageIndex} rated: ${rating} (quality: ${data.feedback.quality_score})`);
                 return true;
             } else {
                 console.error('Failed to save rating:', data.error);
@@ -496,6 +492,7 @@ class FeedbackPanel {
         } catch (error) {
             console.error('Error saving rating:', error);
             alert('Failed to save rating. Please try again.');
+            return false;
         }
     }
 

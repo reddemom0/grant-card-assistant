@@ -202,9 +202,10 @@ export async function updateConversationTitle(conversationId, title) {
 // ===== FEEDBACK OPERATIONS =====
 
 /**
- * Save conversation feedback (thumbs up/down rating)
- * @param {string} conversationId
- * @param {number} userId
+ * Save per-message feedback (thumbs up/down rating)
+ * @param {string} conversationId - UUID of the conversation
+ * @param {string} messageId - UUID of the specific message being rated
+ * @param {number} userId - ID of the user providing feedback
  * @param {string} rating - 'positive' or 'negative'
  * @param {string} feedbackText - Optional text explanation
  * @param {object} implicitSignals - { revisionCount, completionTime, messageCount }
@@ -212,6 +213,7 @@ export async function updateConversationTitle(conversationId, title) {
  */
 export async function saveConversationFeedback(
   conversationId,
+  messageId,
   userId,
   rating,
   feedbackText = null,
@@ -224,9 +226,9 @@ export async function saveConversationFeedback(
 
     const result = await client.query(
       `INSERT INTO conversation_feedback
-       (conversation_id, user_id, rating, feedback_text, revision_count, completion_time_seconds, message_count, quality_score, created_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-       ON CONFLICT (conversation_id)
+       (conversation_id, message_id, user_id, rating, feedback_text, revision_count, completion_time_seconds, message_count, quality_score, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+       ON CONFLICT (message_id)
        DO UPDATE SET
          rating = EXCLUDED.rating,
          feedback_text = EXCLUDED.feedback_text,
@@ -238,6 +240,7 @@ export async function saveConversationFeedback(
        RETURNING *`,
       [
         conversationId,
+        messageId,
         userId,
         rating,
         feedbackText,
