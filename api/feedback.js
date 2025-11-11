@@ -105,8 +105,13 @@ export default async function handler(req, res) {
       // If messageIndex provided instead of messageId, look up the message ID
       let actualMessageId = messageId;
       if (!actualMessageId && messageIndex !== undefined) {
-        const messages = await db.getConversationMessages(conversationId);
-        const message = messages[messageIndex];
+        const conversation = await db.getConversation(conversationId);
+        if (!conversation || !conversation.messages) {
+          return res.status(404).json({
+            error: 'Conversation not found'
+          });
+        }
+        const message = conversation.messages[messageIndex];
         if (!message) {
           return res.status(400).json({
             error: `Message at index ${messageIndex} not found`
