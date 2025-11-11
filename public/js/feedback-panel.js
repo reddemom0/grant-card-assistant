@@ -29,18 +29,27 @@ class FeedbackPanel {
             return;
         }
 
-        // Wrap existing content in chat-panel
-        const existingContent = container.innerHTML;
-        container.innerHTML = `
-            <div class="feedback-layout">
-                <div class="chat-panel-wrapper">
-                    ${existingContent}
-                </div>
-                <div class="feedback-panel" id="feedback-panel">
-                    ${this.getFeedbackPanelHTML()}
-                </div>
-            </div>
-        `;
+        // Create wrapper divs WITHOUT destroying existing DOM
+        const feedbackLayout = document.createElement('div');
+        feedbackLayout.className = 'feedback-layout';
+
+        const chatPanelWrapper = document.createElement('div');
+        chatPanelWrapper.className = 'chat-panel-wrapper';
+
+        const feedbackPanel = document.createElement('div');
+        feedbackPanel.className = 'feedback-panel';
+        feedbackPanel.id = 'feedback-panel';
+        feedbackPanel.innerHTML = this.getFeedbackPanelHTML();
+
+        // Move existing content into wrapper (preserves DOM elements and references)
+        while (container.firstChild) {
+            chatPanelWrapper.appendChild(container.firstChild);
+        }
+
+        // Build new structure
+        feedbackLayout.appendChild(chatPanelWrapper);
+        feedbackLayout.appendChild(feedbackPanel);
+        container.appendChild(feedbackLayout);
 
         this.injectStyles();
     }
