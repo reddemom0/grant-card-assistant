@@ -451,7 +451,7 @@
         // Load overview of all agents
         async function loadOverview() {
             try {
-                const response = await fetch('/api/admin/feedback-learning/overview', {
+                const response = await fetch('/api/feedback-metrics?action=overview', {
                     credentials: 'include'
                 });
 
@@ -576,7 +576,7 @@
 
         // Load overview tab
         async function loadOverviewTab() {
-            const response = await fetch(`/api/admin/feedback-learning/stats/${selectedAgent}`, {
+            const response = await fetch(`/api/feedback-metrics?action=stats&agentType=${selectedAgent}`, {
                 credentials: 'include'
             });
             const data = await response.json();
@@ -665,7 +665,7 @@
 
         // Load high-quality feedback tab
         async function loadHighQualityTab() {
-            const response = await fetch(`/api/admin/feedback-learning/high-quality/${selectedAgent}?limit=20`, {
+            const response = await fetch(`/api/feedback-metrics?action=high-quality&agentType=${selectedAgent}&limit=20`, {
                 credentials: 'include'
             });
             const data = await response.json();
@@ -716,7 +716,7 @@
 
         // Load negative feedback tab
         async function loadNegativeTab() {
-            const response = await fetch(`/api/admin/feedback-learning/negative/${selectedAgent}?limit=10`, {
+            const response = await fetch(`/api/feedback-metrics?action=negative&agentType=${selectedAgent}&limit=10`, {
                 credentials: 'include'
             });
             const data = await response.json();
@@ -771,7 +771,7 @@
 
         // Load corrections tab
         async function loadCorrectionsTab() {
-            const response = await fetch(`/api/admin/feedback-learning/corrections/${selectedAgent}?limit=50`, {
+            const response = await fetch(`/api/feedback-metrics?action=corrections&agentType=${selectedAgent}&limit=50`, {
                 credentials: 'include'
             });
             const data = await response.json();
@@ -815,7 +815,7 @@
 
         // Load trends tab
         async function loadTrendsTab() {
-            const response = await fetch(`/api/admin/feedback-learning/trends/${selectedAgent}?days=30`, {
+            const response = await fetch(`/api/feedback-metrics?action=trends&agentType=${selectedAgent}&days=30`, {
                 credentials: 'include'
             });
             const data = await response.json();
