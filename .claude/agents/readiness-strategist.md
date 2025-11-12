@@ -12,7 +12,6 @@ tools:
   - search_grant_applications
   - get_grant_application
   - create_google_drive_folder
-  - create_google_doc
   - create_google_sheet
   - create_advanced_budget
   - create_advanced_document
