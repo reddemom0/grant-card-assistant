@@ -229,10 +229,16 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'end_turn') {
         console.log('✅ Agent completed successfully (end_turn)');
 
-        // Save content as-is (including thinking blocks)
+        // Save content (including thinking blocks, but filter out empty text blocks)
         // Extended thinking requires thinking blocks to be present in conversation history
         // for proper context in subsequent turns
-        const contentToSave = fullResponse.content;
+        const contentToSave = fullResponse.content.filter(block => {
+          // Remove empty text blocks that would cause API errors when loaded
+          if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
+            return false;
+          }
+          return true;
+        });
 
         // Save final messages to database
         const { saveMessage } = await import('../database/messages.js');
@@ -259,10 +265,17 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
 
-        // Clean content blocks: remove index field only
+        // Clean content blocks: remove index field and filter out empty text blocks
         // NOTE: Thinking blocks MUST be kept in both conversation history AND database
         // (Claude API requirement when extended thinking is enabled - context needed across turns)
         const cleanedContent = fullResponse.content
+          .filter(block => {
+            // Remove empty text blocks that would cause API errors
+            if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
+              return false;
+            }
+            return true;
+          })
           .map(block => {
             const { index, ...cleanBlock} = block;
             return cleanBlock;
@@ -340,10 +353,16 @@ export async function runAgent({
           sessionId
         });
 
-        // Save what we have (including thinking blocks for extended thinking context)
+        // Save what we have (including thinking blocks, but filter out empty text blocks)
         const { saveMessage } = await import('../database/messages.js');
+        const contentToSave = fullResponse.content.filter(block => {
+          if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
+            return false;
+          }
+          return true;
+        });
         await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', fullResponse.content);
+        await saveMessage(conversationId, 'assistant', contentToSave);
 
         closeSSE(res);
 
@@ -360,8 +379,14 @@ export async function runAgent({
         console.log('✓ Agent hit stop sequence');
 
         const { saveMessage } = await import('../database/messages.js');
+        const contentToSave = fullResponse.content.filter(block => {
+          if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
+            return false;
+          }
+          return true;
+        });
         await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', fullResponse.content);
+        await saveMessage(conversationId, 'assistant', contentToSave);
 
         closeSSE(res);
 
