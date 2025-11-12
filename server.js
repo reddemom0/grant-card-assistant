@@ -447,6 +447,14 @@ app.get('/dashboard', (req, res) => {
   res.sendFile('dashboard.html', { root: '.' });
 });
 
+app.get('/metrics', (req, res) => {
+  res.sendFile('metrics.html', { root: '.' });
+});
+
+app.get('/usage', (req, res) => {
+  res.sendFile('usage.html', { root: '.' });
+});
+
 app.get('/admin*', (req, res) => {
   res.sendFile('admin.html', { root: '.' });
 });

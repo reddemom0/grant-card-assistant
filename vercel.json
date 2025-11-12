@@ -90,6 +90,10 @@
       "dest": "/dashboard.html"
     },
     {
+      "src": "/metrics",
+      "dest": "/metrics.html"
+    },
+    {
       "src": "/usage",
       "dest": "/usage.html"
     },
