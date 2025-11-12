@@ -279,10 +279,11 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
 
-        // Clean content blocks: remove index field and filter out thinking blocks
-        // Thinking blocks should not be included in conversation history
+        // Clean content blocks: remove index field only
+        // NOTE: Thinking blocks MUST be kept in conversation history when tool_use blocks are present
+        // (Claude API requirement when extended thinking is enabled)
+        // They are filtered out when saving to database (see lines 234-236, 365-367, 387-389)
         const cleanedContent = fullResponse.content
-          .filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking')
           .map(block => {
             const { index, ...cleanBlock} = block;
             return cleanBlock;
