@@ -786,26 +786,78 @@
                     </div>
 
                     <div style="background: var(--background); padding: 0.5rem; border-radius: 0.5rem;">
-                        ${data.applications.map(app => {
+                        ${data.applications.map((app, index) => {
                             const appliedDate = new Date(app.applied_at);
                             const learningDate = app.learning_updated_at ? new Date(app.learning_updated_at) : null;
                             // files_loaded is already an array from the API
                             const filesLoaded = Array.isArray(app.files_loaded) ? app.files_loaded : [];
 
+                            // Extract snippets from learning content
+                            const getSnippet = (content, maxLength = 200) => {
+                                if (!content) return '';
+                                // Remove markdown headers and get first meaningful paragraph
+                                const lines = content.split('\n').filter(line =>
+                                    line.trim() &&
+                                    !line.startsWith('#') &&
+                                    !line.startsWith('**') &&
+                                    !line.startsWith('---')
+                                );
+                                const text = lines.slice(0, 3).join(' ').trim();
+                                return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+                            };
+
+                            const patternsSnippet = app.learning_content?.['learned-patterns.md']
+                                ? getSnippet(app.learning_content['learned-patterns.md'])
+                                : '';
+                            const errorsSnippet = app.learning_content?.['common-errors.md']
+                                ? getSnippet(app.learning_content['common-errors.md'])
+                                : '';
+
                             return `
-                                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                                    <div style="flex: 1;">
-                                        <div style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem;">
-                                            ${app.conversation_title || 'Untitled Conversation'}
+                                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
+                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                                        <div style="flex: 1;">
+                                            <div style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem;">
+                                                ${app.conversation_title || 'Untitled Conversation'}
+                                            </div>
+                                            <div style="font-size: 0.75rem; color: var(--text-secondary);">
+                                                <span>📁 Files: ${filesLoaded.join(', ')}</span>
+                                                ${learningDate ? `<span style="margin-left: 1rem;">🕐 Learning from: ${learningDate.toLocaleDateString()}</span>` : ''}
+                                            </div>
                                         </div>
-                                        <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                                            <span>📁 Files: ${filesLoaded.join(', ')}</span>
-                                            ${learningDate ? `<span style="margin-left: 1rem;">🕐 Learning from: ${learningDate.toLocaleDateString()}</span>` : ''}
+                                        <div style="text-align: right; font-size: 0.75rem; color: var(--text-secondary);">
+                                            <div>${appliedDate.toLocaleDateString()}</div>
+                                            <div>${appliedDate.toLocaleTimeString()}</div>
                                         </div>
                                     </div>
-                                    <div style="text-align: right; font-size: 0.75rem; color: var(--text-secondary);">
-                                        <div>${appliedDate.toLocaleDateString()}</div>
-                                        <div>${appliedDate.toLocaleTimeString()}</div>
+
+                                    <!-- Learning content preview -->
+                                    <div style="margin-top: 0.75rem; background: #f8f9fa; padding: 0.75rem; border-radius: 0.375rem; border-left: 3px solid var(--primary);">
+                                        <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                                            🧠 What the AI Learned:
+                                        </div>
+                                        ${patternsSnippet ? `
+                                            <div style="font-size: 0.75rem; margin-bottom: 0.5rem;">
+                                                <strong style="color: var(--success);">✅ Success Patterns:</strong>
+                                                <div style="color: var(--text-secondary); margin-top: 0.25rem; font-style: italic;">
+                                                    ${patternsSnippet}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        ${errorsSnippet ? `
+                                            <div style="font-size: 0.75rem;">
+                                                <strong style="color: var(--error);">❌ Errors to Avoid:</strong>
+                                                <div style="color: var(--text-secondary); margin-top: 0.25rem; font-style: italic;">
+                                                    ${errorsSnippet}
+                                                </div>
+                                            </div>
+                                        ` : ''}
+                                        <button
+                                            onclick="showFullLearning(${index}, ${JSON.stringify(app.learning_content).replace(/"/g, '&quot;')})"
+                                            style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; font-size: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 0.25rem; cursor: pointer;"
+                                        >
+                                            View Full Learning Content →
+                                        </button>
                                     </div>
                                 </div>
                             `;
@@ -822,6 +874,113 @@
                     </div>
                 `;
             }
+        }
+
+        // Show full learning content in modal
+        function showFullLearning(index, learningContent) {
+            // Create modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                padding: 2rem;
+            `;
+
+            const modalContent = document.createElement('div');
+            modalContent.style.cssText = `
+                background: white;
+                max-width: 800px;
+                width: 100%;
+                max-height: 80vh;
+                overflow-y: auto;
+                border-radius: 0.75rem;
+                padding: 2rem;
+            `;
+
+            let contentHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2 style="margin: 0; font-size: 1.25rem; color: var(--text-primary);">
+                        🧠 Full Learning Content
+                    </h2>
+                    <button onclick="this.closest('[style*=fixed]').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
+                </div>
+            `;
+
+            // Format markdown content for display
+            const formatContent = (content) => {
+                if (!content) return '';
+                return content
+                    .split('\n')
+                    .map(line => {
+                        if (line.startsWith('# ')) {
+                            return `<h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.125rem;">${line.substring(2)}</h3>`;
+                        } else if (line.startsWith('## ')) {
+                            return `<h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1rem; font-weight: 600;">${line.substring(3)}</h4>`;
+                        } else if (line.startsWith('### ')) {
+                            return `<h5 style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 600;">${line.substring(4)}</h5>`;
+                        } else if (line.startsWith('**') && line.endsWith('**')) {
+                            return `<p style="font-weight: 600; margin: 0.5rem 0;">${line.replace(/\*\*/g, '')}</p>`;
+                        } else if (line.startsWith('---')) {
+                            return '<hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">';
+                        } else if (line.trim()) {
+                            return `<p style="margin: 0.5rem 0; line-height: 1.6;">${line}</p>`;
+                        }
+                        return '';
+                    })
+                    .join('');
+            };
+
+            if (learningContent['learned-patterns.md']) {
+                contentHTML += `
+                    <div style="background: #f0fdf4; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--success); margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem 0; color: var(--success); font-size: 1rem;">✅ Learned Success Patterns</h3>
+                        <div style="font-size: 0.875rem; color: var(--text-primary);">
+                            ${formatContent(learningContent['learned-patterns.md'])}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (learningContent['common-errors.md']) {
+                contentHTML += `
+                    <div style="background: #fef2f2; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--error); margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem 0; color: var(--error); font-size: 1rem;">❌ Common Errors to Avoid</h3>
+                        <div style="font-size: 0.875rem; color: var(--text-primary);">
+                            ${formatContent(learningContent['common-errors.md'])}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (learningContent['user-corrections.md']) {
+                contentHTML += `
+                    <div style="background: #fef9ef; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--warning); margin-bottom: 1.5rem;">
+                        <h3 style="margin: 0 0 1rem 0; color: var(--warning); font-size: 1rem;">📝 User Corrections</h3>
+                        <div style="font-size: 0.875rem; color: var(--text-primary);">
+                            ${formatContent(learningContent['user-corrections.md'])}
+                        </div>
+                    </div>
+                `;
+            }
+
+            modalContent.innerHTML = contentHTML;
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
         }
 
         // Trigger learning update

@@ -216,12 +216,22 @@ export default async function handler(req, res) {
 
         const appStats = await getLearningApplicationStats(agentType);
 
-        // Parse files_loaded from JSON string to array
+        // Parse files_loaded from JSON string to array and get learning content
+        const { getLearningMemoryFiles } = await import('../src/database/learning-memory-storage.js');
+        const learningFiles = await getLearningMemoryFiles(agentType);
+
+        // Create a map of file content for quick lookup
+        const fileContentMap = {};
+        learningFiles.forEach(file => {
+          fileContentMap[file.file_name] = file.content;
+        });
+
         const parsedApplications = applications.map(app => ({
           ...app,
           files_loaded: typeof app.files_loaded === 'string'
             ? JSON.parse(app.files_loaded)
-            : app.files_loaded
+            : app.files_loaded,
+          learning_content: fileContentMap // Include all learning content
         }));
 
         return res.status(200).json({
