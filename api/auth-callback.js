@@ -109,23 +109,24 @@ export default async function handler(req, res) {
          google_access_token = $5,
          google_refresh_token = COALESCE($6, users.google_refresh_token),
          google_token_expiry = $7
-       RETURNING id, email, name, picture`,
+       RETURNING id, email, name, picture, role`,
       [userInfo.id, userInfo.email, userInfo.name, userInfo.picture, tokens.access_token, tokens.refresh_token, tokenExpiry]
     );
 
     console.log('✅ Stored OAuth tokens (refresh_token present:', !!tokens.refresh_token, ')');
 
     const user = userResult.rows[0];
-    console.log('✅ User created/updated:', { id: user.id, email: user.email });
+    console.log('✅ User created/updated:', { id: user.id, email: user.email, role: user.role });
 
-    // Create JWT token with picture included
+    // Create JWT token with picture and role included
     console.log('🔵 Creating JWT token...');
     const token = jwt.sign(
       {
         userId: user.id,
         email: user.email,
         name: user.name,
-        picture: user.picture
+        picture: user.picture,
+        role: user.role || 'user'
       },
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
