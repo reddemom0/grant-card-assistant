@@ -374,25 +374,29 @@ export const GOOGLE_DOCS_TOOLS = [
     }
   },
   {
-    name: 'create_google_sheet',
-    description: 'Create a Google Sheet with budget template for grant applications. Creates a spreadsheet with two tabs: "Eligible Expenses" (pre-populated with categories for client to fill amounts) and "Ineligible Expenses" (reference list). Returns shareable link.',
+    name: 'create_advanced_budget',
+    description: 'Create a comprehensive budget spreadsheet using Google Sheets API with program-specific templates. Generates multi-sheet workbooks with branded formatting, formulas, validation rules, and dynamic budget tables tailored to specific grant programs (e.g., ETG, BCIC Ignite, CanExport). Supports custom budget data injection for automated budget generation.',
     input_schema: {
       type: 'object',
       properties: {
         title: {
           type: 'string',
-          description: 'Sheet title (e.g., "BCIC Ignite Budget Template - TechVentures Inc.")'
+          description: 'Spreadsheet title (e.g., "ETG Budget - Q1 2024 Training Program")'
         },
-        grant_program: {
+        grantProgram: {
           type: 'string',
-          description: 'Optional: Grant program name to customize eligible expense categories (e.g., "BCIC Ignite", "ETG"). If not provided, uses default categories.'
+          description: 'Grant program name to determine template structure and categories (e.g., "ETG", "BCIC Ignite", "CanExport SMEs"). Each program has a specific template with appropriate expense categories, formulas, and validation rules.'
         },
-        parent_folder_id: {
+        budgetData: {
+          type: 'object',
+          description: 'Optional: Structured budget data to populate the spreadsheet dynamically. If provided, the tool will generate budget rows from this data instead of using a blank template. Format depends on grant program requirements.'
+        },
+        parentFolderId: {
           type: 'string',
-          description: 'Optional: ID of the parent folder to place this sheet in (from create_google_drive_folder result).'
+          description: 'Optional: Google Drive folder ID to create the spreadsheet in (from create_google_drive_folder). If not provided, creates in user\'s root Drive.'
         }
       },
-      required: ['title']
+      required: ['title', 'grantProgram']
     }
   },
   {
