@@ -10,6 +10,7 @@ import * as hubspot from './hubspot.js';
 import * as googleDrive from './google-drive.js';
 import * as googleDocs from './google-docs.js';
 import * as googleSheets from './google-sheets.js';
+import { createAdvancedDocumentTool } from './google-docs-advanced.js';
 import { isServerTool } from './definitions.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -201,20 +202,6 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         );
         break;
 
-      case 'create_google_doc':
-        // Path to Granted Consulting logo (relative to this file)
-        const logoPath = path.join(__dirname, '../assets/granted-logo.jpeg');
-
-        result = await googleDocs.createGoogleDoc(
-          input.title,
-          input.content,
-          input.folder_name,
-          userId,  // User ID for OAuth
-          logoPath,  // Logo file path
-          input.parent_folder_id  // Parent folder ID (optional)
-        );
-        break;
-
       case 'create_google_sheet':
         result = await googleSheets.createGoogleSheet(
           input.title,
@@ -222,6 +209,14 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           input.parent_folder_id,  // Parent folder ID (optional)
           input.grant_program  // Grant program for custom categories (optional)
         );
+        break;
+
+      case 'create_advanced_document':
+        result = await createAdvancedDocumentTool(input, {
+          conversationId,
+          userId,
+          agentType
+        });
         break;
 
       // ============================================================================

@@ -374,32 +374,6 @@ export const GOOGLE_DOCS_TOOLS = [
     }
   },
   {
-    name: 'create_google_doc',
-    description: 'Create a formatted Google Doc with readiness assessment content. Returns a shareable link. Use this AFTER generating the complete assessment to create a professional document that can be shared with clients. Can be placed in a specific folder by providing parent_folder_id.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        title: {
-          type: 'string',
-          description: 'Document title (e.g., "BCIC Ignite Readiness Assessment - TechVentures Inc.")'
-        },
-        content: {
-          type: 'string',
-          description: 'The complete assessment content with markdown formatting. Use ## for headings, ### for subheadings, - for bullet lists, **bold** for emphasis, and tables where appropriate.'
-        },
-        folder_name: {
-          type: 'string',
-          description: 'Optional (LEGACY): Folder name to organize the document. Prefer using parent_folder_id instead for better control.'
-        },
-        parent_folder_id: {
-          type: 'string',
-          description: 'Optional: ID of the parent folder to place this document in (from create_google_drive_folder result). Takes precedence over folder_name.'
-        }
-      },
-      required: ['title', 'content']
-    }
-  },
-  {
     name: 'create_google_sheet',
     description: 'Create a Google Sheet with budget template for grant applications. Creates a spreadsheet with two tabs: "Eligible Expenses" (pre-populated with categories for client to fill amounts) and "Ineligible Expenses" (reference list). Returns shareable link.',
     input_schema: {
@@ -419,6 +393,38 @@ export const GOOGLE_DOCS_TOOLS = [
         }
       },
       required: ['title']
+    }
+  },
+  {
+    name: 'create_advanced_document',
+    description: 'Create a properly formatted Google Doc from template configuration using Google Docs API v1 (NOT markdown). Supports Readiness Assessments, Interview Questions, and Evaluation Rubrics for hiring, market-expansion, training, rd, loan, and investment grant types. Documents include branded formatting, structured tables, callouts, and placeholders for client data.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Document title (e.g., "CanExport Readiness Assessment - Acme Corp")'
+        },
+        grantType: {
+          type: 'string',
+          enum: ['hiring', 'market-expansion', 'training', 'rd', 'loan', 'investment'],
+          description: 'Type of grant program'
+        },
+        documentType: {
+          type: 'string',
+          enum: ['readiness-assessment', 'interview-questions', 'evaluation-rubric'],
+          description: 'Type of document to create'
+        },
+        data: {
+          type: 'object',
+          description: 'Optional: Data to populate template placeholders (e.g., { client_name: "Acme Corp", program_name: "CanExport SMEs" }). Each template has default placeholders that can be overridden.'
+        },
+        parentFolderId: {
+          type: 'string',
+          description: 'Optional: Google Drive folder ID to create the document in. If not provided, creates in user\'s root Drive.'
+        }
+      },
+      required: ['title', 'grantType', 'documentType']
     }
   }
 ];

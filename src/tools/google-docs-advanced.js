@@ -4,6 +4,8 @@
  */
 
 import { google } from 'googleapis';
+import { getTemplate } from './doc-templates/index.js';
+import { createGoogleDocFromTemplate } from './google-docs-construction.js';
 
 /**
  * Brand colors (Granted Consulting)
@@ -420,4 +422,80 @@ export async function setDocumentStyles(docsClient, documentId) {
       ]
     }
   });
+}
+
+/**
+ * Tool wrapper: Create advanced document from template
+ * Integrates with Direct Claude API tool system
+ * @param {Object} input - Tool input parameters
+ * @param {string} input.title - Document title
+ * @param {string} input.grantType - Grant type (hiring, market-expansion, training, rd, loan, investment)
+ * @param {string} input.documentType - Document type (readiness-assessment, interview-questions, evaluation-rubric)
+ * @param {Object} input.data - Optional data for placeholders
+ * @param {string} input.parentFolderId - Optional parent folder ID
+ * @param {Object} context - Execution context with userId
+ * @returns {Promise<Object>} Result with success status and document URL
+ */
+export async function createAdvancedDocumentTool(input, context) {
+  const { title, grantType, documentType, data = {}, parentFolderId } = input;
+  const { userId } = context || {};
+
+  console.log(`📄 Creating advanced document: ${title}`);
+  console.log(`   Grant Type: ${grantType}`);
+  console.log(`   Document Type: ${documentType}`);
+  console.log(`   User ID: ${userId}`);
+
+  try {
+    // Validate required fields
+    if (!title || !grantType || !documentType) {
+      return {
+        success: false,
+        error: 'Missing required fields: title, grantType, and documentType are required'
+      };
+    }
+
+    if (!userId) {
+      return {
+        success: false,
+        error: 'User ID is required for document creation. Ensure user is authenticated.'
+      };
+    }
+
+    // Get template
+    const template = getTemplate(grantType, documentType);
+    if (!template) {
+      return {
+        success: false,
+        error: `No template found for grant type "${grantType}" and document type "${documentType}"`
+      };
+    }
+
+    console.log(`   ✓ Template found: ${template.title || 'Untitled'}`);
+
+    // Create document using template
+    const result = await createGoogleDocFromTemplate(
+      title,
+      userId,
+      template,
+      data,
+      parentFolderId
+    );
+
+    console.log(`   ✓ Document created: ${result.url}`);
+
+    return {
+      success: true,
+      documentId: result.documentId,
+      url: result.url,
+      message: `Created ${documentType} for ${grantType} grant type`
+    };
+
+  } catch (error) {
+    console.error(`   ✗ Failed to create document:`, error);
+    return {
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    };
+  }
 }
