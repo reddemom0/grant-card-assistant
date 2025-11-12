@@ -360,10 +360,14 @@ export async function runAgent({
           sessionId
         });
 
-        // Save what we have
+        // Save what we have (filter out thinking blocks)
         const { saveMessage } = await import('../database/messages.js');
+        const contentToSave = Array.isArray(fullResponse.content)
+          ? fullResponse.content.filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking')
+          : fullResponse.content;
+
         await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', fullResponse.content);
+        await saveMessage(conversationId, 'assistant', contentToSave);
 
         closeSSE(res);
 
@@ -380,8 +384,12 @@ export async function runAgent({
         console.log('✓ Agent hit stop sequence');
 
         const { saveMessage } = await import('../database/messages.js');
+        const contentToSave = Array.isArray(fullResponse.content)
+          ? fullResponse.content.filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking')
+          : fullResponse.content;
+
         await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', fullResponse.content);
+        await saveMessage(conversationId, 'assistant', contentToSave);
 
         closeSSE(res);
 
