@@ -723,6 +723,24 @@
                 ` : ''}
 
                 <div class="section">
+                    <div class="section-header">
+                        <h3 class="section-title">💭 Sentiment Analysis</h3>
+                        <button class="btn btn-primary" onclick="triggerSentimentAnalysis()">
+                            Analyze Sentiment Now
+                        </button>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
+                        AI-powered emotional tone analysis of user feedback
+                    </p>
+                    <div id="sentiment-container">
+                        <div class="loading" style="padding: 2rem;">
+                            <div class="loading-spinner"></div>
+                            <p style="margin-top: 1rem; color: var(--text-secondary);">Loading sentiment data...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
                     <h3 class="section-title">📜 Learning Application History</h3>
                     <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
                         Track when learned patterns were applied to actual conversations
@@ -736,7 +754,8 @@
                 </div>
             `;
 
-            // Load learning history
+            // Load sentiment data and learning history
+            loadSentimentData();
             loadLearningHistory();
         }
 
@@ -981,6 +1000,148 @@
                     modal.remove();
                 }
             });
+        }
+
+        // Load sentiment data
+        async function loadSentimentData() {
+            if (!selectedAgent) return;
+
+            const container = document.getElementById('sentiment-container');
+
+            try {
+                // Check pending count
+                const pendingResponse = await fetch(`/api/sentiment-analysis?action=pending-count`, {
+                    credentials: 'include'
+                });
+                const pendingData = await pendingResponse.json();
+
+                // Get existing stats
+                const statsResponse = await fetch(`/api/sentiment-analysis?action=stats&agentType=${selectedAgent}&days=30`, {
+                    credentials: 'include'
+                });
+                const statsData = await statsResponse.json();
+
+                if (pendingData.pendingCount === 0 && statsData.stats.total === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💭</div>
+                            <p>No sentiment analysis data yet</p>
+                            <p style="font-size: 0.875rem; margin-top: 0.5rem;">
+                                Sentiment analysis will be available once there is feedback to analyze
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = `
+                    <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">ANALYZED FEEDBACK</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${statsData.stats.total}</div>
+                            </div>
+                            <div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">PENDING ANALYSIS</div>
+                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--warning);">${pendingData.pendingCount}</div>
+                            </div>
+                        </div>
+
+                        ${statsData.stats.total > 0 ? `
+                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+                                <div style="text-align: center;">
+                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--success);">${statsData.stats.positive}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">😊 Positive</div>
+                                    <div style="font-size: 0.875rem; color: var(--success); font-weight: 600;">${statsData.stats.positivePercent.toFixed(1)}%</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--error);">${statsData.stats.negative}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">😞 Negative</div>
+                                    <div style="font-size: 0.875rem; color: var(--error); font-weight: 600;">${statsData.stats.negativePercent.toFixed(1)}%</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--info);">${statsData.stats.neutral}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">😐 Neutral</div>
+                                    <div style="font-size: 0.875rem; color: var(--info); font-weight: 600;">${statsData.stats.neutralPercent.toFixed(1)}%</div>
+                                </div>
+                                <div style="text-align: center;">
+                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--warning);">${statsData.stats.mixed}</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">🤔 Mixed</div>
+                                    <div style="font-size: 0.875rem; color: var(--warning); font-weight: 600;">${statsData.stats.mixedPercent.toFixed(1)}%</div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center;">
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">AVERAGE SENTIMENT SCORE</div>
+                                <div style="font-size: 1.125rem; font-weight: 700; color: ${statsData.stats.averageScore >= 0 ? 'var(--success)' : 'var(--error)'};">
+                                    ${statsData.stats.averageScore.toFixed(2)}
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Range: -1.0 to 1.0</div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading sentiment data:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Error loading sentiment data</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--error);">
+                            ${error.message}
+                        </p>
+                    </div>
+                `;
+            }
+        }
+
+        // Trigger sentiment analysis
+        async function triggerSentimentAnalysis() {
+            if (!selectedAgent) return;
+
+            const button = event.currentTarget;
+            button.disabled = true;
+            button.textContent = 'Analyzing...';
+
+            try {
+                const response = await fetch('/api/sentiment-analysis', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action: 'analyze-pending'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Reload sentiment data
+                    await loadSentimentData();
+
+                    // Show success message
+                    if (result.analyzed > 0) {
+                        alert(`✅ Sentiment analysis complete!\n\n` +
+                              `Analyzed: ${result.analyzed} feedback items\n` +
+                              `Positive: ${result.stats.positive} (${result.stats.positivePercent.toFixed(1)}%)\n` +
+                              `Negative: ${result.stats.negative} (${result.stats.negativePercent.toFixed(1)}%)\n` +
+                              `Neutral: ${result.stats.neutral} (${result.stats.neutralPercent.toFixed(1)}%)\n` +
+                              `Mixed: ${result.stats.mixed} (${result.stats.mixedPercent.toFixed(1)}%)\n` +
+                              `Average Score: ${result.stats.averageScore.toFixed(2)}`);
+                    } else {
+                        alert('✅ No feedback pending analysis');
+                    }
+                } else {
+                    alert(`Failed to analyze sentiment: ${result.error}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Analyze Sentiment Now';
+            }
         }
 
         // Trigger learning update
