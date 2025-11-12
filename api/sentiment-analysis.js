@@ -85,22 +85,29 @@ export default async function handler(req, res) {
 
           const stats = await getSentimentStats(agentType, parseInt(days) || 30);
 
+          // Handle NULL values from database
+          const total = parseInt(stats?.total) || 0;
+          const positive = parseInt(stats?.positive) || 0;
+          const negative = parseInt(stats?.negative) || 0;
+          const neutral = parseInt(stats?.neutral) || 0;
+          const mixed = parseInt(stats?.mixed) || 0;
+
           return res.status(200).json({
             success: true,
             agentType,
             days: parseInt(days) || 30,
             stats: {
-              total: parseInt(stats.total),
-              positive: parseInt(stats.positive),
-              negative: parseInt(stats.negative),
-              neutral: parseInt(stats.neutral),
-              mixed: parseInt(stats.mixed),
-              averageScore: parseFloat(stats.avg_score) || 0,
-              averageQuality: parseFloat(stats.avg_quality) || 0,
-              positivePercent: stats.total > 0 ? (parseInt(stats.positive) / parseInt(stats.total)) * 100 : 0,
-              negativePercent: stats.total > 0 ? (parseInt(stats.negative) / parseInt(stats.total)) * 100 : 0,
-              neutralPercent: stats.total > 0 ? (parseInt(stats.neutral) / parseInt(stats.total)) * 100 : 0,
-              mixedPercent: stats.total > 0 ? (parseInt(stats.mixed) / parseInt(stats.total)) * 100 : 0
+              total,
+              positive,
+              negative,
+              neutral,
+              mixed,
+              averageScore: parseFloat(stats?.avg_score) || 0,
+              averageQuality: parseFloat(stats?.avg_quality) || 0,
+              positivePercent: total > 0 ? (positive / total) * 100 : 0,
+              negativePercent: total > 0 ? (negative / total) * 100 : 0,
+              neutralPercent: total > 0 ? (neutral / total) * 100 : 0,
+              mixedPercent: total > 0 ? (mixed / total) * 100 : 0
             }
           });
 

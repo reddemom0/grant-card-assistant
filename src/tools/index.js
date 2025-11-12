@@ -14,6 +14,7 @@ import { webFetch } from './web-fetch.js';
 import { todoWrite } from './todo-write.js';
 import { hubspotQuery } from './hubspot.js';
 import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
+import { createAdvancedDocumentTool } from './google-docs-advanced.js';
 
 /**
  * Tool Definitions for Claude Function Calling
@@ -291,6 +292,40 @@ export const TOOLS = {
       required: ['title', 'grantProgram']
     },
     execute: createAdvancedBudgetTool
+  },
+
+  create_advanced_document: {
+    name: 'create_advanced_document',
+    description: 'Create a properly formatted Google Doc from template configuration using Google Docs API v1 (NOT markdown). Supports Readiness Assessments, Interview Questions, and Evaluation Rubrics for hiring, market-expansion, training, rd, loan, and investment grant types. Documents include branded formatting, structured tables, callouts, and placeholders for client data.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Document title (e.g., "CanExport Readiness Assessment - Acme Corp")'
+        },
+        grantType: {
+          type: 'string',
+          enum: ['hiring', 'market-expansion', 'training', 'rd', 'loan', 'investment'],
+          description: 'Type of grant program'
+        },
+        documentType: {
+          type: 'string',
+          enum: ['readiness-assessment', 'interview-questions', 'evaluation-rubric'],
+          description: 'Type of document to create'
+        },
+        data: {
+          type: 'object',
+          description: 'Optional: Data to populate template placeholders (e.g., { client_name: "Acme Corp", program_name: "CanExport SMEs" }). Each template has default placeholders that can be overridden.'
+        },
+        parentFolderId: {
+          type: 'string',
+          description: 'Optional: Google Drive folder ID to create the document in. If not provided, creates in user\'s root Drive.'
+        }
+      },
+      required: ['title', 'grantType', 'documentType']
+    },
+    execute: createAdvancedDocumentTool
   }
 };
 
@@ -323,7 +358,9 @@ export function getToolDefinitions(allowedTools) {
     'TodoWrite': 'todo_write',
     'HubSpot': 'hubspot_query',
     'CreateAdvancedBudget': 'create_advanced_budget',
-    'create_advanced_budget': 'create_advanced_budget'
+    'create_advanced_budget': 'create_advanced_budget',
+    'CreateAdvancedDocument': 'create_advanced_document',
+    'create_advanced_document': 'create_advanced_document'
   };
 
   // Filter tools based on allowed list

@@ -1021,6 +1021,21 @@
                 });
                 const statsData = await statsResponse.json();
 
+                // Handle case where API returns error or stats is undefined
+                if (!statsData.success || !statsData.stats) {
+                    console.error('Stats API error:', statsData);
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="empty-state-icon">💭</div>
+                            <p>Sentiment analysis available</p>
+                            <p style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--text-secondary);">
+                                ${pendingData.pendingCount} feedback items pending analysis
+                            </p>
+                        </div>
+                    `;
+                    return;
+                }
+
                 if (pendingData.pendingCount === 0 && statsData.stats.total === 0) {
                     container.innerHTML = `
                         <div class="empty-state">
