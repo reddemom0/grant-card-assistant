@@ -13,6 +13,7 @@ import { webSearch } from './web-search.js';
 import { webFetch } from './web-fetch.js';
 import { todoWrite } from './todo-write.js';
 import { hubspotQuery } from './hubspot.js';
+import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 
 /**
  * Tool Definitions for Claude Function Calling
@@ -262,6 +263,34 @@ export const TOOLS = {
       required: ['operation', 'query']
     },
     execute: hubspotQuery
+  },
+
+  create_advanced_budget: {
+    name: 'create_advanced_budget',
+    description: 'Create an advanced, program-specific budget spreadsheet in Google Sheets. Supports pre-built templates for CanExport SMEs, RTRI, and BCAFE programs with multiple sheets, detailed categories, instructions, and reference sheets. Can also dynamically generate budgets for new programs based on program guidelines.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Title for the budget spreadsheet (e.g., "CanExport SMEs Budget Template")'
+        },
+        grantProgram: {
+          type: 'string',
+          description: 'Grant program name (e.g., "CanExport SMEs", "RTRI", "BCAFE"). Used to select template or generate dynamic budget.'
+        },
+        budgetData: {
+          type: 'object',
+          description: 'Optional: Pre-filled budget data. For dynamic budgets, should include: { programName, eligibleCategories: [{name, description, items: []}], ineligibleExpenses: [], instructions: "" }',
+        },
+        parentFolderId: {
+          type: 'string',
+          description: 'Optional: Google Drive folder ID to create the sheet in. If not provided, creates in root.'
+        }
+      },
+      required: ['title', 'grantProgram']
+    },
+    execute: createAdvancedBudgetTool
   }
 };
 
@@ -292,7 +321,9 @@ export function getToolDefinitions(allowedTools) {
     'WebSearch': 'web_search',
     'WebFetch': 'web_fetch',
     'TodoWrite': 'todo_write',
-    'HubSpot': 'hubspot_query'
+    'HubSpot': 'hubspot_query',
+    'CreateAdvancedBudget': 'create_advanced_budget',
+    'create_advanced_budget': 'create_advanced_budget'
   };
 
   // Filter tools based on allowed list
