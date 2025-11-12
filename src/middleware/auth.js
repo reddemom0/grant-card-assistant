@@ -80,3 +80,27 @@ export function requireAuth(req, res, next) {
   }
   next();
 }
+
+/**
+ * Require admin role
+ * Use this for admin-only endpoints and pages
+ */
+export function requireAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      error: 'Authentication required',
+      message: 'Please log in to access this resource'
+    });
+  }
+
+  if (req.user.role !== 'admin') {
+    console.warn(`⚠️  Access denied: ${req.user.email} attempted to access admin resource`);
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Admin access required'
+    });
+  }
+
+  console.log(`✅ Admin access granted: ${req.user.email}`);
+  next();
+}

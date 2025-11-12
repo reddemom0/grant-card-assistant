@@ -90,6 +90,10 @@
       "dest": "/dashboard.html"
     },
     {
+      "src": "/usage",
+      "dest": "/usage.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
