@@ -279,10 +279,12 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
 
-        // Clean content blocks: remove index field from all blocks
+        // Clean content blocks: remove index field and filter out thinking blocks
+        // Thinking blocks should not be included in conversation history
         const cleanedContent = fullResponse.content
+          .filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking')
           .map(block => {
-            const { index, ...cleanBlock } = block;
+            const { index, ...cleanBlock} = block;
             return cleanBlock;
           });
 
@@ -358,10 +360,14 @@ export async function runAgent({
           sessionId
         });
 
-        // Save what we have
+        // Save what we have (filter out thinking blocks)
         const { saveMessage } = await import('../database/messages.js');
+        const contentToSave = Array.isArray(fullResponse.content)
+          ? fullResponse.content.filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking')
+          : fullResponse.content;
+
         await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', fullResponse.content);
+        await saveMessage(conversationId, 'assistant', contentToSave);
 
         closeSSE(res);
 
@@ -378,8 +384,12 @@ export async function runAgent({
         console.log('✓ Agent hit stop sequence');
 
         const { saveMessage } = await import('../database/messages.js');
+        const contentToSave = Array.isArray(fullResponse.content)
+          ? fullResponse.content.filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking')
+          : fullResponse.content;
+
         await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', fullResponse.content);
+        await saveMessage(conversationId, 'assistant', contentToSave);
 
         closeSSE(res);
 
