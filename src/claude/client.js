@@ -260,9 +260,8 @@ export async function runAgent({
         console.log('🔧 Agent requested tool use');
 
         // Clean content blocks: remove index field only
-        // NOTE: Thinking blocks MUST be kept in conversation history when tool_use blocks are present
-        // (Claude API requirement when extended thinking is enabled)
-        // They are filtered out when saving to database (see lines 234-236, 365-367, 387-389)
+        // NOTE: Thinking blocks MUST be kept in both conversation history AND database
+        // (Claude API requirement when extended thinking is enabled - context needed across turns)
         const cleanedContent = fullResponse.content
           .map(block => {
             const { index, ...cleanBlock} = block;
