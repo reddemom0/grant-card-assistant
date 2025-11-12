@@ -54,7 +54,11 @@ export default async function handler(req, res) {
         // Save results to database
         console.log('💾 Saving sentiment analysis results...');
         for (let i = 0; i < pendingFeedback.length; i++) {
-          await saveFeedbackSentiment(pendingFeedback[i].id, analyses[i]);
+          await saveFeedbackSentiment(
+            pendingFeedback[i].id,
+            analyses[i],
+            pendingFeedback[i].source_table  // Pass which table to update
+          );
         }
 
         console.log(`✅ Sentiment analysis complete for ${analyses.length} items`);
@@ -93,7 +97,11 @@ export default async function handler(req, res) {
           // Save results to database
           console.log('💾 Saving sentiment analysis results...');
           for (let i = 0; i < pendingFeedback.length; i++) {
-            await saveFeedbackSentiment(pendingFeedback[i].id, analyses[i]);
+            await saveFeedbackSentiment(
+              pendingFeedback[i].id,
+              analyses[i],
+              pendingFeedback[i].source_table  // Pass which table to update
+            );
           }
 
           console.log(`✅ Sentiment analysis complete for ${analyses.length} items`);

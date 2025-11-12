@@ -15,63 +15,101 @@ const pool = new Pool({
 });
 
 /**
- * Save sentiment analysis for a feedback item
+ * Save sentiment analysis for a feedback item (handles BOTH tables)
  * @param {number} feedbackId - Feedback ID
  * @param {Object} sentiment - Sentiment analysis result
+ * @param {string} sourceTable - 'conversation_feedback' or 'feedback_notes'
  * @returns {Promise<void>}
  */
-export async function saveFeedbackSentiment(feedbackId, sentiment) {
+export async function saveFeedbackSentiment(feedbackId, sentiment, sourceTable = 'conversation_feedback') {
   const client = await pool.connect();
   try {
-    await client.query(
-      `UPDATE conversation_feedback
-       SET
-         sentiment = $1,
-         sentiment_score = $2,
-         sentiment_themes = $3,
-         sentiment_analyzed_at = NOW()
-       WHERE id = $4`,
-      [
-        sentiment.sentiment,
-        sentiment.sentiment_score,
-        JSON.stringify({
-          confidence: sentiment.confidence,
-          emotions: sentiment.emotions,
-          themes: sentiment.themes,
-          key_phrases: sentiment.key_phrases,
-          summary: sentiment.summary
-        }),
-        feedbackId
-      ]
-    );
+    const sentimentThemes = JSON.stringify({
+      confidence: sentiment.confidence,
+      emotions: sentiment.emotions,
+      themes: sentiment.themes,
+      key_phrases: sentiment.key_phrases,
+      summary: sentiment.summary
+    });
+
+    if (sourceTable === 'feedback_notes') {
+      // Save to feedback_notes table
+      await client.query(
+        `UPDATE feedback_notes
+         SET
+           sentiment = $1,
+           sentiment_score = $2,
+           sentiment_themes = $3,
+           sentiment_analyzed_at = NOW()
+         WHERE id = $4`,
+        [sentiment.sentiment, sentiment.sentiment_score, sentimentThemes, feedbackId]
+      );
+    } else {
+      // Save to conversation_feedback table (default)
+      await client.query(
+        `UPDATE conversation_feedback
+         SET
+           sentiment = $1,
+           sentiment_score = $2,
+           sentiment_themes = $3,
+           sentiment_analyzed_at = NOW()
+         WHERE id = $4`,
+        [sentiment.sentiment, sentiment.sentiment_score, sentimentThemes, feedbackId]
+      );
+    }
   } finally {
     client.release();
   }
 }
 
 /**
- * Get feedback items that need sentiment analysis
+ * Get feedback items that need sentiment analysis (from BOTH tables)
  * @param {number} limit - Maximum number to return
  * @returns {Promise<Array>} Feedback items pending analysis
  */
 export async function getFeedbackPendingAnalysis(limit = 100) {
   const client = await pool.connect();
   try {
+    // Query BOTH conversation_feedback AND feedback_notes tables
     const result = await client.query(
-      `SELECT
+      `
+      -- Feedback from conversation_feedback table
+      SELECT
+         'conversation_feedback' as source_table,
          cf.id,
          cf.conversation_id,
          cf.rating,
          cf.feedback_text as text,
          cf.quality_score as "qualityScore",
-         c.agent_type as "agentType"
+         c.agent_type as "agentType",
+         cf.created_at
        FROM conversation_feedback cf
        JOIN conversations c ON cf.conversation_id = c.id
        WHERE cf.sentiment IS NULL
        AND cf.feedback_text IS NOT NULL
        AND cf.feedback_text != ''
-       ORDER BY cf.created_at DESC
-       LIMIT $1`,
+
+      UNION ALL
+
+      -- Feedback from feedback_notes table
+      SELECT
+         'feedback_notes' as source_table,
+         fn.id,
+         fn.conversation_id,
+         NULL as rating,
+         fn.note_text as text,
+         NULL as "qualityScore",
+         c.agent_type as "agentType",
+         fn.created_at
+       FROM feedback_notes fn
+       JOIN conversations c ON fn.conversation_id = c.id
+       WHERE fn.sentiment IS NULL
+       AND fn.note_text IS NOT NULL
+       AND fn.note_text != ''
+
+       ORDER BY created_at DESC
+       LIMIT $1
+      `,
       [limit]
     );
 
@@ -266,7 +304,7 @@ export async function getCommonEmotions(agentType, limit = 10) {
 }
 
 /**
- * Get all feedback with sentiment data for an agent
+ * Get all feedback with sentiment data for an agent (from BOTH tables)
  * @param {string} agentType - Agent type
  * @param {number} days - Number of days to look back (default 90)
  * @param {number} limit - Maximum number of items (default 200)
@@ -276,7 +314,9 @@ export async function getFeedbackWithSentiment(agentType, days = 90, limit = 200
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `SELECT
+      `
+      -- Feedback from conversation_feedback table
+      SELECT
          cf.id,
          cf.conversation_id,
          cf.rating,
@@ -291,8 +331,29 @@ export async function getFeedbackWithSentiment(agentType, days = 90, limit = 200
        JOIN conversations c ON cf.conversation_id = c.id
        WHERE c.agent_type = $1
        AND cf.created_at >= NOW() - INTERVAL '${days} days'
-       ORDER BY cf.created_at DESC
-       LIMIT $2`,
+
+      UNION ALL
+
+      -- Feedback from feedback_notes table
+      SELECT
+         fn.id,
+         fn.conversation_id,
+         NULL as rating,
+         fn.note_text as note,
+         NULL as quality_score,
+         fn.sentiment,
+         fn.sentiment_score,
+         fn.sentiment_themes,
+         fn.created_at,
+         c.agent_type
+       FROM feedback_notes fn
+       JOIN conversations c ON fn.conversation_id = c.id
+       WHERE c.agent_type = $1
+       AND fn.created_at >= NOW() - INTERVAL '${days} days'
+
+       ORDER BY created_at DESC
+       LIMIT $2
+      `,
       [agentType, limit]
     );
 

@@ -184,8 +184,42 @@ export async function getFeedbackStats(agentType) {
   const client = await pool.connect();
   try {
     // Get comprehensive feedback statistics combining explicit ratings + implicit sentiment
+    // UNION both conversation_feedback and feedback_notes tables
     const feedbackStats = await client.query(
-      `SELECT
+      `WITH all_feedback AS (
+        -- Feedback from conversation_feedback table (thumbs up/down with optional notes)
+        SELECT
+          cf.rating,
+          cf.sentiment,
+          cf.sentiment_score,
+          cf.sentiment_themes,
+          cf.quality_score,
+          cf.revision_count,
+          cf.completion_time_seconds,
+          cf.message_count,
+          cf.feedback_text as note
+        FROM conversation_feedback cf
+        JOIN conversations c ON cf.conversation_id = c.id
+        WHERE c.agent_type = $1
+
+        UNION ALL
+
+        -- Feedback from feedback_notes table (notes without ratings)
+        SELECT
+          NULL as rating,
+          fn.sentiment,
+          fn.sentiment_score,
+          fn.sentiment_themes,
+          NULL as quality_score,
+          NULL as revision_count,
+          NULL as completion_time_seconds,
+          NULL as message_count,
+          fn.note_text as note
+        FROM feedback_notes fn
+        JOIN conversations c ON fn.conversation_id = c.id
+        WHERE c.agent_type = $1
+      )
+      SELECT
         -- Explicit ratings (thumbs up/down)
         COUNT(*) as total_feedback,
         COUNT(CASE WHEN rating IS NOT NULL THEN 1 END) as explicit_ratings,
@@ -208,29 +242,27 @@ export async function getFeedbackStats(agentType) {
           THEN 1
         END) as implicit_negative,
 
-        -- Sentiment distribution (all notes with sentiment)
+        -- Sentiment distribution (all notes with sentiment from BOTH tables)
         COUNT(CASE WHEN sentiment = 'positive' THEN 1 END) as sentiment_positive,
         COUNT(CASE WHEN sentiment = 'negative' THEN 1 END) as sentiment_negative,
         COUNT(CASE WHEN sentiment = 'neutral' THEN 1 END) as sentiment_neutral,
         COUNT(CASE WHEN sentiment = 'mixed' THEN 1 END) as sentiment_mixed,
 
-        -- Quality metrics
+        -- Quality metrics (only from conversation_feedback)
         AVG(quality_score) as avg_quality_score,
         AVG(revision_count) as avg_revision_count,
         AVG(completion_time_seconds) as avg_completion_time,
         AVG(message_count) as avg_message_count,
 
-        -- Confidence metrics
+        -- Confidence metrics (from both tables)
         AVG(CASE WHEN sentiment IS NOT NULL
           THEN (sentiment_themes->>'confidence')::float
         END) as avg_sentiment_confidence,
 
-        -- Count of feedback with notes
-        COUNT(CASE WHEN feedback_text IS NOT NULL AND feedback_text != '' THEN 1 END) as total_notes
+        -- Count of feedback with notes (from both tables)
+        COUNT(CASE WHEN note IS NOT NULL AND note != '' THEN 1 END) as total_notes
 
-      FROM conversation_feedback cf
-      JOIN conversations c ON cf.conversation_id = c.id
-      WHERE c.agent_type = $1`,
+      FROM all_feedback`,
       [agentType]
     );
 
