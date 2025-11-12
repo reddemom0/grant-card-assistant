@@ -565,6 +565,42 @@ function createInstructionsSheet(sheetConfig, sheetId) {
       });
       row++;
     }
+  } else {
+    // Default instructions when none provided
+    const defaultInstructions = [
+      '1. Fill in the Project Activity column with specific tasks and deliverables',
+      '2. Provide detailed descriptions for each activity',
+      '3. Specify timeline or project phase for each item',
+      '4. Enter estimated costs in CAD dollars',
+      '5. Review funding percentages for each category (varies by program)',
+      '6. Ensure all R&D-related activities are properly documented',
+      '7. Keep detailed records and receipts for all expenses',
+      '8. Submit claims according to program requirements',
+      '',
+      'Note: Consult with your program advisor to confirm eligible expenses and funding rates.'
+    ];
+
+    for (const instruction of defaultInstructions) {
+      requests.push({
+        updateCells: {
+          range: {
+            sheetId,
+            startRowIndex: row,
+            endRowIndex: row + 1,
+            startColumnIndex: 0,
+            endColumnIndex: 8
+          },
+          rows: [{
+            values: [{
+              userEnteredValue: { stringValue: instruction },
+              userEnteredFormat: { wrapStrategy: 'WRAP' }
+            }]
+          }],
+          fields: 'userEnteredValue,userEnteredFormat'
+        }
+      });
+      row++;
+    }
   }
 
   return requests;
@@ -628,9 +664,7 @@ function createBudgetSheet(sheetConfig, sheetId) {
     let row = 1;
 
     for (const category of sheetConfig.categories) {
-      const categoryText = category.code
-        ? `${category.code} | ${category.name}`
-        : category.name;
+      const categoryName = category.name || '';
 
       const description = [
         category.description,
@@ -639,15 +673,18 @@ function createBudgetSheet(sheetConfig, sheetId) {
       ].filter(Boolean).join('\n');
 
       const rowValues = [{
-        userEnteredValue: { stringValue: category.code || '' }
-      }, {
-        userEnteredValue: { stringValue: '' }
+        userEnteredValue: { stringValue: categoryName },
+        userEnteredFormat: {
+          textFormat: { bold: true }
+        }
       }, {
         userEnteredValue: { stringValue: description },
         userEnteredFormat: {
           wrapStrategy: 'WRAP',
           textFormat: { fontSize: 9 }
         }
+      }, {
+        userEnteredValue: { stringValue: '' }
       }];
 
       // Fill remaining columns with empty cells
