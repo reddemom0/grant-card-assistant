@@ -20,6 +20,8 @@ import feedbackHandler from './api/feedback.js';
 import feedbackNoteHandler from './api/feedback-note.js';
 import feedbackMetricsHandler from './api/feedback-metrics.js';
 import feedbackLearningHandler from './api/feedback-learning.js';
+import sentimentAnalysisHandler from './api/sentiment-analysis.js';
+import usageAnalyticsHandler from './api/usage-analytics.js';
 
 // New direct API handlers
 import {
@@ -136,6 +138,13 @@ app.get('/api/feedback-metrics', authenticateUser, feedbackMetricsHandler);
 // Feedback learning - trigger analysis and memory file generation
 app.get('/api/feedback-learning', authenticateUser, feedbackLearningHandler);
 app.post('/api/feedback-learning', authenticateUser, feedbackLearningHandler);
+
+// Sentiment analysis - with authentication
+app.get('/api/sentiment-analysis', authenticateUser, sentimentAnalysisHandler);
+app.post('/api/sentiment-analysis', authenticateUser, sentimentAnalysisHandler);
+
+// Usage analytics (admin only) - with authentication
+app.get('/api/usage-analytics', authenticateUser, usageAnalyticsHandler);
 
 // Authentication endpoints
 app.use('/api', authRouter);
