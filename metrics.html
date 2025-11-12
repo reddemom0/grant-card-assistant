@@ -1340,15 +1340,28 @@
 
             document.getElementById('tab-content').innerHTML = `
                 <div class="section">
-                    <h3 class="section-title">Performance Metrics</h3>
+                    <h3 class="section-title">
+                        Performance Metrics
+                        ${stats.avgConfidence > 0 ? `
+                            <span style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary); margin-left: 0.5rem;">
+                                ⓘ Includes high-confidence sentiment analysis
+                            </span>
+                        ` : ''}
+                    </h3>
                     <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
                         <div class="stat">
                             <div class="stat-value">${stats.totalRatings}</div>
-                            <div class="stat-label">Total Ratings</div>
+                            <div class="stat-label">Total Feedback</div>
+                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                ${stats.explicitRatings} explicit + ${stats.implicitPositive + stats.implicitNegative} inferred
+                            </div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value">${stats.positiveRate}%</div>
-                            <div class="stat-label">Positive Rate</div>
+                            <div class="stat-value">${stats.satisfactionRate}%</div>
+                            <div class="stat-label">Satisfaction Rate</div>
+                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                Weighted calculation
+                            </div>
                         </div>
                         <div class="stat">
                             <div class="stat-value">${stats.avgQualityScore.toFixed(2)}</div>
@@ -1375,18 +1388,32 @@
                             <div class="stat-label">Total Messages</div>
                         </div>
                     </div>
+                    ${stats.avgConfidence > 0 ? `
+                        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-left: 3px solid var(--info); border-radius: 0.375rem; font-size: 0.875rem;">
+                            <strong>Data Confidence:</strong> ${(stats.avgConfidence * 100).toFixed(0)}%
+                            <span style="color: var(--text-secondary); margin-left: 0.5rem;">
+                                | Explicit ratings weighted 1.0x, sentiment-inferred weighted 0.8x
+                            </span>
+                        </div>
+                    ` : ''}
                 </div>
 
                 <div class="section">
                     <h3 class="section-title">Feedback Distribution</h3>
-                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 1.5rem;">
                         <div class="stat">
                             <div class="stat-value" style="color: var(--success);">${stats.positiveCount}</div>
                             <div class="stat-label">👍 Positive</div>
+                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                ${stats.explicitPositive} explicit + ${stats.implicitPositive} inferred
+                            </div>
                         </div>
                         <div class="stat">
                             <div class="stat-value" style="color: var(--danger);">${stats.negativeCount}</div>
                             <div class="stat-label">👎 Negative</div>
+                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                ${stats.explicitNegative} explicit + ${stats.implicitNegative} inferred
+                            </div>
                         </div>
                         <div class="stat">
                             <div class="stat-value" style="color: var(--text-secondary);">${stats.totalMessages - stats.totalRatings}</div>
@@ -1399,20 +1426,48 @@
                     <h3 class="section-title">Notes Sentiment</h3>
                     <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
                         <div class="stat">
-                            <div class="stat-value" style="color: var(--success);">${stats.positiveNotes}</div>
+                            <div class="stat-value" style="color: var(--success);">${stats.sentimentPositive}</div>
                             <div class="stat-label">Positive</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value" style="color: var(--danger);">${stats.negativeNotes}</div>
+                            <div class="stat-value" style="color: var(--danger);">${stats.sentimentNegative}</div>
                             <div class="stat-label">Negative</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value" style="color: var(--warning);">${stats.mixedNotes}</div>
+                            <div class="stat-value" style="color: var(--warning);">${stats.sentimentMixed}</div>
                             <div class="stat-label">Mixed</div>
                         </div>
                         <div class="stat">
-                            <div class="stat-value" style="color: var(--text-secondary);">${stats.neutralNotes}</div>
+                            <div class="stat-value" style="color: var(--text-secondary);">${stats.sentimentNeutral}</div>
                             <div class="stat-label">Neutral</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section" style="background: var(--background); border-radius: 0.75rem; padding: 1rem;">
+                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">📊 Feedback Source Breakdown</h4>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
+                        <div>
+                            <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                                Explicit Ratings
+                            </div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                ${stats.explicitRatings} total (${stats.explicitRate}% positive)
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                Direct thumbs up/down from users
+                            </div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
+                                Sentiment-Inferred Ratings
+                            </div>
+                            <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                ${stats.implicitPositive + stats.implicitNegative} total (${stats.implicitRate}% positive)
+                            </div>
+                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                High-confidence sentiment (>70%) from notes
+                            </div>
                         </div>
                     </div>
                 </div>

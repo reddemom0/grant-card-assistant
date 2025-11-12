@@ -79,7 +79,29 @@ export default async function handler(req, res) {
 
         console.log(`🔍 Generating insights for ${agentType}...`);
 
-        // Fetch all feedback with sentiment data
+        // STEP 1: First, check if any feedback needs sentiment analysis
+        console.log(`🔍 Checking for feedback pending sentiment analysis...`);
+        const pendingFeedback = await getFeedbackPendingAnalysis(100);
+
+        if (pendingFeedback.length > 0) {
+          console.log(`📊 Found ${pendingFeedback.length} feedback items needing sentiment analysis`);
+          console.log(`🤖 Running automatic sentiment analysis before generating insights...`);
+
+          // Analyze in batches
+          const analyses = await analyzeBatchSentiment(pendingFeedback);
+
+          // Save results to database
+          console.log('💾 Saving sentiment analysis results...');
+          for (let i = 0; i < pendingFeedback.length; i++) {
+            await saveFeedbackSentiment(pendingFeedback[i].id, analyses[i]);
+          }
+
+          console.log(`✅ Sentiment analysis complete for ${analyses.length} items`);
+        } else {
+          console.log(`✅ All feedback already has sentiment analysis`);
+        }
+
+        // STEP 2: Fetch all feedback with sentiment data
         const feedbackItems = await getFeedbackWithSentiment(agentType, 90, 200);
 
         console.log(`📊 Found ${feedbackItems.length} feedback items with sentiment data`);
@@ -98,14 +120,15 @@ export default async function handler(req, res) {
           });
         }
 
-        // Generate insights using Claude
+        // STEP 3: Generate insights using Claude
         const insights = await generateFeedbackInsights(feedbackItems, agentType);
 
         console.log(`✅ Insights generated successfully`);
 
         return res.status(200).json({
           success: true,
-          insights
+          insights,
+          sentimentAnalyzed: pendingFeedback.length // Tell UI how many were analyzed
         });
       }
 
