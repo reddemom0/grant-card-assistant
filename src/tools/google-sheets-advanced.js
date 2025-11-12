@@ -38,14 +38,20 @@ export async function createAdvancedBudgetTool(input, context) {
       parentFolderId
     );
 
-    console.log(`✅ Advanced budget created successfully: ${result.spreadsheetUrl}`);
+    // Check if creation failed
+    if (!result.success) {
+      throw new Error(result.error || 'Unknown error creating budget');
+    }
+
+    console.log(`✅ Advanced budget created successfully: ${result.sheet.url}`);
 
     return {
       success: true,
-      spreadsheetId: result.spreadsheetId,
-      spreadsheetUrl: result.spreadsheetUrl,
-      sheetsCreated: result.sheetsCreated,
-      message: `Created ${result.sheetsCreated.length}-sheet budget template for ${grantProgram}`
+      spreadsheetId: result.sheet.id,
+      spreadsheetUrl: result.sheet.url,
+      title: result.sheet.title,
+      template: result.sheet.template || grantProgram,
+      message: `Created budget template for ${grantProgram}`
     };
   } catch (error) {
     console.error(`❌ Failed to create advanced budget:`, error);

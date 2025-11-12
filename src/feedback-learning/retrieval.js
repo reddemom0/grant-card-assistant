@@ -183,19 +183,87 @@ export async function getUserCorrections(agentType, limit = 50) {
 export async function getFeedbackStats(agentType) {
   const client = await pool.connect();
   try {
-    // Get rating statistics
-    const ratingStats = await client.query(
-      `SELECT
-        COUNT(*) as total_ratings,
-        COUNT(CASE WHEN rating = 'positive' THEN 1 END) as positive_count,
-        COUNT(CASE WHEN rating = 'negative' THEN 1 END) as negative_count,
+    // Get comprehensive feedback statistics combining explicit ratings + implicit sentiment
+    // UNION both conversation_feedback and feedback_notes tables
+    const feedbackStats = await client.query(
+      `WITH all_feedback AS (
+        -- Feedback from conversation_feedback table (thumbs up/down with optional notes)
+        SELECT
+          cf.rating,
+          cf.sentiment,
+          cf.sentiment_score,
+          cf.sentiment_themes,
+          cf.quality_score,
+          cf.revision_count,
+          cf.completion_time_seconds,
+          cf.message_count,
+          cf.feedback_text as note
+        FROM conversation_feedback cf
+        JOIN conversations c ON cf.conversation_id = c.id
+        WHERE c.agent_type = $1
+
+        UNION ALL
+
+        -- Feedback from feedback_notes table (notes without ratings)
+        SELECT
+          NULL as rating,
+          fn.sentiment,
+          fn.sentiment_score,
+          fn.sentiment_themes,
+          NULL as quality_score,
+          NULL as revision_count,
+          NULL as completion_time_seconds,
+          NULL as message_count,
+          fn.note_text as note
+        FROM feedback_notes fn
+        JOIN conversations c ON fn.conversation_id = c.id
+        WHERE c.agent_type = $1
+      )
+      SELECT
+        -- Explicit ratings (thumbs up/down)
+        COUNT(*) as total_feedback,
+        COUNT(CASE WHEN rating IS NOT NULL THEN 1 END) as explicit_ratings,
+        COUNT(CASE WHEN rating IS NULL THEN 1 END) as standalone_notes,
+        COUNT(CASE WHEN rating = 'positive' THEN 1 END) as explicit_positive,
+        COUNT(CASE WHEN rating = 'negative' THEN 1 END) as explicit_negative,
+
+        -- High-confidence implicit ratings from sentiment analysis
+        COUNT(CASE
+          WHEN rating IS NULL
+          AND sentiment IS NOT NULL
+          AND (sentiment_themes->>'confidence')::float > 0.7
+          AND sentiment_score > 0.3
+          THEN 1
+        END) as implicit_positive,
+        COUNT(CASE
+          WHEN rating IS NULL
+          AND sentiment IS NOT NULL
+          AND (sentiment_themes->>'confidence')::float > 0.7
+          AND sentiment_score < -0.3
+          THEN 1
+        END) as implicit_negative,
+
+        -- Sentiment distribution (all notes with sentiment from BOTH tables)
+        COUNT(CASE WHEN sentiment = 'positive' THEN 1 END) as sentiment_positive,
+        COUNT(CASE WHEN sentiment = 'negative' THEN 1 END) as sentiment_negative,
+        COUNT(CASE WHEN sentiment = 'neutral' THEN 1 END) as sentiment_neutral,
+        COUNT(CASE WHEN sentiment = 'mixed' THEN 1 END) as sentiment_mixed,
+
+        -- Quality metrics (only from conversation_feedback)
         AVG(quality_score) as avg_quality_score,
         AVG(revision_count) as avg_revision_count,
         AVG(completion_time_seconds) as avg_completion_time,
-        AVG(message_count) as avg_message_count
-      FROM conversation_feedback cf
-      JOIN conversations c ON cf.conversation_id = c.id
-      WHERE c.agent_type = $1`,
+        AVG(message_count) as avg_message_count,
+
+        -- Confidence metrics (from both tables)
+        AVG(CASE WHEN sentiment IS NOT NULL
+          THEN (sentiment_themes->>'confidence')::float
+        END) as avg_sentiment_confidence,
+
+        -- Count of feedback with notes (from both tables)
+        COUNT(CASE WHEN note IS NOT NULL AND note != '' THEN 1 END) as total_notes
+
+      FROM all_feedback`,
       [agentType]
     );
 
@@ -209,44 +277,89 @@ export async function getFeedbackStats(agentType) {
       [agentType]
     );
 
-    // Get notes statistics
-    const notesStats = await client.query(
-      `SELECT
-        COUNT(*) as total_notes,
-        COUNT(CASE WHEN sentiment = 'positive' THEN 1 END) as positive_notes,
-        COUNT(CASE WHEN sentiment = 'negative' THEN 1 END) as negative_notes,
-        COUNT(CASE WHEN sentiment = 'mixed' THEN 1 END) as mixed_notes,
-        COUNT(CASE WHEN sentiment = 'neutral' THEN 1 END) as neutral_notes
-      FROM feedback_notes fn
-      JOIN conversations c ON fn.conversation_id = c.id
-      WHERE c.agent_type = $1`,
-      [agentType]
-    );
-
-    const stats = ratingStats.rows[0];
+    const stats = feedbackStats.rows[0];
     const messages = messageStats.rows[0];
-    const notes = notesStats.rows[0];
+
+    // Calculate combined metrics
+    const explicitRatings = parseInt(stats.explicit_ratings) || 0;
+    const standaloneNotes = parseInt(stats.standalone_notes) || 0;
+    const explicitPositive = parseInt(stats.explicit_positive) || 0;
+    const explicitNegative = parseInt(stats.explicit_negative) || 0;
+    const implicitPositive = parseInt(stats.implicit_positive) || 0;
+    const implicitNegative = parseInt(stats.implicit_negative) || 0;
+
+    // Total feedback = COUNT(*) from UNION of both tables (all feedback interactions)
+    // This includes: all thumbs ratings + all standalone notes
+    const totalFeedback = parseInt(stats.total_feedback) || 0;
+    const totalNotesCount = parseInt(stats.total_notes) || 0;
+
+    // Total ratings for satisfaction calculation (explicit + high-confidence implicit only)
+    const totalRatings = explicitRatings + implicitPositive + implicitNegative;
+
+    // Weighted satisfaction calculation
+    // Explicit ratings: 1.0x weight, Implicit ratings: 0.8x weight
+    const weightedPositive = (explicitPositive * 1.0) + (implicitPositive * 0.8);
+    const weightedNegative = (explicitNegative * 1.0) + (implicitNegative * 0.8);
+    const totalWeighted = weightedPositive + weightedNegative;
+
+    const weightedSatisfaction = totalWeighted > 0
+      ? (weightedPositive / totalWeighted * 100).toFixed(1)
+      : 0;
+
+    // Simple unweighted satisfaction for comparison
+    const totalPositive = explicitPositive + implicitPositive;
+    const unweightedSatisfaction = totalRatings > 0
+      ? (totalPositive / totalRatings * 100).toFixed(1)
+      : 0;
 
     return {
-      totalRatings: parseInt(stats.total_ratings) || 0,
-      positiveCount: parseInt(stats.positive_count) || 0,
-      negativeCount: parseInt(stats.negative_count) || 0,
+      // Combined metrics (what we show primarily)
+      totalFeedback: totalFeedback,
+      totalRatings: totalRatings,
+      positiveCount: totalPositive,
+      negativeCount: explicitNegative + implicitNegative,
+      satisfactionRate: weightedSatisfaction,
+
+      // Feedback source breakdown
+      explicitRatings: explicitRatings,
+      standaloneNotes: standaloneNotes,
+
+      // Explicit ratings breakdown
+      explicitPositive: explicitPositive,
+      explicitNegative: explicitNegative,
+      explicitRate: explicitRatings > 0
+        ? (explicitPositive / explicitRatings * 100).toFixed(1)
+        : 0,
+
+      // Implicit ratings breakdown (from sentiment)
+      implicitPositive: implicitPositive,
+      implicitNegative: implicitNegative,
+      implicitRate: (implicitPositive + implicitNegative) > 0
+        ? (implicitPositive / (implicitPositive + implicitNegative) * 100).toFixed(1)
+        : 0,
+
+      // Sentiment distribution (all notes)
+      sentimentPositive: parseInt(stats.sentiment_positive) || 0,
+      sentimentNegative: parseInt(stats.sentiment_negative) || 0,
+      sentimentNeutral: parseInt(stats.sentiment_neutral) || 0,
+      sentimentMixed: parseInt(stats.sentiment_mixed) || 0,
+
+      // Confidence & quality metrics
+      avgConfidence: parseFloat(stats.avg_sentiment_confidence) || 0,
       avgQualityScore: parseFloat(stats.avg_quality_score) || 0,
       avgRevisionCount: parseFloat(stats.avg_revision_count) || 0,
       avgCompletionTime: parseFloat(stats.avg_completion_time) || 0,
       avgMessageCount: parseFloat(stats.avg_message_count) || 0,
+
+      // Other metrics
       totalMessages: parseInt(messages.total_messages) || 0,
-      feedbackRate: stats.total_ratings > 0
-        ? (parseInt(stats.total_ratings) / parseInt(messages.total_messages) * 100).toFixed(1)
+      totalNotes: parseInt(stats.total_notes) || 0,
+      feedbackRate: stats.total_feedback > 0
+        ? (parseInt(stats.total_feedback) / parseInt(messages.total_messages) * 100).toFixed(1)
         : 0,
-      positiveRate: stats.total_ratings > 0
-        ? (parseInt(stats.positive_count) / parseInt(stats.total_ratings) * 100).toFixed(1)
-        : 0,
-      totalNotes: parseInt(notes.total_notes) || 0,
-      positiveNotes: parseInt(notes.positive_notes) || 0,
-      negativeNotes: parseInt(notes.negative_notes) || 0,
-      mixedNotes: parseInt(notes.mixed_notes) || 0,
-      neutralNotes: parseInt(notes.neutral_notes) || 0,
+
+      // Legacy compatibility (kept for backward compat)
+      positiveRate: unweightedSatisfaction, // Alias for satisfaction
     };
   } finally {
     client.release();

@@ -11,6 +11,7 @@ import * as googleDrive from './google-drive.js';
 import * as googleDocs from './google-docs.js';
 import * as googleSheets from './google-sheets.js';
 import { createAdvancedDocumentTool } from './google-docs-advanced.js';
+import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 import { isServerTool } from './definitions.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -202,13 +203,12 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         );
         break;
 
-      case 'create_google_sheet':
-        result = await googleSheets.createGoogleSheet(
-          input.title,
-          userId,  // User ID for OAuth
-          input.parent_folder_id,  // Parent folder ID (optional)
-          input.grant_program  // Grant program for custom categories (optional)
-        );
+      case 'create_advanced_budget':
+        result = await createAdvancedBudgetTool(input, {
+          conversationId,
+          userId,
+          agentType
+        });
         break;
 
       case 'create_advanced_document':
