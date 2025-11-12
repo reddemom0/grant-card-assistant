@@ -264,3 +264,58 @@ export async function getCommonEmotions(agentType, limit = 10) {
     client.release();
   }
 }
+
+/**
+ * Get all feedback with sentiment data for an agent
+ * @param {string} agentType - Agent type
+ * @param {number} days - Number of days to look back (default 90)
+ * @param {number} limit - Maximum number of items (default 200)
+ * @returns {Promise<Array>} Feedback items with sentiment data
+ */
+export async function getFeedbackWithSentiment(agentType, days = 90, limit = 200) {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT
+         cf.id,
+         cf.conversation_id,
+         cf.rating,
+         cf.feedback_text as note,
+         cf.quality_score,
+         cf.sentiment,
+         cf.sentiment_score,
+         cf.sentiment_themes,
+         cf.created_at,
+         c.agent_type
+       FROM conversation_feedback cf
+       JOIN conversations c ON cf.conversation_id = c.id
+       WHERE c.agent_type = $1
+       AND cf.created_at >= NOW() - INTERVAL '${days} days'
+       ORDER BY cf.created_at DESC
+       LIMIT $2`,
+      [agentType, limit]
+    );
+
+    // Parse JSON fields and flatten structure
+    return result.rows.map(row => ({
+      id: row.id,
+      conversation_id: row.conversation_id,
+      rating: row.rating,
+      note: row.note,
+      text: row.note,  // Alias for compatibility
+      quality_score: parseFloat(row.quality_score) || 0,
+      qualityScore: parseFloat(row.quality_score) || 0,  // Alias for compatibility
+      sentiment: row.sentiment,
+      sentiment_score: parseFloat(row.sentiment_score) || 0,
+      themes: row.sentiment_themes?.themes || [],
+      emotions: row.sentiment_themes?.emotions || [],
+      key_phrases: row.sentiment_themes?.key_phrases || [],
+      summary: row.sentiment_themes?.summary || '',
+      confidence: row.sentiment_themes?.confidence || 0,
+      created_at: row.created_at,
+      agentType: row.agent_type
+    }));
+  } finally {
+    client.release();
+  }
+}

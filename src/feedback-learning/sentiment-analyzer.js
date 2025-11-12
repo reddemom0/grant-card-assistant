@@ -190,6 +190,115 @@ function clampScore(score) {
 }
 
 /**
+ * Generate actionable insights from feedback for an agent
+ * @param {Array<Object>} feedbackItems - Array of feedback with sentiment data
+ * @param {string} agentType - Type of agent being analyzed
+ * @returns {Promise<Object>} Insights summary with recommendations
+ */
+export async function generateFeedbackInsights(feedbackItems, agentType) {
+  if (!feedbackItems || feedbackItems.length === 0) {
+    return {
+      summary: 'No feedback data available yet.',
+      patterns: [],
+      strengths: [],
+      improvements: [],
+      actionItems: [],
+      analyzed_at: new Date()
+    };
+  }
+
+  try {
+    // Prepare feedback data for analysis
+    const feedbackSummary = feedbackItems.map((item, idx) => {
+      return `
+Feedback #${idx + 1}:
+- Rating: ${item.rating || 'N/A'}
+- Quality Score: ${item.quality_score || item.qualityScore || 'N/A'}
+- Sentiment: ${item.sentiment || 'N/A'} (Score: ${item.sentiment_score || 'N/A'})
+- Emotions: ${item.emotions?.join(', ') || 'N/A'}
+- Themes: ${item.themes?.join(', ') || 'N/A'}
+- User Note: ${item.note || item.text || 'No note provided'}
+- Summary: ${item.summary || 'N/A'}
+`;
+    }).join('\n---\n');
+
+    const prompt = `You are analyzing user feedback for the **${agentType}** AI agent to identify patterns and generate actionable improvement recommendations.
+
+**Feedback Data** (${feedbackItems.length} items):
+${feedbackSummary}
+
+Please analyze this feedback and provide a comprehensive insights report. Return ONLY a JSON object (no markdown, no code blocks) with this structure:
+
+{
+  "summary": "2-3 sentence executive summary of overall feedback sentiment and key findings",
+  "patterns": [
+    "Pattern 1: Description of recurring theme or issue",
+    "Pattern 2: Another pattern observed",
+    "..."
+  ],
+  "strengths": [
+    "Strength 1: What users consistently praise",
+    "Strength 2: Another positive aspect",
+    "..."
+  ],
+  "improvements": [
+    "Improvement 1: Specific issue users mention that needs addressing",
+    "Improvement 2: Another area for improvement",
+    "..."
+  ],
+  "actionItems": [
+    {
+      "priority": "high|medium|low",
+      "title": "Brief action title",
+      "description": "What should be done and why",
+      "impact": "Expected benefit if implemented"
+    }
+  ]
+}
+
+Guidelines:
+- Be specific and actionable
+- Focus on recurring themes (not isolated feedback)
+- Prioritize improvements that affect user experience most
+- Include 3-5 patterns, strengths, and improvements
+- Include 3-5 action items sorted by priority
+- Use clear, concise language
+- Base insights ONLY on the data provided`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4096,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    // Extract JSON from response
+    const content = response.content[0].text.trim();
+
+    // Remove markdown code blocks if present
+    const jsonMatch = content.match(/```json\n?([\s\S]*?)\n?```/) ||
+                     content.match(/```\n?([\s\S]*?)\n?```/) ||
+                     [null, content];
+
+    const jsonText = jsonMatch[1] || content;
+    const insights = JSON.parse(jsonText);
+
+    return {
+      ...insights,
+      analyzed_at: new Date(),
+      feedbackCount: feedbackItems.length,
+      agentType
+    };
+
+  } catch (error) {
+    console.error('Insights generation error:', error);
+    throw new Error(`Failed to generate insights: ${error.message}`);
+  }
+}
+
+/**
  * Get sentiment statistics for a set of analyses
  * @param {Array<Object>} analyses - Array of sentiment analysis results
  * @returns {Object} Statistics

@@ -1,17 +1,18 @@
 /**
  * Sentiment Analysis API
- * POST /api/sentiment-analysis - Trigger sentiment analysis
+ * POST /api/sentiment-analysis - Trigger sentiment analysis or generate insights
  * GET /api/sentiment-analysis - Get sentiment stats and trends
  */
 
-import { analyzeFeedbackSentiment, analyzeBatchSentiment, calculateSentimentStats } from '../src/feedback-learning/sentiment-analyzer.js';
+import { analyzeFeedbackSentiment, analyzeBatchSentiment, calculateSentimentStats, generateFeedbackInsights } from '../src/feedback-learning/sentiment-analyzer.js';
 import {
   saveFeedbackSentiment,
   getFeedbackPendingAnalysis,
   getSentimentStats,
   getSentimentTrends,
   getCommonThemes,
-  getCommonEmotions
+  getCommonEmotions,
+  getFeedbackWithSentiment
 } from '../src/database/sentiment.js';
 
 export default async function handler(req, res) {
@@ -68,8 +69,48 @@ export default async function handler(req, res) {
         });
       }
 
+      if (action === 'generate-insights') {
+        // Generate AI-powered insights from all feedback for an agent
+        if (!agentType) {
+          return res.status(400).json({
+            error: 'Missing agentType parameter'
+          });
+        }
+
+        console.log(`🔍 Generating insights for ${agentType}...`);
+
+        // Fetch all feedback with sentiment data
+        const feedbackItems = await getFeedbackWithSentiment(agentType, 90, 200);
+
+        console.log(`📊 Found ${feedbackItems.length} feedback items with sentiment data`);
+
+        if (feedbackItems.length === 0) {
+          return res.status(200).json({
+            success: true,
+            insights: {
+              summary: 'No feedback data available yet for this agent.',
+              patterns: [],
+              strengths: [],
+              improvements: [],
+              actionItems: [],
+              feedbackCount: 0
+            }
+          });
+        }
+
+        // Generate insights using Claude
+        const insights = await generateFeedbackInsights(feedbackItems, agentType);
+
+        console.log(`✅ Insights generated successfully`);
+
+        return res.status(200).json({
+          success: true,
+          insights
+        });
+      }
+
       return res.status(400).json({
-        error: 'Invalid action. Use "analyze-pending"'
+        error: 'Invalid action. Use "analyze-pending" or "generate-insights"'
       });
     }
 
