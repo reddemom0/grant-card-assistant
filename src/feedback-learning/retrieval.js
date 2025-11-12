@@ -223,6 +223,7 @@ export async function getFeedbackStats(agentType) {
         -- Explicit ratings (thumbs up/down)
         COUNT(*) as total_feedback,
         COUNT(CASE WHEN rating IS NOT NULL THEN 1 END) as explicit_ratings,
+        COUNT(CASE WHEN rating IS NULL THEN 1 END) as standalone_notes,
         COUNT(CASE WHEN rating = 'positive' THEN 1 END) as explicit_positive,
         COUNT(CASE WHEN rating = 'negative' THEN 1 END) as explicit_negative,
 
@@ -281,12 +282,18 @@ export async function getFeedbackStats(agentType) {
 
     // Calculate combined metrics
     const explicitRatings = parseInt(stats.explicit_ratings) || 0;
+    const standaloneNotes = parseInt(stats.standalone_notes) || 0;
     const explicitPositive = parseInt(stats.explicit_positive) || 0;
     const explicitNegative = parseInt(stats.explicit_negative) || 0;
     const implicitPositive = parseInt(stats.implicit_positive) || 0;
     const implicitNegative = parseInt(stats.implicit_negative) || 0;
 
-    // Total feedback that counts toward satisfaction (explicit + high-confidence implicit)
+    // Total feedback = COUNT(*) from UNION of both tables (all feedback interactions)
+    // This includes: all thumbs ratings + all standalone notes
+    const totalFeedback = parseInt(stats.total_feedback) || 0;
+    const totalNotesCount = parseInt(stats.total_notes) || 0;
+
+    // Total ratings for satisfaction calculation (explicit + high-confidence implicit only)
     const totalRatings = explicitRatings + implicitPositive + implicitNegative;
 
     // Weighted satisfaction calculation
@@ -307,14 +314,17 @@ export async function getFeedbackStats(agentType) {
 
     return {
       // Combined metrics (what we show primarily)
-      totalFeedback: parseInt(stats.total_feedback) || 0,
+      totalFeedback: totalFeedback,
       totalRatings: totalRatings,
       positiveCount: totalPositive,
       negativeCount: explicitNegative + implicitNegative,
       satisfactionRate: weightedSatisfaction,
 
-      // Explicit ratings breakdown
+      // Feedback source breakdown
       explicitRatings: explicitRatings,
+      standaloneNotes: standaloneNotes,
+
+      // Explicit ratings breakdown
       explicitPositive: explicitPositive,
       explicitNegative: explicitNegative,
       explicitRate: explicitRatings > 0
