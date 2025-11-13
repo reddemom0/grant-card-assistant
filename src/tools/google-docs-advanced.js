@@ -8,6 +8,12 @@ import { getTemplate } from './doc-templates/index.js';
 import { createGoogleDocFromTemplate } from './google-docs-construction.js';
 
 /**
+ * Logo URL - can be overridden via GRANTED_LOGO_URL environment variable
+ * For now using a direct Google Drive link (update this after uploading logo)
+ */
+const LOGO_URL = process.env.GRANTED_LOGO_URL || 'https://drive.google.com/uc?export=view&id=PLACEHOLDER';
+
+/**
  * Brand colors (Granted Consulting)
  */
 const BRAND_COLORS = {
@@ -341,59 +347,104 @@ function processInlineFormatting(line, startIndex, requests) {
  * @returns {Promise<void>}
  */
 export async function addGrantedHeader(docsClient, documentId) {
-  // For now, add text-based header
-  // Will be replaced with logo image when user provides it
-  await docsClient.documents.batchUpdate({
-    documentId: documentId,
-    requestBody: {
-      requests: [
-        // Insert header text at the top
-        {
-          insertText: {
-            location: { index: 1 },
-            text: 'GRANTED CONSULTING\n\n'
-          }
-        },
-        // Style the header
-        {
-          updateTextStyle: {
-            range: {
-              startIndex: 1,
-              endIndex: 19  // Length of "GRANTED CONSULTING"
-            },
-            textStyle: {
-              fontSize: {
-                magnitude: 14,
-                unit: 'PT'
-              },
-              foregroundColor: {
-                color: {
-                  rgbColor: {
-                    red: 0.4,
-                    green: 0.4,
-                    blue: 0.4
-                  }
-                }
-              }
-            },
-            fields: 'fontSize,foregroundColor'
-          }
-        },
-        // Right-align the header
-        {
-          updateParagraphStyle: {
-            range: {
-              startIndex: 1,
-              endIndex: 21
-            },
-            paragraphStyle: {
-              alignment: 'END'  // Right-align
-            },
-            fields: 'alignment'
+  const requests = [];
+
+  // Check if we have a valid logo URL
+  const hasLogo = LOGO_URL && !LOGO_URL.includes('PLACEHOLDER');
+
+  if (hasLogo) {
+    // Insert logo image at the top
+    requests.push({
+      insertInlineImage: {
+        location: { index: 1 },
+        uri: LOGO_URL,
+        objectSize: {
+          height: {
+            magnitude: 40,
+            unit: 'PT'
+          },
+          width: {
+            magnitude: 200,
+            unit: 'PT'
           }
         }
-      ]
-    }
+      }
+    });
+
+    // Add newlines after the logo
+    requests.push({
+      insertText: {
+        location: { index: 2 },
+        text: '\n\n'
+      }
+    });
+
+    // Right-align the logo paragraph
+    requests.push({
+      updateParagraphStyle: {
+        range: {
+          startIndex: 1,
+          endIndex: 2
+        },
+        paragraphStyle: {
+          alignment: 'END'
+        },
+        fields: 'alignment'
+      }
+    });
+  } else {
+    // Fallback to text-based header if logo not available
+    requests.push({
+      insertText: {
+        location: { index: 1 },
+        text: 'GRANTED CONSULTING\n\n'
+      }
+    });
+
+    // Style the header text
+    requests.push({
+      updateTextStyle: {
+        range: {
+          startIndex: 1,
+          endIndex: 19
+        },
+        textStyle: {
+          fontSize: {
+            magnitude: 14,
+            unit: 'PT'
+          },
+          foregroundColor: {
+            color: {
+              rgbColor: {
+                red: 0.4,
+                green: 0.4,
+                blue: 0.4
+              }
+            }
+          }
+        },
+        fields: 'fontSize,foregroundColor'
+      }
+    });
+
+    // Right-align the header
+    requests.push({
+      updateParagraphStyle: {
+        range: {
+          startIndex: 1,
+          endIndex: 21
+        },
+        paragraphStyle: {
+          alignment: 'END'
+        },
+        fields: 'alignment'
+      }
+    });
+  }
+
+  await docsClient.documents.batchUpdate({
+    documentId: documentId,
+    requestBody: { requests }
   });
 }
 
