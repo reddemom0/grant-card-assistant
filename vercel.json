@@ -17,6 +17,14 @@
       "dest": "/api/feedback.js"
     },
     {
+      "src": "/api/feedback-metrics",
+      "dest": "/api/feedback-metrics.js"
+    },
+    {
+      "src": "/api/admin-feedback",
+      "dest": "/api/admin-feedback.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/server.js"
     },
