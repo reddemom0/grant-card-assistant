@@ -339,7 +339,7 @@ export const pdfAPI = {
     // Make API call
     try {
       const message = await anthropic.messages.create({
-        model: config.model || 'claude-sonnet-4-20250514',
+        model: config.model || 'claude-sonnet-4-5-20250929',
         max_tokens: config.maxTokens || 4096,
         messages: [{
           role: 'user',
@@ -412,7 +412,7 @@ export const pdfAPI = {
         return {
           custom_id: req.customId || `pdf-${index}`,
           params: {
-            model: req.model || 'claude-sonnet-4-20250514',
+            model: req.model || 'claude-sonnet-4-5-20250929',
             max_tokens: req.maxTokens || 4096,
             messages: [{
               role: 'user',

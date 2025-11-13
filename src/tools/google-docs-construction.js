@@ -723,19 +723,20 @@ function buildListRequests(section, data, index) {
   requests.push({
     insertText: {
       location: { index },
-      text: listText + '\n'
+      text: listText + '\n\n'  // ← FIXED: Extra newline to break list continuity
     }
   });
 
-  // Apply bullet formatting
-  const glyphType = section.type === 'numbered-questions' ? 'DECIMAL' :
-                   section.type === 'checklist' ? 'CHECKBOX' : 'BULLET_DISC';
+  // Apply bullet formatting with valid Google Docs API preset names
+  const glyphType = section.type === 'numbered-questions' ? 'NUMBERED_DECIMAL_ALPHA_ROMAN' :
+                   section.type === 'checklist' ? 'BULLET_CHECKBOX' :
+                   'BULLET_DISC_CIRCLE_SQUARE';
 
   requests.push({
     createParagraphBullets: {
       range: {
         startIndex: index,
-        endIndex: index + listText.length
+        endIndex: index + listText.length  // Don't include the extra newline in bullet range
       },
       bulletPreset: glyphType
     }
@@ -945,4 +946,42 @@ function replacePlaceholders(text, data) {
   });
 
   return result;
+}
+
+/**
+ * Parse inline markdown formatting (**bold**, etc.) and create formatting requests
+ * Returns { text: plainText, formatRanges: [{start, end, format}] }
+ */
+function parseInlineMarkdown(text, startIndex) {
+  const formatRanges = [];
+  let plainText = '';
+  let currentIndex = 0;
+
+  // Parse **bold** text
+  const boldRegex = /\*\*(.*?)\*\*/g;
+  let match;
+  let lastIndex = 0;
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    // Add text before the match
+    plainText += text.substring(lastIndex, match.index);
+
+    // Add the bold text (without asterisks)
+    const boldStart = startIndex + plainText.length;
+    plainText += match[1]; // The text inside **...**
+    const boldEnd = startIndex + plainText.length;
+
+    formatRanges.push({
+      startIndex: boldStart,
+      endIndex: boldEnd,
+      bold: true
+    });
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  plainText += text.substring(lastIndex);
+
+  return { text: plainText, formatRanges };
 }

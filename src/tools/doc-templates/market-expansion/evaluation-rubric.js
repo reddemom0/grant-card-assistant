@@ -20,16 +20,26 @@ export const EVALUATION_RUBRIC = {
     },
     {
       type: 'paragraph',
-      text: 'Client: {{client_name}}',
-      style: 'bold'
+      text: '**For use by:** Granted Strategy Team',
+      style: 'normal'
     },
     {
       type: 'paragraph',
-      text: 'Evaluated by: {{evaluator_name}}'
+      text: '**Client:** {{client_name}}',
+      style: 'normal'
     },
     {
       type: 'paragraph',
-      text: 'Date: {{evaluation_date}}'
+      text: '**Evaluated by:** {{evaluator_name}}',
+      style: 'normal'
+    },
+    {
+      type: 'paragraph',
+      text: '**Date:** {{evaluation_date}}',
+      style: 'normal'
+    },
+    {
+      type: 'divider'
     },
 
     {
@@ -183,14 +193,14 @@ export const EVALUATION_RUBRIC = {
   ],
 
   defaultData: {
-    program_name: '[Market Expansion Program Name]',
-    client_name: '[Client Company Name]',
-    evaluator_name: '[Your Name]',
-    evaluation_date: '[Date]',
-    difficulty_score: '[1.0-5.0]',
-    value_score: '[1.0-5.0]',
-    overall_assessment: '[Brief assessment summary]',
-    recommendation: '[Detailed recommendation for client]',
-    priority_rating: '[A/B/C]'
+    program_name: 'CanExport Innovation',
+    client_name: '[Company Name]',
+    evaluator_name: 'Granted Consulting',
+    evaluation_date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    difficulty_score: '[Score from 1.0 to 5.0]',
+    value_score: '[Score from 1.0 to 5.0]',
+    overall_assessment: '[Summary of grant fit for this client]',
+    recommendation: '[Detailed recommendation: Should client pursue this grant? What are the key considerations?]',
+    priority_rating: '[A = High Priority | B = Medium Priority | C = Low Priority]'
   }
 };

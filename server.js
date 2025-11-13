@@ -143,7 +143,7 @@ app.post('/api/feedback-learning', authenticateUser, feedbackLearningHandler);
 app.get('/api/sentiment-analysis', authenticateUser, sentimentAnalysisHandler);
 app.post('/api/sentiment-analysis', authenticateUser, sentimentAnalysisHandler);
 
-// Usage analytics (admin only) - with authentication
+// Usage analytics - with authentication
 app.get('/api/usage-analytics', authenticateUser, usageAnalyticsHandler);
 
 // Authentication endpoints

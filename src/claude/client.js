@@ -25,7 +25,7 @@ const anthropic = new Anthropic({
 // DEPRECATED: These are now set dynamically based on query complexity
 // Kept for backwards compatibility
 const FALLBACK_MAX_AGENT_LOOPS = 20;
-const FALLBACK_MODEL = 'claude-sonnet-4-20250514';
+const FALLBACK_MODEL = 'claude-sonnet-4-5-20250929'; // Use latest Sonnet 4.5
 const FALLBACK_MAX_TOKENS = 16000;
 const FALLBACK_THINKING_BUDGET = 10000;
 

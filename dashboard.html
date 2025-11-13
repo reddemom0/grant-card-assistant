@@ -922,14 +922,6 @@
                     userPicture.src = userInfo.picture;
                     userPicture.style.display = 'block';
                 }
-
-                // Show usage analytics link if user is admin
-                if (userInfo.role === 'admin') {
-                    const usageLink = document.getElementById('usage-link');
-                    if (usageLink) {
-                        usageLink.style.display = 'flex';
-                    }
-                }
             }
 
             const observer = new IntersectionObserver((entries) => {

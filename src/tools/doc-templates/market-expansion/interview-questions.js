@@ -21,12 +21,21 @@ export const INTERVIEW_QUESTIONS = {
     },
     {
       type: 'paragraph',
-      text: 'Client: {{client_name}}',
-      style: 'bold'
+      text: '**For use by:** Granted Strategy Team',
+      style: 'normal'
     },
     {
       type: 'paragraph',
-      text: 'Date: {{interview_date}}'
+      text: '**Client:** {{client_name}}',
+      style: 'normal'
+    },
+    {
+      type: 'paragraph',
+      text: '**Date:** {{interview_date}}',
+      style: 'normal'
+    },
+    {
+      type: 'divider'
     },
 
     {
@@ -241,8 +250,8 @@ export const INTERVIEW_QUESTIONS = {
   ],
 
   defaultData: {
-    program_name: '[Grant Program Name]',
-    client_name: '[Client Company Name]',
-    interview_date: '[Date]'
+    program_name: 'CanExport Innovation',
+    client_name: '[Company Name]',
+    interview_date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 };
