@@ -136,6 +136,21 @@ export default async function handler(req, res) {
 
       console.log(`✅ Feedback saved: ${conversationId} - ${rating} (quality: ${savedFeedback.quality_score})`);
 
+      // Auto-trigger learning generation if threshold reached (runs in background)
+      try {
+        const conversation = await db.getConversation(conversationId);
+        if (conversation?.agent_type) {
+          const { autoTriggerLearningGeneration } = await import('../src/feedback-learning/auto-trigger.js');
+          // Don't await - run in background
+          autoTriggerLearningGeneration(conversation.agent_type).catch(err => {
+            console.error('Background learning trigger failed:', err);
+          });
+        }
+      } catch (error) {
+        // Don't fail the feedback submission if auto-trigger fails
+        console.error('Error triggering auto-learning:', error);
+      }
+
       return res.status(200).json({
         success: true,
         feedback: savedFeedback
