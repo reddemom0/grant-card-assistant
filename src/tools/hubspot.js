@@ -1982,6 +1982,33 @@ export async function loadCompanyContext({
 
     // STEP 2: Search grant applications for this company
     console.log(`\n📍 STEP 2: Searching grant applications...`);
+
+    // 🔍 DIAGNOSTIC: First search without grant_program filter to see ALL deals
+    console.log(`\n🔍 DIAGNOSTIC: Searching for ALL deals for "${bestCompany.name}" (no grant filter)...`);
+    const diagnosticResult = await searchGrantApplications(
+      null, // No grant program filter
+      null, // No status filter
+      bestCompany.name,
+      agent_type
+    );
+
+    if (diagnosticResult.success && diagnosticResult.applications.length > 0) {
+      console.log(`🔍 FOUND ${diagnosticResult.applications.length} total deal(s) for "${bestCompany.name}"`);
+      console.log(`🔍 Sample deal data:`);
+      diagnosticResult.applications.slice(0, 3).forEach((app, i) => {
+        console.log(`   Deal ${i + 1}:`);
+        console.log(`     - ID: ${app.id}`);
+        console.log(`     - Name: ${app.name}`);
+        console.log(`     - Company Name (property): "${app.companyName}"`);
+        console.log(`     - Grant Type: "${app.program}"`);
+        console.log(`     - Status: ${app.status}`);
+      });
+    } else {
+      console.log(`🔍 NO DEALS FOUND for "${bestCompany.name}" (even without grant filter)`);
+      console.log(`🔍 This suggests the company_name property doesn't match "${bestCompany.name}"`);
+    }
+
+    // Now do the actual filtered search
     const applicationsResult = await searchGrantApplications(
       grant_program,
       null, // status
@@ -1990,7 +2017,7 @@ export async function loadCompanyContext({
     );
 
     if (!applicationsResult.success || applicationsResult.applications.length === 0) {
-      console.log(`⚠️  No grant applications found for "${bestCompany.name}"`);
+      console.log(`⚠️  No grant applications found for "${bestCompany.name}" with grant_program="${grant_program}"`);
       return {
         success: true,
         company: bestCompany,
