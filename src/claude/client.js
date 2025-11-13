@@ -15,17 +15,19 @@ import { loadLearningMemory } from '../tools/learning-memory.js';
 import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE } from './streaming.js';
+import { getQueryConfig, logConfigDecision } from './query-classifier.js';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-// Configuration
-const MAX_AGENT_LOOPS = 20; // Safety limit to prevent infinite loops
-const MODEL = 'claude-sonnet-4-20250514'; // Latest Sonnet 4.5 model
-const MAX_TOKENS = 16000; // Must be > thinking budget
-const THINKING_BUDGET = 10000; // Tokens for extended thinking
+// DEPRECATED: These are now set dynamically based on query complexity
+// Kept for backwards compatibility
+const FALLBACK_MAX_AGENT_LOOPS = 20;
+const FALLBACK_MODEL = 'claude-sonnet-4-20250514';
+const FALLBACK_MAX_TOKENS = 16000;
+const FALLBACK_THINKING_BUDGET = 10000;
 
 /**
  * Main agent execution function
@@ -101,6 +103,20 @@ export async function runAgent({
     } else {
       console.log(`✓ No learned patterns available yet (feedback learning will run as feedback is collected)`);
     }
+
+    // ============================================================================
+    // 2.6. Get query-specific configuration (NEW: Performance Optimization)
+    // ============================================================================
+
+    const queryConfig = getQueryConfig(message, agentType);
+    logConfigDecision(queryConfig, message);
+
+    // Extract configuration values
+    const MODEL = queryConfig.model;
+    const MAX_TOKENS = queryConfig.maxTokens;
+    const THINKING_CONFIG = queryConfig.thinking;
+    const TEMPERATURE = queryConfig.temperature;
+    const MAX_AGENT_LOOPS = queryConfig.maxIterations;
 
     // ============================================================================
     // 3. Load conversation history from database
@@ -188,6 +204,7 @@ export async function runAgent({
       const stream = await anthropic.messages.create({
         model: MODEL,
         max_tokens: MAX_TOKENS,
+        temperature: TEMPERATURE,
 
         // System prompt with caching
         system: [
@@ -201,11 +218,8 @@ export async function runAgent({
         messages,
         tools,
 
-        // Extended thinking enabled - separates reasoning from response
-        thinking: {
-          type: 'enabled',
-          budget_tokens: THINKING_BUDGET
-        },
+        // Extended thinking - dynamically configured based on query complexity
+        thinking: THINKING_CONFIG,
 
         // Enable streaming
         stream: true
