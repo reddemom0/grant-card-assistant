@@ -131,7 +131,7 @@ testCases.forEach((testCase, index) => {
   console.log(`   Query: "${testCase.query}"`);
   console.log(`   Expected: ${testCase.expected} | Got: ${complexity}`);
   console.log(`   Reason: ${testCase.reason}`);
-  console.log(`   Config: ${config.model}, thinking=${config.thinking.budget_tokens > 0}, temp=${config.temperature}`);
+  console.log(`   Config: ${config.model}, thinking=${config.thinking ? 'enabled' : 'disabled'}, temp=${config.temperature}`);
   console.log('');
 });
 

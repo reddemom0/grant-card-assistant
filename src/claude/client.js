@@ -201,7 +201,7 @@ export async function runAgent({
       // Call Claude API with streaming
       console.log(`📡 Calling Claude API...`);
 
-      const stream = await anthropic.messages.create({
+      const apiParams = {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         temperature: TEMPERATURE,
@@ -218,12 +218,16 @@ export async function runAgent({
         messages,
         tools,
 
-        // Extended thinking - dynamically configured based on query complexity
-        thinking: THINKING_CONFIG,
-
         // Enable streaming
         stream: true
-      }, {
+      };
+
+      // Only add thinking if configured (undefined = disabled for simple queries)
+      if (THINKING_CONFIG) {
+        apiParams.thinking = THINKING_CONFIG;
+      }
+
+      const stream = await anthropic.messages.create(apiParams, {
         // Beta headers for web fetch tool, interleaved thinking, and memory tool
         headers: {
           'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27'

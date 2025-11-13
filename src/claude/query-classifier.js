@@ -112,15 +112,13 @@ export function getModelForQuery(queryComplexity) {
 /**
  * Get extended thinking configuration
  * @param {string} queryComplexity - 'simple' or 'complex'
- * @returns {Object} Thinking configuration
+ * @returns {Object|undefined} Thinking configuration (undefined = disabled)
  */
 export function getThinkingConfig(queryComplexity) {
   if (queryComplexity === 'simple') {
     // Simple queries: Disable extended thinking for speed
-    return {
-      type: 'enabled',
-      budget_tokens: 0 // Effectively disables it
-    };
+    // Return undefined to omit thinking parameter entirely
+    return undefined;
   }
 
   // Complex queries: Full thinking budget
@@ -208,7 +206,7 @@ export function logConfigDecision(config, message) {
   console.log(`   Query: "${preview}${message.length > 100 ? '...' : ''}"`);
   console.log(`   Complexity: ${config.complexity}`);
   console.log(`   Model: ${config.model}`);
-  console.log(`   Extended Thinking: ${config.thinking.budget_tokens > 0 ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`   Extended Thinking: ${config.thinking ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   Max Tokens: ${config.maxTokens}`);
   console.log(`   Temperature: ${config.temperature}`);
   console.log(`   Max Iterations: ${config.maxIterations}`);
