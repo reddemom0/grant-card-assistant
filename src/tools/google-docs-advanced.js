@@ -106,9 +106,9 @@ function renderTableAsText(headers, rows = []) {
  * @param {string} content - Markdown formatted content
  * @returns {Array} Array of Google Docs API requests
  */
-export function markdownToGrantedDocsRequests(content) {
+export function markdownToGrantedDocsRequests(content, startIndex = 1) {
   const requests = [];
-  let currentIndex = 1; // Google Docs index starts at 1
+  let currentIndex = startIndex; // Start at specified index (default 1)
 
   // Split content into lines
   const lines = content.split('\n');
@@ -515,19 +515,20 @@ function processInlineFormatting(line, startIndex, requests) {
 }
 
 /**
- * Create document header with Granted Consulting branding
- * @param {Object} docsClient - Google Docs API client
- * @param {string} documentId - Document ID
- * @returns {Promise<void>}
+ * Generate document header requests with Granted Consulting branding
+ * Returns requests array and the offset to use for subsequent content
+ * @returns {Object} { requests: Array, offset: number }
  */
-export async function addGrantedHeader(docsClient, documentId) {
+export function generateGrantedHeaderRequests() {
   const requests = [];
+  let offset;
 
   // Check if we have a valid logo URL
   const hasLogo = LOGO_URL && !LOGO_URL.includes('PLACEHOLDER');
 
   if (hasLogo) {
     // Insert logo image at the top
+    // Note: inline image has length 1 according to Google Docs API
     requests.push({
       insertInlineImage: {
         location: { index: 1 },
@@ -566,12 +567,17 @@ export async function addGrantedHeader(docsClient, documentId) {
         fields: 'alignment'
       }
     });
+
+    // Offset: image (1) + newlines (2) = 3
+    offset = 3;
   } else {
     // Fallback to text-based header if logo not available
+    const headerText = 'GRANTED CONSULTING\n\n';
+
     requests.push({
       insertText: {
         location: { index: 1 },
-        text: 'GRANTED CONSULTING\n\n'
+        text: headerText
       }
     });
 
@@ -580,7 +586,7 @@ export async function addGrantedHeader(docsClient, documentId) {
       updateTextStyle: {
         range: {
           startIndex: 1,
-          endIndex: 19
+          endIndex: 19 // "GRANTED CONSULTING" length
         },
         textStyle: {
           fontSize: {
@@ -606,7 +612,7 @@ export async function addGrantedHeader(docsClient, documentId) {
       updateParagraphStyle: {
         range: {
           startIndex: 1,
-          endIndex: 21
+          endIndex: headerText.length
         },
         paragraphStyle: {
           alignment: 'END'
@@ -614,12 +620,12 @@ export async function addGrantedHeader(docsClient, documentId) {
         fields: 'alignment'
       }
     });
+
+    // Offset: full text length
+    offset = headerText.length;
   }
 
-  await docsClient.documents.batchUpdate({
-    documentId: documentId,
-    requestBody: { requests }
-  });
+  return { requests, offset };
 }
 
 /**
@@ -925,24 +931,29 @@ export async function createAdvancedDocumentTool(input, context) {
     const markdown = templateToMarkdown(template, data);
     console.log(`   ✓ Converted template to markdown (${markdown.length} chars)`);
 
-    // Step 3: Generate document requests from markdown
-    const requests = markdownToGrantedDocsRequests(markdown);
-    console.log(`   ✓ Generated ${requests.length} formatting requests`);
+    // Step 3: Generate header requests
+    const { requests: headerRequests, offset } = generateGrantedHeaderRequests();
+    console.log(`   ✓ Generated header (offset: ${offset})`);
 
-    // Step 4: Apply all formatting in one batch
-    if (requests.length > 0) {
+    // Step 4: Generate content requests starting after the header
+    const contentRequests = markdownToGrantedDocsRequests(markdown, 1 + offset);
+    console.log(`   ✓ Generated ${contentRequests.length} content formatting requests`);
+
+    // Step 5: Combine header + content in one batch (write backwards pattern)
+    const allRequests = [...headerRequests, ...contentRequests];
+    if (allRequests.length > 0) {
       await docs.documents.batchUpdate({
         documentId: documentId,
-        requestBody: { requests }
+        requestBody: { requests: allRequests }
       });
-      console.log(`   ✓ Applied all formatting`);
+      console.log(`   ✓ Applied all formatting (${allRequests.length} total requests)`);
     }
 
-    // Step 5: Apply document-wide styles
+    // Step 6: Apply document-wide styles
     await setDocumentStyles(docs, documentId);
     console.log(`   ✓ Applied document styles`);
 
-    // Step 6: Move to parent folder if specified
+    // Step 7: Move to parent folder if specified
     if (parentFolderId) {
       await drive.files.update({
         fileId: documentId,
