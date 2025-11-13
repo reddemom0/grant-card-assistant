@@ -21,12 +21,21 @@ export const INTERVIEW_QUESTIONS = {
     },
     {
       type: 'paragraph',
-      text: 'Client: {{client_name}}',
-      style: 'bold'
+      text: '**For use by:** Granted Strategy Team',
+      style: 'normal'
     },
     {
       type: 'paragraph',
-      text: 'Date: {{interview_date}}'
+      text: '**Client:** {{client_name}}',
+      style: 'normal'
+    },
+    {
+      type: 'paragraph',
+      text: '**Date:** {{interview_date}}',
+      style: 'normal'
+    },
+    {
+      type: 'divider'
     },
 
     {

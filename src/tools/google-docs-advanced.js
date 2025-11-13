@@ -76,6 +76,40 @@ export function markdownToGrantedDocsRequests(content) {
       continue;
     }
 
+    // Horizontal divider (---)
+    if (line.trim() === '---') {
+      const text = '_______________________________________________________________________________\n';
+      const startIndex = currentIndex;
+
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: text
+        }
+      });
+
+      // Style as light gray
+      requests.push({
+        updateTextStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length - 1
+          },
+          textStyle: {
+            foregroundColor: {
+              color: {
+                rgbColor: { red: 0.8, green: 0.8, blue: 0.8 }
+              }
+            }
+          },
+          fields: 'foregroundColor'
+        }
+      });
+
+      currentIndex += text.length;
+      continue;
+    }
+
     // Section Header (## ) - Blue, bold, larger
     if (line.startsWith('## ')) {
       const text = line.substring(3) + '\n';
@@ -455,6 +489,11 @@ function templateToMarkdown(template, data) {
     switch (section.type) {
       case 'title':
         lines.push(`# ${processedText}`);
+        lines.push('');
+        break;
+
+      case 'divider':
+        lines.push('---');
         lines.push('');
         break;
 
