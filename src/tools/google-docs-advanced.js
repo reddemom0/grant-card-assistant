@@ -141,7 +141,7 @@ export function markdownToGrantedDocsRequests(content) {
               magnitude: STYLES.HEADING_SIZE,
               unit: 'PT'
             },
-            foregroundColor: BRAND_COLORS.HEADER_BLUE.color
+            foregroundColor: BRAND_COLORS.HEADER_BLUE
           },
           fields: 'bold,fontSize,foregroundColor'
         }
