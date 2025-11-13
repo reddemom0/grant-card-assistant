@@ -723,7 +723,7 @@ function buildListRequests(section, data, index) {
   requests.push({
     insertText: {
       location: { index },
-      text: listText + '\n'
+      text: listText + '\n\n'  // ← FIXED: Extra newline to break list continuity
     }
   });
 
@@ -735,7 +735,7 @@ function buildListRequests(section, data, index) {
     createParagraphBullets: {
       range: {
         startIndex: index,
-        endIndex: index + listText.length
+        endIndex: index + listText.length  // Don't include the extra newline in bullet range
       },
       bulletPreset: glyphType
     }
