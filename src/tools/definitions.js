@@ -303,6 +303,77 @@ export const HUBSPOT_TOOLS = [
       },
       required: ['file_id_or_url']
     }
+  },
+  {
+    name: 'load_company_context',
+    description: 'CONSOLIDATED TOOL (Phase 2): Load complete company and grant application context in ONE call. Uses fuzzy name matching (e.g., "Spring Activator" finds "Spring Activator Inc.", "Seagate" finds "Seagate Mass Timber Corporation"). Returns company details, all grant applications, financial status, claim tracking, timeline, contacts, and optional email summary. Replaces multiple separate searches (search_grant_applications + get_grant_application + get_project_email_history). Use this FIRST when a user mentions a company name to get comprehensive context efficiently.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        company_name: {
+          type: 'string',
+          description: 'Company name (fuzzy matching supported - accepts partial names, names without legal suffixes like "Inc." or "Corp.", acronyms, etc.)'
+        },
+        grant_program: {
+          type: 'string',
+          enum: ['CanExport', 'ETG', 'BCAFE', 'Other'],
+          description: 'Optional: Filter applications by specific grant program'
+        },
+        include_emails: {
+          type: 'boolean',
+          description: 'Include email summary for context enrichment (default: true). Email history is loaded silently and used to enrich responses with relevant communication context.',
+          default: true
+        },
+        email_limit: {
+          type: 'number',
+          description: 'Number of recent emails to analyze for context (default: 20)',
+          default: 20
+        },
+        load_funding_agreement: {
+          type: 'boolean',
+          description: 'Automatically find and read funding agreement PDF (default: false). Set to true for audit workflows that need funding agreement details.',
+          default: false
+        }
+      },
+      required: ['company_name']
+    }
+  },
+  {
+    name: 'find_and_read_funding_agreement',
+    description: 'CONSOLIDATED TOOL (Phase 2): Automatically discover and read a funding agreement PDF in ONE call. Searches emails, deal files, and contact files to find the document. Returns full content plus parsed key fields (project dates, approved categories, funding amount, target markets). Replaces 5-7 separate tool calls (search_project_emails + get_email_details + search_hubspot_contacts + get_contact_files + read_hubspot_file). Use when you need funding agreement details for compliance auditing.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_id: {
+          type: 'string',
+          description: 'HubSpot deal ID (if known). Either deal_id or company_name must be provided.'
+        },
+        company_name: {
+          type: 'string',
+          description: 'Company name with fuzzy matching (will find deal first if deal_id not provided). Either deal_id or company_name must be provided.'
+        },
+        grant_program: {
+          type: 'string',
+          enum: ['CanExport', 'ETG', 'BCAFE', 'Other'],
+          description: 'Grant program filter (if company has multiple deals)'
+        },
+        return_content: {
+          type: 'boolean',
+          description: 'Return full document content (default: true)',
+          default: true
+        },
+        max_content_length: {
+          type: 'number',
+          description: 'Maximum content length to return in characters (default: 50000)',
+          default: 50000
+        },
+        parse_fields: {
+          type: 'boolean',
+          description: 'Extract key fields from document (project dates, categories, funding, markets) using pattern matching (default: true)',
+          default: true
+        }
+      }
+    }
   }
 ];
 
