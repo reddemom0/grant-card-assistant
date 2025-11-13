@@ -81,30 +81,66 @@ function validatePath(requestedPath) {
 }
 
 /**
- * VIEW command: Read contents of a memory file
+ * VIEW command: Read contents of a memory file OR list directory contents
  *
  * @param {object} input - { path: "/memories/user_feedback/corrections.xml" }
- * @returns {object} - { success: true, content: "file contents" } or error
+ * @returns {object} - { success: true, content: "file contents" } or { success: true, type: 'directory', files: [...] }
  */
 async function handleView(input) {
   try {
     const filePath = validatePath(input.path);
 
-    // Check if file exists
+    // Check if path exists
+    let stats;
     try {
-      await fs.access(filePath);
+      stats = await fs.stat(filePath);
     } catch {
       return {
         success: false,
-        error: `File not found: ${input.path}`
+        error: `Path not found: ${input.path}`
       };
     }
 
-    // Read file contents
+    // If it's a directory, list its contents
+    if (stats.isDirectory()) {
+      try {
+        const files = await fs.readdir(filePath);
+
+        // Get stats for each file/directory
+        const fileList = await Promise.all(
+          files.map(async (file) => {
+            const fullPath = path.join(filePath, file);
+            const fileStat = await fs.stat(fullPath);
+            return {
+              name: file,
+              type: fileStat.isDirectory() ? 'directory' : 'file',
+              size: fileStat.size,
+              modified: fileStat.mtime
+            };
+          })
+        );
+
+        return {
+          success: true,
+          type: 'directory',
+          path: input.path,
+          files: fileList,
+          message: `Directory contains ${fileList.length} items. To view a file, use the full path like ${input.path}/${fileList[0]?.name || 'filename'}`
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: `Failed to read directory: ${error.message}`
+        };
+      }
+    }
+
+    // If it's a file, read its contents
     const content = await fs.readFile(filePath, 'utf-8');
 
     return {
       success: true,
+      type: 'file',
       content: content
     };
   } catch (error) {
