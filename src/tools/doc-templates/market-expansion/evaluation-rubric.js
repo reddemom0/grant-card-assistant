@@ -20,16 +20,26 @@ export const EVALUATION_RUBRIC = {
     },
     {
       type: 'paragraph',
-      text: 'Client: {{client_name}}',
-      style: 'bold'
+      text: '**For use by:** Granted Strategy Team',
+      style: 'normal'
     },
     {
       type: 'paragraph',
-      text: 'Evaluated by: {{evaluator_name}}'
+      text: '**Client:** {{client_name}}',
+      style: 'normal'
     },
     {
       type: 'paragraph',
-      text: 'Date: {{evaluation_date}}'
+      text: '**Evaluated by:** {{evaluator_name}}',
+      style: 'normal'
+    },
+    {
+      type: 'paragraph',
+      text: '**Date:** {{evaluation_date}}',
+      style: 'normal'
+    },
+    {
+      type: 'divider'
     },
 
     {

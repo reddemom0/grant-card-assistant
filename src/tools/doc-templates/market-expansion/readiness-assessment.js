@@ -7,6 +7,12 @@ export const READINESS_ASSESSMENT = {
   grantType: 'market-expansion',
   documentType: 'readiness-assessment',
 
+  // Branding configuration
+  branding: {
+    headerColor: '#0047AB',
+    useCleanFormatting: true
+  },
+
   sections: [
     // Document Title with Branding
     {
@@ -14,18 +20,23 @@ export const READINESS_ASSESSMENT = {
       text: '{{program_name}} - Readiness Assessment',
       style: 'title-branded'
     },
-
-    // Company Information Header
-    {
-      type: 'subheader',
-      text: '{{company_name}}',
-      style: 'subheader-branded'
-    },
-
     {
       type: 'paragraph',
-      text: 'Prepared by: Granted Consulting\nDate: {{assessment_date}}\n',
-      style: 'bold'
+      text: '**For use by:** Granted Strategy Team',
+      style: 'normal'
+    },
+    {
+      type: 'paragraph',
+      text: '**Client:** {{company_name}}',
+      style: 'normal'
+    },
+    {
+      type: 'paragraph',
+      text: '**Date:** {{assessment_date}}',
+      style: 'normal'
+    },
+    {
+      type: 'divider'
     },
 
     // Program Overview Section
