@@ -947,3 +947,41 @@ function replacePlaceholders(text, data) {
 
   return result;
 }
+
+/**
+ * Parse inline markdown formatting (**bold**, etc.) and create formatting requests
+ * Returns { text: plainText, formatRanges: [{start, end, format}] }
+ */
+function parseInlineMarkdown(text, startIndex) {
+  const formatRanges = [];
+  let plainText = '';
+  let currentIndex = 0;
+
+  // Parse **bold** text
+  const boldRegex = /\*\*(.*?)\*\*/g;
+  let match;
+  let lastIndex = 0;
+
+  while ((match = boldRegex.exec(text)) !== null) {
+    // Add text before the match
+    plainText += text.substring(lastIndex, match.index);
+
+    // Add the bold text (without asterisks)
+    const boldStart = startIndex + plainText.length;
+    plainText += match[1]; // The text inside **...**
+    const boldEnd = startIndex + plainText.length;
+
+    formatRanges.push({
+      startIndex: boldStart,
+      endIndex: boldEnd,
+      bold: true
+    });
+
+    lastIndex = match.index + match[0].length;
+  }
+
+  // Add remaining text
+  plainText += text.substring(lastIndex);
+
+  return { text: plainText, formatRanges };
+}

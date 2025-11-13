@@ -436,6 +436,97 @@ export async function setDocumentStyles(docsClient, documentId) {
  * @param {Object} context - Execution context with userId
  * @returns {Promise<Object>} Result with success status and document URL
  */
+/**
+ * Convert structured template to markdown format
+ * @param {Object} template - Structured template object
+ * @param {Object} data - Data to fill placeholders
+ * @returns {string} Markdown formatted content
+ */
+function templateToMarkdown(template, data) {
+  const lines = [];
+
+  // Merge template defaults with provided data
+  const mergedData = { ...template.defaultData, ...data };
+
+  for (const section of template.sections) {
+    const text = section.text || '';
+    const processedText = replacePlaceholders(text, mergedData);
+
+    switch (section.type) {
+      case 'title':
+        lines.push(`# ${processedText}`);
+        lines.push('');
+        break;
+
+      case 'header':
+        if (section.level === 1) {
+          lines.push(`## ${processedText}`);
+        } else if (section.level === 2) {
+          lines.push(`### ${processedText}`);
+        } else {
+          lines.push(`#### ${processedText}`);
+        }
+        lines.push('');
+        break;
+
+      case 'subheader':
+        lines.push(`**${processedText}**`);
+        lines.push('');
+        break;
+
+      case 'paragraph':
+        lines.push(processedText);
+        lines.push('');
+        break;
+
+      case 'list':
+      case 'checklist':
+        if (section.items) {
+          section.items.forEach(item => {
+            const processedItem = replacePlaceholders(item, mergedData);
+            if (section.type === 'checklist') {
+              lines.push(`☐ ${processedItem}`);
+            } else {
+              lines.push(`- ${processedItem}`);
+            }
+          });
+          lines.push('');
+        }
+        break;
+
+      case 'numbered-questions':
+        if (section.items) {
+          section.items.forEach((item, index) => {
+            const processedItem = replacePlaceholders(item, mergedData);
+            lines.push(`**${index + 1}.** ${processedItem}`);
+            lines.push('');
+          });
+        }
+        break;
+
+      default:
+        // For complex types like tables, just add the text
+        if (processedText) {
+          lines.push(processedText);
+          lines.push('');
+        }
+    }
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Replace {{placeholders}} in text
+ */
+function replacePlaceholders(text, data) {
+  if (!text) return '';
+  return text.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
+    const value = data[key.trim()];
+    return value !== undefined ? value : match;
+  });
+}
+
 export async function createAdvancedDocumentTool(input, context) {
   const { title, grantType, documentType, data = {}, parentFolderId } = input;
   const { userId } = context || {};
@@ -470,23 +561,93 @@ export async function createAdvancedDocumentTool(input, context) {
       };
     }
 
-    console.log(`   ✓ Template found: ${template.title || 'Untitled'}`);
+    console.log(`   ✓ Template found`);
 
-    // Create document using template
-    const result = await createGoogleDocFromTemplate(
-      title,
-      userId,
-      template,
-      data,
-      parentFolderId
+    // Get user's OAuth credentials
+    const { query } = await import('../database/connection.js');
+    const result = await query(
+      'SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE id = $1',
+      [userId]
     );
 
-    console.log(`   ✓ Document created: ${result.url}`);
+    if (result.rows.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const user = result.rows[0];
+
+    if (!user.google_access_token) {
+      throw new Error('User has not connected Google account');
+    }
+
+    // Create OAuth2 client
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      access_token: user.google_access_token,
+      refresh_token: user.google_refresh_token,
+      expiry_date: user.google_token_expiry ? new Date(user.google_token_expiry).getTime() : null
+    });
+
+    const docs = google.docs({ version: 'v1', auth: oauth2Client });
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    // Step 1: Create empty document
+    const doc = await docs.documents.create({
+      requestBody: {
+        title: title
+      }
+    });
+
+    const documentId = doc.data.documentId;
+    console.log(`   ✓ Created empty document: ${documentId}`);
+
+    // Step 2: Convert template to markdown
+    const markdown = templateToMarkdown(template, data);
+    console.log(`   ✓ Converted template to markdown (${markdown.length} chars)`);
+
+    // Step 3: Generate document requests from markdown
+    const requests = markdownToGrantedDocsRequests(markdown);
+    console.log(`   ✓ Generated ${requests.length} formatting requests`);
+
+    // Step 4: Apply all formatting in one batch
+    if (requests.length > 0) {
+      await docs.documents.batchUpdate({
+        documentId: documentId,
+        requestBody: { requests }
+      });
+      console.log(`   ✓ Applied all formatting`);
+    }
+
+    // Step 5: Apply document-wide styles
+    await setDocumentStyles(docs, documentId);
+    console.log(`   ✓ Applied document styles`);
+
+    // Step 6: Move to parent folder if specified
+    if (parentFolderId) {
+      await drive.files.update({
+        fileId: documentId,
+        addParents: parentFolderId,
+        fields: 'id, parents'
+      });
+      console.log(`   ✓ Moved to folder: ${parentFolderId}`);
+    }
+
+    // Step 7: Get web view link
+    const file = await drive.files.get({
+      fileId: documentId,
+      fields: 'webViewLink'
+    });
+
+    console.log(`   ✓ Document created successfully: ${file.data.webViewLink}`);
 
     return {
       success: true,
-      documentId: result.documentId,
-      url: result.url,
+      documentId: documentId,
+      url: file.data.webViewLink,
       message: `Created ${documentType} for ${grantType} grant type`
     };
 
