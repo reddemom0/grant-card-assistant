@@ -17,13 +17,33 @@ const LOGO_URL = process.env.GRANTED_LOGO_URL || 'https://drive.google.com/uc?ex
  * Brand colors (Granted Consulting)
  */
 const BRAND_COLORS = {
-  // Dark blue for headers (RGB: 0, 71, 171)
+  // Dark blue 2 for headers (RGB: 0, 71, 171)
   HEADER_BLUE: {
     color: {
       rgbColor: {
         red: 0,
         green: 0.278,  // 71/255
         blue: 0.671    // 171/255
+      }
+    }
+  },
+  // Dark gray 3 for title text (RGB: 102, 102, 102)
+  TITLE_GRAY: {
+    color: {
+      rgbColor: {
+        red: 0.4,      // 102/255
+        green: 0.4,
+        blue: 0.4
+      }
+    }
+  },
+  // Red for warning text
+  WARNING_RED: {
+    color: {
+      rgbColor: {
+        red: 1.0,
+        green: 0,
+        blue: 0
       }
     }
   },
@@ -45,7 +65,7 @@ const BRAND_COLORS = {
 const STYLES = {
   BODY_FONT: 'Arial',
   BODY_SIZE: 11,
-  HEADING_SIZE: 14,
+  HEADING_SIZE: 17,  // Updated to match PDF template specification
   TITLE_SIZE: 18,
   LINE_SPACING: 100, // Single spacing (100%)
   MARGINS: {
@@ -55,6 +75,169 @@ const STYLES = {
     right: 72
   }
 };
+
+/**
+ * Insert a simple table (e.g., Yes/No checkboxes)
+ * @param {number} startIndex - Starting index in document
+ * @param {Array<string>} columns - Column headers
+ * @param {Array} requests - Requests array to append to
+ * @returns {Object} Updated index
+ */
+function insertSimpleTable(startIndex, columns, requests) {
+  // Create a simple table with 1 row and n columns
+  requests.push({
+    insertTable: {
+      rows: 1,
+      columns: columns.length,
+      location: {
+        index: startIndex
+      }
+    }
+  });
+
+  // The table creates cells, we need to populate them
+  // Each cell is separated by special table characters
+  // After inserting table at index N, cells start at N+3
+  let cellIndex = startIndex + 3;
+
+  for (let col = 0; col < columns.length; col++) {
+    const cellText = columns[col];
+
+    requests.push({
+      insertText: {
+        location: { index: cellIndex },
+        text: cellText
+      }
+    });
+
+    // Style the cell text
+    requests.push({
+      updateTextStyle: {
+        range: {
+          startIndex: cellIndex,
+          endIndex: cellIndex + cellText.length
+        },
+        textStyle: {
+          bold: true,
+          fontSize: {
+            magnitude: 11,
+            unit: 'PT'
+          }
+        },
+        fields: 'bold,fontSize'
+      }
+    });
+
+    // Move to next cell (cellText.length + 2 for cell boundaries)
+    cellIndex += cellText.length + 2;
+  }
+
+  // Total characters added: 3 (table start) + sum of cell text + (2 * numCells) + 2 (table end)
+  const totalChars = 3 + columns.reduce((sum, col) => sum + col.length, 0) + (2 * columns.length) + 2;
+
+  return { newIndex: startIndex + totalChars };
+}
+
+/**
+ * Parse and insert a full table from template markers
+ * @param {Array<string>} lines - All lines
+ * @param {number} startLine - Starting line index
+ * @param {number} startIndex - Starting character index
+ * @param {Array} requests - Requests array to append to
+ * @returns {Object} Updated index and line number
+ */
+function parseAndInsertTable(lines, startLine, startIndex, requests) {
+  let i = startLine + 1;
+  let headers = [];
+  let rows = [];
+
+  // Parse table content
+  while (i < lines.length && lines[i].trim() !== '[TABLE:end]') {
+    const line = lines[i].trim();
+
+    if (line.startsWith('[HEADERS]')) {
+      headers = line.substring(9).split('|');
+    } else if (line.startsWith('[ROW]')) {
+      const rowData = line.substring(5).split('|');
+      rows.push(rowData);
+    }
+
+    i++;
+  }
+
+  // Create table
+  const numRows = 1 + rows.length; // 1 header row + data rows
+  const numCols = headers.length;
+
+  requests.push({
+    insertTable: {
+      rows: numRows,
+      columns: numCols,
+      location: {
+        index: startIndex
+      }
+    }
+  });
+
+  // Populate cells
+  let cellIndex = startIndex + 3;
+
+  // Add headers
+  for (let col = 0; col < headers.length; col++) {
+    const cellText = headers[col];
+
+    requests.push({
+      insertText: {
+        location: { index: cellIndex },
+        text: cellText
+      }
+    });
+
+    // Style as bold
+    requests.push({
+      updateTextStyle: {
+        range: {
+          startIndex: cellIndex,
+          endIndex: cellIndex + cellText.length
+        },
+        textStyle: {
+          bold: true
+        },
+        fields: 'bold'
+      }
+    });
+
+    cellIndex += cellText.length + 2;
+  }
+
+  // Add rows
+  for (let row = 0; row < rows.length; row++) {
+    for (let col = 0; col < rows[row].length; col++) {
+      const cellText = rows[row][col];
+
+      requests.push({
+        insertText: {
+          location: { index: cellIndex },
+          text: cellText
+        }
+      });
+
+      cellIndex += cellText.length + 2;
+    }
+  }
+
+  // Calculate total characters
+  const headerChars = headers.reduce((sum, h) => sum + h.length, 0);
+  const rowChars = rows.reduce((sum, row) =>
+    sum + row.reduce((rowSum, cell) => rowSum + cell.length, 0), 0);
+  const totalCells = numRows * numCols;
+  const totalChars = 3 + headerChars + rowChars + (2 * totalCells) + 2;
+
+  return {
+    newIndex: startIndex + totalChars,
+    nextLineIndex: i + 1 // Skip past [TABLE:end]
+  };
+}
 
 /**
  * Convert markdown to Google Docs requests with Granted Consulting branding
@@ -69,7 +252,10 @@ export function markdownToGrantedDocsRequests(content) {
   // Split content into lines
   const lines = content.split('\n');
 
-  for (const line of lines) {
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
     if (!line.trim()) {
       // Empty line - add a newline
       requests.push({
@@ -79,6 +265,94 @@ export function markdownToGrantedDocsRequests(content) {
         }
       });
       currentIndex += 1;
+      i++;
+      continue;
+    }
+
+    // Warning callout - red text
+    if (line.trim().startsWith('[WARNING]')) {
+      const text = line.trim().replace(/^\[WARNING\]/, '').replace(/\[\/WARNING\]$/, '') + '\n';
+      const startIndex = currentIndex;
+
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: text
+        }
+      });
+
+      // Style as red
+      requests.push({
+        updateTextStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length - 1
+          },
+          textStyle: {
+            foregroundColor: BRAND_COLORS.WARNING_RED,
+            bold: true
+          },
+          fields: 'foregroundColor,bold'
+        }
+      });
+
+      currentIndex += text.length;
+      i++;
+      continue;
+    }
+
+    // Info callout
+    if (line.trim().startsWith('[INFO]')) {
+      const text = line.trim().replace(/^\[INFO\]/, '').replace(/\[\/INFO\]$/, '') + '\n';
+      const startIndex = currentIndex;
+
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: text
+        }
+      });
+
+      // Style with info color (can customize)
+      requests.push({
+        updateTextStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length - 1
+          },
+          textStyle: {
+            italic: true
+          },
+          fields: 'italic'
+        }
+      });
+
+      currentIndex += text.length;
+      i++;
+      continue;
+    }
+
+    // Simple Yes/No table
+    if (line.trim() === '[TABLE:yes-no]') {
+      const tableResult = insertSimpleTable(currentIndex, ['Yes', 'No'], requests);
+      currentIndex = tableResult.newIndex;
+      i++;
+      continue;
+    }
+
+    // Simple Yes/No/Partial table
+    if (line.trim() === '[TABLE:yes-no-partial]') {
+      const tableResult = insertSimpleTable(currentIndex, ['Yes', 'No', 'Partial'], requests);
+      currentIndex = tableResult.newIndex;
+      i++;
+      continue;
+    }
+
+    // Full table with headers and rows
+    if (line.trim() === '[TABLE:start]') {
+      const tableResult = parseAndInsertTable(lines, i, currentIndex, requests);
+      currentIndex = tableResult.newIndex;
+      i = tableResult.nextLineIndex;
       continue;
     }
 
@@ -113,6 +387,7 @@ export function markdownToGrantedDocsRequests(content) {
       });
 
       currentIndex += text.length;
+      i++;
       continue;
     }
 
@@ -169,6 +444,7 @@ export function markdownToGrantedDocsRequests(content) {
       });
 
       currentIndex += text.length;
+      i++;
     }
     // Subsection (### ) - Regular heading style
     else if (line.startsWith('### ')) {
@@ -200,6 +476,7 @@ export function markdownToGrantedDocsRequests(content) {
       });
 
       currentIndex += text.length;
+      i++;
     }
     // Bullet list (- )
     else if (line.trim().startsWith('- ')) {
@@ -224,26 +501,40 @@ export function markdownToGrantedDocsRequests(content) {
       });
 
       currentIndex += text.length;
+      i++;
     }
-    // Checkbox (☐ or [ ])
+    // Checkbox (☐ or [ ]) - using Google Docs API checkboxes
     else if (line.trim().startsWith('☐') || line.trim().startsWith('[ ]')) {
       const text = line.trim().replace(/^(☐|\[\s?\])/, '').trim() + '\n';
       const startIndex = currentIndex;
 
-      // Insert checkbox symbol + text
+      // Insert text
       requests.push({
         insertText: {
           location: { index: currentIndex },
-          text: '☐ ' + text
+          text: text
         }
       });
 
-      currentIndex += ('☐ ' + text).length;
+      // Convert to checkbox bullet
+      requests.push({
+        createParagraphBullets: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length
+          },
+          bulletPreset: 'BULLET_CHECKBOX'
+        }
+      });
+
+      currentIndex += text.length;
+      i++;
     }
     // Regular text with inline formatting
     else {
       const processedLine = processInlineFormatting(line, currentIndex, requests);
       currentIndex = processedLine.newIndex;
+      i++;
     }
   }
 
@@ -594,8 +885,60 @@ function templateToMarkdown(template, data) {
         }
         break;
 
+      case 'question':
+        // Questions should be in italic
+        const questionNum = section.number ? `**${section.number}.** ` : '';
+        const questionText = replacePlaceholders(section.text, mergedData);
+        lines.push(`${questionNum}*${questionText}*`);
+
+        // Add follow-up text if present
+        if (section.followup && section.followup.length > 0) {
+          section.followup.forEach(followupText => {
+            const processedFollowup = replacePlaceholders(followupText, mergedData);
+            lines.push(`   ${processedFollowup}`);
+          });
+        }
+
+        // Add Yes/No table if present
+        if (section.table && section.table.type === 'yes-no') {
+          lines.push('[TABLE:yes-no]');
+        } else if (section.table && section.table.type === 'yes-no-partial') {
+          lines.push('[TABLE:yes-no-partial]');
+        }
+        lines.push('');
+        break;
+
+      case 'callout':
+        // Callouts with warning style should be red
+        if (section.style === 'warning') {
+          lines.push(`[WARNING]${processedText}[/WARNING]`);
+        } else if (section.style === 'info') {
+          lines.push(`[INFO]${processedText}[/INFO]`);
+        } else {
+          lines.push(processedText);
+        }
+        lines.push('');
+        break;
+
+      case 'table':
+        // Create table marker with data
+        lines.push('[TABLE:start]');
+        if (section.headers) {
+          const processedHeaders = section.headers.map(h => replacePlaceholders(h, mergedData));
+          lines.push(`[HEADERS]${processedHeaders.join('|')}`);
+        }
+        if (section.rows) {
+          section.rows.forEach(row => {
+            const processedRow = row.map(cell => replacePlaceholders(cell, mergedData));
+            lines.push(`[ROW]${processedRow.join('|')}`);
+          });
+        }
+        lines.push('[TABLE:end]');
+        lines.push('');
+        break;
+
       default:
-        // For complex types like tables, just add the text
+        // For other types, just add the text
         if (processedText) {
           lines.push(processedText);
           lines.push('');
