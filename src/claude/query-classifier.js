@@ -151,7 +151,9 @@ export function getTemperature(queryComplexity) {
     return 0.3; // More focused, less verbose
   }
 
-  return 0.7; // Balanced for analysis
+  // IMPORTANT: When extended thinking is enabled, Anthropic requires temperature = 1.0
+  // See: https://docs.claude.com/en/docs/build-with-claude/extended-thinking
+  return 1.0; // Required for extended thinking
 }
 
 /**
