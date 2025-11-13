@@ -77,166 +77,27 @@ const STYLES = {
 };
 
 /**
- * Insert a simple table (e.g., Yes/No checkboxes)
- * @param {number} startIndex - Starting index in document
- * @param {Array<string>} columns - Column headers
- * @param {Array} requests - Requests array to append to
- * @returns {Object} Updated index
+ * Render table as formatted text (pipe-separated values)
+ * This is safer and more reliable than complex table API calculations
+ * @param {Array<string>} headers - Column headers
+ * @param {Array<Array<string>>} rows - Table rows
+ * @returns {string} Formatted table text
  */
-function insertSimpleTable(startIndex, columns, requests) {
-  // Create a simple table with 1 row and n columns
-  requests.push({
-    insertTable: {
-      rows: 1,
-      columns: columns.length,
-      location: {
-        index: startIndex
-      }
-    }
+function renderTableAsText(headers, rows = []) {
+  const lines = [];
+
+  // Header row
+  lines.push(headers.join(' | '));
+
+  // Separator line
+  lines.push(headers.map(h => '─'.repeat(h.length)).join('─┼─'));
+
+  // Data rows
+  rows.forEach(row => {
+    lines.push(row.join(' | '));
   });
 
-  // The table creates cells, we need to populate them
-  // Each cell is separated by special table characters
-  // After inserting table at index N, cells start at N+3
-  let cellIndex = startIndex + 3;
-
-  for (let col = 0; col < columns.length; col++) {
-    const cellText = columns[col];
-
-    requests.push({
-      insertText: {
-        location: { index: cellIndex },
-        text: cellText
-      }
-    });
-
-    // Style the cell text
-    requests.push({
-      updateTextStyle: {
-        range: {
-          startIndex: cellIndex,
-          endIndex: cellIndex + cellText.length
-        },
-        textStyle: {
-          bold: true,
-          fontSize: {
-            magnitude: 11,
-            unit: 'PT'
-          }
-        },
-        fields: 'bold,fontSize'
-      }
-    });
-
-    // Move to next cell (cellText.length + 2 for cell boundaries)
-    cellIndex += cellText.length + 2;
-  }
-
-  // Total characters added: 3 (table start) + sum of cell text + (2 * numCells) + 2 (table end)
-  const totalChars = 3 + columns.reduce((sum, col) => sum + col.length, 0) + (2 * columns.length) + 2;
-
-  return { newIndex: startIndex + totalChars };
-}
-
-/**
- * Parse and insert a full table from template markers
- * @param {Array<string>} lines - All lines
- * @param {number} startLine - Starting line index
- * @param {number} startIndex - Starting character index
- * @param {Array} requests - Requests array to append to
- * @returns {Object} Updated index and line number
- */
-function parseAndInsertTable(lines, startLine, startIndex, requests) {
-  let i = startLine + 1;
-  let headers = [];
-  let rows = [];
-
-  // Parse table content
-  while (i < lines.length && lines[i].trim() !== '[TABLE:end]') {
-    const line = lines[i].trim();
-
-    if (line.startsWith('[HEADERS]')) {
-      headers = line.substring(9).split('|');
-    } else if (line.startsWith('[ROW]')) {
-      const rowData = line.substring(5).split('|');
-      rows.push(rowData);
-    }
-
-    i++;
-  }
-
-  // Create table
-  const numRows = 1 + rows.length; // 1 header row + data rows
-  const numCols = headers.length;
-
-  requests.push({
-    insertTable: {
-      rows: numRows,
-      columns: numCols,
-      location: {
-        index: startIndex
-      }
-    }
-  });
-
-  // Populate cells
-  let cellIndex = startIndex + 3;
-
-  // Add headers
-  for (let col = 0; col < headers.length; col++) {
-    const cellText = headers[col];
-
-    requests.push({
-      insertText: {
-        location: { index: cellIndex },
-        text: cellText
-      }
-    });
-
-    // Style as bold
-    requests.push({
-      updateTextStyle: {
-        range: {
-          startIndex: cellIndex,
-          endIndex: cellIndex + cellText.length
-        },
-        textStyle: {
-          bold: true
-        },
-        fields: 'bold'
-      }
-    });
-
-    cellIndex += cellText.length + 2;
-  }
-
-  // Add rows
-  for (let row = 0; row < rows.length; row++) {
-    for (let col = 0; col < rows[row].length; col++) {
-      const cellText = rows[row][col];
-
-      requests.push({
-        insertText: {
-          location: { index: cellIndex },
-          text: cellText
-        }
-      });
-
-      cellIndex += cellText.length + 2;
-    }
-  }
-
-  // Calculate total characters
-  const headerChars = headers.reduce((sum, h) => sum + h.length, 0);
-  const rowChars = rows.reduce((sum, row) =>
-    sum + row.reduce((rowSum, cell) => rowSum + cell.length, 0), 0);
-  const totalCells = numRows * numCols;
-  const totalChars = 3 + headerChars + rowChars + (2 * totalCells) + 2;
-
-  return {
-    newIndex: startIndex + totalChars,
-    nextLineIndex: i + 1 // Skip past [TABLE:end]
-  };
+  return lines.join('\n') + '\n\n';
 }
 
 /**
@@ -332,27 +193,62 @@ export function markdownToGrantedDocsRequests(content) {
       continue;
     }
 
-    // Simple Yes/No table
+    // Simple Yes/No table - rendered as formatted text
     if (line.trim() === '[TABLE:yes-no]') {
-      const tableResult = insertSimpleTable(currentIndex, ['Yes', 'No'], requests);
-      currentIndex = tableResult.newIndex;
+      const text = renderTableAsText(['Yes', 'No']);
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: text
+        }
+      });
+      currentIndex += text.length;
       i++;
       continue;
     }
 
-    // Simple Yes/No/Partial table
+    // Simple Yes/No/Partial table - rendered as formatted text
     if (line.trim() === '[TABLE:yes-no-partial]') {
-      const tableResult = insertSimpleTable(currentIndex, ['Yes', 'No', 'Partial'], requests);
-      currentIndex = tableResult.newIndex;
+      const text = renderTableAsText(['Yes', 'No', 'Partial']);
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: text
+        }
+      });
+      currentIndex += text.length;
       i++;
       continue;
     }
 
-    // Full table with headers and rows
+    // Full table with headers and rows - rendered as formatted text
     if (line.trim() === '[TABLE:start]') {
-      const tableResult = parseAndInsertTable(lines, i, currentIndex, requests);
-      currentIndex = tableResult.newIndex;
-      i = tableResult.nextLineIndex;
+      i++;
+      let headers = [];
+      let rows = [];
+
+      // Parse table content
+      while (i < lines.length && lines[i].trim() !== '[TABLE:end]') {
+        const tableLine = lines[i].trim();
+        if (tableLine.startsWith('[HEADERS]')) {
+          headers = tableLine.substring(9).split('|');
+        } else if (tableLine.startsWith('[ROW]')) {
+          const rowData = tableLine.substring(5).split('|');
+          rows.push(rowData);
+        }
+        i++;
+      }
+
+      // Render as formatted text
+      const text = renderTableAsText(headers, rows);
+      requests.push({
+        insertText: {
+          location: { index: currentIndex },
+          text: text
+        }
+      });
+      currentIndex += text.length;
+      i++; // Skip [TABLE:end]
       continue;
     }
 
@@ -503,27 +399,14 @@ export function markdownToGrantedDocsRequests(content) {
       currentIndex += text.length;
       i++;
     }
-    // Checkbox (☐ or [ ]) - using Google Docs API checkboxes
+    // Checkbox (☐ or [ ]) - TEMPORARILY SIMPLIFIED (using text instead of API checkboxes)
     else if (line.trim().startsWith('☐') || line.trim().startsWith('[ ]')) {
-      const text = line.trim().replace(/^(☐|\[\s?\])/, '').trim() + '\n';
-      const startIndex = currentIndex;
+      const text = '☐ ' + line.trim().replace(/^(☐|\[\s?\])/, '').trim() + '\n';
 
-      // Insert text
       requests.push({
         insertText: {
           location: { index: currentIndex },
           text: text
-        }
-      });
-
-      // Convert to checkbox bullet
-      requests.push({
-        createParagraphBullets: {
-          range: {
-            startIndex: startIndex,
-            endIndex: startIndex + text.length
-          },
-          bulletPreset: 'BULLET_CHECKBOX'
         }
       });
 
