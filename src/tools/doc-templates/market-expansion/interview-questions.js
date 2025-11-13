@@ -241,8 +241,8 @@ export const INTERVIEW_QUESTIONS = {
   ],
 
   defaultData: {
-    program_name: '[Grant Program Name]',
-    client_name: '[Client Company Name]',
-    interview_date: '[Date]'
+    program_name: 'CanExport Innovation',
+    client_name: '[Company Name]',
+    interview_date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
   }
 };

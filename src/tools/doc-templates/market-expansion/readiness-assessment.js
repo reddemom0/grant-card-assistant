@@ -8,10 +8,44 @@ export const READINESS_ASSESSMENT = {
   documentType: 'readiness-assessment',
 
   sections: [
+    // Document Title with Branding
+    {
+      type: 'title',
+      text: '{{program_name}} - Readiness Assessment',
+      style: 'title-branded'
+    },
+
+    // Company Information Header
+    {
+      type: 'subheader',
+      text: '{{company_name}}',
+      style: 'subheader-branded'
+    },
+
+    {
+      type: 'paragraph',
+      text: 'Prepared by: Granted Consulting\nDate: {{assessment_date}}\n',
+      style: 'bold'
+    },
+
+    // Program Overview Section
     {
       type: 'header',
-      level: 2,
-      text: 'Process Overview'
+      level: 1,
+      text: 'Program Overview',
+      style: 'header-branded'
+    },
+    {
+      type: 'paragraph',
+      text: '{{program_description}}'
+    },
+
+    // Process Overview Section
+    {
+      type: 'header',
+      level: 1,
+      text: 'Process Overview',
+      style: 'header-branded'
     },
     {
       type: 'list',
@@ -33,7 +67,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Target Market Identification'
+      text: 'Target Market Identification',
+      style: 'header-branded'
     },
     {
       type: 'paragraph',
@@ -69,7 +104,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Target Markets Review'
+      text: 'Target Markets Review',
+      style: 'header-branded'
     },
     {
       type: 'callout',
@@ -80,7 +116,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Target Customer Review'
+      text: 'Target Customer Review',
+      style: 'header-branded'
     },
     {
       type: 'table',
@@ -114,7 +151,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Qualifiers'
+      text: 'Qualifiers',
+      style: 'header-branded'
     },
     {
       type: 'subheader',
@@ -284,7 +322,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Competitors'
+      text: 'Competitors',
+      style: 'header-branded'
     },
     {
       type: 'table',
@@ -300,7 +339,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Project Outcomes'
+      text: 'Project Outcomes',
+      style: 'header-branded'
     },
     {
       type: 'table',
@@ -319,7 +359,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Project Activities'
+      text: 'Project Activities',
+      style: 'header-branded'
     },
     {
       type: 'paragraph',
@@ -389,7 +430,8 @@ export const READINESS_ASSESSMENT = {
     {
       type: 'header',
       level: 2,
-      text: 'Final Housekeeping'
+      text: 'Final Housekeeping',
+      style: 'header-branded'
     },
     {
       type: 'list',
@@ -409,11 +451,49 @@ export const READINESS_ASSESSMENT = {
   // Default placeholders for CanExport SMEs
   defaultData: {
     program_name: 'CanExport SMEs',
+    company_name: '[Company Name]',
+    assessment_date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+    program_description: 'CanExport SMEs provides funding to small and medium-sized Canadian enterprises to help them develop new export opportunities and markets. The program offers up to $50,000 in funding (75% reimbursement for travel and 50% for other eligible expenses) to support international business development activities.',
     adjudication_days: '60',
     market_sales_threshold: '$100,000',
     market_percentage_threshold: '10',
     multi_market_threshold: '10',
     market_warning: 'Please advise: Entrance to the United States is mutually exclusive with other markets. For stronger applications, we suggest a maximum of two target markets per application.',
+
+    // Company information placeholders
+    company_size: '[Small/Medium/Large]',
+    years_established: '[Number of years]',
+    num_employees: '[Number]',
+    industry: '[Industry sector]',
+    age_range: '[Age range]',
+    education: '[Education level]',
+    profession_location: '[Profession/Location]',
+    preferences_needs: '[Customer preferences]',
+
+    // Competitor placeholders
+    competitor_1_name: '[Competitor 1]',
+    competitor_1_presence: '[Their market presence]',
+    competitor_1_advantage: '[Your advantage over them]',
+    competitor_2_name: '[Competitor 2]',
+    competitor_2_presence: '[Their market presence]',
+    competitor_2_advantage: '[Your advantage over them]',
+    competitor_3_name: '[Competitor 3]',
+    competitor_3_presence: '[Their market presence]',
+    competitor_3_advantage: '[Your advantage over them]',
+    competitor_4_name: '[Competitor 4]',
+    competitor_4_presence: '[Their market presence]',
+    competitor_4_advantage: '[Your advantage over them]',
+
+    // Project outcomes placeholders
+    expected_revenue: '[Dollar amount]',
+    expected_leads: '[Number of leads]',
+    jobs_created: '[Number of jobs]',
+    investment_amount: '[Dollar amount]',
+    rd_increase: '[Description]',
+    agreements_signed: '[Number/Description]',
+    other_outcomes: '[Other outcomes]',
+
+    // Program details
     cost_share: '50',
     max_funding: '$50,000',
     outcome_date: 'March 31, 2026',
