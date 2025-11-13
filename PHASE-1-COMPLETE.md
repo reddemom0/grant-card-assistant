@@ -195,8 +195,10 @@ Should see clean execution without memory errors
 
 1. **f8747ea** - feat: Implement intelligent query optimization for 81-87% latency reduction
 2. **b13c112** - fix: Memory tool EISDIR error when viewing directories
+3. **212b342** - fix: Return undefined instead of budget_tokens=0 to disable extended thinking
+4. **2c2a474** - fix: Set temperature=1.0 for complex queries with extended thinking
 
-Both pushed to `development` branch.
+All pushed to `development` branch.
 
 ---
 

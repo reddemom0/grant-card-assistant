@@ -1,5 +1,5 @@
 /**
- * Usage Analytics API (Admin Only)
+ * Usage Analytics API
  * GET /api/usage-analytics - Get usage statistics
  */
 
@@ -11,16 +11,10 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Require admin authentication
+  // Require authentication (available to all authenticated users)
   if (!req.user) {
     return res.status(401).json({
       error: 'Unauthorized - Please log in'
-    });
-  }
-
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({
-      error: 'Forbidden - Admin access required'
     });
   }
 
