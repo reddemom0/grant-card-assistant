@@ -727,9 +727,10 @@ function buildListRequests(section, data, index) {
     }
   });
 
-  // Apply bullet formatting
-  const glyphType = section.type === 'numbered-questions' ? 'DECIMAL' :
-                   section.type === 'checklist' ? 'CHECKBOX' : 'BULLET_DISC';
+  // Apply bullet formatting with valid Google Docs API preset names
+  const glyphType = section.type === 'numbered-questions' ? 'NUMBERED_DECIMAL_ALPHA_ROMAN' :
+                   section.type === 'checklist' ? 'BULLET_CHECKBOX' :
+                   'BULLET_DISC_CIRCLE_SQUARE';
 
   requests.push({
     createParagraphBullets: {
