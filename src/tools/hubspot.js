@@ -1776,3 +1776,584 @@ export async function readHubSpotFile(fileIdOrUrl) {
     };
   }
 }
+
+// ============================================================================
+// CONSOLIDATED TOOLS (Phase 2 Optimization)
+// These tools reduce multiple API calls into single operations
+// ============================================================================
+
+/**
+ * Fuzzy match company name against HubSpot company records
+ * Handles partial names, missing legal suffixes, acronyms, etc.
+ * @param {string} userInput - Company name provided by user
+ * @param {Array} companies - HubSpot company search results
+ * @returns {Object} Best match with confidence score
+ */
+function fuzzyMatchCompany(userInput, companies) {
+  if (!companies || companies.length === 0) {
+    return { match: null, confidence: 0 };
+  }
+
+  const normalizeForMatching = (str) => {
+    if (!str) return '';
+    return str.toLowerCase()
+      .replace(/\b(inc|corp|ltd|llc|corporation|society|association|co|company)\b\.?/gi, '')
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  const userNormalized = normalizeForMatching(userInput);
+  const userWords = new Set(userNormalized.split(' '));
+
+  let bestMatch = null;
+  let highestConfidence = 0;
+
+  for (const company of companies) {
+    const companyNormalized = normalizeForMatching(company.name);
+    const companyWords = new Set(companyNormalized.split(' '));
+
+    let confidence = 0;
+
+    // Rule 1: Exact match (case insensitive, without legal suffix) = 100
+    if (userNormalized === companyNormalized) {
+      confidence = 100;
+    }
+    // Rule 2: Company name starts with user input = 90
+    else if (companyNormalized.startsWith(userNormalized)) {
+      confidence = 90;
+    }
+    // Rule 3: All user words present in company name = 80
+    else if ([...userWords].every(word => companyWords.has(word))) {
+      confidence = 80;
+    }
+    // Rule 4: Partial word overlap
+    else {
+      const overlap = [...userWords].filter(word => companyWords.has(word)).length;
+      const totalWords = Math.max(userWords.size, companyWords.size);
+      confidence = (overlap / totalWords) * 70;
+    }
+
+    if (confidence > highestConfidence) {
+      highestConfidence = confidence;
+      bestMatch = company;
+    }
+  }
+
+  return { match: bestMatch, confidence: highestConfidence };
+}
+
+/**
+ * Parse funding agreement content to extract key fields
+ * Uses regex patterns to find project dates, categories, funding, markets
+ * @param {string} content - Full document text
+ * @returns {Object} Parsed fields
+ */
+function parseFundingAgreement(content) {
+  const parsed = {
+    project_period: null,
+    approved_categories: [],
+    approved_funding: null,
+    target_markets: [],
+    reimbursement_rate: null
+  };
+
+  if (!content) return parsed;
+
+  // Extract project period
+  const datePatterns = [
+    /project\s+period[:\s]+(\w+\s+\d{1,2},\s+\d{4})\s*[-–to]+\s*(\w+\s+\d{1,2},\s+\d{4})/i,
+    /start\s+date[:\s]+(\d{4}-\d{2}-\d{2}).*?end\s+date[:\s]+(\d{4}-\d{2}-\d{2})/is,
+    /(\d{4}-\d{2}-\d{2})\s*[-–to]+\s*(\d{4}-\d{2}-\d{2})/
+  ];
+
+  for (const pattern of datePatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      parsed.project_period = {
+        start: match[1],
+        end: match[2]
+      };
+      break;
+    }
+  }
+
+  // Extract approved categories (A-H pattern common in CanExport)
+  const categoryPattern = /category\s+([A-H])[:\s-]/gi;
+  const categoryMatches = content.matchAll(categoryPattern);
+  for (const match of categoryMatches) {
+    if (!parsed.approved_categories.includes(match[1].toUpperCase())) {
+      parsed.approved_categories.push(match[1].toUpperCase());
+    }
+  }
+
+  // Extract approved funding
+  const fundingPatterns = [
+    /approved\s+funding[:\s]+\$?([\d,]+)/i,
+    /total\s+funding[:\s]+\$?([\d,]+)/i,
+    /reimbursement[:\s]+\$?([\d,]+)/i
+  ];
+
+  for (const pattern of fundingPatterns) {
+    const match = content.match(pattern);
+    if (match) {
+      parsed.approved_funding = `$${match[1]}`;
+      break;
+    }
+  }
+
+  // Extract target markets (countries)
+  const marketPattern = /target\s+market[s]?[:\s]+([^.\n]+)/i;
+  const marketMatch = content.match(marketPattern);
+  if (marketMatch) {
+    parsed.target_markets = marketMatch[1]
+      .split(/[,;]/)
+      .map(m => m.trim())
+      .filter(m => m.length > 0);
+  }
+
+  // Extract reimbursement rate
+  const ratePattern = /(\d{1,3})%\s+reimbursement/i;
+  const rateMatch = content.match(ratePattern);
+  if (rateMatch) {
+    parsed.reimbursement_rate = `${rateMatch[1]}%`;
+  }
+
+  return parsed;
+}
+
+/**
+ * Load complete company context in one consolidated call
+ * Replaces: searchGrantApplications + getGrantApplication + getProjectEmailHistory
+ *
+ * @param {Object} params - Search parameters
+ * @param {string} params.company_name - Company name (fuzzy matching supported)
+ * @param {string} [params.grant_program] - Filter by grant program (CanExport, ETG, BCAFE)
+ * @param {boolean} [params.include_emails=true] - Include email summary for context
+ * @param {number} [params.email_limit=20] - Number of recent emails to analyze
+ * @param {boolean} [params.load_funding_agreement=false] - Auto-load funding agreement
+ * @param {string} [params.agent_type] - Agent type for field selection
+ * @returns {Object} Complete company context
+ */
+export async function loadCompanyContext({
+  company_name,
+  grant_program = null,
+  include_emails = true,
+  email_limit = 20,
+  load_funding_agreement = false,
+  agent_type = null
+}) {
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`🚀 CONSOLIDATED TOOL: load_company_context`);
+  console.log(`   Company: "${company_name}"`);
+  console.log(`   Grant Program: ${grant_program || 'any'}`);
+  console.log(`   Include Emails: ${include_emails}`);
+  console.log(`   Load FA: ${load_funding_agreement}`);
+  console.log('='.repeat(80));
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    // STEP 1: Fuzzy company search
+    console.log(`\n📍 STEP 1: Searching for company "${company_name}"...`);
+    const companySearchResult = await searchHubSpotCompanies(company_name);
+
+    if (!companySearchResult.success || companySearchResult.companies.length === 0) {
+      console.log(`❌ No companies found matching "${company_name}"`);
+      return {
+        success: false,
+        error: `No companies found matching "${company_name}"`
+      };
+    }
+
+    // Apply fuzzy matching to find best match
+    const { match: bestCompany, confidence } = fuzzyMatchCompany(
+      company_name,
+      companySearchResult.companies
+    );
+
+    console.log(`✓ Found ${companySearchResult.companies.length} company matches`);
+    console.log(`  Best match: "${bestCompany.name}" (${confidence}% confidence)`);
+
+    // STEP 2: Search grant applications for this company
+    console.log(`\n📍 STEP 2: Searching grant applications...`);
+    const applicationsResult = await searchGrantApplications(
+      grant_program,
+      null, // status
+      bestCompany.name, // Use exact HubSpot name
+      agent_type
+    );
+
+    if (!applicationsResult.success || applicationsResult.applications.length === 0) {
+      console.log(`⚠️  No grant applications found for "${bestCompany.name}"`);
+      return {
+        success: true,
+        company: bestCompany,
+        applications: [],
+        message: `Found company but no grant applications${grant_program ? ` for ${grant_program}` : ''}`
+      };
+    }
+
+    console.log(`✓ Found ${applicationsResult.applications.length} grant application(s)`);
+
+    // STEP 3: Load full details for each application
+    console.log(`\n📍 STEP 3: Loading application details...`);
+    const detailedApplications = [];
+
+    for (const app of applicationsResult.applications) {
+      const appDetails = await getGrantApplication(app.id, agent_type);
+      if (appDetails.success) {
+        // Merge application data with associations
+        detailedApplications.push({
+          deal_id: app.id,
+          ...appDetails.application,
+          contacts: appDetails.associations?.contacts?.results || [],
+          companies: appDetails.associations?.companies?.results || []
+        });
+      }
+    }
+
+    console.log(`✓ Loaded details for ${detailedApplications.length} application(s)`);
+
+    // STEP 4: Load email history for primary application (if requested)
+    let emailSummary = null;
+    if (include_emails && detailedApplications.length > 0) {
+      console.log(`\n📍 STEP 4: Loading email history...`);
+      const primaryDealId = detailedApplications[0].deal_id;
+
+      const emailHistory = await getProjectEmailHistory(primaryDealId, email_limit);
+      if (emailHistory.success && emailHistory.emails.length > 0) {
+        const emails = emailHistory.emails;
+
+        // Calculate summary statistics
+        const inboundCount = emails.filter(e => e.direction === 'INBOUND').length;
+        const outboundCount = emails.filter(e => e.direction === 'OUTBOUND').length;
+
+        // Extract recent topics from email subjects
+        const recentTopics = emails
+          .slice(0, 5)
+          .map(e => e.subject)
+          .filter(s => s && s.length > 0);
+
+        emailSummary = {
+          total: emails.length,
+          inbound: inboundCount,
+          outbound: outboundCount,
+          most_recent: emails[0] ? {
+            date: emails[0].timestamp,
+            subject: emails[0].subject,
+            from: emails[0].from,
+            email_id: emails[0].id
+          } : null,
+          recent_topics: recentTopics
+        };
+
+        console.log(`✓ Loaded ${emails.length} emails (${inboundCount} in, ${outboundCount} out)`);
+      } else {
+        console.log(`ℹ️  No email history found`);
+      }
+    }
+
+    // STEP 5: Load funding agreement (if requested)
+    let fundingAgreement = null;
+    if (load_funding_agreement && detailedApplications.length > 0) {
+      console.log(`\n📍 STEP 5: Loading funding agreement...`);
+      const primaryDealId = detailedApplications[0].deal_id;
+
+      const faResult = await findAndReadFundingAgreement({
+        deal_id: primaryDealId,
+        agent_type
+      });
+
+      if (faResult.success) {
+        fundingAgreement = faResult;
+        console.log(`✓ Loaded funding agreement: ${faResult.file.name}`);
+      } else {
+        console.log(`⚠️  Could not load funding agreement: ${faResult.error}`);
+      }
+    }
+
+    // Build final response
+    const response = {
+      success: true,
+      company: bestCompany,
+      applications: detailedApplications,
+      match_confidence: confidence
+    };
+
+    if (emailSummary) {
+      response.email_summary = emailSummary;
+    }
+
+    if (fundingAgreement) {
+      response.funding_agreement = fundingAgreement;
+    }
+
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`✅ CONSOLIDATED CONTEXT LOADED SUCCESSFULLY`);
+    console.log(`   Company: ${bestCompany.name}`);
+    console.log(`   Applications: ${detailedApplications.length}`);
+    console.log(`   Emails: ${emailSummary ? emailSummary.total : 'not loaded'}`);
+    console.log(`   Funding Agreement: ${fundingAgreement ? 'loaded' : 'not loaded'}`);
+    console.log('='.repeat(80) + '\n');
+
+    return response;
+
+  } catch (error) {
+    console.error('❌ load_company_context error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Find and read funding agreement automatically
+ * Replaces: searchProjectEmails + getEmailDetails + searchHubSpotContacts + getContactFiles + readHubSpotFile
+ *
+ * @param {Object} params - Search parameters
+ * @param {string} [params.deal_id] - HubSpot deal ID (if known)
+ * @param {string} [params.company_name] - Company name (will find deal first)
+ * @param {string} [params.grant_program] - Grant program filter
+ * @param {boolean} [params.return_content=true] - Return full document content
+ * @param {number} [params.max_content_length=50000] - Maximum content length
+ * @param {boolean} [params.parse_fields=true] - Extract key fields from document
+ * @param {string} [params.agent_type] - Agent type for field selection
+ * @returns {Object} Funding agreement with metadata and content
+ */
+export async function findAndReadFundingAgreement({
+  deal_id = null,
+  company_name = null,
+  grant_program = null,
+  return_content = true,
+  max_content_length = 50000,
+  parse_fields = true,
+  agent_type = null
+}) {
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`🔍 CONSOLIDATED TOOL: find_and_read_funding_agreement`);
+  console.log(`   Deal ID: ${deal_id || 'not provided'}`);
+  console.log(`   Company: ${company_name || 'not provided'}`);
+  console.log('='.repeat(80));
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    // STEP 1: If company_name provided, find deal_id first
+    if (!deal_id && company_name) {
+      console.log(`\n📍 STEP 1: Finding deal for company "${company_name}"...`);
+      const context = await loadCompanyContext({
+        company_name,
+        grant_program,
+        include_emails: false,
+        load_funding_agreement: false,
+        agent_type
+      });
+
+      if (!context.success || !context.applications || context.applications.length === 0) {
+        return {
+          success: false,
+          error: `Could not find grant application for company "${company_name}"`
+        };
+      }
+
+      deal_id = context.applications[0].deal_id;
+      console.log(`✓ Found deal ID: ${deal_id}`);
+    }
+
+    if (!deal_id) {
+      return {
+        success: false,
+        error: 'Either deal_id or company_name must be provided'
+      };
+    }
+
+    // STEP 2: Search emails for funding agreement reference
+    console.log(`\n📍 STEP 2: Searching emails for funding agreement...`);
+    const emailSearchResult = await searchProjectEmails(
+      deal_id,
+      'funding agreement',
+      10
+    );
+
+    if (!emailSearchResult.success || emailSearchResult.emails.length === 0) {
+      console.log(`⚠️  No emails found mentioning "funding agreement"`);
+
+      // Fallback: Try to find in deal files directly
+      console.log(`\n📍 FALLBACK: Checking deal files...`);
+      const dealFilesResult = await getDealFiles(deal_id);
+
+      if (dealFilesResult.success && dealFilesResult.files.length > 0) {
+        const faFile = dealFilesResult.files.find(f =>
+          f.name.toLowerCase().includes('funding') &&
+          (f.name.toLowerCase().includes('agreement') || f.name.toLowerCase().includes('contract'))
+        );
+
+        if (faFile) {
+          console.log(`✓ Found funding agreement in deal files: ${faFile.name}`);
+          const fileContent = await readHubSpotFile(faFile.id);
+
+          if (fileContent.success) {
+            const response = {
+              success: true,
+              file: fileContent.file,
+              discovery_path: 'deal_file'
+            };
+
+            if (return_content) {
+              response.content = fileContent.content.substring(0, max_content_length);
+            }
+
+            if (parse_fields && fileContent.content) {
+              response.parsed_fields = parseFundingAgreement(fileContent.content);
+            }
+
+            return response;
+          }
+        }
+      }
+
+      return {
+        success: false,
+        error: 'Funding agreement not found in emails or deal files'
+      };
+    }
+
+    console.log(`✓ Found ${emailSearchResult.emails.length} email(s) mentioning funding agreement`);
+
+    // STEP 3: Get email details to find file ID
+    console.log(`\n📍 STEP 3: Checking email for file links...`);
+    const primaryEmail = emailSearchResult.emails[0];
+    const emailDetails = await getEmailDetails(primaryEmail.id);
+
+    if (!emailDetails.success) {
+      return {
+        success: false,
+        error: 'Could not retrieve email details'
+      };
+    }
+
+    // STEP 4: Extract file ID from email HTML body
+    let fileId = null;
+    let discoveryPath = null;
+
+    if (emailDetails.email.htmlBody) {
+      const fileIdMatch = emailDetails.email.htmlBody.match(/file[\/:](\d+)/);
+      if (fileIdMatch) {
+        fileId = fileIdMatch[1];
+        discoveryPath = 'email_html';
+        console.log(`✓ Found file ID in email HTML: ${fileId}`);
+      }
+    }
+
+    // STEP 5: If no file ID in email, search sender's contact files
+    if (!fileId) {
+      console.log(`\n📍 STEP 5: Searching sender's contact files...`);
+      const senderEmail = emailDetails.email.from;
+
+      if (!senderEmail) {
+        return {
+          success: false,
+          error: 'Could not identify email sender'
+        };
+      }
+
+      const contactSearchResult = await searchHubSpotContacts(senderEmail, 1);
+
+      if (!contactSearchResult.success || contactSearchResult.contacts.length === 0) {
+        return {
+          success: false,
+          error: `Could not find contact record for sender: ${senderEmail}`
+        };
+      }
+
+      const senderId = contactSearchResult.contacts[0].id;
+      console.log(`✓ Found sender contact: ${senderId}`);
+
+      const contactFilesResult = await getContactFiles(senderId);
+
+      if (!contactFilesResult.success || contactFilesResult.files.length === 0) {
+        return {
+          success: false,
+          error: 'No files found in sender\'s contact record'
+        };
+      }
+
+      // Find funding agreement file
+      const faFile = contactFilesResult.files.find(f =>
+        f.name.toLowerCase().includes('funding') ||
+        f.name.toLowerCase().includes('agreement') ||
+        f.name.toLowerCase().includes('contract')
+      );
+
+      if (!faFile) {
+        return {
+          success: false,
+          error: 'Funding agreement not found in sender\'s files'
+        };
+      }
+
+      fileId = faFile.id;
+      discoveryPath = 'contact_file';
+      console.log(`✓ Found funding agreement in contact files: ${faFile.name}`);
+    }
+
+    // STEP 6: Read the file
+    console.log(`\n📍 STEP 6: Reading file content...`);
+    const fileContent = await readHubSpotFile(fileId);
+
+    if (!fileContent.success) {
+      return {
+        success: false,
+        error: `Could not read file: ${fileContent.error}`
+      };
+    }
+
+    console.log(`✓ Read ${fileContent.length} characters from ${fileContent.file.name}`);
+
+    // Build response
+    const response = {
+      success: true,
+      file: fileContent.file,
+      discovery_path: discoveryPath,
+      source_email_id: primaryEmail.id
+    };
+
+    if (return_content) {
+      response.content = fileContent.content.substring(0, max_content_length);
+    }
+
+    if (parse_fields && fileContent.content) {
+      console.log(`\n📍 PARSING: Extracting key fields...`);
+      response.parsed_fields = parseFundingAgreement(fileContent.content);
+      console.log(`  Parsed fields:`, response.parsed_fields);
+    }
+
+    console.log(`\n${'='.repeat(80)}`);
+    console.log(`✅ FUNDING AGREEMENT LOADED SUCCESSFULLY`);
+    console.log(`   File: ${fileContent.file.name}`);
+    console.log(`   Discovery: ${discoveryPath}`);
+    console.log(`   Size: ${fileContent.length} characters`);
+    console.log('='.repeat(80) + '\n');
+
+    return response;
+
+  } catch (error) {
+    console.error('❌ find_and_read_funding_agreement error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}

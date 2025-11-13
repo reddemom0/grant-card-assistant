@@ -173,6 +173,33 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       // ============================================================================
+      // CONSOLIDATED HUBSPOT TOOLS (Phase 2)
+      // ============================================================================
+
+      case 'load_company_context':
+        result = await hubspot.loadCompanyContext({
+          company_name: input.company_name,
+          grant_program: input.grant_program,
+          include_emails: input.include_emails !== undefined ? input.include_emails : true,
+          email_limit: input.email_limit || 20,
+          load_funding_agreement: input.load_funding_agreement || false,
+          agent_type: agentType
+        });
+        break;
+
+      case 'find_and_read_funding_agreement':
+        result = await hubspot.findAndReadFundingAgreement({
+          deal_id: input.deal_id,
+          company_name: input.company_name,
+          grant_program: input.grant_program,
+          return_content: input.return_content !== undefined ? input.return_content : true,
+          max_content_length: input.max_content_length || 50000,
+          parse_fields: input.parse_fields !== undefined ? input.parse_fields : true,
+          agent_type: agentType
+        });
+        break;
+
+      // ============================================================================
       // GOOGLE DRIVE TOOLS
       // ============================================================================
 
