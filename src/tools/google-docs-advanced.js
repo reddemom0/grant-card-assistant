@@ -101,6 +101,307 @@ function renderTableAsText(headers, rows = []) {
 }
 
 /**
+ * Parse markdown content into structured elements (text blocks and tables)
+ * @param {string} content - Markdown formatted content
+ * @returns {Array} Array of {type, content, position} objects
+ */
+function parseMarkdownStructure(content) {
+  const elements = [];
+  const lines = content.split('\n');
+  let currentTextBlock = [];
+  let lineIndex = 0;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Check for table markers
+    if (line.trim() === '[TABLE:yes-no]') {
+      // Save any accumulated text
+      if (currentTextBlock.length > 0) {
+        elements.push({
+          type: 'text',
+          content: currentTextBlock.join('\n'),
+          lineStart: lineIndex - currentTextBlock.length,
+          lineEnd: lineIndex
+        });
+        currentTextBlock = [];
+      }
+
+      // Add simple yes/no table
+      elements.push({
+        type: 'table',
+        headers: ['Yes', 'No'],
+        rows: [],
+        lineStart: lineIndex,
+        lineEnd: lineIndex + 1
+      });
+      lineIndex++;
+      i++;
+      continue;
+    }
+
+    if (line.trim() === '[TABLE:yes-no-partial]') {
+      // Save any accumulated text
+      if (currentTextBlock.length > 0) {
+        elements.push({
+          type: 'text',
+          content: currentTextBlock.join('\n'),
+          lineStart: lineIndex - currentTextBlock.length,
+          lineEnd: lineIndex
+        });
+        currentTextBlock = [];
+      }
+
+      // Add simple yes/no/partial table
+      elements.push({
+        type: 'table',
+        headers: ['Yes', 'No', 'Partial'],
+        rows: [],
+        lineStart: lineIndex,
+        lineEnd: lineIndex + 1
+      });
+      lineIndex++;
+      i++;
+      continue;
+    }
+
+    if (line.trim() === '[TABLE:start]') {
+      // Save any accumulated text
+      if (currentTextBlock.length > 0) {
+        elements.push({
+          type: 'text',
+          content: currentTextBlock.join('\n'),
+          lineStart: lineIndex - currentTextBlock.length,
+          lineEnd: lineIndex
+        });
+        currentTextBlock = [];
+      }
+
+      i++;
+      lineIndex++;
+      let headers = [];
+      let rows = [];
+      const tableStartLine = lineIndex - 1;
+
+      // Parse table content
+      while (i < lines.length && lines[i].trim() !== '[TABLE:end]') {
+        const tableLine = lines[i].trim();
+        if (tableLine.startsWith('[HEADERS]')) {
+          headers = tableLine.substring(9).split('|').map(h => h.trim());
+        } else if (tableLine.startsWith('[ROW]')) {
+          const rowData = tableLine.substring(5).split('|').map(c => c.trim());
+          rows.push(rowData);
+        }
+        i++;
+        lineIndex++;
+      }
+
+      elements.push({
+        type: 'table',
+        headers: headers,
+        rows: rows,
+        lineStart: tableStartLine,
+        lineEnd: lineIndex + 1
+      });
+
+      i++; // Skip [TABLE:end]
+      lineIndex++;
+      continue;
+    }
+
+    // Regular text line
+    currentTextBlock.push(line);
+    lineIndex++;
+    i++;
+  }
+
+  // Save any remaining text
+  if (currentTextBlock.length > 0) {
+    elements.push({
+      type: 'text',
+      content: currentTextBlock.join('\n'),
+      lineStart: lineIndex - currentTextBlock.length,
+      lineEnd: lineIndex
+    });
+  }
+
+  return elements;
+}
+
+/**
+ * PHASE 1: Generate requests to create document structure (text + empty tables)
+ * Uses "write backwards" pattern - highest index first
+ * @param {Array} elements - Parsed markdown elements from parseMarkdownStructure()
+ * @param {number} startIndex - Starting index in document
+ * @returns {Object} { requests: Array, tableMetadata: Array }
+ */
+function generatePhase1Requests(elements, startIndex = 1) {
+  const requests = [];
+  const tableMetadata = []; // Track where tables will be for Phase 2
+  let currentIndex = startIndex;
+
+  // Process elements in order (we'll reverse at the end for "write backwards")
+  for (const element of elements) {
+    if (element.type === 'text') {
+      // Process text content using existing markdown parser
+      const textRequests = markdownToGrantedDocsRequestsOld(element.content, currentIndex);
+      requests.push(...textRequests);
+
+      // Calculate how much space this text will take
+      const textLength = calculateTextLength(element.content);
+      currentIndex += textLength;
+
+    } else if (element.type === 'table') {
+      // Insert empty table structure
+      const numRows = element.rows.length > 0 ? element.rows.length : 1; // At least 1 row for headers
+      const numCols = element.headers.length;
+
+      requests.push({
+        insertTable: {
+          location: { index: currentIndex },
+          rows: numRows + 1, // +1 for header row
+          columns: numCols
+        }
+      });
+
+      // Store metadata for Phase 2
+      tableMetadata.push({
+        insertIndex: currentIndex,
+        headers: element.headers,
+        rows: element.rows,
+        numRows: numRows + 1,
+        numCols: numCols
+      });
+
+      // Tables consume space: each table has start/end indexes
+      // We'll need to read the document to get exact cell indexes
+      // For now, add placeholder space (will be corrected in Phase 2)
+      currentIndex += 2; // Rough estimate, actual value from document read
+    }
+  }
+
+  return { requests, tableMetadata };
+}
+
+/**
+ * PHASE 2: Generate requests to populate table cells
+ * Requires reading the document first to find cell paragraph indexes
+ * @param {Object} document - Document from documents.get()
+ * @param {Array} tableMetadata - Metadata from Phase 1
+ * @returns {Array} Array of insertText requests for table cells
+ */
+function generatePhase2Requests(document, tableMetadata) {
+  const requests = [];
+
+  // Extract tables from document body
+  const body = document.tabs?.[0]?.documentTab?.body || document.body;
+  const tables = body.content.filter(el => el.table);
+
+  // Match our metadata with actual tables in document
+  for (let i = 0; i < Math.min(tables.length, tableMetadata.length); i++) {
+    const tableElement = tables[i];
+    const metadata = tableMetadata[i];
+    const table = tableElement.table;
+
+    // Populate header row (row 0)
+    if (table.tableRows && table.tableRows[0]) {
+      const headerRow = table.tableRows[0];
+      for (let col = 0; col < metadata.headers.length; col++) {
+        if (headerRow.tableCells && headerRow.tableCells[col]) {
+          const cell = headerRow.tableCells[col];
+          // Each cell has content array with paragraphs
+          if (cell.content && cell.content[0] && cell.content[0].paragraph) {
+            const paragraphStartIndex = cell.content[0].startIndex;
+            requests.push({
+              insertText: {
+                location: { index: paragraphStartIndex + 1 }, // +1 to insert inside paragraph
+                text: metadata.headers[col]
+              }
+            });
+
+            // Make header row bold
+            requests.push({
+              updateTextStyle: {
+                range: {
+                  startIndex: paragraphStartIndex + 1,
+                  endIndex: paragraphStartIndex + 1 + metadata.headers[col].length
+                },
+                textStyle: {
+                  bold: true
+                },
+                fields: 'bold'
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // Populate data rows
+    for (let row = 0; row < metadata.rows.length; row++) {
+      const rowIndex = row + 1; // +1 because row 0 is headers
+      if (table.tableRows && table.tableRows[rowIndex]) {
+        const tableRow = table.tableRows[rowIndex];
+        for (let col = 0; col < metadata.rows[row].length; col++) {
+          if (tableRow.tableCells && tableRow.tableCells[col]) {
+            const cell = tableRow.tableCells[col];
+            if (cell.content && cell.content[0] && cell.content[0].paragraph) {
+              const paragraphStartIndex = cell.content[0].startIndex;
+              requests.push({
+                insertText: {
+                  location: { index: paragraphStartIndex + 1 },
+                  text: metadata.rows[row][col]
+                }
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Reverse for "write backwards" pattern
+  return requests.reverse();
+}
+
+/**
+ * Calculate text length for index tracking (rough estimate)
+ * @param {string} text - Text content
+ * @returns {number} Approximate length in UTF-16 code units
+ */
+function calculateTextLength(text) {
+  // Each character is 1 unit, plus newlines
+  return text.length;
+}
+
+/**
+ * Process text-only markdown (no tables) - simplified version for Phase 1
+ * @param {string} content - Markdown content
+ * @param {number} startIndex - Start index
+ * @returns {Array} Requests array
+ */
+function markdownToGrantedDocsRequestsOld(content, startIndex = 1) {
+  // For now, just insert as plain text with basic formatting
+  // The full implementation with headers, bold, etc. will be the existing markdownToGrantedDocsRequests
+  // This is a simplified version for Phase 1 structure creation
+
+  if (!content || content.trim().length === 0) {
+    return [];
+  }
+
+  const requests = [];
+  requests.push({
+    insertText: {
+      location: { index: startIndex },
+      text: content + '\n\n'
+    }
+  });
+
+  return requests;
+}
+
+/**
  * Convert markdown to Google Docs requests with Granted Consulting branding
  * Supports: ##, ###, -, **, *italic*, tables, checkboxes
  * @param {string} content - Markdown formatted content
@@ -936,25 +1237,49 @@ export async function createAdvancedDocumentTool(input, context) {
     const { requests: headerRequests, offset } = generateGrantedHeaderRequests();
     console.log(`   ✓ Generated header (offset: ${offset})`);
 
-    // Step 4: Generate content requests starting after the header
-    const contentRequests = markdownToGrantedDocsRequests(markdown, 1 + offset);
-    console.log(`   ✓ Generated ${contentRequests.length} content formatting requests`);
+    // Step 4: Parse markdown into structured elements (text + tables)
+    const elements = parseMarkdownStructure(markdown);
+    console.log(`   ✓ Parsed ${elements.length} elements (${elements.filter(e => e.type === 'table').length} tables)`);
 
-    // Step 5: Combine header + content in one batch (write backwards pattern)
-    const allRequests = [...headerRequests, ...contentRequests];
-    if (allRequests.length > 0) {
+    // Step 5: Generate Phase 1 requests (document structure: text + empty tables)
+    const { requests: phase1Requests, tableMetadata } = generatePhase1Requests(elements, 1 + offset);
+    console.log(`   ✓ Generated Phase 1: ${phase1Requests.length} structure requests`);
+
+    // Step 6: Apply Phase 1 (header + structure)
+    const allPhase1Requests = [...headerRequests, ...phase1Requests];
+    if (allPhase1Requests.length > 0) {
       await docs.documents.batchUpdate({
         documentId: documentId,
-        requestBody: { requests: allRequests }
+        requestBody: { requests: allPhase1Requests }
       });
-      console.log(`   ✓ Applied all formatting (${allRequests.length} total requests)`);
+      console.log(`   ✓ Applied Phase 1: Document structure created`);
     }
 
-    // Step 6: Apply document-wide styles
+    // Step 7: If we have tables, read document and populate cells (Phase 2)
+    if (tableMetadata.length > 0) {
+      console.log(`   ⟳ Reading document to find table cell indexes...`);
+      const document = await docs.documents.get({
+        documentId: documentId,
+        includeTabsContent: true
+      });
+
+      const phase2Requests = generatePhase2Requests(document.data, tableMetadata);
+      console.log(`   ✓ Generated Phase 2: ${phase2Requests.length} table population requests`);
+
+      if (phase2Requests.length > 0) {
+        await docs.documents.batchUpdate({
+          documentId: documentId,
+          requestBody: { requests: phase2Requests }
+        });
+        console.log(`   ✓ Applied Phase 2: Tables populated`);
+      }
+    }
+
+    // Step 8: Apply document-wide styles
     await setDocumentStyles(docs, documentId);
     console.log(`   ✓ Applied document styles`);
 
-    // Step 7: Move to parent folder if specified
+    // Step 9: Move to parent folder if specified
     if (parentFolderId) {
       await drive.files.update({
         fileId: documentId,
@@ -964,7 +1289,7 @@ export async function createAdvancedDocumentTool(input, context) {
       console.log(`   ✓ Moved to folder: ${parentFolderId}`);
     }
 
-    // Step 7: Get web view link
+    // Step 10: Get web view link
     const file = await drive.files.get({
       fileId: documentId,
       fields: 'webViewLink'
