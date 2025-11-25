@@ -1237,49 +1237,26 @@ export async function createAdvancedDocumentTool(input, context) {
     const { requests: headerRequests, offset } = generateGrantedHeaderRequests();
     console.log(`   ✓ Generated header (offset: ${offset})`);
 
-    // Step 4: Parse markdown into structured elements (text + tables)
-    const elements = parseMarkdownStructure(markdown);
-    console.log(`   ✓ Parsed ${elements.length} elements (${elements.filter(e => e.type === 'table').length} tables)`);
+    // Step 4: Generate content requests (TEMPORARY: using single-phase text-based tables)
+    // TODO: Fix two-phase real table implementation (index tracking issue at requests[5])
+    const contentRequests = markdownToGrantedDocsRequests(markdown, 1 + offset);
+    console.log(`   ✓ Generated ${contentRequests.length} content formatting requests`);
 
-    // Step 5: Generate Phase 1 requests (document structure: text + empty tables)
-    const { requests: phase1Requests, tableMetadata } = generatePhase1Requests(elements, 1 + offset);
-    console.log(`   ✓ Generated Phase 1: ${phase1Requests.length} structure requests`);
-
-    // Step 6: Apply Phase 1 (header + structure)
-    const allPhase1Requests = [...headerRequests, ...phase1Requests];
-    if (allPhase1Requests.length > 0) {
+    // Step 5: Apply all requests in one batch
+    const allRequests = [...headerRequests, ...contentRequests];
+    if (allRequests.length > 0) {
       await docs.documents.batchUpdate({
         documentId: documentId,
-        requestBody: { requests: allPhase1Requests }
+        requestBody: { requests: allRequests }
       });
-      console.log(`   ✓ Applied Phase 1: Document structure created`);
+      console.log(`   ✓ Applied all formatting (${allRequests.length} total requests)`);
     }
 
-    // Step 7: If we have tables, read document and populate cells (Phase 2)
-    if (tableMetadata.length > 0) {
-      console.log(`   ⟳ Reading document to find table cell indexes...`);
-      const document = await docs.documents.get({
-        documentId: documentId,
-        includeTabsContent: true
-      });
-
-      const phase2Requests = generatePhase2Requests(document.data, tableMetadata);
-      console.log(`   ✓ Generated Phase 2: ${phase2Requests.length} table population requests`);
-
-      if (phase2Requests.length > 0) {
-        await docs.documents.batchUpdate({
-          documentId: documentId,
-          requestBody: { requests: phase2Requests }
-        });
-        console.log(`   ✓ Applied Phase 2: Tables populated`);
-      }
-    }
-
-    // Step 8: Apply document-wide styles
+    // Step 6: Apply document-wide styles
     await setDocumentStyles(docs, documentId);
     console.log(`   ✓ Applied document styles`);
 
-    // Step 9: Move to parent folder if specified
+    // Step 7: Move to parent folder if specified
     if (parentFolderId) {
       await drive.files.update({
         fileId: documentId,
@@ -1289,7 +1266,7 @@ export async function createAdvancedDocumentTool(input, context) {
       console.log(`   ✓ Moved to folder: ${parentFolderId}`);
     }
 
-    // Step 10: Get web view link
+    // Step 8: Get web view link
     const file = await drive.files.get({
       fileId: documentId,
       fields: 'webViewLink'
