@@ -230,130 +230,139 @@ function parseMarkdownStructure(content) {
 }
 
 /**
- * PHASE 1: Generate requests to create document structure (text + empty tables)
- * Uses "write backwards" pattern - highest index first
- * @param {Array} elements - Parsed markdown elements from parseMarkdownStructure()
+ * PHASE 1: Generate requests to create document structure
+ * Strategy: Convert everything to markdown (tables as markers), let existing processor handle it
+ * @param {string} markdown - Full markdown content with table markers
  * @param {number} startIndex - Starting index in document
- * @returns {Object} { requests: Array, tableMetadata: Array }
+ * @returns {Object} { requests: Array, tableMarkers: Array }
  */
-function generatePhase1Requests(elements, startIndex = 1) {
-  const requests = [];
-  const tableMetadata = []; // Track where tables will be for Phase 2
-  let currentIndex = startIndex;
+function generatePhase1Requests(markdown, startIndex = 1) {
+  // Use existing markdown processor - it handles indexes correctly
+  const requests = markdownToGrantedDocsRequests(markdown, startIndex);
 
-  // Process elements in order (we'll reverse at the end for "write backwards")
-  for (const element of elements) {
-    if (element.type === 'text') {
-      // Process text content using existing markdown parser
-      const textRequests = markdownToGrantedDocsRequestsOld(element.content, currentIndex);
-      requests.push(...textRequests);
+  // Extract table marker positions by scanning the markdown
+  const tableMarkers = [];
+  const lines = markdown.split('\n');
+  let lineIndex = 0;
 
-      // Calculate how much space this text will take
-      const textLength = calculateTextLength(element.content);
-      currentIndex += textLength;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
 
-    } else if (element.type === 'table') {
-      // Insert empty table structure
-      const numRows = element.rows.length > 0 ? element.rows.length : 1; // At least 1 row for headers
-      const numCols = element.headers.length;
-
-      requests.push({
-        insertTable: {
-          location: { index: currentIndex },
-          rows: numRows + 1, // +1 for header row
-          columns: numCols
+    if (line.trim() === '[TABLE:yes-no]') {
+      tableMarkers.push({ type: 'yes-no', lineIndex: i, headers: ['Yes', 'No'], rows: [] });
+    } else if (line.trim() === '[TABLE:yes-no-partial]') {
+      tableMarkers.push({ type: 'yes-no-partial', lineIndex: i, headers: ['Yes', 'No', 'Partial'], rows: [] });
+    } else if (line.trim() === '[TABLE:start]') {
+      let headers = [];
+      let rows = [];
+      i++;
+      while (i < lines.length && lines[i].trim() !== '[TABLE:end]') {
+        const tableLine = lines[i].trim();
+        if (tableLine.startsWith('[HEADERS]')) {
+          headers = tableLine.substring(9).split('|').map(h => h.trim());
+        } else if (tableLine.startsWith('[ROW]')) {
+          rows.push(tableLine.substring(5).split('|').map(c => c.trim()));
         }
-      });
-
-      // Store metadata for Phase 2
-      tableMetadata.push({
-        insertIndex: currentIndex,
-        headers: element.headers,
-        rows: element.rows,
-        numRows: numRows + 1,
-        numCols: numCols
-      });
-
-      // Tables consume space: each table has start/end indexes
-      // We'll need to read the document to get exact cell indexes
-      // For now, add placeholder space (will be corrected in Phase 2)
-      currentIndex += 2; // Rough estimate, actual value from document read
+        i++;
+      }
+      tableMarkers.push({ type: 'custom', lineIndex: lineIndex, headers, rows });
     }
   }
 
-  return { requests, tableMetadata };
+  return { requests, tableMarkers };
 }
 
 /**
- * PHASE 2: Generate requests to populate table cells
- * Requires reading the document first to find cell paragraph indexes
+ * PHASE 2: Replace text-based tables with real Google Docs tables
+ * Strategy:
+ *  1. Search document text for table patterns (pipes and dashes)
+ *  2. Find their start/end indexes
+ *  3. Delete text tables
+ *  4. Insert real Google Docs table structures
+ *  5. Populate cells
+ *
  * @param {Object} document - Document from documents.get()
- * @param {Array} tableMetadata - Metadata from Phase 1
- * @returns {Array} Array of insertText requests for table cells
+ * @param {Array} tableMarkers - Metadata about tables from Phase 1
+ * @returns {Promise<Array>} Array of requests to replace tables
  */
-function generatePhase2Requests(document, tableMetadata) {
+async function generatePhase2TableReplacements(document, tableMarkers) {
   const requests = [];
-
-  // Extract tables from document body
   const body = document.tabs?.[0]?.documentTab?.body || document.body;
-  const tables = body.content.filter(el => el.table);
 
-  // Match our metadata with actual tables in document
-  for (let i = 0; i < Math.min(tables.length, tableMetadata.length); i++) {
-    const tableElement = tables[i];
-    const metadata = tableMetadata[i];
-    const table = tableElement.table;
+  if (!body || !body.content) {
+    return requests;
+  }
 
-    // Populate header row (row 0)
-    if (table.tableRows && table.tableRows[0]) {
-      const headerRow = table.tableRows[0];
-      for (let col = 0; col < metadata.headers.length; col++) {
-        if (headerRow.tableCells && headerRow.tableCells[col]) {
-          const cell = headerRow.tableCells[col];
-          // Each cell has content array with paragraphs
-          if (cell.content && cell.content[0] && cell.content[0].paragraph) {
-            const paragraphStartIndex = cell.content[0].startIndex;
-            requests.push({
-              insertText: {
-                location: { index: paragraphStartIndex + 1 }, // +1 to insert inside paragraph
-                text: metadata.headers[col]
-              }
-            });
+  // Find text-based table patterns in document content
+  const textTableRanges = findTextTableRanges(body, tableMarkers.length);
 
-            // Make header row bold
-            requests.push({
-              updateTextStyle: {
-                range: {
-                  startIndex: paragraphStartIndex + 1,
-                  endIndex: paragraphStartIndex + 1 + metadata.headers[col].length
-                },
-                textStyle: {
-                  bold: true
-                },
-                fields: 'bold'
-              }
-            });
-          }
+  // Process in reverse order (write backwards) to avoid index shifts
+  for (let i = textTableRanges.length - 1; i >= 0; i--) {
+    const range = textTableRanges[i];
+    const tableInfo = tableMarkers[i];
+
+    if (!range || !tableInfo) continue;
+
+    const { startIndex, endIndex } = range;
+    const { headers, rows } = tableInfo;
+
+    // 1. Delete the text-based table
+    requests.push({
+      deleteContentRange: {
+        range: {
+          startIndex: startIndex,
+          endIndex: endIndex
         }
       }
-    }
+    });
 
-    // Populate data rows
-    for (let row = 0; row < metadata.rows.length; row++) {
-      const rowIndex = row + 1; // +1 because row 0 is headers
-      if (table.tableRows && table.tableRows[rowIndex]) {
-        const tableRow = table.tableRows[rowIndex];
-        for (let col = 0; col < metadata.rows[row].length; col++) {
-          if (tableRow.tableCells && tableRow.tableCells[col]) {
-            const cell = tableRow.tableCells[col];
-            if (cell.content && cell.content[0] && cell.content[0].paragraph) {
-              const paragraphStartIndex = cell.content[0].startIndex;
-              requests.push({
-                insertText: {
-                  location: { index: paragraphStartIndex + 1 },
-                  text: metadata.rows[row][col]
-                }
+    // 2. Insert real table structure at the same position
+    const numRows = rows.length > 0 ? rows.length + 1 : 1; // +1 for header row
+    const numCols = headers.length;
+
+    requests.push({
+      insertTable: {
+        location: { index: startIndex },
+        rows: numRows,
+        columns: numCols
+      }
+    });
+  }
+
+  // After structural changes, we need to read document again to populate cells
+  // For now, return these requests and we'll do population in a third phase if needed
+  return requests;
+}
+
+/**
+ * Find text-based table patterns in document
+ * Looks for pipe-separated text patterns like "Yes | No"
+ * @param {Object} body - Document body
+ * @param {number} expectedCount - Expected number of tables
+ * @returns {Array} Array of {startIndex, endIndex} ranges
+ */
+function findTextTableRanges(body, expectedCount) {
+  const ranges = [];
+
+  for (const element of body.content) {
+    if (element.paragraph) {
+      const paragraph = element.paragraph;
+      if (paragraph.elements) {
+        for (const paraElement of paragraph.elements) {
+          if (paraElement.textRun && paraElement.textRun.content) {
+            const text = paraElement.textRun.content;
+
+            // Look for table patterns: text with pipes and dashes
+            if (text.includes(' | ') || text.includes('─┼─')) {
+              // Found a table pattern
+              ranges.push({
+                startIndex: paraElement.startIndex,
+                endIndex: paraElement.endIndex
               });
+
+              if (ranges.length >= expectedCount) {
+                return ranges;
+              }
             }
           }
         }
@@ -361,7 +370,92 @@ function generatePhase2Requests(document, tableMetadata) {
     }
   }
 
-  // Reverse for "write backwards" pattern
+  return ranges;
+}
+
+/**
+ * PHASE 3: Populate table cells with data
+ * After Phase 2 creates empty table structures, this fills them with content
+ * @param {Object} document - Updated document after Phase 2
+ * @param {Array} tableMarkers - Table metadata from Phase 1
+ * @returns {Array} Array of insertText and formatting requests
+ */
+function generatePhase3CellPopulation(document, tableMarkers) {
+  const requests = [];
+  const body = document.tabs?.[0]?.documentTab?.body || document.body;
+
+  // Extract all tables from document
+  const tables = body.content.filter(el => el.table);
+
+  // Populate each table with its corresponding data
+  for (let tableIndex = 0; tableIndex < Math.min(tables.length, tableMarkers.length); tableIndex++) {
+    const tableElement = tables[tableIndex];
+    const tableInfo = tableMarkers[tableIndex];
+    const table = tableElement.table;
+
+    if (!table || !table.tableRows) continue;
+
+    // Populate header row (row 0)
+    if (table.tableRows[0]) {
+      const headerRow = table.tableRows[0];
+      for (let col = 0; col < tableInfo.headers.length; col++) {
+        const cell = headerRow.tableCells?.[col];
+        if (cell && cell.content && cell.content[0]) {
+          const cellParagraph = cell.content[0];
+          const insertIndex = cellParagraph.startIndex + 1; // +1 to insert inside paragraph
+
+          // Insert header text
+          requests.push({
+            insertText: {
+              location: { index: insertIndex },
+              text: tableInfo.headers[col]
+            }
+          });
+
+          // Make header bold
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: insertIndex,
+                endIndex: insertIndex + tableInfo.headers[col].length
+              },
+              textStyle: {
+                bold: true
+              },
+              fields: 'bold'
+            }
+          });
+        }
+      }
+    }
+
+    // Populate data rows
+    for (let rowIndex = 0; rowIndex < tableInfo.rows.length; rowIndex++) {
+      const rowData = tableInfo.rows[rowIndex];
+      const tableRowIndex = rowIndex + 1; // +1 because row 0 is headers
+
+      if (table.tableRows[tableRowIndex]) {
+        const tableRow = table.tableRows[tableRowIndex];
+
+        for (let col = 0; col < rowData.length; col++) {
+          const cell = tableRow.tableCells?.[col];
+          if (cell && cell.content && cell.content[0]) {
+            const cellParagraph = cell.content[0];
+            const insertIndex = cellParagraph.startIndex + 1;
+
+            requests.push({
+              insertText: {
+                location: { index: insertIndex },
+                text: rowData[col]
+              }
+            });
+          }
+        }
+      }
+    }
+  }
+
+  // Return requests in reverse order (write backwards pattern)
   return requests.reverse();
 }
 
@@ -1239,19 +1333,76 @@ export async function createAdvancedDocumentTool(input, context) {
     const { requests: headerRequests, offset } = generateGrantedHeaderRequests();
     console.log(`   ✓ Generated header (offset: ${offset})`);
 
-    // Step 4: Generate content requests (TEMPORARY: using single-phase text-based tables)
-    // TODO: Fix two-phase real table implementation (index tracking issue at requests[5])
-    const contentRequests = markdownToGrantedDocsRequests(markdown, 1 + offset);
-    console.log(`   ✓ Generated ${contentRequests.length} content formatting requests`);
+    // Step 4: Check if markdown has tables
+    const hasTables = markdown.includes('[TABLE:') || markdown.includes('[TABLE-');
 
-    // Step 5: Apply all requests in one batch
-    const allRequests = [...headerRequests, ...contentRequests];
-    if (allRequests.length > 0) {
-      await docs.documents.batchUpdate({
-        documentId: documentId,
-        requestBody: { requests: allRequests }
-      });
-      console.log(`   ✓ Applied all formatting (${allRequests.length} total requests)`);
+    if (!hasTables) {
+      // No tables - use simple single-phase approach
+      const contentRequests = markdownToGrantedDocsRequests(markdown, 1 + offset);
+      console.log(`   ✓ Generated ${contentRequests.length} content formatting requests`);
+
+      const allRequests = [...headerRequests, ...contentRequests];
+      if (allRequests.length > 0) {
+        await docs.documents.batchUpdate({
+          documentId: documentId,
+          requestBody: { requests: allRequests }
+        });
+        console.log(`   ✓ Applied all formatting (${allRequests.length} total requests)`);
+      }
+    } else {
+      // Has tables - use two-phase approach with real Google Docs tables
+      console.log(`   ⟳ Document contains tables - using two-phase approach...`);
+
+      // Phase 1: Create structure with table placeholders
+      const { requests: phase1Requests, tableMarkers } = generatePhase1Requests(markdown, 1 + offset);
+
+      const allPhase1 = [...headerRequests, ...phase1Requests];
+      if (allPhase1.length > 0) {
+        await docs.documents.batchUpdate({
+          documentId: documentId,
+          requestBody: { requests: allPhase1 }
+        });
+        console.log(`   ✓ Phase 1: Created document structure`);
+      }
+
+      // Phase 2: Replace text tables with real tables
+      if (tableMarkers.length > 0) {
+        console.log(`   ⟳ Phase 2: Converting ${tableMarkers.length} text tables to real tables...`);
+
+        // Read document to find table text positions
+        const document = await docs.documents.get({
+          documentId: documentId,
+          includeTabsContent: true
+        });
+
+        // Generate Phase 2 requests (delete text tables, insert real tables)
+        const phase2Requests = await generatePhase2TableReplacements(document.data, tableMarkers);
+
+        if (phase2Requests.length > 0) {
+          await docs.documents.batchUpdate({
+            documentId: documentId,
+            requestBody: { requests: phase2Requests }
+          });
+          console.log(`   ✓ Phase 2: Replaced text tables with real table structures`);
+
+          // Phase 3: Read document again to find table cell indexes, then populate
+          console.log(`   ⟳ Phase 3: Populating table cells...`);
+          const updatedDocument = await docs.documents.get({
+            documentId: documentId,
+            includeTabsContent: true
+          });
+
+          const phase3Requests = generatePhase3CellPopulation(updatedDocument.data, tableMarkers);
+
+          if (phase3Requests.length > 0) {
+            await docs.documents.batchUpdate({
+              documentId: documentId,
+              requestBody: { requests: phase3Requests }
+            });
+            console.log(`   ✓ Phase 3: Populated ${tableMarkers.length} tables`);
+          }
+        }
+      }
     }
 
     // Step 6: Apply document-wide styles
