@@ -1603,6 +1603,159 @@ Example format:
   }
 }
 
+/**
+ * Dynamically generate evaluation rubric based on grant criteria using Claude API
+ * @param {string} grantType - Type of grant (hiring, market-expansion, etc.)
+ * @param {string} grantCriteria - Grant program's evaluation criteria
+ * @param {Object} data - Optional data for placeholders (program_name, client_name, etc.)
+ * @param {string} companyContext - Optional company information from HubSpot
+ * @returns {Promise<Object>} Template structure with generated rubric
+ */
+async function generateEvaluationRubricFromCriteria(grantType, grantCriteria, data = {}, companyContext = null) {
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY
+  });
+
+  const program_name = data.program_name || '[Program Name]';
+  const client_name = data.client_name || '[Company Name]';
+  const evaluation_date = data.evaluation_date || new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const prompt = `You are creating an evaluation rubric for Granted Consulting to assess a client's readiness for a specific grant program. This rubric will be used to score the client's responses from interviews and readiness assessments against the grant's evaluation criteria.
+
+GRANT PROGRAM CRITERIA:
+${grantCriteria}
+
+${companyContext ? `COMPANY CONTEXT:\n${companyContext}\n\n` : ''}
+
+YOUR TASK:
+Create a comprehensive evaluation rubric with:
+1. Scoring guide (1-10 scale definition)
+2. Evaluation categories based on the grant criteria (typically 4-6 major categories like A, B, C, D, E)
+3. Sub-criteria within each category (2-3 specific areas to assess)
+4. Overall assessment section with weighted scoring
+
+RUBRIC STRUCTURE:
+
+**SCORING GUIDE** (use this exact scale):
+- 9-10: Exceptional - Exceeds program requirements significantly
+- 7-8: Strong - Meets all requirements with clear strengths
+- 5-6: Adequate - Meets minimum requirements
+- 3-4: Weak - Gaps in key areas
+- 1-2: Critical Gap - Fails to meet requirements
+
+**EVALUATION CATEGORIES**:
+Based on the grant criteria, create 4-6 major categories (A, B, C, D, E, F) that cover all evaluation areas. Each category should have:
+- Clear category name (e.g., "A. TECHNOLOGY READINESS & OWNERSHIP")
+- 2-3 sub-criteria with specific evaluation points
+- Each sub-criterion needs bullet points of what to assess
+
+Example format:
+A. [MAJOR CATEGORY NAME]
+A1. [Sub-criterion name]
+Evaluation criteria:
+• [Specific thing to assess]
+• [Specific thing to assess]
+• [Specific thing to assess]
+
+**OVERALL ASSESSMENT**:
+Include a weighted scoring table with categories and their weights (should total 100%).
+
+**RECOMMENDATION FRAMEWORK**:
+- GO / NO-GO / CONDITIONAL GO options
+- Space for rationale
+- Required actions if conditional
+- Next steps
+
+FORMAT YOUR RESPONSE AS STRUCTURED TEXT (NOT MARKDOWN):
+Use this exact format:
+
+SCORING GUIDE:
+[The 1-10 scale explanation]
+
+[For each category, use this format:]
+A. [CATEGORY NAME]
+
+A1. [Sub-criterion name]
+Evaluation criteria:
+• [Point 1]
+• [Point 2]
+• [Point 3]
+
+[Repeat for A2, A3, then B1, B2, etc.]
+
+OVERALL ASSESSMENT
+[Weighted scoring table structure]
+
+OVERALL RECOMMENDATION: [GO / NO-GO / CONDITIONAL GO]
+
+RATIONALE:
+[Explanation template]
+
+REQUIRED ACTIONS (if Conditional GO):
+[Action items]
+
+NEXT STEPS:
+[Next steps]`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 4000,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    const responseText = message.content[0].text;
+
+    // Build template structure - we'll put the generated rubric into a single large text block
+    // since the rubric structure is complex with nested sections
+    return {
+      sections: [
+        {
+          type: 'title',
+          text: `Evaluation Rubric: ${program_name}`,
+          style: 'title-large'
+        },
+        {
+          type: 'paragraph',
+          text: `Client: ${client_name}`
+        },
+        {
+          type: 'paragraph',
+          text: `For use by: Granted RA Team`
+        },
+        {
+          type: 'paragraph',
+          text: `Date: ${evaluation_date}`
+        },
+        {
+          type: 'divider'
+        },
+        {
+          type: 'paragraph',
+          text: responseText,
+          style: 'preserve-formatting'
+        }
+      ],
+      defaultData: {
+        program_name,
+        client_name,
+        evaluation_date
+      }
+    };
+
+  } catch (error) {
+    console.error('Error generating evaluation rubric:', error);
+    throw new Error(`Failed to generate evaluation rubric: ${error.message}`);
+  }
+}
+
 export async function createAdvancedDocumentTool(input, context) {
   const { title, grantType, documentType, data = {}, grantCriteria, companyContext, parentFolderId } = input;
   const { userId } = context || {};
@@ -1642,6 +1795,13 @@ export async function createAdvancedDocumentTool(input, context) {
       console.log(`   ✓ Generated ${template.sections.filter(s => s.type === 'numbered-questions')[0]?.items?.length || 0} questions`);
       if (companyContext) {
         console.log(`   ✓ Included company-specific questions and preliminary fit assessment`);
+      }
+    } else if (documentType === 'evaluation-rubric' && grantCriteria) {
+      console.log(`   🧠 Dynamically generating evaluation rubric based on grant criteria...`);
+      template = await generateEvaluationRubricFromCriteria(grantType, grantCriteria, data, companyContext);
+      console.log(`   ✓ Generated comprehensive evaluation rubric with scoring framework`);
+      if (companyContext) {
+        console.log(`   ✓ Tailored rubric to company context`);
       }
     } else {
       // Get static template

@@ -496,7 +496,7 @@ export const GOOGLE_DOCS_TOOLS = [
         },
         grantCriteria: {
           type: 'string',
-          description: 'Optional: For interview-questions documents, provide the grant program\'s evaluation criteria to dynamically generate ~10 focused interview questions tailored to the specific grant. Include key areas like: eligibility requirements, evaluation factors, program priorities, and any specific assessment dimensions. When provided, overrides static templates with AI-generated questions. Example: "CanExport evaluates: export readiness (market research, capacity), international growth strategy, project viability, financial capacity, and team experience. Priorities: first-time exporters, innovative products, emerging markets."'
+          description: 'Optional: For interview-questions and evaluation-rubric documents, provide the grant program\'s evaluation criteria to dynamically generate tailored content. For interview questions: generates ~10 strategic questions. For evaluation rubrics: generates comprehensive scoring framework with categories, sub-criteria, and assessment tables. Include: eligibility requirements, evaluation factors, program priorities, and assessment dimensions. When provided, overrides static templates with AI-generated content. Example: "CanExport evaluates: export readiness (market research, capacity), international growth strategy, project viability, financial capacity, and team experience. Priorities: first-time exporters, innovative products, emerging markets."'
         },
         companyContext: {
           type: 'string',
