@@ -462,39 +462,73 @@ At the end of readiness assessment, you should be able to pitch the project to t
 **Use this template ONLY when user requests Document 2**
 
 <interview_questions_guidelines>
-**PURPOSE**: Create ~10 focused interview questions dynamically generated based on the specific grant program's evaluation criteria.
+**PURPOSE**: Create ~10 strategic, consultative interview questions that help your team assess:
+1. **Company suitability** - Is this client a good fit for this grant?
+2. **Project scope** - Is the project well-defined, feasible, and aligned with grant objectives?
+3. **Potential impact** - Will this project deliver meaningful, realistic outcomes?
 
 **DYNAMIC GENERATION APPROACH** (MANDATORY):
-1. **Research grant program criteria** - Identify the key evaluation factors the grant program uses to assess applications
-2. **Extract evaluation criteria** - Pull out specific areas like:
-   - Eligibility requirements (e.g., company size, project type, eligible activities)
-   - Core evaluation factors (e.g., export readiness, innovation level, environmental impact, team capacity)
-   - Program priorities (e.g., first-time exporters, clean tech, Indigenous-led businesses, job creation)
-   - Specific assessment dimensions (e.g., market research, financial capacity, risk mitigation)
-3. **Pass criteria to tool** - Use the `grantCriteria` parameter in `create_advanced_document` to enable dynamic question generation
-4. **Result** - Tool will use Claude API to generate exactly 10 focused questions tailored to probe those specific criteria
+1. **Research grant program** - Use web_search or read_google_drive_file to understand:
+   - What does the grant fund? (activities, expenses, project types)
+   - Who is it for? (eligibility criteria, target applicants)
+   - What do evaluators look for? (evaluation criteria, scoring factors)
+   - What are the priorities? (program goals, special focus areas)
 
-**WHY DYNAMIC GENERATION?**
-- Different grants have different priorities (CanExport → export readiness; Clean tech → emissions reduction; R&D → innovation methodology)
-- Static question banks can't capture nuances of every grant program
-- ~10 focused questions are more effective than 80+ generic questions
-- Questions are tailored to what grant evaluators will actually assess
+2. **Extract evaluation criteria** - Summarize the grant's assessment framework:
+   - **Eligibility factors**: Company size, location, industry, project type
+   - **Core evaluation areas**: What the grant evaluates (readiness, innovation, impact, capacity, etc.)
+   - **Program priorities**: Special focus areas or preferred applicant characteristics
+   - **Key success factors**: What makes a strong application
+
+3. **Pass criteria to tool** - Use `grantCriteria` parameter with a clear summary of what the grant evaluates
+
+4. **Result** - Tool generates 10 strategic questions that:
+   - **Reveal fit through discovery** (not "Do you meet X?" but questions whose answers reveal whether they meet X)
+   - **Uncover project scope and feasibility** (understand what they're really trying to do)
+   - **Assess realistic impact** (what outcomes are expected and achievable)
+   - **Identify gaps and risks** (what's missing or concerning)
+
+**WHY STRATEGIC QUESTIONS?**
+- **Discovery vs checklist**: Open-ended questions reveal more than yes/no answers
+- **Consultative approach**: Helps clients think through their project while you assess
+- **Uncover real readiness**: Practical questions reveal actual capabilities, not aspirations
+- **Better assessment**: Detailed responses give you context to make informed recommendations
 
 **EXAMPLE CRITERIA FORMATS:**
 
+These examples show how to summarize grant criteria focused on assessing **suitability, scope, and impact**:
+
 *For CanExport SMEs:*
 ```
-CanExport SMEs evaluates: (1) Export readiness - market research completed, production capacity, export infrastructure; (2) International growth strategy - target market selection, market entry approach, competitive positioning; (3) Project viability - clear activities, realistic timeline, measurable outcomes; (4) Financial capacity - sufficient cash flow, matching funds, sustainability; (5) Team experience - management expertise, export experience, advisor support. Program priorities: First-time exporters, innovative products/services, emerging markets, SMEs under $10M revenue.
+CanExport SMEs funds international marketing activities for SMEs expanding to new export markets.
+
+Eligibility: Canadian SMEs with <$10M revenue, 3+ years in business, demonstrated export readiness.
+
+Evaluates: (1) Export readiness - Has the company done market research? Do they have production capacity and export infrastructure? (2) International growth strategy - Clear target market rationale, realistic market entry plan, understanding of competitive landscape. (3) Project viability - Well-defined activities (trade shows, market visits, marketing materials), achievable timeline, measurable outcomes. (4) Financial capacity - Cash flow to execute project, ability to contribute matching funds (50% cost-share), sustainable business model. (5) Team capability - Management with industry expertise, export experience (or advisors), capacity to execute.
+
+Program priorities: First-time exporters, innovative/value-added products, emerging markets, Indigenous/women-led businesses.
 ```
 
-*For clean tech grant:*
+*For CleanBC Industrial Incentive Program (Clean Tech):*
 ```
-CleanBC evaluates: (1) GHG emission reduction potential - quantified impact, measurement methodology; (2) Technology readiness - TRL level, validation, scalability; (3) Environmental co-benefits - air quality, waste reduction, ecosystem impact; (4) Economic viability - cost-effectiveness, market adoption potential, job creation; (5) Implementation plan - technical feasibility, timeline, risk mitigation. Program priorities: Solutions achieving 50+ tCO2e reduction annually, technologies at TRL 5-8, B.C.-based companies.
+CleanBC funds emission reduction projects in industrial facilities.
+
+Eligibility: B.C. industrial operations in manufacturing, oil & gas, mining, forestry, agriculture. Projects must reduce GHG emissions by 50+ tCO2e annually.
+
+Evaluates: (1) Emission reduction potential - Quantified GHG impact with credible methodology, baseline vs projected emissions, measurement plan. (2) Technology readiness - Solution at TRL 5-8 (demonstrated but not fully commercial), validation data, scalability potential. (3) Environmental co-benefits - Air quality improvements, waste reduction, water conservation, ecosystem benefits. (4) Economic viability - Cost per tonne CO2e reduced, payback period, market adoption barriers, job creation/retention. (5) Implementation feasibility - Technical complexity manageable, realistic timeline, clear risk mitigation, experienced team.
+
+Program priorities: Projects achieving 50+ tCO2e reduction, technologies at TRL 5-8, B.C.-based companies, projects ready to start within 6 months.
 ```
 
-*For R&D grant:*
+*For Research & Technology Readiness Initiative (R&D):*
 ```
-RTRI evaluates: (1) Innovation level - technical novelty, advancement over existing solutions, patent potential; (2) Technical feasibility - research methodology, team expertise, facilities/equipment; (3) Commercial potential - market size, competitive advantage, monetization strategy; (4) Economic impact - job creation, revenue projections, B.C. benefit; (5) Project plan - milestones, budget justification, risk management. Program priorities: Applied research, industry partnerships, companies with strong IP strategy.
+RTRI funds applied research projects that advance technologies toward commercial readiness.
+
+Eligibility: B.C. companies with proprietary technology at TRL 3-6, industry partnership required, technology must have clear commercial pathway.
+
+Evaluates: (1) Innovation level - Technical novelty (beyond incremental improvements), advancement over existing solutions, patent potential, competitive technical advantage. (2) Technical feasibility - Sound research methodology, team with relevant expertise, access to required facilities/equipment, clear validation plan. (3) Commercial potential - Large addressable market, compelling value proposition, clear competitive advantage, realistic monetization strategy, path to customers. (4) Economic impact - Jobs created/retained, revenue projections for company and B.C. economy, supply chain benefits, IP staying in B.C. (5) Project execution - Clear milestones linked to TRL advancement, justified budget, identified risks with mitigation plans, partnership commitment.
+
+Program priorities: Applied research (not basic science), industry partnerships (not academic-only), strong IP strategy, technologies solving real market problems.
 ```
 </interview_questions_guidelines>
 
@@ -526,13 +560,27 @@ create_advanced_document({
 })
 ```
 
-**Step 3: Tool generates document**
-- Claude API automatically generates ~10 focused questions tailored to the grant criteria
-- Questions probe the specific evaluation factors mentioned in grantCriteria
+**Step 3: Tool generates strategic questions**
+- Claude API automatically generates ~10 **strategic, consultative questions** tailored to the grant
+- Questions are designed to:
+  - **Assess fit through discovery** - Reveal company suitability without checklist questions
+  - **Uncover project scope** - Understand what they're actually trying to accomplish
+  - **Evaluate realistic impact** - Probe expected outcomes and feasibility
+  - **Identify gaps/risks** - Surface concerns through open-ended exploration
 - Document is created in Google Docs with branded formatting
 
+**WHAT THE QUESTIONS WILL LOOK LIKE:**
+Instead of: "Do you have export experience?" (yes/no checklist)
+You get: "Walk me through your current international sales activities and what's driving your interest in expanding to [market]?" (strategic discovery)
+
+Instead of: "Have you completed market research?" (checklist)
+You get: "What research have you done on [target market], and what did you learn about demand for your product there?" (uncovers depth of research)
+
+Instead of: "Do you have production capacity?" (yes/no)
+You get: "If you secured customers in [market], describe how you'd scale production to meet the demand. What constraints would you face?" (reveals actual capacity)
+
 **IMPORTANT NOTES:**
-- **Always include grantCriteria parameter** when creating interview questions - this triggers dynamic generation
+- **Always include grantCriteria parameter** when creating interview questions - this triggers strategic generation
 - **Without grantCriteria**: Falls back to generic static template (not recommended)
 - **Grant Type Mapping**: Use the correct grantType enum value based on program:
   - Export/market entry programs → "market-expansion"

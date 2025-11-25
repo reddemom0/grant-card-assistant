@@ -1382,28 +1382,44 @@ async function generateInterviewQuestionsFromCriteria(grantType, grantCriteria, 
     day: 'numeric'
   });
 
-  const prompt = `You are creating interview questions for a grant readiness assessment. Generate exactly 10 focused interview questions that Granted Consulting's strategy team can use to assess a client's readiness for this grant program.
+  const prompt = `You are creating strategic interview questions for Granted Consulting's grant readiness assessment. These questions will be used by consultants to assess whether a client is a good fit for this grant program.
 
 GRANT PROGRAM CRITERIA:
 ${grantCriteria}
 
-REQUIREMENTS:
-- Generate EXACTLY 10 questions (no more, no less)
-- Questions should probe the key evaluation criteria mentioned above
-- Questions should be open-ended and encourage detailed responses
-- Focus on areas the grant evaluators will assess
-- Questions should help identify gaps in the client's readiness
-- Keep questions professional and interview-appropriate
-- Questions should follow a logical flow from high-level to specific
+YOUR TASK:
+Generate exactly 10 strategic, consultative interview questions that help the consulting team:
+1. **Assess company suitability** - Is this company a good fit for this grant? Do they meet the underlying intent, not just technical requirements?
+2. **Understand project scope** - What is the client actually trying to accomplish? Is the project well-defined and feasible?
+3. **Evaluate potential impact** - What outcomes will this project deliver? Are the expected results realistic and meaningful?
+
+QUESTION DESIGN PRINCIPLES:
+- **Strategic, not checklist** - Don't ask "Do you meet X?" Ask questions that reveal WHETHER they meet X through their answer
+- **Open-ended discovery** - Questions should prompt detailed responses that reveal readiness, gaps, and risks
+- **Consultative tone** - Help the client think through their project while gathering assessment information
+- **Practical focus** - Questions should uncover real capabilities, not aspirational statements
+- **Flow logically** - Start with high-level context (company/project overview), then dive into specific areas
+
+EXAMPLES OF GOOD STRATEGIC QUESTIONS:
+- "Walk me through your current export activities and what's driving your interest in expanding to [target market]?" (reveals export readiness without asking directly)
+- "What problem are you trying to solve with this project, and why now?" (uncovers project rationale and timing)
+- "Describe the team who will execute this project - who's doing what, and what similar projects have they delivered?" (assesses capacity without yes/no)
+- "If this project succeeds, what does your business look like in 2 years? What metrics change?" (evaluates impact understanding)
+
+AVOID:
+- Yes/no questions ("Do you have export experience?")
+- Checklist questions ("Have you completed market research?")
+- Leading questions that tell them the "right" answer
+- Overly technical jargon that intimidates clients
 
 FORMAT:
-Return ONLY a numbered list of questions (1-10), one per line. Do not include explanations, categories, or any other text. Just the questions.
+Return ONLY a numbered list of 10 questions, one per line. No explanations, categories, or other text.
 
 Example format:
-1. [First question]
-2. [Second question]
+1. [Strategic question revealing company context]
+2. [Question uncovering project scope and motivation]
 ...
-10. [Tenth question]`;
+10. [Question assessing capacity or impact]`;
 
   try {
     const message = await anthropic.messages.create({
