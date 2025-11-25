@@ -1468,7 +1468,7 @@ Example format:
 2. [Question uncovering project scope and motivation]
 ...
 10. [Question assessing capacity or impact]`;
-  }`;
+  }
 
   try {
     const message = await anthropic.messages.create({
