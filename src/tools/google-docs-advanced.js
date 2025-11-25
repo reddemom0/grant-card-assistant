@@ -408,13 +408,13 @@ function findTextTableRanges(body, expectedCount) {
 
 /**
  * PHASE 3: Populate table cells with data
- * Uses calculated index offsets (proven approach from Google Docs API examples)
+ * Uses ACTUAL cell paragraph indexes from the re-fetched document (not calculated offsets)
  *
- * Index calculation pattern:
- * - First cell: tableStart + 4
- * - Next column: +2
- * - Next row first column: previous row's last column + 3
- * - Must insert in REVERSE order to avoid index shifts
+ * IMPORTANT: The calculated offset approach from examples only works when creating
+ * and populating tables in ONE batchUpdate. Since we create empty tables in Phase 2,
+ * then populate in Phase 3, we must use the actual cell indexes from the document.
+ *
+ * Must insert in REVERSE order to avoid index shifts when inserting text.
  *
  * @param {Object} document - Updated document after Phase 2
  * @param {Array} tableMarkers - Table metadata from Phase 1
@@ -433,94 +433,132 @@ function generatePhase3CellPopulation(document, tableMarkers) {
   for (let tableIndex = 0; tableIndex < Math.min(tableElements.length, tableMarkers.length); tableIndex++) {
     const tableElement = tableElements[tableIndex];
     const tableInfo = tableMarkers[tableIndex];
+    const table = tableElement.table;
 
-    // Get table start index - this is our anchor point
-    const tableStartIndex = tableElement.startIndex;
-
-    if (typeof tableStartIndex !== 'number') {
-      console.log(`   ⚠️  Table ${tableIndex}: Missing startIndex`);
+    if (!table || !table.tableRows) {
+      console.log(`   ⚠️  Table ${tableIndex}: Missing table or tableRows`);
       continue;
     }
 
-    console.log(`   📍 Table ${tableIndex}: startIndex=${tableStartIndex}, rows=${tableInfo.rows.length + 1}, cols=${tableInfo.headers.length}`);
+    console.log(`   📍 Table ${tableIndex}: ${table.tableRows.length} rows, populating with ${tableInfo.headers.length} headers + ${tableInfo.rows.length} data rows`);
 
-    // Calculate cell indexes using proven offset pattern
-    // Pattern: first cell = tableStart + 4, then +2 for columns, +3 for rows
-    let currentIndex = tableStartIndex + 4;
-
-    // Populate header row
-    for (let col = 0; col < tableInfo.headers.length; col++) {
-      const cellIndex = currentIndex + (col * 2);
-      const headerText = tableInfo.headers[col];
-
-      // Insert header text
-      requests.push({
-        insertText: {
-          location: { index: cellIndex },
-          text: headerText
+    // Populate header row (row 0)
+    if (table.tableRows[0]) {
+      const headerRow = table.tableRows[0];
+      for (let col = 0; col < tableInfo.headers.length; col++) {
+        const cell = headerRow.tableCells?.[col];
+        if (!cell || !cell.content || !cell.content[0]) {
+          console.log(`   ⚠️  Table ${tableIndex}, header col ${col}: Missing cell content`);
+          continue;
         }
-      });
 
-      // Make header bold
-      requests.push({
-        updateTextStyle: {
-          range: {
-            startIndex: cellIndex,
-            endIndex: cellIndex + headerText.length
-          },
-          textStyle: {
-            bold: true
-          },
-          fields: 'bold'
+        const cellContent = cell.content[0];
+
+        // Validate that the content has a paragraph with startIndex
+        if (!cellContent.paragraph || typeof cellContent.startIndex !== 'number') {
+          console.log(`   ⚠️  Table ${tableIndex}, header col ${col}: Invalid paragraph structure`);
+          continue;
         }
-      });
+
+        // Use ACTUAL cell paragraph startIndex + 1 to insert inside the paragraph
+        const insertIndex = cellContent.startIndex + 1;
+        const headerText = tableInfo.headers[col];
+
+        // Insert header text
+        requests.push({
+          insertText: {
+            location: { index: insertIndex },
+            text: headerText
+          }
+        });
+
+        // Make header bold
+        requests.push({
+          updateTextStyle: {
+            range: {
+              startIndex: insertIndex,
+              endIndex: insertIndex + headerText.length
+            },
+            textStyle: {
+              bold: true
+            },
+            fields: 'bold'
+          }
+        });
+      }
     }
-
-    // Move to first data row (last header column + 3)
-    currentIndex = tableStartIndex + 4 + (tableInfo.headers.length - 1) * 2 + 3;
 
     // Populate data rows
     for (let rowIndex = 0; rowIndex < tableInfo.rows.length; rowIndex++) {
       const rowData = tableInfo.rows[rowIndex];
+      const tableRowIndex = rowIndex + 1; // +1 because row 0 is headers
+
+      if (!table.tableRows[tableRowIndex]) {
+        console.log(`   ⚠️  Table ${tableIndex}: Missing row ${tableRowIndex}`);
+        continue;
+      }
+
+      const tableRow = table.tableRows[tableRowIndex];
 
       for (let col = 0; col < rowData.length; col++) {
-        const cellIndex = currentIndex + (col * 2);
+        const cell = tableRow.tableCells?.[col];
+        if (!cell || !cell.content || !cell.content[0]) {
+          console.log(`   ⚠️  Table ${tableIndex}, row ${tableRowIndex}, col ${col}: Missing cell content`);
+          continue;
+        }
+
+        const cellContent = cell.content[0];
+
+        // Validate paragraph structure
+        if (!cellContent.paragraph || typeof cellContent.startIndex !== 'number') {
+          console.log(`   ⚠️  Table ${tableIndex}, row ${tableRowIndex}, col ${col}: Invalid paragraph structure`);
+          continue;
+        }
+
+        // Use ACTUAL cell paragraph startIndex + 1
+        const insertIndex = cellContent.startIndex + 1;
         const cellText = rowData[col];
 
         requests.push({
           insertText: {
-            location: { index: cellIndex },
+            location: { index: insertIndex },
             text: cellText
           }
         });
       }
-
-      // Move to next row (last column of current row + 3)
-      currentIndex = currentIndex + (rowData.length - 1) * 2 + 3;
     }
   }
 
   console.log(`   ✓ Generated ${requests.length} cell population requests`);
 
-  // DEBUG: Log first few requests
+  // DEBUG: Log first and last few requests to see the range
   if (requests.length > 0) {
-    console.log(`   🔍 First 5 requests (before reversal):`);
-    for (let i = 0; i < Math.min(5, requests.length); i++) {
+    console.log(`   🔍 First 3 requests (before reversal):`);
+    for (let i = 0; i < Math.min(3, requests.length); i++) {
       const req = requests[i];
       if (req.insertText) {
-        console.log(`      [${i}] insertText at ${req.insertText.location.index}: "${req.insertText.text.substring(0, 30)}${req.insertText.text.length > 30 ? '...' : ''}"`);
+        console.log(`      [${i}] insertText at ${req.insertText.location.index}: "${req.insertText.text.substring(0, 20)}..."`);
       } else if (req.updateTextStyle) {
-        console.log(`      [${i}] updateTextStyle from ${req.updateTextStyle.range.startIndex} to ${req.updateTextStyle.range.endIndex}`);
+        console.log(`      [${i}] updateTextStyle ${req.updateTextStyle.range.startIndex}-${req.updateTextStyle.range.endIndex}`);
+      }
+    }
+    console.log(`   🔍 Last 3 requests (before reversal):`);
+    for (let i = Math.max(0, requests.length - 3); i < requests.length; i++) {
+      const req = requests[i];
+      if (req.insertText) {
+        console.log(`      [${i}] insertText at ${req.insertText.location.index}: "${req.insertText.text.substring(0, 20)}..."`);
+      } else if (req.updateTextStyle) {
+        console.log(`      [${i}] updateTextStyle ${req.updateTextStyle.range.startIndex}-${req.updateTextStyle.range.endIndex}`);
       }
     }
   }
 
   // CRITICAL: Reverse requests to avoid index shifts
-  // When inserting text, earlier indexes shift later ones
+  // When inserting text at early indexes, it shifts all later indexes
   // By inserting highest index first, we preserve earlier indexes
   requests.reverse();
 
-  console.log(`   ✓ Reversed requests for proper insertion order`);
+  console.log(`   ✓ Reversed ${requests.length} requests for proper insertion order`);
 
   return requests;
 }
