@@ -336,7 +336,7 @@ async function generatePhase2TableReplacements(document, tableMarkers) {
 
 /**
  * Find text-based table patterns in document
- * Looks for pipe-separated text patterns like "Yes | No"
+ * Looks for complete table structures from top border to bottom border
  * @param {Object} body - Document body
  * @param {number} expectedCount - Expected number of tables
  * @returns {Array} Array of {startIndex, endIndex} ranges
@@ -344,30 +344,49 @@ async function generatePhase2TableReplacements(document, tableMarkers) {
 function findTextTableRanges(body, expectedCount) {
   const ranges = [];
 
+  // Flatten all content elements with their text
+  const contentElements = [];
   for (const element of body.content) {
-    if (element.paragraph) {
-      const paragraph = element.paragraph;
-      if (paragraph.elements) {
-        for (const paraElement of paragraph.elements) {
-          if (paraElement.textRun && paraElement.textRun.content) {
-            const text = paraElement.textRun.content;
-
-            // Look for table patterns: text with pipes and dashes
-            if (text.includes(' | ') || text.includes('─┼─')) {
-              // Found a table pattern
-              ranges.push({
-                startIndex: paraElement.startIndex,
-                endIndex: paraElement.endIndex
-              });
-
-              if (ranges.length >= expectedCount) {
-                return ranges;
-              }
-            }
-          }
+    if (element.paragraph?.elements) {
+      for (const paraElement of element.paragraph.elements) {
+        if (paraElement.textRun?.content) {
+          contentElements.push({
+            text: paraElement.textRun.content,
+            startIndex: paraElement.startIndex,
+            endIndex: paraElement.endIndex
+          });
         }
       }
     }
+  }
+
+  // Find complete tables by looking for start and end patterns
+  let i = 0;
+  while (i < contentElements.length && ranges.length < expectedCount) {
+    const elem = contentElements[i];
+
+    // Look for table start: top border with ┌ or ┬
+    if (elem.text.includes('┌') || elem.text.includes('┬')) {
+      const tableStartIndex = elem.startIndex;
+      let tableEndIndex = elem.endIndex;
+
+      // Scan forward to find table end: bottom border with └ or ┴
+      for (let j = i + 1; j < contentElements.length; j++) {
+        tableEndIndex = contentElements[j].endIndex;
+
+        // Found bottom border - this is the end of the table
+        if (contentElements[j].text.includes('└') || contentElements[j].text.includes('┴')) {
+          ranges.push({
+            startIndex: tableStartIndex,
+            endIndex: tableEndIndex
+          });
+          i = j; // Skip past this table
+          break;
+        }
+      }
+    }
+
+    i++;
   }
 
   return ranges;
@@ -387,45 +406,60 @@ function generatePhase3CellPopulation(document, tableMarkers) {
   // Extract all tables from document
   const tables = body.content.filter(el => el.table);
 
+  console.log(`   📊 Found ${tables.length} tables in document, populating ${Math.min(tables.length, tableMarkers.length)}...`);
+
   // Populate each table with its corresponding data
   for (let tableIndex = 0; tableIndex < Math.min(tables.length, tableMarkers.length); tableIndex++) {
     const tableElement = tables[tableIndex];
     const tableInfo = tableMarkers[tableIndex];
     const table = tableElement.table;
 
-    if (!table || !table.tableRows) continue;
+    if (!table || !table.tableRows) {
+      console.log(`   ⚠️  Table ${tableIndex}: Missing table or tableRows`);
+      continue;
+    }
 
     // Populate header row (row 0)
     if (table.tableRows[0]) {
       const headerRow = table.tableRows[0];
       for (let col = 0; col < tableInfo.headers.length; col++) {
         const cell = headerRow.tableCells?.[col];
-        if (cell && cell.content && cell.content[0]) {
-          const cellParagraph = cell.content[0];
-          const insertIndex = cellParagraph.startIndex + 1; // +1 to insert inside paragraph
-
-          // Insert header text
-          requests.push({
-            insertText: {
-              location: { index: insertIndex },
-              text: tableInfo.headers[col]
-            }
-          });
-
-          // Make header bold
-          requests.push({
-            updateTextStyle: {
-              range: {
-                startIndex: insertIndex,
-                endIndex: insertIndex + tableInfo.headers[col].length
-              },
-              textStyle: {
-                bold: true
-              },
-              fields: 'bold'
-            }
-          });
+        if (!cell || !cell.content || !cell.content[0]) {
+          console.log(`   ⚠️  Table ${tableIndex}, header col ${col}: Missing cell content`);
+          continue;
         }
+
+        const cellContent = cell.content[0];
+
+        // Validate that the content has a paragraph with startIndex
+        if (!cellContent.paragraph || typeof cellContent.startIndex !== 'number') {
+          console.log(`   ⚠️  Table ${tableIndex}, header col ${col}: Invalid paragraph structure`);
+          continue;
+        }
+
+        const insertIndex = cellContent.startIndex + 1; // +1 to insert inside paragraph
+
+        // Insert header text
+        requests.push({
+          insertText: {
+            location: { index: insertIndex },
+            text: tableInfo.headers[col]
+          }
+        });
+
+        // Make header bold
+        requests.push({
+          updateTextStyle: {
+            range: {
+              startIndex: insertIndex,
+              endIndex: insertIndex + tableInfo.headers[col].length
+            },
+            textStyle: {
+              bold: true
+            },
+            fields: 'bold'
+          }
+        });
       }
     }
 
@@ -434,26 +468,41 @@ function generatePhase3CellPopulation(document, tableMarkers) {
       const rowData = tableInfo.rows[rowIndex];
       const tableRowIndex = rowIndex + 1; // +1 because row 0 is headers
 
-      if (table.tableRows[tableRowIndex]) {
-        const tableRow = table.tableRows[tableRowIndex];
+      if (!table.tableRows[tableRowIndex]) {
+        console.log(`   ⚠️  Table ${tableIndex}: Missing row ${tableRowIndex}`);
+        continue;
+      }
 
-        for (let col = 0; col < rowData.length; col++) {
-          const cell = tableRow.tableCells?.[col];
-          if (cell && cell.content && cell.content[0]) {
-            const cellParagraph = cell.content[0];
-            const insertIndex = cellParagraph.startIndex + 1;
+      const tableRow = table.tableRows[tableRowIndex];
 
-            requests.push({
-              insertText: {
-                location: { index: insertIndex },
-                text: rowData[col]
-              }
-            });
-          }
+      for (let col = 0; col < rowData.length; col++) {
+        const cell = tableRow.tableCells?.[col];
+        if (!cell || !cell.content || !cell.content[0]) {
+          console.log(`   ⚠️  Table ${tableIndex}, row ${tableRowIndex}, col ${col}: Missing cell content`);
+          continue;
         }
+
+        const cellContent = cell.content[0];
+
+        // Validate paragraph structure
+        if (!cellContent.paragraph || typeof cellContent.startIndex !== 'number') {
+          console.log(`   ⚠️  Table ${tableIndex}, row ${tableRowIndex}, col ${col}: Invalid paragraph structure`);
+          continue;
+        }
+
+        const insertIndex = cellContent.startIndex + 1;
+
+        requests.push({
+          insertText: {
+            location: { index: insertIndex },
+            text: rowData[col]
+          }
+        });
       }
     }
   }
+
+  console.log(`   ✓ Generated ${requests.length} cell population requests`);
 
   // Return requests in reverse order (write backwards pattern)
   return requests.reverse();
