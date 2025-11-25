@@ -266,12 +266,15 @@ function populateWeightedCriteriaTable(rows, section, data) {
     for (let col = 0; col < section.headers.length && col < headerRow.tableCells.length; col++) {
       const cell = headerRow.tableCells[col];
       const cellStart = cell.startIndex;
-      requests.push({
-        insertText: {
-          location: { index: cellStart + 1 },
-          text: section.headers[col]
-        }
-      });
+      const headerText = section.headers[col];
+      if (headerText && headerText.trim().length > 0) {
+        requests.push({
+          insertText: {
+            location: { index: cellStart + 1 },
+            text: headerText
+          }
+        });
+      }
     }
   }
 
@@ -292,12 +295,15 @@ function populateWeightedCriteriaTable(rows, section, data) {
     for (let col = 0; col < cells.length && col < tableRow.tableCells.length; col++) {
       const cell = tableRow.tableCells[col];
       const cellStart = cell.startIndex;
-      requests.push({
-        insertText: {
-          location: { index: cellStart + 1 },
-          text: cells[col]
-        }
-      });
+      const cellText = cells[col];
+      if (cellText && cellText.trim().length > 0) {
+        requests.push({
+          insertText: {
+            location: { index: cellStart + 1 },
+            text: cellText
+          }
+        });
+      }
     }
   }
 
@@ -315,12 +321,15 @@ function populateScoringTable(rows, section, data) {
     const headerRow = rows[0];
     for (let col = 0; col < section.headers.length && col < headerRow.tableCells.length; col++) {
       const cell = headerRow.tableCells[col];
-      requests.push({
-        insertText: {
-          location: { index: cell.startIndex + 1 },
-          text: section.headers[col]
-        }
-      });
+      const headerText = section.headers[col];
+      if (headerText && headerText.trim().length > 0) {
+        requests.push({
+          insertText: {
+            location: { index: cell.startIndex + 1 },
+            text: headerText
+          }
+        });
+      }
     }
   }
 
@@ -337,12 +346,15 @@ function populateScoringTable(rows, section, data) {
 
     for (let col = 0; col < cells.length && col < tableRow.tableCells.length; col++) {
       const cell = tableRow.tableCells[col];
-      requests.push({
-        insertText: {
-          location: { index: cell.startIndex + 1 },
-          text: cells[col]
-        }
-      });
+      const cellText = cells[col];
+      if (cellText && cellText.trim().length > 0) {
+        requests.push({
+          insertText: {
+            location: { index: cell.startIndex + 1 },
+            text: cellText
+          }
+        });
+      }
     }
   }
 
@@ -367,12 +379,15 @@ function populateScoreSummaryTable(rows, section, data) {
 
     for (let col = 0; col < cells.length && col < tableRow.tableCells.length; col++) {
       const cell = tableRow.tableCells[col];
-      requests.push({
-        insertText: {
-          location: { index: cell.startIndex + 1 },
-          text: cells[col]
-        }
-      });
+      const cellText = cells[col];
+      if (cellText && cellText.trim().length > 0) {
+        requests.push({
+          insertText: {
+            location: { index: cell.startIndex + 1 },
+            text: cellText
+          }
+        });
+      }
     }
   }
 
@@ -390,12 +405,15 @@ function populateGenericTable(rows, section, data) {
     const headerRow = rows[0];
     for (let col = 0; col < section.headers.length && col < headerRow.tableCells.length; col++) {
       const cell = headerRow.tableCells[col];
-      requests.push({
-        insertText: {
-          location: { index: cell.startIndex + 1 },
-          text: section.headers[col]
-        }
-      });
+      const headerText = section.headers[col];
+      if (headerText && headerText.trim().length > 0) {
+        requests.push({
+          insertText: {
+            location: { index: cell.startIndex + 1 },
+            text: headerText
+          }
+        });
+      }
     }
   }
 
@@ -411,12 +429,14 @@ function populateGenericTable(rows, section, data) {
       for (let col = 0; col < cells.length && col < tableRow.tableCells.length; col++) {
         const cell = tableRow.tableCells[col];
         const cellValue = replacePlaceholders(String(cells[col] || ''), data);
-        requests.push({
-          insertText: {
-            location: { index: cell.startIndex + 1 },
-            text: cellValue
-          }
-        });
+        if (cellValue && cellValue.trim().length > 0) {
+          requests.push({
+            insertText: {
+              location: { index: cell.startIndex + 1 },
+              text: cellValue
+            }
+          });
+        }
       }
     }
   }
