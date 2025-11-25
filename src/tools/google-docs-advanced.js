@@ -336,7 +336,7 @@ async function generatePhase2TableReplacements(document, tableMarkers) {
 
 /**
  * Find text-based table patterns in document
- * Looks for complete table structures from top border to bottom border
+ * Looks for pipe-separated tables with headers and separator lines
  * @param {Object} body - Document body
  * @param {number} expectedCount - Expected number of tables
  * @returns {Array} Array of {startIndex, endIndex} ranges
@@ -360,30 +360,44 @@ function findTextTableRanges(body, expectedCount) {
     }
   }
 
-  // Find complete tables by looking for start and end patterns
+  // Find complete tables by looking for separator pattern (─┼─)
   let i = 0;
   while (i < contentElements.length && ranges.length < expectedCount) {
     const elem = contentElements[i];
 
-    // Look for table start: top border with ┌ or ┬
-    if (elem.text.includes('┌') || elem.text.includes('┬')) {
-      const tableStartIndex = elem.startIndex;
+    // Look for table separator line: contains ─┼─
+    if (elem.text.includes('─┼─')) {
+      // Found a separator - this indicates a table
+      // Look backwards for header row (line before separator)
+      let tableStartIndex = elem.startIndex;
+      if (i > 0) {
+        // Start from previous element (header row)
+        tableStartIndex = contentElements[i - 1].startIndex;
+      }
+
+      // Scan forward to find all rows (lines with | but not ─┼─)
       let tableEndIndex = elem.endIndex;
-
-      // Scan forward to find table end: bottom border with └ or ┴
       for (let j = i + 1; j < contentElements.length; j++) {
-        tableEndIndex = contentElements[j].endIndex;
+        const nextElem = contentElements[j];
 
-        // Found bottom border - this is the end of the table
-        if (contentElements[j].text.includes('└') || contentElements[j].text.includes('┴')) {
-          ranges.push({
-            startIndex: tableStartIndex,
-            endIndex: tableEndIndex
-          });
-          i = j; // Skip past this table
+        // If this line has pipes (data row), include it
+        if (nextElem.text.includes(' | ')) {
+          tableEndIndex = nextElem.endIndex;
+        } else if (!nextElem.text.trim() || nextElem.text === '\n') {
+          // Empty line after table - end here
+          break;
+        } else {
+          // Non-table content - end of table
           break;
         }
       }
+
+      ranges.push({
+        startIndex: tableStartIndex,
+        endIndex: tableEndIndex
+      });
+
+      console.log(`   📊 Found text table: indices ${tableStartIndex}-${tableEndIndex}`);
     }
 
     i++;
