@@ -518,8 +518,9 @@ function generatePhase3CellPopulation(document, tableMarkers) {
 
   console.log(`   ✓ Generated ${requests.length} cell population requests`);
 
-  // Return requests in reverse order (write backwards pattern)
-  return requests.reverse();
+  // Return requests in FORWARD order for batch update
+  // (API handles index adjustments automatically within a batch)
+  return requests;
 }
 
 /**
