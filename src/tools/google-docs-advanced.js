@@ -453,6 +453,9 @@ function generatePhase3CellPopulation(document, tableMarkers) {
 
         const insertIndex = cellContent.startIndex + 1; // +1 to insert inside paragraph
 
+        // DEBUG: Log cell structure
+        console.log(`   🔍 Table ${tableIndex} header[${col}]: startIndex=${cellContent.startIndex}, endIndex=${cellContent.endIndex}, insertAt=${insertIndex}, text="${tableInfo.headers[col]}"`);
+
         // Insert header text
         requests.push({
           insertText: {
@@ -506,6 +509,11 @@ function generatePhase3CellPopulation(document, tableMarkers) {
 
         const insertIndex = cellContent.startIndex + 1;
 
+        // DEBUG: Log first few cells only (to avoid log spam)
+        if (tableIndex === 0 && tableRowIndex === 1 && col < 2) {
+          console.log(`   🔍 Table ${tableIndex} row[${tableRowIndex}][${col}]: startIndex=${cellContent.startIndex}, endIndex=${cellContent.endIndex}, insertAt=${insertIndex}, text="${rowData[col]}"`);
+        }
+
         requests.push({
           insertText: {
             location: { index: insertIndex },
@@ -517,6 +525,19 @@ function generatePhase3CellPopulation(document, tableMarkers) {
   }
 
   console.log(`   ✓ Generated ${requests.length} cell population requests`);
+
+  // DEBUG: Log first few requests to see indexes
+  if (requests.length > 0) {
+    console.log(`   🔍 First 5 requests:`);
+    for (let i = 0; i < Math.min(5, requests.length); i++) {
+      const req = requests[i];
+      if (req.insertText) {
+        console.log(`      [${i}] insertText at ${req.insertText.location.index}: "${req.insertText.text.substring(0, 30)}${req.insertText.text.length > 30 ? '...' : ''}"`);
+      } else if (req.updateTextStyle) {
+        console.log(`      [${i}] updateTextStyle from ${req.updateTextStyle.range.startIndex} to ${req.updateTextStyle.range.endIndex}`);
+      }
+    }
+  }
 
   // Return requests in FORWARD order for batch update
   // (API handles index adjustments automatically within a batch)
