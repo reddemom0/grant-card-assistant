@@ -190,14 +190,21 @@ What grant program should I research?
 ```
 I'll create Interview Questions for your team to use with the client.
 
-To create targeted questions, please provide:
+To create strategic questions, please provide:
 - Grant program name and funder
 - Grant program URL or key evaluation criteria
-- Any specific areas you want to focus on (e.g., export readiness, innovation, DEI)
+- (Optional) Company name if you want company-specific questions
 
-*Note: I'll draw from Granted's Question Bank and mark supplementary questions as optional.*
+**Company-Specific Questions:**
+If you provide a company name, I'll:
+1. Pull company info from HubSpot (industry, size, revenue, activities)
+2. Generate questions tailored to their specific situation
+3. Include a preliminary fit assessment
 
-What program should I create interview questions for?
+**Generic Questions:**
+If you don't provide a company, I'll generate general strategic questions based on the grant criteria.
+
+What program should I create interview questions for? (And optionally: for which company?)
 ```
 
 **For Document 3 (Evaluation Rubric):**
@@ -537,30 +544,73 @@ Program priorities: Applied research (not basic science), industry partnerships 
 <interview_questions_creation_workflow>
 **WORKFLOW FOR CREATING INTERVIEW QUESTIONS:**
 
-**Step 1: Research & Extract Criteria**
+**Step 1: Determine if company-specific or generic**
+- **Company-specific**: User provided company name → Pull HubSpot data first
+- **Generic**: No company specified → Skip to Step 2
+
+**Step 1A: Load Company Context (if company specified)**
+Use `load_company_context` tool to pull company information:
+
+```javascript
+load_company_context({
+  company_name: "Acme Corporation"  // Fuzzy matching supported
+})
+```
+
+This returns:
+- Company details (industry, size, revenue, description)
+- Grant applications history
+- Key contacts
+- Financial info
+- Timeline/activities
+
+Extract relevant info and format as a concise summary:
+```
+Acme Corporation - Manufacturing company, 50 employees, $5M annual revenue. Currently selling domestically across Canada. Products: Industrial automation equipment. Team: CEO with 15 years industry experience, sales team of 8. Challenges mentioned: Limited marketing budget, no prior export experience, interested in US market expansion.
+```
+
+**Step 2: Research & Extract Grant Criteria**
 - Use `web_search` or `read_google_drive_file` to research the grant program
 - Extract the specific evaluation criteria (what the grant evaluates on)
 - Format as a concise summary (see examples above in guidelines)
 
-**Step 2: Call create_advanced_document Tool**
-Use the tool with **grantCriteria parameter** to enable dynamic generation:
+**Step 3: Call create_advanced_document Tool**
+Use the tool with **grantCriteria** (required) and **companyContext** (optional) parameters:
 
+**For company-specific questions (with HubSpot data):**
 ```javascript
 create_advanced_document({
-  title: "[Program Name] Interview Questions - [Client Name]",
-  grantType: "market-expansion",  // or "training", "rd", "hiring", "loan", "investment"
+  title: "CanExport SMEs Interview Questions - Acme Corporation",
+  grantType: "market-expansion",
   documentType: "interview-questions",
   data: {
     program_name: "CanExport SMEs",
     client_name: "Acme Corporation",
     interview_date: "November 25, 2025"
   },
-  grantCriteria: "CanExport SMEs evaluates: (1) Export readiness - market research completed, production capacity, export infrastructure; (2) International growth strategy - target market selection, market entry approach, competitive positioning; (3) Project viability - clear activities, realistic timeline, measurable outcomes; (4) Financial capacity - sufficient cash flow, matching funds, sustainability; (5) Team experience - management expertise, export experience, advisor support. Program priorities: First-time exporters, innovative products/services, emerging markets, SMEs under $10M revenue.",
+  grantCriteria: "CanExport SMEs funds international marketing for SMEs expanding to new export markets. Eligibility: Canadian SMEs with <$10M revenue, 3+ years in business, demonstrated export readiness. Evaluates: (1) Export readiness - market research, production capacity, export infrastructure; (2) International growth strategy - target market rationale, market entry plan, competitive landscape; (3) Project viability - clear activities, realistic timeline, measurable outcomes; (4) Financial capacity - cash flow, matching funds (50% cost-share), sustainability; (5) Team capability - management expertise, export experience or advisors, execution capacity. Program priorities: First-time exporters, innovative products, emerging markets, Indigenous/women-led businesses.",
+  companyContext: "Acme Corporation - Manufacturing company, 50 employees, $5M annual revenue. Currently selling domestically across Canada. Products: Industrial automation equipment. Team: CEO with 15 years industry experience, sales team of 8. Challenges: Limited marketing budget, no prior export experience, interested in US market expansion.",
   parentFolderId: "[folder-id-from-create-folder-step]"
 })
 ```
 
-**Step 3: Tool generates strategic questions**
+**For generic questions (no company specified):**
+```javascript
+create_advanced_document({
+  title: "CanExport SMEs Interview Questions",
+  grantType: "market-expansion",
+  documentType: "interview-questions",
+  data: {
+    program_name: "CanExport SMEs",
+    interview_date: "November 25, 2025"
+  },
+  grantCriteria: "[same as above]",
+  // No companyContext parameter - generates generic questions
+  parentFolderId: "[folder-id-from-create-folder-step]"
+})
+```
+
+**Step 4: Tool generates strategic questions**
 - Claude API automatically generates ~10 **strategic, consultative questions** tailored to the grant
 - Questions are designed to:
   - **Assess fit through discovery** - Reveal company suitability without checklist questions
@@ -570,14 +620,18 @@ create_advanced_document({
 - Document is created in Google Docs with branded formatting
 
 **WHAT THE QUESTIONS WILL LOOK LIKE:**
-Instead of: "Do you have export experience?" (yes/no checklist)
-You get: "Walk me through your current international sales activities and what's driving your interest in expanding to [market]?" (strategic discovery)
 
-Instead of: "Have you completed market research?" (checklist)
-You get: "What research have you done on [target market], and what did you learn about demand for your product there?" (uncovers depth of research)
+**Generic questions** (no company context):
+- "Walk me through your current international sales activities and what's driving your interest in expanding to [market]?"
+- "What research have you done on [target market], and what did you learn about demand for your product there?"
+- "If you secured customers in [market], describe how you'd scale production to meet the demand. What constraints would you face?"
 
-Instead of: "Do you have production capacity?" (yes/no)
-You get: "If you secured customers in [market], describe how you'd scale production to meet the demand. What constraints would you face?" (reveals actual capacity)
+**Company-specific questions** (with HubSpot context):
+- "Acme, you're currently at $5M in domestic sales. Walk me through how export revenue to the US would fit into your growth plan over the next 2-3 years."
+- "You mentioned your team has limited export experience. What specific capabilities or advisors would you need to bring in to execute this US expansion?"
+- "With your industrial automation equipment, what research have you done on the US market? Who are the competitors you'd be up against?"
+- **Plus: Preliminary Fit Assessment** included at top of document:
+  - "Strong fit: Acme meets CanExport eligibility (Canadian SME, <$10M revenue, 3+ years in business). Strengths: Experienced leadership, innovative products, clear target market (US). Concerns to explore: No prior export experience (will need advisors), limited marketing budget (may need creative cost-sharing approach). Recommended action: Explore their market research depth and assess if they have realistic budget for 50% cost-share."
 
 **IMPORTANT NOTES:**
 - **Always include grantCriteria parameter** when creating interview questions - this triggers strategic generation

@@ -498,6 +498,10 @@ export const GOOGLE_DOCS_TOOLS = [
           type: 'string',
           description: 'Optional: For interview-questions documents, provide the grant program\'s evaluation criteria to dynamically generate ~10 focused interview questions tailored to the specific grant. Include key areas like: eligibility requirements, evaluation factors, program priorities, and any specific assessment dimensions. When provided, overrides static templates with AI-generated questions. Example: "CanExport evaluates: export readiness (market research, capacity), international growth strategy, project viability, financial capacity, and team experience. Priorities: first-time exporters, innovative products, emerging markets."'
         },
+        companyContext: {
+          type: 'string',
+          description: 'Optional: For interview-questions documents, provide company information from HubSpot (obtained via load_company_context tool) to generate company-specific questions and preliminary fit assessment. Include: company name, industry, size, revenue, current activities, stage, key challenges. When provided with grantCriteria, questions will be tailored to this specific company\'s situation and a preliminary fit assessment will be included. Example: "Acme Corp - Manufacturing, 50 employees, $5M revenue, currently selling domestically in Canada, looking to expand to US market, challenges: limited marketing budget, no prior export experience."'
+        },
         parentFolderId: {
           type: 'string',
           description: 'Optional: Google Drive folder ID to create the document in. If not provided, creates in user\'s root Drive.'

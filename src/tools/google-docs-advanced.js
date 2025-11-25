@@ -1367,9 +1367,10 @@ function replacePlaceholders(text, data) {
  * @param {string} grantType - Type of grant (hiring, market-expansion, etc.)
  * @param {string} grantCriteria - Grant program's evaluation criteria
  * @param {Object} data - Optional data for placeholders (program_name, client_name, etc.)
- * @returns {Promise<Object>} Template structure with generated questions
+ * @param {string} companyContext - Optional company information from HubSpot for company-specific questions
+ * @returns {Promise<Object>} Template structure with generated questions and optional fit assessment
  */
-async function generateInterviewQuestionsFromCriteria(grantType, grantCriteria, data = {}) {
+async function generateInterviewQuestionsFromCriteria(grantType, grantCriteria, data = {}, companyContext = null) {
   const anthropic = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY
   });
@@ -1382,7 +1383,54 @@ async function generateInterviewQuestionsFromCriteria(grantType, grantCriteria, 
     day: 'numeric'
   });
 
-  const prompt = `You are creating strategic interview questions for Granted Consulting's grant readiness assessment. These questions will be used by consultants to assess whether a client is a good fit for this grant program.
+  let prompt;
+
+  if (companyContext) {
+    // Company-specific questions with fit assessment
+    prompt = `You are creating strategic interview questions for Granted Consulting's grant readiness assessment for a SPECIFIC COMPANY. These questions will be used by consultants to assess this company's fit for this grant program.
+
+GRANT PROGRAM CRITERIA:
+${grantCriteria}
+
+COMPANY INFORMATION (from HubSpot CRM):
+${companyContext}
+
+YOUR TASK:
+1. Generate exactly 10 strategic interview questions TAILORED TO THIS SPECIFIC COMPANY
+2. Provide a preliminary fit assessment (2-3 sentences)
+
+QUESTION DESIGN - COMPANY-SPECIFIC APPROACH:
+- **Reference their situation** - Questions should reflect what you know about them (e.g., "Given you're currently selling domestically..." or "With your manufacturing background...")
+- **Probe their specific gaps** - Based on company info, what might be missing for this grant? Ask questions that reveal those areas
+- **Strategic, not checklist** - Don't ask "Do you meet X?" Ask questions that reveal WHETHER they meet X
+- **Consultative tone** - Help them think through their specific situation
+
+EXAMPLES OF COMPANY-SPECIFIC QUESTIONS:
+- For $5M manufacturing company targeting exports: "You're currently at $5M in domestic sales - walk me through how export revenue would fit into your growth plan over the next 2-3 years."
+- For company with no export experience applying to CanExport: "You mentioned you haven't exported before. What's driving your interest in [target market] specifically, versus other international opportunities?"
+- For 50-person team applying for innovation grant: "With your current team of 50, how would you structure the innovation project team? What skills do you have in-house vs need to bring in?"
+
+FIT ASSESSMENT GUIDANCE:
+Based on company info and grant criteria, provide honest preliminary assessment:
+- **Strong fit** if they clearly align with eligibility and priorities
+- **Moderate fit** if they meet basics but have gaps or concerns
+- **Weak fit** if significant eligibility issues or misalignment with priorities
+Include specific reasons (1-2 strengths, 1-2 concerns or gaps to explore in interview)
+
+FORMAT:
+Return your response in this exact format:
+
+PRELIMINARY FIT ASSESSMENT:
+[2-3 sentences assessing fit level and key reasons]
+
+INTERVIEW QUESTIONS:
+1. [Company-specific strategic question]
+2. [Question tailored to their situation]
+...
+10. [Question assessing their specific capacity or impact]`;
+  } else {
+    // Generic questions without company context
+    prompt = `You are creating strategic interview questions for Granted Consulting's grant readiness assessment. These questions will be used by consultants to assess whether a client is a good fit for this grant program.
 
 GRANT PROGRAM CRITERIA:
 ${grantCriteria}
@@ -1420,6 +1468,7 @@ Example format:
 2. [Question uncovering project scope and motivation]
 ...
 10. [Question assessing capacity or impact]`;
+  }`;
 
   try {
     const message = await anthropic.messages.create({
@@ -1433,15 +1482,50 @@ Example format:
 
     const responseText = message.content[0].text;
 
-    // Parse the numbered questions
-    const lines = responseText.trim().split('\n').filter(line => line.trim());
-    const questions = [];
+    let fitAssessment = null;
+    let questions = [];
 
-    for (const line of lines) {
-      // Match patterns like "1. Question text" or "1) Question text"
-      const match = line.match(/^\d+[\.)]\s*(.+)$/);
-      if (match) {
-        questions.push(match[1].trim());
+    if (companyContext) {
+      // Parse company-specific response with fit assessment
+      const sections = responseText.split(/INTERVIEW QUESTIONS:/i);
+
+      if (sections.length >= 2) {
+        // Extract fit assessment
+        const assessmentSection = sections[0];
+        const assessmentMatch = assessmentSection.match(/PRELIMINARY FIT ASSESSMENT:?\s*\n?(.*)/is);
+        if (assessmentMatch) {
+          fitAssessment = assessmentMatch[1].trim();
+        }
+
+        // Extract questions from second section
+        const questionsText = sections[1];
+        const lines = questionsText.trim().split('\n').filter(line => line.trim());
+
+        for (const line of lines) {
+          const match = line.match(/^\d+[\.)]\s*(.+)$/);
+          if (match) {
+            questions.push(match[1].trim());
+          }
+        }
+      } else {
+        // Fallback if format wasn't followed exactly
+        console.warn('Expected format not found, trying to parse questions only');
+        const lines = responseText.trim().split('\n').filter(line => line.trim());
+        for (const line of lines) {
+          const match = line.match(/^\d+[\.)]\s*(.+)$/);
+          if (match) {
+            questions.push(match[1].trim());
+          }
+        }
+      }
+    } else {
+      // Parse generic questions (original logic)
+      const lines = responseText.trim().split('\n').filter(line => line.trim());
+      for (const line of lines) {
+        const match = line.match(/^\d+[\.)]\s*(.+)$/);
+        if (match) {
+          questions.push(match[1].trim());
+        }
       }
     }
 
@@ -1451,35 +1535,61 @@ Example format:
     }
 
     // Build template structure matching static template format
-    return {
-      sections: [
-        {
-          type: 'title',
-          text: `${program_name} Interview Questions`,
-          style: 'title-large'
-        },
-        {
-          type: 'paragraph',
-          text: `Client: ${client_name}`
-        },
-        {
-          type: 'paragraph',
-          text: `Date: ${interview_date}`
-        },
-        {
-          type: 'divider'
-        },
+    const sections = [
+      {
+        type: 'title',
+        text: `${program_name} Interview Questions`,
+        style: 'title-large'
+      },
+      {
+        type: 'paragraph',
+        text: `Client: ${client_name}`
+      },
+      {
+        type: 'paragraph',
+        text: `Date: ${interview_date}`
+      },
+      {
+        type: 'divider'
+      }
+    ];
+
+    // Add fit assessment if we have it
+    if (fitAssessment && companyContext) {
+      sections.push(
         {
           type: 'header',
           level: 2,
-          text: 'Interview Questions',
+          text: 'Preliminary Fit Assessment',
           style: 'header-branded'
         },
         {
-          type: 'numbered-questions',
-          items: questions
+          type: 'callout',
+          text: fitAssessment,
+          style: 'callout-info'
+        },
+        {
+          type: 'divider'
         }
-      ],
+      );
+    }
+
+    // Add interview questions
+    sections.push(
+      {
+        type: 'header',
+        level: 2,
+        text: 'Interview Questions',
+        style: 'header-branded'
+      },
+      {
+        type: 'numbered-questions',
+        items: questions
+      }
+    );
+
+    return {
+      sections,
       defaultData: {
         program_name,
         client_name,
@@ -1494,7 +1604,7 @@ Example format:
 }
 
 export async function createAdvancedDocumentTool(input, context) {
-  const { title, grantType, documentType, data = {}, grantCriteria, parentFolderId } = input;
+  const { title, grantType, documentType, data = {}, grantCriteria, companyContext, parentFolderId } = input;
   const { userId } = context || {};
 
   console.log(`📄 Creating advanced document: ${title}`);
@@ -1503,6 +1613,9 @@ export async function createAdvancedDocumentTool(input, context) {
   console.log(`   User ID: ${userId}`);
   if (grantCriteria) {
     console.log(`   Dynamic generation: Using grant criteria to generate questions`);
+  }
+  if (companyContext) {
+    console.log(`   Company-specific: Using HubSpot context to tailor questions`);
   }
 
   try {
@@ -1525,8 +1638,11 @@ export async function createAdvancedDocumentTool(input, context) {
     let template;
     if (documentType === 'interview-questions' && grantCriteria) {
       console.log(`   🧠 Dynamically generating interview questions based on grant criteria...`);
-      template = await generateInterviewQuestionsFromCriteria(grantType, grantCriteria, data);
+      template = await generateInterviewQuestionsFromCriteria(grantType, grantCriteria, data, companyContext);
       console.log(`   ✓ Generated ${template.sections.filter(s => s.type === 'numbered-questions')[0]?.items?.length || 0} questions`);
+      if (companyContext) {
+        console.log(`   ✓ Included company-specific questions and preliminary fit assessment`);
+      }
     } else {
       // Get static template
       template = getTemplate(grantType, documentType);
