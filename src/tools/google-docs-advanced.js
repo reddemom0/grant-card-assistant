@@ -921,8 +921,18 @@ export function generateGrantedHeaderRequests() {
   let offset;
 
   // Check if we have a valid logo URL
-  // Temporarily disabled until logo is properly configured in Railway
-  const hasLogo = false; // LOGO_URL && !LOGO_URL.includes('PLACEHOLDER');
+  // Must be set via GRANTED_LOGO_URL env var and not contain PLACEHOLDER
+  // Must also start with http:// or https:// to be valid
+  const hasLogo = LOGO_URL &&
+                  !LOGO_URL.includes('PLACEHOLDER') &&
+                  (LOGO_URL.startsWith('http://') || LOGO_URL.startsWith('https://'));
+
+  // Log logo status for debugging
+  if (hasLogo) {
+    console.log(`   🖼️  Using logo: ${LOGO_URL.substring(0, 50)}...`);
+  } else {
+    console.log(`   📝 Using text header (GRANTED_LOGO_URL not configured)`);
+  }
 
   if (hasLogo) {
     // Insert logo image at the top
