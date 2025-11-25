@@ -460,8 +460,8 @@ function generatePhase3CellPopulation(document, tableMarkers) {
           continue;
         }
 
-        // Use ACTUAL cell paragraph startIndex + 1 to insert inside the paragraph
-        const insertIndex = cellContent.startIndex + 1;
+        // Use ACTUAL cell paragraph startIndex (empty cells only have 1 char - the newline)
+        const insertIndex = cellContent.startIndex;
         const headerText = tableInfo.headers[col];
 
         // Insert header text
@@ -515,8 +515,8 @@ function generatePhase3CellPopulation(document, tableMarkers) {
           continue;
         }
 
-        // Use ACTUAL cell paragraph startIndex + 1
-        const insertIndex = cellContent.startIndex + 1;
+        // Use ACTUAL cell paragraph startIndex (empty cells only have 1 char - the newline)
+        const insertIndex = cellContent.startIndex;
         const cellText = rowData[col];
 
         requests.push({
