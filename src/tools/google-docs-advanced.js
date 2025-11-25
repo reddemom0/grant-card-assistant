@@ -643,7 +643,7 @@ export function markdownToGrantedDocsRequests(content, startIndex = 1) {
       currentIndex += text.length;
       i++;
     }
-    // Subsection (### ) - Regular heading style
+    // Subsection (### ) - Blue heading style (same as level 1 but smaller)
     else if (line.startsWith('### ')) {
       const text = line.substring(4) + '\n';
       const startIndex = currentIndex;
@@ -655,6 +655,7 @@ export function markdownToGrantedDocsRequests(content, startIndex = 1) {
         }
       });
 
+      // Make it blue, bold, and medium size (matching level 1 but 14pt instead of 17pt)
       requests.push({
         updateTextStyle: {
           range: {
@@ -664,11 +665,12 @@ export function markdownToGrantedDocsRequests(content, startIndex = 1) {
           textStyle: {
             bold: true,
             fontSize: {
-              magnitude: 12,
+              magnitude: 14,
               unit: 'PT'
-            }
+            },
+            foregroundColor: BRAND_COLORS.HEADER_BLUE
           },
-          fields: 'bold,fontSize'
+          fields: 'bold,fontSize,foregroundColor'
         }
       });
 
@@ -1077,10 +1079,10 @@ function templateToMarkdown(template, data) {
         break;
 
       case 'question':
-        // Questions should be in italic
+        // Questions should be in bold+italic
         const questionNum = section.number ? `**${section.number}.** ` : '';
         const questionText = replacePlaceholders(section.text, mergedData);
-        lines.push(`${questionNum}*${questionText}*`);
+        lines.push(`${questionNum}***${questionText}***`);
 
         // Add follow-up text if present
         if (section.followup && section.followup.length > 0) {
