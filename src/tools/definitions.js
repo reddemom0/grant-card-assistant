@@ -472,7 +472,7 @@ export const GOOGLE_DOCS_TOOLS = [
   },
   {
     name: 'create_advanced_document',
-    description: 'Create a properly formatted Google Doc from template configuration using Google Docs API v1 (NOT markdown). Supports Readiness Assessments, Interview Questions, and Evaluation Rubrics for hiring, market-expansion, training, rd, loan, and investment grant types. Documents include branded formatting, structured tables, callouts, and placeholders for client data.',
+    description: 'Create a properly formatted Google Doc from template configuration using Google Docs API v1 (NOT markdown). Supports Readiness Assessments, Interview Questions, and Evaluation Rubrics for hiring, market-expansion, training, rd, loan, and investment grant types. Documents include branded formatting, structured tables, callouts, and placeholders for client data. For interview questions, can dynamically generate questions based on grant criteria instead of using static templates.',
     input_schema: {
       type: 'object',
       properties: {
@@ -493,6 +493,10 @@ export const GOOGLE_DOCS_TOOLS = [
         data: {
           type: 'object',
           description: 'Optional: Data to populate template placeholders (e.g., { client_name: "Acme Corp", program_name: "CanExport SMEs" }). Each template has default placeholders that can be overridden.'
+        },
+        grantCriteria: {
+          type: 'string',
+          description: 'Optional: For interview-questions documents, provide the grant program\'s evaluation criteria to dynamically generate ~10 focused interview questions tailored to the specific grant. Include key areas like: eligibility requirements, evaluation factors, program priorities, and any specific assessment dimensions. When provided, overrides static templates with AI-generated questions. Example: "CanExport evaluates: export readiness (market research, capacity), international growth strategy, project viability, financial capacity, and team experience. Priorities: first-time exporters, innovative products, emerging markets."'
         },
         parentFolderId: {
           type: 'string',

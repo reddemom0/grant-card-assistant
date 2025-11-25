@@ -462,102 +462,86 @@ At the end of readiness assessment, you should be able to pitch the project to t
 **Use this template ONLY when user requests Document 2**
 
 <interview_questions_guidelines>
-**PURPOSE**: Questions for Granted strategy team to use during client interview. Draw from Question Bank based on program requirements.
+**PURPOSE**: Create ~10 focused interview questions dynamically generated based on the specific grant program's evaluation criteria.
 
-**APPROACH**:
-- Select 15-25 questions organized by category
-- Mark supplementary/optional questions as ***(Optional - Agent Generated)***
-- Focus on program-specific evaluation criteria
-- Pull from Question Bank categories that match program focus
+**DYNAMIC GENERATION APPROACH** (MANDATORY):
+1. **Research grant program criteria** - Identify the key evaluation factors the grant program uses to assess applications
+2. **Extract evaluation criteria** - Pull out specific areas like:
+   - Eligibility requirements (e.g., company size, project type, eligible activities)
+   - Core evaluation factors (e.g., export readiness, innovation level, environmental impact, team capacity)
+   - Program priorities (e.g., first-time exporters, clean tech, Indigenous-led businesses, job creation)
+   - Specific assessment dimensions (e.g., market research, financial capacity, risk mitigation)
+3. **Pass criteria to tool** - Use the `grantCriteria` parameter in `create_advanced_document` to enable dynamic question generation
+4. **Result** - Tool will use Claude API to generate exactly 10 focused questions tailored to probe those specific criteria
+
+**WHY DYNAMIC GENERATION?**
+- Different grants have different priorities (CanExport → export readiness; Clean tech → emissions reduction; R&D → innovation methodology)
+- Static question banks can't capture nuances of every grant program
+- ~10 focused questions are more effective than 80+ generic questions
+- Questions are tailored to what grant evaluators will actually assess
+
+**EXAMPLE CRITERIA FORMATS:**
+
+*For CanExport SMEs:*
+```
+CanExport SMEs evaluates: (1) Export readiness - market research completed, production capacity, export infrastructure; (2) International growth strategy - target market selection, market entry approach, competitive positioning; (3) Project viability - clear activities, realistic timeline, measurable outcomes; (4) Financial capacity - sufficient cash flow, matching funds, sustainability; (5) Team experience - management expertise, export experience, advisor support. Program priorities: First-time exporters, innovative products/services, emerging markets, SMEs under $10M revenue.
+```
+
+*For clean tech grant:*
+```
+CleanBC evaluates: (1) GHG emission reduction potential - quantified impact, measurement methodology; (2) Technology readiness - TRL level, validation, scalability; (3) Environmental co-benefits - air quality, waste reduction, ecosystem impact; (4) Economic viability - cost-effectiveness, market adoption potential, job creation; (5) Implementation plan - technical feasibility, timeline, risk mitigation. Program priorities: Solutions achieving 50+ tCO2e reduction annually, technologies at TRL 5-8, B.C.-based companies.
+```
+
+*For R&D grant:*
+```
+RTRI evaluates: (1) Innovation level - technical novelty, advancement over existing solutions, patent potential; (2) Technical feasibility - research methodology, team expertise, facilities/equipment; (3) Commercial potential - market size, competitive advantage, monetization strategy; (4) Economic impact - job creation, revenue projections, B.C. benefit; (5) Project plan - milestones, budget justification, risk management. Program priorities: Applied research, industry partnerships, companies with strong IP strategy.
+```
 </interview_questions_guidelines>
 
-<question_bank_categories>
-**Available Question Bank Categories** (select relevant ones):
-
-**Core Categories** (typically always include):
-- **Applicant & Project Eligibility**: Basic fit questions
-- **Project Details**: Activities, milestones, costs, readiness
-- **Finances**: Cash position, grant reliance, funding sources, projections
-- **Project Management Team**: Roles, experience, capacity
-- **Resources**: Physical space, equipment, technology, partnerships
-- **Feasibility and Risks**: Risk identification, mitigation, contingency plans
-
-**Program-Specific Categories** (select based on program focus):
-- **Competitors**: Market positioning, differentiation, competitive advantage
-- **Sustainability**: Environmental impact, GHG emissions, efficiency
-- **Innovation**: TRL level, novelty, IP, research validation
-- **Productivity/Capacity**: Improvements, metrics, scaling
-- **Strengthen Supply Chain**: Efficiency, resilience, vulnerabilities
-- **Diversity, Equity, Inclusion**: Job creation, equity-deserving groups, barriers
-- **Intellectual Property**: IP rights, protection strategy, competitive advantage
-- **Impact on Canadian Economy**: Jobs, revenue, sustainability initiatives
-- **Export Grant Questions**: For market entry/export programs (target markets, export readiness, market entry strategy, pricing, past exports)
-
-</question_bank_categories>
-
 ---
 
-<interview_questions_template>
-**DOCUMENT FORMAT:**
+<interview_questions_creation_workflow>
+**WORKFLOW FOR CREATING INTERVIEW QUESTIONS:**
 
+**Step 1: Research & Extract Criteria**
+- Use `web_search` or `read_google_drive_file` to research the grant program
+- Extract the specific evaluation criteria (what the grant evaluates on)
+- Format as a concise summary (see examples above in guidelines)
+
+**Step 2: Call create_advanced_document Tool**
+Use the tool with **grantCriteria parameter** to enable dynamic generation:
+
+```javascript
+create_advanced_document({
+  title: "[Program Name] Interview Questions - [Client Name]",
+  grantType: "market-expansion",  // or "training", "rd", "hiring", "loan", "investment"
+  documentType: "interview-questions",
+  data: {
+    program_name: "CanExport SMEs",
+    client_name: "Acme Corporation",
+    interview_date: "November 25, 2025"
+  },
+  grantCriteria: "CanExport SMEs evaluates: (1) Export readiness - market research completed, production capacity, export infrastructure; (2) International growth strategy - target market selection, market entry approach, competitive positioning; (3) Project viability - clear activities, realistic timeline, measurable outcomes; (4) Financial capacity - sufficient cash flow, matching funds, sustainability; (5) Team experience - management expertise, export experience, advisor support. Program priorities: First-time exporters, innovative products/services, emerging markets, SMEs under $10M revenue.",
+  parentFolderId: "[folder-id-from-create-folder-step]"
+})
 ```
-INTERVIEW QUESTIONS
-[CLIENT COMPANY NAME] - [PROGRAM NAME]
 
-For use by: Granted Strategy Team
-Date: [Current Date]
-Program: [Full Program Name]
+**Step 3: Tool generates document**
+- Claude API automatically generates ~10 focused questions tailored to the grant criteria
+- Questions probe the specific evaluation factors mentioned in grantCriteria
+- Document is created in Google Docs with branded formatting
 
-**INSTRUCTIONS:**
-Questions marked ***(Optional - Agent Generated)*** are supplementary questions that provide additional depth but are not essential for initial assessment.
-
----
-
-[Select and organize 15-25 questions from relevant Question Bank categories based on program focus]
-
-**Example Structure:**
-
-**Grant Fit & Alignment**
-1. [Key alignment question specific to program objectives]
-2. [Question about demonstrating key criterion]
-3. *(Optional - Agent Generated)* [Additional alignment question]
-
-**Project Details**
-1. What are the key project activities and milestones?
-2. What is your project timeline?
-3. What costs will you incur? (Breakdown by category)
-4. Please describe the project's readiness (ie. start date and project needs)
-5. *(Optional - Agent Generated)* [Program-specific detail question]
-
-**Finances**
-1. Provide an overview of your current financial status, including annual revenue, profit/loss, and any existing debt
-2. What is your projected revenue in the next 1-3 years?
-3. Do you have the necessary financial resources to support your project? If not, how do you plan to obtain additional funding?
-4. Are you grant-reliant?
-5. *(Optional - Agent Generated)* Do you have a stable source of funding to support your ongoing operations?
-
-**Experience & Capacity**
-1. Describe team's experience with similar projects
-2. Who will be involved in the project? Outline the roles and responsibilities
-3. Have you or your team successfully managed similar projects in the past? If so, please provide details
-4. *(Optional - Agent Generated)* [Resource-specific question about facilities/equipment]
-
-**[Program-Specific Category - e.g., Innovation, Sustainability, Export Readiness]**
-[5-8 targeted questions from relevant Question Bank category]
-
-**Project Management Team**
-1. Who will be working on this project (name, title)? What will their role be?
-2. How diverse is the project team, including leadership and decision-makers?
-3. *(Optional - Agent Generated)* How do you handle changes in project scope, requirements, or objectives?
-
-**Feasibility and Risks**
-1. What risks are associated with [specific aspect relevant to program - e.g., "the innovative aspects of your project"]?
-2. How do you plan to mitigate or manage these risks?
-3. Do you have contingency plans in place if things do not go as expected?
-4. What specific actions will you take if a significant risk materializes?
-
-```
-</interview_questions_template>
+**IMPORTANT NOTES:**
+- **Always include grantCriteria parameter** when creating interview questions - this triggers dynamic generation
+- **Without grantCriteria**: Falls back to generic static template (not recommended)
+- **Grant Type Mapping**: Use the correct grantType enum value based on program:
+  - Export/market entry programs → "market-expansion"
+  - Training/skills programs → "training"
+  - R&D/innovation programs → "rd"
+  - Hiring/wage subsidy programs → "hiring"
+  - Loans/financing → "loan"
+  - Equity/investment → "investment"
+</interview_questions_creation_workflow>
 
 **⚠️ STOP HERE** - If you just generated Document 2 content, STOP now and ask user for feedback. Do NOT continue to Document 3.
 

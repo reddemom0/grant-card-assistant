@@ -6,6 +6,7 @@
 import { google } from 'googleapis';
 import { getTemplate } from './doc-templates/index.js';
 import { createGoogleDocFromTemplate } from './google-docs-construction.js';
+import Anthropic from '@anthropic-ai/sdk';
 
 /**
  * Logo URL - can be overridden via GRANTED_LOGO_URL environment variable
@@ -1361,14 +1362,132 @@ function replacePlaceholders(text, data) {
   });
 }
 
+/**
+ * Dynamically generate interview questions based on grant criteria using Claude API
+ * @param {string} grantType - Type of grant (hiring, market-expansion, etc.)
+ * @param {string} grantCriteria - Grant program's evaluation criteria
+ * @param {Object} data - Optional data for placeholders (program_name, client_name, etc.)
+ * @returns {Promise<Object>} Template structure with generated questions
+ */
+async function generateInterviewQuestionsFromCriteria(grantType, grantCriteria, data = {}) {
+  const anthropic = new Anthropic({
+    apiKey: process.env.ANTHROPIC_API_KEY
+  });
+
+  const program_name = data.program_name || '[Program Name]';
+  const client_name = data.client_name || '[Company Name]';
+  const interview_date = data.interview_date || new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
+  const prompt = `You are creating interview questions for a grant readiness assessment. Generate exactly 10 focused interview questions that Granted Consulting's strategy team can use to assess a client's readiness for this grant program.
+
+GRANT PROGRAM CRITERIA:
+${grantCriteria}
+
+REQUIREMENTS:
+- Generate EXACTLY 10 questions (no more, no less)
+- Questions should probe the key evaluation criteria mentioned above
+- Questions should be open-ended and encourage detailed responses
+- Focus on areas the grant evaluators will assess
+- Questions should help identify gaps in the client's readiness
+- Keep questions professional and interview-appropriate
+- Questions should follow a logical flow from high-level to specific
+
+FORMAT:
+Return ONLY a numbered list of questions (1-10), one per line. Do not include explanations, categories, or any other text. Just the questions.
+
+Example format:
+1. [First question]
+2. [Second question]
+...
+10. [Tenth question]`;
+
+  try {
+    const message = await anthropic.messages.create({
+      model: 'claude-3-5-haiku-20241022',
+      max_tokens: 2000,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    const responseText = message.content[0].text;
+
+    // Parse the numbered questions
+    const lines = responseText.trim().split('\n').filter(line => line.trim());
+    const questions = [];
+
+    for (const line of lines) {
+      // Match patterns like "1. Question text" or "1) Question text"
+      const match = line.match(/^\d+[\.)]\s*(.+)$/);
+      if (match) {
+        questions.push(match[1].trim());
+      }
+    }
+
+    // Validate we got 10 questions
+    if (questions.length < 8 || questions.length > 12) {
+      console.warn(`Generated ${questions.length} questions, expected 10. Using anyway.`);
+    }
+
+    // Build template structure matching static template format
+    return {
+      sections: [
+        {
+          type: 'title',
+          text: `${program_name} Interview Questions`,
+          style: 'title-large'
+        },
+        {
+          type: 'paragraph',
+          text: `Client: ${client_name}`
+        },
+        {
+          type: 'paragraph',
+          text: `Date: ${interview_date}`
+        },
+        {
+          type: 'divider'
+        },
+        {
+          type: 'header',
+          level: 2,
+          text: 'Interview Questions',
+          style: 'header-branded'
+        },
+        {
+          type: 'numbered-questions',
+          items: questions
+        }
+      ],
+      defaultData: {
+        program_name,
+        client_name,
+        interview_date
+      }
+    };
+
+  } catch (error) {
+    console.error('Error generating interview questions:', error);
+    throw new Error(`Failed to generate interview questions: ${error.message}`);
+  }
+}
+
 export async function createAdvancedDocumentTool(input, context) {
-  const { title, grantType, documentType, data = {}, parentFolderId } = input;
+  const { title, grantType, documentType, data = {}, grantCriteria, parentFolderId } = input;
   const { userId } = context || {};
 
   console.log(`📄 Creating advanced document: ${title}`);
   console.log(`   Grant Type: ${grantType}`);
   console.log(`   Document Type: ${documentType}`);
   console.log(`   User ID: ${userId}`);
+  if (grantCriteria) {
+    console.log(`   Dynamic generation: Using grant criteria to generate questions`);
+  }
 
   try {
     // Validate required fields
@@ -1386,16 +1505,23 @@ export async function createAdvancedDocumentTool(input, context) {
       };
     }
 
-    // Get template
-    const template = getTemplate(grantType, documentType);
-    if (!template) {
-      return {
-        success: false,
-        error: `No template found for grant type "${grantType}" and document type "${documentType}"`
-      };
+    // Check if we should dynamically generate interview questions
+    let template;
+    if (documentType === 'interview-questions' && grantCriteria) {
+      console.log(`   🧠 Dynamically generating interview questions based on grant criteria...`);
+      template = await generateInterviewQuestionsFromCriteria(grantType, grantCriteria, data);
+      console.log(`   ✓ Generated ${template.sections.filter(s => s.type === 'numbered-questions')[0]?.items?.length || 0} questions`);
+    } else {
+      // Get static template
+      template = getTemplate(grantType, documentType);
+      if (!template) {
+        return {
+          success: false,
+          error: `No template found for grant type "${grantType}" and document type "${documentType}"`
+        };
+      }
+      console.log(`   ✓ Template found`);
     }
-
-    console.log(`   ✓ Template found`);
 
     // Get user's OAuth credentials
     const { query } = await import('../database/connection.js');
