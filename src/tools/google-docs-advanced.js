@@ -1713,36 +1713,186 @@ NEXT STEPS:
 
     const responseText = message.content[0].text;
 
-    // Build template structure - we'll put the generated rubric into a single large text block
-    // since the rubric structure is complex with nested sections
-    return {
-      sections: [
-        {
-          type: 'title',
-          text: `Evaluation Rubric: ${program_name}`,
-          style: 'title-large'
-        },
-        {
-          type: 'paragraph',
-          text: `Client: ${client_name}`
-        },
-        {
-          type: 'paragraph',
-          text: `For use by: Granted RA Team`
-        },
-        {
-          type: 'paragraph',
-          text: `Date: ${evaluation_date}`
-        },
-        {
-          type: 'divider'
-        },
-        {
-          type: 'paragraph',
-          text: responseText,
-          style: 'preserve-formatting'
+    // Parse the generated rubric into structured sections with proper formatting
+    const sections = [
+      {
+        type: 'title',
+        text: `Evaluation Rubric: ${program_name}`,
+        style: 'title-large'
+      },
+      {
+        type: 'paragraph',
+        text: `Client: ${client_name}`
+      },
+      {
+        type: 'paragraph',
+        text: `For use by: Granted RA Team`
+      },
+      {
+        type: 'paragraph',
+        text: `Date: ${evaluation_date}`
+      },
+      {
+        type: 'divider'
+      }
+    ];
+
+    // Parse the response text into formatted sections
+    const lines = responseText.split('\n');
+    let currentSection = null;
+    let currentCriteria = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      if (!line) continue;
+
+      // SCORING GUIDE header
+      if (line.match(/^SCORING GUIDE:?$/i)) {
+        sections.push({
+          type: 'header',
+          level: 2,
+          text: 'SCORING GUIDE',
+          style: 'header-branded'
+        });
+        continue;
+      }
+
+      // Major category headers (A. CATEGORY NAME)
+      if (line.match(/^[A-F]\.\s+[A-Z\s&]+$/)) {
+        sections.push({
+          type: 'header',
+          level: 2,
+          text: line,
+          style: 'header-branded'
+        });
+        continue;
+      }
+
+      // Sub-criterion headers (A1. Sub-criterion name)
+      if (line.match(/^[A-F]\d+\.\s+.+$/)) {
+        // If we have accumulated criteria from previous sub-criterion, add scoring table
+        if (currentCriteria.length > 0) {
+          sections.push({
+            type: 'table',
+            headers: ['Score (1-10)', 'What\'s Strong', 'What\'s Missing', 'Recommendations'],
+            rows: [
+              ['', '', '', '']
+            ],
+            style: 'evaluation-table'
+          });
+          currentCriteria = [];
         }
-      ],
+
+        sections.push({
+          type: 'subheader',
+          text: line,
+          style: 'subheader-branded'
+        });
+        continue;
+      }
+
+      // "Evaluation criteria:" label
+      if (line.match(/^Evaluation criteria:?$/i)) {
+        sections.push({
+          type: 'paragraph',
+          text: 'Evaluation criteria:',
+          style: 'bold'
+        });
+        continue;
+      }
+
+      // Bullet points (• or - at start)
+      if (line.match(/^[•\-]\s+.+$/)) {
+        const text = line.replace(/^[•\-]\s+/, '');
+        currentCriteria.push(text);
+        sections.push({
+          type: 'bullet',
+          text: text
+        });
+        continue;
+      }
+
+      // OVERALL ASSESSMENT header
+      if (line.match(/^OVERALL ASSESSMENT:?$/i)) {
+        // Add final scoring table if we have criteria
+        if (currentCriteria.length > 0) {
+          sections.push({
+            type: 'table',
+            headers: ['Score (1-10)', 'What\'s Strong', 'What\'s Missing', 'Recommendations'],
+            rows: [
+              ['', '', '', '']
+            ],
+            style: 'evaluation-table'
+          });
+          currentCriteria = [];
+        }
+
+        sections.push({
+          type: 'header',
+          level: 2,
+          text: 'OVERALL ASSESSMENT',
+          style: 'header-branded'
+        });
+        continue;
+      }
+
+      // OVERALL RECOMMENDATION header
+      if (line.match(/^OVERALL RECOMMENDATION:?/i)) {
+        sections.push({
+          type: 'header',
+          level: 3,
+          text: 'OVERALL RECOMMENDATION',
+          style: 'subheader-branded'
+        });
+        const recommendation = line.replace(/^OVERALL RECOMMENDATION:?\s*/i, '');
+        if (recommendation) {
+          sections.push({
+            type: 'paragraph',
+            text: recommendation,
+            style: 'bold'
+          });
+        }
+        continue;
+      }
+
+      // Section headers (RATIONALE, REQUIRED ACTIONS, NEXT STEPS)
+      if (line.match(/^(RATIONALE|REQUIRED ACTIONS|NEXT STEPS):?$/i)) {
+        sections.push({
+          type: 'header',
+          level: 3,
+          text: line.replace(/:$/, ''),
+          style: 'subheader-branded'
+        });
+        continue;
+      }
+
+      // Regular paragraphs or list items
+      if (line.match(/^\d+\.\s+/)) {
+        // Numbered list item
+        sections.push({
+          type: 'numbered-list-item',
+          text: line.replace(/^\d+\.\s+/, '')
+        });
+      } else if (line.includes(':')) {
+        // Key-value pairs (like "A. Technology Viability: 25%")
+        sections.push({
+          type: 'paragraph',
+          text: line,
+          style: 'normal'
+        });
+      } else if (line.length > 0) {
+        // Regular paragraph
+        sections.push({
+          type: 'paragraph',
+          text: line,
+          style: 'normal'
+        });
+      }
+    }
+
+    return {
+      sections,
       defaultData: {
         program_name,
         client_name,
