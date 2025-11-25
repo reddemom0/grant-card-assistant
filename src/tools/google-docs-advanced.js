@@ -524,7 +524,8 @@ export function generateGrantedHeaderRequests() {
   let offset;
 
   // Check if we have a valid logo URL
-  const hasLogo = LOGO_URL && !LOGO_URL.includes('PLACEHOLDER');
+  // Temporarily disabled until logo is properly configured in Railway
+  const hasLogo = false; // LOGO_URL && !LOGO_URL.includes('PLACEHOLDER');
 
   if (hasLogo) {
     // Insert logo image at the top
