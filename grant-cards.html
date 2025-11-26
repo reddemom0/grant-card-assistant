@@ -1187,13 +1187,16 @@
                         <div style="margin-top: 1.5rem;">
                             <div style="font-size: 0.9rem; font-weight: 600; color: var(--granted-blue); margin-bottom: 0.75rem;">Quick Actions:</div>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                                <button class="quick-btn" onclick="insertQuickText('Search Criteria')">🔍 Search</button>
-                                <button class="quick-btn" onclick="insertQuickText('Preview Description')">👁️ Preview</button>
-                                <button class="quick-btn" onclick="insertQuickText('General Requirements')">📝 Requirements</button>
-                                <button class="quick-btn" onclick="insertQuickText('Grant Criteria')">📋 Criteria</button>
-                                <button class="quick-btn" onclick="insertQuickText('Granted Insights')">💡 Insights</button>
-                                <button class="quick-btn" onclick="insertQuickText('Categories')">🏷️ Categories</button>
-                                <button class="quick-btn" onclick="insertQuickText('Missing Info')">❓ Missing</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Search Criteria')">🔍 Search</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Preview Description')">👁️ Preview</button>
+                                <button class="quick-btn" onclick="sendQuickTask('General Requirements')">📝 Requirements</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Recent Changes')">🔄 Changes</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Grant Criteria')">📋 Criteria</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Best Practices & Forms')">📚 Best Practices</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Granted Insights')">💡 Insights</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Granted Notes')">📝 Notes</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Categories & Tags')">🏷️ Categories</button>
+                                <button class="quick-btn" onclick="sendQuickTask('Missing Information')">❓ Missing</button>
                             </div>
                         </div>
 
@@ -1223,12 +1226,16 @@
     <!-- Floating Input Area -->
     <div class="floating-input">
         <div class="floating-quick-actions">
-            <button class="floating-quick-btn" onclick="insertQuickText('Generate Criteria')" data-task="grant-criteria">📋 Criteria</button>
-            <button class="floating-quick-btn" onclick="insertQuickText('Preview Description')" data-task="preview">👁️ Preview</button>
-            <button class="floating-quick-btn" onclick="insertQuickText('Requirements')" data-task="requirements">📝 Requirements</button>
-            <button class="floating-quick-btn" onclick="insertQuickText('Insights')" data-task="insights">💡 Insights</button>
-            <button class="floating-quick-btn" onclick="insertQuickText('Categories')" data-task="categories">🏷️ Categories</button>
-            <button class="floating-quick-btn" onclick="insertQuickText('Missing Info')" data-task="missing-info">🔍 Missing</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Search Criteria')" data-task="search-criteria">🔍 Search</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Preview Description')" data-task="preview">👁️ Preview</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('General Requirements')" data-task="requirements">📝 Requirements</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Recent Changes')" data-task="recent-changes">🔄 Changes</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Grant Criteria')" data-task="grant-criteria">📋 Criteria</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Best Practices & Forms')" data-task="best-practices">📚 Best Practices</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Granted Insights')" data-task="insights">💡 Insights</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Granted Notes')" data-task="granted-notes">📝 Notes</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Categories & Tags')" data-task="categories">🏷️ Categories</button>
+            <button class="floating-quick-btn" onclick="sendQuickTask('Missing Information')" data-task="missing-info">❓ Missing</button>
         </div>
         <div class="simple-input-box" id="input-box">
             <input type="file" id="file-input" accept=".pdf,.doc,.docx,.txt,.md,.jpg,.jpeg,.png,.gif,.bmp,.tiff" multiple style="display: none;">
@@ -1299,6 +1306,19 @@
                 messageInput.focus();
                 messageInput.style.height = 'auto';
                 messageInput.style.height = messageInput.scrollHeight + 'px';
+            }
+        }
+
+        // Send quick task immediately (for quick action buttons)
+        function sendQuickTask(taskName) {
+            const messageInput = document.getElementById('message-input');
+            if (messageInput && agentInterface) {
+                messageInput.value = taskName;
+                messageInput.style.height = 'auto';
+                messageInput.style.height = messageInput.scrollHeight + 'px';
+
+                // Send the message immediately
+                agentInterface.sendMessage();
             }
         }
 
