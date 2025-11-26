@@ -1154,42 +1154,49 @@
             <div class="messages" id="messages">
                 <div class="message assistant welcome-message" id="welcome-message">
                     <div class="message-content">
-                        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">Welcome! I'm your Grant Card specialist</div>
-                        
-                        <div style="margin-bottom: 1rem;">I help transform raw grant documents into <strong>structured Grant Cards</strong> using Granted Consulting's proven templates and workflows.</div>
-                        
+                        <div style="font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem;">Welcome! I'm your Grant Card Assistant.</div>
+
+                        <div style="margin-bottom: 1rem;">I help you populate individual sections of grant cards by extracting and formatting information from grant program documents.</div>
+
                         <div style="margin-bottom: 1rem;">
-                            <div><strong>Grant Card Workflows:</strong></div>
-                            <div>• <strong>Generate Criteria</strong> - Extract key eligibility and selection criteria</div>
-                            <div>• <strong>Preview Description</strong> - Create compelling grant summaries</div>
-                            <div>• <strong>General Requirements</strong> - Identify application requirements</div>
-                            <div>• <strong>Granted Insights</strong> - Add strategic recommendations</div>
-                            <div>• <strong>Categories & Tags</strong> - Organize and categorize grants</div>
-                            <div>• <strong>Missing Information</strong> - Identify gaps in documentation</div>
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">How I work:</div>
+                            <div>• You request ONE section at a time</div>
+                            <div>• I generate formatted content for that section</div>
+                            <div>• You copy/paste into your grant card form</div>
+                            <div>• Repeat for each section you need</div>
                         </div>
 
                         <div style="background: rgba(0, 138, 191, 0.1); padding: 1rem; border-radius: 8px; margin-bottom: 1rem;">
-                            <div style="font-weight: 600; color: #008ABF; margin-bottom: 0.5rem;">📋 Grant Types Supported</div>
+                            <div style="font-weight: 600; color: #008ABF; margin-bottom: 0.5rem;">10 Sections I can generate:</div>
                             <div style="font-size: 0.9rem; color: #374151;">
-                                <div>• Hiring & Training Grants • Market Expansion • R&D Funding</div>
-                                <div>• Investment Grants • Loan Programs • Export Development</div>
+                                <div>1. <strong>Search Criteria</strong> - Database metadata fields</div>
+                                <div>2. <strong>Preview Description</strong> - 1-2 sentence summary</div>
+                                <div>3. <strong>General Requirements</strong> - High-level eligibility overview</div>
+                                <div>4. <strong>Recent Changes</strong> - Program updates</div>
+                                <div>5. <strong>Grant Criteria</strong> - Detailed eligibility and requirements</div>
+                                <div>6. <strong>Best Practices & Forms</strong> - Application tips and resources</div>
+                                <div>7. <strong>Granted Insights</strong> - Strategic competitive advice</div>
+                                <div>8. <strong>Granted Notes</strong> - Internal staff guidance</div>
+                                <div>9. <strong>Categories & Tags</strong> - Classification metadata</div>
+                                <div>10. <strong>Missing Information</strong> - Gap analysis</div>
                             </div>
                         </div>
 
-                        <div>Upload grant documents, provide URLs, or describe the grant program you need formatted into a professional Grant Card!</div>
-                        
+                        <div style="margin-bottom: 1rem;">Upload your grant document and tell me which section you need!</div>
+
                         <div style="margin-top: 1.5rem;">
                             <div style="font-size: 0.9rem; font-weight: 600; color: var(--granted-blue); margin-bottom: 0.75rem;">Quick Actions:</div>
                             <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-                                <button class="quick-btn" onclick="insertQuickText('Generate Criteria')">📋 Criteria</button>
+                                <button class="quick-btn" onclick="insertQuickText('Search Criteria')">🔍 Search</button>
                                 <button class="quick-btn" onclick="insertQuickText('Preview Description')">👁️ Preview</button>
-                                <button class="quick-btn" onclick="insertQuickText('Requirements')">📝 Requirements</button>
-                                <button class="quick-btn" onclick="insertQuickText('Insights')">💡 Insights</button>
+                                <button class="quick-btn" onclick="insertQuickText('General Requirements')">📝 Requirements</button>
+                                <button class="quick-btn" onclick="insertQuickText('Grant Criteria')">📋 Criteria</button>
+                                <button class="quick-btn" onclick="insertQuickText('Granted Insights')">💡 Insights</button>
                                 <button class="quick-btn" onclick="insertQuickText('Categories')">🏷️ Categories</button>
-                                <button class="quick-btn" onclick="insertQuickText('Missing Info')">🔍 Missing</button>
+                                <button class="quick-btn" onclick="insertQuickText('Missing Info')">❓ Missing</button>
                             </div>
                         </div>
-                        
+
                         <div style="margin-top: 1.5rem;">
                             <div style="font-size: 0.9rem; font-weight: 600; color: var(--granted-blue); margin-bottom: 0.75rem;">Upload Options:</div>
                             <div style="display: flex; gap: 1rem;">
