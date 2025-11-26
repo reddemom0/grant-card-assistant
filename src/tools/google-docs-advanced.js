@@ -465,6 +465,11 @@ function generatePhase3CellPopulation(document, tableMarkers) {
         const insertIndex = cellContent.startIndex;
         const headerText = tableInfo.headers[col];
 
+        // Skip empty header text (Google Docs API rejects empty insertText)
+        if (!headerText || headerText.trim().length === 0) {
+          continue;
+        }
+
         // Insert header text
         requests.push({
           insertText: {
@@ -519,6 +524,11 @@ function generatePhase3CellPopulation(document, tableMarkers) {
         // Use ACTUAL cell paragraph startIndex (empty cells only have 1 char - the newline)
         const insertIndex = cellContent.startIndex;
         const cellText = rowData[col];
+
+        // Skip empty cell text (Google Docs API rejects empty insertText)
+        if (!cellText || cellText.trim().length === 0) {
+          continue;
+        }
 
         requests.push({
           insertText: {
