@@ -1757,6 +1757,41 @@ NEXT STEPS:
 
       if (!line) continue;
 
+      // Markdown headers (# Header, ## Header, ### Header, #### Header)
+      const markdownHeaderMatch = line.match(/^(#{1,4})\s+(.+)$/);
+      if (markdownHeaderMatch) {
+        const level = markdownHeaderMatch[1].length; // Number of # symbols
+        const headerText = markdownHeaderMatch[2].trim();
+
+        // Map markdown level to our header system
+        if (level === 1) {
+          // # Title → Skip, we already have title
+          sections.push({
+            type: 'header',
+            level: 2,
+            text: headerText,
+            style: 'header-branded'
+          });
+        } else if (level === 2) {
+          // ## Header → Level 2 (blue header)
+          sections.push({
+            type: 'header',
+            level: 2,
+            text: headerText,
+            style: 'header-branded'
+          });
+        } else if (level >= 3) {
+          // ### or #### → Level 3 (subheader)
+          sections.push({
+            type: 'header',
+            level: 3,
+            text: headerText,
+            style: 'subheader-branded'
+          });
+        }
+        continue;
+      }
+
       // SCORING GUIDE header
       if (line.match(/^SCORING GUIDE:?$/i)) {
         sections.push({
