@@ -340,6 +340,40 @@ Business Types: Any Business Type
 **Output:** Only the structured field list, no preambles
 </task>
 
+<task type="recent-changes">
+**Recent Changes Generation**
+
+**Purpose:** Compare current grant program to previous year's version to identify changes in deadlines, funding amounts, eligibility, or requirements.
+
+**Methodology:**
+1. **Current Program Analysis** - Extract key program details from provided documentation (grant name, funder, current year)
+2. **Historical Research** - Use web_search to find previous year's guidelines, announcements, or archived versions
+3. **Change Identification** - Compare current vs previous versions across key areas:
+   - Funding amounts (increased/decreased/unchanged)
+   - Deadline changes (new dates, intake cycles)
+   - Eligibility criteria (new requirements, removed restrictions)
+   - Application process (simplified/more complex, new stages)
+   - Program focus or priorities (new eligible activities, changed objectives)
+4. **Change Documentation** - Document specific changes with effective dates when available
+
+**Output Format:**
+- Bullet list of identified changes
+- Format: "[Change Type] - [Description] (Previous: [X] → Current: [Y])"
+- Include effective dates if available
+- If no changes found or no historical information available: "No documented changes from previous year found" or "Unable to locate previous year's program information for comparison"
+- List most significant changes first (funding/eligibility changes before process changes)
+
+**Example Output:**
+```
+- Funding Amount - Maximum grant increased (Previous: $2M → Current: $3M)
+- Eligibility - Minimum company size requirement removed (Previously required 5+ employees)
+- Deadline - Changed from annual intake to rolling applications (Effective: January 2024)
+- Application Process - New 4-stage evaluation process (Previously 3 stages)
+```
+
+**Output:** Only the changes list with web search findings, no preambles
+</task>
+
 <task type="grant-criteria">
 **Grant Criteria Generation**
 
