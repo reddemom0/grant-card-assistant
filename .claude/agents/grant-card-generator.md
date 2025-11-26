@@ -440,6 +440,74 @@ Forms:
 **Output:** Only the two-section format with extracted content, no preambles
 </task>
 
+<task type="granted-notes">
+**Granted Notes Generation**
+
+**Purpose:** Extract detailed operational information and internal procedural details to help consultants guide clients through the application and claims process.
+
+**Methodology:**
+1. **Process Documentation** - Extract step-by-step application workflow details
+2. **Claims & Reporting** - Document funding disbursement, milestone requirements, reporting obligations
+3. **Contact Extraction** - Identify program contacts, emails, phone numbers
+4. **Operational Details** - Capture timeline specifics, response times, evaluation processes
+
+**Content to Extract:**
+
+**Application Process:**
+- Detailed step-by-step application workflow
+- Response times at each stage
+- What's required at each stage (inquiry form, full application, proposal, etc.)
+- Evaluation process details (who reviews, what they look for)
+- Contract negotiation elements (milestones, reporting, IP terms)
+
+**Claims Process:**
+- How funding is disbursed (milestone-based, reimbursement, advance payment)
+- Reporting requirements (frequency, what must be reported)
+- Documentation needed for claims
+- Timeline for claims processing
+
+**Contact Information:**
+- Program email address
+- Phone numbers
+- Contact person names/titles
+- Regional contacts (if applicable)
+
+**Additional Operational Notes:**
+- Any other procedural details consultants should know
+- Special requirements or considerations
+- Important operational constraints
+
+**Output Format:**
+Organized by subsection headers:
+
+**Application Process**
+- Bullet list of process steps with timelines and requirements
+
+**Claims Process**
+- Bullet list of claims/reporting requirements
+
+**Contact Information**
+- Contact details (email, phone, names)
+
+**Example Output:**
+```
+Application Process
+- Inquiry Form: submit an inquiry form. ICE Fund usually responds in 1-2 weeks
+- Full Project Application, only if the inquiry is accepted (detailed proposal including a budget, technical documentation, financials, etc.)
+- Evaluation: The proposal is reviewed by internal and/or external (technical & business) evaluators
+- Contract Negotiation & Signing (includes milestones, reporting, IP, and other terms)
+
+Claims Process
+- Funding is milestone-based
+- Recipients must report on progress (technical and financial)
+
+Contact Information
+icefund@gov.bc.ca
+```
+
+**Output:** Only the structured operational notes, no preambles
+</task>
+
 <task type="grant-criteria">
 **Grant Criteria Generation**
 
