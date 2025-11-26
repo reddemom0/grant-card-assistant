@@ -374,6 +374,72 @@ Business Types: Any Business Type
 **Output:** Only the changes list with web search findings, no preambles
 </task>
 
+<task type="best-practices">
+**Best Practices & Forms Generation**
+
+**Purpose:** Extract practical application guidance and resource links from grant documentation.
+
+**Methodology:**
+1. **Guidance Extraction** - Identify recommended approaches, encouraged actions, suggested first steps
+2. **Rejection Criteria** - Document immediate disqualification triggers and common mistakes
+3. **Special Considerations** - Note discretionary decisions, concurrent funding options, special circumstances
+4. **Resource Compilation** - Extract all links to forms, webpages, guidelines, portals
+
+**Content to Extract:**
+
+**Best Practices:**
+- Recommended first steps (e.g., inquiry forms, pre-application consultations)
+- Where to find detailed information (evaluation criteria, full requirements)
+- Immediate rejection criteria:
+  - Language/completeness requirements
+  - Eligibility disqualifications
+  - Environmental or negative impact concerns
+- Concurrent funding considerations
+- Discretionary funding decisions or special notes
+- Any "encouraged," "recommended," or "highly suggested" guidance
+- Success factors or helpful tips mentioned in documentation
+
+**Forms & Resources:**
+- Program Webpage link
+- Program Guidelines link
+- Application Portal link (if different from webpage)
+- Inquiry Form link
+- Contact information
+- Any other referenced resources
+
+**Output Format:**
+Two distinct sections:
+
+**Best Practices:**
+- Bullet list of 4-8 actionable items
+- Include sub-bullets for detailed points (e.g., rejection criteria)
+- Focus on what applicants should know before applying
+
+**Forms:**
+- Bullet list with "Resource Name: click here" format
+- Include all available links from source material
+- If no links available: "Resource links not provided in source material"
+
+**Example Output:**
+```
+Best Practices:
+- Applicants are encouraged to complete an Inquiry Form as a first step in the application process
+- Full list of evaluation criteria is available in the program guidelines document
+- Applications can be rejected immediately if:
+  ○ They are not in English, incomplete, or unclear
+  ○ The project or applicant does not meet eligibility requirements
+  ○ The project could cause serious negative effects (e.g., environmental harm)
+- Applicants might have their project considered for funding by another program at the same time
+- The ICE Fund may choose not to fund a project for reasons such as budget limits, how funds are allocated, or whether the project fits the Ministry's goals
+
+Forms:
+- Program Webpage: click here
+- Program Guidelines: click here
+```
+
+**Output:** Only the two-section format with extracted content, no preambles
+</task>
+
 <task type="grant-criteria">
 **Grant Criteria Generation**
 
