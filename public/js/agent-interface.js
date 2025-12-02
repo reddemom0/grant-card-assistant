@@ -96,8 +96,25 @@ class AgentInterface {
      */
     async initializeConversationId() {
         const path = window.location.pathname;
+        const urlParams = new URLSearchParams(window.location.search);
+        const conversationParam = urlParams.get('conversation');
 
-        // Check if URL contains /chat/{conversationId}
+        // Check for ?conversation={conversationId} query parameter (new format)
+        if (conversationParam) {
+            console.log('📖 Loading conversation from URL parameter:', conversationParam);
+            this.conversationId = conversationParam;
+            this.isFirstMessage = false;
+
+            // Load conversation history from server
+            const data = await this.loadConversationHistory();
+            if (data && data.messages) {
+                console.log(`✅ Found ${data.messages.length} messages, restoring UI...`);
+                this.restoreConversationUI(data);
+            }
+            return;
+        }
+
+        // Check if URL contains /chat/{conversationId} (old format)
         if (path.includes('/chat/')) {
             const conversationId = path.split('/chat/')[1].split('?')[0];
 
