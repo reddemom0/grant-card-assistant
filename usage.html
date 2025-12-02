@@ -384,7 +384,7 @@
                         <div class="stat-card">
                             <div class="stat-icon">💬</div>
                             <div class="stat-value">${stats.totalConversations}</div>
-                            <div class="stat-label">Total Tasks</div>
+                            <div class="stat-label">Total Conversations</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">👥</div>
@@ -493,17 +493,6 @@
                                 `).join('')}
                             </tbody>
                         </table>
-
-                        ${data.trainingGaps.length > 0 ? `
-                            <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Training Gaps</h4>
-                            <div style="display: grid; gap: 0.5rem;">
-                                ${data.trainingGaps.map(gap => `
-                                    <div style="padding: 0.75rem; background: var(--background); border-left: 3px solid var(--warning); border-radius: 0.375rem;">
-                                        <strong>${gap.name}</strong> hasn't used: ${gap.unusedAgents.map(a => formatAgentName(a)).join(', ')}
-                                    </div>
-                                `).join('')}
-                            </div>
-                        ` : ''}
                     </div>
                 `;
             } catch (error) {
@@ -548,17 +537,17 @@
                                         ${agent.avgDurationMinutes.toFixed(0)} min average
                                     </div>
                                 </div>
-                                <span class="metric">${agent.totalTasks} tasks</span>
+                                <span class="metric">${agent.totalTasks} conversations</span>
                                 <span class="metric">${agent.tasksPerUser} per user</span>
                             </div>
                         `).join('')}
 
-                        <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Weekly Tasks per Person</h4>
+                        <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Weekly Conversations per Person</h4>
                         <table>
                             <thead>
                                 <tr>
                                     <th>Team Member</th>
-                                    <th>Avg Tasks/Week</th>
+                                    <th>Avg Conversations/Week</th>
                                     <th>Last 4 Weeks</th>
                                 </tr>
                             </thead>
@@ -633,7 +622,7 @@
                             <div class="stat-card">
                                 <div class="stat-icon">💬</div>
                                 <div class="stat-value">${data.teamStats.avgMessagesPerConv}</div>
-                                <div class="stat-label">Avg Messages/Task</div>
+                                <div class="stat-label">Avg Messages/Conversation</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-icon">⭐</div>
@@ -681,7 +670,7 @@
                                                 </div>
                                             </div>
                                             <div style="text-align: right; font-size: 0.875rem;">
-                                                <div><strong>${user.conversationCount}</strong> tasks</div>
+                                                <div><strong>${user.conversationCount}</strong> conversations</div>
                                                 <div style="color: var(--text-secondary);">Quality: ${user.avgQuality}</div>
                                             </div>
                                         </div>
