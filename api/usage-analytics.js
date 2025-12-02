@@ -36,10 +36,19 @@ export default async function handler(req, res) {
         case 'trends':
           return await getUsageTrends(req, res, daysInt);
 
+        case 'team-adoption':
+          return await getTeamAdoptionDashboard(req, res, daysInt);
+
+        case 'productivity-impact':
+          return await getProductivityMetrics(req, res, daysInt);
+
+        case 'individual-performance':
+          return await getIndividualPerformance(req, res, daysInt);
+
         default:
           return res.status(400).json({
             error: 'Invalid action parameter',
-            availableActions: ['overview', 'agent-stats', 'user-activity', 'trends']
+            availableActions: ['overview', 'agent-stats', 'user-activity', 'trends', 'team-adoption', 'productivity-impact', 'individual-performance']
           });
       }
     }
@@ -505,4 +514,351 @@ async function getEngagementStats(days) {
       lowEngaged: parseInt(stats.low_engaged_users) || 0  // Score < 40
     }
   };
+}
+
+/**
+ * INTERNAL TEAM ANALYTICS (12-person team)
+ * Metrics designed for small internal teams, not consumer SaaS
+ */
+
+/**
+ * Get Team Adoption Dashboard
+ * - Who's using which agents?
+ * - Weekly active users out of total team
+ * - Feature discovery gaps
+ */
+async function getTeamAdoptionDashboard(req, res, days) {
+  // Get all users (full team roster)
+  const allUsersResult = await query(`
+    SELECT id, email, name, picture, created_at
+    FROM users
+    ORDER BY name
+  `);
+
+  // Get all available agents
+  const agentsResult = await query(`
+    SELECT DISTINCT agent_type
+    FROM conversations
+    ORDER BY agent_type
+  `);
+
+  const agents = agentsResult.rows.map(r => r.agent_type);
+
+  // Get adoption matrix: user × agent usage
+  const adoptionResult = await query(`
+    SELECT
+      u.id as user_id,
+      u.email,
+      u.name,
+      u.picture,
+      c.agent_type,
+      COUNT(DISTINCT c.id) as conversation_count,
+      MIN(c.created_at) as first_used,
+      MAX(c.updated_at) as last_used
+    FROM users u
+    LEFT JOIN conversations c ON u.id = c.user_id
+    WHERE c.id IS NOT NULL
+    GROUP BY u.id, u.email, u.name, u.picture, c.agent_type
+    ORDER BY u.name, c.agent_type
+  `);
+
+  // Build adoption matrix
+  const adoptionMatrix = allUsersResult.rows.map(user => {
+    const userAdoption = adoptionResult.rows.filter(r => r.user_id === user.id);
+
+    const agentUsage = {};
+    agents.forEach(agent => {
+      const usage = userAdoption.find(a => a.agent_type === agent);
+      agentUsage[agent] = {
+        used: !!usage,
+        conversationCount: usage ? parseInt(usage.conversation_count) : 0,
+        firstUsed: usage ? usage.first_used : null,
+        lastUsed: usage ? usage.last_used : null
+      };
+    });
+
+    return {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      picture: user.picture,
+      agentUsage,
+      totalAgentsUsed: Object.values(agentUsage).filter(a => a.used).length,
+      totalConversations: Object.values(agentUsage).reduce((sum, a) => sum + a.conversationCount, 0)
+    };
+  });
+
+  // Weekly active users (last 7 days)
+  const weeklyActiveResult = await query(`
+    SELECT COUNT(DISTINCT user_id) as active_users
+    FROM conversations
+    WHERE updated_at >= NOW() - INTERVAL '7 days'
+  `);
+
+  // Never-used agents per person
+  const trainingGaps = adoptionMatrix.map(user => ({
+    userId: user.userId,
+    name: user.name,
+    email: user.email,
+    unusedAgents: agents.filter(agent => !user.agentUsage[agent].used),
+    unusedCount: agents.filter(agent => !user.agentUsage[agent].used).length
+  })).filter(u => u.unusedCount > 0);
+
+  return res.status(200).json({
+    success: true,
+    days,
+    teamSize: allUsersResult.rows.length,
+    weeklyActiveUsers: parseInt(weeklyActiveResult.rows[0].active_users) || 0,
+    availableAgents: agents,
+    adoptionMatrix,
+    trainingGaps,
+    summary: {
+      fullyAdopted: adoptionMatrix.filter(u => u.totalAgentsUsed === agents.length).length,
+      partialAdoption: adoptionMatrix.filter(u => u.totalAgentsUsed > 0 && u.totalAgentsUsed < agents.length).length,
+      noUsage: adoptionMatrix.filter(u => u.totalAgentsUsed === 0).length
+    }
+  });
+}
+
+/**
+ * Get Productivity & Impact Metrics
+ * - Average time per task type
+ * - Tasks completed per person per week
+ * - Quality trends over time
+ */
+async function getProductivityMetrics(req, res, days) {
+  // Average session duration per agent type
+  const agentProductivityResult = await query(`
+    SELECT
+      c.agent_type,
+      COUNT(DISTINCT c.id) as total_tasks,
+      COUNT(DISTINCT c.user_id) as users_count
+    FROM conversations c
+    WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+    GROUP BY c.agent_type
+  `);
+
+  const agentProductivity = await Promise.all(agentProductivityResult.rows.map(async row => {
+    const avgDuration = await calculateAvgSessionDuration(row.agent_type, days);
+
+    return {
+      agentType: row.agent_type,
+      totalTasks: parseInt(row.total_tasks),
+      avgDurationMinutes: avgDuration,
+      usersCount: parseInt(row.users_count),
+      tasksPerUser: (parseInt(row.total_tasks) / parseInt(row.users_count)).toFixed(1)
+    };
+  }));
+
+  // Tasks completed per person per week (last 4 weeks)
+  const weeklyTasksResult = await query(`
+    SELECT
+      u.id,
+      u.name,
+      u.email,
+      DATE_TRUNC('week', c.created_at) as week_start,
+      COUNT(DISTINCT c.id) as tasks_completed
+    FROM users u
+    JOIN conversations c ON u.id = c.user_id
+    WHERE c.created_at >= NOW() - INTERVAL '28 days'
+    GROUP BY u.id, u.name, u.email, DATE_TRUNC('week', c.created_at)
+    ORDER BY u.name, week_start DESC
+  `);
+
+  // Group by user
+  const userWeeklyTasks = {};
+  weeklyTasksResult.rows.forEach(row => {
+    if (!userWeeklyTasks[row.id]) {
+      userWeeklyTasks[row.id] = {
+        userId: row.id,
+        name: row.name,
+        email: row.email,
+        weeks: []
+      };
+    }
+    userWeeklyTasks[row.id].weeks.push({
+      weekStart: row.week_start,
+      tasksCompleted: parseInt(row.tasks_completed)
+    });
+  });
+
+  // Calculate averages
+  const userProductivity = Object.values(userWeeklyTasks).map(user => ({
+    ...user,
+    avgTasksPerWeek: user.weeks.length > 0
+      ? (user.weeks.reduce((sum, w) => sum + w.tasksCompleted, 0) / user.weeks.length).toFixed(1)
+      : 0
+  }));
+
+  // Quality trends over time (using feedback ratings if available)
+  const qualityTrendsResult = await query(`
+    SELECT
+      DATE(f.created_at) as date,
+      COUNT(*) as feedback_count,
+      AVG(CASE WHEN f.rating = 'positive' THEN 1 WHEN f.rating = 'negative' THEN 0 END) as positive_rate,
+      AVG(f.quality_score) as avg_quality
+    FROM feedback f
+    JOIN messages m ON f.message_id = m.id
+    JOIN conversations c ON m.conversation_id = c.id
+    WHERE f.created_at >= NOW() - INTERVAL '${days} days'
+    GROUP BY DATE(f.created_at)
+    ORDER BY date DESC
+    LIMIT 30
+  `);
+
+  const qualityTrends = qualityTrendsResult.rows.map(row => ({
+    date: row.date,
+    feedbackCount: parseInt(row.feedback_count),
+    positiveRate: row.positive_rate ? (parseFloat(row.positive_rate) * 100).toFixed(1) : null,
+    avgQuality: row.avg_quality ? parseFloat(row.avg_quality).toFixed(2) : null
+  }));
+
+  return res.status(200).json({
+    success: true,
+    days,
+    agentProductivity,
+    userProductivity,
+    qualityTrends
+  });
+}
+
+/**
+ * Get Individual Performance Tracking
+ * - Top users by agent
+ * - Users needing support
+ * - Training gaps
+ */
+async function getIndividualPerformance(req, res, days) {
+  // Top users by agent
+  const topUsersByAgentResult = await query(`
+    SELECT
+      c.agent_type,
+      u.id,
+      u.name,
+      u.email,
+      u.picture,
+      COUNT(DISTINCT c.id) as conversation_count,
+      COUNT(DISTINCT m.id) as message_count,
+      AVG(COALESCE(
+        (SELECT AVG(quality_score)
+         FROM feedback f
+         JOIN messages msg ON f.message_id = msg.id
+         WHERE msg.conversation_id = c.id),
+        0.7
+      )) as avg_quality
+    FROM conversations c
+    JOIN users u ON c.user_id = u.id
+    LEFT JOIN messages m ON c.id = m.conversation_id
+    WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+    GROUP BY c.agent_type, u.id, u.name, u.email, u.picture
+    ORDER BY c.agent_type, conversation_count DESC
+  `);
+
+  // Group by agent
+  const topUsersByAgent = {};
+  topUsersByAgentResult.rows.forEach(row => {
+    if (!topUsersByAgent[row.agent_type]) {
+      topUsersByAgent[row.agent_type] = [];
+    }
+    topUsersByAgent[row.agent_type].push({
+      userId: row.id,
+      name: row.name,
+      email: row.email,
+      picture: row.picture,
+      conversationCount: parseInt(row.conversation_count),
+      messageCount: parseInt(row.message_count),
+      avgQuality: parseFloat(row.avg_quality).toFixed(2)
+    });
+  });
+
+  // Users needing support (high revision counts, low quality scores)
+  const usersNeedingSupportResult = await query(`
+    SELECT
+      u.id,
+      u.name,
+      u.email,
+      u.picture,
+      COUNT(DISTINCT c.id) as conversation_count,
+      AVG(COALESCE(
+        (SELECT AVG(quality_score)
+         FROM feedback f
+         JOIN messages msg ON f.message_id = msg.id
+         WHERE msg.conversation_id = c.id),
+        0.7
+      )) as avg_quality,
+      AVG(m.revision_count) as avg_revisions,
+      COUNT(DISTINCT CASE WHEN f.rating = 'negative' THEN f.id END) as negative_feedback_count
+    FROM users u
+    JOIN conversations c ON u.id = c.user_id
+    LEFT JOIN messages m ON c.id = m.conversation_id
+    LEFT JOIN feedback f ON m.id = f.message_id
+    WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+    GROUP BY u.id, u.name, u.email, u.picture
+    HAVING COUNT(DISTINCT c.id) >= 3  -- Only users with at least 3 conversations
+  `);
+
+  const usersNeedingSupport = usersNeedingSupportResult.rows
+    .filter(row => {
+      const avgQuality = parseFloat(row.avg_quality);
+      const avgRevisions = parseFloat(row.avg_revisions);
+      const negativeCount = parseInt(row.negative_feedback_count);
+
+      // Flag if: low quality (<0.6) OR high revisions (>3) OR multiple negative feedback
+      return avgQuality < 0.6 || avgRevisions > 3 || negativeCount >= 2;
+    })
+    .map(row => ({
+      userId: row.id,
+      name: row.name,
+      email: row.email,
+      picture: row.picture,
+      conversationCount: parseInt(row.conversation_count),
+      avgQuality: parseFloat(row.avg_quality).toFixed(2),
+      avgRevisions: parseFloat(row.avg_revisions).toFixed(1),
+      negativeFeedbackCount: parseInt(row.negative_feedback_count),
+      issues: []
+    }))
+    .map(user => {
+      // Add specific issues
+      if (parseFloat(user.avgQuality) < 0.6) user.issues.push('Low quality outputs');
+      if (parseFloat(user.avgRevisions) > 3) user.issues.push('Many revisions needed');
+      if (user.negativeFeedbackCount >= 2) user.issues.push('Multiple negative feedback');
+      return user;
+    });
+
+  // Overall team statistics
+  const teamStatsResult = await query(`
+    SELECT
+      COUNT(DISTINCT c.user_id) as active_users,
+      COUNT(DISTINCT c.id) as total_conversations,
+      AVG(m.message_count) as avg_messages_per_conv,
+      AVG(COALESCE(
+        (SELECT AVG(quality_score)
+         FROM feedback f
+         JOIN messages msg ON f.message_id = msg.id
+         WHERE msg.conversation_id = c.id),
+        0.7
+      )) as team_avg_quality
+    FROM conversations c
+    LEFT JOIN (
+      SELECT conversation_id, COUNT(*) as message_count
+      FROM messages
+      GROUP BY conversation_id
+    ) m ON c.id = m.conversation_id
+    WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+  `);
+
+  const teamStats = teamStatsResult.rows[0];
+
+  return res.status(200).json({
+    success: true,
+    days,
+    topUsersByAgent,
+    usersNeedingSupport,
+    teamStats: {
+      activeUsers: parseInt(teamStats.active_users),
+      totalConversations: parseInt(teamStats.total_conversations),
+      avgMessagesPerConv: parseFloat(teamStats.avg_messages_per_conv).toFixed(1),
+      teamAvgQuality: parseFloat(teamStats.team_avg_quality).toFixed(2)
+    }
+  });
 }
