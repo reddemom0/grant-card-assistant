@@ -376,6 +376,9 @@
 
                 const data = await response.json();
                 const stats = data.overview;
+                const activeUsers = data.activeUsers || {};
+                const retention = data.retention || {};
+                const engagement = data.engagement || {};
 
                 container.innerHTML = `
                     <div class="stats-grid">
@@ -410,6 +413,98 @@
                             <div class="stat-label">Active Days</div>
                         </div>
                     </div>
+
+                    ${activeUsers.dau !== undefined ? `
+                        <div class="section" style="margin-top: 2rem;">
+                            <h3 class="section-title">📈 Active Users</h3>
+                            <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
+                                <div class="stat-card">
+                                    <div class="stat-icon">🟢</div>
+                                    <div class="stat-value">${activeUsers.dau}</div>
+                                    <div class="stat-label">Daily Active Users</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon">📅</div>
+                                    <div class="stat-value">${activeUsers.wau}</div>
+                                    <div class="stat-label">Weekly Active Users</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon">📆</div>
+                                    <div class="stat-value">${activeUsers.mau}</div>
+                                    <div class="stat-label">Monthly Active Users</div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon">🎯</div>
+                                    <div class="stat-value">${activeUsers.stickiness}%</div>
+                                    <div class="stat-label">Stickiness (DAU/MAU)</div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${retention.day7 ? `
+                        <div class="section" style="margin-top: 2rem;">
+                            <h3 class="section-title">🔄 User Retention</h3>
+                            <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
+                                <div class="stat-card">
+                                    <div class="stat-icon">📊</div>
+                                    <div class="stat-value">${retention.day7.retentionRate.toFixed(1)}%</div>
+                                    <div class="stat-label">7-Day Retention</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                                        ${retention.day7.returnedUsers} of ${retention.day7.cohortSize} users returned
+                                    </div>
+                                </div>
+                                <div class="stat-card">
+                                    <div class="stat-icon">📈</div>
+                                    <div class="stat-value">${retention.day30.retentionRate.toFixed(1)}%</div>
+                                    <div class="stat-label">30-Day Retention</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+                                        ${retention.day30.returnedUsers} of ${retention.day30.cohortSize} users returned
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    ${engagement.averageScore !== undefined ? `
+                        <div class="section" style="margin-top: 2rem;">
+                            <h3 class="section-title">⭐ User Engagement</h3>
+                            <div style="text-align: center; margin-bottom: 1.5rem;">
+                                <div style="font-size: 3rem; font-weight: 700; color: var(--primary);">
+                                    ${engagement.averageScore.toFixed(1)}
+                                </div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">
+                                    Average Engagement Score (out of 100)
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                    Based on frequency, recency, and depth of usage
+                                </div>
+                            </div>
+                            <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+                                <div class="stat-card" style="border-left: 4px solid var(--success);">
+                                    <div class="stat-value" style="color: var(--success);">${engagement.breakdown.highlyEngaged}</div>
+                                    <div class="stat-label">Highly Engaged</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                        Score ≥ 70
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid var(--info);">
+                                    <div class="stat-value" style="color: var(--info);">${engagement.breakdown.moderatelyEngaged}</div>
+                                    <div class="stat-label">Moderately Engaged</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                        Score 40-69
+                                    </div>
+                                </div>
+                                <div class="stat-card" style="border-left: 4px solid var(--warning);">
+                                    <div class="stat-value" style="color: var(--warning);">${engagement.breakdown.lowEngaged}</div>
+                                    <div class="stat-label">Low Engagement</div>
+                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
+                                        Score < 40
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    ` : ''}
                 `;
             } catch (error) {
                 console.error('Error loading overview:', error);
