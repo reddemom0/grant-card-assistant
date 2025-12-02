@@ -537,8 +537,8 @@
                                         ${agent.avgDurationMinutes.toFixed(0)} min average
                                     </div>
                                 </div>
-                                <span class="metric">${agent.totalTasks} conversations</span>
-                                <span class="metric">${agent.tasksPerUser} per user</span>
+                                <span class="metric">${agent.totalConversations} conversations</span>
+                                <span class="metric">${agent.conversationsPerUser} per user</span>
                             </div>
                         `).join('')}
 
@@ -555,10 +555,10 @@
                                 ${data.userProductivity.map(user => `
                                     <tr>
                                         <td>${user.name}</td>
-                                        <td><strong>${user.avgTasksPerWeek}</strong></td>
+                                        <td><strong>${user.avgConversationsPerWeek}</strong></td>
                                         <td>
                                             ${user.weeks.map(w => `
-                                                <span class="badge badge-primary" style="margin-right: 0.25rem;">${w.tasksCompleted}</span>
+                                                <span class="badge badge-primary" style="margin-right: 0.25rem;">${w.conversationsCompleted}</span>
                                             `).join('')}
                                         </td>
                                     </tr>

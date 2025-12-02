@@ -644,21 +644,21 @@ async function getProductivityMetrics(req, res, days) {
 
       return {
         agentType: row.agent_type,
-        totalTasks: parseInt(row.total_tasks),
+        totalConversations: parseInt(row.total_tasks),
         avgDurationMinutes: avgDuration,
         usersCount: parseInt(row.users_count),
-        tasksPerUser: (parseInt(row.total_tasks) / parseInt(row.users_count)).toFixed(1)
+        conversationsPerUser: (parseInt(row.total_tasks) / parseInt(row.users_count)).toFixed(1)
       };
     }));
 
-    // Tasks completed per person per week (last 4 weeks)
-    const weeklyTasksResult = await query(`
+    // Conversations per person per week (last 4 weeks)
+    const weeklyConversationsResult = await query(`
       SELECT
         u.id,
         u.name,
         u.email,
         DATE_TRUNC('week', c.created_at) as week_start,
-        COUNT(DISTINCT c.id) as tasks_completed
+        COUNT(DISTINCT c.id) as conversations_completed
       FROM users u
       JOIN conversations c ON u.id = c.user_id
       WHERE c.created_at >= NOW() - INTERVAL '28 days'
@@ -667,27 +667,27 @@ async function getProductivityMetrics(req, res, days) {
     `);
 
     // Group by user
-    const userWeeklyTasks = {};
-    weeklyTasksResult.rows.forEach(row => {
-      if (!userWeeklyTasks[row.id]) {
-        userWeeklyTasks[row.id] = {
+    const userWeeklyConversations = {};
+    weeklyConversationsResult.rows.forEach(row => {
+      if (!userWeeklyConversations[row.id]) {
+        userWeeklyConversations[row.id] = {
           userId: row.id,
           name: row.name,
           email: row.email,
           weeks: []
         };
       }
-      userWeeklyTasks[row.id].weeks.push({
+      userWeeklyConversations[row.id].weeks.push({
         weekStart: row.week_start,
-        tasksCompleted: parseInt(row.tasks_completed)
+        conversationsCompleted: parseInt(row.conversations_completed)
       });
     });
 
     // Calculate averages
-    const userProductivity = Object.values(userWeeklyTasks).map(user => ({
+    const userProductivity = Object.values(userWeeklyConversations).map(user => ({
       ...user,
-      avgTasksPerWeek: user.weeks.length > 0
-        ? (user.weeks.reduce((sum, w) => sum + w.tasksCompleted, 0) / user.weeks.length).toFixed(1)
+      avgConversationsPerWeek: user.weeks.length > 0
+        ? (user.weeks.reduce((sum, w) => sum + w.conversationsCompleted, 0) / user.weeks.length).toFixed(1)
         : 0
     }));
 
