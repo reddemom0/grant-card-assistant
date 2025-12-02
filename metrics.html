@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Feedback Learning Dashboard | Grant Writers</title>
+    <title>Feedback Learning Dashboard - Granted AI Hub</title>
     <style>
         * {
             margin: 0;
@@ -12,23 +12,19 @@
         }
 
         :root {
-            --background: #fafaf9;
-            --surface: #ffffff;
-            --border: #e7e5e4;
-            --text-primary: #1c1917;
-            --text-secondary: #78716c;
-            --primary: #2563eb;
-            --primary-hover: #1d4ed8;
-            --success: #10b981;
-            --warning: #f59e0b;
-            --danger: #ef4444;
-            --info: #3b82f6;
+            --primary-blue: #008abf;
+            --secondary-gray: #6d7881;
+            --light-gray: #dde1e3;
+            --success-green: #10b981;
+            --warning-yellow: #f59e0b;
+            --danger-red: #ef4444;
+            --bg-gray: #f9fafb;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
+            background: var(--bg-gray);
+            color: var(--secondary-gray);
             line-height: 1.6;
         }
 
@@ -38,1706 +34,737 @@
             padding: 2rem;
         }
 
-        .header {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            padding: 1.5rem 2rem;
-            margin: -2rem -2rem 2rem -2rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        header {
+            margin-bottom: 2rem;
         }
 
         h1 {
-            font-size: 1.875rem;
-            font-weight: 700;
-            color: var(--text-primary);
+            color: var(--primary-blue);
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
         }
 
         .subtitle {
-            color: var(--text-secondary);
-            font-size: 0.875rem;
-            margin-top: 0.25rem;
+            color: var(--secondary-gray);
+            font-size: 0.95rem;
         }
 
-        .back-link {
-            color: var(--primary);
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
+        /* Time Filter */
+        .time-filter {
             display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
         }
 
-        .back-link:hover {
-            color: var(--primary-hover);
+        .time-filter button {
+            padding: 0.75rem 1.5rem;
+            border: 2px solid var(--light-gray);
+            background: white;
+            color: var(--secondary-gray);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
-        .loading {
-            text-align: center;
-            padding: 4rem 0;
-            color: var(--text-secondary);
+        .time-filter button:hover {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
         }
 
-        .loading-spinner {
-            display: inline-block;
-            width: 3rem;
-            height: 3rem;
-            border: 3px solid var(--border);
-            border-top-color: var(--primary);
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+        .time-filter button.active {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
         }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .agent-grid {
+        /* Summary Cards */
+        .summary-cards {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
             gap: 1.5rem;
             margin-bottom: 2rem;
         }
 
-        .agent-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
+        .card {
+            background: white;
             padding: 1.5rem;
-            cursor: pointer;
-            transition: all 0.2s;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
-        .agent-card:hover {
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            transform: translateY(-2px);
+        .card-label {
+            font-size: 0.875rem;
+            color: var(--secondary-gray);
+            margin-bottom: 0.5rem;
         }
 
-        .agent-card.selected {
-            border-color: var(--primary);
-            background: #eff6ff;
-        }
-
-        .agent-name {
-            font-size: 1.125rem;
+        .card-value {
+            font-size: 2rem;
             font-weight: 600;
-            margin-bottom: 0.75rem;
-            color: var(--text-primary);
+            color: var(--primary-blue);
         }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 0.75rem;
-            margin-top: 1rem;
-        }
-
-        .stat {
-            text-align: center;
-        }
-
-        .stat-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .stat-label {
+        .card-sublabel {
             font-size: 0.75rem;
-            color: var(--text-secondary);
+            color: var(--secondary-gray);
             margin-top: 0.25rem;
         }
 
-        .quality-badge {
-            display: inline-block;
-            padding: 0.25rem 0.75rem;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-top: 0.5rem;
+        /* Quality Matrix */
+        .matrix-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
         }
 
-        .quality-excellent {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .quality-good {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .quality-needs-work {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .section {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            padding: 1.5rem;
+        .matrix-section h2 {
+            color: var(--secondary-gray);
+            font-size: 1.25rem;
             margin-bottom: 1.5rem;
         }
 
-        .section-header {
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        th {
+            background: var(--bg-gray);
+            color: var(--secondary-gray);
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            font-size: 0.95rem;
+        }
+
+        tr {
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        tr:hover {
+            background: rgba(0, 138, 191, 0.05);
+        }
+
+        .agent-name {
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        .score {
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .score-excellent {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-green);
+        }
+
+        .score-good {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .score-fair {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-yellow);
+        }
+
+        .score-poor {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+        }
+
+        .score-na {
+            background: rgba(156, 163, 175, 0.1);
+            color: #9ca3af;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 2rem auto;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 900px;
+            position: relative;
+        }
+
+        .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .section-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .tabs {
-            display: flex;
-            gap: 0.5rem;
-            border-bottom: 1px solid var(--border);
             margin-bottom: 1.5rem;
         }
 
-        .tab {
-            padding: 0.75rem 1.5rem;
-            border: none;
+        .modal-header h2 {
+            color: var(--primary-blue);
+            font-size: 1.5rem;
+        }
+
+        .close-btn {
             background: none;
-            color: var(--text-secondary);
-            font-weight: 500;
+            border: none;
+            font-size: 1.5rem;
             cursor: pointer;
-            border-bottom: 2px solid transparent;
-            transition: all 0.2s;
+            color: var(--secondary-gray);
         }
 
-        .tab:hover {
-            color: var(--text-primary);
+        .close-btn:hover {
+            color: var(--danger-red);
         }
 
-        .tab.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-item {
+            background: var(--bg-gray);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .metric-item-label {
+            font-size: 0.75rem;
+            color: var(--secondary-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-item-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        .issue-breakdown {
+            margin-top: 2rem;
+        }
+
+        .issue-breakdown h3 {
+            color: var(--secondary-gray);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .issue-tag {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+            border-radius: 6px;
+            margin: 0.25rem;
+            font-size: 0.875rem;
+        }
+
+        .issue-tag .count {
+            font-weight: 600;
+            margin-left: 0.5rem;
         }
 
         .feedback-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
+            margin-top: 2rem;
         }
 
         .feedback-item {
-            background: var(--background);
-            border: 1px solid var(--border);
-            border-radius: 0.5rem;
+            background: var(--bg-gray);
             padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
         }
 
         .feedback-header {
             display: flex;
             justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 0.75rem;
+            align-items: center;
+            margin-bottom: 0.5rem;
         }
 
         .feedback-rating {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .rating-positive {
-            color: var(--success);
             font-weight: 600;
         }
 
-        .rating-negative {
-            color: var(--danger);
-            font-weight: 600;
+        .feedback-rating.positive {
+            color: var(--success-green);
         }
 
-        .quality-score {
-            font-size: 0.875rem;
-            color: var(--text-secondary);
-        }
-
-        .feedback-content {
-            font-size: 0.875rem;
-            color: var(--text-primary);
-            line-height: 1.6;
-            margin-bottom: 0.75rem;
-            background: var(--surface);
-            padding: 0.75rem;
-            border-radius: 0.375rem;
-            border-left: 3px solid var(--primary);
+        .feedback-rating.negative {
+            color: var(--danger-red);
         }
 
         .feedback-meta {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
+            font-size: 0.875rem;
+            color: var(--secondary-gray);
         }
 
-        .chart-container {
-            height: 300px;
-            margin-top: 1rem;
+        .feedback-text {
+            margin-top: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .feedback-tags {
+            margin-top: 0.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .feedback-tag {
+            padding: 0.25rem 0.75rem;
+            background: rgba(0, 138, 191, 0.1);
+            color: var(--primary-blue);
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--secondary-gray);
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
         }
 
         .empty-state {
             text-align: center;
             padding: 3rem;
-            color: var(--text-secondary);
+            color: var(--secondary-gray);
         }
 
-        .empty-state-icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
-            opacity: 0.5;
-        }
-
-        .btn {
-            padding: 0.5rem 1rem;
-            border-radius: 0.5rem;
-            border: none;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-hover);
-        }
-
-        .badge {
+        /* Tooltip */
+        .tooltip-container {
+            position: relative;
             display: inline-block;
-            padding: 0.25rem 0.625rem;
-            border-radius: 0.375rem;
-            font-size: 0.75rem;
-            font-weight: 600;
+            cursor: help;
         }
 
-        .badge-success {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .badge-warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .badge-danger {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .badge-info {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .correction-item {
-            background: #fef3c7;
-            border-left: 3px solid #f59e0b;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin-bottom: 0.75rem;
-        }
-
-        .correction-text {
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
             font-size: 0.875rem;
-            color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            font-weight: normal;
+            text-transform: none;
+            letter-spacing: normal;
+            white-space: nowrap;
+            z-index: 1000;
+            transition: opacity 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         }
 
-        .correction-meta {
-            font-size: 0.75rem;
-            color: var(--text-secondary);
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.9);
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Adjust for long tooltips */
+        .tooltip-text.long {
+            white-space: normal;
+            max-width: 300px;
+            text-align: left;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <div>
-                <h1>📊 Feedback Learning Dashboard</h1>
-                <p class="subtitle">Track agent improvements and learning patterns</p>
-            </div>
-            <a href="/dashboard" class="back-link">
-                ← Back to Dashboard
-            </a>
+        <header>
+            <h1>Feedback Learning Dashboard</h1>
+            <p class="subtitle">Track agent improvements and learning patterns</p>
+        </header>
+
+        <!-- Time Filter -->
+        <div class="time-filter">
+            <button class="active" onclick="setTimeRange(1)">Last 24 Hours</button>
+            <button onclick="setTimeRange(7)">7 Days</button>
+            <button onclick="setTimeRange(30)">One Month</button>
+            <button onclick="setTimeRange(90)">Three Months</button>
         </div>
 
-        <div id="loading" class="loading">
-            <div class="loading-spinner"></div>
-            <p style="margin-top: 1rem;">Loading feedback data...</p>
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-label">Total Conversations</div>
+                <div class="card-value" id="totalConversations">-</div>
+                <div class="card-sublabel" id="timeLabel">Last 7 Days</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Average Quality Score</div>
+                <div class="card-value" id="avgQuality">-</div>
+                <div class="card-sublabel">Across all agents</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Positive Feedback Rate</div>
+                <div class="card-value" id="avgPositive">-</div>
+                <div class="card-sublabel">Average across agents</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Active Agents</div>
+                <div class="card-value" id="activeAgents">-</div>
+                <div class="card-sublabel">With conversations</div>
+            </div>
         </div>
 
-        <div id="content" style="display: none;">
-            <!-- Agent Selection -->
-            <div class="section">
-                <h2 class="section-title">Select Agent</h2>
-                <div id="agent-grid" class="agent-grid"></div>
+        <!-- Agent Quality Matrix -->
+        <div class="matrix-section">
+            <h2>Agent Performance Matrix</h2>
+            <div id="matrixContainer">
+                <div class="loading">Loading agent quality data...</div>
             </div>
+        </div>
+    </div>
 
-            <!-- Agent Details -->
-            <div id="agent-details" style="display: none;">
-                <!-- Tabs -->
-                <div class="tabs">
-                    <button class="tab active" data-tab="overview">Overview</button>
-                    <button class="tab" data-tab="learning-insights">🧠 Learning Insights</button>
-                    <button class="tab" data-tab="high-quality">High Quality (Learn From)</button>
-                    <button class="tab" data-tab="negative">Negative (Avoid)</button>
-                    <button class="tab" data-tab="corrections">User Corrections</button>
-                    <button class="tab" data-tab="trends">Trends</button>
-                </div>
-
-                <!-- Tab Content -->
-                <div id="tab-content"></div>
+    <!-- Agent Details Modal -->
+    <div id="agentModal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 id="modalAgentName">Agent Details</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalContent">
+                <div class="loading">Loading...</div>
             </div>
         </div>
     </div>
 
     <script>
-        // Authentication check (matches dashboard.html)
-        function checkAuth() {
-            const cookies = document.cookie.split(';');
-            const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
-
-            if (!authToken) {
-                console.log('No auth token, redirecting to login...');
-                window.location.href = '/';
-                return false;
-            }
-
-            console.log('✅ User authenticated');
-            return true;
-        }
-
-        // Run auth check immediately
-        if (!checkAuth()) {
-            // Will redirect to login
-            throw new Error('Not authenticated');
-        }
-
-        let selectedAgent = null;
-        let overviewData = [];
+        let currentDays = 7;
 
         // Initialize
-        async function init() {
-            await loadOverview();
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('content').style.display = 'block';
+        document.addEventListener('DOMContentLoaded', () => {
+            loadQualityMatrix();
+        });
 
-            // Setup tab switching
-            document.querySelectorAll('.tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
-                    loadTabContent(tab.dataset.tab);
-                });
+        // Set time range filter
+        async function setTimeRange(days) {
+            currentDays = days;
+
+            // Update active button
+            document.querySelectorAll('.time-filter button').forEach(btn => {
+                btn.classList.remove('active');
             });
-        }
+            event.target.classList.add('active');
 
-        // Load overview of all agents
-        async function loadOverview() {
-            try {
-                const response = await fetch('/api/feedback-metrics?action=overview', {
-                    credentials: 'include'
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load overview');
-                }
-
-                const data = await response.json();
-                overviewData = data.data;
-
-                renderAgentGrid();
-            } catch (error) {
-                console.error('Error loading overview:', error);
-                document.getElementById('loading').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
-                        <p>Failed to load feedback data</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-
-        // Render agent cards
-        function renderAgentGrid() {
-            const grid = document.getElementById('agent-grid');
-
-            if (overviewData.length === 0) {
-                grid.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <p>No feedback data available yet</p>
-                    </div>
-                `;
-                return;
-            }
-
-            grid.innerHTML = overviewData.map(agent => {
-                const qualityClass = agent.avgQualityScore >= 0.75 ? 'quality-excellent' :
-                                   agent.avgQualityScore >= 0.6 ? 'quality-good' : 'quality-needs-work';
-                const qualityLabel = agent.avgQualityScore >= 0.75 ? 'Excellent' :
-                                   agent.avgQualityScore >= 0.6 ? 'Good' : 'Needs Work';
-
-                return `
-                    <div class="agent-card" onclick="selectAgent('${agent.agentType}')">
-                        <div class="agent-name">${formatAgentName(agent.agentType)}</div>
-                        <div class="stats-grid">
-                            <div class="stat">
-                                <div class="stat-value">${agent.totalRatings}</div>
-                                <div class="stat-label">Total Ratings</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-value">${agent.positiveRate}%</div>
-                                <div class="stat-label">Positive</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-value">${agent.avgQualityScore.toFixed(2)}</div>
-                                <div class="stat-label">Quality Score</div>
-                            </div>
-                            <div class="stat">
-                                <div class="stat-value">${agent.totalMessages}</div>
-                                <div class="stat-label">Messages</div>
-                            </div>
-                        </div>
-                        <div class="quality-badge ${qualityClass}">${qualityLabel}</div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        // Select agent
-        function selectAgent(agentType) {
-            selectedAgent = agentType;
-
-            // Highlight selected card
-            document.querySelectorAll('.agent-card').forEach(card => {
-                card.classList.remove('selected');
-            });
-            event.currentTarget.classList.add('selected');
-
-            // Show agent details
-            document.getElementById('agent-details').style.display = 'block';
-
-            // Load overview tab
-            loadTabContent('overview');
-        }
-
-        // Load tab content
-        async function loadTabContent(tab) {
-            if (!selectedAgent) return;
-
-            const content = document.getElementById('tab-content');
-            content.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
-
-            try {
-                switch (tab) {
-                    case 'overview':
-                        await loadOverviewTab();
-                        break;
-                    case 'learning-insights':
-                        await loadLearningInsightsTab();
-                        break;
-                    case 'high-quality':
-                        await loadHighQualityTab();
-                        break;
-                    case 'negative':
-                        await loadNegativeTab();
-                        break;
-                    case 'corrections':
-                        await loadCorrectionsTab();
-                        break;
-                    case 'trends':
-                        await loadTrendsTab();
-                        break;
-                }
-            } catch (error) {
-                content.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
-                        <p>Failed to load ${tab} data</p>
-                    </div>
-                `;
-            }
-        }
-
-        // Load learning insights tab
-        async function loadLearningInsightsTab() {
-            const response = await fetch(`/api/feedback-learning?agentType=${selectedAgent}`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-
-            if (!data.hasData) {
-                document.getElementById('tab-content').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">🧠</div>
-                        <p>No learning insights yet</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Feedback learning will run automatically as feedback is collected</p>
-                    </div>
-                `;
-                return;
-            }
-
-            const insights = data.insights;
-            const lastUpdated = new Date(data.lastGenerated);
-
-            document.getElementById('tab-content').innerHTML = `
-                <div class="section">
-                    <div class="section-header">
-                        <h3 class="section-title">🧠 AI Learning Summary</h3>
-                        <button class="btn btn-primary" onclick="triggerLearningUpdate()">
-                            Update Learning Now
-                        </button>
-                    </div>
-                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1.5rem;">
-                        Last updated: <strong>${lastUpdated.toLocaleString()}</strong>
-                    </p>
-
-                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--success);">${data.counts.successPatterns}</div>
-                            <div class="stat-label">Success Patterns Learned</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--danger);">${data.counts.errorPatterns}</div>
-                            <div class="stat-label">Error Patterns Identified</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--warning);">${data.counts.corrections}</div>
-                            <div class="stat-label">User Corrections Applied</div>
-                        </div>
-                    </div>
-                </div>
-
-                ${insights.topThemes.length > 0 ? `
-                    <div class="section">
-                        <h3 class="section-title">🎯 Top Themes in Successful Responses</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
-                            The AI has identified these recurring themes in highly-rated responses
-                        </p>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
-                            ${insights.topThemes.slice(0, 10).map((theme, idx) => `
-                                <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem; border: 1px solid var(--border);">
-                                    <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">#${idx + 1}</div>
-                                    <div style="font-weight: 600; margin-top: 0.25rem;">${theme.theme}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                        ${theme.count} occurrences
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${insights.successExamples.length > 0 ? `
-                    <div class="section">
-                        <h3 class="section-title">✅ Success Pattern Examples</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
-                            Highly-rated responses the AI should emulate
-                        </p>
-                        <div class="feedback-list">
-                            ${insights.successExamples.slice(0, 5).map(example => `
-                                <div style="background: #ecfdf5; border-left: 3px solid #10b981; padding: 1rem; border-radius: 0.5rem;">
-                                    <div style="font-size: 0.875rem; color: var(--text-primary); margin-bottom: 0.5rem;">
-                                        <strong>Quality Score: ${example.qualityScore.toFixed(2)}</strong>
-                                    </div>
-                                    ${example.userNote ? `
-                                        <div style="font-size: 0.875rem; font-style: italic; margin-bottom: 0.5rem;">
-                                            "${example.userNote}"
-                                        </div>
-                                    ` : ''}
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                                        ${new Date(example.timestamp).toLocaleDateString()}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${insights.errorExamples && insights.errorExamples.length > 0 ? `
-                    <div class="section">
-                        <h3 class="section-title">❌ Error Patterns to Avoid</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
-                            Issues identified in low-rated responses that the AI should avoid
-                        </p>
-                        <div class="feedback-list">
-                            ${insights.errorExamples.slice(0, 5).map(error => `
-                                <div style="background: #fef2f2; border-left: 3px solid #ef4444; padding: 1rem; border-radius: 0.5rem;">
-                                    <div style="font-size: 0.875rem; color: var(--text-primary); margin-bottom: 0.5rem;">
-                                        <strong>Quality Score: ${error.qualityScore.toFixed(2)}</strong>
-                                        ${error.errorType && error.errorType !== 'other' ? `<span style="margin-left: 0.5rem; color: var(--text-secondary);">(${error.errorType})</span>` : ''}
-                                    </div>
-                                    ${error.issue ? `
-                                        <div style="font-size: 0.875rem; margin-bottom: 0.5rem; font-style: italic;">
-                                            "${error.issue}"
-                                        </div>
-                                    ` : ''}
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                                        ${new Date(error.timestamp).toLocaleDateString()}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-
-                ${insights.corrections.length > 0 ? `
-                    <div class="section">
-                        <h3 class="section-title">🔧 Active User Corrections</h3>
-                        <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
-                            Direct corrections from users that shaped AI behavior
-                        </p>
-                        <div class="feedback-list">
-                            ${insights.corrections.slice(0, 5).map(correction => `
-                                <div class="correction-item">
-                                    <div class="correction-text">
-                                        ${correction.issue || correction.note}
-                                    </div>
-                                    <div class="correction-meta">
-                                        <span>Sentiment: <strong>${correction.sentiment}</strong></span>
-                                        <span>• ${new Date(correction.timestamp || correction.created_at).toLocaleDateString()}</span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                ` : ''}
-
-                <div class="section">
-                    <div class="section-header">
-                        <h3 class="section-title">💭 Feedback Insights & Recommendations</h3>
-                        <button class="btn btn-primary" onclick="generateInsights()">
-                            Generate AI Insights
-                        </button>
-                    </div>
-                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
-                        AI-powered analysis of feedback patterns with actionable improvement recommendations
-                    </p>
-                    <div id="insights-container">
-                        <div class="empty-state" style="padding: 3rem;">
-                            <div class="empty-state-icon">🤖</div>
-                            <p>Click "Generate AI Insights" to analyze feedback patterns</p>
-                            <p style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--text-secondary);">
-                                Claude will analyze all feedback and provide actionable recommendations
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-header">
-                        <h3 class="section-title">📊 Sentiment Statistics</h3>
-                    </div>
-                    <div id="sentiment-container">
-                        <div class="loading" style="padding: 2rem;">
-                            <div class="loading-spinner"></div>
-                            <p style="margin-top: 1rem; color: var(--text-secondary);">Loading sentiment data...</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3 class="section-title">📜 Learning Application History</h3>
-                    <p style="color: var(--text-secondary); font-size: 0.875rem; margin-bottom: 1rem;">
-                        Track when learned patterns were applied to actual conversations
-                    </p>
-                    <div id="learning-history-container">
-                        <div class="loading" style="padding: 2rem;">
-                            <div class="loading-spinner"></div>
-                            <p style="margin-top: 1rem; color: var(--text-secondary);">Loading application history...</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-
-            // Load sentiment data and learning history
-            loadSentimentData();
-            loadLearningHistory();
-        }
-
-        // Load learning application history
-        async function loadLearningHistory() {
-            try {
-                const response = await fetch(`/api/feedback-metrics?action=learning-history&agentType=${selectedAgent}&limit=20`, {
-                    credentials: 'include'
-                });
-                const data = await response.json();
-
-                const container = document.getElementById('learning-history-container');
-
-                if (data.count === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">📭</div>
-                            <p>No learning applications yet</p>
-                            <p style="font-size: 0.875rem; margin-top: 0.5rem;">
-                                Learning patterns will be applied to conversations as users interact with the agent
-                            </p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                container.innerHTML = `
-                    <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
-                            <div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${data.stats.totalApplications}</div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Total Applications</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--success);">${data.stats.uniqueConversations}</div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Conversations Improved</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--info);">${data.stats.uniqueUsers}</div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Users Benefited</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
-                        <strong>Recent Applications:</strong> Showing ${data.count} most recent
-                    </div>
-
-                    <div style="background: var(--background); padding: 0.5rem; border-radius: 0.5rem;">
-                        ${data.applications.map((app, index) => {
-                            const appliedDate = new Date(app.applied_at);
-                            const learningDate = app.learning_updated_at ? new Date(app.learning_updated_at) : null;
-                            // files_loaded is already an array from the API
-                            const filesLoaded = Array.isArray(app.files_loaded) ? app.files_loaded : [];
-
-                            // Extract snippets from learning content
-                            const getSnippet = (content, maxLength = 200) => {
-                                if (!content) return '';
-                                // Remove markdown headers and get first meaningful paragraph
-                                const lines = content.split('\n').filter(line =>
-                                    line.trim() &&
-                                    !line.startsWith('#') &&
-                                    !line.startsWith('**') &&
-                                    !line.startsWith('---')
-                                );
-                                const text = lines.slice(0, 3).join(' ').trim();
-                                return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
-                            };
-
-                            const patternsSnippet = app.learning_content?.['learned-patterns.md']
-                                ? getSnippet(app.learning_content['learned-patterns.md'])
-                                : '';
-                            const errorsSnippet = app.learning_content?.['common-errors.md']
-                                ? getSnippet(app.learning_content['common-errors.md'])
-                                : '';
-
-                            return `
-                                <div style="padding: 0.75rem; border-bottom: 1px solid var(--border);">
-                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
-                                        <div style="flex: 1;">
-                                            <div style="font-size: 0.875rem; font-weight: 500; margin-bottom: 0.25rem;">
-                                                ${app.conversation_title || 'Untitled Conversation'}
-                                            </div>
-                                            <div style="font-size: 0.75rem; color: var(--text-secondary);">
-                                                <span>📁 Files: ${filesLoaded.join(', ')}</span>
-                                                ${learningDate ? `<span style="margin-left: 1rem;">🕐 Learning from: ${learningDate.toLocaleDateString()}</span>` : ''}
-                                            </div>
-                                        </div>
-                                        <div style="text-align: right; font-size: 0.75rem; color: var(--text-secondary);">
-                                            <div>${appliedDate.toLocaleDateString()}</div>
-                                            <div>${appliedDate.toLocaleTimeString()}</div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Learning content preview -->
-                                    <div style="margin-top: 0.75rem; background: #f8f9fa; padding: 0.75rem; border-radius: 0.375rem; border-left: 3px solid var(--primary);">
-                                        <div style="font-size: 0.75rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
-                                            🧠 What the AI Learned:
-                                        </div>
-                                        ${patternsSnippet ? `
-                                            <div style="font-size: 0.75rem; margin-bottom: 0.5rem;">
-                                                <strong style="color: var(--success);">✅ Success Patterns:</strong>
-                                                <div style="color: var(--text-secondary); margin-top: 0.25rem; font-style: italic;">
-                                                    ${patternsSnippet}
-                                                </div>
-                                            </div>
-                                        ` : ''}
-                                        ${errorsSnippet ? `
-                                            <div style="font-size: 0.75rem;">
-                                                <strong style="color: var(--error);">❌ Errors to Avoid:</strong>
-                                                <div style="color: var(--text-secondary); margin-top: 0.25rem; font-style: italic;">
-                                                    ${errorsSnippet}
-                                                </div>
-                                            </div>
-                                        ` : ''}
-                                        <button
-                                            onclick="showFullLearning(${index}, ${JSON.stringify(app.learning_content).replace(/"/g, '&quot;')})"
-                                            style="margin-top: 0.5rem; padding: 0.25rem 0.75rem; font-size: 0.75rem; background: var(--primary); color: white; border: none; border-radius: 0.25rem; cursor: pointer;"
-                                        >
-                                            View Full Learning Content →
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                `;
-            } catch (error) {
-                const container = document.getElementById('learning-history-container');
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
-                        <p>Failed to load learning history</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">${error.message}</p>
-                    </div>
-                `;
-            }
-        }
-
-        // Show full learning content in modal
-        function showFullLearning(index, learningContent) {
-            // Create modal
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.7);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-                padding: 2rem;
-            `;
-
-            const modalContent = document.createElement('div');
-            modalContent.style.cssText = `
-                background: white;
-                max-width: 800px;
-                width: 100%;
-                max-height: 80vh;
-                overflow-y: auto;
-                border-radius: 0.75rem;
-                padding: 2rem;
-            `;
-
-            let contentHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                    <h2 style="margin: 0; font-size: 1.25rem; color: var(--text-primary);">
-                        🧠 Full Learning Content
-                    </h2>
-                    <button onclick="this.closest('[style*=fixed]').remove()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
-                </div>
-            `;
-
-            // Format markdown content for display
-            const formatContent = (content) => {
-                if (!content) return '';
-                return content
-                    .split('\n')
-                    .map(line => {
-                        if (line.startsWith('# ')) {
-                            return `<h3 style="margin-top: 1.5rem; margin-bottom: 0.75rem; font-size: 1.125rem;">${line.substring(2)}</h3>`;
-                        } else if (line.startsWith('## ')) {
-                            return `<h4 style="margin-top: 1rem; margin-bottom: 0.5rem; font-size: 1rem; font-weight: 600;">${line.substring(3)}</h4>`;
-                        } else if (line.startsWith('### ')) {
-                            return `<h5 style="margin-top: 0.75rem; margin-bottom: 0.5rem; font-size: 0.875rem; font-weight: 600;">${line.substring(4)}</h5>`;
-                        } else if (line.startsWith('**') && line.endsWith('**')) {
-                            return `<p style="font-weight: 600; margin: 0.5rem 0;">${line.replace(/\*\*/g, '')}</p>`;
-                        } else if (line.startsWith('---')) {
-                            return '<hr style="margin: 1rem 0; border: none; border-top: 1px solid var(--border);">';
-                        } else if (line.trim()) {
-                            return `<p style="margin: 0.5rem 0; line-height: 1.6;">${line}</p>`;
-                        }
-                        return '';
-                    })
-                    .join('');
+            // Update time label
+            const labels = {
+                1: 'Last 24 Hours',
+                7: 'Last 7 Days',
+                30: 'Last Month',
+                90: 'Last 3 Months'
             };
+            document.getElementById('timeLabel').textContent = labels[days];
 
-            if (learningContent['learned-patterns.md']) {
-                contentHTML += `
-                    <div style="background: #f0fdf4; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--success); margin-bottom: 1.5rem;">
-                        <h3 style="margin: 0 0 1rem 0; color: var(--success); font-size: 1rem;">✅ Learned Success Patterns</h3>
-                        <div style="font-size: 0.875rem; color: var(--text-primary);">
-                            ${formatContent(learningContent['learned-patterns.md'])}
-                        </div>
-                    </div>
-                `;
-            }
-
-            if (learningContent['common-errors.md']) {
-                contentHTML += `
-                    <div style="background: #fef2f2; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--error); margin-bottom: 1.5rem;">
-                        <h3 style="margin: 0 0 1rem 0; color: var(--error); font-size: 1rem;">❌ Common Errors to Avoid</h3>
-                        <div style="font-size: 0.875rem; color: var(--text-primary);">
-                            ${formatContent(learningContent['common-errors.md'])}
-                        </div>
-                    </div>
-                `;
-            }
-
-            if (learningContent['user-corrections.md']) {
-                contentHTML += `
-                    <div style="background: #fef9ef; padding: 1rem; border-radius: 0.5rem; border-left: 4px solid var(--warning); margin-bottom: 1.5rem;">
-                        <h3 style="margin: 0 0 1rem 0; color: var(--warning); font-size: 1rem;">📝 User Corrections</h3>
-                        <div style="font-size: 0.875rem; color: var(--text-primary);">
-                            ${formatContent(learningContent['user-corrections.md'])}
-                        </div>
-                    </div>
-                `;
-            }
-
-            modalContent.innerHTML = contentHTML;
-            modal.appendChild(modalContent);
-            document.body.appendChild(modal);
-
-            // Close on background click
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.remove();
-                }
-            });
+            // Reload data
+            await loadQualityMatrix();
         }
 
-        // Load sentiment data
-        async function loadSentimentData() {
-            if (!selectedAgent) return;
-
-            const container = document.getElementById('sentiment-container');
-
+        // Load agent quality matrix
+        async function loadQualityMatrix() {
             try {
-                // Check pending count
-                const pendingResponse = await fetch(`/api/sentiment-analysis?action=pending-count`, {
-                    credentials: 'include'
-                });
-                const pendingData = await pendingResponse.json();
+                const response = await fetch(`/api/agent-quality?days=${currentDays}`);
+                const data = await response.json();
 
-                // Get existing stats
-                const statsResponse = await fetch(`/api/sentiment-analysis?action=stats&agentType=${selectedAgent}&days=30`, {
-                    credentials: 'include'
-                });
-                const statsData = await statsResponse.json();
-
-                // Handle case where API returns error or stats is undefined
-                if (!statsData.success || !statsData.stats) {
-                    console.error('Stats API error:', statsData);
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">💭</div>
-                            <p>Sentiment analysis available</p>
-                            <p style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--text-secondary);">
-                                ${pendingData.pendingCount} feedback items pending analysis
-                            </p>
-                        </div>
-                    `;
+                if (!data.success) {
+                    showError('Failed to load agent quality data');
                     return;
                 }
 
-                if (pendingData.pendingCount === 0 && statsData.stats.total === 0) {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">💭</div>
-                            <p>No sentiment analysis data yet</p>
-                            <p style="font-size: 0.875rem; margin-top: 0.5rem;">
-                                Sentiment analysis will be available once there is feedback to analyze
-                            </p>
-                        </div>
-                    `;
-                    return;
-                }
+                // Update summary cards
+                document.getElementById('totalConversations').textContent = data.summary.totalConversations.toLocaleString();
+                document.getElementById('avgQuality').textContent = data.summary.avgQualityScore !== null
+                    ? data.summary.avgQualityScore.toFixed(1)
+                    : '-';
+                document.getElementById('avgPositive').textContent = data.summary.avgPositiveRate !== null
+                    ? `${data.summary.avgPositiveRate.toFixed(1)}%`
+                    : '-';
 
-                container.innerHTML = `
-                    <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem; margin-bottom: 1rem;">
-                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1rem;">
-                            <div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">ANALYZED FEEDBACK</div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--primary);">${statsData.stats.total}</div>
-                            </div>
-                            <div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.5rem;">PENDING ANALYSIS</div>
-                                <div style="font-size: 1.5rem; font-weight: 700; color: var(--warning);">${pendingData.pendingCount}</div>
-                            </div>
-                        </div>
+                const activeAgents = data.agents.filter(a => a.conversationCount > 0).length;
+                document.getElementById('activeAgents').textContent = `${activeAgents} / ${data.agents.length}`;
 
-                        ${statsData.stats.total > 0 ? `
-                            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);">
-                                <div style="text-align: center;">
-                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--success);">${statsData.stats.positive}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">😊 Positive</div>
-                                    <div style="font-size: 0.875rem; color: var(--success); font-weight: 600;">${statsData.stats.positivePercent.toFixed(1)}%</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--error);">${statsData.stats.negative}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">😞 Negative</div>
-                                    <div style="font-size: 0.875rem; color: var(--error); font-weight: 600;">${statsData.stats.negativePercent.toFixed(1)}%</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--info);">${statsData.stats.neutral}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">😐 Neutral</div>
-                                    <div style="font-size: 0.875rem; color: var(--info); font-weight: 600;">${statsData.stats.neutralPercent.toFixed(1)}%</div>
-                                </div>
-                                <div style="text-align: center;">
-                                    <div style="font-size: 1.25rem; font-weight: 700; color: var(--warning);">${statsData.stats.mixed}</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">🤔 Mixed</div>
-                                    <div style="font-size: 0.875rem; color: var(--warning); font-weight: 600;">${statsData.stats.mixedPercent.toFixed(1)}%</div>
-                                </div>
-                            </div>
+                // Render matrix
+                renderMatrix(data.agents);
 
-                            <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); text-align: center;">
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 0.25rem;">AVERAGE SENTIMENT SCORE</div>
-                                <div style="font-size: 1.125rem; font-weight: 700; color: ${statsData.stats.averageScore >= 0 ? 'var(--success)' : 'var(--error)'};">
-                                    ${statsData.stats.averageScore.toFixed(2)}
-                                </div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">Range: -1.0 to 1.0</div>
-                            </div>
-                        ` : ''}
-                    </div>
-                `;
             } catch (error) {
-                console.error('Error loading sentiment data:', error);
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
-                        <p>Error loading sentiment data</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--error);">
-                            ${error.message}
-                        </p>
-                    </div>
-                `;
+                console.error('Error loading quality matrix:', error);
+                showError('Failed to load data: ' + error.message);
             }
         }
 
-        // Generate AI-powered insights from feedback
-        async function generateInsights() {
-            if (!selectedAgent) return;
+        // Render the agent quality matrix table
+        function renderMatrix(agents) {
+            const container = document.getElementById('matrixContainer');
 
-            const button = event.currentTarget;
-            button.disabled = true;
-            button.textContent = 'Analyzing feedback patterns...';
-
-            const container = document.getElementById('insights-container');
-            container.innerHTML = `
-                <div class="loading" style="padding: 2rem;">
-                    <div class="loading-spinner"></div>
-                    <p style="margin-top: 1rem; color: var(--text-secondary);">
-                        Claude is analyzing feedback patterns and generating recommendations...
-                    </p>
-                    <p style="margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
-                        This may take 10-30 seconds
-                    </p>
-                </div>
-            `;
-
-            try {
-                const response = await fetch('/api/sentiment-analysis', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        action: 'generate-insights',
-                        agentType: selectedAgent
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success && result.insights) {
-                    const insights = result.insights;
-
-                    // Display insights in a nice format
-                    container.innerHTML = `
-                        <div style="margin-bottom: 2rem;">
-                            <div style="background: var(--info); color: white; padding: 1rem; border-radius: 0.5rem; margin-bottom: 1.5rem;">
-                                <strong style="font-size: 0.875rem; text-transform: uppercase; letter-spacing: 0.05em;">Executive Summary</strong>
-                                <p style="margin-top: 0.5rem; line-height: 1.6; font-size: 0.9375rem;">${insights.summary}</p>
-                                <p style="margin-top: 0.5rem; font-size: 0.875rem; opacity: 0.9;">
-                                    Based on ${insights.feedbackCount} feedback items
-                                </p>
-                            </div>
-
-                            ${insights.patterns && insights.patterns.length > 0 ? `
-                                <div style="margin-bottom: 1.5rem;">
-                                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary);">
-                                        🔍 Patterns Observed
-                                    </h4>
-                                    <ul style="list-style: none; padding: 0;">
-                                        ${insights.patterns.map(pattern => `
-                                            <li style="padding: 0.75rem; background: var(--background); border-left: 3px solid var(--primary); margin-bottom: 0.5rem; border-radius: 0.25rem;">
-                                                ${pattern}
-                                            </li>
-                                        `).join('')}
-                                    </ul>
-                                </div>
-                            ` : ''}
-
-                            ${insights.strengths && insights.strengths.length > 0 ? `
-                                <div style="margin-bottom: 1.5rem;">
-                                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--success);">
-                                        ✅ Strengths
-                                    </h4>
-                                    <ul style="list-style: none; padding: 0;">
-                                        ${insights.strengths.map(strength => `
-                                            <li style="padding: 0.75rem; background: #d1fae5; border-left: 3px solid var(--success); margin-bottom: 0.5rem; border-radius: 0.25rem;">
-                                                ${strength}
-                                            </li>
-                                        `).join('')}
-                                    </ul>
-                                </div>
-                            ` : ''}
-
-                            ${insights.improvements && insights.improvements.length > 0 ? `
-                                <div style="margin-bottom: 1.5rem;">
-                                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--warning);">
-                                        ⚠️ Areas for Improvement
-                                    </h4>
-                                    <ul style="list-style: none; padding: 0;">
-                                        ${insights.improvements.map(improvement => `
-                                            <li style="padding: 0.75rem; background: #fef3c7; border-left: 3px solid var(--warning); margin-bottom: 0.5rem; border-radius: 0.25rem;">
-                                                ${improvement}
-                                            </li>
-                                        `).join('')}
-                                    </ul>
-                                </div>
-                            ` : ''}
-
-                            ${insights.actionItems && insights.actionItems.length > 0 ? `
-                                <div style="margin-bottom: 1.5rem;">
-                                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--danger);">
-                                        🎯 Action Items
-                                    </h4>
-                                    <div style="display: grid; gap: 1rem;">
-                                        ${insights.actionItems.map((action, idx) => {
-                                            const priorityColors = {
-                                                high: '#ef4444',
-                                                medium: '#f59e0b',
-                                                low: '#6b7280'
-                                            };
-                                            const priorityColor = priorityColors[action.priority] || '#6b7280';
-
-                                            return `
-                                                <div style="padding: 1rem; background: var(--background); border-left: 4px solid ${priorityColor}; border-radius: 0.375rem;">
-                                                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
-                                                        <strong style="font-size: 0.9375rem;">${idx + 1}. ${action.title}</strong>
-                                                        <span style="background: ${priorityColor}; color: white; padding: 0.125rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase;">
-                                                            ${action.priority}
-                                                        </span>
-                                                    </div>
-                                                    <p style="margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
-                                                        ${action.description}
-                                                    </p>
-                                                    <p style="color: var(--success); font-size: 0.875rem; font-style: italic;">
-                                                        <strong>Impact:</strong> ${action.impact}
-                                                    </p>
-                                                </div>
-                                            `;
-                                        }).join('')}
-                                    </div>
-                                </div>
-                            ` : ''}
-
-                            <div style="margin-top: 1.5rem; padding: 0.75rem; background: var(--background); border-radius: 0.375rem; font-size: 0.75rem; color: var(--text-secondary); text-align: center;">
-                                Generated on ${new Date(insights.analyzed_at).toLocaleString()} by Claude AI
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    container.innerHTML = `
-                        <div class="empty-state">
-                            <div class="empty-state-icon">⚠️</div>
-                            <p>Failed to generate insights</p>
-                            <p style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--error);">
-                                ${result.error || 'Unknown error'}
-                            </p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error generating insights:', error);
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">⚠️</div>
-                        <p>Error generating insights</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem; color: var(--error);">
-                            ${error.message}
-                        </p>
-                    </div>
-                `;
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Generate AI Insights';
-            }
-        }
-
-        // Trigger learning update
-        async function triggerLearningUpdate() {
-            if (!selectedAgent) return;
-
-            const button = event.currentTarget;
-            button.disabled = true;
-            button.textContent = 'Updating...';
-
-            try {
-                const response = await fetch('/api/feedback-learning', {
-                    method: 'POST',
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        agentType: selectedAgent
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    // Reload the tab
-                    await loadLearningInsightsTab();
-
-                    // Show success message
-                    alert(`✅ Learning updated successfully!\n\n` +
-                          `Success Patterns: ${result.report.successPatterns}\n` +
-                          `Error Patterns: ${result.report.errorPatterns}\n` +
-                          `Corrections: ${result.report.corrections}`);
-                } else {
-                    alert(`Failed to update learning: ${result.error}`);
-                }
-            } catch (error) {
-                alert(`Error: ${error.message}`);
-            } finally {
-                button.disabled = false;
-                button.textContent = 'Update Learning Now';
-            }
-        }
-
-        // Load overview tab
-        async function loadOverviewTab() {
-            const response = await fetch(`/api/feedback-metrics?action=stats&agentType=${selectedAgent}`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-            const stats = data.stats;
-
-            document.getElementById('tab-content').innerHTML = `
-                <div class="section">
-                    <h3 class="section-title">
-                        Performance Metrics
-                        ${stats.avgConfidence > 0 ? `
-                            <span style="font-size: 0.75rem; font-weight: normal; color: var(--text-secondary); margin-left: 0.5rem;">
-                                ⓘ Includes high-confidence sentiment analysis
-                            </span>
-                        ` : ''}
-                    </h3>
-                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
-                        <div class="stat">
-                            <div class="stat-value">${stats.totalFeedback}</div>
-                            <div class="stat-label">Total Feedback</div>
-                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                ${stats.explicitRatings} ratings + ${stats.standaloneNotes} notes
-                            </div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${stats.satisfactionRate}%</div>
-                            <div class="stat-label">Satisfaction Rate</div>
-                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                Weighted calculation
-                            </div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${stats.avgQualityScore.toFixed(2)}</div>
-                            <div class="stat-label">Avg Quality</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${stats.feedbackRate}%</div>
-                            <div class="stat-label">Feedback Rate</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${stats.avgRevisionCount.toFixed(1)}</div>
-                            <div class="stat-label">Avg Revisions</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${Math.round(stats.avgCompletionTime / 60)}</div>
-                            <div class="stat-label">Avg Time (min)</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${stats.totalNotes}</div>
-                            <div class="stat-label">Total Notes</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${stats.totalMessages}</div>
-                            <div class="stat-label">Total Messages</div>
-                        </div>
-                    </div>
-                    ${stats.avgConfidence > 0 ? `
-                        <div style="margin-top: 1rem; padding: 0.75rem; background: rgba(59, 130, 246, 0.1); border-left: 3px solid var(--info); border-radius: 0.375rem; font-size: 0.875rem;">
-                            <strong>Data Confidence:</strong> ${(stats.avgConfidence * 100).toFixed(0)}%
-                            <span style="color: var(--text-secondary); margin-left: 0.5rem;">
-                                | Explicit ratings weighted 1.0x, sentiment-inferred weighted 0.8x
-                            </span>
-                        </div>
-                    ` : ''}
-                </div>
-
-                <div class="section">
-                    <h3 class="section-title">Feedback Distribution</h3>
-                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 1.5rem;">
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--success);">${stats.positiveCount}</div>
-                            <div class="stat-label">👍 Positive</div>
-                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                ${stats.explicitPositive} explicit + ${stats.implicitPositive} inferred
-                            </div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--danger);">${stats.negativeCount}</div>
-                            <div class="stat-label">👎 Negative</div>
-                            <div style="font-size: 0.625rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                ${stats.explicitNegative} explicit + ${stats.implicitNegative} inferred
-                            </div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--text-secondary);">${stats.totalMessages - stats.totalRatings}</div>
-                            <div class="stat-label">No Rating</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <h3 class="section-title">Notes Sentiment</h3>
-                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--success);">${stats.sentimentPositive}</div>
-                            <div class="stat-label">Positive</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--danger);">${stats.sentimentNegative}</div>
-                            <div class="stat-label">Negative</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--warning);">${stats.sentimentMixed}</div>
-                            <div class="stat-label">Mixed</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value" style="color: var(--text-secondary);">${stats.sentimentNeutral}</div>
-                            <div class="stat-label">Neutral</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="section" style="background: var(--background); border-radius: 0.75rem; padding: 1rem;">
-                    <h4 style="font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem;">📊 Feedback Source Breakdown</h4>
-                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem;">
-                        <div>
-                            <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
-                                Explicit Ratings
-                            </div>
-                            <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                                ${stats.explicitRatings} total (${stats.explicitRate}% positive)
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                Direct thumbs up/down from users
-                            </div>
-                        </div>
-                        <div>
-                            <div style="font-size: 0.875rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;">
-                                Sentiment-Inferred Ratings
-                            </div>
-                            <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                                ${stats.implicitPositive + stats.implicitNegative} total (${stats.implicitRate}% positive)
-                            </div>
-                            <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                High-confidence sentiment (>70%) from notes
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Load high-quality feedback tab
-        async function loadHighQualityTab() {
-            const response = await fetch(`/api/feedback-metrics?action=high-quality&agentType=${selectedAgent}&limit=20`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-
-            if (data.feedback.length === 0) {
-                document.getElementById('tab-content').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📭</div>
-                        <p>No high-quality feedback yet</p>
-                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Quality score threshold: 0.75+</p>
-                    </div>
-                `;
+            if (agents.length === 0) {
+                container.innerHTML = '<div class="empty-state">No agent data available</div>';
                 return;
             }
 
-            document.getElementById('tab-content').innerHTML = `
-                <div class="section">
-                    <div class="section-header">
-                        <h3 class="section-title">High Quality Responses (Learn From These)</h3>
-                        <span class="badge badge-success">${data.count} messages</span>
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Conversations
+                                    <span class="tooltip-text">Number of conversations with this agent in the selected time period</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Quality Score
+                                    <span class="tooltip-text long">Weighted composite score based on accuracy (30%), instruction following (25%), positive feedback (20%), format (10%), workflow (10%), and context usage (5%)</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Accuracy
+                                    <span class="tooltip-text long">Percentage of conversations without accuracy issues like missed information, hallucinations, or incorrect data</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Instructions
+                                    <span class="tooltip-text long">Percentage of conversations where the agent delivered what the user specifically requested</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Format
+                                    <span class="tooltip-text long">Percentage of conversations where output followed the required structure, word limits, and formatting rules</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Workflow
+                                    <span class="tooltip-text long">Percentage of conversations that followed the correct process without repeating steps or asking for information already provided</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Positive %
+                                    <span class="tooltip-text">Percentage of feedback that was positive (thumbs up) vs negative (thumbs down)</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Avg Revisions
+                                    <span class="tooltip-text">Average number of times users asked the agent to revise its output before finalizing</span>
+                                </span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${agents.map(agent => `
+                            <tr onclick="viewAgentDetails('${agent.agentType}')">
+                                <td class="agent-name">${agent.agentName}</td>
+                                <td>${agent.conversationCount}</td>
+                                <td>${formatScore(agent.qualityScore)}</td>
+                                <td>${formatScore(agent.accuracyScore)}</td>
+                                <td>${formatScore(agent.instructionScore)}</td>
+                                <td>${formatScore(agent.formatScore)}</td>
+                                <td>${formatScore(agent.workflowScore)}</td>
+                                <td>${agent.positiveRate !== null ? `${agent.positiveRate}%` : '-'}</td>
+                                <td>${agent.avgRevisions !== null ? agent.avgRevisions.toFixed(1) : '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // Format score with color coding
+        function formatScore(score) {
+            if (score === null) {
+                return '<span class="score score-na">-</span>';
+            }
+
+            let className = 'score-poor';
+            if (score >= 90) className = 'score-excellent';
+            else if (score >= 80) className = 'score-good';
+            else if (score >= 70) className = 'score-fair';
+
+            return `<span class="score ${className}">${score}</span>`;
+        }
+
+        // View agent details in modal
+        async function viewAgentDetails(agentType) {
+            const modal = document.getElementById('agentModal');
+            const modalContent = document.getElementById('modalContent');
+            modal.style.display = 'block';
+
+            // Show loading
+            modalContent.innerHTML = '<div class="loading">Loading agent details...</div>';
+
+            try {
+                const response = await fetch(`/api/agent-quality?action=agent-details&agentType=${agentType}&days=${currentDays}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    modalContent.innerHTML = '<div class="error">Failed to load agent details</div>';
+                    return;
+                }
+
+                // Update modal title
+                document.getElementById('modalAgentName').textContent = data.agentName;
+
+                // Render details
+                renderAgentDetails(data);
+
+            } catch (error) {
+                console.error('Error loading agent details:', error);
+                modalContent.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        // Render agent details in modal
+        function renderAgentDetails(data) {
+            const modalContent = document.getElementById('modalContent');
+
+            const html = `
+                <div class="metric-grid">
+                    <div class="metric-item">
+                        <div class="metric-item-label">Quality Score</div>
+                        <div class="metric-item-value">${data.metrics.qualityScore !== null ? data.metrics.qualityScore : '-'}</div>
                     </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Accuracy</div>
+                        <div class="metric-item-value">${data.metrics.accuracyScore !== null ? data.metrics.accuracyScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Instructions</div>
+                        <div class="metric-item-value">${data.metrics.instructionScore !== null ? data.metrics.instructionScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Format</div>
+                        <div class="metric-item-value">${data.metrics.formatScore !== null ? data.metrics.formatScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Workflow</div>
+                        <div class="metric-item-value">${data.metrics.workflowScore !== null ? data.metrics.workflowScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Context Usage</div>
+                        <div class="metric-item-value">${data.metrics.contextScore !== null ? data.metrics.contextScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Avg Revisions</div>
+                        <div class="metric-item-value">${data.metrics.avgRevisions !== null ? data.metrics.avgRevisions.toFixed(1) : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Positive Rate</div>
+                        <div class="metric-item-value">${data.metrics.positiveRate !== null ? data.metrics.positiveRate + '%' : '-'}</div>
+                    </div>
+                </div>
+
+                ${data.issueBreakdown.length > 0 ? `
+                    <div class="issue-breakdown">
+                        <h3>Common Issues</h3>
+                        <div>
+                            ${data.issueBreakdown.map(issue => `
+                                <span class="issue-tag">
+                                    ${issue.tag}
+                                    <span class="count">${issue.occurrence_count}</span>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${data.recentFeedback.length > 0 ? `
                     <div class="feedback-list">
-                        ${data.feedback.map(item => `
+                        <h3>Recent Feedback (Last 20)</h3>
+                        ${data.recentFeedback.map(fb => `
                             <div class="feedback-item">
                                 <div class="feedback-header">
-                                    <div class="feedback-rating rating-positive">
-                                        👍 ${item.rating}
-                                    </div>
-                                    <div class="quality-score">
-                                        Quality: <strong>${item.quality_score.toFixed(2)}</strong>
-                                    </div>
+                                    <span class="feedback-rating ${fb.rating}">${fb.rating === 'positive' ? '👍' : '👎'} ${fb.rating}</span>
+                                    <span class="feedback-meta">${fb.user_name} • ${new Date(fb.created_at).toLocaleDateString()}</span>
                                 </div>
-                                <div class="feedback-content">
-                                    ${truncate(parseMessageContent(item.message_content), 300)}
-                                </div>
-                                ${item.note && item.note.trim() ? `
-                                    <div style="background: #ecfdf5; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; border-left: 3px solid #10b981; font-size: 0.875rem;">
-                                        <strong>💬 User Feedback:</strong> ${item.note}
+                                ${fb.feedback_text ? `<div class="feedback-text">${fb.feedback_text}</div>` : ''}
+                                ${fb.tags && fb.tags.length > 0 ? `
+                                    <div class="feedback-tags">
+                                        ${fb.tags.map(tag => `<span class="feedback-tag">${tag}</span>`).join('')}
                                     </div>
                                 ` : ''}
-                                <div class="feedback-meta">
-                                    <span>📊 Revisions: ${item.revision_count}</span>
-                                    <span>⏱️ Time: ${Math.round(item.completion_time_seconds / 60)}m</span>
-                                    <span>💬 Messages: ${item.message_count}</span>
-                                    <span>📅 ${formatDate(item.created_at)}</span>
-                                </div>
                             </div>
                         `).join('')}
                     </div>
-                </div>
+                ` : '<div class="empty-state">No recent feedback</div>'}
             `;
+
+            modalContent.innerHTML = html;
         }
 
-        // Load negative feedback tab
-        async function loadNegativeTab() {
-            const response = await fetch(`/api/feedback-metrics?action=negative&agentType=${selectedAgent}&limit=10`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-
-            if (data.feedback.length === 0) {
-                document.getElementById('tab-content').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">✨</div>
-                        <p>No negative feedback - Great work!</p>
-                    </div>
-                `;
-                return;
+        // Close modal
+        function closeModal(event) {
+            // Close if clicking outside modal content or close button
+            if (!event || event.target.id === 'agentModal' || event.target.classList.contains('close-btn')) {
+                document.getElementById('agentModal').style.display = 'none';
             }
-
-            document.getElementById('tab-content').innerHTML = `
-                <div class="section">
-                    <div class="section-header">
-                        <h3 class="section-title">Negative Patterns (Avoid These)</h3>
-                        <span class="badge badge-danger">${data.count} messages</span>
-                    </div>
-                    <div class="feedback-list">
-                        ${data.feedback.map(item => `
-                            <div class="feedback-item" style="border-left: 3px solid var(--danger);">
-                                <div class="feedback-header">
-                                    <div class="feedback-rating rating-negative">
-                                        👎 ${item.rating}
-                                    </div>
-                                    <div class="quality-score">
-                                        Quality: <strong>${item.quality_score.toFixed(2)}</strong>
-                                    </div>
-                                </div>
-                                <div class="feedback-content">
-                                    ${truncate(parseMessageContent(item.message_content), 300)}
-                                </div>
-                                ${item.note && item.note.trim() ? `
-                                    <div style="background: #fef2f2; padding: 0.75rem; border-radius: 0.375rem; margin-bottom: 0.75rem; border-left: 3px solid #ef4444; font-size: 0.875rem;">
-                                        <strong>💬 User Feedback:</strong> ${item.note}
-                                    </div>
-                                ` : ''}
-                                <div class="feedback-meta">
-                                    <span>📊 Revisions: ${item.revision_count}</span>
-                                    <span>⏱️ Time: ${Math.round(item.completion_time_seconds / 60)}m</span>
-                                    <span>💬 Messages: ${item.message_count}</span>
-                                    <span>📅 ${formatDate(item.created_at)}</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
         }
 
-        // Load corrections tab
-        async function loadCorrectionsTab() {
-            const response = await fetch(`/api/feedback-metrics?action=corrections&agentType=${selectedAgent}&limit=50`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-
-            if (data.corrections.length === 0) {
-                document.getElementById('tab-content').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">✅</div>
-                        <p>No user corrections yet</p>
-                    </div>
-                `;
-                return;
-            }
-
-            document.getElementById('tab-content').innerHTML = `
-                <div class="section">
-                    <div class="section-header">
-                        <h3 class="section-title">User Corrections (Critical Learning)</h3>
-                        <span class="badge badge-warning">${data.count} corrections</span>
-                    </div>
-                    <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.875rem;">
-                        These notes contain correction keywords like "actually", "incorrect", "wrong", etc.
-                    </p>
-                    <div class="feedback-list">
-                        ${data.corrections.map(item => `
-                            <div class="correction-item">
-                                <div class="correction-text">
-                                    ${item.note_text}
-                                </div>
-                                <div class="correction-meta">
-                                    <span>Sentiment: <strong>${item.sentiment}</strong></span>
-                                    <span>• Message Index: ${item.message_index}</span>
-                                    <span>• ${formatDate(item.created_at)}</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
+        // Show error message
+        function showError(message) {
+            const container = document.getElementById('matrixContainer');
+            container.innerHTML = `<div class="error">${message}</div>`;
         }
-
-        // Load trends tab
-        async function loadTrendsTab() {
-            const response = await fetch(`/api/feedback-metrics?action=trends&agentType=${selectedAgent}&days=30`, {
-                credentials: 'include'
-            });
-            const data = await response.json();
-
-            if (data.trends.length === 0) {
-                document.getElementById('tab-content').innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📈</div>
-                        <p>Not enough data for trends yet</p>
-                    </div>
-                `;
-                return;
-            }
-
-            // Calculate trend summary
-            const avgQuality = (data.trends.reduce((sum, day) => sum + parseFloat(day.avg_quality_score), 0) / data.trends.length).toFixed(2);
-            const totalRatings = data.trends.reduce((sum, day) => sum + parseInt(day.total_ratings), 0);
-            const totalPositive = data.trends.reduce((sum, day) => sum + parseInt(day.positive_count), 0);
-            const positiveRate = ((totalPositive / totalRatings) * 100).toFixed(1);
-
-            document.getElementById('tab-content').innerHTML = `
-                <div class="section">
-                    <h3 class="section-title">30-Day Trends</h3>
-                    <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
-                        <div class="stat">
-                            <div class="stat-value">${avgQuality}</div>
-                            <div class="stat-label">Avg Quality Score</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${totalRatings}</div>
-                            <div class="stat-label">Total Ratings</div>
-                        </div>
-                        <div class="stat">
-                            <div class="stat-value">${positiveRate}%</div>
-                            <div class="stat-label">Positive Rate</div>
-                        </div>
-                    </div>
-
-                    <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem;">
-                        ${data.trends.slice(0, 10).map(day => `
-                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 0.75rem; border-bottom: 1px solid var(--border);">
-                                <div style="font-weight: 500;">${formatDate(day.date)}</div>
-                                <div style="display: flex; gap: 2rem; align-items: center;">
-                                    <span style="color: var(--success);">👍 ${day.positive_count}</span>
-                                    <span style="color: var(--danger);">👎 ${day.negative_count}</span>
-                                    <span style="color: var(--primary); font-weight: 600;">Quality: ${parseFloat(day.avg_quality_score).toFixed(2)}</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
-        // Helper functions
-        function formatAgentName(agentType) {
-            const names = {
-                'etg-writer': 'ETG Business Case',
-                'grant-cards': 'Grant Card Generator',
-                'bcafe-writer': 'BCAFE Writer',
-                'canexport-claims': 'CanExport Claims',
-                'readiness-strategist': 'Readiness Strategist'
-            };
-            return names[agentType] || agentType;
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-            if (diffDays === 0) return 'Today';
-            if (diffDays === 1) return 'Yesterday';
-            if (diffDays < 7) return `${diffDays} days ago`;
-
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        }
-
-        function truncate(text, maxLength) {
-            if (text.length <= maxLength) return text;
-            return text.substring(0, maxLength) + '...';
-        }
-
-        function parseMessageContent(content) {
-            // Handle JSON array format from Claude API
-            if (typeof content === 'string' && content.trim().startsWith('[')) {
-                try {
-                    const parsed = JSON.parse(content);
-                    if (Array.isArray(parsed)) {
-                        // Extract text from all content blocks
-                        return parsed
-                            .filter(block => block.type === 'text')
-                            .map(block => block.text)
-                            .join('\n');
-                    }
-                } catch (e) {
-                    // If parsing fails, return as-is
-                    return content;
-                }
-            }
-            return content;
-        }
-
-        // Initialize on load
-        init();
     </script>
 </body>
 </html>
