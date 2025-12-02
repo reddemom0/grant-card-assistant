@@ -1,12 +1,17 @@
 // Migration: Add Agent Performance Metrics Schema
 // Run with: node migrations/add-agent-metrics-schema.js
 
-const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
+import pg from 'pg';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const { Pool } = pg;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const pool = new Pool({
-  connectionString: process.env.POSTGRES_URL,
+  connectionString: process.env.DATABASE_URL || process.env.POSTGRES_URL,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
@@ -52,14 +57,12 @@ async function runMigration() {
   }
 }
 
-// Run if called directly
-if (require.main === module) {
-  runMigration()
-    .then(() => process.exit(0))
-    .catch((error) => {
-      console.error(error);
-      process.exit(1);
-    });
-}
+// Run migration
+runMigration()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
 
-module.exports = { runMigration };
+export { runMigration };
