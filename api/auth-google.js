@@ -41,15 +41,14 @@ export default function handler(req, res) {
   console.log('   response_type:', 'code');
   console.log('   scope:', scopes);
   console.log('   access_type:', 'offline');
-  console.log('   prompt:', 'select_account'); // Only show account picker, not consent screen if already authorized
+  console.log('   prompt:', 'none - Google will decide when to show consent');
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(clientId)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `response_type=code&` +
     `scope=${encodeURIComponent(scopes)}&` +
-    `access_type=offline&` +
-    `prompt=select_account`;
+    `access_type=offline`;
 
   console.log('🔵 Full OAuth URL:', googleAuthUrl);
   console.log('🔵 URL length:', googleAuthUrl.length);
