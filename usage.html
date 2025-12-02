@@ -346,8 +346,8 @@
     </div>
 
     <script>
-        // Version: 2025-12-02-v6 - Handle empty user activity gracefully
-        console.log('📊 Usage Analytics v2025-12-02-v6 loaded');
+        // Version: 2025-12-02-v7 - Time-filtered team productivity metrics
+        console.log('📊 Usage Analytics v2025-12-02-v7 loaded');
 
         let currentDays = 7;
         let currentTimeFilter = '7days'; // Options: '24hours', '7days', '30days', '90days'
@@ -600,25 +600,23 @@
                             </div>
                         `).join('')}
 
-                        <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Weekly Conversations per Person</h4>
+                        <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Team Productivity (${getTimePeriodLabel()})</h4>
                         <table>
                             <thead>
                                 <tr>
                                     <th>Team Member</th>
-                                    <th>Avg Conversations/Week</th>
-                                    <th>Last 4 Weeks</th>
+                                    <th>Total Conversations</th>
+                                    <th>Total Messages</th>
+                                    <th>Total Feedback</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${data.userProductivity.map(user => `
                                     <tr>
                                         <td>${user.name}</td>
-                                        <td><strong>${user.avgConversationsPerWeek}</strong></td>
-                                        <td>
-                                            ${user.weeks.map(w => `
-                                                <span class="badge badge-primary" style="margin-right: 0.25rem;">${w.conversationsCompleted}</span>
-                                            `).join('')}
-                                        </td>
+                                        <td><strong>${user.totalConversations}</strong></td>
+                                        <td><strong>${user.totalMessages}</strong></td>
+                                        <td><strong>${user.totalFeedback}</strong></td>
                                     </tr>
                                 `).join('')}
                             </tbody>

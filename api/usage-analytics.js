@@ -783,44 +783,31 @@ async function getProductivityMetrics(req, res, days) {
       };
     }));
 
-    // Conversations per person per week (last 4 weeks)
-    const weeklyConversationsResult = await query(`
+    // Total conversations, messages, and feedback per person for the selected time period
+    const userProductivityResult = await query(`
       SELECT
         u.id,
         u.name,
         u.email,
-        DATE_TRUNC('week', c.created_at) as week_start,
-        COUNT(DISTINCT c.id) as conversations_completed
+        COUNT(DISTINCT c.id) as total_conversations,
+        COUNT(DISTINCT m.id) as total_messages,
+        COUNT(DISTINCT f.id) as total_feedback
       FROM users u
-      JOIN conversations c ON u.id = c.user_id
-      WHERE c.created_at >= NOW() - INTERVAL '28 days'
-      GROUP BY u.id, u.name, u.email, DATE_TRUNC('week', c.created_at)
-      ORDER BY u.name, week_start DESC
+      LEFT JOIN conversations c ON u.id = c.user_id AND c.created_at >= NOW() - INTERVAL '${days} days'
+      LEFT JOIN messages m ON c.id = m.conversation_id
+      LEFT JOIN conversation_feedback f ON m.id = f.message_id
+      GROUP BY u.id, u.name, u.email
+      HAVING COUNT(DISTINCT c.id) > 0
+      ORDER BY total_conversations DESC
     `);
 
-    // Group by user
-    const userWeeklyConversations = {};
-    weeklyConversationsResult.rows.forEach(row => {
-      if (!userWeeklyConversations[row.id]) {
-        userWeeklyConversations[row.id] = {
-          userId: row.id,
-          name: row.name,
-          email: row.email,
-          weeks: []
-        };
-      }
-      userWeeklyConversations[row.id].weeks.push({
-        weekStart: row.week_start,
-        conversationsCompleted: parseInt(row.conversations_completed)
-      });
-    });
-
-    // Calculate averages
-    const userProductivity = Object.values(userWeeklyConversations).map(user => ({
-      ...user,
-      avgConversationsPerWeek: user.weeks.length > 0
-        ? (user.weeks.reduce((sum, w) => sum + w.conversationsCompleted, 0) / user.weeks.length).toFixed(1)
-        : 0
+    const userProductivity = userProductivityResult.rows.map(row => ({
+      userId: row.id,
+      name: row.name,
+      email: row.email,
+      totalConversations: parseInt(row.total_conversations) || 0,
+      totalMessages: parseInt(row.total_messages) || 0,
+      totalFeedback: parseInt(row.total_feedback) || 0
     }));
 
     // Quality trends over time (using feedback ratings if available)
