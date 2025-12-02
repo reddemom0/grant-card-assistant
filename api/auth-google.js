@@ -41,7 +41,7 @@ export default function handler(req, res) {
   console.log('   response_type:', 'code');
   console.log('   scope:', scopes);
   console.log('   access_type:', 'offline');
-  console.log('   prompt:', 'consent'); // Changed to 'consent' to force refresh token
+  console.log('   prompt:', 'select_account'); // Only show account picker, not consent screen if already authorized
 
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(clientId)}&` +
@@ -49,7 +49,7 @@ export default function handler(req, res) {
     `response_type=code&` +
     `scope=${encodeURIComponent(scopes)}&` +
     `access_type=offline&` +
-    `prompt=consent`;
+    `prompt=select_account`;
 
   console.log('🔵 Full OAuth URL:', googleAuthUrl);
   console.log('🔵 URL length:', googleAuthUrl.length);
