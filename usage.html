@@ -778,7 +778,7 @@
 
         function openConversation(conversationId, agentType) {
             const baseUrl = getAgentUrl(agentType);
-            const url = `${baseUrl}?conversation=${conversationId}`;
+            const url = `${baseUrl}/chat/${conversationId}`;
             console.log('🔗 Opening conversation:', { conversationId, agentType, url });
             window.open(url, '_blank');
         }
