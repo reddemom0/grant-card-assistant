@@ -1,4 +1,4 @@
-// api/auth-google.js
+// api/auth-google.js - Updated 2025-12-02
 export default function handler(req, res) {
   console.log('🔵 OAuth flow started');
   console.log('🔵 Request URL:', req.url);
