@@ -47,15 +47,27 @@ export default async function handler(req, res) {
 
         case 'user-details':
           const { userId } = req.query;
+          console.log('📊 user-details request:', { userId, days: req.query.days, daysInt });
           if (!userId) {
+            console.error('❌ Missing userId parameter');
             return res.status(400).json({ error: 'userId parameter required' });
+          }
+          if (isNaN(daysInt) || daysInt < 1) {
+            console.error('❌ Invalid days parameter:', { days: req.query.days, daysInt });
+            return res.status(400).json({ error: 'Invalid days parameter' });
           }
           return await getUserDetails(req, res, parseInt(userId), daysInt);
 
         case 'agent-details':
           const { agentType } = req.query;
+          console.log('📊 agent-details request:', { agentType, days: req.query.days, daysInt });
           if (!agentType) {
+            console.error('❌ Missing agentType parameter');
             return res.status(400).json({ error: 'agentType parameter required' });
+          }
+          if (isNaN(daysInt) || daysInt < 1) {
+            console.error('❌ Invalid days parameter:', { days: req.query.days, daysInt });
+            return res.status(400).json({ error: 'Invalid days parameter' });
           }
           return await getAgentDetails(req, res, agentType, daysInt);
 

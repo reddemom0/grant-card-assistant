@@ -346,8 +346,8 @@
     </div>
 
     <script>
-        // Version: 2025-12-02-v4 - Fixed conversation loading from URL parameter
-        console.log('📊 Usage Analytics v2025-12-02-v4 loaded');
+        // Version: 2025-12-02-v5 - Fixed time filter parameter validation
+        console.log('📊 Usage Analytics v2025-12-02-v5 loaded');
 
         let currentDays = 7;
         let currentTimeFilter = '7days'; // Options: '24hours', '7days', '30days', '90days'
@@ -860,14 +860,18 @@
 
         // Change time filter from within modal
         async function changeModalTimeFilter(days) {
-            currentDays = days;
+            // Ensure days is a number
+            const daysNum = parseInt(days);
+            console.log('📊 Changing modal time filter:', { days, daysNum, type: typeof days });
+
+            currentDays = daysNum;
             const filterMap = {
                 1: '24hours',
                 7: '7days',
                 30: '30days',
                 90: '90days'
             };
-            currentTimeFilter = filterMap[days] || '7days';
+            currentTimeFilter = filterMap[daysNum] || '7days';
 
             // Reload modal content with new time filter
             if (currentModalContext) {
@@ -883,13 +887,19 @@
         async function viewUserDetails(userId, userName) {
             // Store context for time filter changes
             currentModalContext = { type: 'user', userId, userName };
-            console.log('📊 Opening user details modal:', { userId, userName, currentDays, currentTimeFilter });
+
+            // Ensure currentDays is a valid number
+            const validDays = parseInt(currentDays) || 7;
+            console.log('📊 Opening user details modal:', { userId, userName, currentDays, validDays, currentTimeFilter });
 
             openDetailsModal();
             document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading user details...</p></div>';
 
             try {
-                const response = await fetch(`/api/usage-analytics?action=user-details&userId=${userId}&days=${currentDays}`, {
+                const url = `/api/usage-analytics?action=user-details&userId=${userId}&days=${validDays}`;
+                console.log('📊 Fetching user details from:', url);
+
+                const response = await fetch(url, {
                     credentials: 'include'
                 });
 
@@ -983,11 +993,18 @@
             // Store context for time filter changes
             currentModalContext = { type: 'agent', agentType };
 
+            // Ensure currentDays is a valid number
+            const validDays = parseInt(currentDays) || 7;
+            console.log('📊 Opening agent details modal:', { agentType, currentDays, validDays, currentTimeFilter });
+
             openDetailsModal();
             document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading agent details...</p></div>';
 
             try {
-                const response = await fetch(`/api/usage-analytics?action=agent-details&agentType=${agentType}&days=${currentDays}`, {
+                const url = `/api/usage-analytics?action=agent-details&agentType=${agentType}&days=${validDays}`;
+                console.log('📊 Fetching agent details from:', url);
+
+                const response = await fetch(url, {
                     credentials: 'include'
                 });
 
