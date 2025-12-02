@@ -697,7 +697,7 @@ async function getProductivityMetrics(req, res, days) {
       COUNT(*) as feedback_count,
       AVG(CASE WHEN f.rating = 'positive' THEN 1 WHEN f.rating = 'negative' THEN 0 END) as positive_rate,
       AVG(f.quality_score) as avg_quality
-    FROM feedback f
+    FROM conversation_feedback f
     JOIN messages m ON f.message_id = m.id
     JOIN conversations c ON m.conversation_id = c.id
     WHERE f.created_at >= NOW() - INTERVAL '${days} days'
@@ -741,7 +741,7 @@ async function getIndividualPerformance(req, res, days) {
       COUNT(DISTINCT m.id) as message_count,
       AVG(COALESCE(
         (SELECT AVG(quality_score)
-         FROM feedback f
+         FROM conversation_feedback f
          JOIN messages msg ON f.message_id = msg.id
          WHERE msg.conversation_id = c.id),
         0.7
@@ -781,17 +781,17 @@ async function getIndividualPerformance(req, res, days) {
       COUNT(DISTINCT c.id) as conversation_count,
       AVG(COALESCE(
         (SELECT AVG(quality_score)
-         FROM feedback f
+         FROM conversation_feedback f
          JOIN messages msg ON f.message_id = msg.id
          WHERE msg.conversation_id = c.id),
         0.7
       )) as avg_quality,
-      AVG(m.revision_count) as avg_revisions,
-      COUNT(DISTINCT CASE WHEN f.rating = 'negative' THEN f.id END) as negative_feedback_count
+      AVG(COALESCE(cf.revision_count, 0)) as avg_revisions,
+      COUNT(DISTINCT CASE WHEN cf.rating = 'negative' THEN cf.id END) as negative_feedback_count
     FROM users u
     JOIN conversations c ON u.id = c.user_id
     LEFT JOIN messages m ON c.id = m.conversation_id
-    LEFT JOIN feedback f ON m.id = f.message_id
+    LEFT JOIN conversation_feedback cf ON m.id = cf.message_id
     WHERE c.created_at >= NOW() - INTERVAL '${days} days'
     GROUP BY u.id, u.name, u.email, u.picture
     HAVING COUNT(DISTINCT c.id) >= 3  -- Only users with at least 3 conversations
@@ -833,7 +833,7 @@ async function getIndividualPerformance(req, res, days) {
       AVG(m.message_count) as avg_messages_per_conv,
       AVG(COALESCE(
         (SELECT AVG(quality_score)
-         FROM feedback f
+         FROM conversation_feedback f
          JOIN messages msg ON f.message_id = msg.id
          WHERE msg.conversation_id = c.id),
         0.7
