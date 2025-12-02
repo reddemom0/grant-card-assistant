@@ -107,6 +107,30 @@ export default async function handler(req, res) {
 
       console.log(`📝 Feedback note saved: ${conversationId} - ${savedNote.sentiment} sentiment`);
 
+      // Auto-tag feedback note (runs in background)
+      try {
+        const conversation = await db.getConversation(conversationId);
+        if (conversation?.agent_type && noteText.trim().length > 5) {
+          const { tagFeedbackNote } = await import('../src/feedback/auto-tagger.js');
+          // Run in background - don't block response
+          tagFeedbackNote(
+            savedNote.id,
+            noteText,
+            conversation.agent_type,
+            conversationId
+          ).then(result => {
+            if (result.success && result.tags.length > 0) {
+              console.log(`🏷️  Auto-tagged note ${savedNote.id} with ${result.tags.length} tags`);
+            }
+          }).catch(err => {
+            console.error('Background note tagging failed:', err);
+          });
+        }
+      } catch (error) {
+        // Don't fail the note submission if tagging fails
+        console.error('Error auto-tagging note:', error);
+      }
+
       // Auto-trigger learning generation if threshold reached (runs in background)
       try {
         const conversation = await db.getConversation(conversationId);

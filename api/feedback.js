@@ -136,6 +136,31 @@ export default async function handler(req, res) {
 
       console.log(`✅ Feedback saved: ${conversationId} - ${rating} (quality: ${savedFeedback.quality_score})`);
 
+      // Auto-tag feedback (runs in background)
+      let appliedTags = [];
+      try {
+        const conversation = await db.getConversation(conversationId);
+        if (conversation?.agent_type && feedbackText && feedbackText.trim().length > 5) {
+          const { tagFeedback } = await import('../src/feedback/auto-tagger.js');
+          // Run in background - don't block response
+          tagFeedback(
+            savedFeedback.id,
+            feedbackText,
+            conversation.agent_type,
+            conversationId
+          ).then(result => {
+            if (result.success && result.tags.length > 0) {
+              console.log(`🏷️  Auto-tagged feedback ${savedFeedback.id} with ${result.tags.length} tags`);
+            }
+          }).catch(err => {
+            console.error('Background tagging failed:', err);
+          });
+        }
+      } catch (error) {
+        // Don't fail the feedback submission if tagging fails
+        console.error('Error auto-tagging feedback:', error);
+      }
+
       // Auto-trigger learning generation if threshold reached (runs in background)
       try {
         const conversation = await db.getConversation(conversationId);
