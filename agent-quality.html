@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Quality Metrics - Granted AI Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #008abf;
+            --secondary-gray: #6d7881;
+            --light-gray: #dde1e3;
+            --success-green: #10b981;
+            --warning-yellow: #f59e0b;
+            --danger-red: #ef4444;
+            --bg-gray: #f9fafb;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: var(--bg-gray);
+            color: var(--secondary-gray);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        header {
+            margin-bottom: 2rem;
+        }
+
+        h1 {
+            color: var(--primary-blue);
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--secondary-gray);
+            font-size: 0.95rem;
+        }
+
+        /* Time Filter */
+        .time-filter {
+            display: flex;
+            gap: 0.75rem;
+            margin: 2rem 0;
+            flex-wrap: wrap;
+        }
+
+        .time-filter button {
+            padding: 0.75rem 1.5rem;
+            border: 2px solid var(--light-gray);
+            background: white;
+            color: var(--secondary-gray);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .time-filter button:hover {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+        }
+
+        .time-filter button.active {
+            background: var(--primary-blue);
+            color: white;
+            border-color: var(--primary-blue);
+        }
+
+        /* Summary Cards */
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-label {
+            font-size: 0.875rem;
+            color: var(--secondary-gray);
+            margin-bottom: 0.5rem;
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        .card-sublabel {
+            font-size: 0.75rem;
+            color: var(--secondary-gray);
+            margin-top: 0.25rem;
+        }
+
+        /* Quality Matrix */
+        .matrix-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .matrix-section h2 {
+            color: var(--secondary-gray);
+            font-size: 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--light-gray);
+        }
+
+        th {
+            background: var(--bg-gray);
+            color: var(--secondary-gray);
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            font-size: 0.95rem;
+        }
+
+        tr {
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+
+        tr:hover {
+            background: rgba(0, 138, 191, 0.05);
+        }
+
+        .agent-name {
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        .score {
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            display: inline-block;
+        }
+
+        .score-excellent {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-green);
+        }
+
+        .score-good {
+            background: rgba(59, 130, 246, 0.1);
+            color: #3b82f6;
+        }
+
+        .score-fair {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-yellow);
+        }
+
+        .score-poor {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+        }
+
+        .score-na {
+            background: rgba(156, 163, 175, 0.1);
+            color: #9ca3af;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: white;
+            margin: 2rem auto;
+            padding: 2rem;
+            border-radius: 12px;
+            max-width: 900px;
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-header h2 {
+            color: var(--primary-blue);
+            font-size: 1.5rem;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--secondary-gray);
+        }
+
+        .close-btn:hover {
+            color: var(--danger-red);
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .metric-item {
+            background: var(--bg-gray);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .metric-item-label {
+            font-size: 0.75rem;
+            color: var(--secondary-gray);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-item-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-blue);
+        }
+
+        .issue-breakdown {
+            margin-top: 2rem;
+        }
+
+        .issue-breakdown h3 {
+            color: var(--secondary-gray);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+
+        .issue-tag {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+            border-radius: 6px;
+            margin: 0.25rem;
+            font-size: 0.875rem;
+        }
+
+        .issue-tag .count {
+            font-weight: 600;
+            margin-left: 0.5rem;
+        }
+
+        .feedback-list {
+            margin-top: 2rem;
+        }
+
+        .feedback-item {
+            background: var(--bg-gray);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .feedback-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .feedback-rating {
+            font-weight: 600;
+        }
+
+        .feedback-rating.positive {
+            color: var(--success-green);
+        }
+
+        .feedback-rating.negative {
+            color: var(--danger-red);
+        }
+
+        .feedback-meta {
+            font-size: 0.875rem;
+            color: var(--secondary-gray);
+        }
+
+        .feedback-text {
+            margin-top: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .feedback-tags {
+            margin-top: 0.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+
+        .feedback-tag {
+            padding: 0.25rem 0.75rem;
+            background: rgba(0, 138, 191, 0.1);
+            color: var(--primary-blue);
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--secondary-gray);
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-red);
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--secondary-gray);
+        }
+
+        /* Tooltip */
+        .tooltip-container {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+
+        .tooltip-text {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: normal;
+            text-transform: none;
+            letter-spacing: normal;
+            white-space: nowrap;
+            z-index: 1000;
+            transition: opacity 0.2s;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .tooltip-text::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.9);
+        }
+
+        .tooltip-container:hover .tooltip-text {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        /* Adjust for long tooltips */
+        .tooltip-text.long {
+            white-space: normal;
+            max-width: 300px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Agent Quality Metrics</h1>
+            <p class="subtitle">Performance tracking for all AI agents</p>
+        </header>
+
+        <!-- Time Filter -->
+        <div class="time-filter">
+            <button class="active" onclick="setTimeRange(1)">Last 24 Hours</button>
+            <button onclick="setTimeRange(7)">7 Days</button>
+            <button onclick="setTimeRange(30)">One Month</button>
+            <button onclick="setTimeRange(90)">Three Months</button>
+        </div>
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="card">
+                <div class="card-label">Total Conversations</div>
+                <div class="card-value" id="totalConversations">-</div>
+                <div class="card-sublabel" id="timeLabel">Last 7 Days</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Average Quality Score</div>
+                <div class="card-value" id="avgQuality">-</div>
+                <div class="card-sublabel">Across all agents</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Positive Feedback Rate</div>
+                <div class="card-value" id="avgPositive">-</div>
+                <div class="card-sublabel">Average across agents</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Active Agents</div>
+                <div class="card-value" id="activeAgents">-</div>
+                <div class="card-sublabel">With conversations</div>
+            </div>
+        </div>
+
+        <!-- Agent Quality Matrix -->
+        <div class="matrix-section">
+            <h2>Agent Performance Matrix</h2>
+            <div id="matrixContainer">
+                <div class="loading">Loading agent quality data...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Agent Details Modal -->
+    <div id="agentModal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 id="modalAgentName">Agent Details</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <div id="modalContent">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentDays = 7;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadQualityMatrix();
+        });
+
+        // Set time range filter
+        async function setTimeRange(days) {
+            currentDays = days;
+
+            // Update active button
+            document.querySelectorAll('.time-filter button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update time label
+            const labels = {
+                1: 'Last 24 Hours',
+                7: 'Last 7 Days',
+                30: 'Last Month',
+                90: 'Last 3 Months'
+            };
+            document.getElementById('timeLabel').textContent = labels[days];
+
+            // Reload data
+            await loadQualityMatrix();
+        }
+
+        // Load agent quality matrix
+        async function loadQualityMatrix() {
+            try {
+                const response = await fetch(`/api/agent-quality?days=${currentDays}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    showError('Failed to load agent quality data');
+                    return;
+                }
+
+                // Update summary cards
+                document.getElementById('totalConversations').textContent = data.summary.totalConversations.toLocaleString();
+                document.getElementById('avgQuality').textContent = data.summary.avgQualityScore !== null
+                    ? data.summary.avgQualityScore.toFixed(1)
+                    : '-';
+                document.getElementById('avgPositive').textContent = data.summary.avgPositiveRate !== null
+                    ? `${data.summary.avgPositiveRate.toFixed(1)}%`
+                    : '-';
+
+                const activeAgents = data.agents.filter(a => a.conversationCount > 0).length;
+                document.getElementById('activeAgents').textContent = `${activeAgents} / ${data.agents.length}`;
+
+                // Render matrix
+                renderMatrix(data.agents);
+
+            } catch (error) {
+                console.error('Error loading quality matrix:', error);
+                showError('Failed to load data: ' + error.message);
+            }
+        }
+
+        // Render the agent quality matrix table
+        function renderMatrix(agents) {
+            const container = document.getElementById('matrixContainer');
+
+            if (agents.length === 0) {
+                container.innerHTML = '<div class="empty-state">No agent data available</div>';
+                return;
+            }
+
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Conversations
+                                    <span class="tooltip-text">Number of conversations with this agent in the selected time period</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Quality Score
+                                    <span class="tooltip-text long">Weighted composite score based on accuracy (30%), instruction following (25%), positive feedback (20%), format (10%), workflow (10%), and context usage (5%)</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Accuracy
+                                    <span class="tooltip-text long">Percentage of conversations without accuracy issues like missed information, hallucinations, or incorrect data</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Instructions
+                                    <span class="tooltip-text long">Percentage of conversations where the agent delivered what the user specifically requested</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Format
+                                    <span class="tooltip-text long">Percentage of conversations where output followed the required structure, word limits, and formatting rules</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Workflow
+                                    <span class="tooltip-text long">Percentage of conversations that followed the correct process without repeating steps or asking for information already provided</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Positive %
+                                    <span class="tooltip-text">Percentage of feedback that was positive (thumbs up) vs negative (thumbs down)</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Avg Revisions
+                                    <span class="tooltip-text">Average number of times users asked the agent to revise its output before finalizing</span>
+                                </span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${agents.map(agent => `
+                            <tr onclick="viewAgentDetails('${agent.agentType}')">
+                                <td class="agent-name">${agent.agentName}</td>
+                                <td>${agent.conversationCount}</td>
+                                <td>${formatScore(agent.qualityScore)}</td>
+                                <td>${formatScore(agent.accuracyScore)}</td>
+                                <td>${formatScore(agent.instructionScore)}</td>
+                                <td>${formatScore(agent.formatScore)}</td>
+                                <td>${formatScore(agent.workflowScore)}</td>
+                                <td>${agent.positiveRate !== null ? `${agent.positiveRate}%` : '-'}</td>
+                                <td>${agent.avgRevisions !== null ? agent.avgRevisions.toFixed(1) : '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        // Format score with color coding
+        function formatScore(score) {
+            if (score === null) {
+                return '<span class="score score-na">-</span>';
+            }
+
+            let className = 'score-poor';
+            if (score >= 90) className = 'score-excellent';
+            else if (score >= 80) className = 'score-good';
+            else if (score >= 70) className = 'score-fair';
+
+            return `<span class="score ${className}">${score}</span>`;
+        }
+
+        // View agent details in modal
+        async function viewAgentDetails(agentType) {
+            const modal = document.getElementById('agentModal');
+            const modalContent = document.getElementById('modalContent');
+            modal.style.display = 'block';
+
+            // Show loading
+            modalContent.innerHTML = '<div class="loading">Loading agent details...</div>';
+
+            try {
+                const response = await fetch(`/api/agent-quality?action=agent-details&agentType=${agentType}&days=${currentDays}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    modalContent.innerHTML = '<div class="error">Failed to load agent details</div>';
+                    return;
+                }
+
+                // Update modal title
+                document.getElementById('modalAgentName').textContent = data.agentName;
+
+                // Render details
+                renderAgentDetails(data);
+
+            } catch (error) {
+                console.error('Error loading agent details:', error);
+                modalContent.innerHTML = '<div class="error">Error: ' + error.message + '</div>';
+            }
+        }
+
+        // Render agent details in modal
+        function renderAgentDetails(data) {
+            const modalContent = document.getElementById('modalContent');
+
+            const html = `
+                <div class="metric-grid">
+                    <div class="metric-item">
+                        <div class="metric-item-label">Quality Score</div>
+                        <div class="metric-item-value">${data.metrics.qualityScore !== null ? data.metrics.qualityScore : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Accuracy</div>
+                        <div class="metric-item-value">${data.metrics.accuracyScore !== null ? data.metrics.accuracyScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Instructions</div>
+                        <div class="metric-item-value">${data.metrics.instructionScore !== null ? data.metrics.instructionScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Format</div>
+                        <div class="metric-item-value">${data.metrics.formatScore !== null ? data.metrics.formatScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Workflow</div>
+                        <div class="metric-item-value">${data.metrics.workflowScore !== null ? data.metrics.workflowScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Context Usage</div>
+                        <div class="metric-item-value">${data.metrics.contextScore !== null ? data.metrics.contextScore + '%' : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Avg Revisions</div>
+                        <div class="metric-item-value">${data.metrics.avgRevisions !== null ? data.metrics.avgRevisions.toFixed(1) : '-'}</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-item-label">Positive Rate</div>
+                        <div class="metric-item-value">${data.metrics.positiveRate !== null ? data.metrics.positiveRate + '%' : '-'}</div>
+                    </div>
+                </div>
+
+                ${data.issueBreakdown.length > 0 ? `
+                    <div class="issue-breakdown">
+                        <h3>Common Issues</h3>
+                        <div>
+                            ${data.issueBreakdown.map(issue => `
+                                <span class="issue-tag">
+                                    ${issue.tag}
+                                    <span class="count">${issue.occurrence_count}</span>
+                                </span>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+
+                ${data.recentFeedback.length > 0 ? `
+                    <div class="feedback-list">
+                        <h3>Recent Feedback (Last 20)</h3>
+                        ${data.recentFeedback.map(fb => `
+                            <div class="feedback-item">
+                                <div class="feedback-header">
+                                    <span class="feedback-rating ${fb.rating}">${fb.rating === 'positive' ? '👍' : '👎'} ${fb.rating}</span>
+                                    <span class="feedback-meta">${fb.user_name} • ${new Date(fb.created_at).toLocaleDateString()}</span>
+                                </div>
+                                ${fb.feedback_text ? `<div class="feedback-text">${fb.feedback_text}</div>` : ''}
+                                ${fb.tags && fb.tags.length > 0 ? `
+                                    <div class="feedback-tags">
+                                        ${fb.tags.map(tag => `<span class="feedback-tag">${tag}</span>`).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : '<div class="empty-state">No recent feedback</div>'}
+            `;
+
+            modalContent.innerHTML = html;
+        }
+
+        // Close modal
+        function closeModal(event) {
+            // Close if clicking outside modal content or close button
+            if (!event || event.target.id === 'agentModal' || event.target.classList.contains('close-btn')) {
+                document.getElementById('agentModal').style.display = 'none';
+            }
+        }
+
+        // Show error message
+        function showError(message) {
+            const container = document.getElementById('matrixContainer');
+            container.innerHTML = `<div class="error">${message}</div>`;
+        }
+    </script>
+</body>
+</html>

@@ -106,6 +106,10 @@
       "dest": "/usage.html"
     },
     {
+      "src": "/agent-quality",
+      "dest": "/agent-quality.html"
+    },
+    {
       "src": "/(.*)",
       "dest": "/$1"
     }
