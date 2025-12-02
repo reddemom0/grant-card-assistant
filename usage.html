@@ -337,6 +337,14 @@
         <div id="individual-performance"></div>
     </div>
 
+    <!-- Modal for user/agent details -->
+    <div id="detailsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 1000; overflow: auto;">
+        <div style="position: relative; background: white; margin: 2rem auto; max-width: 900px; border-radius: 12px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);">
+            <button onclick="closeDetailsModal()" style="position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary);">×</button>
+            <div id="modalContent" style="padding: 2rem;"></div>
+        </div>
+    </div>
+
     <script>
         let currentDays = 7;
         let currentTimeFilter = '7days'; // Options: '24hours', '7days', '30days', '90days'
@@ -465,19 +473,29 @@
                             </div>
                         </div>
 
-                        <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Agent Adoption Matrix</h4>
+                        <h4 style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.875rem;">Click on any user or agent for detailed breakdown</h4>
                         <table>
                             <thead>
                                 <tr>
                                     <th>Team Member</th>
-                                    ${data.availableAgents.map(agent => `<th style="text-align: center;">${formatAgentName(agent)}</th>`).join('')}
+                                    ${data.availableAgents.map(agent => `
+                                        <th style="text-align: center; cursor: pointer; transition: background 0.2s;"
+                                            onclick="viewAgentDetails('${agent}')"
+                                            onmouseover="this.style.background='var(--background)'"
+                                            onmouseout="this.style.background='transparent'"
+                                            title="Click to view ${formatAgentName(agent)} details">
+                                            ${formatAgentName(agent)}
+                                        </th>
+                                    `).join('')}
                                     <th style="text-align: center;">Total</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${data.adoptionMatrix.map(user => `
-                                    <tr>
-                                        <td>
+                                    <tr style="cursor: pointer; transition: background 0.2s;"
+                                        onmouseover="this.style.background='var(--background)'"
+                                        onmouseout="this.style.background='transparent'">
+                                        <td onclick="viewUserDetails(${user.userId}, '${user.name}')" title="Click to view ${user.name}'s usage">
                                             <div class="user-info">
                                                 <img src="${user.picture || '/default-avatar.png'}" alt="${user.name}" class="user-avatar">
                                                 <div>
@@ -503,11 +521,16 @@
                                                 showCheckmark = usage.usedLast3Months;
                                             }
 
+                                            // Build tooltip text
+                                            const tooltipText = usage.lastUsed
+                                                ? `Last used: ${formatDate(usage.lastUsed)}\\n${usage.conversationCount} conversation${usage.conversationCount !== 1 ? 's' : ''} total`
+                                                : 'Never used';
+
                                             return `
                                                 <td style="text-align: center;">
                                                     ${showCheckmark
-                                                        ? `<span style="color: var(--success); font-size: 1.25rem;" title="Used in selected period">✓</span>`
-                                                        : `<span style="color: var(--text-secondary); opacity: 0.3;">—</span>`
+                                                        ? `<span style="color: var(--success); font-size: 1.25rem; cursor: help;" title="${tooltipText}">✓</span>`
+                                                        : `<span style="color: var(--text-secondary); opacity: 0.3;" title="${tooltipText}">—</span>`
                                                     }
                                                 </td>
                                             `;
@@ -753,6 +776,189 @@
                 return `${Math.floor(diffMins / 60)} hours ago`;
             } else {
                 return date.toLocaleDateString();
+            }
+        }
+
+        // Modal functions
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        function openDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'block';
+        }
+
+        // Click outside modal to close
+        document.getElementById('detailsModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'detailsModal') {
+                closeDetailsModal();
+            }
+        });
+
+        // View user details
+        async function viewUserDetails(userId, userName) {
+            openDetailsModal();
+            document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading user details...</p></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=user-details&userId=${userId}&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load user details');
+                }
+
+                const data = await response.json();
+
+                document.getElementById('modalContent').innerHTML = `
+                    <h2 style="margin-bottom: 1.5rem; color: var(--primary);">📊 ${userName}'s Usage</h2>
+
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-value">${data.totalConversations}</div>
+                            <div class="stat-label">Conversations</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🤖</div>
+                            <div class="stat-value">${data.agentsUsed}</div>
+                            <div class="stat-label">Agents Used</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-value">${formatDuration(data.totalMinutes)}</div>
+                            <div class="stat-label">Total Time</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📅</div>
+                            <div class="stat-value">${formatDate(data.lastActivity)}</div>
+                            <div class="stat-label">Last Active</div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-bottom: 1rem;">Usage by Agent</h3>
+                    ${data.agentBreakdown.map(agent => `
+                        <div class="agent-bar" style="margin-bottom: 0.5rem;">
+                            <div class="agent-name">${formatAgentName(agent.agentType)}</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${(agent.conversations / data.totalConversations) * 100}%;">
+                                    ${agent.conversations} conversations
+                                </div>
+                            </div>
+                            <span class="metric">${formatDuration(agent.avgDuration)} avg</span>
+                        </div>
+                    `).join('')}
+
+                    <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Recent Activity</h3>
+                    <table style="width: 100%;">
+                        <thead>
+                            <tr>
+                                <th>Agent</th>
+                                <th>Date</th>
+                                <th>Messages</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${data.recentConversations.map(conv => `
+                                <tr>
+                                    <td>${formatAgentName(conv.agentType)}</td>
+                                    <td>${formatDate(conv.createdAt)}</td>
+                                    <td>${conv.messageCount}</td>
+                                    <td>${formatDuration(conv.duration)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+            } catch (error) {
+                console.error('Error loading user details:', error);
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Error loading user details</p>
+                    </div>
+                `;
+            }
+        }
+
+        // View agent details
+        async function viewAgentDetails(agentType) {
+            openDetailsModal();
+            document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading agent details...</p></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=agent-details&agentType=${agentType}&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load agent details');
+                }
+
+                const data = await response.json();
+
+                document.getElementById('modalContent').innerHTML = `
+                    <h2 style="margin-bottom: 1.5rem; color: var(--primary);">🤖 ${formatAgentName(agentType)}</h2>
+
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-value">${data.totalConversations}</div>
+                            <div class="stat-label">Conversations</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-value">${data.uniqueUsers}</div>
+                            <div class="stat-label">Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-value">${formatDuration(data.avgDuration)}</div>
+                            <div class="stat-label">Avg Duration</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📝</div>
+                            <div class="stat-value">${data.avgMessages}</div>
+                            <div class="stat-label">Avg Messages</div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-bottom: 1rem;">🏆 Top Users</h3>
+                    ${data.topUsers.map((user, idx) => `
+                        <div style="padding: 0.75rem; background: var(--background); border-left: 3px solid ${idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#CD7F32'}; border-radius: 0.375rem; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                            <div class="user-info">
+                                <img src="${user.picture}" alt="${user.name}" class="user-avatar">
+                                <div>
+                                    <div class="user-name">${user.name}</div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div><strong>${user.conversations}</strong> conversations</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">${formatDuration(user.totalTime)}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+
+                    <h3 style="margin-top: 2rem; margin-bottom: 1rem;">📈 Usage Trend</h3>
+                    <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem;">
+                        ${data.dailyUsage.map(day => `
+                            <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                                <span>${formatDate(day.date)}</span>
+                                <span><strong>${day.conversations}</strong> conversations</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading agent details:', error);
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Error loading agent details</p>
+                    </div>
+                `;
             }
         }
 

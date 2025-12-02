@@ -45,10 +45,24 @@ export default async function handler(req, res) {
         case 'individual-performance':
           return await getIndividualPerformance(req, res, daysInt);
 
+        case 'user-details':
+          const { userId } = req.query;
+          if (!userId) {
+            return res.status(400).json({ error: 'userId parameter required' });
+          }
+          return await getUserDetails(req, res, parseInt(userId), daysInt);
+
+        case 'agent-details':
+          const { agentType } = req.query;
+          if (!agentType) {
+            return res.status(400).json({ error: 'agentType parameter required' });
+          }
+          return await getAgentDetails(req, res, agentType, daysInt);
+
         default:
           return res.status(400).json({
             error: 'Invalid action parameter',
-            availableActions: ['overview', 'agent-stats', 'user-activity', 'trends', 'team-adoption', 'productivity-impact', 'individual-performance']
+            availableActions: ['overview', 'agent-stats', 'user-activity', 'trends', 'team-adoption', 'productivity-impact', 'individual-performance', 'user-details', 'agent-details']
           });
       }
     }
@@ -909,6 +923,192 @@ async function getIndividualPerformance(req, res, days) {
       error: 'Failed to fetch individual performance',
       message: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+}
+
+/**
+ * Get detailed breakdown for a specific user
+ */
+async function getUserDetails(req, res, userId, days) {
+  try {
+    // Get user's basic stats
+    const userStatsResult = await query(`
+      SELECT
+        u.name,
+        u.email,
+        u.picture,
+        COUNT(DISTINCT c.id) as total_conversations,
+        COUNT(DISTINCT c.agent_type) as agents_used,
+        MAX(c.updated_at) as last_activity
+      FROM users u
+      LEFT JOIN conversations c ON u.id = c.user_id
+      WHERE u.id = $1
+        AND (c.created_at >= NOW() - INTERVAL '${days} days' OR c.id IS NULL)
+      GROUP BY u.id, u.name, u.email, u.picture
+    `, [userId]);
+
+    if (userStatsResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const userStats = userStatsResult.rows[0];
+
+    // Calculate total time spent
+    const totalTime = await calculateUserTotalSessionDuration(userId, days);
+
+    // Get breakdown by agent
+    const agentBreakdownResult = await query(`
+      SELECT
+        c.agent_type,
+        COUNT(DISTINCT c.id) as conversations
+      FROM conversations c
+      WHERE c.user_id = $1
+        AND c.created_at >= NOW() - INTERVAL '${days} days'
+      GROUP BY c.agent_type
+      ORDER BY conversations DESC
+    `, [userId]);
+
+    const agentBreakdown = await Promise.all(agentBreakdownResult.rows.map(async row => {
+      const avgDuration = await calculateAvgSessionDuration(row.agent_type, days);
+      return {
+        agentType: row.agent_type,
+        conversations: parseInt(row.conversations),
+        avgDuration: avgDuration
+      };
+    }));
+
+    // Get recent conversations
+    const recentConversationsResult = await query(`
+      SELECT
+        c.id,
+        c.agent_type,
+        c.created_at,
+        COUNT(DISTINCT m.id) as message_count
+      FROM conversations c
+      LEFT JOIN messages m ON c.id = m.conversation_id
+      WHERE c.user_id = $1
+        AND c.created_at >= NOW() - INTERVAL '${days} days'
+      GROUP BY c.id, c.agent_type, c.created_at
+      ORDER BY c.created_at DESC
+      LIMIT 10
+    `, [userId]);
+
+    const recentConversations = recentConversationsResult.rows.map(row => ({
+      id: row.id,
+      agentType: row.agent_type,
+      createdAt: row.created_at,
+      messageCount: parseInt(row.message_count),
+      duration: 0 // We could calculate this if needed
+    }));
+
+    return res.status(200).json({
+      success: true,
+      userName: userStats.name,
+      totalConversations: parseInt(userStats.total_conversations),
+      agentsUsed: parseInt(userStats.agents_used),
+      totalMinutes: totalTime,
+      lastActivity: userStats.last_activity,
+      agentBreakdown,
+      recentConversations
+    });
+  } catch (error) {
+    console.error('Error in getUserDetails:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch user details',
+      message: error.message
+    });
+  }
+}
+
+/**
+ * Get detailed breakdown for a specific agent
+ */
+async function getAgentDetails(req, res, agentType, days) {
+  try {
+    // Get agent's basic stats
+    const agentStatsResult = await query(`
+      SELECT
+        COUNT(DISTINCT c.id) as total_conversations,
+        COUNT(DISTINCT c.user_id) as unique_users,
+        AVG(m.message_count) as avg_messages
+      FROM conversations c
+      LEFT JOIN (
+        SELECT conversation_id, COUNT(*) as message_count
+        FROM messages
+        GROUP BY conversation_id
+      ) m ON c.id = m.conversation_id
+      WHERE c.agent_type = $1
+        AND c.created_at >= NOW() - INTERVAL '${days} days'
+    `, [agentType]);
+
+    const agentStats = agentStatsResult.rows[0];
+
+    // Calculate average duration
+    const avgDuration = await calculateAvgSessionDuration(agentType, days);
+
+    // Get top users
+    const topUsersResult = await query(`
+      SELECT
+        u.id,
+        u.name,
+        u.picture,
+        COUNT(DISTINCT c.id) as conversations
+      FROM conversations c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.agent_type = $1
+        AND c.created_at >= NOW() - INTERVAL '${days} days'
+      GROUP BY u.id, u.name, u.picture
+      ORDER BY conversations DESC
+      LIMIT 5
+    `, [agentType]);
+
+    const topUsers = await Promise.all(topUsersResult.rows.map(async row => {
+      const userTime = await calculateUserTotalSessionDuration(row.id, days);
+      return {
+        id: row.id,
+        name: row.name,
+        picture: row.picture,
+        conversations: parseInt(row.conversations),
+        totalTime: userTime
+      };
+    }));
+
+    // Get daily usage trend
+    const dailyUsageResult = await query(`
+      SELECT
+        DATE(c.created_at) as date,
+        COUNT(DISTINCT c.id) as conversations
+      FROM conversations c
+      WHERE c.agent_type = $1
+        AND c.created_at >= NOW() - INTERVAL '${days} days'
+      GROUP BY DATE(c.created_at)
+      ORDER BY date DESC
+      LIMIT 14
+    `, [agentType]);
+
+    const dailyUsage = dailyUsageResult.rows.map(row => ({
+      date: row.date,
+      conversations: parseInt(row.conversations)
+    }));
+
+    return res.status(200).json({
+      success: true,
+      agentType,
+      totalConversations: parseInt(agentStats.total_conversations) || 0,
+      uniqueUsers: parseInt(agentStats.unique_users) || 0,
+      avgDuration: avgDuration,
+      avgMessages: agentStats.avg_messages ? parseFloat(agentStats.avg_messages).toFixed(1) : '0',
+      topUsers,
+      dailyUsage
+    });
+  } catch (error) {
+    console.error('Error in getAgentDetails:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to fetch agent details',
+      message: error.message
     });
   }
 }
