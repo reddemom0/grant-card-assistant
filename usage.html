@@ -346,8 +346,8 @@
     </div>
 
     <script>
-        // Version: 2025-12-02-v2 - Time-filtered summaries and duration fixes
-        console.log('📊 Usage Analytics v2025-12-02-v2 loaded');
+        // Version: 2025-12-02-v3 - Clickable conversation rows
+        console.log('📊 Usage Analytics v2025-12-02-v3 loaded');
 
         let currentDays = 7;
         let currentTimeFilter = '7days'; // Options: '24hours', '7days', '30days', '90days'
@@ -764,6 +764,25 @@
             return names[agentType] || agentType;
         }
 
+        function getAgentUrl(agentType) {
+            const urls = {
+                'grant-card-generator': '/grant-cards',
+                'etg-writer': '/etg-agent',
+                'bcafe-writer': '/bcafe-agent',
+                'canexport-claims': '/canexport-claims',
+                'readiness-strategist': '/readiness-strategist',
+                'canexport-writer': '/canexport-writer'
+            };
+            return urls[agentType] || '/';
+        }
+
+        function openConversation(conversationId, agentType) {
+            const baseUrl = getAgentUrl(agentType);
+            const url = `${baseUrl}?conversation=${conversationId}`;
+            console.log('🔗 Opening conversation:', { conversationId, agentType, url });
+            window.open(url, '_blank');
+        }
+
         function formatDuration(minutes) {
             if (minutes < 60) {
                 return `${Math.round(minutes)} min`;
@@ -934,7 +953,11 @@
                         </thead>
                         <tbody>
                             ${data.recentConversations.map(conv => `
-                                <tr>
+                                <tr style="cursor: pointer; transition: background 0.2s;"
+                                    onmouseover="this.style.background='var(--background)'"
+                                    onmouseout="this.style.background='transparent'"
+                                    onclick="openConversation('${conv.id}', '${conv.agentType}')"
+                                    title="Click to open this conversation">
                                     <td>${formatAgentName(conv.agentType)}</td>
                                     <td>${formatDate(conv.createdAt)}</td>
                                     <td>${conv.messageCount}</td>
