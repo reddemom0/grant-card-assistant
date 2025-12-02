@@ -803,14 +803,26 @@ async function getProductivityMetrics(req, res, days) {
       ORDER BY total_conversations DESC
     `);
 
-    const userProductivity = userProductivityResult.rows.map(row => ({
-      userId: row.id,
-      name: row.name,
-      email: row.email,
-      totalConversations: parseInt(row.total_conversations) || 0,
-      totalMessages: parseInt(row.total_messages) || 0,
-      totalFeedback: parseInt(row.total_feedback) || 0
-    }));
+    const userProductivity = userProductivityResult.rows.map(row => {
+      const totalConversations = parseInt(row.total_conversations) || 0;
+      const totalMessages = parseInt(row.total_messages) || 0;
+      const totalFeedback = parseInt(row.total_feedback) || 0;
+
+      return {
+        userId: row.id,
+        name: row.name,
+        email: row.email,
+        totalConversations,
+        totalMessages,
+        totalFeedback,
+        avgMessagesPerConversation: totalConversations > 0
+          ? (totalMessages / totalConversations).toFixed(1)
+          : '0.0',
+        avgFeedbackPerMessage: totalMessages > 0
+          ? (totalFeedback / totalMessages).toFixed(2)
+          : '0.00'
+      };
+    });
 
     // Quality trends over time (using feedback ratings if available)
     // Use try-catch in case conversation_feedback table doesn't exist or has no data
