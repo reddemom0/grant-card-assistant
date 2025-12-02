@@ -5,7 +5,7 @@
  * Metrics auto-update via database triggers
  */
 
-import { query } from '../database/db.js';
+import { query } from '../database/connection.js';
 import { classifyFeedback, getTagExplanation } from './tag-classifier.js';
 
 /**

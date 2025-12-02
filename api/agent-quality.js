@@ -4,7 +4,7 @@
  * Provides agent performance data for the quality matrix dashboard
  */
 
-import { query } from '../src/database/db.js';
+import { query } from '../src/database/connection.js';
 
 export default async function handler(req, res) {
   // Handle OPTIONS for CORS
