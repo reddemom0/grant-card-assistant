@@ -862,8 +862,12 @@
     <script>
         // Check authentication on page load
         async function checkAuth() {
+            console.log('🔍 Checking authentication...');
+            console.log('🔍 All cookies:', document.cookie);
             const cookies = document.cookie.split(';');
+            console.log('🔍 Parsed cookies:', cookies);
             const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
+            console.log('🔍 Found auth token:', !!authToken);
 
             if (authToken) {
                 // User is authenticated, redirect to dashboard
@@ -871,7 +875,7 @@
                 window.location.href = '/dashboard';
             } else {
                 // User not authenticated, show login button
-                console.log('No auth token, showing Google login');
+                console.log('❌ No auth token found, showing Google login');
                 const loginBtn = document.getElementById('login-btn');
                 if (loginBtn) {
                     loginBtn.style.display = 'flex';

@@ -136,11 +136,14 @@ export default async function handler(req, res) {
     // Set cookie WITHOUT HttpOnly so JavaScript can read it
     // Note: HttpOnly would be more secure, but we need JavaScript to check auth on client side
     console.log('🔵 Setting cookie...');
-    // Don't set Domain attribute - let it default to current host for proper development/production separation
-    const cookieHeader = `granted_session=${token}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+    // Use multiple Set-Cookie attributes for better compatibility
+    const maxAge = 7 * 24 * 60 * 60; // 7 days in seconds
+    const expires = new Date(Date.now() + maxAge * 1000).toUTCString();
+    const cookieHeader = `granted_session=${token}; Path=/; Expires=${expires}; Max-Age=${maxAge}; SameSite=Lax; Secure`;
     res.setHeader('Set-Cookie', cookieHeader);
     console.log('✅ Cookie set for host:', host);
     console.log('✅ Cookie header:', cookieHeader);
+    console.log('✅ Cookie expires:', expires);
 
     // Use HTML redirect instead of server redirect to ensure cookie persists
     const userDataEncoded = encodeURIComponent(JSON.stringify({
@@ -154,12 +157,26 @@ export default async function handler(req, res) {
       <!DOCTYPE html>
       <html>
       <head>
-        <meta http-equiv="refresh" content="0;url=/dashboard.html#user=${userDataEncoded}">
+        <title>Login Successful</title>
         <script>
-          // Verify cookie was set
-          console.log('Auth callback: Cookies after login:', document.cookie);
-          // Immediate redirect as backup
-          window.location.href = '/dashboard.html#user=${userDataEncoded}';
+          console.log('🔵 Auth callback page loaded');
+          console.log('🔵 Checking cookies...');
+          console.log('🔵 document.cookie:', document.cookie);
+
+          // Wait a moment for cookie to be set, then redirect
+          setTimeout(() => {
+            console.log('🔵 Cookies after delay:', document.cookie);
+            const hasAuthCookie = document.cookie.includes('granted_session=');
+            console.log('🔵 Has granted_session cookie:', hasAuthCookie);
+
+            if (hasAuthCookie) {
+              console.log('✅ Cookie verified, redirecting to dashboard...');
+            } else {
+              console.warn('⚠️ Cookie not found, redirecting anyway...');
+            }
+
+            window.location.href = '/dashboard#user=${userDataEncoded}';
+          }, 500);
         </script>
       </head>
       <body>
