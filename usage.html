@@ -332,8 +332,9 @@
         </div>
 
         <div id="overview-stats"></div>
-        <div id="agent-stats"></div>
-        <div id="user-activity"></div>
+        <div id="team-adoption"></div>
+        <div id="productivity-impact"></div>
+        <div id="individual-performance"></div>
     </div>
 
     <script>
@@ -355,8 +356,9 @@
         async function loadAllData() {
             await Promise.all([
                 loadOverview(),
-                loadAgentStats(),
-                loadUserActivity()
+                loadTeamAdoption(),
+                loadProductivityImpact(),
+                loadIndividualPerformance()
             ]);
         }
 
@@ -376,135 +378,30 @@
 
                 const data = await response.json();
                 const stats = data.overview;
-                const activeUsers = data.activeUsers || {};
-                const retention = data.retention || {};
-                const engagement = data.engagement || {};
 
                 container.innerHTML = `
                     <div class="stats-grid">
                         <div class="stat-card">
                             <div class="stat-icon">💬</div>
                             <div class="stat-value">${stats.totalConversations}</div>
-                            <div class="stat-label">Total Conversations</div>
+                            <div class="stat-label">Total Tasks</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">👥</div>
                             <div class="stat-value">${stats.uniqueUsers}</div>
-                            <div class="stat-label">Unique Users</div>
+                            <div class="stat-label">Active Team Members</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">🤖</div>
                             <div class="stat-value">${stats.activeAgents}</div>
-                            <div class="stat-label">Active Agents</div>
+                            <div class="stat-label">Agents in Use</div>
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon">📝</div>
                             <div class="stat-value">${stats.totalMessages}</div>
                             <div class="stat-label">Total Messages</div>
                         </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📊</div>
-                            <div class="stat-value">${stats.avgMessagesPerConversation}</div>
-                            <div class="stat-label">Avg Messages/Conv</div>
-                        </div>
-                        <div class="stat-card">
-                            <div class="stat-icon">📅</div>
-                            <div class="stat-value">${stats.activeDays}</div>
-                            <div class="stat-label">Active Days</div>
-                        </div>
                     </div>
-
-                    ${activeUsers.dau !== undefined ? `
-                        <div class="section" style="margin-top: 2rem;">
-                            <h3 class="section-title">📈 Active Users</h3>
-                            <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr);">
-                                <div class="stat-card">
-                                    <div class="stat-icon">🟢</div>
-                                    <div class="stat-value">${activeUsers.dau}</div>
-                                    <div class="stat-label">Daily Active Users</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-icon">📅</div>
-                                    <div class="stat-value">${activeUsers.wau}</div>
-                                    <div class="stat-label">Weekly Active Users</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-icon">📆</div>
-                                    <div class="stat-value">${activeUsers.mau}</div>
-                                    <div class="stat-label">Monthly Active Users</div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-icon">🎯</div>
-                                    <div class="stat-value">${activeUsers.stickiness}%</div>
-                                    <div class="stat-label">Stickiness (DAU/MAU)</div>
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
-
-                    ${retention.day7 ? `
-                        <div class="section" style="margin-top: 2rem;">
-                            <h3 class="section-title">🔄 User Retention</h3>
-                            <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
-                                <div class="stat-card">
-                                    <div class="stat-icon">📊</div>
-                                    <div class="stat-value">${retention.day7.retentionRate.toFixed(1)}%</div>
-                                    <div class="stat-label">7-Day Retention</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                                        ${retention.day7.returnedUsers} of ${retention.day7.cohortSize} users returned
-                                    </div>
-                                </div>
-                                <div class="stat-card">
-                                    <div class="stat-icon">📈</div>
-                                    <div class="stat-value">${retention.day30.retentionRate.toFixed(1)}%</div>
-                                    <div class="stat-label">30-Day Retention</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
-                                        ${retention.day30.returnedUsers} of ${retention.day30.cohortSize} users returned
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
-
-                    ${engagement.averageScore !== undefined ? `
-                        <div class="section" style="margin-top: 2rem;">
-                            <h3 class="section-title">⭐ User Engagement</h3>
-                            <div style="text-align: center; margin-bottom: 1.5rem;">
-                                <div style="font-size: 3rem; font-weight: 700; color: var(--primary);">
-                                    ${engagement.averageScore.toFixed(1)}
-                                </div>
-                                <div style="font-size: 0.875rem; color: var(--text-secondary);">
-                                    Average Engagement Score (out of 100)
-                                </div>
-                                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                    Based on frequency, recency, and depth of usage
-                                </div>
-                            </div>
-                            <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
-                                <div class="stat-card" style="border-left: 4px solid var(--success);">
-                                    <div class="stat-value" style="color: var(--success);">${engagement.breakdown.highlyEngaged}</div>
-                                    <div class="stat-label">Highly Engaged</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                        Score ≥ 70
-                                    </div>
-                                </div>
-                                <div class="stat-card" style="border-left: 4px solid var(--info);">
-                                    <div class="stat-value" style="color: var(--info);">${engagement.breakdown.moderatelyEngaged}</div>
-                                    <div class="stat-label">Moderately Engaged</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                        Score 40-69
-                                    </div>
-                                </div>
-                                <div class="stat-card" style="border-left: 4px solid var(--warning);">
-                                    <div class="stat-value" style="color: var(--warning);">${engagement.breakdown.lowEngaged}</div>
-                                    <div class="stat-label">Low Engagement</div>
-                                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.25rem;">
-                                        Score < 40
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
                 `;
             } catch (error) {
                 console.error('Error loading overview:', error);
@@ -517,143 +414,291 @@
             }
         }
 
-        async function loadAgentStats() {
-            const container = document.getElementById('agent-stats');
+        async function loadTeamAdoption() {
+            const container = document.getElementById('team-adoption');
             container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
 
             try {
-                const response = await fetch(`/api/usage-analytics?action=agent-stats&days=${currentDays}`, {
+                const response = await fetch(`/api/usage-analytics?action=team-adoption&days=${currentDays}`, {
                     credentials: 'include'
                 });
 
                 if (!response.ok) {
-                    throw new Error('Failed to load agent stats');
+                    throw new Error('Failed to load team adoption');
                 }
 
                 const data = await response.json();
-                const agents = data.agents;
-
-                if (agents.length === 0) {
-                    container.innerHTML = `
-                        <div class="section">
-                            <h3 class="section-title">🤖 Agent Usage</h3>
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📭</div>
-                                <p>No agent activity in this time period</p>
-                            </div>
-                        </div>
-                    `;
-                    return;
-                }
-
-                const maxConversations = Math.max(...agents.map(a => a.conversationCount));
 
                 container.innerHTML = `
                     <div class="section">
-                        <h3 class="section-title">🤖 Agent Usage</h3>
-                        ${agents.map(agent => `
-                            <div class="agent-bar">
-                                <div class="agent-name">${formatAgentName(agent.agentType)}</div>
-                                <div class="progress-bar">
-                                    <div class="progress-fill" style="width: ${(agent.conversationCount / maxConversations) * 100}%">
-                                        ${agent.conversationCount} conversations
-                                    </div>
-                                </div>
-                                <span class="metric">${agent.uniqueUsers} users</span>
-                                <span class="metric">${agent.messageCount} msgs</span>
-                                <span class="metric">${agent.avgDurationMinutes.toFixed(1)} min avg</span>
+                        <h3 class="section-title">👥 Team Adoption Dashboard</h3>
+                        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+                            <div class="stat-card">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-value">${data.weeklyActiveUsers}/${data.teamSize}</div>
+                                <div class="stat-label">Active This Week</div>
                             </div>
-                        `).join('')}
-                    </div>
-                `;
-            } catch (error) {
-                console.error('Error loading agent stats:', error);
-                container.innerHTML = `
-                    <div class="section">
-                        <h3 class="section-title">🤖 Agent Usage</h3>
-                        <div class="empty-state">
-                            <div class="empty-state-icon">⚠️</div>
-                            <p>Error loading agent stats</p>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-
-        async function loadUserActivity() {
-            const container = document.getElementById('user-activity');
-            container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
-
-            try {
-                const response = await fetch(`/api/usage-analytics?action=user-activity&days=${currentDays}`, {
-                    credentials: 'include'
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to load user activity');
-                }
-
-                const data = await response.json();
-                const users = data.users;
-
-                if (users.length === 0) {
-                    container.innerHTML = `
-                        <div class="section">
-                            <h3 class="section-title">👥 User Activity</h3>
-                            <div class="empty-state">
-                                <div class="empty-state-icon">📭</div>
-                                <p>No user activity in this time period</p>
+                            <div class="stat-card">
+                                <div class="stat-icon">✅</div>
+                                <div class="stat-value">${data.summary.fullyAdopted}</div>
+                                <div class="stat-label">Full Adoption</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">⚠️</div>
+                                <div class="stat-value">${data.summary.partialAdoption}</div>
+                                <div class="stat-label">Partial Adoption</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">❌</div>
+                                <div class="stat-value">${data.summary.noUsage}</div>
+                                <div class="stat-label">No Usage</div>
                             </div>
                         </div>
-                    `;
-                    return;
-                }
 
-                container.innerHTML = `
-                    <div class="section">
-                        <h3 class="section-title">👥 User Activity</h3>
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Agent Adoption Matrix</h4>
                         <table>
                             <thead>
                                 <tr>
-                                    <th>User</th>
-                                    <th>Conversations</th>
-                                    <th>Agents Used</th>
-                                    <th>Messages</th>
-                                    <th>Time Spent</th>
-                                    <th>Last Active</th>
+                                    <th>Team Member</th>
+                                    ${data.availableAgents.map(agent => `<th style="text-align: center;">${formatAgentName(agent)}</th>`).join('')}
+                                    <th style="text-align: center;">Total</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${users.map(user => `
+                                ${data.adoptionMatrix.map(user => `
                                     <tr>
                                         <td>
                                             <div class="user-info">
                                                 <img src="${user.picture || '/default-avatar.png'}" alt="${user.name}" class="user-avatar">
                                                 <div>
                                                     <div class="user-name">${user.name}</div>
-                                                    <div class="user-email">${user.email}</div>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td><strong>${user.conversationCount}</strong></td>
-                                        <td><span class="badge badge-primary">${user.agentsUsed} agents</span></td>
-                                        <td>${user.messageCount}</td>
-                                        <td>${formatDuration(user.totalDurationMinutes)}</td>
-                                        <td>${formatDate(user.lastActivity)}</td>
+                                        ${data.availableAgents.map(agent => {
+                                            const usage = user.agentUsage[agent];
+                                            return `
+                                                <td style="text-align: center;">
+                                                    ${usage.used
+                                                        ? `<span style="color: var(--success); font-size: 1.25rem;" title="${usage.conversationCount} conversations">✓</span>`
+                                                        : `<span style="color: var(--text-secondary); opacity: 0.3;">—</span>`
+                                                    }
+                                                </td>
+                                            `;
+                                        }).join('')}
+                                        <td style="text-align: center;">
+                                            <strong>${user.totalAgentsUsed}/${data.availableAgents.length}</strong>
+                                        </td>
                                     </tr>
                                 `).join('')}
                             </tbody>
                         </table>
+
+                        ${data.trainingGaps.length > 0 ? `
+                            <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Training Gaps</h4>
+                            <div style="display: grid; gap: 0.5rem;">
+                                ${data.trainingGaps.map(gap => `
+                                    <div style="padding: 0.75rem; background: var(--background); border-left: 3px solid var(--warning); border-radius: 0.375rem;">
+                                        <strong>${gap.name}</strong> hasn't used: ${gap.unusedAgents.map(a => formatAgentName(a)).join(', ')}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             } catch (error) {
-                console.error('Error loading user activity:', error);
+                console.error('Error loading team adoption:', error);
                 container.innerHTML = `
                     <div class="section">
-                        <h3 class="section-title">👥 User Activity</h3>
+                        <h3 class="section-title">👥 Team Adoption Dashboard</h3>
                         <div class="empty-state">
                             <div class="empty-state-icon">⚠️</div>
-                            <p>Error loading user activity</p>
+                            <p>Error loading team adoption</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadProductivityImpact() {
+            const container = document.getElementById('productivity-impact');
+            container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=productivity-impact&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load productivity metrics');
+                }
+
+                const data = await response.json();
+
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">⚡ Productivity & Impact</h3>
+
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Average Time per Agent</h4>
+                        ${data.agentProductivity.map(agent => `
+                            <div class="agent-bar">
+                                <div class="agent-name">${formatAgentName(agent.agentType)}</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 100%; background: var(--info);">
+                                        ${agent.avgDurationMinutes.toFixed(0)} min average
+                                    </div>
+                                </div>
+                                <span class="metric">${agent.totalTasks} tasks</span>
+                                <span class="metric">${agent.tasksPerUser} per user</span>
+                            </div>
+                        `).join('')}
+
+                        <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Weekly Tasks per Person</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Team Member</th>
+                                    <th>Avg Tasks/Week</th>
+                                    <th>Last 4 Weeks</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.userProductivity.map(user => `
+                                    <tr>
+                                        <td>${user.name}</td>
+                                        <td><strong>${user.avgTasksPerWeek}</strong></td>
+                                        <td>
+                                            ${user.weeks.map(w => `
+                                                <span class="badge badge-primary" style="margin-right: 0.25rem;">${w.tasksCompleted}</span>
+                                            `).join('')}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+
+                        ${data.qualityTrends.length > 0 ? `
+                            <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Quality Trends</h4>
+                            <div style="background: var(--background); padding: 1rem; border-radius: 0.5rem;">
+                                ${data.qualityTrends.slice(0, 7).map(trend => `
+                                    <div style="display: flex; justify-content: space-between; padding: 0.5rem; border-bottom: 1px solid var(--border);">
+                                        <span>${formatDate(trend.date)}</span>
+                                        <span style="color: var(--success);">${trend.positiveRate || 'N/A'}% positive</span>
+                                        <span>Quality: ${trend.avgQuality || 'N/A'}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading productivity metrics:', error);
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">⚡ Productivity & Impact</h3>
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <p>Error loading productivity metrics</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadIndividualPerformance() {
+            const container = document.getElementById('individual-performance');
+            container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=individual-performance&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load individual performance');
+                }
+
+                const data = await response.json();
+
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">🏆 Individual Performance</h3>
+
+                        <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 2rem;">
+                            <div class="stat-card">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-value">${data.teamStats.activeUsers}</div>
+                                <div class="stat-label">Active Users</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">💬</div>
+                                <div class="stat-value">${data.teamStats.avgMessagesPerConv}</div>
+                                <div class="stat-label">Avg Messages/Task</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">⭐</div>
+                                <div class="stat-value">${data.teamStats.teamAvgQuality}</div>
+                                <div class="stat-label">Team Avg Quality</div>
+                            </div>
+                        </div>
+
+                        ${data.usersNeedingSupport.length > 0 ? `
+                            <h4 style="margin-bottom: 1rem; color: var(--warning);">⚠️ Users Needing Support</h4>
+                            <div style="display: grid; gap: 1rem; margin-bottom: 2rem;">
+                                ${data.usersNeedingSupport.map(user => `
+                                    <div style="padding: 1rem; background: #fef3c7; border-left: 4px solid var(--warning); border-radius: 0.5rem;">
+                                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;">
+                                            <img src="${user.picture}" alt="${user.name}" class="user-avatar">
+                                            <div>
+                                                <strong>${user.name}</strong>
+                                                <div style="font-size: 0.875rem; color: var(--text-secondary);">${user.email}</div>
+                                            </div>
+                                        </div>
+                                        <div style="display: flex; gap: 1rem; font-size: 0.875rem;">
+                                            <span>Quality: ${user.avgQuality}</span>
+                                            <span>Revisions: ${user.avgRevisions}</span>
+                                            <span>Negative feedback: ${user.negativeFeedbackCount}</span>
+                                        </div>
+                                        <div style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--warning);">
+                                            Issues: ${user.issues.join(', ')}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : '<p style="color: var(--success); margin-bottom: 2rem;">✅ All team members performing well!</p>'}
+
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Top Users by Agent</h4>
+                        ${Object.keys(data.topUsersByAgent).map(agentType => `
+                            <div style="margin-bottom: 1.5rem;">
+                                <h5 style="margin-bottom: 0.5rem; color: var(--text-secondary);">${formatAgentName(agentType)}</h5>
+                                <div style="display: grid; gap: 0.5rem;">
+                                    ${data.topUsersByAgent[agentType].slice(0, 3).map((user, idx) => `
+                                        <div style="padding: 0.75rem; background: var(--background); border-left: 3px solid ${idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#CD7F32'}; border-radius: 0.375rem; display: flex; justify-content: space-between; align-items: center;">
+                                            <div class="user-info">
+                                                <img src="${user.picture}" alt="${user.name}" class="user-avatar">
+                                                <div>
+                                                    <div class="user-name">${user.name}</div>
+                                                </div>
+                                            </div>
+                                            <div style="text-align: right; font-size: 0.875rem;">
+                                                <div><strong>${user.conversationCount}</strong> tasks</div>
+                                                <div style="color: var(--text-secondary);">Quality: ${user.avgQuality}</div>
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading individual performance:', error);
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">🏆 Individual Performance</h3>
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <p>Error loading individual performance</p>
                         </div>
                     </div>
                 `;
