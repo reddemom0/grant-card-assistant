@@ -22,6 +22,8 @@ import feedbackMetricsHandler from './api/feedback-metrics.js';
 import feedbackLearningHandler from './api/feedback-learning.js';
 import sentimentAnalysisHandler from './api/sentiment-analysis.js';
 import usageAnalyticsHandler from './api/usage-analytics.js';
+import agentQualityHandler from './api/agent-quality.js';
+import feedbackTaggingHandler from './api/feedback-tagging.js';
 
 // New direct API handlers
 import {
@@ -145,6 +147,13 @@ app.post('/api/sentiment-analysis', authenticateUser, sentimentAnalysisHandler);
 
 // Usage analytics - with authentication
 app.get('/api/usage-analytics', authenticateUser, usageAnalyticsHandler);
+
+// Agent quality metrics - with authentication
+app.get('/api/agent-quality', authenticateUser, agentQualityHandler);
+
+// Feedback tagging admin - with authentication
+app.get('/api/feedback-tagging', authenticateUser, feedbackTaggingHandler);
+app.post('/api/feedback-tagging', authenticateUser, feedbackTaggingHandler);
 
 // Authentication endpoints
 app.use('/api', authRouter);
@@ -462,6 +471,10 @@ app.get('/metrics', (req, res) => {
 
 app.get('/usage', (req, res) => {
   res.sendFile('usage.html', { root: '.' });
+});
+
+app.get('/agent-quality', (req, res) => {
+  res.sendFile('agent-quality.html', { root: '.' });
 });
 
 app.get('/admin*', (req, res) => {
