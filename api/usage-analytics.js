@@ -544,7 +544,7 @@ async function getTeamAdoptionDashboard(req, res, days) {
 
   const agents = agentsResult.rows.map(r => r.agent_type);
 
-  // Get adoption matrix: user × agent usage
+  // Get adoption matrix: user × agent usage with last activity dates
   const adoptionResult = await query(`
     SELECT
       u.id as user_id,
@@ -554,7 +554,11 @@ async function getTeamAdoptionDashboard(req, res, days) {
       c.agent_type,
       COUNT(DISTINCT c.id) as conversation_count,
       MIN(c.created_at) as first_used,
-      MAX(c.updated_at) as last_used
+      MAX(c.updated_at) as last_used,
+      COUNT(DISTINCT c.id) FILTER (WHERE c.updated_at >= NOW() - INTERVAL '1 day') as used_last_day,
+      COUNT(DISTINCT c.id) FILTER (WHERE c.updated_at >= NOW() - INTERVAL '7 days') as used_last_week,
+      COUNT(DISTINCT c.id) FILTER (WHERE c.updated_at >= NOW() - INTERVAL '30 days') as used_last_month,
+      COUNT(DISTINCT c.id) FILTER (WHERE c.updated_at >= NOW() - INTERVAL '90 days') as used_last_3months
     FROM users u
     LEFT JOIN conversations c ON u.id = c.user_id
     WHERE c.id IS NOT NULL
@@ -562,7 +566,22 @@ async function getTeamAdoptionDashboard(req, res, days) {
     ORDER BY u.name, c.agent_type
   `);
 
-  // Build adoption matrix
+  // Get last activity date for each user (across all agents)
+  const lastActivityResult = await query(`
+    SELECT
+      u.id as user_id,
+      MAX(c.updated_at) as last_activity
+    FROM users u
+    LEFT JOIN conversations c ON u.id = c.user_id
+    GROUP BY u.id
+  `);
+
+  const lastActivityMap = {};
+  lastActivityResult.rows.forEach(row => {
+    lastActivityMap[row.user_id] = row.last_activity;
+  });
+
+  // Build adoption matrix with time-based filters
   const adoptionMatrix = allUsersResult.rows.map(user => {
     const userAdoption = adoptionResult.rows.filter(r => r.user_id === user.id);
 
@@ -573,7 +592,11 @@ async function getTeamAdoptionDashboard(req, res, days) {
         used: !!usage,
         conversationCount: usage ? parseInt(usage.conversation_count) : 0,
         firstUsed: usage ? usage.first_used : null,
-        lastUsed: usage ? usage.last_used : null
+        lastUsed: usage ? usage.last_used : null,
+        usedLastDay: usage ? parseInt(usage.used_last_day) > 0 : false,
+        usedLastWeek: usage ? parseInt(usage.used_last_week) > 0 : false,
+        usedLastMonth: usage ? parseInt(usage.used_last_month) > 0 : false,
+        usedLast3Months: usage ? parseInt(usage.used_last_3months) > 0 : false
       };
     });
 
@@ -582,6 +605,7 @@ async function getTeamAdoptionDashboard(req, res, days) {
       email: user.email,
       name: user.name,
       picture: user.picture,
+      lastActivity: lastActivityMap[user.id] || null,
       agentUsage,
       totalAgentsUsed: Object.values(agentUsage).filter(a => a.used).length,
       totalConversations: Object.values(agentUsage).reduce((sum, a) => sum + a.conversationCount, 0)

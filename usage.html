@@ -325,10 +325,10 @@
         </div>
 
         <div class="time-filter">
-            <button class="active" onclick="setTimeRange(7)">Last 7 Days</button>
-            <button onclick="setTimeRange(30)">Last 30 Days</button>
-            <button onclick="setTimeRange(90)">Last 90 Days</button>
-            <button onclick="setTimeRange(365)">Last Year</button>
+            <button onclick="setTimeRange(1)">Last 24 Hours</button>
+            <button class="active" onclick="setTimeRange(7)">7 Days</button>
+            <button onclick="setTimeRange(30)">One Month</button>
+            <button onclick="setTimeRange(90)">Three Months</button>
         </div>
 
         <div id="overview-stats"></div>
@@ -339,9 +339,19 @@
 
     <script>
         let currentDays = 7;
+        let currentTimeFilter = '7days'; // Options: '24hours', '7days', '30days', '90days'
 
         async function setTimeRange(days) {
             currentDays = days;
+
+            // Map days to filter name
+            const filterMap = {
+                1: '24hours',
+                7: '7days',
+                30: '30days',
+                90: '90days'
+            };
+            currentTimeFilter = filterMap[days] || '7days';
 
             // Update active button
             document.querySelectorAll('.time-filter button').forEach(btn => {
@@ -472,15 +482,31 @@
                                                 <img src="${user.picture || '/default-avatar.png'}" alt="${user.name}" class="user-avatar">
                                                 <div>
                                                     <div class="user-name">${user.name}</div>
+                                                    <div class="user-email" style="font-size: 0.75rem; color: var(--text-secondary);">
+                                                        ${user.lastActivity ? 'Last active: ' + formatDate(user.lastActivity) : 'No activity'}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </td>
                                         ${data.availableAgents.map(agent => {
                                             const usage = user.agentUsage[agent];
+
+                                            // Determine if checkmark should show based on current time filter
+                                            let showCheckmark = false;
+                                            if (currentTimeFilter === '24hours') {
+                                                showCheckmark = usage.usedLastDay;
+                                            } else if (currentTimeFilter === '7days') {
+                                                showCheckmark = usage.usedLastWeek;
+                                            } else if (currentTimeFilter === '30days') {
+                                                showCheckmark = usage.usedLastMonth;
+                                            } else if (currentTimeFilter === '90days') {
+                                                showCheckmark = usage.usedLast3Months;
+                                            }
+
                                             return `
                                                 <td style="text-align: center;">
-                                                    ${usage.used
-                                                        ? `<span style="color: var(--success); font-size: 1.25rem;" title="${usage.conversationCount} conversations">✓</span>`
+                                                    ${showCheckmark
+                                                        ? `<span style="color: var(--success); font-size: 1.25rem;" title="Used in selected period">✓</span>`
                                                         : `<span style="color: var(--text-secondary); opacity: 0.3;">—</span>`
                                                     }
                                                 </td>
