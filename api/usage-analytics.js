@@ -342,6 +342,62 @@ async function calculateUserTotalSessionDuration(userId, days) {
 }
 
 /**
+ * Calculate session-based duration for a single conversation
+ * Uses 30-minute idle timeout to define sessions
+ */
+async function calculateConversationSessionDuration(conversationId) {
+  const result = await query(`
+    WITH message_times AS (
+      SELECT
+        MIN(created_at) as first_message,
+        MAX(created_at) as last_message,
+        COUNT(*) as message_count
+      FROM messages
+      WHERE conversation_id = $1
+    ),
+    message_gaps AS (
+      SELECT
+        m.created_at as message_time,
+        LAG(m.created_at) OVER (ORDER BY m.created_at) as prev_message_time,
+        EXTRACT(EPOCH FROM (
+          m.created_at - LAG(m.created_at) OVER (ORDER BY m.created_at)
+        )) / 60 as gap_minutes
+      FROM messages m
+      WHERE m.conversation_id = $1
+      ORDER BY m.created_at
+    ),
+    session_duration AS (
+      SELECT
+        SUM(
+          CASE
+            WHEN gap_minutes IS NULL THEN 0
+            WHEN gap_minutes > 30 THEN 0  -- New session after 30min idle
+            WHEN gap_minutes > 4 * 60 THEN 0  -- Safety cap at 4 hours
+            ELSE gap_minutes
+          END
+        ) as active_minutes
+      FROM message_gaps
+    )
+    SELECT
+      CASE
+        -- If we have calculated gaps, use them
+        WHEN session_duration.active_minutes > 0 THEN session_duration.active_minutes
+        -- Otherwise, use time between first and last message (capped at 2 hours)
+        WHEN message_times.message_count > 1 THEN
+          LEAST(
+            EXTRACT(EPOCH FROM (message_times.last_message - message_times.first_message)) / 60,
+            120
+          )
+        -- Single message conversations get 0 duration
+        ELSE 0
+      END as active_minutes
+    FROM message_times, session_duration
+  `, [conversationId]);
+
+  return parseFloat(result.rows[0]?.active_minutes) || 0;
+}
+
+/**
  * Get DAU/WAU/MAU (Daily/Weekly/Monthly Active Users)
  */
 async function getActiveUsersStats() {
@@ -626,35 +682,61 @@ async function getTeamAdoptionDashboard(req, res, days) {
     };
   });
 
-  // Weekly active users (last 7 days)
-  const weeklyActiveResult = await query(`
+  // Active users within the selected time period
+  const activeUsersResult = await query(`
     SELECT COUNT(DISTINCT user_id) as active_users
     FROM conversations
-    WHERE updated_at >= NOW() - INTERVAL '7 days'
+    WHERE updated_at >= NOW() - INTERVAL '${days} days'
   `);
 
-  // Never-used agents per person
-  const trainingGaps = adoptionMatrix.map(user => ({
-    userId: user.userId,
-    name: user.name,
-    email: user.email,
-    unusedAgents: agents.filter(agent => !user.agentUsage[agent].used),
-    unusedCount: agents.filter(agent => !user.agentUsage[agent].used).length
-  })).filter(u => u.unusedCount > 0);
+  // Calculate summary based on usage WITHIN the selected time period
+  const summary = {
+    activeUsers: parseInt(activeUsersResult.rows[0].active_users) || 0,
+    fullyAdopted: 0,
+    partialAdoption: 0,
+    noUsage: 0
+  };
+
+  adoptionMatrix.forEach(user => {
+    // Count agents used within the selected time period
+    let agentsUsedInPeriod = 0;
+
+    agents.forEach(agent => {
+      const usage = user.agentUsage[agent];
+      // Check if agent was used in the selected period based on days filter
+      let usedInPeriod = false;
+      if (days === 1) {
+        usedInPeriod = usage.usedLastDay;
+      } else if (days === 7) {
+        usedInPeriod = usage.usedLastWeek;
+      } else if (days === 30) {
+        usedInPeriod = usage.usedLastMonth;
+      } else if (days === 90) {
+        usedInPeriod = usage.usedLast3Months;
+      }
+
+      if (usedInPeriod) {
+        agentsUsedInPeriod++;
+      }
+    });
+
+    // Categorize user based on agents used in period
+    if (agentsUsedInPeriod === agents.length) {
+      summary.fullyAdopted++;
+    } else if (agentsUsedInPeriod > 0) {
+      summary.partialAdoption++;
+    } else {
+      summary.noUsage++;
+    }
+  });
 
   return res.status(200).json({
     success: true,
     days,
     teamSize: allUsersResult.rows.length,
-    weeklyActiveUsers: parseInt(weeklyActiveResult.rows[0].active_users) || 0,
     availableAgents: agents,
     adoptionMatrix,
-    trainingGaps,
-    summary: {
-      fullyAdopted: adoptionMatrix.filter(u => u.totalAgentsUsed === agents.length).length,
-      partialAdoption: adoptionMatrix.filter(u => u.totalAgentsUsed > 0 && u.totalAgentsUsed < agents.length).length,
-      noUsage: adoptionMatrix.filter(u => u.totalAgentsUsed === 0).length
-    }
+    summary
   });
 }
 
@@ -994,12 +1076,16 @@ async function getUserDetails(req, res, userId, days) {
       LIMIT 10
     `, [userId]);
 
-    const recentConversations = recentConversationsResult.rows.map(row => ({
-      id: row.id,
-      agentType: row.agent_type,
-      createdAt: row.created_at,
-      messageCount: parseInt(row.message_count),
-      duration: 0 // We could calculate this if needed
+    // Calculate duration for each conversation
+    const recentConversations = await Promise.all(recentConversationsResult.rows.map(async row => {
+      const duration = await calculateConversationSessionDuration(row.id);
+      return {
+        id: row.id,
+        agentType: row.agent_type,
+        createdAt: row.created_at,
+        messageCount: parseInt(row.message_count),
+        duration: duration
+      };
     }));
 
     return res.status(200).json({

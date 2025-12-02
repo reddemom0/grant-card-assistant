@@ -346,6 +346,9 @@
     </div>
 
     <script>
+        // Version: 2025-12-02-v2 - Time-filtered summaries and duration fixes
+        console.log('📊 Usage Analytics v2025-12-02-v2 loaded');
+
         let currentDays = 7;
         let currentTimeFilter = '7days'; // Options: '24hours', '7days', '30days', '90days'
 
@@ -446,6 +449,12 @@
                 }
 
                 const data = await response.json();
+                console.log('📊 Team adoption data loaded:', {
+                    days: currentDays,
+                    filter: currentTimeFilter,
+                    summary: data.summary,
+                    timePeriodLabel: getTimePeriodLabel()
+                });
 
                 container.innerHTML = `
                     <div class="section">
@@ -453,8 +462,8 @@
                         <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
                             <div class="stat-card">
                                 <div class="stat-icon">👥</div>
-                                <div class="stat-value">${data.weeklyActiveUsers}/${data.teamSize}</div>
-                                <div class="stat-label">Active This Week</div>
+                                <div class="stat-value">${data.summary.activeUsers}/${data.teamSize}</div>
+                                <div class="stat-label">Active ${getTimePeriodLabel()}</div>
                             </div>
                             <div class="stat-card">
                                 <div class="stat-icon">✅</div>
@@ -779,9 +788,22 @@
             }
         }
 
+        function getTimePeriodLabel() {
+            const labels = {
+                '24hours': 'Last 24 Hours',
+                '7days': 'This Week',
+                '30days': 'This Month',
+                '90days': 'Last 3 Months'
+            };
+            return labels[currentTimeFilter] || 'This Week';
+        }
+
         // Modal functions
+        let currentModalContext = null; // Store what's currently being viewed
+
         function closeDetailsModal() {
             document.getElementById('detailsModal').style.display = 'none';
+            currentModalContext = null;
         }
 
         function openDetailsModal() {
@@ -795,8 +817,55 @@
             }
         });
 
+        // Generate time filter buttons for modal
+        function getModalTimeFilterButtons() {
+            const filters = [
+                { days: 1, label: 'Last 24 Hours' },
+                { days: 7, label: '7 Days' },
+                { days: 30, label: 'One Month' },
+                { days: 90, label: 'Three Months' }
+            ];
+
+            return `
+                <div class="time-filter" style="margin-bottom: 1.5rem;">
+                    ${filters.map(filter => `
+                        <button
+                            class="${currentDays === filter.days ? 'active' : ''}"
+                            onclick="changeModalTimeFilter(${filter.days})">
+                            ${filter.label}
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        // Change time filter from within modal
+        async function changeModalTimeFilter(days) {
+            currentDays = days;
+            const filterMap = {
+                1: '24hours',
+                7: '7days',
+                30: '30days',
+                90: '90days'
+            };
+            currentTimeFilter = filterMap[days] || '7days';
+
+            // Reload modal content with new time filter
+            if (currentModalContext) {
+                if (currentModalContext.type === 'user') {
+                    await viewUserDetails(currentModalContext.userId, currentModalContext.userName);
+                } else if (currentModalContext.type === 'agent') {
+                    await viewAgentDetails(currentModalContext.agentType);
+                }
+            }
+        }
+
         // View user details
         async function viewUserDetails(userId, userName) {
+            // Store context for time filter changes
+            currentModalContext = { type: 'user', userId, userName };
+            console.log('📊 Opening user details modal:', { userId, userName, currentDays, currentTimeFilter });
+
             openDetailsModal();
             document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading user details...</p></div>';
 
@@ -810,9 +879,12 @@
                 }
 
                 const data = await response.json();
+                console.log('📊 User details loaded:', data);
 
                 document.getElementById('modalContent').innerHTML = `
-                    <h2 style="margin-bottom: 1.5rem; color: var(--primary);">📊 ${userName}'s Usage</h2>
+                    <h2 style="margin-bottom: 1rem; color: var(--primary);">📊 ${userName}'s Usage (${getTimePeriodLabel()})</h2>
+
+                    ${getModalTimeFilterButtons()}
 
                     <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
                         <div class="stat-card">
@@ -885,6 +957,9 @@
 
         // View agent details
         async function viewAgentDetails(agentType) {
+            // Store context for time filter changes
+            currentModalContext = { type: 'agent', agentType };
+
             openDetailsModal();
             document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading agent details...</p></div>';
 
@@ -900,7 +975,9 @@
                 const data = await response.json();
 
                 document.getElementById('modalContent').innerHTML = `
-                    <h2 style="margin-bottom: 1.5rem; color: var(--primary);">🤖 ${formatAgentName(agentType)}</h2>
+                    <h2 style="margin-bottom: 1rem; color: var(--primary);">🤖 ${formatAgentName(agentType)} (${getTimePeriodLabel()})</h2>
+
+                    ${getModalTimeFilterButtons()}
 
                     <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
                         <div class="stat-card">
