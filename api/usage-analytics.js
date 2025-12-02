@@ -784,6 +784,7 @@ async function getProductivityMetrics(req, res, days) {
     }));
 
     // Total conversations, messages, and feedback per person for the selected time period
+    // Count both conversation_feedback (thumbs up/down) AND feedback_notes (in-conversation notes)
     const userProductivityResult = await query(`
       SELECT
         u.id,
@@ -791,11 +792,12 @@ async function getProductivityMetrics(req, res, days) {
         u.email,
         COUNT(DISTINCT c.id) as total_conversations,
         COUNT(DISTINCT m.id) as total_messages,
-        COUNT(DISTINCT f.id) as total_feedback
+        (COUNT(DISTINCT cf.id) + COUNT(DISTINCT fn.id)) as total_feedback
       FROM users u
       LEFT JOIN conversations c ON u.id = c.user_id AND c.created_at >= NOW() - INTERVAL '${days} days'
       LEFT JOIN messages m ON c.id = m.conversation_id
-      LEFT JOIN conversation_feedback f ON m.id = f.message_id
+      LEFT JOIN conversation_feedback cf ON m.id = cf.message_id
+      LEFT JOIN feedback_notes fn ON c.id = fn.conversation_id AND fn.user_id = u.id
       GROUP BY u.id, u.name, u.email
       HAVING COUNT(DISTINCT c.id) > 0
       ORDER BY total_conversations DESC
