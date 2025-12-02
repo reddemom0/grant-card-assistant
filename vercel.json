@@ -17,6 +17,10 @@
       "dest": "/api/feedback.js"
     },
     {
+      "src": "/api/feedback-tagging",
+      "dest": "/api/feedback-tagging.js"
+    },
+    {
       "src": "/api/feedback-metrics",
       "dest": "/api/feedback-metrics.js"
     },
