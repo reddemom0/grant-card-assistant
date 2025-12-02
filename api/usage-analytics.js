@@ -102,13 +102,7 @@ async function getAgentStats(req, res, days) {
       COUNT(DISTINCT c.user_id) as unique_users,
       COUNT(DISTINCT m.id) as message_count,
       MIN(c.created_at) as first_used,
-      MAX(c.updated_at) as last_used,
-      AVG(
-        EXTRACT(EPOCH FROM (
-          (SELECT MAX(created_at) FROM messages WHERE conversation_id = c.id) -
-          (SELECT MIN(created_at) FROM messages WHERE conversation_id = c.id)
-        )) / 60
-      ) as avg_duration_minutes
+      MAX(c.updated_at) as last_used
     FROM conversations c
     LEFT JOIN messages m ON c.id = m.conversation_id
     WHERE c.created_at >= NOW() - INTERVAL '${days} days'
@@ -116,17 +110,22 @@ async function getAgentStats(req, res, days) {
     ORDER BY conversation_count DESC
   `);
 
-  const agents = result.rows.map(row => ({
-    agentType: row.agent_type,
-    conversationCount: parseInt(row.conversation_count),
-    uniqueUsers: parseInt(row.unique_users),
-    messageCount: parseInt(row.message_count),
-    avgMessagesPerConversation: row.conversation_count > 0
-      ? (parseInt(row.message_count) / parseInt(row.conversation_count)).toFixed(1)
-      : 0,
-    avgDurationMinutes: parseFloat(row.avg_duration_minutes) || 0,
-    firstUsed: row.first_used,
-    lastUsed: row.last_used
+  // Calculate session-based active time for each agent
+  const agents = await Promise.all(result.rows.map(async row => {
+    const avgDuration = await calculateAvgSessionDuration(row.agent_type, days);
+
+    return {
+      agentType: row.agent_type,
+      conversationCount: parseInt(row.conversation_count),
+      uniqueUsers: parseInt(row.unique_users),
+      messageCount: parseInt(row.message_count),
+      avgMessagesPerConversation: row.conversation_count > 0
+        ? (parseInt(row.message_count) / parseInt(row.conversation_count)).toFixed(1)
+        : 0,
+      avgDurationMinutes: avgDuration,
+      firstUsed: row.first_used,
+      lastUsed: row.last_used
+    };
   }));
 
   return res.status(200).json({
@@ -150,13 +149,7 @@ async function getUserActivity(req, res, days) {
       COUNT(DISTINCT c.agent_type) as agents_used,
       COUNT(DISTINCT m.id) as message_count,
       MIN(c.created_at) as first_activity,
-      MAX(c.updated_at) as last_activity,
-      SUM(
-        EXTRACT(EPOCH FROM (
-          (SELECT MAX(created_at) FROM messages WHERE conversation_id = c.id) -
-          (SELECT MIN(created_at) FROM messages WHERE conversation_id = c.id)
-        )) / 60
-      ) as total_duration_minutes
+      MAX(c.updated_at) as last_activity
     FROM users u
     JOIN conversations c ON u.id = c.user_id
     LEFT JOIN messages m ON c.id = m.conversation_id
@@ -165,20 +158,26 @@ async function getUserActivity(req, res, days) {
     ORDER BY conversation_count DESC
   `);
 
-  const users = result.rows.map(row => ({
-    id: row.id,
-    email: row.email,
-    name: row.name,
-    picture: row.picture,
-    conversationCount: parseInt(row.conversation_count),
-    agentsUsed: parseInt(row.agents_used),
-    messageCount: parseInt(row.message_count),
-    totalDurationMinutes: parseFloat(row.total_duration_minutes) || 0,
-    avgDurationMinutes: row.conversation_count > 0
-      ? (parseFloat(row.total_duration_minutes) / parseInt(row.conversation_count)).toFixed(1)
-      : 0,
-    firstActivity: row.first_activity,
-    lastActivity: row.last_activity
+  // Calculate session-based active time for each user
+  const users = await Promise.all(result.rows.map(async row => {
+    const totalDuration = await calculateUserTotalSessionDuration(row.id, days);
+    const avgDuration = row.conversation_count > 0
+      ? (totalDuration / parseInt(row.conversation_count)).toFixed(1)
+      : 0;
+
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      picture: row.picture,
+      conversationCount: parseInt(row.conversation_count),
+      agentsUsed: parseInt(row.agents_used),
+      messageCount: parseInt(row.message_count),
+      totalDurationMinutes: totalDuration,
+      avgDurationMinutes: parseFloat(avgDuration),
+      firstActivity: row.first_activity,
+      lastActivity: row.last_activity
+    };
   }));
 
   return res.status(200).json({
@@ -217,4 +216,92 @@ async function getUsageTrends(req, res, days) {
     days,
     trends
   });
+}
+
+/**
+ * Calculate average session-based duration for an agent type
+ * Uses 30-minute idle timeout to define sessions
+ */
+async function calculateAvgSessionDuration(agentType, days) {
+  const result = await query(`
+    WITH message_gaps AS (
+      SELECT
+        c.id as conversation_id,
+        m.created_at as message_time,
+        LAG(m.created_at) OVER (PARTITION BY c.id ORDER BY m.created_at) as prev_message_time,
+        EXTRACT(EPOCH FROM (
+          m.created_at - LAG(m.created_at) OVER (PARTITION BY c.id ORDER BY m.created_at)
+        )) / 60 as gap_minutes
+      FROM conversations c
+      JOIN messages m ON c.id = m.conversation_id
+      WHERE c.agent_type = $1
+        AND c.created_at >= NOW() - INTERVAL '${days} days'
+      ORDER BY c.id, m.created_at
+    ),
+    session_times AS (
+      SELECT
+        conversation_id,
+        -- Cap each gap at 30 minutes (idle timeout)
+        -- Ignore first message (no gap)
+        SUM(
+          CASE
+            WHEN gap_minutes IS NULL THEN 0
+            WHEN gap_minutes > 30 THEN 0  -- New session after 30min idle
+            WHEN gap_minutes > 4 * 60 THEN 0  -- Safety cap at 4 hours
+            ELSE gap_minutes
+          END
+        ) as active_minutes
+      FROM message_gaps
+      GROUP BY conversation_id
+    )
+    SELECT
+      AVG(active_minutes) as avg_active_minutes,
+      COUNT(*) as conversation_count
+    FROM session_times
+    WHERE active_minutes > 0
+  `, [agentType]);
+
+  return parseFloat(result.rows[0]?.avg_active_minutes) || 0;
+}
+
+/**
+ * Calculate total session-based duration for a user
+ * Uses 30-minute idle timeout to define sessions
+ */
+async function calculateUserTotalSessionDuration(userId, days) {
+  const result = await query(`
+    WITH message_gaps AS (
+      SELECT
+        c.id as conversation_id,
+        m.created_at as message_time,
+        LAG(m.created_at) OVER (PARTITION BY c.id ORDER BY m.created_at) as prev_message_time,
+        EXTRACT(EPOCH FROM (
+          m.created_at - LAG(m.created_at) OVER (PARTITION BY c.id ORDER BY m.created_at)
+        )) / 60 as gap_minutes
+      FROM conversations c
+      JOIN messages m ON c.id = m.conversation_id
+      WHERE c.user_id = $1
+        AND c.created_at >= NOW() - INTERVAL '${days} days'
+      ORDER BY c.id, m.created_at
+    ),
+    session_times AS (
+      SELECT
+        conversation_id,
+        SUM(
+          CASE
+            WHEN gap_minutes IS NULL THEN 0
+            WHEN gap_minutes > 30 THEN 0  -- New session after 30min idle
+            WHEN gap_minutes > 4 * 60 THEN 0  -- Safety cap at 4 hours
+            ELSE gap_minutes
+          END
+        ) as active_minutes
+      FROM message_gaps
+      GROUP BY conversation_id
+    )
+    SELECT
+      SUM(active_minutes) as total_active_minutes
+    FROM session_times
+  `, [userId]);
+
+  return parseFloat(result.rows[0]?.total_active_minutes) || 0;
 }
