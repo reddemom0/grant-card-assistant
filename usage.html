@@ -346,8 +346,8 @@
     </div>
 
     <script>
-        // Version: 2025-12-02-v5 - Fixed time filter parameter validation
-        console.log('📊 Usage Analytics v2025-12-02-v5 loaded');
+        // Version: 2025-12-02-v6 - Handle empty user activity gracefully
+        console.log('📊 Usage Analytics v2025-12-02-v6 loaded');
 
         let currentDays = 7;
         let currentTimeFilter = '7days'; // Options: '24hours', '7days', '30days', '90days'
@@ -939,7 +939,7 @@
                     </div>
 
                     <h3 style="margin-bottom: 1rem;">Usage by Agent</h3>
-                    ${data.agentBreakdown.map(agent => `
+                    ${data.agentBreakdown.length > 0 ? data.agentBreakdown.map(agent => `
                         <div class="agent-bar" style="margin-bottom: 0.5rem;">
                             <div class="agent-name">${formatAgentName(agent.agentType)}</div>
                             <div class="progress-bar">
@@ -949,33 +949,35 @@
                             </div>
                             <span class="metric">${formatDuration(agent.avgDuration)} avg</span>
                         </div>
-                    `).join('')}
+                    `).join('') : '<p style="color: var(--text-secondary); font-style: italic; padding: 1rem; text-align: center;">No agent usage in this time period</p>'}
 
                     <h3 style="margin-top: 2rem; margin-bottom: 1rem;">Recent Activity</h3>
-                    <table style="width: 100%;">
-                        <thead>
-                            <tr>
-                                <th>Agent</th>
-                                <th>Date</th>
-                                <th>Messages</th>
-                                <th>Duration</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${data.recentConversations.map(conv => `
-                                <tr style="cursor: pointer; transition: background 0.2s;"
-                                    onmouseover="this.style.background='var(--background)'"
-                                    onmouseout="this.style.background='transparent'"
-                                    onclick="openConversation('${conv.id}', '${conv.agentType}')"
-                                    title="Click to open this conversation">
-                                    <td>${formatAgentName(conv.agentType)}</td>
-                                    <td>${formatDate(conv.createdAt)}</td>
-                                    <td>${conv.messageCount}</td>
-                                    <td>${formatDuration(conv.duration)}</td>
+                    ${data.recentConversations.length > 0 ? `
+                        <table style="width: 100%;">
+                            <thead>
+                                <tr>
+                                    <th>Agent</th>
+                                    <th>Date</th>
+                                    <th>Messages</th>
+                                    <th>Duration</th>
                                 </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                ${data.recentConversations.map(conv => `
+                                    <tr style="cursor: pointer; transition: background 0.2s;"
+                                        onmouseover="this.style.background='var(--background)'"
+                                        onmouseout="this.style.background='transparent'"
+                                        onclick="openConversation('${conv.id}', '${conv.agentType}')"
+                                        title="Click to open this conversation">
+                                        <td>${formatAgentName(conv.agentType)}</td>
+                                        <td>${formatDate(conv.createdAt)}</td>
+                                        <td>${conv.messageCount}</td>
+                                        <td>${formatDuration(conv.duration)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    ` : '<p style="color: var(--text-secondary); font-style: italic; padding: 1rem; text-align: center;">No recent activity in this time period</p>'}
                 `;
             } catch (error) {
                 console.error('Error loading user details:', error);

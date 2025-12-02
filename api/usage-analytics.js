@@ -1026,19 +1026,18 @@ async function getIndividualPerformance(req, res, days) {
  */
 async function getUserDetails(req, res, userId, days) {
   try {
-    // Get user's basic stats
+    // Get user's basic stats with time-filtered conversations
     const userStatsResult = await query(`
       SELECT
         u.name,
         u.email,
         u.picture,
-        COUNT(DISTINCT c.id) as total_conversations,
-        COUNT(DISTINCT c.agent_type) as agents_used,
-        MAX(c.updated_at) as last_activity
+        COUNT(DISTINCT c.id) FILTER (WHERE c.created_at >= NOW() - INTERVAL '${days} days') as total_conversations,
+        COUNT(DISTINCT c.agent_type) FILTER (WHERE c.created_at >= NOW() - INTERVAL '${days} days') as agents_used,
+        MAX(c.updated_at) FILTER (WHERE c.created_at >= NOW() - INTERVAL '${days} days') as last_activity
       FROM users u
       LEFT JOIN conversations c ON u.id = c.user_id
       WHERE u.id = $1
-        AND (c.created_at >= NOW() - INTERVAL '${days} days' OR c.id IS NULL)
       GROUP BY u.id, u.name, u.email, u.picture
     `, [userId]);
 
@@ -1047,64 +1046,75 @@ async function getUserDetails(req, res, userId, days) {
     }
 
     const userStats = userStatsResult.rows[0];
+    const totalConversations = parseInt(userStats.total_conversations) || 0;
+    const agentsUsed = parseInt(userStats.agents_used) || 0;
 
-    // Calculate total time spent
-    const totalTime = await calculateUserTotalSessionDuration(userId, days);
+    console.log('📊 User stats:', { userId, userName: userStats.name, totalConversations, agentsUsed, days });
 
-    // Get breakdown by agent
-    const agentBreakdownResult = await query(`
-      SELECT
-        c.agent_type,
-        COUNT(DISTINCT c.id) as conversations
-      FROM conversations c
-      WHERE c.user_id = $1
-        AND c.created_at >= NOW() - INTERVAL '${days} days'
-      GROUP BY c.agent_type
-      ORDER BY conversations DESC
-    `, [userId]);
+    // Only calculate details if user has conversations in this time period
+    let totalTime = 0;
+    let agentBreakdown = [];
+    let recentConversations = [];
 
-    const agentBreakdown = await Promise.all(agentBreakdownResult.rows.map(async row => {
-      const avgDuration = await calculateAvgSessionDuration(row.agent_type, days);
-      return {
-        agentType: row.agent_type,
-        conversations: parseInt(row.conversations),
-        avgDuration: avgDuration
-      };
-    }));
+    if (totalConversations > 0) {
+      // Calculate total time spent
+      totalTime = await calculateUserTotalSessionDuration(userId, days);
 
-    // Get recent conversations
-    const recentConversationsResult = await query(`
-      SELECT
-        c.id,
-        c.agent_type,
-        c.created_at,
-        COUNT(DISTINCT m.id) as message_count
-      FROM conversations c
-      LEFT JOIN messages m ON c.id = m.conversation_id
-      WHERE c.user_id = $1
-        AND c.created_at >= NOW() - INTERVAL '${days} days'
-      GROUP BY c.id, c.agent_type, c.created_at
-      ORDER BY c.created_at DESC
-      LIMIT 10
-    `, [userId]);
+      // Get breakdown by agent
+      const agentBreakdownResult = await query(`
+        SELECT
+          c.agent_type,
+          COUNT(DISTINCT c.id) as conversations
+        FROM conversations c
+        WHERE c.user_id = $1
+          AND c.created_at >= NOW() - INTERVAL '${days} days'
+        GROUP BY c.agent_type
+        ORDER BY conversations DESC
+      `, [userId]);
 
-    // Calculate duration for each conversation
-    const recentConversations = await Promise.all(recentConversationsResult.rows.map(async row => {
-      const duration = await calculateConversationSessionDuration(row.id);
-      return {
-        id: row.id,
-        agentType: row.agent_type,
-        createdAt: row.created_at,
-        messageCount: parseInt(row.message_count),
-        duration: duration
-      };
-    }));
+      agentBreakdown = await Promise.all(agentBreakdownResult.rows.map(async row => {
+        const avgDuration = await calculateAvgSessionDuration(row.agent_type, days);
+        return {
+          agentType: row.agent_type,
+          conversations: parseInt(row.conversations),
+          avgDuration: avgDuration
+        };
+      }));
+
+      // Get recent conversations
+      const recentConversationsResult = await query(`
+        SELECT
+          c.id,
+          c.agent_type,
+          c.created_at,
+          COUNT(DISTINCT m.id) as message_count
+        FROM conversations c
+        LEFT JOIN messages m ON c.id = m.conversation_id
+        WHERE c.user_id = $1
+          AND c.created_at >= NOW() - INTERVAL '${days} days'
+        GROUP BY c.id, c.agent_type, c.created_at
+        ORDER BY c.created_at DESC
+        LIMIT 10
+      `, [userId]);
+
+      // Calculate duration for each conversation
+      recentConversations = await Promise.all(recentConversationsResult.rows.map(async row => {
+        const duration = await calculateConversationSessionDuration(row.id);
+        return {
+          id: row.id,
+          agentType: row.agent_type,
+          createdAt: row.created_at,
+          messageCount: parseInt(row.message_count),
+          duration: duration
+        };
+      }));
+    }
 
     return res.status(200).json({
       success: true,
       userName: userStats.name,
-      totalConversations: parseInt(userStats.total_conversations),
-      agentsUsed: parseInt(userStats.agents_used),
+      totalConversations,
+      agentsUsed,
       totalMinutes: totalTime,
       lastActivity: userStats.last_activity,
       agentBreakdown,
