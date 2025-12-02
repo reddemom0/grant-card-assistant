@@ -75,6 +75,15 @@ async function getUsageOverview(req, res, days) {
 
   const stats = result.rows[0];
 
+  // Get DAU/WAU/MAU
+  const activeUsersStats = await getActiveUsersStats();
+
+  // Get retention metrics
+  const retentionStats = await getRetentionStats();
+
+  // Get engagement score
+  const engagementStats = await getEngagementStats(days);
+
   return res.status(200).json({
     success: true,
     days,
@@ -87,7 +96,10 @@ async function getUsageOverview(req, res, days) {
       avgMessagesPerConversation: stats.total_conversations > 0
         ? (parseInt(stats.total_messages) / parseInt(stats.total_conversations)).toFixed(1)
         : 0
-    }
+    },
+    activeUsers: activeUsersStats,
+    retention: retentionStats,
+    engagement: engagementStats
   });
 }
 
@@ -304,4 +316,193 @@ async function calculateUserTotalSessionDuration(userId, days) {
   `, [userId]);
 
   return parseFloat(result.rows[0]?.total_active_minutes) || 0;
+}
+
+/**
+ * Get DAU/WAU/MAU (Daily/Weekly/Monthly Active Users)
+ */
+async function getActiveUsersStats() {
+  const result = await query(`
+    SELECT
+      COUNT(DISTINCT CASE
+        WHEN c.updated_at >= NOW() - INTERVAL '1 day'
+        THEN c.user_id
+      END) as dau,
+      COUNT(DISTINCT CASE
+        WHEN c.updated_at >= NOW() - INTERVAL '7 days'
+        THEN c.user_id
+      END) as wau,
+      COUNT(DISTINCT CASE
+        WHEN c.updated_at >= NOW() - INTERVAL '30 days'
+        THEN c.user_id
+      END) as mau
+    FROM conversations c
+  `);
+
+  const stats = result.rows[0];
+  const dau = parseInt(stats.dau) || 0;
+  const wau = parseInt(stats.wau) || 0;
+  const mau = parseInt(stats.mau) || 0;
+
+  return {
+    dau,
+    wau,
+    mau,
+    // Stickiness ratio: DAU/MAU (higher is better, indicates daily engagement)
+    stickiness: mau > 0 ? ((dau / mau) * 100).toFixed(1) : 0
+  };
+}
+
+/**
+ * Get retention metrics (7-day and 30-day retention rates)
+ */
+async function getRetentionStats() {
+  // 7-day retention: % of users who return within 7 days of first conversation
+  const retention7Day = await query(`
+    WITH first_activity AS (
+      SELECT
+        user_id,
+        MIN(created_at) as first_conversation_date
+      FROM conversations
+      WHERE created_at >= NOW() - INTERVAL '37 days'  -- Look back further to track retention
+      GROUP BY user_id
+    ),
+    cohort_users AS (
+      SELECT
+        user_id,
+        first_conversation_date
+      FROM first_activity
+      WHERE first_conversation_date >= NOW() - INTERVAL '30 days'
+        AND first_conversation_date < NOW() - INTERVAL '7 days'  -- Only users who had chance to return
+    ),
+    returned_users AS (
+      SELECT DISTINCT
+        cu.user_id
+      FROM cohort_users cu
+      JOIN conversations c ON cu.user_id = c.user_id
+      WHERE c.created_at > cu.first_conversation_date
+        AND c.created_at <= cu.first_conversation_date + INTERVAL '7 days'
+    )
+    SELECT
+      COUNT(DISTINCT cu.user_id) as cohort_size,
+      COUNT(DISTINCT ru.user_id) as returned_count
+    FROM cohort_users cu
+    LEFT JOIN returned_users ru ON cu.user_id = ru.user_id
+  `);
+
+  // 30-day retention: % of users who return within 30 days
+  const retention30Day = await query(`
+    WITH first_activity AS (
+      SELECT
+        user_id,
+        MIN(created_at) as first_conversation_date
+      FROM conversations
+      WHERE created_at >= NOW() - INTERVAL '60 days'
+      GROUP BY user_id
+    ),
+    cohort_users AS (
+      SELECT
+        user_id,
+        first_conversation_date
+      FROM first_activity
+      WHERE first_conversation_date >= NOW() - INTERVAL '60 days'
+        AND first_conversation_date < NOW() - INTERVAL '30 days'
+    ),
+    returned_users AS (
+      SELECT DISTINCT
+        cu.user_id
+      FROM cohort_users cu
+      JOIN conversations c ON cu.user_id = c.user_id
+      WHERE c.created_at > cu.first_conversation_date
+        AND c.created_at <= cu.first_conversation_date + INTERVAL '30 days'
+    )
+    SELECT
+      COUNT(DISTINCT cu.user_id) as cohort_size,
+      COUNT(DISTINCT ru.user_id) as returned_count
+    FROM cohort_users cu
+    LEFT JOIN returned_users ru ON cu.user_id = ru.user_id
+  `);
+
+  const day7Stats = retention7Day.rows[0];
+  const day30Stats = retention30Day.rows[0];
+
+  const cohortSize7 = parseInt(day7Stats.cohort_size) || 0;
+  const returnedCount7 = parseInt(day7Stats.returned_count) || 0;
+  const cohortSize30 = parseInt(day30Stats.cohort_size) || 0;
+  const returnedCount30 = parseInt(day30Stats.returned_count) || 0;
+
+  return {
+    day7: {
+      cohortSize: cohortSize7,
+      returnedUsers: returnedCount7,
+      retentionRate: cohortSize7 > 0 ? ((returnedCount7 / cohortSize7) * 100).toFixed(1) : 0
+    },
+    day30: {
+      cohortSize: cohortSize30,
+      returnedUsers: returnedCount30,
+      retentionRate: cohortSize30 > 0 ? ((returnedCount30 / cohortSize30) * 100).toFixed(1) : 0
+    }
+  };
+}
+
+/**
+ * Calculate engagement score (0-100) based on frequency, recency, and depth
+ */
+async function getEngagementStats(days) {
+  const result = await query(`
+    WITH user_engagement AS (
+      SELECT
+        c.user_id,
+        COUNT(DISTINCT c.id) as conversation_count,
+        COUNT(DISTINCT DATE(c.created_at)) as active_days,
+        MAX(c.updated_at) as last_activity,
+        COUNT(DISTINCT m.id) as message_count,
+        EXTRACT(EPOCH FROM (NOW() - MAX(c.updated_at))) / 86400 as days_since_last_activity
+      FROM conversations c
+      LEFT JOIN messages m ON c.id = m.conversation_id
+      WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+      GROUP BY c.user_id
+    ),
+    scored_users AS (
+      SELECT
+        user_id,
+        conversation_count,
+        active_days,
+        message_count,
+        days_since_last_activity,
+        -- Frequency score (0-40): Based on conversations and active days
+        LEAST(40, (conversation_count * 5) + (active_days * 3)) as frequency_score,
+        -- Recency score (0-30): Based on days since last activity
+        CASE
+          WHEN days_since_last_activity <= 1 THEN 30
+          WHEN days_since_last_activity <= 3 THEN 25
+          WHEN days_since_last_activity <= 7 THEN 20
+          WHEN days_since_last_activity <= 14 THEN 15
+          WHEN days_since_last_activity <= 30 THEN 10
+          ELSE 5
+        END as recency_score,
+        -- Depth score (0-30): Based on message count
+        LEAST(30, message_count / 5) as depth_score
+      FROM user_engagement
+    )
+    SELECT
+      COUNT(*) as total_users,
+      AVG(frequency_score + recency_score + depth_score) as avg_engagement_score,
+      COUNT(CASE WHEN (frequency_score + recency_score + depth_score) >= 70 THEN 1 END) as highly_engaged_users,
+      COUNT(CASE WHEN (frequency_score + recency_score + depth_score) BETWEEN 40 AND 69 THEN 1 END) as moderately_engaged_users,
+      COUNT(CASE WHEN (frequency_score + recency_score + depth_score) < 40 THEN 1 END) as low_engaged_users
+    FROM scored_users
+  `);
+
+  const stats = result.rows[0];
+
+  return {
+    averageScore: parseFloat(stats.avg_engagement_score) || 0,
+    totalUsers: parseInt(stats.total_users) || 0,
+    breakdown: {
+      highlyEngaged: parseInt(stats.highly_engaged_users) || 0,  // Score >= 70
+      moderatelyEngaged: parseInt(stats.moderately_engaged_users) || 0,  // Score 40-69
+      lowEngaged: parseInt(stats.low_engaged_users) || 0  // Score < 40
+    }
+  };
 }
