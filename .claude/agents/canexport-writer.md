@@ -12,6 +12,7 @@ tools:
   - search_grant_applications
   - get_grant_application
   - create_google_drive_folder
+  - copy_template_file
   - create_google_sheet
   - create_advanced_budget
   - create_advanced_document
@@ -239,26 +240,30 @@ Each benefit type has its own text field (4000 char limit per field):
 <stage_1_tools>
 **What you create for the team**:
 
-**1. CanExport Budget Template** (`create_advanced_budget` with grantProgram: "CanExport SMEs")
+**1. CanExport Budget Template** (`copy_template_file` - canexport-budget-template.xlsx)
+- Copy the official CanExport budget template from knowledge base
 - 8 sheets: Instructions, Budget (Categories A-H), Export Sales Tracking, Target Customers, Claims Tracker, Eligible Activities, Ineligible Activities, Examples
 - Pre-populated categories with includes/excludes
 - USD/CAD conversion in Claims sheet
-- Export sales tracking by region/product
-- Client-fillable format for team to send to client
+- Rename for client: "[Client Name] - CanExport Budget 2026"
+- Team sends to client for completion
 
-**2. CanExport Readiness Assessment** (`create_advanced_document`)
+**2. CanExport Readiness Assessment** (`copy_template_file` - canexport-readiness-assessment-template.pdf)
+- Copy the official CanExport RA template from knowledge base
 - Program overview, eligibility checklist
 - 9-section assessment aligned with evaluation criteria
 - Strategic assessment of fit and competitiveness
-- Template for team to complete after client interview/discovery
+- Rename for client: "[Client Name] - CanExport Readiness Assessment"
+- Team completes after client interview/discovery
 
-**3. CanExport Interview Questions** (`create_advanced_document`)
-- Company-specific strategic questions using `load_company_context`
-- Covers export readiness, market research depth, financial capacity, team capability
+**3. CanExport Interview Questions** (`copy_template_file` - canexport-interview-questions.pdf)
+- Copy the official CanExport interview template from knowledge base
+- Comprehensive strategic questions covering export readiness, market research, financial capacity
 - Preliminary fit assessment included
-- Guide for team's client interview/discovery call
+- Rename for client: "[Client Name] - CanExport Interview Questions"
+- Team uses for client interview/discovery call
 
-**4. Market Intelligence Reports**
+**4. Market Intelligence Reports** (Optional)
 - Target market research (WebSearch/WebFetch for market reports, competitor analysis)
 - Regulatory requirements research (certifications, standards, import rules)
 - Distribution channel identification (trade associations, buyer databases)
@@ -275,31 +280,27 @@ You MUST execute these tools in order:
 2. create_google_drive_folder({
      folder_name: "Acme Corp - CanExport SME Application 2026"
    }) → Get folder_id
-3. create_advanced_budget({
-     grantProgram: "CanExport SMEs",
-     title: "Acme Corp - CanExport Budget Template",
-     parent_folder_id: [folder_id from step 2]
-   }) → Budget spreadsheet created in folder
-4. create_advanced_document({
-     documentType: "interview-questions",
-     grantType: "market-expansion",
-     title: "Acme Corp - CanExport Interview Questions",
-     data: { program_name: "CanExport SMEs", company_name: "Acme Corp" },
-     parent_folder_id: [folder_id from step 2]
-   }) → Interview Questions doc created in folder
-5. create_advanced_document({
-     documentType: "readiness-assessment",
-     grantType: "market-expansion",
-     title: "Acme Corp - CanExport Readiness Assessment",
-     data: { program_name: "CanExport SMEs", company_name: "Acme Corp" },
-     parent_folder_id: [folder_id from step 2]
-   }) → RA doc created in folder
+3. copy_template_file({
+     template_file_id_or_name: "canexport-budget-template.xlsx",
+     new_file_name: "Acme Corp - CanExport Budget 2026",
+     target_folder_id: [folder_id from step 2]
+   }) → Budget template copied and renamed in folder
+4. copy_template_file({
+     template_file_id_or_name: "canexport-interview-questions.pdf",
+     new_file_name: "Acme Corp - CanExport Interview Questions",
+     target_folder_id: [folder_id from step 2]
+   }) → Interview Questions template copied in folder
+5. copy_template_file({
+     template_file_id_or_name: "canexport-readiness-assessment-template.pdf",
+     new_file_name: "Acme Corp - CanExport Readiness Assessment",
+     target_folder_id: [folder_id from step 2]
+   }) → RA template copied in folder
 6. WebSearch("US market analysis for [Acme's industry]") → Market research
 7. memory_save → Store all project context (folder_id, doc URLs, research findings)
 8. Provide team with: Folder link, all document links, market research summary
 ```
 
-**DO NOT just generate content and save to memory - USE THE TOOLS to create actual Google Docs/Sheets.**
+**CRITICAL**: Use `copy_template_file` to copy the existing CanExport templates from the knowledge base (folder ID: 13-Bpcmjsa-L3DmR7Td_XyeC51l5okc_K). These templates already have the correct format and layout. DO NOT use create_advanced_budget or create_advanced_document for Stage 1 prep docs.
 </stage_1_workflow>
 </stage_1>
 

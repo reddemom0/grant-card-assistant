@@ -230,6 +230,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         );
         break;
 
+      case 'copy_template_file':
+        result = await googleDrive.copyTemplateFile(
+          input.template_file_id_or_name,
+          input.new_file_name,
+          input.target_folder_id,
+          userId  // User ID for OAuth
+        );
+        break;
+
       case 'create_advanced_budget':
         result = await createAdvancedBudgetTool(input, {
           conversationId,

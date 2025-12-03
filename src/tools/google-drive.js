@@ -357,3 +357,104 @@ export async function createGoogleDriveFolder(folderName, userId) {
     };
   }
 }
+
+/**
+ * Copy a template file in Google Drive (for CanExport templates)
+ * @param {string} templateFileIdOrName - Source file ID or name to search for
+ * @param {string} newFileName - Name for the copied file
+ * @param {string} targetFolderId - Optional: Folder ID to place the copy in
+ * @param {number} userId - User ID (for OAuth-based access)
+ * @returns {Object} Copied file information
+ */
+export async function copyTemplateFile(templateFileIdOrName, newFileName, targetFolderId, userId) {
+  try {
+    console.log(`Copying template: "${templateFileIdOrName}" → "${newFileName}"`);
+
+    // Get user's OAuth credentials
+    const { query } = await import('../database/connection.js');
+    const result = await query(
+      'SELECT google_access_token, google_refresh_token, google_token_expiry FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      throw new Error('User not found');
+    }
+
+    const user = result.rows[0];
+
+    if (!user.google_access_token) {
+      throw new Error('User has not connected Google account');
+    }
+
+    // Create OAuth2 client with user's tokens
+    const oauth2Client = new google.auth.OAuth2(
+      process.env.GOOGLE_CLIENT_ID,
+      process.env.GOOGLE_CLIENT_SECRET
+    );
+
+    oauth2Client.setCredentials({
+      access_token: user.google_access_token,
+      refresh_token: user.google_refresh_token,
+      expiry_date: user.google_token_expiry ? new Date(user.google_token_expiry).getTime() : null
+    });
+
+    // Create Drive client
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+
+    // Step 1: Find the template file if name was provided instead of ID
+    let templateFileId = templateFileIdOrName;
+
+    // Check if it's a file ID (looks like alphanumeric string) or a name
+    if (!templateFileIdOrName.match(/^[a-zA-Z0-9_-]{20,}$/)) {
+      // It's a name, search for it
+      console.log(`Searching for template file: "${templateFileIdOrName}"`);
+      const searchResponse = await drive.files.list({
+        q: `name='${templateFileIdOrName}' and trashed=false`,
+        fields: 'files(id, name)',
+        pageSize: 1
+      });
+
+      if (searchResponse.data.files.length === 0) {
+        throw new Error(`Template file not found: ${templateFileIdOrName}`);
+      }
+
+      templateFileId = searchResponse.data.files[0].id;
+      console.log(`Found template file ID: ${templateFileId}`);
+    }
+
+    // Step 2: Copy the file
+    const copyMetadata = {
+      name: newFileName
+    };
+
+    // Add parent folder if specified
+    if (targetFolderId) {
+      copyMetadata.parents = [targetFolderId];
+    }
+
+    const copiedFile = await drive.files.copy({
+      fileId: templateFileId,
+      resource: copyMetadata,
+      fields: 'id, name, webViewLink, mimeType'
+    });
+
+    console.log(`✓ Template copied successfully: ${copiedFile.data.name}`);
+
+    return {
+      success: true,
+      file: {
+        id: copiedFile.data.id,
+        name: copiedFile.data.name,
+        url: copiedFile.data.webViewLink,
+        mimeType: copiedFile.data.mimeType
+      }
+    };
+  } catch (error) {
+    console.error('Google Drive copy template error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}

@@ -445,6 +445,28 @@ export const GOOGLE_DOCS_TOOLS = [
     }
   },
   {
+    name: 'copy_template_file',
+    description: 'Copy a CanExport template file (Budget, RA, or Interview Questions) from the knowledge base and rename it for a specific client project. Use this to create client-specific versions of CanExport templates. The tool will search for the template by name in Google Drive, copy it, rename it with the client name, and place it in the project folder.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        template_file_id_or_name: {
+          type: 'string',
+          description: 'Template file name or ID to copy. Common templates: "canexport-budget-template.xlsx", "canexport-readiness-assessment-template.pdf", "canexport-interview-questions.pdf". Can provide either the exact filename or a Google Drive file ID.'
+        },
+        new_file_name: {
+          type: 'string',
+          description: 'New name for the copied file (e.g., "Spring Activator - CanExport Budget 2026", "Acme Corp - CanExport Interview Questions"). Include client name and document type for easy identification.'
+        },
+        target_folder_id: {
+          type: 'string',
+          description: 'Google Drive folder ID where the copied file should be placed (from create_google_drive_folder). This organizes all client documents in one project folder.'
+        }
+      },
+      required: ['template_file_id_or_name', 'new_file_name', 'target_folder_id']
+    }
+  },
+  {
     name: 'create_advanced_budget',
     description: 'Create a comprehensive budget spreadsheet using Google Sheets API with program-specific templates. Generates multi-sheet workbooks with branded formatting, formulas, validation rules, and dynamic budget tables tailored to specific grant programs (e.g., ETG, BCIC Ignite, CanExport). Supports custom budget data injection for automated budget generation.',
     input_schema: {
