@@ -130,7 +130,10 @@ async function calculateAgentMetrics(agentType, days) {
       COUNT(DISTINCT cf.id) FILTER (WHERE cf.rating = 'positive') as positive_feedback,
       COUNT(DISTINCT cf.id) FILTER (WHERE cf.rating = 'negative') as negative_feedback,
       AVG(cf.revision_count) as avg_revisions,
-      AVG(cf.completion_time_seconds) as avg_completion_seconds
+      AVG(cf.completion_time_seconds) as avg_completion_seconds,
+      (SELECT COUNT(*) FROM messages m WHERE m.conversation_id IN (
+        SELECT id FROM conversations WHERE agent_type = $1 AND created_at >= NOW() - INTERVAL '${days} days'
+      )) as total_messages
     FROM conversations c
     LEFT JOIN conversation_feedback cf ON c.id = cf.conversation_id
     WHERE c.agent_type = $1
@@ -145,6 +148,8 @@ async function calculateAgentMetrics(agentType, days) {
   if (conversationCount === 0) {
     return {
       conversationCount: 0,
+      totalMessages: 0,
+      totalFeedback: 0,
       accuracyScore: null,
       workflowScore: null,
       formatScore: null,
@@ -232,6 +237,8 @@ async function calculateAgentMetrics(agentType, days) {
 
   return {
     conversationCount,
+    totalMessages: parseInt(metrics.total_messages) || 0,
+    totalFeedback,
     accuracyScore: parseFloat(accuracyScore.toFixed(1)),
     workflowScore: parseFloat(workflowScore.toFixed(1)),
     formatScore: parseFloat(formatScore.toFixed(1)),

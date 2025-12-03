@@ -624,6 +624,18 @@
                             </th>
                             <th>
                                 <span class="tooltip-container">
+                                    Total Messages
+                                    <span class="tooltip-text">Total number of messages across all conversations in the selected time period</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
+                                    Feedback Received
+                                    <span class="tooltip-text">Total feedback items including thumbs up/down and text feedback</span>
+                                </span>
+                            </th>
+                            <th>
+                                <span class="tooltip-container">
                                     Quality Score
                                     <span class="tooltip-text long">Weighted composite score based on accuracy (30%), instruction following (25%), positive feedback (20%), format (10%), workflow (10%), and context usage (5%)</span>
                                 </span>
@@ -671,6 +683,8 @@
                             <tr onclick="viewAgentDetails('${agent.agentType}')">
                                 <td class="agent-name">${agent.agentName}</td>
                                 <td>${agent.conversationCount}</td>
+                                <td>${agent.totalMessages || 0}</td>
+                                <td>${agent.totalFeedback || 0}</td>
                                 <td>${formatScore(agent.qualityScore)}</td>
                                 <td>${formatScore(agent.accuracyScore)}</td>
                                 <td>${formatScore(agent.instructionScore)}</td>
