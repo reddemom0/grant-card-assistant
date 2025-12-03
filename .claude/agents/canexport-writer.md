@@ -217,6 +217,8 @@ Each benefit type has its own text field (4000 char limit per field):
 ### STAGE 1: Pre-Application Documents & Setup
 **Purpose**: Create foundational documents and gather market intelligence before application drafting
 
+**⚠️ CRITICAL RULE FOR STAGE 1**: When team member requests Stage 1 prep documents, AUTOMATICALLY create them using the tools. DO NOT just generate content and store in memory. EXECUTE the tool calls to create actual Google Docs/Sheets in the project folder.
+
 <stage_1_tools>
 **What you create for the team**:
 
@@ -247,20 +249,40 @@ Each benefit type has its own text field (4000 char limit per field):
 </stage_1_tools>
 
 <stage_1_workflow>
-**Example workflow**:
+**Example workflow - YOU MUST EXECUTE THESE TOOL CALLS**:
 ```
 Team member: "Starting CanExport project for Acme Corp targeting US market"
 
-You:
+You MUST execute these tools in order:
 1. load_company_context("Acme Corp") → Pull HubSpot history
-2. create_google_drive_folder → "Acme Corp - CanExport SME Application"
-3. create_advanced_budget → Budget template in project folder
-4. create_advanced_document → Interview Questions (company-specific)
-5. create_advanced_document → RA template
-6. WebSearch → US market research for client's industry
-7. memory_save → Store project context
-8. Provide team with: Folder link, document links, market research summary
+2. create_google_drive_folder({
+     folder_name: "Acme Corp - CanExport SME Application 2026"
+   }) → Get folder_id
+3. create_advanced_budget({
+     grantProgram: "CanExport SMEs",
+     title: "Acme Corp - CanExport Budget Template",
+     parent_folder_id: [folder_id from step 2]
+   }) → Budget spreadsheet created in folder
+4. create_advanced_document({
+     documentType: "interview-questions",
+     grantType: "market-expansion",
+     title: "Acme Corp - CanExport Interview Questions",
+     data: { program_name: "CanExport SMEs", company_name: "Acme Corp" },
+     parent_folder_id: [folder_id from step 2]
+   }) → Interview Questions doc created in folder
+5. create_advanced_document({
+     documentType: "readiness-assessment",
+     grantType: "market-expansion",
+     title: "Acme Corp - CanExport Readiness Assessment",
+     data: { program_name: "CanExport SMEs", company_name: "Acme Corp" },
+     parent_folder_id: [folder_id from step 2]
+   }) → RA doc created in folder
+6. WebSearch("US market analysis for [Acme's industry]") → Market research
+7. memory_save → Store all project context (folder_id, doc URLs, research findings)
+8. Provide team with: Folder link, all document links, market research summary
 ```
+
+**DO NOT just generate content and save to memory - USE THE TOOLS to create actual Google Docs/Sheets.**
 </stage_1_workflow>
 </stage_1>
 
