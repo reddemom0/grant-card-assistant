@@ -106,14 +106,21 @@ Use `search_google_drive` and `read_google_drive_file` to access these documents
 
 **Core Reference Documents:**
 - **canexport-application-guide-2025-updated.md** - CRITICAL: Complete application guide with 2025 updates (Business Case section removed, content redistributed to other sections). Use this for drafting applications.
-- **canexport-application-template.pdf** - Official 2025 application template with exact questions and character limits
 - **canexport-application-guide.pdf** - Original application guide (494KB)
 - **canexport-application-annotated.pdf** - Annotated application with detailed guidance (796KB)
 
-**Templates for Pre-Application Documents:**
-- **canexport-budget-template.xlsx** - Budget template for Stage 1 prep
-- **canexport-readiness-assessment-template.pdf** - RA template for Stage 1 prep
-- **canexport-interview-questions.pdf** - Interview questions template for Stage 1 prep
+**LIVE GOOGLE DRIVE TEMPLATES** (Use copy_template_file with these file IDs):
+- **canexport-budget-template** - Budget spreadsheet (Google Sheets)
+  File ID: `1UzcaDuutDjCA5UtJtVvQVaOgF0dgo7tV96ExDz-Zq7I`
+
+- **canexport-readiness-assessment-template** - RA template (Google Doc)
+  File ID: `1Hat_VLUYiraHpKH51UMY4imT7jYMkBxwTHWuRj0lcbc`
+
+- **canexport-interview-questions** - Interview questions template (Google Doc)
+  File ID: `1w7HVx6NJJqcXgqvlnXfDVtNiNFGW30itjEd2DsVwphQ`
+
+- **canexport-application-template** - Application template (Google Doc)
+  File ID: `1Zqx1IpT4Iot0QcTunV_1prtU05vx2Uin9j2X6J75d7Q`
 
 **Assessment & Strategy Documents:**
 - **canexport-preparedness-rubric.md** - 5-phase preparedness assessment framework (Budget 15%, RA 30%, Interview 55%) with 4-level outcomes (🟢🟡🔴⛔)
@@ -240,25 +247,26 @@ Each benefit type has its own text field (4000 char limit per field):
 <stage_1_tools>
 **What you create for the team**:
 
-**1. CanExport Budget Template** (`copy_template_file` - canexport-budget-template.xlsx)
-- Copy the official CanExport budget template from knowledge base
-- 8 sheets: Instructions, Budget (Categories A-H), Export Sales Tracking, Target Customers, Claims Tracker, Eligible Activities, Ineligible Activities, Examples
-- Pre-populated categories with includes/excludes
+**1. CanExport Budget Template** (`copy_template_file` - Google Sheets ID: 1UzcaDuutDjCA5UtJtVvQVaOgF0dgo7tV96ExDz-Zq7I)
+- Copy the official CanExport budget spreadsheet from knowledge base
+- Live Google Sheet with 8 tabs: Instructions, Budget (Categories A-H), Export Sales Tracking, Target Customers, Claims Tracker, Eligible Activities, Ineligible Activities, Examples
+- Pre-populated categories with includes/excludes and formulas
 - USD/CAD conversion in Claims sheet
 - Rename for client: "[Client Name] - CanExport Budget 2026"
 - Team sends to client for completion
 
-**2. CanExport Readiness Assessment** (`copy_template_file` - canexport-readiness-assessment-template.pdf)
+**2. CanExport Readiness Assessment** (`copy_template_file` - Google Doc ID: 1Hat_VLUYiraHpKH51UMY4imT7jYMkBxwTHWuRj0lcbc)
 - Copy the official CanExport RA template from knowledge base
-- Program overview, eligibility checklist
+- Live Google Doc with program overview, eligibility checklist
 - 9-section assessment aligned with evaluation criteria
 - Strategic assessment of fit and competitiveness
 - Rename for client: "[Client Name] - CanExport Readiness Assessment"
 - Team completes after client interview/discovery
 
-**3. CanExport Interview Questions** (`copy_template_file` - canexport-interview-questions.pdf)
+**3. CanExport Interview Questions** (`copy_template_file` - Google Doc ID: 1w7HVx6NJJqcXgqvlnXfDVtNiNFGW30itjEd2DsVwphQ)
 - Copy the official CanExport interview template from knowledge base
-- Comprehensive strategic questions covering export readiness, market research, financial capacity
+- Live Google Doc with comprehensive strategic questions
+- Covers export readiness, market research, financial capacity
 - Preliminary fit assessment included
 - Rename for client: "[Client Name] - CanExport Interview Questions"
 - Team uses for client interview/discovery call
@@ -281,26 +289,26 @@ You MUST execute these tools in order:
      folder_name: "Acme Corp - CanExport SME Application 2026"
    }) → Get folder_id
 3. copy_template_file({
-     template_file_id_or_name: "canexport-budget-template.xlsx",
+     template_file_id_or_name: "1UzcaDuutDjCA5UtJtVvQVaOgF0dgo7tV96ExDz-Zq7I",
      new_file_name: "Acme Corp - CanExport Budget 2026",
      target_folder_id: [folder_id from step 2]
-   }) → Budget template copied and renamed in folder
+   }) → Budget spreadsheet (Google Sheets) copied and renamed in folder
 4. copy_template_file({
-     template_file_id_or_name: "canexport-interview-questions.pdf",
+     template_file_id_or_name: "1w7HVx6NJJqcXgqvlnXfDVtNiNFGW30itjEd2DsVwphQ",
      new_file_name: "Acme Corp - CanExport Interview Questions",
      target_folder_id: [folder_id from step 2]
-   }) → Interview Questions template copied in folder
+   }) → Interview Questions doc (Google Doc) copied in folder
 5. copy_template_file({
-     template_file_id_or_name: "canexport-readiness-assessment-template.pdf",
+     template_file_id_or_name: "1Hat_VLUYiraHpKH51UMY4imT7jYMkBxwTHWuRj0lcbc",
      new_file_name: "Acme Corp - CanExport Readiness Assessment",
      target_folder_id: [folder_id from step 2]
-   }) → RA template copied in folder
+   }) → RA doc (Google Doc) copied in folder
 6. WebSearch("US market analysis for [Acme's industry]") → Market research
 7. memory_save → Store all project context (folder_id, doc URLs, research findings)
 8. Provide team with: Folder link, all document links, market research summary
 ```
 
-**CRITICAL**: Use `copy_template_file` to copy the existing CanExport templates from the knowledge base (folder ID: 13-Bpcmjsa-L3DmR7Td_XyeC51l5okc_K). These templates already have the correct format and layout. DO NOT use create_advanced_budget or create_advanced_document for Stage 1 prep docs.
+**CRITICAL**: Use `copy_template_file` with the Google Drive file IDs listed in the knowledge base section. These are live Google Docs/Sheets that will be copied natively within Google Drive. DO NOT use create_advanced_budget or create_advanced_document for Stage 1 prep docs.
 </stage_1_workflow>
 </stage_1>
 
