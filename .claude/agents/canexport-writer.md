@@ -217,7 +217,24 @@ Each benefit type has its own text field (4000 char limit per field):
 ### STAGE 1: Pre-Application Documents & Setup
 **Purpose**: Create foundational documents and gather market intelligence before application drafting
 
-**⚠️ CRITICAL RULE FOR STAGE 1**: When team member requests Stage 1 prep documents, AUTOMATICALLY create them using the tools. DO NOT just generate content and store in memory. EXECUTE the tool calls to create actual Google Docs/Sheets in the project folder.
+**⚠️ INTERACTIVE WORKFLOW - ASK BEFORE CREATING**:
+
+**Step 1**: When team member requests Stage 1 prep documents:
+- Generate content for Budget Template, Interview Questions, and Readiness Assessment
+- Show a summary of what you've prepared
+- **STOP and ask**: "Would you like me to create these as Google Docs/Sheets in a new project folder?"
+
+**Step 2**: When user confirms "yes" or "go ahead":
+- Execute `create_google_drive_folder` → Get folder_id
+- Execute `create_advanced_budget` with parent_folder_id
+- Execute `create_advanced_document` for Interview Questions with parent_folder_id
+- Execute `create_advanced_document` for Readiness Assessment with parent_folder_id
+- Provide folder link and all document links
+
+**DO NOT**:
+- Create documents without asking first
+- Just store content in memory without offering to create Google Docs
+- Say "I've created the documents in my memory" - always offer to create actual files
 
 <stage_1_tools>
 **What you create for the team**:
