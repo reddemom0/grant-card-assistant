@@ -426,10 +426,6 @@
         <header>
             <h1>Feedback Learning Dashboard</h1>
             <p class="subtitle">Track agent improvements and learning patterns</p>
-            <button id="backfillBtn" onclick="runBackfill()" style="margin-top: 1rem; padding: 0.5rem 1.5rem; background: #2563eb; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.875rem; font-weight: 500;">
-                🔄 Tag Historical Feedback
-            </button>
-            <span id="backfillStatus" style="margin-left: 1rem; font-size: 0.875rem; color: #6b7280;"></span>
         </header>
 
         <!-- Time Filter -->
@@ -515,59 +511,6 @@
 
             // Reload data
             await loadQualityMatrix();
-        }
-
-        // Run backfill to tag historical feedback
-        async function runBackfill() {
-            const btn = document.getElementById('backfillBtn');
-            const status = document.getElementById('backfillStatus');
-
-            // Disable button and show loading
-            btn.disabled = true;
-            btn.style.opacity = '0.6';
-            btn.style.cursor = 'not-allowed';
-            status.textContent = '⏳ Processing...';
-            status.style.color = '#2563eb';
-
-            try {
-                const response = await fetch('/api/feedback-tagging?action=backfill', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        limit: 200,
-                        daysBack: 90,
-                        agentType: null
-                    })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    status.textContent = `✅ Tagged ${result.tagged || 0} items (processed ${result.processed || 0})`;
-                    status.style.color = '#059669';
-
-                    // Reload the dashboard after 2 seconds
-                    setTimeout(() => {
-                        loadQualityMatrix();
-                        status.textContent = '';
-                    }, 2000);
-                } else {
-                    status.textContent = `❌ Error: ${result.error}`;
-                    status.style.color = '#dc2626';
-                    btn.disabled = false;
-                    btn.style.opacity = '1';
-                    btn.style.cursor = 'pointer';
-                }
-            } catch (error) {
-                console.error('Backfill error:', error);
-                status.textContent = `❌ Failed: ${error.message}`;
-                status.style.color = '#dc2626';
-                btn.disabled = false;
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-            }
         }
 
         // Load agent quality matrix
