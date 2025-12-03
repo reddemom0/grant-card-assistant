@@ -61,25 +61,67 @@ class FeedbackPanel {
                 <p class="feedback-subtitle">Help this agent improve</p>
             </div>
 
-            <!-- Quick Note Entry -->
-            <div class="feedback-note-input">
-                <textarea
-                    id="quick-note-textarea"
-                    placeholder="Share your thoughts as we go..."
-                    rows="3"
-                    maxlength="1000"
-                ></textarea>
-                <div class="note-char-count" id="note-char-count">0/1000</div>
-                <button class="btn-save-note" id="save-note-btn">
-                    Save Note
+            <!-- Quick Feedback Widget -->
+            <div class="feedback-widget">
+                <h4>How was this response?</h4>
+                <div class="rating-buttons">
+                    <button class="btn-thumb thumbs-up" data-rating="positive">
+                        <span class="thumb-icon">👍</span>
+                        <span>Helpful</span>
+                    </button>
+                    <button class="btn-thumb thumbs-down" data-rating="negative">
+                        <span class="thumb-icon">👎</span>
+                        <span>Not Helpful</span>
+                    </button>
+                </div>
+
+                <!-- Optional Quick Note -->
+                <div class="feedback-note-input">
+                    <label for="quick-note-textarea" style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem; display: block;">Optional: Quick note</label>
+                    <textarea
+                        id="quick-note-textarea"
+                        placeholder="Share specific feedback..."
+                        rows="3"
+                        maxlength="1000"
+                    ></textarea>
+                    <div class="note-char-count" id="note-char-count">0/1000</div>
+                </div>
+
+                <!-- Quick Tags -->
+                <div class="quick-tags">
+                    <label style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.5rem; display: block;">Quick tags (optional):</label>
+                    <div class="tags-grid">
+                        <label class="tag-checkbox">
+                            <input type="checkbox" value="missed-information" data-category="accuracy">
+                            <span>Missed info</span>
+                        </label>
+                        <label class="tag-checkbox">
+                            <input type="checkbox" value="not-what-i-asked" data-category="instruction">
+                            <span>Not what I asked</span>
+                        </label>
+                        <label class="tag-checkbox">
+                            <input type="checkbox" value="wrong-format" data-category="format">
+                            <span>Wrong format</span>
+                        </label>
+                        <label class="tag-checkbox">
+                            <input type="checkbox" value="repeated-step" data-category="workflow">
+                            <span>Repeated steps</span>
+                        </label>
+                    </div>
+                </div>
+
+                <button class="btn-submit-feedback" id="submit-feedback-btn">
+                    Submit Feedback
                 </button>
             </div>
+
+            <hr class="feedback-divider">
 
             <!-- Previous Notes -->
             <div class="feedback-notes-list">
                 <h4>Your Notes</h4>
                 <div id="notes-container" class="notes-container">
-                    <p class="no-notes" id="no-notes-message">No notes yet. Add your first note above!</p>
+                    <p class="no-notes" id="no-notes-message">No notes yet. Submit feedback above!</p>
                 </div>
             </div>
         `;
@@ -180,6 +222,85 @@ class FeedbackPanel {
             }
 
             .btn-save-note:disabled {
+                background: #9ca3af;
+                cursor: not-allowed;
+            }
+
+            /* Feedback Widget */
+            .feedback-widget {
+                background: white;
+                border-radius: 0.75rem;
+                padding: 1rem;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            }
+
+            .feedback-widget h4 {
+                font-size: 0.875rem;
+                color: #111827;
+                margin: 0 0 0.75rem 0;
+                font-weight: 600;
+            }
+
+            /* Quick Tags */
+            .quick-tags {
+                margin-top: 1rem;
+            }
+
+            .tags-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 0.5rem;
+            }
+
+            .tag-checkbox {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.5rem;
+                border: 1px solid #e5e7eb;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                transition: all 0.2s;
+                font-size: 0.8125rem;
+                color: #374151;
+            }
+
+            .tag-checkbox:hover {
+                border-color: #3b82f6;
+                background: #eff6ff;
+            }
+
+            .tag-checkbox input[type="checkbox"] {
+                width: 1rem;
+                height: 1rem;
+                cursor: pointer;
+            }
+
+            .tag-checkbox input[type="checkbox"]:checked + span {
+                color: #1f2937;
+                font-weight: 500;
+            }
+
+            /* Submit Feedback Button */
+            .btn-submit-feedback {
+                width: 100%;
+                padding: 0.75rem;
+                background: #10b981;
+                color: white;
+                border: none;
+                border-radius: 0.5rem;
+                cursor: pointer;
+                font-size: 0.875rem;
+                font-weight: 600;
+                margin-top: 1rem;
+                transition: background 0.2s;
+            }
+
+            .btn-submit-feedback:hover:not(:disabled) {
+                background: #059669;
+            }
+
+            .btn-submit-feedback:disabled {
                 background: #9ca3af;
                 cursor: not-allowed;
             }
@@ -298,6 +419,18 @@ class FeedbackPanel {
                 background: #fef2f2;
             }
 
+            .btn-thumb.active.thumbs-up {
+                border-color: #10b981;
+                background: #d1fae5;
+                border-width: 2px;
+            }
+
+            .btn-thumb.active.thumbs-down {
+                border-color: #ef4444;
+                background: #fee2e2;
+                border-width: 2px;
+            }
+
             .thumb-icon {
                 font-size: 1.5rem;
             }
@@ -351,10 +484,23 @@ class FeedbackPanel {
     }
 
     attachEventListeners() {
-        // Save note button
-        const saveNoteBtn = document.getElementById('save-note-btn');
-        if (saveNoteBtn) {
-            saveNoteBtn.addEventListener('click', () => this.saveNote());
+        // Rating buttons (thumbs up/down)
+        const ratingButtons = document.querySelectorAll('.btn-thumb');
+        ratingButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove active from all buttons
+                ratingButtons.forEach(b => b.classList.remove('active'));
+                // Add active to clicked button
+                btn.classList.add('active');
+                // Store selected rating
+                this.selectedRating = btn.dataset.rating;
+            });
+        });
+
+        // Submit feedback button
+        const submitBtn = document.getElementById('submit-feedback-btn');
+        if (submitBtn) {
+            submitBtn.addEventListener('click', () => this.submitFeedback());
         }
 
         // Character count
@@ -363,14 +509,6 @@ class FeedbackPanel {
             textarea.addEventListener('input', (e) => {
                 const count = e.target.value.length;
                 document.getElementById('note-char-count').textContent = `${count}/1000`;
-            });
-
-            // Enter to save (with Shift+Enter for new line)
-            textarea.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    this.saveNote();
-                }
             });
         }
     }
@@ -388,6 +526,85 @@ class FeedbackPanel {
             }
         } catch (error) {
             console.error('Error loading notes:', error);
+        }
+    }
+
+    async submitFeedback() {
+        // Check if rating is selected
+        if (!this.selectedRating) {
+            alert('Please select a rating (👍 or 👎) before submitting');
+            return;
+        }
+
+        const submitBtn = document.getElementById('submit-feedback-btn');
+        const textarea = document.getElementById('quick-note-textarea');
+        const feedbackText = textarea.value.trim();
+
+        // Get selected quick tags
+        const selectedTags = [];
+        const checkboxes = document.querySelectorAll('.tag-checkbox input[type="checkbox"]:checked');
+        checkboxes.forEach(cb => selectedTags.push(cb.value));
+
+        // Disable button
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Submitting...';
+
+        try {
+            const response = await fetch('/api/feedback', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    conversationId: this.conversationId,
+                    messageIndex: this.messageCount,
+                    rating: this.selectedRating,
+                    feedbackText: feedbackText || undefined,
+                    quickTags: selectedTags.length > 0 ? selectedTags : undefined,
+                    revisionCount: this.revisionCount,
+                    completionTime: Math.floor((Date.now() - this.conversationStartTime) / 1000),
+                    messageCount: this.messageCount
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Clear form
+                textarea.value = '';
+                document.getElementById('note-char-count').textContent = '0/1000';
+                document.querySelectorAll('.btn-thumb').forEach(b => b.classList.remove('active'));
+                checkboxes.forEach(cb => cb.checked = false);
+                this.selectedRating = null;
+
+                // Show success message
+                submitBtn.textContent = '✓ Submitted!';
+                setTimeout(() => {
+                    submitBtn.textContent = 'Submit Feedback';
+                    submitBtn.disabled = false;
+                }, 2000);
+
+                // Add to notes display
+                const feedbackNote = {
+                    note_text: feedbackText || `${this.selectedRating === 'positive' ? '👍' : '👎'} Feedback submitted`,
+                    sentiment: this.selectedRating === 'positive' ? 'positive' : 'negative',
+                    created_at: new Date().toISOString()
+                };
+                this.notes.unshift(feedbackNote);
+                this.renderNotes();
+
+                console.log('✅ Feedback submitted');
+            } else {
+                alert('Failed to submit feedback: ' + (data.error || 'Unknown error'));
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Feedback';
+            }
+        } catch (error) {
+            console.error('Error submitting feedback:', error);
+            alert('Failed to submit feedback. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Submit Feedback';
         }
     }
 

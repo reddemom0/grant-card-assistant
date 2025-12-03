@@ -74,6 +74,7 @@ export default async function handler(req, res) {
         messageIndex,    // Index of message (0-based) - alternative to messageId
         rating,          // 'positive' | 'negative'
         feedbackText,    // Optional text explanation
+        quickTags,       // Array of user-selected tags
         revisionCount,   // How many times user asked for changes
         completionTime,  // How long conversation took (seconds)
         messageCount     // Total messages in conversation
@@ -136,29 +137,47 @@ export default async function handler(req, res) {
 
       console.log(`✅ Feedback saved: ${conversationId} - ${rating} (quality: ${savedFeedback.quality_score})`);
 
-      // Auto-tag feedback (runs in background)
-      let appliedTags = [];
-      try {
-        const conversation = await db.getConversation(conversationId);
-        if (conversation?.agent_type && feedbackText && feedbackText.trim().length > 5) {
-          const { tagFeedback } = await import('../src/feedback/auto-tagger.js');
-          // Run in background - don't block response
-          tagFeedback(
-            savedFeedback.id,
-            feedbackText,
-            conversation.agent_type,
-            conversationId
-          ).then(result => {
-            if (result.success && result.tags.length > 0) {
-              console.log(`🏷️  Auto-tagged feedback ${savedFeedback.id} with ${result.tags.length} tags`);
-            }
-          }).catch(err => {
-            console.error('Background tagging failed:', err);
-          });
+      // Handle quick tags (user-selected tags from UI)
+      if (quickTags && Array.isArray(quickTags) && quickTags.length > 0) {
+        try {
+          const { query } = await import('../src/database/connection.js');
+          for (const tag of quickTags) {
+            await query(`
+              INSERT INTO feedback_tags (feedback_id, tag, created_at)
+              VALUES ($1, $2, NOW())
+              ON CONFLICT DO NOTHING
+            `, [savedFeedback.id, tag]);
+          }
+          console.log(`🏷️  Applied ${quickTags.length} quick tags to feedback ${savedFeedback.id}`);
+        } catch (error) {
+          console.error('Error applying quick tags:', error);
         }
-      } catch (error) {
-        // Don't fail the feedback submission if tagging fails
-        console.error('Error auto-tagging feedback:', error);
+      }
+
+      // Auto-tag feedback text (runs in background) - only if no quick tags or has feedback text
+      if (feedbackText && feedbackText.trim().length > 5) {
+        try {
+          const conversation = await db.getConversation(conversationId);
+          if (conversation?.agent_type) {
+            const { tagFeedback } = await import('../src/feedback/auto-tagger.js');
+            // Run in background - don't block response
+            tagFeedback(
+              savedFeedback.id,
+              feedbackText,
+              conversation.agent_type,
+              conversationId
+            ).then(result => {
+              if (result.success && result.tags.length > 0) {
+                console.log(`🏷️  Auto-tagged feedback ${savedFeedback.id} with ${result.tags.length} tags from text`);
+              }
+            }).catch(err => {
+              console.error('Background tagging failed:', err);
+            });
+          }
+        } catch (error) {
+          // Don't fail the feedback submission if tagging fails
+          console.error('Error auto-tagging feedback:', error);
+        }
       }
 
       // Auto-trigger learning generation if threshold reached (runs in background)
