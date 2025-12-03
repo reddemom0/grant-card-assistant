@@ -114,16 +114,6 @@ class FeedbackPanel {
                     Submit Feedback
                 </button>
             </div>
-
-            <hr class="feedback-divider">
-
-            <!-- Previous Notes -->
-            <div class="feedback-notes-list">
-                <h4>Your Notes</h4>
-                <div id="notes-container" class="notes-container">
-                    <p class="no-notes" id="no-notes-message">No notes yet. Submit feedback above!</p>
-                </div>
-            </div>
         `;
     }
 
@@ -596,22 +586,15 @@ class FeedbackPanel {
                 this.selectedRating = null;
 
                 // Show success message
-                submitBtn.textContent = '✓ Submitted!';
+                submitBtn.textContent = '✓ Feedback submitted!';
+                submitBtn.style.background = '#10b981';
                 setTimeout(() => {
                     submitBtn.textContent = 'Submit Feedback';
+                    submitBtn.style.background = '#10b981';
                     submitBtn.disabled = false;
-                }, 2000);
+                }, 3000);
 
-                // Add to notes display
-                const feedbackNote = {
-                    note_text: feedbackText || `${this.selectedRating === 'positive' ? '👍' : '👎'} Feedback submitted`,
-                    sentiment: this.selectedRating === 'positive' ? 'positive' : 'negative',
-                    created_at: new Date().toISOString()
-                };
-                this.notes.unshift(feedbackNote);
-                this.renderNotes();
-
-                console.log('✅ Feedback submitted');
+                console.log('✅ Feedback submitted successfully');
             } else {
                 alert('Failed to submit feedback: ' + (data.error || 'Unknown error'));
                 submitBtn.disabled = false;
