@@ -143,7 +143,7 @@ class FeedbackPanel {
             }
 
             .chat-panel-wrapper {
-                flex: 0 0 70%;
+                flex: 0 0 62%;
                 display: flex;
                 flex-direction: column;
                 border-right: 1px solid var(--border, #e5e7eb);
@@ -151,7 +151,7 @@ class FeedbackPanel {
             }
 
             .feedback-panel {
-                flex: 0 0 30%;
+                flex: 0 0 38%;
                 background: #f9fafb;
                 padding: 1.5rem;
                 overflow-y: auto;
@@ -486,14 +486,27 @@ class FeedbackPanel {
     attachEventListeners() {
         // Rating buttons (thumbs up/down)
         const ratingButtons = document.querySelectorAll('.btn-thumb');
-        ratingButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
+        console.log(`🔘 Found ${ratingButtons.length} rating buttons`);
+
+        ratingButtons.forEach((btn, index) => {
+            const rating = btn.dataset.rating;
+            console.log(`   Button ${index}: rating="${rating}", classes="${btn.className}"`);
+
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const clickedRating = btn.dataset.rating;
+                console.log(`👆 Clicked button with rating: "${clickedRating}"`);
+
                 // Remove active from all buttons
                 ratingButtons.forEach(b => b.classList.remove('active'));
                 // Add active to clicked button
                 btn.classList.add('active');
                 // Store selected rating
-                this.selectedRating = btn.dataset.rating;
+                this.selectedRating = clickedRating;
+
+                console.log(`✓ Selected rating stored: "${this.selectedRating}"`);
             });
         });
 
@@ -530,6 +543,8 @@ class FeedbackPanel {
     }
 
     async submitFeedback() {
+        console.log(`📤 submitFeedback() called, selectedRating: "${this.selectedRating}"`);
+
         // Check if rating is selected
         if (!this.selectedRating) {
             alert('Please select a rating (👍 or 👎) before submitting');
@@ -544,6 +559,8 @@ class FeedbackPanel {
         const selectedTags = [];
         const checkboxes = document.querySelectorAll('.tag-checkbox input[type="checkbox"]:checked');
         checkboxes.forEach(cb => selectedTags.push(cb.value));
+
+        console.log(`📊 Submitting: rating="${this.selectedRating}", text="${feedbackText}", tags=${JSON.stringify(selectedTags)}`);
 
         // Disable button
         submitBtn.disabled = true;
