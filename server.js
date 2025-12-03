@@ -457,6 +457,10 @@ app.get('/canexport-claims*', (req, res) => {
   res.sendFile('canexport-claims.html', { root: '.' });
 });
 
+app.get('/canexport-writer*', (req, res) => {
+  res.sendFile('canexport-writer.html', { root: '.' });
+});
+
 app.get('/readiness-strategist*', (req, res) => {
   res.sendFile('readiness-strategist.html', { root: '.' });
 });
