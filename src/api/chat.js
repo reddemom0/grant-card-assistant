@@ -141,6 +141,15 @@ export async function handleChatRequest(req, res) {
         });
 
         console.log(`✓ PDF attachment`);
+      } else if (attachment.type === 'document') {
+        // Handle document attachments (TXT, VTT, DOCX, etc.)
+        processedAttachments.push({
+          type: 'document',
+          mimeType: attachment.mimeType || 'text/plain',
+          data: attachment.data // Should be base64
+        });
+
+        console.log(`✓ Document attachment: ${attachment.mimeType || 'text/plain'}`);
       } else {
         console.warn(`⚠️  Unknown attachment type: ${attachment.type}, skipping`);
       }

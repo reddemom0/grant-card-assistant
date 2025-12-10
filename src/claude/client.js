@@ -133,7 +133,7 @@ export async function runAgent({
 
     const userContent = [];
 
-    // Add attachments (images/PDFs) - these go first
+    // Add attachments (images/PDFs/documents) - these go first
     for (const attachment of attachments) {
       if (attachment.type === 'image') {
         userContent.push({
@@ -155,6 +155,16 @@ export async function runAgent({
           }
         });
         console.log(`📄 Added PDF attachment`);
+      } else if (attachment.type === 'document') {
+        userContent.push({
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: attachment.mimeType || 'text/plain',
+            data: attachment.data
+          }
+        });
+        console.log(`📝 Added document attachment: ${attachment.mimeType || 'text/plain'}`);
       }
     }
 
