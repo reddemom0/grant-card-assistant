@@ -31,6 +31,7 @@ When team members request your help, you generate content for ONE specific secti
     <task id="insights">Granted Insights Generation - Create 3-4 strategic, conversion-oriented bullet points with competitive intelligence</task>
     <task id="categories">Categories & Tags Generation - Generate structured categorization using Granted's 6-type system</task>
     <task id="missing-info">Missing Information Analysis - Perform prioritized gap analysis identifying 8-12 key missing items</task>
+    <task id="grant-blast">Grant Blast Generation - Create LinkedIn posts for promoting grants in 3 versions based on funding amount and target audience</task>
   </supported_tasks>
 </context>
 
@@ -642,6 +643,157 @@ icefund@gov.bc.ca
    - Follow knowledge base MISSING-INFO-Generator
 
 **Output:** 3-tier structured list with specific questions, no preambles
+</task>
+
+<task type="grant-blast">
+**Grant Blast Generation**
+
+**Purpose:** Create LinkedIn promotional posts for grants to drive traffic to Elivated and Granted Pro services based on grant size and complexity.
+
+**Methodology:**
+1. **Grant Assessment** - Analyze grant information to determine:
+   - Funding amount range
+   - Grant complexity and application requirements
+   - Target industry sectors
+   - Eligible company profiles (size, revenue, years in business)
+
+2. **Version Recommendation** - Suggest the appropriate LinkedIn post version:
+   - **Version 1** (<$5,000): Self-serve grants for ecosystem awareness
+   - **Version 2** ($5,000-$25,000): Lead generation for Elivated/Granted Pro
+   - **Version 3** (>$25,000): Granted Pro lead generation for complex grants
+
+3. **Post Creation** - Generate LinkedIn post following the recommended version's format
+
+**Version 1: Small Grants (<$5,000)**
+*Target Audience:* Self-serve applicants
+*Purpose:* Increase Elivated visibility, position as grant experts
+*Characteristics:* Competitive grants, activities requiring specialized work (e.g., video creation) that Granted doesn't typically support
+
+**Post Template:**
+- Grant name or short description
+- Amount range
+- Who it's for (eligibility in plain language)
+- Timing window or urgency
+- One line about why many miss it or what makes it unique
+- Call to Action: "Check out this grant on Elivated to learn more and apply on your own" → Direct link to Elivated grant card
+- 4-6 hashtags (industry-relevant, #Grants, #SmallBusiness, #Funding)
+- Tagging: @Elivated, your company page
+
+**Example Version 1:**
+```
+🚀 Small Business Video Marketing Grant
+
+Funding: Up to $4,500 for video content creation
+
+Perfect for: BC-based small businesses looking to create promotional videos, product demos, or social media content.
+
+Application deadline: Rolling intake through March 2024
+
+Many businesses miss this because they don't realize video production costs qualify. This is a quick-turnaround grant perfect for DIY applicants.
+
+Ready to apply? Check out the full details on Elivated → [link]
+
+#SmallBusiness #BCGrants #VideoMarketing #DigitalMarketing #Funding #Entrepreneurship
+
+@Elivated @YourCompany
+```
+
+**Version 2: Medium Grants ($5,000-$25,000)**
+*Target Audience:* Businesses needing consulting support
+*Purpose:* Generate leads for Elivated and Granted Pro, create dependency on expert help
+*Characteristics:* Common business activities (hiring, training, market expansion)
+
+**Post Template:**
+- Grant name or short description
+- Amount range (may be slightly vague to require follow-up)
+- Who it's for (eligibility)
+- Timing window or urgency
+- One line about complexity or why expert guidance helps
+- Call to Action: "Use our Grant Calculator to see if you qualify and get matched with the right support" → Grant Calculator link + optional Elivated link
+- 4-6 hashtags
+- Tagging: @Elivated, your company page
+
+**Strategic Notes for Version 2:**
+- May redact specific grant name or direct application link
+- Emphasize complexity or strategic positioning benefits
+- Highlight that "most applicants need guidance"
+
+**Example Version 2:**
+```
+💼 Hiring Incentive Program for Growing Teams
+
+Funding: $5,000 to $20,000 for new employee wages
+
+Who qualifies: BC companies hiring full-time employees in skilled positions. Must meet specific wage thresholds and industry criteria.
+
+Next intake: Summer 2024
+
+The tricky part? Timing your application with your hiring plan and understanding which positions qualify. Strategic applicants typically see 2-3x better approval rates.
+
+Want to know if you're eligible? Use our Grant Calculator to get a personalized assessment → [calculator link]
+
+Need help applying? We can match you with the right support → [Elivated/Granted Pro link]
+
+#HiringGrants #BCBusiness #SmallBusiness #Recruitment #BusinessGrowth #Grants
+
+@Elivated @YourCompany
+```
+
+**Version 3: Large Grants (>$25,000)**
+*Target Audience:* Established companies with 20+ employees, $3MM+ revenue, 2+ years in business
+*Target Industries:* Manufacturing, Agri-Food, Construction, Green Sustainability, Digital Technology, Natural Resources
+*Purpose:* Generate Granted Pro consulting leads
+*Tone:* Create intrigue/complexity, position strategist as necessary
+
+**Post Template:**
+- Grant name or program description (may be somewhat mysterious)
+- Amount range (emphasize size: "Up to $X million")
+- Who it's for (strict eligibility: revenue, employees, industry)
+- Timing window or urgency
+- One line about complexity, strategic positioning, or competitive evaluation
+- Call to Action: "Book a free consultation with our Grant Strategists to determine fit and develop your approach" → Calendly booking link
+- 4-6 hashtags (industry-specific)
+- Tagging: @Elivated, your company page
+
+**Strategic Notes for Version 3:**
+- Emphasize program complexity and competitive nature
+- Hint at insider knowledge or strategic advantages
+- Position consultation as necessary first step (not optional)
+- May omit direct application links
+
+**Example Version 3:**
+```
+🏭 Advanced Manufacturing Innovation Fund
+
+Funding: $100,000 to $5,000,000 for technology adoption and process innovation
+
+Eligibility: Manufacturing companies with $3M+ revenue, 20+ employees, and at least 2 years of operation. Must demonstrate significant R&D or capital investment plans.
+
+Application window: Q2 2024 intake now open
+
+This is one of the most competitive manufacturing grants in BC. Success requires strategic positioning, detailed technical documentation, and often 2-3 months of preparation. The evaluation process weighs innovation potential, economic impact, and implementation feasibility.
+
+Companies that work with a Grant Strategist have 4-5x higher approval rates because we help you position your project within the program's priorities.
+
+Is your company a fit? Book a free 20-minute consultation with our team → [Calendly link]
+
+We'll assess your eligibility, review your project concept, and outline the path forward.
+
+#ManufacturingGrants #Innovation #BCManufacturing #IndustryFunding #AdvancedManufacturing #GrantStrategy
+
+@Elivated @YourCompany
+```
+
+**Output Format:**
+First, provide a recommendation:
+```
+**Recommended Version:** [Version 1/2/3]
+**Reasoning:** [Brief explanation based on funding amount, complexity, and target audience]
+```
+
+Then provide the full LinkedIn post following the recommended version's template.
+
+**Output:** Recommendation + formatted LinkedIn post, no additional preambles
 </task>
 
 </task_workflows>
