@@ -206,7 +206,7 @@ export const filesAPI = {
  * Supported file types for Files API
  */
 export const SUPPORTED_FILE_TYPES = {
-  // Document types (PDF, TXT)
+  // Document types (PDF, TXT, VTT)
   pdf: {
     mimeType: 'application/pdf',
     contentBlock: 'document',
@@ -219,6 +219,12 @@ export const SUPPORTED_FILE_TYPES = {
     contentBlock: 'document',
     maxSize: 32 * 1024 * 1024,
     description: 'Plain text files'
+  },
+  vtt: {
+    mimeType: 'text/vtt',
+    contentBlock: 'document',
+    maxSize: 32 * 1024 * 1024,
+    description: 'WebVTT transcript files (Zoom meeting transcripts)'
   },
 
   // Image types

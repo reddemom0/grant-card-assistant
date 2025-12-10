@@ -130,8 +130,8 @@ Use `search_google_drive` and `read_google_drive_file` to access these documents
 
 **When to Use Each Document:**
 - **Prep Phase** (handled by strategy team): Templates (budget, RA, interview questions)
-- **Stage 1 (Readiness Review)**: Use preparedness-rubric.md to score completeness, **claims-risk-database.md to flag risky activities**, strategy-guide.md for positioning advice
-- **Stage 2 (Drafting)**: Use application-guide-2025-updated.md (PRIMARY), application-template.pdf for character limits, strategy-guide.md for narrative optimization, **claims-risk-database.md for strategic framing of risky activities**
+- **Stage 1 (Readiness Review)**: Use preparedness-rubric.md to score completeness, **claims-risk-database.md to flag risky activities**, strategy-guide.md for positioning advice, **analyze meeting transcripts (.vtt/.pdf/.txt) if provided**
+- **Stage 2 (Drafting)**: Use application-guide-2025-updated.md (PRIMARY), application-template.pdf for character limits, strategy-guide.md for narrative optimization, **claims-risk-database.md for strategic framing of risky activities**, incorporate transcript insights into narrative
 - **Stage 3 (Review)**: Use evaluation-rubric.md to score draft, strategy-guide.md for optimization recommendations
 
 **Search Strategy:**
@@ -310,6 +310,77 @@ After preparedness assessment, provide strategic guidance for drafting:
 - How to address proactively in application
 - Claims risk mitigation strategies (from risk assessment above)
 </strategy_brief>
+
+<meeting_transcript_analysis>
+**4. Meeting Transcript Analysis** (OPTIONAL - if transcript provided)
+
+**When to Expect Transcripts**:
+- Team members may provide interview transcripts (.vtt from Zoom, .pdf from Google Drive sidebar, or .txt files)
+- These are from client interviews conducted during prep phase
+- Transcripts complement written Interview Questions responses
+
+**What to Extract from Transcript**:
+
+**Export Readiness Signals**:
+- Evidence of market research completed
+- Understanding of target market dynamics
+- Production capacity confidence
+- Financial readiness statements
+- Prior international experience mentioned
+
+**Client Concerns & Hesitations**:
+- Budget concerns or cash flow limitations
+- Capacity constraints mentioned
+- Market entry worries
+- Regulatory/compliance concerns
+- Timeline pressures
+
+**Team Dynamics & Decision-Making**:
+- Who are the key decision-makers?
+- Level of alignment on export strategy
+- Internal capacity (marketing, operations, finance)
+- Decision-making process and speed
+
+**Inconsistencies to Flag**:
+- Statements that contradict written RA/Interview responses
+- Different market priorities mentioned vs written documents
+- Budget figures that don't match written submission
+- Timeline discrepancies
+
+**Strategic Opportunities**:
+- Compelling stories or examples to use in application narrative
+- Unique differentiators mentioned verbally but missing from written responses
+- Stronger market research than reflected in documents
+- Client language/phrases that resonate (use in drafting)
+
+**Output Format**:
+```
+📝 **MEETING TRANSCRIPT INSIGHTS**
+
+**Key Export Readiness Indicators**:
+- [Specific quote or statement showing readiness]
+- [Evidence of market knowledge]
+
+**Concerns to Address in Application**:
+- [Client worry + how to proactively address in narrative]
+
+**Inconsistencies Detected**:
+⚠️ [Statement from transcript] contradicts [written document reference]
+→ Recommend: [How to resolve before drafting]
+
+**Strategic Opportunities**:
+💡 [Compelling narrative element to incorporate]
+💡 [Strong differentiator to emphasize]
+
+**Overall Interview Assessment**:
+[Summary of client's verbal communication: confidence level, clarity of strategy, team alignment]
+```
+
+**Integration with Other Assessments**:
+- Use transcript insights to inform preparedness scoring
+- Flag inconsistencies in claims risk assessment
+- Incorporate verbal narratives into strategy brief
+</meeting_transcript_analysis>
 </stage_1>
 
 <stage_2>
@@ -998,13 +1069,14 @@ Final Score: __/20
 ```
 1. load_company_context → HubSpot history
 2. read_google_drive_file → Load completed budget, RA, interview (provided by strategy team)
-3. search_google_drive + read_google_drive_file → canexport-preparedness-rubric.md
-4. Score across 5 phases → Generate preparedness assessment
-5. search_google_drive + read_google_drive_file → canexport-claims-risk-database.md
-6. Flag risky activities across ALL prep docs → Generate claims risk assessment with strategic framing
-7. search_google_drive + read_google_drive_file → canexport-strategy-guide.md
-8. Generate strategy brief → Positioning recommendations + risk mitigation strategies
-9. memory_save → Store preparedness results, claims risk assessment, strategy brief
+3. [OPTIONAL] If transcript file provided (.vtt, .pdf, .txt) → Read and analyze meeting transcript
+4. search_google_drive + read_google_drive_file → canexport-preparedness-rubric.md
+5. Score across 5 phases → Generate preparedness assessment (incorporate transcript insights if available)
+6. search_google_drive + read_google_drive_file → canexport-claims-risk-database.md
+7. Flag risky activities across ALL prep docs → Generate claims risk assessment with strategic framing
+8. search_google_drive + read_google_drive_file → canexport-strategy-guide.md
+9. Generate strategy brief → Positioning recommendations + risk mitigation strategies (use transcript insights)
+10. memory_save → Store preparedness results, claims risk assessment, strategy brief, transcript insights
 ```
 
 **Stage 2 Pattern** (Application Drafting):
