@@ -604,13 +604,121 @@ icefund@gov.bc.ca
 <task type="insights">
 **Granted Insights Generation**
 
-**Methodology:**
-1. **Strategic Analysis** - Identify competitive advantages, positioning opportunities, insider knowledge, success factors
-2. **Insights Construction** - Create 3-4 strategic bullet points (1 sentence each max)
-   - Include "Next Steps" bullet about Grant Consultant
-   - Follow knowledge base GRANTED-INSIGHTS-Generator
+**Strategic Purpose:**
+Create concise insights that:
+1. **Generate need for Granted's expertise** - Highlight barriers/complexity that warrant professional help
+2. **Pre-qualify leads** - Surface difficulties so unqualified applicants self-select out before contacting Granted
 
-**Output:** ONLY the insights section - 3-4 strategic bullets (NOT full grant card)
+**Critical Constraints:**
+- **DO NOT repeat information** already in other grant card sections (eligibility, requirements, deadlines, etc.)
+- **Maximum 3-4 bullets total** (including Next Steps)
+- **Maximum 150 characters per bullet** - ruthlessly concise
+- **Spartan tone** - no marketing fluff, just facts about barriers/complexity
+- **Keywords to emphasize**: urgency, limited spots, competitive, expertise required, preparation time, strategic positioning
+
+**Methodology:**
+
+**Step 1: Barrier Analysis**
+Identify HIGH BARRIERS TO ENTRY that make this grant difficult:
+- Application complexity (multi-stage, technical documentation, detailed financials)
+- Competitive evaluation (limited spots, scoring criteria, rejection rate)
+- Preparation requirements (months of prep, external consultants, specialized expertise)
+- Hidden requirements (unwritten expectations, strategic positioning, insider knowledge)
+- Timing constraints (narrow windows, specific milestone timing)
+
+**Step 2: Core Application Requirements**
+Identify the 2-3 MOST CRITICAL elements needed for a competitive application:
+- Key documents (business plans, technical specs, financial projections, impact assessments)
+- Strategic positioning (how to frame project within program priorities)
+- Evidence requirements (demonstration of capacity, past performance, partnerships)
+- Technical expertise (specialized knowledge, certifications, professional input)
+
+**Step 3: Industry Targeting**
+Based on grant focus, eligible activities, and evaluation criteria:
+- Identify 2-4 SPECIFIC industries that are ideal fits (be precise, not generic)
+- Use actual industry names: "Food & Beverage Manufacturing", "Clean Technology", "Digital Health", "Agri-Food Processing", "Advanced Manufacturing", "Construction Technology", "Forestry Products", "Mining Technology", "Software Development"
+- Consider: eligible activities, evaluation criteria emphasis, funding priorities, past recipients
+- Avoid generic terms like "any business" or "multiple sectors"
+
+**Step 4: Insight Construction (3-4 bullets)**
+
+**Format:**
+```
+**Granted Insights:**
+- [Barrier/complexity insight - max 150 chars]
+- [Core requirement insight - max 150 chars]
+- [Strategic timing/urgency insight OR industry targeting - max 150 chars]
+- **Next Steps:** [Concise CTA - max 150 chars]
+```
+
+**Content Guidelines:**
+
+**Barrier/Complexity Bullets (Choose 1-2):**
+- "Multi-stage evaluation with [X] selection criteria - [Y]% of applications advance past Stage 1"
+- "Requires [specific technical document] prepared by certified [professional type]"
+- "Limited to [X] recipients per intake - highly competitive scoring on [key criteria]"
+- "Evaluation emphasizes [specific uncommon requirement] that most applicants underestimate"
+- "[X]-month preparation timeline typical for competitive applications"
+
+**Core Requirement Bullets (Choose 1):**
+- "Strong applications require detailed [specific document type] demonstrating [outcome]"
+- "Evaluators prioritize [specific evidence type] over general business plans"
+- "Must demonstrate [specific capability/partnership] before applying"
+
+**Industry Targeting (Optional - use if applicable):**
+- "Particularly suited for [Industry 1], [Industry 2], and [Industry 3] with [specific characteristic]"
+- "Best fit: [Industry] companies with [specific attribute matching grant priorities]"
+
+**Next Steps Bullet (Required - always last):**
+- **Next Steps:** "Connect with a Grant Consultant to assess fit and develop your application strategy"
+- **Next Steps:** "Book a strategy session to position your project competitively and meet evaluation criteria"
+- **Next Steps:** "Work with our team to prepare [specific critical document] and strengthen your submission"
+
+**Examples:**
+
+**Example 1 - Highly Competitive R&D Grant:**
+```
+**Granted Insights:**
+- 12-week preparation typical - requires detailed technical feasibility study and commercialization plan
+- Scoring heavily weighted toward innovation novelty and IP strategy (40% of total evaluation)
+- Ideal for Clean Technology, Advanced Manufacturing, and Digital Health companies with patentable innovations
+- **Next Steps:** Book a strategy session to position your R&D project within program priorities
+```
+
+**Example 2 - Training Grant with Hidden Complexity:**
+```
+**Granted Insights:**
+- Must demonstrate ROI projections and post-training performance metrics - not just course descriptions
+- Applications without sector-specific training outcomes face 60%+ rejection rates
+- Best for Construction, Manufacturing, and Technology sectors investing in technical upskilling
+- **Next Steps:** Connect with a Grant Consultant to structure training plans that align with evaluation criteria
+```
+
+**Example 3 - Capital Investment Grant:**
+```
+**Granted Insights:**
+- Requires certified engineer reports for equipment feasibility and environmental impact assessments
+- Only 15-20 projects funded per quarter - evaluation favors economic impact and job creation metrics
+- Strong fit for Food Processing, Wood Products, and Agri-Food Manufacturing with capital expansion plans
+- **Next Steps:** Work with our team to prepare technical documentation and strengthen your business case
+```
+
+**What NOT to Include:**
+❌ Restating eligibility from grant card ("Must be BC-based incorporated company")
+❌ Repeating funding amounts or deadlines already shown
+❌ Generic advice ("make sure to read guidelines carefully")
+❌ Vague statements without specific barriers ("this is a competitive program")
+❌ Long explanations or background context
+
+**What TO Include:**
+✅ Specific barriers applicants underestimate
+✅ Concrete preparation requirements (timelines, specialized documents)
+✅ Quantified competitive pressure (limited spots, rejection rates, scoring weights)
+✅ Strategic positioning needs
+✅ Precise industry targeting (3-4 specific industries max)
+✅ Clear next step with Granted expertise
+
+**Output:** ONLY the insights section in the exact format above - no preambles, no explanations
 </task>
 
 <task type="categories">
