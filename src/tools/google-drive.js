@@ -359,6 +359,62 @@ export async function createGoogleDriveFolder(folderName, userId) {
 }
 
 /**
+ * Upload a file to Google Drive
+ * @param {string} fileName - Name for the uploaded file
+ * @param {string} content - File content (text/markdown)
+ * @param {string} mimeType - MIME type (e.g., 'text/markdown', 'text/plain')
+ * @param {string} folderId - Optional: Folder ID to place the file in
+ * @returns {Object} Uploaded file information
+ */
+export async function uploadFileToGoogleDrive(fileName, content, mimeType = 'text/plain', folderId = null) {
+  try {
+    console.log(`Uploading file to Google Drive: "${fileName}" (${mimeType})`);
+
+    // Use Service Account for knowledge base uploads
+    const drive = createDriveClient(null, false); // Write access
+
+    const fileMetadata = {
+      name: fileName,
+      mimeType: mimeType
+    };
+
+    // Add parent folder if specified
+    if (folderId) {
+      fileMetadata.parents = [folderId];
+    }
+
+    const media = {
+      mimeType: mimeType,
+      body: content
+    };
+
+    const file = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id, name, webViewLink, mimeType'
+    });
+
+    console.log(`✓ File uploaded successfully: ${file.data.name} (ID: ${file.data.id})`);
+
+    return {
+      success: true,
+      file: {
+        id: file.data.id,
+        name: file.data.name,
+        url: file.data.webViewLink,
+        mimeType: file.data.mimeType
+      }
+    };
+  } catch (error) {
+    console.error('Google Drive upload error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Copy a template file in Google Drive (for CanExport templates)
  * @param {string} templateFileIdOrName - Source file ID or name to search for
  * @param {string} newFileName - Name for the copied file
