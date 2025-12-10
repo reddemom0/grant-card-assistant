@@ -724,19 +724,294 @@ Based on grant focus, eligible activities, and evaluation criteria:
 <task type="categories">
 **Categories & Tags Generation**
 
-**Methodology:**
-1. **Grant Type Classification** - Apply 6-category system, identify primary and secondary types
-2. **Structured Tagging** - Generate 7 sections with count limits:
-   - PRIMARY GRANT TYPE: One of 6 types
-   - SECONDARY TYPES: Additional types if applicable
-   - INDUSTRIES: 2-5 tags
-   - GEOGRAPHY: 1-3 tags
-   - RECIPIENT TYPE: 1-3 tags
-   - FUNDING FOCUS: 3-5 tags
-   - PROGRAM CHARACTERISTICS: 2-4 tags
-   - Follow knowledge base CATEGORIES-TAGS-Classifier
+**Strategic Purpose:**
+Generate intelligent, strategic industry tags that attract COMPETITIVE applicants, not just technically eligible ones. Use contextual understanding and industry clustering to identify the grant's true target audience.
 
-**Output:** Direct classification format, no preambles, database-ready
+**Methodology:**
+
+**Step 1: Grant Intent Analysis**
+Read the grant holistically to understand its TRUE target, not just literal eligibility:
+
+**Key Signals to Analyze:**
+- **Sophistication level**: R&D/innovation/commercialization vs. adoption/implementation vs. basic activity
+- **Evaluation criteria emphasis**: What does scoring prioritize? (technical merit, innovation, economic impact, job creation)
+- **Language patterns**: "cutting-edge", "pioneering", "advanced" = high-tech targets vs. "implement", "adopt", "improve" = broader targets
+- **Funding amount**: $500K+ typically signals more sophisticated projects than $5K grants
+- **Required documentation**: Technical feasibility studies, IP strategy, commercialization plans = innovation-focused
+
+**Example:**
+- Grant says: "Clean technology R&D with commercialization potential"
+- TRUE target: Advanced battery tech, carbon capture systems, green hydrogen, renewable energy innovation
+- NOT the target: Environmental cleaning products, eco-friendly packaging (even if technically "clean tech")
+
+**Step 2: Strategic Industry Selection (5-8 industries)**
+
+**Be strategically selective:**
+✅ Industries that match the grant's competitive profile and sophistication level
+✅ Industries where companies would actually have a strong approval chance
+✅ Industries aligned with evaluation criteria priorities
+❌ Technically eligible but unlikely to be competitive industries
+
+**Step 3: Industry Cluster Mapping (Generative + Expansive)**
+
+When you see a sector mentioned, map the ENTIRE ECOSYSTEM around it using industry knowledge:
+
+**Industry Cluster Examples:**
+
+**"Green Technology" / "Clean Tech" cluster includes:**
+- Renewable Energy (solar, wind, hydro, geothermal)
+- Energy Storage (battery tech, grid storage)
+- Carbon Capture & Sequestration
+- Green Hydrogen Production
+- Electric Vehicle Infrastructure
+- Sustainable Manufacturing
+- Waste-to-Energy Systems
+- Building Energy Efficiency Technology
+- Smart Grid Technology
+- Water Treatment & Conservation Tech
+
+**"Advanced Manufacturing" cluster includes:**
+- Automation & Robotics
+- Additive Manufacturing (3D printing)
+- Industrial IoT & Smart Factories
+- Advanced Materials Development
+- Precision Manufacturing
+- Aerospace Manufacturing
+- Medical Device Manufacturing
+- Semiconductor Manufacturing
+
+**"Agri-Food" cluster includes:**
+- Food & Beverage Processing
+- Agricultural Technology (AgTech)
+- Vertical Farming & Controlled Environment Agriculture
+- Food Safety & Traceability Systems
+- Plant-Based Food Innovation
+- Aquaculture & Fisheries
+- Agricultural Equipment Manufacturing
+- Supply Chain & Cold Storage Technology
+
+**"Digital Technology" cluster includes:**
+- Software Development (SaaS, enterprise, mobile)
+- Artificial Intelligence & Machine Learning
+- Cybersecurity
+- Cloud Computing & Infrastructure
+- Data Analytics & Business Intelligence
+- Digital Health Technology
+- FinTech
+- EdTech
+- E-commerce Platforms
+
+**Construction Technology" cluster includes:**
+- Building Information Modeling (BIM)
+- Modular & Prefab Construction
+- Construction Automation & Robotics
+- Green Building & Net-Zero Design
+- Construction Materials Innovation
+- Project Management Technology
+- Structural Engineering Software
+
+**"Natural Resources" cluster includes:**
+- Mining Technology & Automation
+- Forestry & Timber Products
+- Oil & Gas (Emissions Reduction Tech)
+- Geosciences & Exploration
+- Environmental Monitoring & Remediation
+- Resource Recovery & Recycling
+
+**Step 4: Similarity & Closeness Matching**
+
+Understand that different terms often refer to the same industry cluster:
+- "Green technology" = "Clean tech" = "Environmental innovation" = "Sustainability technology"
+- "Digital health" = "Health tech" = "Medical technology software"
+- "Smart manufacturing" = "Industry 4.0" = "Advanced manufacturing systems"
+
+When the grant uses ANY term in a cluster, consider the ENTIRE cluster for tagging.
+
+**Step 5: Context-Based Refinement**
+
+Adjust industry selection based on grant context:
+
+**High-Innovation Grants** (R&D, commercialization, IP development):
+- Target: Advanced battery development, AI/ML applications, novel materials, biotech innovation
+- Avoid: Basic service businesses, retail, general consulting
+
+**Capital/Equipment Grants** (machinery, infrastructure, expansion):
+- Target: Manufacturing, food processing, construction, resource extraction
+- Avoid: Pure software/digital businesses (unless buying servers/hardware)
+
+**Training Grants** (skills development, workforce):
+- Target: Industries with technical skill needs (manufacturing, construction, healthcare, tech)
+- Avoid: Low-skill service industries unless grant specifically targets them
+
+**Market Expansion Grants** (export, new markets):
+- Target: Product-based businesses (manufacturing, food, tech products, natural resources)
+- Avoid: Local service businesses without export potential
+
+**Step 6: Generative Industry Tagging**
+
+**You are NOT limited to predefined industry lists.** If you identify an industry that strategically fits the grant, include it even if it's not on a standard list.
+
+**Be specific and generative:**
+✅ "Carbon Capture Technology" (specific, strategic)
+✅ "Sustainable Packaging Innovation" (specific, strategic)
+✅ "Agricultural Robotics" (specific, strategic)
+❌ "Technology Companies" (too generic)
+❌ "Green Businesses" (too vague)
+❌ "Manufacturing" (too broad - be specific: "Food Processing", "Metal Fabrication", etc.)
+
+**Step 7: Structured Output (7 sections)**
+
+**Format:**
+```
+PRIMARY GRANT TYPE: [One of 6 types]
+
+SECONDARY TYPES: [Additional types if applicable]
+
+INDUSTRIES (5-8 strategic tags):
+- [Specific Industry 1]
+- [Specific Industry 2]
+- [Specific Industry 3]
+- [Specific Industry 4]
+- [Specific Industry 5]
+- [Specific Industry 6]
+- [Optional: Industry 7-8 if highly relevant]
+
+GEOGRAPHY (1-3 tags):
+- [Geographic scope]
+
+RECIPIENT TYPE (1-3 tags):
+- [Company types]
+
+FUNDING FOCUS (3-5 tags):
+- [What the funding targets]
+
+PROGRAM CHARACTERISTICS (2-4 tags):
+- [Grant features: Competitive, Rolling Intake, Multi-Stage, etc.]
+```
+
+**Examples:**
+
+**Example 1 - High-Tech R&D Grant:**
+```
+Grant language: "Support innovative clean energy solutions with commercialization potential. Projects must demonstrate technical feasibility and path to market. Evaluation emphasizes innovation, IP strategy, and economic impact."
+
+PRIMARY GRANT TYPE: Research & Development
+
+SECONDARY TYPES: Market Expansion
+
+INDUSTRIES (Strategic - targets high-innovation companies):
+- Renewable Energy Systems
+- Energy Storage & Battery Technology
+- Green Hydrogen Production
+- Carbon Capture & Sequestration
+- Smart Grid Technology
+- Electric Vehicle Infrastructure
+- Building Energy Management Systems
+
+GEOGRAPHY:
+- British Columbia
+
+RECIPIENT TYPE:
+- Incorporated Companies
+- Technology Startups
+
+FUNDING FOCUS:
+- Technology Development
+- Commercialization
+- IP Development
+- Market Entry
+
+PROGRAM CHARACTERISTICS:
+- Highly Competitive
+- Multi-Stage Application
+- Technical Review Required
+```
+
+**Example 2 - Capital Equipment Grant (Broad Eligibility but Strategic Targeting):**
+```
+Grant language: "Support capital investments in equipment and infrastructure to improve productivity and competitiveness. Available to established BC manufacturers."
+
+PRIMARY GRANT TYPE: Capital Costs
+
+SECONDARY TYPES: Systems & Processes
+
+INDUSTRIES (Strategic - targets manufacturing with capital needs):
+- Food & Beverage Processing
+- Wood Products & Timber Processing
+- Metal Fabrication & Machining
+- Plastics & Composites Manufacturing
+- Industrial Equipment Manufacturing
+- Packaging & Container Production
+
+GEOGRAPHY:
+- British Columbia
+
+RECIPIENT TYPE:
+- Incorporated Companies
+- SMEs (20+ employees preferred)
+
+FUNDING FOCUS:
+- Equipment Acquisition
+- Automation & Technology Adoption
+- Productivity Improvement
+- Infrastructure Expansion
+
+PROGRAM CHARACTERISTICS:
+- Competitive
+- Established Companies Preferred
+- Capital Investment Required
+```
+
+**Example 3 - Training Grant (Broad Eligibility but Context-Filtered):**
+```
+Grant language: "Support technical skills training for employees in sectors facing skills shortages. Priority given to training in emerging technologies and high-demand technical skills."
+
+PRIMARY GRANT TYPE: Training
+
+INDUSTRIES (Strategic - filters for technical training needs):
+- Advanced Manufacturing & Automation
+- Construction & Skilled Trades
+- Software Development & IT
+- Healthcare & Life Sciences
+- Clean Technology
+- Digital Media & Animation
+
+GEOGRAPHY:
+- British Columbia
+
+RECIPIENT TYPE:
+- Any Business Type
+- Non-Profits
+- Industry Associations
+
+FUNDING FOCUS:
+- Technical Skills Development
+- Emerging Technology Training
+- Certification Programs
+- Workforce Development
+
+PROGRAM CHARACTERISTICS:
+- Rolling Intake
+- Quick Turnaround
+- Accessible to SMEs
+```
+
+**What NOT to Do:**
+❌ List 15+ industries just because they're technically eligible
+❌ Include generic categories like "All Industries" or "Any Business"
+❌ Ignore the sophistication level (tagging "soap makers" for an R&D innovation grant)
+❌ Use vague terms like "Green Businesses" instead of specific sectors
+❌ Miss industry clusters (grant says "clean tech", you only tag "Renewable Energy" and miss the other 8 related sectors)
+
+**What TO Do:**
+✅ Be strategically selective (5-8 strong-fit industries, not 20)
+✅ Map entire industry clusters when you see a sector mentioned
+✅ Match sophistication level (innovation grants = high-tech targets)
+✅ Generate specific industry names even if not on predefined lists
+✅ Think about who would actually be COMPETITIVE, not just eligible
+✅ Use your knowledge to expand beyond literal grant language
+
+**Output:** Direct classification format with strategic industry tags, no preambles, database-ready
 </task>
 
 <task type="missing-info">
