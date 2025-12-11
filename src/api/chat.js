@@ -10,6 +10,7 @@ import { runAgent } from '../claude/client.js';
 import { createConversation, getConversation } from '../database/messages.js';
 import { isValidAgentType, getAvailableAgents } from '../agents/load-agents.js';
 import { generateAndSaveTitle } from '../utils/conversation-titles.js';
+import { filesAPI } from '../anthropic-client.js';
 
 /**
  * Main chat endpoint handler
@@ -142,14 +143,56 @@ export async function handleChatRequest(req, res) {
 
         console.log(`✓ PDF attachment`);
       } else if (attachment.type === 'document') {
-        // Handle document attachments (TXT, VTT, DOCX, etc.)
-        processedAttachments.push({
-          type: 'document',
-          mimeType: attachment.mimeType || 'text/plain',
-          data: attachment.data // Should be base64
-        });
+        // Handle document attachments (TXT, VTT, DOCX, XLSX)
+        const mimeType = attachment.mimeType || 'text/plain';
 
-        console.log(`✓ Document attachment: ${attachment.mimeType || 'text/plain'}`);
+        // DOCX and XLSX files must be uploaded to Files API first (can't use base64)
+        const needsFileUpload = [
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // XLSX
+        ].includes(mimeType);
+
+        if (needsFileUpload) {
+          try {
+            // Convert base64 to Buffer
+            const fileBuffer = Buffer.from(attachment.data, 'base64');
+
+            // Determine filename and extension
+            const extension = mimeType.includes('wordprocessingml') ? 'docx' : 'xlsx';
+            const filename = attachment.filename || `attachment_${Date.now()}.${extension}`;
+
+            // Upload to Files API
+            console.log(`📤 Uploading ${extension.toUpperCase()} to Files API...`);
+            const uploadedFile = await filesAPI.upload(
+              null, // filePath not needed
+              filename,
+              mimeType,
+              fileBuffer
+            );
+
+            processedAttachments.push({
+              type: 'document',
+              mimeType: mimeType,
+              fileId: uploadedFile.id, // Use file_id instead of base64
+              filename: filename
+            });
+
+            console.log(`✓ Document uploaded to Files API: ${uploadedFile.id} (${filename})`);
+          } catch (error) {
+            console.error(`❌ Failed to upload ${mimeType} file:`, error.message);
+            // Skip this attachment if upload fails
+            continue;
+          }
+        } else {
+          // TXT, VTT, and other documents can use base64
+          processedAttachments.push({
+            type: 'document',
+            mimeType: mimeType,
+            data: attachment.data // Should be base64
+          });
+
+          console.log(`✓ Document attachment: ${mimeType}`);
+        }
       } else {
         console.warn(`⚠️  Unknown attachment type: ${attachment.type}, skipping`);
       }

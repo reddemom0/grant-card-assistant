@@ -156,15 +156,29 @@ export async function runAgent({
         });
         console.log(`📄 Added PDF attachment`);
       } else if (attachment.type === 'document') {
-        userContent.push({
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: attachment.mimeType || 'text/plain',
-            data: attachment.data
-          }
-        });
-        console.log(`📝 Added document attachment: ${attachment.mimeType || 'text/plain'}`);
+        // Check if this is a file_id reference (DOCX/XLSX) or base64 (TXT/VTT)
+        if (attachment.fileId) {
+          // Use file_id reference for DOCX/XLSX uploaded to Files API
+          userContent.push({
+            type: 'document',
+            source: {
+              type: 'file',
+              file_id: attachment.fileId
+            }
+          });
+          console.log(`📝 Added document attachment via Files API: ${attachment.fileId} (${attachment.filename || attachment.mimeType})`);
+        } else {
+          // Use base64 for TXT, VTT, and other text documents
+          userContent.push({
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: attachment.mimeType || 'text/plain',
+              data: attachment.data
+            }
+          });
+          console.log(`📝 Added document attachment: ${attachment.mimeType || 'text/plain'}`);
+        }
       }
     }
 
@@ -238,9 +252,9 @@ export async function runAgent({
       }
 
       const stream = await anthropic.messages.create(apiParams, {
-        // Beta headers for web fetch tool, interleaved thinking, and memory tool
+        // Beta headers for web fetch tool, interleaved thinking, memory tool, and files API
         headers: {
-          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27'
+          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27,files-api-2025-04-14'
         }
       });
 
