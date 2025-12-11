@@ -176,17 +176,27 @@ export async function handleChatRequest(req, res) {
               csvContent += XLSX.utils.sheet_to_csv(worksheet);
             }
 
-            // Encode CSV as base64
-            const csvBase64 = Buffer.from(csvContent).toString('base64');
+            // Convert CSV to Buffer for Files API upload
+            const csvBuffer = Buffer.from(csvContent);
+            const filename = attachment.filename || 'spreadsheet.xlsx';
+
+            // Upload CSV to Files API (can't use base64 for non-PDF documents)
+            console.log('📤 Uploading converted CSV to Files API...');
+            const uploadedFile = await filesAPI.upload(
+              null,
+              filename,
+              'text/plain', // Use text/plain for CSV files
+              csvBuffer
+            );
 
             processedAttachments.push({
               type: 'document',
-              mimeType: 'text/csv',
-              data: csvBase64,
-              filename: attachment.filename || 'spreadsheet.xlsx'
+              mimeType: 'text/plain',
+              fileId: uploadedFile.id,
+              filename: filename
             });
 
-            console.log(`✓ XLSX converted to CSV (${sheetNames.length} sheet(s), ${csvContent.length} bytes)`);
+            console.log(`✓ XLSX converted to CSV and uploaded (${sheetNames.length} sheet(s), ${csvContent.length} bytes, file_id: ${uploadedFile.id})`);
           } catch (error) {
             console.error('❌ Failed to convert XLSX:', error.message);
             // Skip this attachment if conversion fails
@@ -221,14 +231,32 @@ export async function handleChatRequest(req, res) {
             continue;
           }
         } else {
-          // TXT, VTT, CSV, and other text documents can use base64 directly
-          processedAttachments.push({
-            type: 'document',
-            mimeType: mimeType,
-            data: attachment.data // Should be base64
-          });
+          // TXT, VTT, CSV, and other text documents - upload to Files API
+          // (Claude only accepts PDF for base64 documents)
+          try {
+            const fileBuffer = Buffer.from(attachment.data, 'base64');
+            const filename = attachment.filename || `document_${Date.now()}.txt`;
 
-          console.log(`✓ Document attachment: ${mimeType}`);
+            console.log(`📤 Uploading ${mimeType} to Files API...`);
+            const uploadedFile = await filesAPI.upload(
+              null,
+              filename,
+              'text/plain', // Use text/plain for all text documents
+              fileBuffer
+            );
+
+            processedAttachments.push({
+              type: 'document',
+              mimeType: 'text/plain',
+              fileId: uploadedFile.id,
+              filename: filename
+            });
+
+            console.log(`✓ Document uploaded to Files API: ${uploadedFile.id} (${filename})`);
+          } catch (error) {
+            console.error(`❌ Failed to upload ${mimeType}:`, error.message);
+            continue;
+          }
         }
       } else {
         console.warn(`⚠️  Unknown attachment type: ${attachment.type}, skipping`);
