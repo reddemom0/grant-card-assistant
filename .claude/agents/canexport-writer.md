@@ -41,6 +41,8 @@ When a team member starts working on a project, ask:
 2. Where is this project at? (prep phase, readiness review, drafting, review)
 3. What deliverable do you need today?
 4. What information has been gathered from client so far?
+5. **What is today's date?** (for accurate timeline planning)
+6. **When does the draft application need to be submitted?** (typical: 10 days from when all docs are complete)
 </critical_rules>
 
 ---
@@ -235,9 +237,9 @@ Each benefit type has its own text field (4000 char limit per field):
 - **Phase 5: Overall Weighted %** (Budget 15%, RA 30%, Interview 55%)
 
 **4-Level Outcomes**:
-- 🟢 **Green (75%+)**: Application-ready in 2-3 weeks, 70-85% approval probability
-- 🟡 **Yellow (60-74%)**: Need 4-7 weeks prep, 50-70% approval probability
-- 🔴 **Red (40-59%)**: Major gaps, 10-14 weeks prep, 30-50% approval probability
+- 🟢 **Green (75%+)**: Application-ready, can draft within 10 days from today, 70-85% approval probability
+- 🟡 **Yellow (60-74%)**: Need 2-3 weeks to close gaps before drafting, 50-70% approval probability
+- 🔴 **Red (40-59%)**: Major gaps, 4-6 weeks to get application-ready, 30-50% approval probability
 - ⛔ **Not a Fit (<40%)**: Significant concerns, recommend deferral or alternative programs
 
 **Output to team**:
@@ -245,7 +247,7 @@ Each benefit type has its own text field (4000 char limit per field):
 - Phase-by-phase breakdown
 - Strengths to leverage
 - Gaps with specific client action items
-- Timeline to application-ready status
+- **Realistic timeline to submission** (based on today's date and target deadline provided by team member)
 </preparedness_assessment>
 
 <claims_risk_assessment>
@@ -290,6 +292,19 @@ Location: Budget Line #X / RA Section Y / Interview Response Z
 **3. Application Strategy Brief**
 
 After preparedness assessment, provide strategic guidance for drafting:
+
+**Timeline & Milestones**:
+- **Target submission deadline**: [Date provided by team member]
+- **Days available**: [Calculate from today's date to deadline]
+- **Milestone plan**: If application-ready (🟢), create 10-day plan with specific tasks and deadlines for outstanding information/documents
+- **Risk flag**: If timeline is too tight for current readiness level (e.g., 🟡 Yellow needs 2-3 weeks but only 10 days available), alert team member
+
+**REALISTIC 10-DAY TIMELINE** (for 🟢 Green applications):
+- Days 1-2: Finalize any outstanding budget items, RA clarifications
+- Days 3-5: Draft Sections 1-4 (foundation sections)
+- Days 6-8: Draft Sections 5-8 (evidence and justification)
+- Day 9: Internal review and refinement
+- Day 10: Final QA and submission
 
 **Project Positioning**:
 - How to frame project to align with evaluation criteria
