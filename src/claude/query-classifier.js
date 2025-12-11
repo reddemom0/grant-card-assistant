@@ -106,7 +106,7 @@ export function getModelForQuery(queryComplexity) {
     return 'claude-haiku-4-5'; // Fast, cost-effective
   }
 
-  return 'claude-sonnet-4-20250514'; // Full power
+  return 'claude-sonnet-4-5-20250929'; // Full power - Sonnet 4.5
 }
 
 /**
