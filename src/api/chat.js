@@ -147,7 +147,7 @@ export async function handleChatRequest(req, res) {
         // Handle document attachments (TXT, VTT, DOCX, XLSX)
         const mimeType = attachment.mimeType || 'text/plain';
 
-        // XLSX files need to be converted to CSV (Files API doesn't support XLSX parsing)
+        // XLSX files: Convert to CSV and send as text (much simpler than Files API)
         if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
           try {
             console.log('📊 Converting XLSX to CSV for Claude...');
@@ -176,27 +176,16 @@ export async function handleChatRequest(req, res) {
               csvContent += XLSX.utils.sheet_to_csv(worksheet);
             }
 
-            // Convert CSV to Buffer for Files API upload
-            const csvBuffer = Buffer.from(csvContent);
             const filename = attachment.filename || 'spreadsheet.xlsx';
 
-            // Upload CSV to Files API (can't use base64 for non-PDF documents)
-            console.log('📤 Uploading converted CSV to Files API...');
-            const uploadedFile = await filesAPI.upload(
-              null,
-              filename,
-              'text/plain', // Use text/plain for CSV files
-              csvBuffer
-            );
-
+            // Send as plain text - CSV is just text, no need for Files API
             processedAttachments.push({
-              type: 'document',
-              mimeType: 'text/plain',
-              fileId: uploadedFile.id,
-              filename: filename
+              type: 'csv_text',
+              filename: filename,
+              content: csvContent
             });
 
-            console.log(`✓ XLSX converted to CSV and uploaded (${sheetNames.length} sheet(s), ${csvContent.length} bytes, file_id: ${uploadedFile.id})`);
+            console.log(`✓ XLSX converted to CSV (${sheetNames.length} sheet(s), ${csvContent.length} bytes)`);
           } catch (error) {
             console.error('❌ Failed to convert XLSX:', error.message);
             // Skip this attachment if conversion fails

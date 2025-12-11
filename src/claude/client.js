@@ -155,9 +155,15 @@ export async function runAgent({
           }
         });
         console.log(`📄 Added PDF attachment`);
+      } else if (attachment.type === 'csv_text') {
+        // CSV from XLSX conversion - send as plain text (simple and fast)
+        userContent.push({
+          type: 'text',
+          text: `[File: ${attachment.filename}]\n\n${attachment.content}`
+        });
+        console.log(`📊 Added CSV text from ${attachment.filename} (${attachment.content.length} chars)`);
       } else if (attachment.type === 'document') {
-        // All documents (DOCX, XLSX/CSV, TXT, VTT) use file_id from Files API
-        // Only PDFs can use base64, and they're handled as 'pdf' type above
+        // Other documents (DOCX, TXT, VTT) use file_id from Files API
         const docBlock = {
           type: 'document',
           source: {
