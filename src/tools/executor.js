@@ -256,6 +256,14 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       // ============================================================================
+      // CANEXPORT WRITER TOOLS
+      // ============================================================================
+
+      case 'check_character_count':
+        result = checkCharacterCount(input.section_number, input.section_name, input.text);
+        break;
+
+      // ============================================================================
       // UNKNOWN TOOL
       // ============================================================================
 
@@ -358,5 +366,66 @@ export function validateToolInput(toolName, input, schema) {
   return {
     valid: errors.length === 0,
     errors
+  };
+}
+
+/**
+ * Check character count for CanExport application sections
+ * @param {number} sectionNumber - Section number (1-8)
+ * @param {string} sectionName - Name of the section
+ * @param {string} text - The drafted text to check
+ * @returns {Object} Character count validation result
+ */
+function checkCharacterCount(sectionNumber, sectionName, text) {
+  // CanExport application section character limits
+  const CHARACTER_LIMITS = {
+    1: 2000,  // Products/Services
+    2: 4000,  // Project Summary
+    3: 3000,  // Capacity
+    4: 3000,  // IP Strategy
+    5: 3000,  // Market Potential
+    6: 3000,  // Differentiation
+    7: 2000,  // Benefits to Canada
+    8: null   // Budget Activities (per-line limits, handled separately)
+  };
+
+  const limit = CHARACTER_LIMITS[sectionNumber];
+  const actualCount = text.length;
+
+  // Calculate metrics
+  const isWithinLimit = limit ? actualCount <= limit : true;
+  const difference = limit ? actualCount - limit : 0;
+  const percentageUsed = limit ? Math.round((actualCount / limit) * 100) : 0;
+  const percentageOver = difference > 0 ? Math.round((difference / limit) * 100) : 0;
+
+  // Generate guidance message
+  let guidance = '';
+  if (limit) {
+    if (isWithinLimit) {
+      if (percentageUsed >= 90) {
+        guidance = `✓ Within limit but tight (${percentageUsed}% used). Good use of space.`;
+      } else if (percentageUsed >= 75) {
+        guidance = `✓ Within limit (${percentageUsed}% used). Room for ${limit - actualCount} more characters if needed.`;
+      } else {
+        guidance = `✓ Within limit (${percentageUsed}% used). Consider adding more detail if relevant - ${limit - actualCount} characters available.`;
+      }
+    } else {
+      // Over limit - provide specific cut guidance
+      guidance = `✗ OVER LIMIT by ${difference} characters (${percentageOver}% over). Must cut ${difference} characters. Revision needed.`;
+    }
+  } else {
+    guidance = 'Section 8 uses per-activity character limits (see budget template). Check each activity individually.';
+  }
+
+  return {
+    success: true,
+    section_number: sectionNumber,
+    section_name: sectionName,
+    character_count: actualCount,
+    character_limit: limit,
+    within_limit: isWithinLimit,
+    difference: difference,
+    percentage_used: percentageUsed,
+    guidance: guidance
   };
 }

@@ -423,7 +423,17 @@ Team members typically request drafting support one section at a time (not all 8
 - `load_company_context` → Pull HubSpot data if not already loaded
 - Review completed budget, RA, interview responses
 
-**Step 2: Apply Section-Specific Guidance**
+**Step 2: Draft Section Content**
+- Apply section-specific guidance below
+- Write naturally - don't stress about character count during drafting
+
+**Step 3: Validate Character Count** (CRITICAL - DO NOT SKIP)
+- **Use `check_character_count` tool** with section number, section name, and drafted text
+- **You CANNOT accurately count characters** - the tool provides reliable validation
+- If OVER limit: Revise and check again until within limit
+- If within limit: Present to user with confirmation
+
+**Step 4: Apply Section-Specific Guidance**
 
 <section_1_guidance>
 **SECTION 1: Products/Services (2000 chars)**

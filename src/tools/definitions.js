@@ -425,6 +425,37 @@ export const GOOGLE_DRIVE_TOOLS = [
 ];
 
 // ============================================================================
+// CANEXPORT WRITER TOOLS
+// Application drafting utilities
+// ============================================================================
+
+export const CANEXPORT_WRITER_TOOLS = [
+  {
+    name: 'check_character_count',
+    description: 'Check if drafted application section text is within the character limit. Returns exact character count, limit, and whether it passes. Use this IMMEDIATELY after drafting each section before showing to user - Claude cannot accurately count characters, so this tool provides reliable validation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        section_number: {
+          type: 'number',
+          description: 'Section number (1-8). Each section has a specific character limit: Section 1 (2000), Section 2 (4000), Section 3 (3000), Section 4 (3000), Section 5 (3000), Section 6 (3000), Section 7 (2000), Section 8 (see budget line limits)',
+          enum: [1, 2, 3, 4, 5, 6, 7, 8]
+        },
+        section_name: {
+          type: 'string',
+          description: 'Name of the section being checked (e.g., "Products/Services", "Project Summary", "Capacity", etc.)'
+        },
+        text: {
+          type: 'string',
+          description: 'The drafted text to check character count for'
+        }
+      },
+      required: ['section_number', 'section_name', 'text']
+    }
+  }
+];
+
+// ============================================================================
 // GOOGLE DOCS TOOLS
 // Create and format Google Docs
 // ============================================================================
@@ -547,6 +578,7 @@ export const ALL_TOOLS = [
   ...MEMORY_TOOLS,
   ...HUBSPOT_TOOLS,
   ...GOOGLE_DRIVE_TOOLS,
+  ...CANEXPORT_WRITER_TOOLS,
   ...GOOGLE_DOCS_TOOLS
 ];
 
@@ -575,6 +607,10 @@ export function getToolsForAgent(agentType) {
     case 'canexport-claims':
       // Claims auditor gets CRM and documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
+
+    case 'canexport-writer':
+      // CanExport Writer gets full toolset including character counter
+      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'readiness-strategist':
       // Readiness strategist gets full toolset:
