@@ -952,7 +952,7 @@ class AgentInterface {
      * Handle file drop
      */
     async handleFileDrop(files) {
-        const allowedTypes = ['.pdf', '.doc', '.docx', '.txt', '.md', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
+        const allowedTypes = ['.pdf', '.doc', '.docx', '.xlsx', '.txt', '.md', '.vtt', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff'];
         const validFiles = files.filter(file => {
             const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
             return allowedTypes.includes(fileExtension);
@@ -964,7 +964,7 @@ class AgentInterface {
         }
 
         if (validFiles.length !== files.length) {
-            this.showNotification('Some files were skipped. Supported: PDF, DOCX, TXT, MD, JPG, PNG', 'error');
+            this.showNotification('Some files were skipped. Supported: PDF, DOCX, XLSX, VTT, TXT, MD, JPG, PNG', 'error');
         }
     }
 
