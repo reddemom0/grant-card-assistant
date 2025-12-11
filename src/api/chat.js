@@ -11,6 +11,7 @@ import { createConversation, getConversation } from '../database/messages.js';
 import { isValidAgentType, getAvailableAgents } from '../agents/load-agents.js';
 import { generateAndSaveTitle } from '../utils/conversation-titles.js';
 import { filesAPI } from '../anthropic-client.js';
+import * as XLSX from 'xlsx';
 
 /**
  * Main chat endpoint handler
@@ -146,25 +147,62 @@ export async function handleChatRequest(req, res) {
         // Handle document attachments (TXT, VTT, DOCX, XLSX)
         const mimeType = attachment.mimeType || 'text/plain';
 
-        // DOCX and XLSX files must be uploaded to Files API first (can't use base64)
-        const needsFileUpload = [
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // DOCX
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // XLSX
-        ].includes(mimeType);
-
-        if (needsFileUpload) {
+        // XLSX files need to be converted to CSV (Files API doesn't support XLSX parsing)
+        if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
           try {
+            console.log('📊 Converting XLSX to CSV for Claude...');
+
             // Convert base64 to Buffer
             const fileBuffer = Buffer.from(attachment.data, 'base64');
 
-            // Determine filename and extension
-            const extension = mimeType.includes('wordprocessingml') ? 'docx' : 'xlsx';
-            const filename = attachment.filename || `attachment_${Date.now()}.${extension}`;
+            // Parse XLSX file
+            const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+
+            // Convert all sheets to CSV
+            let csvContent = '';
+            const sheetNames = workbook.SheetNames;
+
+            if (sheetNames.length > 1) {
+              // Multiple sheets - include sheet names as headers
+              sheetNames.forEach((sheetName, index) => {
+                if (index > 0) csvContent += '\n\n';
+                csvContent += `=== Sheet: ${sheetName} ===\n`;
+                const worksheet = workbook.Sheets[sheetName];
+                csvContent += XLSX.utils.sheet_to_csv(worksheet);
+              });
+            } else {
+              // Single sheet - just convert to CSV
+              const worksheet = workbook.Sheets[sheetNames[0]];
+              csvContent += XLSX.utils.sheet_to_csv(worksheet);
+            }
+
+            // Encode CSV as base64
+            const csvBase64 = Buffer.from(csvContent).toString('base64');
+
+            processedAttachments.push({
+              type: 'document',
+              mimeType: 'text/csv',
+              data: csvBase64,
+              filename: attachment.filename || 'spreadsheet.xlsx'
+            });
+
+            console.log(`✓ XLSX converted to CSV (${sheetNames.length} sheet(s), ${csvContent.length} bytes)`);
+          } catch (error) {
+            console.error('❌ Failed to convert XLSX:', error.message);
+            // Skip this attachment if conversion fails
+            continue;
+          }
+        } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+          // DOCX files - upload to Files API
+          try {
+            // Convert base64 to Buffer
+            const fileBuffer = Buffer.from(attachment.data, 'base64');
+            const filename = attachment.filename || `document_${Date.now()}.docx`;
 
             // Upload to Files API
-            console.log(`📤 Uploading ${extension.toUpperCase()} to Files API...`);
+            console.log('📤 Uploading DOCX to Files API...');
             const uploadedFile = await filesAPI.upload(
-              null, // filePath not needed
+              null,
               filename,
               mimeType,
               fileBuffer
@@ -173,18 +211,17 @@ export async function handleChatRequest(req, res) {
             processedAttachments.push({
               type: 'document',
               mimeType: mimeType,
-              fileId: uploadedFile.id, // Use file_id instead of base64
+              fileId: uploadedFile.id,
               filename: filename
             });
 
-            console.log(`✓ Document uploaded to Files API: ${uploadedFile.id} (${filename})`);
+            console.log(`✓ DOCX uploaded to Files API: ${uploadedFile.id} (${filename})`);
           } catch (error) {
-            console.error(`❌ Failed to upload ${mimeType} file:`, error.message);
-            // Skip this attachment if upload fails
+            console.error('❌ Failed to upload DOCX:', error.message);
             continue;
           }
         } else {
-          // TXT, VTT, and other documents can use base64
+          // TXT, VTT, CSV, and other text documents can use base64 directly
           processedAttachments.push({
             type: 'document',
             mimeType: mimeType,

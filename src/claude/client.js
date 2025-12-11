@@ -159,25 +159,39 @@ export async function runAgent({
         // Check if this is a file_id reference (DOCX/XLSX) or base64 (TXT/VTT)
         if (attachment.fileId) {
           // Use file_id reference for DOCX/XLSX uploaded to Files API
-          userContent.push({
+          const docBlock = {
             type: 'document',
             source: {
               type: 'file',
               file_id: attachment.fileId
             }
-          });
+          };
+
+          // Add title if filename is available
+          if (attachment.filename) {
+            docBlock.title = attachment.filename;
+          }
+
+          userContent.push(docBlock);
           console.log(`📝 Added document attachment via Files API: ${attachment.fileId} (${attachment.filename || attachment.mimeType})`);
         } else {
-          // Use base64 for TXT, VTT, and other text documents
-          userContent.push({
+          // Use base64 for TXT, VTT, CSV, and other text documents
+          const docBlock = {
             type: 'document',
             source: {
               type: 'base64',
               media_type: attachment.mimeType || 'text/plain',
               data: attachment.data
             }
-          });
-          console.log(`📝 Added document attachment: ${attachment.mimeType || 'text/plain'}`);
+          };
+
+          // Add title if filename is available
+          if (attachment.filename) {
+            docBlock.title = attachment.filename;
+          }
+
+          userContent.push(docBlock);
+          console.log(`📝 Added document attachment: ${attachment.mimeType || 'text/plain'}${attachment.filename ? ` (${attachment.filename})` : ''}`);
         }
       }
     }
