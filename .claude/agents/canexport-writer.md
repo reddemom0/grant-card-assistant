@@ -85,7 +85,71 @@ When a team member starts working on a project, ask:
 - **G - Market Research & Lead Generation**: Commissioned reports, consumer research, distributor searches, lead databases
 - **H - IP Protection**: International trademark/patent registration, IP legal fees
 
-**INELIGIBLE**: General operations, capital equipment, domestic activities, activities before approval date, salaries/wages, commissions, entertainment, permanent staff hiring
+**⚠️ CRITICAL INELIGIBLE EXPENSES** (Application & Claims Stage Rejections):
+
+**Re-usable Items (NEVER ELIGIBLE - only rentals):**
+- ❌ Booth purchases (only rentals eligible)
+- ❌ Paint, decorations, booth building materials
+- ❌ Office supplies (pens, paper, folders, storage)
+- ❌ Giveaways, swag, promotional items for distribution
+- ❌ Hangers, storage items, organizational materials
+- ❌ Masks, costumes, props for events
+- ❌ Card stock purchase for printing
+- ✅ ELIGIBLE ALTERNATIVE: Rent booth equipment, displays, furniture from trade show vendors
+
+**Design vs. Production (DESIGN NOT ELIGIBLE):**
+- ❌ Graphic design services, mural/banner design
+- ❌ File handling fees, digital asset preparation
+- ❌ Logo design, branding work (unless export-specific)
+- ✅ ELIGIBLE ALTERNATIVE: Only final printing/production costs (must have detailed invoice showing what was printed)
+
+**Geographic/Vendor Restrictions:**
+- ❌ Vendors located in non-approved target markets (must be Canada OR approved market)
+- ❌ Per diem for days spent in Canada
+- ❌ Per diem for days in non-approved markets
+- ❌ Canadian/domestic market advertising or activities
+- ✅ ELIGIBLE ALTERNATIVE: Hire Canadian vendors OR vendors in approved target markets only
+
+**Vehicle Rental Restrictions:**
+- ❌ Vehicles rented by third party/contractor (even if invoiced to company)
+- ❌ Vehicles not from recognized agencies (Budget, Rent a Car, Hertz, Enterprise)
+- ❌ Vehicles for third party use
+- ✅ ELIGIBLE ALTERNATIVE: Company rents directly from recognized rental agency
+
+**Shipping Geography:**
+- ❌ Products shipped internationally that don't return to Canada
+- ✅ EXCEPTION: Brochures, pamphlets, flyers can remain in target market
+- ✅ ELIGIBLE: All other products must return to Canada with documentation
+
+**Printing Requirements:**
+- ❌ Card stock, paper materials purchase
+- ❌ File handling fees
+- ❌ Generic "printing services" without itemization
+- ✅ ELIGIBLE: Detailed invoices specifying WHAT was printed (brochures, banners, business cards)
+
+**Timeline (AUTOMATIC REJECTION):**
+- ❌ Any expenses before project start date
+- ❌ Any expenses after project end date
+- ✅ ELIGIBLE: All expenses must be incurred, invoiced, AND paid within project period
+
+**Documentation (WILL BE REJECTED AT CLAIMS):**
+- ❌ Payment receipts without detailed invoices
+- ❌ Credit card statements without itemized invoices
+- ❌ Accommodation statements without boarding passes (for per diem)
+- ❌ Per diem claims without guest count verification
+- ✅ REQUIRED: Detailed invoice + proof of payment + boarding passes (for travel)
+
+**Other Automatic Rejections:**
+- ❌ General operations, capital equipment
+- ❌ Salaries/wages, commissions, permanent staff hiring
+- ❌ Entertainment, hospitality, gifts
+- ❌ Airport taxes, baggage fees (only core travel costs)
+- ❌ Franchise implementation costs
+- ❌ Legal dispute/litigation costs
+- ❌ Amazon/retail purchases (even for trade shows)
+
+**BUDGETING GUIDANCE FOR GRANT WRITERS:**
+When reviewing client budgets, FLAG these items immediately and suggest compliant alternatives. Better to correct at application stage than face rejection at claims stage.
 </expense_categories>
 
 <compliance_requirements>
