@@ -110,12 +110,28 @@ async function getDriveClient(userId) {
  * Brand colors (Granted Consulting)
  */
 const BRAND_COLORS = {
-  // Dark blue for headers (RGB: 0, 71, 171)
+  // Primary blue for headers (#008abf)
   HEADER_BLUE: {
     rgbColor: {
       red: 0,
-      green: 0.278,  // 71/255
-      blue: 0.671    // 171/255
+      green: 0.541,  // 138/255
+      blue: 0.749    // 191/255
+    }
+  },
+  // Grey for secondary text (#6d7881)
+  GREY: {
+    rgbColor: {
+      red: 0.427,    // 109/255
+      green: 0.471,  // 120/255
+      blue: 0.506    // 129/255
+    }
+  },
+  // Light grey for subtle elements (#dde1e3)
+  LIGHT_GREY: {
+    rgbColor: {
+      red: 0.867,    // 221/255
+      green: 0.882,  // 225/255
+      blue: 0.890    // 227/255
     }
   }
 };

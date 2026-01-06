@@ -255,6 +255,17 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'create_google_doc':
+        result = await googleDocs.createGoogleDoc(
+          input.title,
+          input.content,
+          null,  // folderName - not used when parentFolderId is provided
+          userId,
+          null,  // logoPath - default branding
+          input.parentFolderId || null
+        );
+        break;
+
       // ============================================================================
       // CANEXPORT WRITER TOOLS
       // ============================================================================

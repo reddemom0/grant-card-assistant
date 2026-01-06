@@ -562,6 +562,28 @@ export const GOOGLE_DOCS_TOOLS = [
       },
       required: ['title', 'grantType', 'documentType']
     }
+  },
+  {
+    name: 'create_google_doc',
+    description: 'Create a Google Doc from markdown content with Granted Consulting branding and formatting. Converts markdown (headers, bold, italic, lists, tables) to properly formatted Google Docs. Use this for flexible document creation when you need full control over content (e.g., Budget Building Guides, custom reports, strategic briefs). For standardized templates (Readiness Assessments, Interview Questions, Evaluation Rubrics), use create_advanced_document instead.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Document title (e.g., "Budget Building Guide - Acme Manufacturing")'
+        },
+        content: {
+          type: 'string',
+          description: 'Markdown-formatted content for the document. Supports: headers (#, ##, ###), bold (**text**), italic (*text*), bullet lists (- item), numbered lists (1. item), tables (| col1 | col2 |), and checkboxes (- [ ] item). Line breaks and spacing will be preserved.'
+        },
+        parentFolderId: {
+          type: 'string',
+          description: 'Optional: Google Drive folder ID to create the document in (from create_google_drive_folder). If not provided, creates in user\'s root Drive.'
+        }
+      },
+      required: ['title', 'content']
+    }
   }
 ];
 
