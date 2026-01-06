@@ -516,47 +516,64 @@ Note: If you're still exploring activities, that's fine - the budget process wil
 
 CANEXPORT BUDGET CATEGORIES - WHAT TO FILL OUT
 
-Below is a category-by-category breakdown of which Budget Template rows you should focus on:
+**IMPORTANT NOTE ABOUT THE BUDGET TEMPLATE:**
+The Budget Template is organized by target market. Each market has its own section with all activity categories. If you're targeting multiple markets, you'll fill out activities separately for each market. If you have multiple instances of the same activity FOR THE SAME MARKET (e.g., two separate trips to London), create separate rows for each instance.
+
+Below is a category-by-category breakdown of which activities to fill out:
 
 **CATEGORY A - TRAVEL**
 Our recommendation: [Flexible suggestion based on their project - e.g., "Yes, you should fill this out since you mentioned attending a trade show in the UK" OR "Consider this if you plan to travel to your target market for meetings or events" OR "This may not apply if you're doing all activities remotely"]
 
-Which rows to complete:
-• Row 7 (Airfare): [Guidance - e.g., "Complete 1 row for round-trip airfare for 2 people" OR "Complete multiple rows if planning separate trips"]
-• Row 8 (Per Diem): [Guidance - e.g., "Complete 1 row covering accommodation/meals for 5 days, 2 people"]
-• Row 9 (Visa fees): [Guidance - e.g., "Only fill out if visa required for your target market"]
+Which activities to fill out:
+
+**Airfare (Travel and transportation):**
+[Guidance - e.g., "✓ Fill out: You're sending 2 people to London" OR "✓ Fill out one row for your trip to London" OR "✓ Fill out 2 separate rows if you're taking 2 different trips to the UK" OR "✗ Skip: Not applicable for your project"]
+
+**Per Diem (Accommodation, meals, incidentals):**
+[Guidance - e.g., "✓ Fill out: You'll need accommodation for 5 days, 2 people" OR "✗ Skip: Not needed for remote activities"]
+
+**Mandatory Visa Fees:**
+[Guidance - e.g., "✓ Fill out: If visa required for your target market" OR "✗ Skip: UK doesn't require visa for Canadian business travelers"]
 
 Considerations for your project:
 • [Project-specific note - e.g., "Since you're sending CEO and CTO, budget for 2 travelers maximum"]
 • [Watch-out - e.g., "Only economy class eligible - budget accordingly"]
-• [Specific to their plan - e.g., "If you plan multiple trips, create separate rows for each trip"]
+• [Reminder - e.g., "If planning multiple trips to the same market, create separate rows for each trip"]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **CATEGORY B - TRADE EVENTS**
 Our recommendation: [Flexible suggestion - e.g., "Yes, fill this out since you mentioned exhibiting at TechCrunch Disrupt London" OR "Consider this if you're planning to attend or exhibit at industry events in your target market"]
 
-Which rows to complete:
-• Row 10 (Trade show registration/booth): [Guidance - e.g., "Complete 1 row for booth rental and registration" OR "Complete separate rows if attending multiple events"]
+Which activities to fill out:
+
+**Trade Show Registration and Booth Costs:**
+[Guidance - e.g., "✓ Fill out: You're exhibiting at TechCrunch Disrupt London" OR "✓ Fill out separate rows if attending multiple trade shows in the same market" OR "✗ Skip: Not attending any trade shows"]
 
 Considerations for your project:
 • [Project-specific note - e.g., "Booth RENTALS only - do not include booth purchase or decorations"]
 • [Watch-out - e.g., "Get itemized quote showing booth space, electricity, WiFi separately"]
-• [Specific to their plan - e.g., "If attending multiple trade shows, create separate rows for each"]
+• [Reminder - e.g., "If attending multiple trade shows in the same market, create separate rows for each event"]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **CATEGORY C - MARKETING & PROMOTIONAL MATERIALS**
 Our recommendation: [Flexible suggestion - e.g., "Yes, fill this out since you mentioned running LinkedIn ads and printing brochures" OR "Consider this category for advertising, videos, or printed materials targeting your market"]
 
-Which rows to complete:
-• Row 11 (Advertising): [Guidance - e.g., "Complete 1 row for LinkedIn advertising campaign" OR "Skip if not planning digital advertising"]
-• Row 12 (Video): [Guidance - e.g., "Complete if creating promotional video for target market" OR "Skip if not part of your plan"]
-• Row 13 (Promotional materials): [Guidance - e.g., "Complete 1 row for brochure and banner printing" OR "Skip if not creating print materials"]
+Which activities to fill out:
+
+**Advertising Costs:**
+[Guidance - e.g., "✓ Fill out: You're running LinkedIn advertising campaign" OR "✗ Skip: Not planning digital advertising"]
+
+**Video Creation:**
+[Guidance - e.g., "✓ Fill out: You're creating promotional video for target market" OR "✗ Skip: Not part of your plan"]
+
+**Promotional Materials (Printing):**
+[Guidance - e.g., "✓ Fill out: You're printing brochures and banners" OR "✗ Skip: Not creating print materials"]
 
 Considerations for your project:
-• [Project-specific note - e.g., "PrintShop Pro (mentioned in RA) is Vancouver-based - compliant vendor"]
-• [Watch-out - e.g., "Printing costs only - design fees not eligible"]
+• [Project-specific note - e.g., "PrintShop Pro (mentioned in RA call) is Vancouver-based - compliant vendor"]
+• [Watch-out - e.g., "Printing costs only - design fees NOT eligible"]
 • [Specific to their plan - e.g., "Make sure materials are UK-specific (not generic Canadian materials)"]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -564,8 +581,10 @@ Considerations for your project:
 **CATEGORY D - INTERPRETATION/TRANSLATION**
 Our recommendation: [Flexible suggestion - e.g., "You may need this if doing business in French-speaking regions" OR "Likely not needed since UK is English-speaking" OR "Consider this if you need document translation or interpreter services"]
 
-Which rows to complete:
-• Row 14 (Interpretation services): [Guidance - e.g., "Complete if hiring interpreters for meetings or events" OR "Skip if not needed for your market"]
+Which activities to fill out:
+
+**Interpretation Services:**
+[Guidance - e.g., "✓ Fill out: You need interpreters for meetings in target market" OR "✗ Skip: UK is English-speaking, not needed"]
 
 Considerations for your project:
 • [Project-specific notes if applicable]
@@ -575,8 +594,10 @@ Considerations for your project:
 **CATEGORY E - CONTRACTS/CERTIFICATIONS**
 Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need product certifications or legal services for market entry" OR "You may want to explore this if regulatory compliance is required"]
 
-Which rows to complete:
-• Row 15 (Contractual agreements/certification): [Guidance - e.g., "Complete if pursuing certifications or legal contracts" OR "Skip if not applicable"]
+Which activities to fill out:
+
+**Contractual Agreements/Certification:**
+[Guidance - e.g., "✓ Fill out: You need product certification for target market" OR "✗ Skip: No regulatory certifications needed"]
 
 Considerations for your project:
 • [Project-specific notes if applicable]
@@ -586,11 +607,14 @@ Considerations for your project:
 **CATEGORY F - BUSINESS/TAX/LEGAL CONSULTANTS**
 Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need export strategy, tax, or legal consulting" OR "You might want to budget for an export consultant to help with market entry"]
 
-Which rows to complete:
-• Row 16 (Consultant expenses): [Guidance - e.g., "Complete if hiring consultants for export strategy, legal, or tax advice"]
+Which activities to fill out:
+
+**Business/Tax/Legal Consultant Expenses:**
+[Guidance - e.g., "✓ Fill out: You're hiring [Consultant Name] for sales consulting" OR "✗ Skip: Not using consultants for this project"]
 
 Considerations for your project:
-• [Project-specific notes - e.g., "Consultant must be located in Canada or your target market (not US unless USA is approved)"]
+• [Project-specific notes - e.g., "James Morrison (mentioned in RA call) is London-based - compliant vendor"]
+• [Watch-out - e.g., "Consultant must be located in Canada or your target market (not US unless USA is approved)"]
 • [Watch-out - e.g., "No monthly retainers - project-based only"]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -598,8 +622,10 @@ Considerations for your project:
 **CATEGORY G - MARKET RESEARCH**
 Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need commissioned market research or lead lists" OR "This could help if you want professional market intelligence for your target market"]
 
-Which rows to complete:
-• Row 17 (Market research/lead generation): [Guidance - e.g., "Complete if commissioning research reports or purchasing lead databases"]
+Which activities to fill out:
+
+**Market Research/Lead Generation:**
+[Guidance - e.g., "✓ Fill out: You're commissioning UK market research from TechInsights UK" OR "✗ Skip: Not purchasing market research"]
 
 Considerations for your project:
 • [Project-specific notes if applicable]
@@ -607,13 +633,15 @@ Considerations for your project:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 **CATEGORY H - IP PROTECTION**
-Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need to register trademarks or patents in your target market" OR "This may be valuable if IP protection is important for your market entry"]
+Our recommendation: [Flexible suggestion - e.g., "Yes, fill this out - you indicated in your RA that you need UK trademark registration" OR "Consider this if you need to register trademarks or patents in your target market" OR "✗ Skip: Not needed for your project"]
 
-Which rows to complete:
-• Row 18 (IP protection): [Guidance - e.g., "Complete if registering trademark/patent in target market"]
+Which activities to fill out:
+
+**IP Protection (Trademark/Patent Registration):**
+[Guidance - e.g., "✓ Fill out: You're registering UK trademark ($3,200 quoted from London IP lawyer)" OR "✗ Skip: Already have IP protection in target market"]
 
 Considerations for your project:
-• [Project-specific notes if applicable]
+• [Project-specific notes if applicable - e.g., "You mentioned trademark in Canada but not UK - this is a good eligible expense"]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -629,23 +657,6 @@ Based on your Readiness Assessment, you mentioned some activities that unfortuna
 
 ❌ [Activity mentioned]: Not eligible because [specific reason]
    ✅ **Compliant Alternative**: [Alternative approach]
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-VENDOR LOCATION CHECKLIST
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-For EACH vendor you plan to use, verify:
-
-□ Vendor is located in Canada OR in an approved target market listed above
-  ⚠️ US vendors are NOT eligible if USA is not an approved market
-  ⚠️ Vendors in non-approved countries will cause automatic rejection at claims stage
-
-□ Vendor is not affiliated with your company (arm's length transaction)
-
-□ Consultant/service provider has expertise not available in-house
-
-□ No monthly retainers (project-based only)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
