@@ -805,12 +805,28 @@ If they mentioned: Trademark registration, patent filing, IP protection
       - Reference specific events/vendors from transcript
       - Include compliance warnings (printing only, no giveaways, vendor location, etc.)
 - **Ineligible Activities**: Only include if they checked/mentioned something ineligible
-- **Checklists**: Include vendor location and compliance checklists
+- **Compliance Checklist**: Include the budget template compliance checklist
 
 **Step 4: Output**
 - Generate complete markdown text in chat
 - Team member copies/pastes into document for client
 - No file creation needed - just raw markdown output
+
+**DO NOT INCLUDE:**
+- ❌ "Strategic Strengths of Your Project" section
+- ❌ Estimated Budget Summary table with rows/columns
+- ❌ Vendor Location Checklist (vendor compliance is already in main checklist)
+- ❌ Any commentary about why their project is strong or will succeed
+- ❌ Any scoring or assessment of their readiness
+
+**ONLY INCLUDE:**
+- ✅ Project understanding (what we think they want to do)
+- ✅ Activities from RA checkboxes
+- ✅ Activities from transcript
+- ✅ Category-by-category guidance (A-H)
+- ✅ Ineligible activities (if applicable)
+- ✅ Compliance checklist
+- ✅ Next steps
 
 **Example Request/Response:**
 
