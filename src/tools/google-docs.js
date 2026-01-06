@@ -885,7 +885,7 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
           }
         }
       );
-      headerLength = 21; // "GRANTED CONSULTING\n\n"
+      headerLength = 20; // "GRANTED CONSULTING\n\n" (18 chars + 2 newlines)
     }
 
     // Add title after header
