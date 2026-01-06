@@ -491,75 +491,129 @@ After preparedness assessment, provide strategic guidance for drafting:
 BUDGET BUILDING GUIDE - [Company Name]
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-EXECUTIVE SUMMARY
+BASED ON YOUR READINESS ASSESSMENT, HERE'S WHAT WE UNDERSTAND YOUR PROJECT IS ABOUT:
 
-Project Objective:
-[Company Name] plans to enter the [Target Market] market by [primary strategy from RA - e.g., "exhibiting at [Trade Show Name] and conducting targeted digital advertising to attract distributors"]. This project will enable the company to [primary goal from RA - e.g., "establish relationships with 3-5 German distributors and generate qualified leads for B2B sales"].
+[1-2 sentence summary of their project intent from RA and transcript]
 
 Target Market: [Market(s) from RA]
 
-Key Activities:
-• [Activity 1 from RA - e.g., "Attend [Trade Show Name] in [Location] to meet potential buyers/distributors"]
-• [Activity 2 from RA - e.g., "Run digital advertising campaign targeting German industrial buyers"]
-• [Activity 3 if mentioned]
+Activities You Indicated in Your RA:
+[Pull from "Project Activities" checkboxes on RA pages 5-6]
+• [If checked: "Trade shows - you checked travel, registration/booth fees"]
+• [If checked: "Marketing materials - you checked flyers/brochures and translation"]
+• [If checked: "Consultant services - you checked market research, legal advice, IP protection"]
+• [Other checked items from RA]
 
-Project Timeline: [Start Date - typically 60 business days after submission] to March 31, 2026
+Additional Activities from Your Call:
+[Pull from transcript if available]
+• [Activity mentioned in transcript - e.g., "You mentioned attending TechCrunch Disrupt London"]
+• [Activity mentioned - e.g., "You discussed running LinkedIn advertising"]
+• [Activity mentioned - e.g., "You indicated interest in hiring an export consultant"]
 
-CanExport Categories:
-This project spans [X] CanExport categories: Category [A] (Travel), Category [B] (Trade Events), Category [C] (Marketing)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-YOUR BUDGET ACTIVITIES
-
-Based on your project plan, you should budget for these [X] eligible activities:
-
-✓ Activity #1: [Activity name]
-✓ Activity #2: [Activity name]
-✓ Activity #3: [Activity name]
-[etc.]
-
-Below is detailed guidance for filling out each activity in the Budget Template.
+Note: If you're still exploring activities, that's fine - the budget process will help you finalize specific opportunities.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-ACTIVITY #1: [ACTIVITY NAME IN CAPS]
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Category [A-H] | Budget Template Row [#]
+CANEXPORT BUDGET CATEGORIES - WHAT TO FILL OUT
 
-HOW TO FILL OUT THE BUDGET:
+Below is a category-by-category breakdown of which Budget Template rows you should focus on:
 
-Column C (Activity): Keep the pre-filled text as-is [OR if modification needed: "Change to: [suggested text]"]
+**CATEGORY A - TRAVEL**
+Our recommendation: [Flexible suggestion based on their project - e.g., "Yes, you should fill this out since you mentioned attending a trade show in the UK" OR "Consider this if you plan to travel to your target market for meetings or events" OR "This may not apply if you're doing all activities remotely"]
 
-Column D (Used For):
-"[Suggested text tailored to their specific project]"
+Which rows to complete:
+• Row 7 (Airfare): [Guidance - e.g., "Complete 1 row for round-trip airfare for 2 people" OR "Complete multiple rows if planning separate trips"]
+• Row 8 (Per Diem): [Guidance - e.g., "Complete 1 row covering accommodation/meals for 5 days, 2 people"]
+• Row 9 (Visa fees): [Guidance - e.g., "Only fill out if visa required for your target market"]
 
-Column E (Start Date): [Guidance - e.g., "Date you plan to fly (must be after approval)"]
-
-Column F (End Date): [Guidance - e.g., "Date you return to Canada"]
-
-Column G (Total Cost):
-[If amount mentioned in RA: "$X,XXX"]
-[If not mentioned: "Estimate [type of cost] (e.g., $X,XXX per person × [#] people = $X,XXX)"]
-
-Column H (Vendor Name):
-[If mentioned in RA/transcript: "[Vendor Name] (mentioned in RA call)"]
-[If not mentioned: "TBD - [Type of vendor needed]"]
-
-Column I (Details):
-"[2-3 sentence suggested text based on their project, pre-written for them to adapt]"
-
-Column J (Expected Outcomes):
-"[Specific outcomes based on their stated goals - pre-written for them to adapt]"
-
-⚠️ WATCH OUT FOR:
-- [Compliance requirement 1 specific to this activity type]
-- [Compliance requirement 2]
-- [Red flag from ineligible expenses section if applicable]
+Considerations for your project:
+• [Project-specific note - e.g., "Since you're sending CEO and CTO, budget for 2 travelers maximum"]
+• [Watch-out - e.g., "Only economy class eligible - budget accordingly"]
+• [Specific to their plan - e.g., "If you plan multiple trips, create separate rows for each trip"]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-[Repeat for each activity they plan to do]
+**CATEGORY B - TRADE EVENTS**
+Our recommendation: [Flexible suggestion - e.g., "Yes, fill this out since you mentioned exhibiting at TechCrunch Disrupt London" OR "Consider this if you're planning to attend or exhibit at industry events in your target market"]
+
+Which rows to complete:
+• Row 10 (Trade show registration/booth): [Guidance - e.g., "Complete 1 row for booth rental and registration" OR "Complete separate rows if attending multiple events"]
+
+Considerations for your project:
+• [Project-specific note - e.g., "Booth RENTALS only - do not include booth purchase or decorations"]
+• [Watch-out - e.g., "Get itemized quote showing booth space, electricity, WiFi separately"]
+• [Specific to their plan - e.g., "If attending multiple trade shows, create separate rows for each"]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**CATEGORY C - MARKETING & PROMOTIONAL MATERIALS**
+Our recommendation: [Flexible suggestion - e.g., "Yes, fill this out since you mentioned running LinkedIn ads and printing brochures" OR "Consider this category for advertising, videos, or printed materials targeting your market"]
+
+Which rows to complete:
+• Row 11 (Advertising): [Guidance - e.g., "Complete 1 row for LinkedIn advertising campaign" OR "Skip if not planning digital advertising"]
+• Row 12 (Video): [Guidance - e.g., "Complete if creating promotional video for target market" OR "Skip if not part of your plan"]
+• Row 13 (Promotional materials): [Guidance - e.g., "Complete 1 row for brochure and banner printing" OR "Skip if not creating print materials"]
+
+Considerations for your project:
+• [Project-specific note - e.g., "PrintShop Pro (mentioned in RA) is Vancouver-based - compliant vendor"]
+• [Watch-out - e.g., "Printing costs only - design fees not eligible"]
+• [Specific to their plan - e.g., "Make sure materials are UK-specific (not generic Canadian materials)"]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**CATEGORY D - INTERPRETATION/TRANSLATION**
+Our recommendation: [Flexible suggestion - e.g., "You may need this if doing business in French-speaking regions" OR "Likely not needed since UK is English-speaking" OR "Consider this if you need document translation or interpreter services"]
+
+Which rows to complete:
+• Row 14 (Interpretation services): [Guidance - e.g., "Complete if hiring interpreters for meetings or events" OR "Skip if not needed for your market"]
+
+Considerations for your project:
+• [Project-specific notes if applicable]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**CATEGORY E - CONTRACTS/CERTIFICATIONS**
+Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need product certifications or legal services for market entry" OR "You may want to explore this if regulatory compliance is required"]
+
+Which rows to complete:
+• Row 15 (Contractual agreements/certification): [Guidance - e.g., "Complete if pursuing certifications or legal contracts" OR "Skip if not applicable"]
+
+Considerations for your project:
+• [Project-specific notes if applicable]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**CATEGORY F - BUSINESS/TAX/LEGAL CONSULTANTS**
+Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need export strategy, tax, or legal consulting" OR "You might want to budget for an export consultant to help with market entry"]
+
+Which rows to complete:
+• Row 16 (Consultant expenses): [Guidance - e.g., "Complete if hiring consultants for export strategy, legal, or tax advice"]
+
+Considerations for your project:
+• [Project-specific notes - e.g., "Consultant must be located in Canada or your target market (not US unless USA is approved)"]
+• [Watch-out - e.g., "No monthly retainers - project-based only"]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**CATEGORY G - MARKET RESEARCH**
+Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need commissioned market research or lead lists" OR "This could help if you want professional market intelligence for your target market"]
+
+Which rows to complete:
+• Row 17 (Market research/lead generation): [Guidance - e.g., "Complete if commissioning research reports or purchasing lead databases"]
+
+Considerations for your project:
+• [Project-specific notes if applicable]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+**CATEGORY H - IP PROTECTION**
+Our recommendation: [Flexible suggestion - e.g., "Not mentioned in your RA - consider this if you need to register trademarks or patents in your target market" OR "This may be valuable if IP protection is important for your market entry"]
+
+Which rows to complete:
+• Row 18 (IP protection): [Guidance - e.g., "Complete if registering trademark/patent in target market"]
+
+Considerations for your project:
+• [Project-specific notes if applicable]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -696,30 +750,50 @@ If they mentioned: Trademark registration, patent filing, IP protection
 **Step 1: Load Context**
 - Read RA document (from Google Drive or user upload)
 - Read RA call transcript (if available)
-- Extract:
-  - Target markets
-  - Project goals (what they want to achieve)
-  - Planned activities (even if vague - e.g., "attend trade show")
-  - Any vendors mentioned
-  - Any cost estimates mentioned
+- Extract from RA document:
+  - Target markets (Page 1)
+  - **PROJECT ACTIVITIES CHECKBOXES (Page 5-6)** - CRITICAL for category mapping:
+    - Marketing materials checked? → Category C
+    - Consultant services checked (which types)? → Category F/G
+    - Trade shows checked? → Category B
+    - Travel checked? → Category A
+  - Team members working on project (Q8, Page 4) → Number of travelers for Category A
+  - IP strategy (Q11, Page 4) → Whether to include Category H
+  - Budget range (Q9, Page 4) → Budget expectations
+  - Previous CanExport activities (Q1, Page 2) → Context for repeat applicants
+- Extract from transcript:
+  - Specific events/trade shows mentioned (names, dates, locations)
+  - Specific vendors mentioned
+  - Cost estimates discussed
+  - Number of trips planned
+  - Marketing materials discussed
+  - Any concerns or questions about activities
+  - Timeline preferences
 
 **Step 2: Map Activities**
-- Review what client wants to do
+- Start with checked boxes from RA "Project Activities" section as baseline
+- Enhance with details from transcript
 - Map to CanExport categories (A-H) using logic above
 - Identify which Budget Template rows apply
-- Flag any ineligible activities mentioned
+- Flag any ineligible activities mentioned (e.g., giveaways, booth purchases)
 
 **Step 3: Generate Guide**
 - Use template structure above
-- **Executive Summary**: Synthesize their project objective and key activities
-- **Activity List**: List each eligible activity they should budget for
-- **For Each Activity**: Provide row-by-row guidance with:
-  - Specific text suggestions for their project
-  - Cost estimates (if mentioned in RA)
-  - Vendor names (if mentioned in transcript - mark as "mentioned in RA call")
-  - Expected outcomes tied to their goals
-  - Compliance warnings relevant to that activity type
-- **Ineligible Activities**: Only include if they mentioned something ineligible
+- **Intro Section**:
+  - Synthesize their project intent from RA + transcript
+  - List "Activities You Indicated in Your RA" (from checkboxes)
+  - List "Additional Activities from Your Call" (from transcript)
+- **Category-by-Category Recommendations**:
+  - For each CanExport category (A-H), provide:
+    - **Our recommendation**: Based on what they checked/mentioned (flexible suggestion)
+    - **Which rows to complete**: Specific row guidance
+    - **Considerations for your project**:
+      - Use team member count from RA Q8 for travel
+      - Use budget range from RA Q9 for context
+      - Use IP strategy from RA Q11 for Category H
+      - Reference specific events/vendors from transcript
+      - Include compliance warnings (printing only, no giveaways, vendor location, etc.)
+- **Ineligible Activities**: Only include if they checked/mentioned something ineligible
 - **Checklists**: Include vendor location and compliance checklists
 
 **Step 4: Output**
