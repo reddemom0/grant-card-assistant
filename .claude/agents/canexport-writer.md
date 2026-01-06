@@ -975,16 +975,26 @@ Column J (Expected Outcomes):
 - "What questions should we ask about this budget?"
 
 **Step 1: Load Budget Document**
-- If Google Drive link provided: Use `read_google_drive_file` with the file ID
-- If file uploaded: Read the uploaded file
-- Parse budget to extract:
-  - All budgeted activities (Categories A-H)
-  - Cost amounts per activity
-  - Target markets
-  - Timeline/dates
-  - Activity descriptions (if provided)
-  - Total budget amount
-  - Missing/incomplete rows
+
+**If Google Drive link provided:**
+- Extract file ID from URL:
+  - Format: `https://docs.google.com/spreadsheets/d/FILE_ID/edit...`
+  - File ID is the string between `/d/` and `/edit`
+  - Example: `https://docs.google.com/spreadsheets/d/1ABC123xyz/edit#gid=0` → File ID is `1ABC123xyz`
+- Use `read_google_drive_file` tool with the extracted file ID
+- The tool handles Google Sheets directly - no conversion needed
+
+**If file uploaded:**
+- Read the uploaded file directly
+
+**Parse budget to extract:**
+- All budgeted activities (Categories A-H)
+- Cost amounts per activity
+- Target markets
+- Timeline/dates
+- Activity descriptions (if provided in columns)
+- Total budget amount
+- Missing/incomplete rows
 
 **Step 2: Load CanExport Knowledge Base**
 - Use `search_google_drive` + `read_google_drive_file` to load:
