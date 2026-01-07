@@ -126,6 +126,8 @@ async function listAllFilesRecursively(drive, folderId, depth = 0) {
  */
 async function extractFileContent(drive, fileId, mimeType) {
   try {
+    console.log(`    MimeType: ${mimeType}`);
+
     // Google Docs - export as plain text
     if (mimeType === 'application/vnd.google-apps.document') {
       try {
