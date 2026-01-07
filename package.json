@@ -28,6 +28,7 @@
     "@hubspot/api-client": "^13.4.0",
     "@upstash/redis": "^1.25.1",
     "axios": "^1.7.0",
+    "ioredis": "^5.3.2",
     "axios-retry": "^4.5.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",

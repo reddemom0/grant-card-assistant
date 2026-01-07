@@ -11,7 +11,7 @@
 
 import { google } from 'googleapis';
 import Anthropic from '@anthropic-ai/sdk';
-import { Redis } from '@upstash/redis';
+import Redis from 'ioredis';
 import dotenv from 'dotenv';
 import mammoth from 'mammoth';
 import pdf from 'pdf-parse/lib/pdf-parse.js';
@@ -26,10 +26,7 @@ const CONTENT_SAMPLE_SIZE = 10000; // First 10K chars for analysis
 // Initialize clients
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN
-});
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
 /**
  * Initialize Google Drive API client
