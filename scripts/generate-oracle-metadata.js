@@ -26,7 +26,7 @@ const CONTENT_SAMPLE_SIZE = 10000; // First 10K chars for analysis
 // Initialize clients
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
 
 /**
  * Initialize Google Drive API client
