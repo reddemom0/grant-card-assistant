@@ -218,7 +218,7 @@ async function generateMetadata(fileName, content) {
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022', // Fastest, cheapest for metadata generation
+      model: 'claude-haiku-4-5-20251001', // Claude 4.5 Haiku - fastest, cheapest for metadata generation
       max_tokens: 500,
       messages: [{
         role: 'user',
