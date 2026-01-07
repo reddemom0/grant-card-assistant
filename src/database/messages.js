@@ -82,9 +82,16 @@ export async function getConversationMessages(conversationId) {
 
                 return cleanBlock;
               })
-              // Filter out thinking/redacted_thinking blocks entirely
-              // They cause issues when reloaded from database and aren't needed for conversation continuity
-              .filter(block => block.type !== 'thinking' && block.type !== 'redacted_thinking');
+              // Filter out blocks that cause issues when reloaded from database
+              // These are not needed for conversation continuity:
+              // - thinking/redacted_thinking: Extended thinking blocks
+              // - server_tool_use/web_fetch_tool_result: Server-side tool execution (already processed)
+              .filter(block =>
+                block.type !== 'thinking' &&
+                block.type !== 'redacted_thinking' &&
+                block.type !== 'server_tool_use' &&
+                block.type !== 'web_fetch_tool_result'
+              );
           }
         } catch (e) {
           // If not valid JSON, treat as plain text
