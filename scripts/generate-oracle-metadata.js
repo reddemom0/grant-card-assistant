@@ -65,7 +65,7 @@ async function listDepartmentFolders(drive) {
 }
 
 /**
- * List all files in a department folder
+ * List all files in a department folder (non-recursive, direct children only)
  */
 async function listFilesInFolder(drive, folderId) {
   const files = [];
@@ -84,6 +84,41 @@ async function listFilesInFolder(drive, folderId) {
   } while (pageToken);
 
   return files;
+}
+
+/**
+ * Recursively list all files in a folder and its subfolders
+ */
+async function listAllFilesRecursively(drive, folderId, depth = 0) {
+  const allFiles = [];
+
+  // Get files in current folder
+  const files = await listFilesInFolder(drive, folderId);
+  allFiles.push(...files);
+
+  // Get subfolders
+  let pageToken = null;
+  const subfolders = [];
+
+  do {
+    const response = await drive.files.list({
+      q: `'${folderId}' in parents and trashed = false and mimeType = 'application/vnd.google-apps.folder'`,
+      fields: 'nextPageToken, files(id, name)',
+      pageSize: 100,
+      pageToken
+    });
+
+    subfolders.push(...(response.data.files || []));
+    pageToken = response.data.nextPageToken;
+  } while (pageToken);
+
+  // Recursively process each subfolder
+  for (const subfolder of subfolders) {
+    const subfolderFiles = await listAllFilesRecursively(drive, subfolder.id, depth + 1);
+    allFiles.push(...subfolderFiles);
+  }
+
+  return allFiles;
 }
 
 /**
@@ -258,8 +293,8 @@ async function processDepartment(drive, department, forceReindex) {
   console.log(`📁 Processing: ${department.name}`);
   console.log('='.repeat(80));
 
-  const files = await listFilesInFolder(drive, department.id);
-  console.log(`Found ${files.length} files`);
+  const files = await listAllFilesRecursively(drive, department.id);
+  console.log(`Found ${files.length} files (including subfolders)`);
 
   let processed = 0;
   let skipped = 0;
