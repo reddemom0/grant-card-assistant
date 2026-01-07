@@ -128,20 +128,44 @@ async function extractFileContent(drive, fileId, mimeType) {
   try {
     // Google Docs - export as plain text
     if (mimeType === 'application/vnd.google-apps.document') {
-      const response = await drive.files.export({
-        fileId,
-        mimeType: 'text/plain'
-      });
-      return response.data.substring(0, CONTENT_SAMPLE_SIZE);
+      try {
+        const response = await drive.files.export({
+          fileId,
+          mimeType: 'text/plain'
+        }, { responseType: 'text' });
+        return String(response.data).substring(0, CONTENT_SAMPLE_SIZE);
+      } catch (exportError) {
+        console.warn(`  ⚠️  Failed to export Google Doc: ${exportError.message}`);
+        return null;
+      }
     }
 
     // Google Sheets - export as CSV
     if (mimeType === 'application/vnd.google-apps.spreadsheet') {
-      const response = await drive.files.export({
-        fileId,
-        mimeType: 'text/csv'
-      });
-      return response.data.substring(0, CONTENT_SAMPLE_SIZE);
+      try {
+        const response = await drive.files.export({
+          fileId,
+          mimeType: 'text/csv'
+        }, { responseType: 'text' });
+        return String(response.data).substring(0, CONTENT_SAMPLE_SIZE);
+      } catch (exportError) {
+        console.warn(`  ⚠️  Failed to export Google Sheet: ${exportError.message}`);
+        return null;
+      }
+    }
+
+    // Google Slides - export as plain text
+    if (mimeType === 'application/vnd.google-apps.presentation') {
+      try {
+        const response = await drive.files.export({
+          fileId,
+          mimeType: 'text/plain'
+        }, { responseType: 'text' });
+        return String(response.data).substring(0, CONTENT_SAMPLE_SIZE);
+      } catch (exportError) {
+        console.warn(`  ⚠️  Failed to export Google Slides: ${exportError.message}`);
+        return null;
+      }
     }
 
     // PDFs, DOCX, other files - download and parse
@@ -194,7 +218,7 @@ async function generateMetadata(fileName, content) {
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5-20250929', // Fastest, cheapest for metadata generation
+      model: 'claude-3-5-haiku-20241022', // Fastest, cheapest for metadata generation
       max_tokens: 500,
       messages: [{
         role: 'user',
