@@ -465,6 +465,10 @@ app.get('/readiness-strategist*', (req, res) => {
   res.sendFile('readiness-strategist.html', { root: '.' });
 });
 
+app.get('/oracle*', (req, res) => {
+  res.sendFile('oracle.html', { root: '.' });
+});
+
 app.get('/dashboard', (req, res) => {
   res.sendFile('dashboard.html', { root: '.' });
 });
