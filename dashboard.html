@@ -244,7 +244,7 @@
         }
         
         .agent-card.internal-oracle {
-            --accent-color: #ea580c;
+            --accent-color: #1e778e;
         }
         
         .agent-header {
@@ -756,9 +756,9 @@
                     <div class="agent-icon">🔮</div>
                     <div class="agent-info">
                         <h3>Internal Knowledge Oracle</h3>
-                        <span class="agent-status coming-soon">
-                            <div style="width: 8px; height: 8px; background: #d97706; border-radius: 50%;"></div>
-                            Coming Soon
+                        <span class="agent-status">
+                            <div class="status-indicator"></div>
+                            Active
                         </span>
                     </div>
                 </div>
@@ -774,11 +774,11 @@
                     <li>Team resources & documentation</li>
                 </ul>
                 <div class="agent-action">
-                    <button class="agent-button" disabled>
-                        <span>Coming Soon</span>
-                        <span>⏳</span>
+                    <button class="agent-button">
+                        <span>Open Oracle</span>
+                        <span>→</span>
                     </button>
-                    <div class="usage-stats">In development</div>
+                    <div class="usage-stats">150+ docs indexed</div>
                 </div>
             </div>
         </div>
@@ -884,8 +884,8 @@
                     active: true
                 },
                 'internal-oracle': {
-                    url: '/internal-oracle',
-                    active: false
+                    url: '/oracle',
+                    active: true
                 }
             };
             
