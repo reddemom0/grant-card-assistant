@@ -11,7 +11,7 @@
 
 import { google } from 'googleapis';
 import Anthropic from '@anthropic-ai/sdk';
-import { createClient } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 import dotenv from 'dotenv';
 import mammoth from 'mammoth';
 import pdf from 'pdf-parse/lib/pdf-parse.js';
@@ -26,7 +26,7 @@ const CONTENT_SAMPLE_SIZE = 10000; // First 10K chars for analysis
 // Initialize clients
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-const redis = createClient({
+const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN
 });
