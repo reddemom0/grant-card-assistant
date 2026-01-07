@@ -652,6 +652,7 @@ export const ALL_TOOLS = [
   ...MEMORY_TOOLS,
   ...HUBSPOT_TOOLS,
   ...GOOGLE_DRIVE_TOOLS,
+  ...ORACLE_TOOLS,
   ...CANEXPORT_WRITER_TOOLS,
   ...GOOGLE_DOCS_TOOLS
 ];
@@ -693,6 +694,15 @@ export function getToolsForAgent(agentType) {
       // - HubSpot for client context, deal integration, and assessment storage
       // - Google Docs for creating formatted readiness assessment documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS];
+
+    case 'internal-oracle':
+      // Internal Oracle gets:
+      // - Server tools (WebSearch/WebFetch) for external research if needed
+      // - Oracle search tool for internal knowledge base
+      // - Google Drive for reading documents
+      // - HubSpot for company/project context
+      // - Google Docs for creating new documentation
+      return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...HUBSPOT_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'orchestrator':
       // Orchestrator gets everything

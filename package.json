@@ -16,7 +16,10 @@
     "test:report": "node tests/run-tests.js report",
     "test:file-reading": "node test-file-reading.js",
     "fixtures:generate": "node tests/utils/fixture-generator-cli.js",
-    "db:setup": "node setup-database.js"
+    "db:setup": "node setup-database.js",
+    "oracle:explore": "node scripts/oracle-explore-kb.js",
+    "oracle:index": "node scripts/generate-oracle-metadata.js",
+    "oracle:reindex": "node scripts/generate-oracle-metadata.js --full"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.21",

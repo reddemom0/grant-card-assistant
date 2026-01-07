@@ -220,6 +220,19 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       // ============================================================================
+      // ORACLE TOOLS
+      // ============================================================================
+
+      case 'search_oracle_kb':
+        const { searchOracleKnowledgeBase } = await import('./oracle-search.js');
+        result = await searchOracleKnowledgeBase(input.query, {
+          department: input.department,
+          fileType: input.fileType,
+          limit: input.limit
+        });
+        break;
+
+      // ============================================================================
       // GOOGLE DOCS & SHEETS TOOLS
       // ============================================================================
 
