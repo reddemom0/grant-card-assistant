@@ -122,6 +122,26 @@ async function listAllFilesRecursively(drive, folderId, depth = 0) {
 }
 
 /**
+ * Resolve shortcut to actual file
+ */
+async function resolveShortcut(drive, file) {
+  // If it's a shortcut, get the target file ID and mimeType
+  if (file.mimeType === 'application/vnd.google-apps.shortcut' && file.shortcutDetails) {
+    console.log(`    Shortcut detected, resolving to target...`);
+    return {
+      fileId: file.shortcutDetails.targetId,
+      mimeType: file.shortcutDetails.targetMimeType
+    };
+  }
+
+  // Not a shortcut, return as-is
+  return {
+    fileId: file.id,
+    mimeType: file.mimeType
+  };
+}
+
+/**
  * Download and extract text content from a file
  */
 async function extractFileContent(drive, fileId, mimeType) {
@@ -343,8 +363,11 @@ async function processDepartment(drive, department, forceReindex) {
 
         console.log(`  📄 Processing: ${file.name}`);
 
+        // Resolve shortcut to actual file if needed
+        const { fileId, mimeType } = await resolveShortcut(drive, file);
+
         // Extract content
-        const content = await extractFileContent(drive, file.id, file.mimeType);
+        const content = await extractFileContent(drive, fileId, mimeType);
 
         if (!content) {
           console.log(`  ⚠️  No content extracted, indexing metadata only`);
