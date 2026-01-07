@@ -425,6 +425,58 @@ export const GOOGLE_DRIVE_TOOLS = [
 ];
 
 // ============================================================================
+// ORACLE TOOLS
+// Internal knowledge base search for Granted Consulting documentation
+// ============================================================================
+
+export const ORACLE_TOOLS = [
+  {
+    name: 'search_oracle_kb',
+    description: `Search Granted Consulting's internal knowledge base (Oracle).
+
+Use this to find company documents, processes, templates, examples, and information across all departments.
+
+The knowledge base includes:
+- **Writers**: Application templates, writing guides, program documentation
+- **Strategy**: Pricing guides, discovery scripts, client intake processes
+- **Research**: Grant program databases, eligibility rubrics, procedures
+- **Marketing**: Content calendars, webinar topics, customer story templates
+- **GCs**: Branding guidelines, hiring processes, claim procedures
+
+Returns metadata about matching documents including file name, summary, keywords, and Google Drive link.
+
+After searching, use read_google_drive_file to load the full content of relevant documents.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query (keywords or natural language question)'
+        },
+        department: {
+          type: 'string',
+          enum: ['Writers', 'Strategy', 'Research', 'Marketing', 'GCs'],
+          description: 'Optional: Filter results to specific department'
+        },
+        fileType: {
+          type: 'string',
+          enum: ['template', 'example', 'process', 'reference', 'data'],
+          description: 'Optional: Filter by document type (template=blank forms, example=completed samples, process=SOPs, reference=guidelines, data=databases/lists)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default 10, max 20)',
+          minimum: 1,
+          maximum: 20,
+          default: 10
+        }
+      },
+      required: ['query']
+    }
+  }
+];
+
+// ============================================================================
 // CANEXPORT WRITER TOOLS
 // Application drafting utilities
 // ============================================================================
