@@ -57,8 +57,13 @@ class FeedbackPanel {
     getFeedbackPanelHTML() {
         return `
             <div class="feedback-panel-header">
-                <h3>💬 Feedback</h3>
-                <p class="feedback-subtitle">Help this agent improve</p>
+                <div>
+                    <h3>💬 Feedback</h3>
+                    <p class="feedback-subtitle">Help this agent improve</p>
+                </div>
+                <button class="feedback-panel-toggle" id="feedback-panel-toggle" title="Collapse panel">
+                    ◀
+                </button>
             </div>
 
             <!-- Quick Feedback Widget -->
@@ -128,34 +133,91 @@ class FeedbackPanel {
             /* Feedback Layout */
             .feedback-layout {
                 display: flex;
+                width: 100vw;
+                max-width: 100vw;
                 height: calc(100vh - 4rem);
                 gap: 0;
+                overflow-x: hidden;
             }
 
             .chat-panel-wrapper {
-                flex: 0 0 62%;
+                flex: 1;
+                min-width: 0;
                 display: flex;
                 flex-direction: column;
                 border-right: 1px solid var(--border, #e5e7eb);
                 overflow-y: auto;
+                overflow-x: hidden;
+                transition: all 0.3s ease;
+            }
+
+            .feedback-panel.collapsed ~ .chat-panel-wrapper,
+            .feedback-layout:has(.feedback-panel.collapsed) .chat-panel-wrapper {
+                flex: 1;
+                min-width: 0;
             }
 
             .feedback-panel {
-                flex: 0 0 38%;
+                flex-shrink: 0;
+                width: 380px;
+                max-width: 380px;
                 background: #f9fafb;
                 padding: 1.5rem;
                 overflow-y: auto;
+                overflow-x: hidden;
                 display: flex;
                 flex-direction: column;
                 gap: 1.5rem;
+                transition: all 0.3s ease;
+            }
+
+            .feedback-panel.collapsed {
+                width: 48px;
+                max-width: 48px;
+                padding: 0.5rem;
+                overflow: hidden;
+            }
+
+            .feedback-panel.collapsed .feedback-widget,
+            .feedback-panel.collapsed .feedback-subtitle {
+                display: none;
             }
 
             /* Feedback Panel Header */
+            .feedback-panel-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
             .feedback-panel-header h3 {
                 margin: 0;
                 font-size: 1.125rem;
                 color: #111827;
                 font-weight: 600;
+            }
+
+            .feedback-panel-toggle {
+                background: white;
+                border: 1px solid #d1d5db;
+                border-radius: 0.375rem;
+                padding: 0.25rem 0.5rem;
+                cursor: pointer;
+                font-size: 1rem;
+                color: #6b7280;
+                transition: all 0.2s ease;
+                flex-shrink: 0;
+            }
+
+            .feedback-panel-toggle:hover {
+                background: #f3f4f6;
+                border-color: #9ca3af;
+                color: #111827;
+            }
+
+            .feedback-panel.collapsed .feedback-panel-toggle {
+                transform: rotate(180deg);
             }
 
             .feedback-subtitle {
@@ -456,16 +518,26 @@ class FeedbackPanel {
             @media (max-width: 1024px) {
                 .feedback-layout {
                     flex-direction: column;
+                    width: 100vw;
+                    max-width: 100vw;
                 }
 
                 .chat-panel-wrapper {
                     flex: 1;
+                    min-width: 0;
                     border-right: none;
                     border-bottom: 1px solid var(--border, #e5e7eb);
                 }
 
                 .feedback-panel {
-                    flex: 0 0 300px;
+                    width: 100%;
+                    max-width: 100%;
+                    height: 300px;
+                }
+
+                .feedback-panel.collapsed {
+                    height: 48px;
+                    width: 100%;
                 }
             }
         `;
@@ -474,6 +546,23 @@ class FeedbackPanel {
     }
 
     attachEventListeners() {
+        // Feedback panel toggle button
+        const toggleBtn = document.getElementById('feedback-panel-toggle');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const panel = document.getElementById('feedback-panel');
+                if (panel) {
+                    panel.classList.toggle('collapsed');
+                    // Update tooltip
+                    if (panel.classList.contains('collapsed')) {
+                        toggleBtn.setAttribute('title', 'Expand panel');
+                    } else {
+                        toggleBtn.setAttribute('title', 'Collapse panel');
+                    }
+                }
+            });
+        }
+
         // Rating buttons (thumbs up/down)
         const ratingButtons = document.querySelectorAll('.btn-thumb');
         console.log(`🔘 Found ${ratingButtons.length} rating buttons`);
