@@ -175,12 +175,17 @@ class FeedbackPanel {
                 width: 48px;
                 max-width: 48px;
                 padding: 0.5rem;
-                overflow: hidden;
+                overflow: visible;
             }
 
             .feedback-panel.collapsed .feedback-widget,
-            .feedback-panel.collapsed .feedback-subtitle {
+            .feedback-panel.collapsed .feedback-subtitle,
+            .feedback-panel.collapsed .feedback-panel-header > div {
                 display: none;
+            }
+
+            .feedback-panel.collapsed .feedback-panel-header {
+                justify-content: center;
             }
 
             /* Feedback Panel Header */
@@ -202,12 +207,17 @@ class FeedbackPanel {
                 background: white;
                 border: 1px solid #d1d5db;
                 border-radius: 0.375rem;
-                padding: 0.25rem 0.5rem;
+                padding: 0.5rem;
                 cursor: pointer;
                 font-size: 1rem;
                 color: #6b7280;
                 transition: all 0.2s ease;
                 flex-shrink: 0;
+                min-width: 32px;
+                height: 32px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
 
             .feedback-panel-toggle:hover {
