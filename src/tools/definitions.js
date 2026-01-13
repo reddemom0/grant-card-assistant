@@ -149,8 +149,8 @@ export const HUBSPOT_TOOLS = [
       properties: {
         grant_program: {
           type: 'string',
-          enum: ['ETG', 'BCAFE', 'CanExport', 'DS4Y', 'Digital Skills for Youth', 'Other'],
-          description: 'Filter by specific grant program. Use "DS4Y" or "Digital Skills for Youth" to search for DS4Y deals by name.'
+          enum: ['ETG', 'BCAFE', 'BC MDP', 'CanExport', 'DS4Y', 'Digital Skills for Youth', 'Canada Summer Jobs', 'CSJ', 'Other'],
+          description: 'Filter by grant program. Maps to actual HubSpot grant_type values: ETG → "ETG BC", BCAFE → "BC Agri-Export", CanExport → "CanExport", DS4Y → matches all DS4Y variants (DS4Y Eco-Canada, DS4Y PCPI, etc.), Canada Summer Jobs → "Canada Summer Jobs (CSJ)". For other grant types, use deal_name parameter or select "Other".'
         },
         status: {
           type: 'string',

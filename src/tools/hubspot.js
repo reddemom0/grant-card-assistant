@@ -507,12 +507,12 @@ export async function searchGrantApplications(grantProgram = null, status = null
       // Map common short forms to searchable terms
       if (normalizedProgram === 'etg') {
         searchTerm = 'ETG';
-      } else if (normalizedProgram === 'bcafe' || normalizedProgram === 'bc mdp') {
-        searchTerm = 'BCAFE';
-      } else if (normalizedProgram === 'csjg') {
-        searchTerm = 'CSJG';
-      } else if (normalizedProgram === 'csj') {
-        searchTerm = 'CSJ';
+      } else if (normalizedProgram === 'bcafe' || normalizedProgram.includes('bc agri')) {
+        searchTerm = 'BC Agri-Export';
+      } else if (normalizedProgram === 'bc mdp') {
+        searchTerm = 'BC MDP';
+      } else if (normalizedProgram === 'csj' || normalizedProgram.includes('summer jobs')) {
+        searchTerm = 'Canada Summer Jobs';
       } else if (normalizedProgram.includes('canexport') || normalizedProgram === 'canex') {
         searchTerm = 'CanExport';
       } else if (normalizedProgram === 'ds4y' || normalizedProgram.includes('digital skills')) {
@@ -520,7 +520,7 @@ export async function searchGrantApplications(grantProgram = null, status = null
       }
 
       // Check if we should use CONTAINS_TOKEN or IN operator
-      // Programs like DS4Y have multiple variants (DS4Y - Eco Canada, DS4Y - PCPI, etc.)
+      // Programs like DS4Y have multiple variants (DS4Y Eco-Canada, DS4Y PCPI, etc.)
       const useContainsToken = ['ds4y', 'digital skills for youth'].includes(normalizedProgram);
 
       if (useContainsToken) {
@@ -532,16 +532,22 @@ export async function searchGrantApplications(grantProgram = null, status = null
         });
       } else {
         // Use IN operator with exact grant type values for each program
-        // ETG agent only handles BC's Employer Training Grant (ETG - BC)
+        // Based on actual HubSpot grant_type values
         let grantTypeValues = [];
 
         if (normalizedProgram === 'etg') {
-          // BC Employer Training Grant only
-          grantTypeValues = ['ETG - BC'];
+          // BC Employer Training Grant (no hyphen in actual value)
+          grantTypeValues = ['ETG BC'];
         } else if (normalizedProgram.includes('canexport')) {
-          grantTypeValues = ['CanExport SME', 'CanExport Innovation'];
-        } else if (normalizedProgram === 'bcafe') {
-          grantTypeValues = ['BCAFE', 'BC MDP'];
+          // Just "CanExport" in HubSpot
+          grantTypeValues = ['CanExport'];
+        } else if (normalizedProgram === 'bcafe' || normalizedProgram.includes('bc agri')) {
+          // BC Agriculture Export Program
+          grantTypeValues = ['BC Agri-Export'];
+        } else if (normalizedProgram === 'bc mdp') {
+          grantTypeValues = ['BC MDP'];
+        } else if (normalizedProgram.includes('summer jobs')) {
+          grantTypeValues = ['Canada Summer Jobs (CSJ)'];
         } else {
           // Fallback: just use the search term as-is
           grantTypeValues = [searchTerm];
