@@ -154,8 +154,8 @@ export const HUBSPOT_TOOLS = [
         },
         status: {
           type: 'string',
-          enum: ['draft', 'in_progress', 'submitted', 'under_review', 'approved', 'rejected'],
-          description: 'Filter by application status'
+          enum: ['draft', 'in_progress', 'submitted', 'under_review', 'approved', 'rejected', 'won', 'lost', 'open'],
+          description: 'Filter by application status. Use "lost" for abandoned deals, "won" for completed/invoiced deals, "open" for active deals, "approved" for approved applications.'
         },
         company_name: {
           type: 'string',
