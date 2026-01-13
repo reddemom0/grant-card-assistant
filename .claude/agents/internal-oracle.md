@@ -141,11 +141,11 @@ Use search_getgranted tool with:
 
 **Best Practices:**
 - Start with broad search, then narrow if too many results
-- Always check HubSpot first to get accurate client context
+- Check HubSpot first for accurate client context
 - Cross-reference VisualPing alerts for recent program changes
-- Suggest specific grants with clear next steps (eligibility check, budget prep, timeline)
-- Calculate potential funding amounts when presenting multiple grants
-- Offer to create grant summary documents or readiness assessments
+- Present grants with funding amounts and deadlines
+- Calculate total potential funding across multiple grants
+- You have tools to create docs, emails, proposals - use them as needed
 
 **Example:**
 ```
