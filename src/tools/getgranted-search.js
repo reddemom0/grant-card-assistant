@@ -77,20 +77,20 @@ export async function searchGetGranted(input) {
     const page = await context.newPage();
 
     try {
-      // Navigate to GetGranted
-      console.log(`   📍 Navigating to GetGranted...`);
-      await page.goto(`${GETGRANTED_URL}/grants`, { waitUntil: 'networkidle' });
+      // Navigate to login page
+      console.log(`   📍 Navigating to GetGranted login...`);
+      await page.goto(`${GETGRANTED_URL}/users/sign_in`, { waitUntil: 'domcontentloaded' });
 
-      // Check if we need to login
-      const isLoginPage = await page.locator('input[type="email"]').count() > 0;
+      // Login
+      console.log(`   🔐 Logging in...`);
+      await login(page);
 
-      if (isLoginPage) {
-        console.log(`   🔐 Logging in...`);
-        await login(page);
-      }
+      // Navigate to grants page
+      console.log(`   📍 Navigating to grants page...`);
+      await page.goto(`${GETGRANTED_URL}/grants`, { waitUntil: 'domcontentloaded' });
 
       // Wait for grants page to load
-      await page.waitForSelector('.grant-card, [data-testid="grant-item"]', { timeout: 10000 });
+      await page.waitForSelector('text=/Showing \\d+ of \\d+ grants|Grant Genie/', { timeout: 10000 });
 
       // Apply filters
       console.log(`   🎯 Applying filters...`);
@@ -176,17 +176,87 @@ async function login(page) {
     throw new Error('GETGRANTED_EMAIL and GETGRANTED_PASSWORD environment variables required');
   }
 
-  // Fill login form
-  await page.fill('input[type="email"]', email);
-  await page.fill('input[type="password"]', password);
+  try {
+    // Wait for page to load
+    await page.waitForLoadState('domcontentloaded');
 
-  // Submit
-  await page.click('button[type="submit"]');
+    // Try multiple selector strategies for email field
+    let emailField = page.locator('input[type="email"]').first();
+    let emailFieldExists = await emailField.count() > 0;
 
-  // Wait for navigation to complete
-  await page.waitForURL(/\/grants/, { timeout: 10000 });
+    if (!emailFieldExists) {
+      emailField = page.locator('input[name="user[email]"]').first();
+      emailFieldExists = await emailField.count() > 0;
+    }
 
-  console.log(`   ✅ Logged in successfully`);
+    if (!emailFieldExists) {
+      emailField = page.locator('input[placeholder*="Email" i]').first();
+      emailFieldExists = await emailField.count() > 0;
+    }
+
+    if (!emailFieldExists) {
+      // Take screenshot for debugging
+      await page.screenshot({ path: '/tmp/getgranted-login-error.png', fullPage: true });
+      throw new Error('Could not find email input field on login page');
+    }
+
+    // Fill email
+    await emailField.fill(email);
+    console.log(`   ✓ Email filled`);
+
+    // Try multiple selector strategies for password field
+    let passwordField = page.locator('input[type="password"]').first();
+    let passwordFieldExists = await passwordField.count() > 0;
+
+    if (!passwordFieldExists) {
+      passwordField = page.locator('input[name="user[password]"]').first();
+      passwordFieldExists = await passwordField.count() > 0;
+    }
+
+    if (!passwordFieldExists) {
+      await page.screenshot({ path: '/tmp/getgranted-login-error.png', fullPage: true });
+      throw new Error('Could not find password input field on login page');
+    }
+
+    // Fill password
+    await passwordField.fill(password);
+    console.log(`   ✓ Password filled`);
+
+    // Find and click submit button
+    let submitButton = page.locator('button[type="submit"]').first();
+    let submitExists = await submitButton.count() > 0;
+
+    if (!submitExists) {
+      submitButton = page.locator('input[type="submit"]').first();
+      submitExists = await submitButton.count() > 0;
+    }
+
+    if (!submitExists) {
+      submitButton = page.locator('button:has-text("Log in"), button:has-text("Sign in")').first();
+      submitExists = await submitButton.count() > 0;
+    }
+
+    if (!submitExists) {
+      await page.screenshot({ path: '/tmp/getgranted-login-error.png', fullPage: true });
+      throw new Error('Could not find submit button on login page');
+    }
+
+    // Click submit
+    await submitButton.click();
+    console.log(`   ✓ Submit clicked`);
+
+    // Wait for navigation to complete
+    await page.waitForURL(/\/(grants|dashboard)/, { timeout: 15000 });
+
+    console.log(`   ✅ Logged in successfully`);
+
+  } catch (error) {
+    console.error(`   ❌ Login failed: ${error.message}`);
+    // Try to capture page content for debugging
+    const pageContent = await page.content().catch(() => 'Unable to capture page content');
+    console.error(`   Page HTML preview: ${pageContent.substring(0, 500)}...`);
+    throw error;
+  }
 }
 
 /**
