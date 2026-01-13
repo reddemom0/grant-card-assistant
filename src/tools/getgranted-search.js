@@ -1,0 +1,560 @@
+/**
+ * GetGranted Search Tool for Oracle
+ *
+ * Allows Oracle to search Granted Consulting's GetGranted database
+ * for grant opportunities matching client criteria.
+ *
+ * Uses Playwright for browser automation since GetGranted has no public API.
+ */
+
+import { chromium } from 'playwright';
+import Redis from 'ioredis';
+
+const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
+
+const GETGRANTED_URL = 'https://app.getgranted.ca';
+const CACHE_TTL = 3600; // Cache results for 1 hour
+
+/**
+ * Search GetGranted database
+ *
+ * @param {Object} input - Search parameters
+ * @param {string[]} input.purposes - Grant purposes (Hiring, Training, Market Expansion, etc.)
+ * @param {string[]} input.regions - Canadian provinces/territories
+ * @param {string[]} input.industries - Industry sectors
+ * @param {string} input.business_type - Business structure (Incorporated, Non-Profit, etc.)
+ * @param {string[]} input.owner_demographics - Female, Indigenous, Newcomers, etc.
+ * @param {number} input.company_size_min - Minimum company size (employees)
+ * @param {number} input.company_size_max - Maximum company size
+ * @param {boolean} input.active_only - Only show active grants (default true)
+ * @param {boolean} input.open_intakes_only - Only show grants with open intakes
+ * @param {number} input.limit - Max results to return (default 10, max 50)
+ * @param {boolean} input.fetch_full_details - Fetch full grant card details (slower)
+ * @returns {Promise<Object>} Search results
+ */
+export async function searchGetGranted(input) {
+  try {
+    const {
+      purposes = [],
+      regions = [],
+      industries = [],
+      business_type = null,
+      owner_demographics = [],
+      company_size_min = null,
+      company_size_max = null,
+      active_only = true,
+      open_intakes_only = false,
+      limit = 10,
+      fetch_full_details = false
+    } = input;
+
+    console.log(`🔍 Searching GetGranted with filters:`, {
+      purposes,
+      regions,
+      industries,
+      business_type,
+      company_size_min,
+      company_size_max,
+      active_only,
+      limit
+    });
+
+    // Check cache first
+    const cacheKey = `getgranted:search:${JSON.stringify(input)}`;
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      console.log(`   ✅ Cache hit - returning cached results`);
+      return JSON.parse(cached);
+    }
+
+    // Launch browser in headless mode
+    const browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+      // Navigate to GetGranted
+      console.log(`   📍 Navigating to GetGranted...`);
+      await page.goto(`${GETGRANTED_URL}/grants`, { waitUntil: 'networkidle' });
+
+      // Check if we need to login
+      const isLoginPage = await page.locator('input[type="email"]').count() > 0;
+
+      if (isLoginPage) {
+        console.log(`   🔐 Logging in...`);
+        await login(page);
+      }
+
+      // Wait for grants page to load
+      await page.waitForSelector('.grant-card, [data-testid="grant-item"]', { timeout: 10000 });
+
+      // Apply filters
+      console.log(`   🎯 Applying filters...`);
+      await applyFilters(page, {
+        purposes,
+        regions,
+        industries,
+        business_type,
+        owner_demographics,
+        company_size_min,
+        company_size_max,
+        active_only,
+        open_intakes_only
+      });
+
+      // Wait for results to update
+      await page.waitForTimeout(2000);
+
+      // Extract grant list
+      console.log(`   📋 Extracting grant results...`);
+      const grants = await extractGrantList(page, limit);
+
+      console.log(`   ✅ Found ${grants.length} grants`);
+
+      // Optionally fetch full details for each grant
+      if (fetch_full_details && grants.length > 0) {
+        console.log(`   📄 Fetching full details for ${grants.length} grants...`);
+        for (const grant of grants) {
+          try {
+            await page.goto(`${GETGRANTED_URL}/grants/${grant.grant_id}`, { waitUntil: 'networkidle' });
+            const details = await extractGrantDetails(page);
+            Object.assign(grant, details);
+            await page.waitForTimeout(500); // Polite delay
+          } catch (error) {
+            console.warn(`   ⚠️  Failed to fetch details for grant ${grant.grant_id}: ${error.message}`);
+          }
+        }
+      }
+
+      await browser.close();
+
+      // Build result
+      const result = {
+        success: true,
+        count: grants.length,
+        filters_applied: {
+          purposes: purposes.length > 0 ? purposes : 'all',
+          regions: regions.length > 0 ? regions : 'all',
+          industries: industries.length > 0 ? industries : 'all',
+          active_only,
+          open_intakes_only
+        },
+        grants
+      };
+
+      // Cache results
+      await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(result));
+
+      return result;
+
+    } finally {
+      await browser.close();
+    }
+
+  } catch (error) {
+    console.error('❌ GetGranted search error:', error);
+    return {
+      success: false,
+      error: error.message,
+      grants: []
+    };
+  }
+}
+
+/**
+ * Login to GetGranted
+ */
+async function login(page) {
+  const email = process.env.GETGRANTED_EMAIL;
+  const password = process.env.GETGRANTED_PASSWORD;
+
+  if (!email || !password) {
+    throw new Error('GETGRANTED_EMAIL and GETGRANTED_PASSWORD environment variables required');
+  }
+
+  // Fill login form
+  await page.fill('input[type="email"]', email);
+  await page.fill('input[type="password"]', password);
+
+  // Submit
+  await page.click('button[type="submit"]');
+
+  // Wait for navigation to complete
+  await page.waitForURL(/\/grants/, { timeout: 10000 });
+
+  console.log(`   ✅ Logged in successfully`);
+}
+
+/**
+ * Apply search filters
+ */
+async function applyFilters(page, filters) {
+  const {
+    purposes,
+    regions,
+    industries,
+    business_type,
+    owner_demographics,
+    company_size_min,
+    company_size_max,
+    active_only,
+    open_intakes_only
+  } = filters;
+
+  // Active grants filter
+  if (active_only) {
+    const activeCheckbox = page.locator('text=Show Active Grants').locator('..').locator('input[type="checkbox"]');
+    const isChecked = await activeCheckbox.isChecked();
+    if (!isChecked) {
+      await activeCheckbox.check();
+    }
+  }
+
+  // Open intakes filter
+  if (open_intakes_only) {
+    // Check at least one "Intakes Currently Open" option
+    const openIntakeCheckboxes = page.locator('text=Intakes Currently Open').locator('..').locator('..').locator('input[type="checkbox"]');
+    const count = await openIntakeCheckboxes.count();
+    if (count > 0) {
+      await openIntakeCheckboxes.first().check();
+    }
+  }
+
+  // Purposes (grant types)
+  if (purposes.length > 0) {
+    // First uncheck "Check All" if checked
+    const checkAllButton = page.locator('text=Uncheck All');
+    const isVisible = await checkAllButton.isVisible().catch(() => false);
+    if (isVisible) {
+      await checkAllButton.click();
+      await page.waitForTimeout(500);
+    }
+
+    // Check specific purposes
+    for (const purpose of purposes) {
+      const checkbox = page.locator(`text=${purpose}`).locator('..').locator('input[type="checkbox"]').first();
+      const exists = await checkbox.count() > 0;
+      if (exists) {
+        await checkbox.check();
+      }
+    }
+  }
+
+  // Regions
+  if (regions.length > 0) {
+    // Uncheck "Any Region in Canada" first
+    const anyRegionCheckbox = page.locator('text=Any Region in Canada').locator('..').locator('input[type="checkbox"]');
+    const isChecked = await anyRegionCheckbox.isChecked();
+    if (isChecked) {
+      await anyRegionCheckbox.uncheck();
+    }
+
+    // Check specific regions
+    for (const region of regions) {
+      const checkbox = page.locator(`text=${region}`).first().locator('..').locator('input[type="checkbox"]').first();
+      const exists = await checkbox.count() > 0;
+      if (exists) {
+        await checkbox.check();
+      }
+    }
+  }
+
+  // Industries
+  if (industries.length > 0) {
+    const industryInput = page.locator('input[placeholder*="Add Industries"]');
+    await industryInput.fill(industries.join(', '));
+  }
+
+  // Business type
+  if (business_type) {
+    // Uncheck "Any Business Type"
+    const anyBusinessCheckbox = page.locator('text=Any Business Type').locator('..').locator('input[type="checkbox"]');
+    const isChecked = await anyBusinessCheckbox.isChecked();
+    if (isChecked) {
+      await anyBusinessCheckbox.uncheck();
+    }
+
+    // Check specific type
+    const checkbox = page.locator(`text=${business_type}`).locator('..').locator('input[type="checkbox"]').first();
+    const exists = await checkbox.count() > 0;
+    if (exists) {
+      await checkbox.check();
+    }
+  }
+
+  // Owner demographics
+  if (owner_demographics.length > 0) {
+    for (const demographic of owner_demographics) {
+      const checkbox = page.locator(`text=${demographic}`).locator('..').locator('input[type="checkbox"]').first();
+      const exists = await checkbox.count() > 0;
+      if (exists) {
+        await checkbox.check();
+      }
+    }
+  }
+
+  // Company size
+  if (company_size_min) {
+    const minInput = page.locator('input[placeholder*="Any Min"]');
+    await minInput.fill(String(company_size_min));
+  }
+
+  if (company_size_max) {
+    const maxInput = page.locator('input[placeholder*="Any Max"]');
+    await maxInput.fill(String(company_size_max));
+  }
+
+  // Click Filter button
+  await page.click('button:has-text("Filter")');
+
+  // Wait for results to update
+  await page.waitForTimeout(2000);
+}
+
+/**
+ * Extract grant list from search results
+ */
+async function extractGrantList(page, limit = 10) {
+  const grants = [];
+
+  // Find all grant items (limit to requested amount)
+  const grantItems = page.locator('.grant-card, [data-testid="grant-item"]').first(limit);
+  const count = await grantItems.count();
+
+  for (let i = 0; i < Math.min(count, limit); i++) {
+    const item = grantItems.nth(i);
+
+    try {
+      // Extract grant name and ID
+      const nameElement = item.locator('a, h2, h3').first();
+      const grantName = await nameElement.textContent();
+
+      // Extract grant ID from text or href
+      const idText = await item.locator('text=/ID: \\d+/').textContent().catch(() => '');
+      const grantId = idText.match(/\d+/)?.[0] || '';
+
+      // Extract grant type
+      const grantType = await item.locator('text=/MARKET EXPANSION|HIRING|TRAINING|CAPITAL COSTS|INVESTMENT|R&D/i').textContent().catch(() => 'Unknown');
+
+      // Extract regions
+      const regionsText = await item.locator('text=/ALL OF CANADA|BRITISH COLUMBIA|ONTARIO/i').textContent().catch(() => '');
+
+      // Extract max spend
+      const maxSpendText = await item.locator('text=/\\$[\\d,]+/').textContent().catch(() => '');
+      const maxSpend = maxSpendText.replace(/[^\d]/g, '');
+
+      // Extract program contribution %
+      const contributionText = await item.locator('text=/\\d+%/').textContent().catch(() => '');
+      const contributionPercent = contributionText.replace('%', '');
+
+      // Extract difficulty (count of bars)
+      const difficultyBars = await item.locator('[class*="difficulty"] div, [class*="bar"]').count();
+
+      // Extract deadline status if visible
+      const deadlineText = await item.locator('text=/Open until|CLOSED|deadline/i').textContent().catch(() => '');
+
+      grants.push({
+        grant_id: grantId,
+        grant_name: grantName.trim(),
+        grant_type: grantType.trim(),
+        regions: regionsText.trim(),
+        max_spend: maxSpend ? parseInt(maxSpend) : null,
+        contribution_percentage: contributionPercent ? parseInt(contributionPercent) : null,
+        difficulty: difficultyBars,
+        deadline_status: deadlineText.trim() || 'Unknown',
+        url: `${GETGRANTED_URL}/grants/${grantId}`
+      });
+
+    } catch (error) {
+      console.warn(`   ⚠️  Failed to extract grant at index ${i}: ${error.message}`);
+    }
+  }
+
+  return grants;
+}
+
+/**
+ * Extract full grant details from grant card page
+ */
+async function extractGrantDetails(page) {
+  const details = {};
+
+  try {
+    // Grant Criteria (overview)
+    details.grant_criteria = await page.locator('text=Grant Criteria').locator('..').locator('p, div').first().textContent().catch(() => '');
+
+    // Grant Value
+    const grantValueSection = page.locator('text=Grant Value:').locator('..').locator('ul');
+    details.grant_value = await grantValueSection.allTextContents().catch(() => []);
+
+    // Turnaround Time
+    details.turnaround_time = await page.locator('text=Turnaround Time:').locator('..').textContent().catch(() => '');
+
+    // Eligible Applicants
+    const eligibleSection = page.locator('text=Eligible Applicants:').locator('..').locator('ul');
+    details.eligible_applicants = await eligibleSection.allTextContents().catch(() => []);
+
+    // Ineligible Applicants
+    const ineligibleSection = page.locator('text=Ineligible Applicants:').locator('..').locator('ul');
+    details.ineligible_applicants = await ineligibleSection.allTextContents().catch(() => []);
+
+    // Eligible Expenses
+    const expensesSection = page.locator('text=Eligible Expenses:').locator('..').locator('ul');
+    details.eligible_expenses = await expensesSection.allTextContents().catch(() => []);
+
+    // Program Details
+    const programSection = page.locator('text=Program Details:').locator('..').locator('ul');
+    details.program_details = await programSection.allTextContents().catch(() => []);
+
+    // Best Practices
+    const bestPracticesSection = page.locator('text=Best Practices').locator('..').locator('ul');
+    details.best_practices = await bestPracticesSection.allTextContents().catch(() => []);
+
+    // Forms/Links
+    const formsSection = page.locator('text=Forms:').locator('..').locator('a');
+    const formsCount = await formsSection.count();
+    details.forms = [];
+    for (let i = 0; i < formsCount; i++) {
+      const link = formsSection.nth(i);
+      details.forms.push({
+        text: await link.textContent(),
+        url: await link.getAttribute('href')
+      });
+    }
+
+    // Last updated
+    details.last_updated = await page.locator('text=/UPDATED ON/i').textContent().catch(() => '');
+
+  } catch (error) {
+    console.warn(`   ⚠️  Failed to extract some grant details: ${error.message}`);
+  }
+
+  return details;
+}
+
+/**
+ * Tool definition for Claude agent
+ */
+export const getGrantedSearchTool = {
+  name: 'search_getgranted',
+  description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
+
+Use this to:
+- Find grants for specific clients based on their industry, location, and needs
+- Discover hiring, training, export, R&D, or capital grants
+- Filter by region, company size, owner demographics
+- Get quick summaries or full grant card details
+
+This tool searches the internal GetGranted database (188+ Canadian grants) and returns matching opportunities with eligibility, funding details, and deadlines.
+
+**Common use cases:**
+- "Find hiring grants for a BC tech company with 25 employees"
+- "Show market expansion grants for Indigenous-owned businesses"
+- "Search for R&D grants in Ontario with open intakes"
+- "Find all grants for female-owned manufacturing companies"`,
+
+  input_schema: {
+    type: 'object',
+    properties: {
+      purposes: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: [
+            'Hiring',
+            'Training',
+            'Market Expansion',
+            'Capital Costs',
+            'Business Assessments, Planning & Coaching',
+            'Systems & Processes',
+            'Loan',
+            'Contests & Prizes',
+            'Investment',
+            'Research & Development',
+            'Rebates'
+          ]
+        },
+        description: 'Grant purposes/types to search for. Leave empty for all types.'
+      },
+      regions: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: [
+            'British Columbia',
+            'Ontario',
+            'Alberta',
+            'Manitoba',
+            'New Brunswick',
+            'Newfoundland and Labrador',
+            'Northwest Territories',
+            'Nova Scotia',
+            'Nunavut',
+            'Prince Edward Island',
+            'Quebec',
+            'Saskatchewan',
+            'Yukon'
+          ]
+        },
+        description: 'Canadian provinces/territories. Leave empty for all regions.'
+      },
+      industries: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Industry sectors (e.g., "Technology", "Manufacturing", "Agriculture"). Leave empty for all industries.'
+      },
+      business_type: {
+        type: 'string',
+        enum: ['Incorporated', 'Sole Proprietorship', 'General Partnership', 'Non-Profit', 'Charity'],
+        description: 'Business structure type. Leave empty for any business type.'
+      },
+      owner_demographics: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: ['Female', 'Indigenous', 'Newcomers', 'People with disabilities', 'Rural Entrepreneur', 'Youth']
+        },
+        description: 'Owner demographics for targeted grants. Leave empty if not applicable.'
+      },
+      company_size_min: {
+        type: 'number',
+        description: 'Minimum company size (number of employees). Leave empty for no minimum.'
+      },
+      company_size_max: {
+        type: 'number',
+        description: 'Maximum company size (number of employees). Leave empty for no maximum.'
+      },
+      active_only: {
+        type: 'boolean',
+        description: 'Only show active grants (default true).',
+        default: true
+      },
+      open_intakes_only: {
+        type: 'boolean',
+        description: 'Only show grants with open intake periods (default false).',
+        default: false
+      },
+      limit: {
+        type: 'number',
+        description: 'Maximum number of grants to return (default 10, max 50).',
+        minimum: 1,
+        maximum: 50,
+        default: 10
+      },
+      fetch_full_details: {
+        type: 'boolean',
+        description: 'Fetch full grant card details including eligibility criteria and best practices (slower, default false).',
+        default: false
+      }
+    },
+    required: []
+  },
+
+  handler: searchGetGranted
+};
+
+export default getGrantedSearchTool;

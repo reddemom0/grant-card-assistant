@@ -516,6 +516,90 @@ This tool provides proactive market intelligence - check it regularly or when cl
       },
       required: []
     }
+  },
+  {
+    name: 'search_getgranted',
+    description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
+
+Use this to:
+- Find grants for specific clients based on their industry, location, and needs
+- Discover hiring, training, export, R&D, or capital grants
+- Filter by region, company size, owner demographics
+- Get quick summaries or full grant card details
+
+This tool searches the internal GetGranted database (188+ Canadian grants) and returns matching opportunities with eligibility, funding details, and deadlines.
+
+**Common use cases:**
+- "Find hiring grants for a BC tech company with 25 employees"
+- "Show market expansion grants for Indigenous-owned businesses"
+- "Search for R&D grants in Ontario with open intakes"
+- "Find all grants for female-owned manufacturing companies"`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        purposes: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['Hiring', 'Training', 'Market Expansion', 'Capital Costs', 'Business Assessments, Planning & Coaching', 'Systems & Processes', 'Loan', 'Contests & Prizes', 'Investment', 'Research & Development', 'Rebates']
+          },
+          description: 'Grant purposes/types to search for. Leave empty for all types.'
+        },
+        regions: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['British Columbia', 'Ontario', 'Alberta', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia', 'Nunavut', 'Prince Edward Island', 'Quebec', 'Saskatchewan', 'Yukon']
+          },
+          description: 'Canadian provinces/territories. Leave empty for all regions.'
+        },
+        industries: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Industry sectors (e.g., "Technology", "Manufacturing", "Agriculture"). Leave empty for all industries.'
+        },
+        business_type: {
+          type: 'string',
+          enum: ['Incorporated', 'Sole Proprietorship', 'General Partnership', 'Non-Profit', 'Charity'],
+          description: 'Business structure type. Leave empty for any business type.'
+        },
+        owner_demographics: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['Female', 'Indigenous', 'Newcomers', 'People with disabilities', 'Rural Entrepreneur', 'Youth']
+          },
+          description: 'Owner demographics for targeted grants. Leave empty if not applicable.'
+        },
+        company_size_min: {
+          type: 'number',
+          description: 'Minimum company size (number of employees). Leave empty for no minimum.'
+        },
+        company_size_max: {
+          type: 'number',
+          description: 'Maximum company size (number of employees). Leave empty for no maximum.'
+        },
+        active_only: {
+          type: 'boolean',
+          description: 'Only show active grants (default true).'
+        },
+        open_intakes_only: {
+          type: 'boolean',
+          description: 'Only show grants with open intake periods (default false).'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of grants to return (default 10, max 50).',
+          minimum: 1,
+          maximum: 50
+        },
+        fetch_full_details: {
+          type: 'boolean',
+          description: 'Fetch full grant card details including eligibility criteria and best practices (slower, default false).'
+        }
+      },
+      required: []
+    }
   }
 ];
 

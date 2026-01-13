@@ -242,6 +242,23 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'search_getgranted':
+        const { searchGetGranted } = await import('./getgranted-search.js');
+        result = await searchGetGranted({
+          purposes: input.purposes,
+          regions: input.regions,
+          industries: input.industries,
+          business_type: input.business_type,
+          owner_demographics: input.owner_demographics,
+          company_size_min: input.company_size_min,
+          company_size_max: input.company_size_max,
+          active_only: input.active_only,
+          open_intakes_only: input.open_intakes_only,
+          limit: input.limit,
+          fetch_full_details: input.fetch_full_details
+        });
+        break;
+
       // ============================================================================
       // GOOGLE DOCS & SHEETS TOOLS
       // ============================================================================
