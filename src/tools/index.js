@@ -15,6 +15,7 @@ import { todoWrite } from './todo-write.js';
 import { hubspotQuery } from './hubspot.js';
 import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 import { createAdvancedDocumentTool } from './google-docs-advanced.js';
+import { getVisualPingAlerts } from './visualping-alerts.js';
 
 /**
  * Tool Definitions for Claude Function Calling
@@ -326,6 +327,36 @@ export const TOOLS = {
       required: ['title', 'grantType', 'documentType']
     },
     execute: createAdvancedDocumentTool
+  },
+
+  get_visualping_alerts: {
+    name: 'get_visualping_alerts',
+    description: 'Get recent website change alerts from VisualPing monitoring of government grant pages. Returns alerts about new grant programs, deadline changes, eligibility updates, and other important changes. Each alert includes VisualPing AI summary plus our own analysis with change classification, priority level, and recommended actions. Use this for proactive market intelligence.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Maximum number of alerts to return (default 10, max 50)'
+        },
+        priority: {
+          type: 'string',
+          enum: ['critical', 'high', 'medium', 'low'],
+          description: 'Filter by priority level. Critical = new programs or major changes. Leave empty for all priorities.'
+        },
+        change_type: {
+          type: 'string',
+          enum: ['new_program', 'deadline_change', 'eligibility_update', 'guidelines_update', 'funding_change', 'minor_update'],
+          description: 'Filter by type of change detected. Leave empty for all types.'
+        },
+        days: {
+          type: 'number',
+          description: 'Only show alerts from the last N days (default 30)'
+        }
+      },
+      required: []
+    },
+    execute: getVisualPingAlerts
   }
 };
 
@@ -360,7 +391,9 @@ export function getToolDefinitions(allowedTools) {
     'CreateAdvancedBudget': 'create_advanced_budget',
     'create_advanced_budget': 'create_advanced_budget',
     'CreateAdvancedDocument': 'create_advanced_document',
-    'create_advanced_document': 'create_advanced_document'
+    'create_advanced_document': 'create_advanced_document',
+    'VisualPingAlerts': 'get_visualping_alerts',
+    'get_visualping_alerts': 'get_visualping_alerts'
   };
 
   // Filter tools based on allowed list

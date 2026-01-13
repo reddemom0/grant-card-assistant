@@ -411,6 +411,53 @@ app.get('/api/hubspot/contacts/:contactId/deals', authenticateUser, async (req, 
 });
 
 // ============================================================================
+// VISUALPING WEBHOOK INTEGRATION
+// ============================================================================
+
+import visualPingHandler from './src/api/visualping-webhook.js';
+
+// Webhook endpoint (no authentication - VisualPing needs to POST directly)
+app.post('/api/visualping-webhook', visualPingHandler.handleVisualPingWebhook);
+
+// Get recent alerts (authenticated - for Oracle and admin dashboard)
+app.get('/api/visualping/alerts', authenticateUser, async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 20;
+    const priority = req.query.priority || null;
+
+    const alerts = await visualPingHandler.getRecentAlerts(limit, priority);
+
+    res.json({
+      success: true,
+      count: alerts.length,
+      alerts
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to fetch alerts',
+      details: error.message
+    });
+  }
+});
+
+// Get alert statistics (authenticated)
+app.get('/api/visualping/stats', authenticateUser, async (req, res) => {
+  try {
+    const stats = await visualPingHandler.getAlertStats();
+
+    res.json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Failed to fetch stats',
+      details: error.message
+    });
+  }
+});
+
+// ============================================================================
 // LEGACY AGENT SDK ENDPOINT (for backwards compatibility)
 // ============================================================================
 
