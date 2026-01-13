@@ -572,8 +572,57 @@ export async function searchGrantApplications(grantProgram = null, status = null
           propertyName: 'application_submitted_on',
           operator: 'HAS_PROPERTY'
         });
-      } else if (statusLower.includes('won') || statusLower.includes('invoice')) {
+      } else if (statusLower.includes('invoice_sent') || statusLower === 'invoice sent') {
         // Filter by state = Invoice Sent (Won)
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Invoice Sent (Won)'
+        });
+      } else if (statusLower.includes('invoice_paid') || statusLower === 'invoice paid') {
+        // Filter by state = Invoice Paid
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Invoice Paid'
+        });
+      } else if (statusLower.includes('invoice_cleared') || statusLower === 'invoice cleared') {
+        // Filter by state = Invoice Cleared
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Invoice Cleared'
+        });
+      } else if (statusLower.includes('retainer_sent') || statusLower === 'retainer sent') {
+        // Filter by state = Retainer Sent
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Retainer Sent'
+        });
+      } else if (statusLower.includes('retainer_paid') || statusLower === 'retainer paid') {
+        // Filter by state = Retainer Paid
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Retainer Paid'
+        });
+      } else if (statusLower.includes('suspended')) {
+        // Filter by state = Suspended
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Suspended'
+        });
+      } else if (statusLower.includes('abandoned')) {
+        // Filter by state = Abandoned
+        filters.push({
+          propertyName: 'state',
+          operator: 'EQ',
+          value: 'Abandoned'
+        });
+      } else if (statusLower.includes('won') || statusLower.includes('invoice')) {
+        // Generic "won" or "invoice" - catch all invoicing states
         filters.push({
           propertyName: 'state',
           operator: 'EQ',

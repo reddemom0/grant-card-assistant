@@ -154,8 +154,8 @@ export const HUBSPOT_TOOLS = [
         },
         status: {
           type: 'string',
-          enum: ['draft', 'in_progress', 'submitted', 'under_review', 'approved', 'rejected', 'won', 'lost', 'open'],
-          description: 'Filter by application status. Use "lost" for abandoned deals, "won" for completed/invoiced deals, "open" for active deals, "approved" for approved applications.'
+          enum: ['draft', 'in_progress', 'submitted', 'under_review', 'approved', 'rejected', 'won', 'lost', 'open', 'abandoned', 'invoice_cleared', 'invoice_paid', 'invoice_sent', 'suspended', 'retainer_sent', 'retainer_paid'],
+          description: 'Filter by application status. Common statuses: "lost" (abandoned deals), "won" (completed/invoiced deals), "open" (active deals), "approved" (approved applications), "invoice_sent"/"invoice_paid"/"invoice_cleared" (invoicing workflow), "retainer_sent"/"retainer_paid" (retainer workflow), "suspended" (temporarily on hold), "abandoned" (formally abandoned).'
         },
         company_name: {
           type: 'string',
