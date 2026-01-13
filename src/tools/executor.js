@@ -232,6 +232,16 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'get_visualping_alerts':
+        const { getVisualPingAlerts } = await import('./visualping-alerts.js');
+        result = await getVisualPingAlerts({
+          limit: input.limit,
+          priority: input.priority,
+          change_type: input.change_type,
+          days: input.days
+        });
+        break;
+
       // ============================================================================
       // GOOGLE DOCS & SHEETS TOOLS
       // ============================================================================

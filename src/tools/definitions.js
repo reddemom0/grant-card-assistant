@@ -473,6 +473,49 @@ After searching, use read_google_drive_file to load the full content of relevant
       },
       required: ['query']
     }
+  },
+  {
+    name: 'get_visualping_alerts',
+    description: `Get recent website change alerts from VisualPing monitoring of government grant pages.
+
+Use this to:
+- Check for new grant programs that have been announced
+- Find recent deadline changes or extensions
+- Discover eligibility updates that might benefit clients
+- Monitor guideline or funding amount changes
+- Stay informed about the grant landscape
+
+Each alert includes VisualPing's AI summary plus our own Claude analysis with change classification, priority level, and recommended actions.
+
+This tool provides proactive market intelligence - check it regularly or when clients ask about "new grants" or "what's changed recently".`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Maximum number of alerts to return (default 10, max 50)',
+          minimum: 1,
+          maximum: 50
+        },
+        priority: {
+          type: 'string',
+          enum: ['critical', 'high', 'medium', 'low'],
+          description: 'Filter by priority level. Critical = new programs or major changes, High = significant updates, Medium = guideline tweaks, Low = minor changes. Leave empty for all priorities.'
+        },
+        change_type: {
+          type: 'string',
+          enum: ['new_program', 'deadline_change', 'eligibility_update', 'guidelines_update', 'funding_change', 'minor_update'],
+          description: 'Filter by type of change detected. Leave empty for all types.'
+        },
+        days: {
+          type: 'number',
+          description: 'Only show alerts from the last N days (default 30)',
+          minimum: 1,
+          maximum: 365
+        }
+      },
+      required: []
+    }
   }
 ];
 
