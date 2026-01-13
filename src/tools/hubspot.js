@@ -472,7 +472,7 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
  * @param {string|null} agentType - Agent type for field selection
  * @returns {Object} Search results
  */
-export async function searchGrantApplications(grantProgram = null, status = null, companyName = null, agentType = null) {
+export async function searchGrantApplications(grantProgram = null, status = null, companyName = null, agentType = null, dealName = null) {
   if (!HUBSPOT_TOKEN) {
     return {
       success: false,
@@ -486,9 +486,18 @@ export async function searchGrantApplications(grantProgram = null, status = null
 
     const filters = [];
 
+    // Filter by deal name if specified (highest priority - searches exact deal name)
+    if (dealName) {
+      filters.push({
+        propertyName: 'dealname',
+        operator: 'CONTAINS_TOKEN',
+        value: dealName
+      });
+    }
+
     // Filter by grant program if specified
-    // Maps common terms to HubSpot grant_type values
-    if (grantProgram) {
+    // Maps common terms to HubSpot grant_type values OR deal names
+    if (grantProgram && !dealName) {
       const normalizedProgram = grantProgram.toLowerCase().trim();
 
       // For partial matching, just search for the key term
@@ -506,29 +515,44 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'CSJ';
       } else if (normalizedProgram.includes('canexport') || normalizedProgram === 'canex') {
         searchTerm = 'CanExport';
+      } else if (normalizedProgram === 'ds4y' || normalizedProgram.includes('digital skills')) {
+        searchTerm = 'DS4Y';
       }
 
-      // Use IN operator with exact grant type values for each program
-      // ETG agent only handles BC's Employer Training Grant (ETG - BC)
-      let grantTypeValues = [];
+      // Check if we should search by grant_type or deal name
+      // Programs like DS4Y appear in deal names, not grant_type field
+      const searchByDealName = ['ds4y', 'digital skills for youth'].includes(normalizedProgram);
 
-      if (normalizedProgram === 'etg') {
-        // BC Employer Training Grant only
-        grantTypeValues = ['ETG - BC'];
-      } else if (normalizedProgram.includes('canexport')) {
-        grantTypeValues = ['CanExport SME', 'CanExport Innovation'];
-      } else if (normalizedProgram === 'bcafe') {
-        grantTypeValues = ['BCAFE', 'BC MDP'];
+      if (searchByDealName) {
+        // Search deal name instead of grant_type
+        filters.push({
+          propertyName: 'dealname',
+          operator: 'CONTAINS_TOKEN',
+          value: searchTerm
+        });
       } else {
-        // Fallback: just use the search term as-is
-        grantTypeValues = [searchTerm];
-      }
+        // Use IN operator with exact grant type values for each program
+        // ETG agent only handles BC's Employer Training Grant (ETG - BC)
+        let grantTypeValues = [];
 
-      filters.push({
-        propertyName: 'grant_type',
-        operator: 'IN',
-        values: grantTypeValues
-      });
+        if (normalizedProgram === 'etg') {
+          // BC Employer Training Grant only
+          grantTypeValues = ['ETG - BC'];
+        } else if (normalizedProgram.includes('canexport')) {
+          grantTypeValues = ['CanExport SME', 'CanExport Innovation'];
+        } else if (normalizedProgram === 'bcafe') {
+          grantTypeValues = ['BCAFE', 'BC MDP'];
+        } else {
+          // Fallback: just use the search term as-is
+          grantTypeValues = [searchTerm];
+        }
+
+        filters.push({
+          propertyName: 'grant_type',
+          operator: 'IN',
+          values: grantTypeValues
+        });
+      }
     }
 
     // Filter by status if specified

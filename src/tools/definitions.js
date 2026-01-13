@@ -143,14 +143,14 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'search_grant_applications',
-    description: 'Search for grant applications (HubSpot deals) by program type, status, company, or other criteria. Returns agent-specific application details - fields returned vary by agent type (CanExport agents see claim tracking fields, ETG agents see training fields, etc.). Always includes: approvedFunding (the ACTUAL approved funding amount), project details, team assignments, timeline, and workflow status. The results DO NOT include the misleading "amount" field - only the accurate approvedFunding field.',
+    description: 'Search for grant applications (HubSpot deals) by program type, deal name, status, company, or other criteria. Returns agent-specific application details - fields returned vary by agent type (CanExport agents see claim tracking fields, ETG agents see training fields, etc.). Always includes: approvedFunding (the ACTUAL approved funding amount), project details, team assignments, timeline, and workflow status. The results DO NOT include the misleading "amount" field - only the accurate approvedFunding field. Use deal_name parameter to search by deal title (e.g., "DS4Y" to find Digital Skills for Youth deals).',
     input_schema: {
       type: 'object',
       properties: {
         grant_program: {
           type: 'string',
-          enum: ['ETG', 'BCAFE', 'CanExport', 'Other'],
-          description: 'Filter by specific grant program'
+          enum: ['ETG', 'BCAFE', 'CanExport', 'DS4Y', 'Digital Skills for Youth', 'Other'],
+          description: 'Filter by specific grant program. Use "DS4Y" or "Digital Skills for Youth" to search for DS4Y deals by name.'
         },
         status: {
           type: 'string',
@@ -160,6 +160,10 @@ export const HUBSPOT_TOOLS = [
         company_name: {
           type: 'string',
           description: 'Filter by applicant company name'
+        },
+        deal_name: {
+          type: 'string',
+          description: 'Search for deals containing this text in the deal name (e.g., "DS4Y", "Peterson", "Ampere"). Very useful for programs like DS4Y that appear in deal names rather than grant_type field.'
         }
       }
     }

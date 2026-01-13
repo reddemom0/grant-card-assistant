@@ -125,7 +125,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           input.grant_program,
           input.status,
           input.company_name,
-          agentType
+          agentType,
+          input.deal_name
         );
         break;
 
