@@ -519,14 +519,14 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'DS4Y';
       }
 
-      // Check if we should search by grant_type or deal name
-      // Programs like DS4Y appear in deal names, not grant_type field
-      const searchByDealName = ['ds4y', 'digital skills for youth'].includes(normalizedProgram);
+      // Check if we should use CONTAINS_TOKEN or IN operator
+      // Programs like DS4Y have multiple variants (DS4Y - Eco Canada, DS4Y - PCPI, etc.)
+      const useContainsToken = ['ds4y', 'digital skills for youth'].includes(normalizedProgram);
 
-      if (searchByDealName) {
-        // Search deal name instead of grant_type
+      if (useContainsToken) {
+        // Use CONTAINS_TOKEN for grant types with multiple variants
         filters.push({
-          propertyName: 'dealname',
+          propertyName: 'grant_type',
           operator: 'CONTAINS_TOKEN',
           value: searchTerm
         });
