@@ -112,12 +112,24 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.getHubSpotContact(input.contact_id);
         break;
 
+      case 'get_contact_by_email':
+        result = await hubspot.getContactByEmail(input.email);
+        break;
+
       case 'search_hubspot_companies':
         result = await hubspot.searchHubSpotCompanies(
           input.query,
           input.min_revenue,
           input.max_revenue
         );
+        break;
+
+      case 'get_company_by_domain':
+        result = await hubspot.getCompanyByDomain(input.domain);
+        break;
+
+      case 'get_company_by_id':
+        result = await hubspot.getCompanyById(input.company_id);
         break;
 
       case 'search_grant_applications':

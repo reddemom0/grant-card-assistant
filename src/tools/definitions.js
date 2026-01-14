@@ -120,6 +120,20 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'get_contact_by_email',
+    description: 'Direct lookup of a HubSpot contact by email address. Much faster than search_hubspot_contacts when you have an exact email. Use this when you need contact details for a specific email address (e.g., from an email engagement, deal association, or user mention). Returns full contact details including associated companies and deals.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          description: 'Contact email address (e.g., "sarah@techco.com")'
+        }
+      },
+      required: ['email']
+    }
+  },
+  {
     name: 'search_hubspot_companies',
     description: 'Search HubSpot for companies/organizations by name, domain, or industry. Useful for finding grant applicant organizations and their details.',
     input_schema: {
@@ -139,6 +153,34 @@ export const HUBSPOT_TOOLS = [
         }
       },
       required: ['query']
+    }
+  },
+  {
+    name: 'get_company_by_domain',
+    description: 'Direct lookup of a HubSpot company by domain name. Much faster than search_hubspot_companies when you have an exact domain. Use this when you know the company\'s website domain (e.g., "techco.com", "microsoft.com"). Returns full company details including associated contacts and deals.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        domain: {
+          type: 'string',
+          description: 'Company domain name (e.g., "techco.com", "example.org"). Do not include "www." or "https://"'
+        }
+      },
+      required: ['domain']
+    }
+  },
+  {
+    name: 'get_company_by_id',
+    description: 'Get complete details for a specific HubSpot company by company ID. Use this when you have a HubSpot company ID from another tool result. Returns full company details including associated contacts and deals.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        company_id: {
+          type: 'string',
+          description: 'HubSpot company ID'
+        }
+      },
+      required: ['company_id']
     }
   },
   {

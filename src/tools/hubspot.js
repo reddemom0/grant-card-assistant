@@ -350,6 +350,204 @@ export async function getHubSpotContact(contactId) {
 }
 
 /**
+ * Get contact by email address (direct lookup)
+ * More efficient than search when you have exact email
+ * @param {string} email - Contact email address
+ * @returns {Object} Contact details
+ */
+export async function getContactByEmail(email) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔍 Direct lookup: contact by email "${email}"`);
+
+    // Use search API with email filter (HubSpot doesn't have a direct email lookup endpoint)
+    const response = await client.post('/crm/v3/objects/contacts/search', {
+      filterGroups: [{
+        filters: [{
+          propertyName: 'email',
+          operator: 'EQ',
+          value: email
+        }]
+      }],
+      properties: [
+        'email', 'firstname', 'lastname', 'phone', 'company',
+        'jobtitle', 'city', 'state', 'country',
+        'lifecyclestage', 'createdate'
+      ],
+      limit: 1
+    });
+
+    if (!response.data.results || response.data.results.length === 0) {
+      console.log(`ℹ️  No contact found for email: ${email}`);
+      return {
+        success: false,
+        error: `No contact found with email: ${email}`,
+        contact: null
+      };
+    }
+
+    const contact = response.data.results[0];
+    console.log(`✓ Found contact: ${contact.id}`);
+
+    // Get associations
+    const contactWithAssociations = await client.get(`/crm/v3/objects/contacts/${contact.id}`, {
+      params: {
+        associations: 'companies,deals'
+      }
+    });
+
+    return {
+      success: true,
+      contact: {
+        id: contact.id,
+        ...contact.properties,
+        associations: contactWithAssociations.data.associations || {}
+      }
+    };
+  } catch (error) {
+    console.error('Get contact by email error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Get company by domain (direct lookup)
+ * More efficient than search when you have exact domain
+ * @param {string} domain - Company domain (e.g., "techco.com")
+ * @returns {Object} Company details
+ */
+export async function getCompanyByDomain(domain) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    // Clean domain (remove www., https://, trailing slashes)
+    const cleanDomain = domain
+      .toLowerCase()
+      .replace(/^(https?:\/\/)?(www\.)?/, '')
+      .replace(/\/$/, '');
+
+    console.log(`🔍 Direct lookup: company by domain "${cleanDomain}"`);
+
+    // Use search API with domain filter
+    const response = await client.post('/crm/v3/objects/companies/search', {
+      filterGroups: [{
+        filters: [{
+          propertyName: 'domain',
+          operator: 'EQ',
+          value: cleanDomain
+        }]
+      }],
+      properties: [
+        'name', 'domain', 'industry', 'city', 'state', 'country',
+        'numberofemployees', 'annualrevenue', 'description', 'phone',
+        'website', 'createdate'
+      ],
+      limit: 1
+    });
+
+    if (!response.data.results || response.data.results.length === 0) {
+      console.log(`ℹ️  No company found for domain: ${cleanDomain}`);
+      return {
+        success: false,
+        error: `No company found with domain: ${cleanDomain}`,
+        company: null
+      };
+    }
+
+    const company = response.data.results[0];
+    console.log(`✓ Found company: ${company.id} (${company.properties.name})`);
+
+    // Get associations
+    const companyWithAssociations = await client.get(`/crm/v3/objects/companies/${company.id}`, {
+      params: {
+        associations: 'contacts,deals'
+      }
+    });
+
+    return {
+      success: true,
+      company: {
+        id: company.id,
+        ...company.properties,
+        associations: companyWithAssociations.data.associations || {}
+      }
+    };
+  } catch (error) {
+    console.error('Get company by domain error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Get company by ID (direct lookup)
+ * @param {string} companyId - HubSpot company ID
+ * @returns {Object} Company details
+ */
+export async function getCompanyById(companyId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔍 Direct lookup: company by ID "${companyId}"`);
+
+    const response = await client.get(`/crm/v3/objects/companies/${companyId}`, {
+      params: {
+        properties: [
+          'name', 'domain', 'industry', 'city', 'state', 'country',
+          'numberofemployees', 'annualrevenue', 'description', 'phone',
+          'website', 'createdate'
+        ].join(','),
+        associations: 'contacts,deals'
+      }
+    });
+
+    console.log(`✓ Found company: ${companyId} (${response.data.properties.name})`);
+
+    return {
+      success: true,
+      company: {
+        id: response.data.id,
+        ...response.data.properties,
+        associations: response.data.associations || {}
+      }
+    };
+  } catch (error) {
+    console.error('Get company by ID error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Search HubSpot companies
  * @param {string} query - Search query (name, domain, industry)
  * @param {number|null} minRevenue - Minimum annual revenue filter
