@@ -481,6 +481,31 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'generate_hubspot_embed_link',
+    description: 'Generate an interactive HubSpot embed URL for viewing records directly in HubSpot\'s interface. These links open live HubSpot views where users can see real-time data, add notes, schedule meetings, and take actions. Much better than static text responses - provides full HubSpot functionality. Use this when users want to "pull up", "show me", or "open" a record.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        object_type: {
+          type: 'string',
+          enum: ['contact', 'company', 'deal', 'ticket', 'email'],
+          description: 'Type of HubSpot object. Maps to HubSpot objectTypeIds: contact=0-1, company=0-2, deal=0-3, ticket=0-5, email=0-19.'
+        },
+        record_id: {
+          type: 'string',
+          description: 'HubSpot record ID (e.g., contact ID, company ID, deal ID)'
+        },
+        view: {
+          type: 'string',
+          enum: ['overview', 'activity', 'timeline', 'associations', 'properties', 'meetings', 'emails', 'tasks', 'notes', 'calls'],
+          description: 'Which view/tab to open. Default: "overview" (main record page). "activity" shows recent activities, "associations" shows related records, "properties" shows all fields, etc.',
+          default: 'overview'
+        }
+      },
+      required: ['object_type', 'record_id']
+    }
+  },
+  {
     name: 'read_hubspot_file',
     description: 'Download and read the actual content of a file from HubSpot. Extracts text from PDF, DOCX, and TXT files so you can analyze the content. Use this when you need to read funding agreements, contracts, invoices, or other documents. After finding a file (via get_contact_files, get_deal_files, or get_email_attachments), use this tool with the file ID to read its contents.',
     input_schema: {

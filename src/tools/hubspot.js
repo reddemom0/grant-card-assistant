@@ -12,6 +12,7 @@ import axiosRetry from 'axios-retry';
 
 const HUBSPOT_API = 'https://api.hubapi.com';
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
+const HUBSPOT_PORTAL_ID = '21088260'; // Granted Consulting's HubSpot portal ID
 
 // ============================================================================
 // AGENT-SPECIFIC FIELD CONFIGURATIONS
@@ -540,6 +541,72 @@ export async function getCompanyById(companyId) {
     };
   } catch (error) {
     console.error('Get company by ID error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Generate HubSpot embed link for interactive record viewing
+ * Creates URL that opens live HubSpot interface for a record
+ * @param {string} objectType - Object type (contact, company, deal, ticket, email)
+ * @param {string} recordId - HubSpot record ID
+ * @param {string} view - View to open (overview, activity, timeline, associations, properties, etc.)
+ * @returns {Object} Embed link result
+ */
+export async function generateHubSpotEmbedLink(objectType, recordId, view = 'overview') {
+  try {
+    // Map object types to HubSpot objectTypeIds
+    const objectTypeIdMap = {
+      'contact': '0-1',
+      'company': '0-2',
+      'deal': '0-3',
+      'ticket': '0-5',
+      'email': '0-19'
+    };
+
+    // Map view names to HubSpot view paths
+    const viewPathMap = {
+      'overview': 'record',
+      'activity': 'record',
+      'timeline': 'record',
+      'associations': 'associations',
+      'properties': 'record',
+      'meetings': 'meetings',
+      'emails': 'emails',
+      'tasks': 'tasks',
+      'notes': 'notes',
+      'calls': 'calls'
+    };
+
+    const objectTypeId = objectTypeIdMap[objectType.toLowerCase()];
+    const viewPath = viewPathMap[view.toLowerCase()] || 'record';
+
+    if (!objectTypeId) {
+      return {
+        success: false,
+        error: `Invalid object type: ${objectType}. Must be one of: contact, company, deal, ticket, email`
+      };
+    }
+
+    // Generate HubSpot embed URL
+    // Format: https://app.hubspot.com/contacts/{portalId}/{objectTypeId}/{recordId}
+    const embedUrl = `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/${objectTypeId}/${recordId}`;
+
+    console.log(`🔗 Generated HubSpot embed link: ${objectType} ${recordId} (view: ${view})`);
+
+    return {
+      success: true,
+      url: embedUrl,
+      objectType,
+      recordId,
+      view,
+      description: `Interactive HubSpot ${objectType} record - opens in HubSpot with full functionality (add notes, schedule meetings, see associations, view properties, etc.)`
+    };
+  } catch (error) {
+    console.error('Generate HubSpot embed link error:', error.message);
     return {
       success: false,
       error: error.message
