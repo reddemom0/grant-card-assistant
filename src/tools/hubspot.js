@@ -721,6 +721,16 @@ export async function searchGrantApplications(filters = {}, agentType = null) {
       console.log(`  ✓ Status filter: "${filters.status}"`);
     }
 
+    // Filter by dealstage if explicitly specified
+    if (filters.dealstage) {
+      hsFilters.push({
+        propertyName: 'dealstage',
+        operator: 'EQ',
+        value: filters.dealstage
+      });
+      console.log(`  ✓ Deal stage filter: "${filters.dealstage}"`);
+    }
+
     // Filter by company name if specified
     if (filters.company_name) {
       hsFilters.push({

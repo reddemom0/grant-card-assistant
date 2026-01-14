@@ -158,6 +158,10 @@ export const HUBSPOT_TOOLS = [
           enum: ['draft', 'in_progress', 'submitted', 'under_review', 'approved', 'rejected', 'won', 'lost', 'open', 'abandoned', 'invoice_cleared', 'invoice_paid', 'invoice_sent', 'suspended', 'retainer_sent', 'retainer_paid'],
           description: 'Filter by application status. Common statuses: "lost" (abandoned deals), "won" (completed/invoiced deals), "open" (active deals), "approved" (approved applications), "invoice_sent"/"invoice_paid"/"invoice_cleared" (invoicing workflow), "retainer_sent"/"retainer_paid" (retainer workflow), "suspended" (temporarily on hold), "abandoned" (formally abandoned).'
         },
+        dealstage: {
+          type: 'string',
+          description: 'Filter by specific deal stage ID (HubSpot pipeline stage). Example stage IDs: "qualifiedtobuy", "presentationscheduled", "decisionmakerboughtin", "contractsent", "closedwon", "closedlost". Use this for precise pipeline stage filtering.'
+        },
         company_name: {
           type: 'string',
           description: 'Filter by applicant company name'
