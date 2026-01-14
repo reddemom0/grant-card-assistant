@@ -29,6 +29,10 @@
       "dest": "/api/admin-feedback.js"
     },
     {
+      "src": "/api/admin-import-grants",
+      "dest": "/api/admin-import-grants.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/server.js"
     },
