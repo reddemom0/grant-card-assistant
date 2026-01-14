@@ -549,6 +549,38 @@ export async function getCompanyById(companyId) {
 }
 
 /**
+ * List all HubSpot owners (users who can own records)
+ * @returns {Object} List of owners with their details
+ */
+export async function listHubSpotOwners() {
+  try {
+    const owners = await fetchHubSpotOwners();
+
+    console.log(`✓ Retrieved ${owners.length} HubSpot owners`);
+
+    return {
+      success: true,
+      count: owners.length,
+      owners: owners.map(owner => ({
+        id: owner.id,
+        firstName: owner.firstName || '',
+        lastName: owner.lastName || '',
+        fullName: `${owner.firstName || ''} ${owner.lastName || ''}`.trim(),
+        email: owner.email || '',
+        userId: owner.userId
+      }))
+    };
+  } catch (error) {
+    console.error('List HubSpot owners error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      owners: []
+    };
+  }
+}
+
+/**
  * Generate HubSpot embed link for interactive record viewing
  * Creates URL that opens live HubSpot interface for a record
  * @param {string} objectType - Object type (contact, company, deal, ticket, email)
@@ -733,6 +765,46 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
 // HELPER FUNCTIONS FOR SEARCH
 // ============================================================================
 
+// Cache for HubSpot owners (refreshed every 1 hour)
+let ownersCache = null;
+let ownersCacheTime = 0;
+const OWNERS_CACHE_TTL = 3600000; // 1 hour
+
+/**
+ * Fetch all HubSpot owners (users who can own records)
+ * Results are cached for 1 hour to avoid repeated API calls
+ * @returns {Array} List of owner objects with id, firstName, lastName, email
+ */
+async function fetchHubSpotOwners() {
+  const now = Date.now();
+
+  // Return cached owners if still valid
+  if (ownersCache && (now - ownersCacheTime) < OWNERS_CACHE_TTL) {
+    console.log(`  📋 Using cached HubSpot owners (${ownersCache.length} owners)`);
+    return ownersCache;
+  }
+
+  try {
+    const client = createHubSpotClient();
+    console.log(`  🔄 Fetching HubSpot owners from API...`);
+
+    const response = await client.get('/crm/v3/owners', {
+      params: {
+        limit: 100
+      }
+    });
+
+    ownersCache = response.data.results || [];
+    ownersCacheTime = now;
+
+    console.log(`  ✓ Fetched ${ownersCache.length} HubSpot owners`);
+    return ownersCache;
+  } catch (error) {
+    console.error('Error fetching HubSpot owners:', error.response?.data || error.message);
+    return [];
+  }
+}
+
 /**
  * Convert YYYY-MM-DD date string to Unix timestamp (milliseconds)
  * HubSpot expects timestamps in milliseconds
@@ -760,17 +832,70 @@ function convertDateToTimestamp(dateStr) {
 }
 
 /**
- * Resolve team member name to HubSpot user ID
- * This is a placeholder - in production, you would query HubSpot Owners API
- * For now, it just returns the input (can be name or ID)
- * @param {string} nameOrId - Team member name or HubSpot user ID
- * @returns {string} HubSpot user ID
+ * Resolve team member name/email to HubSpot user ID
+ * Queries HubSpot Owners API and matches by name or email
+ * @param {string} nameOrId - Team member name, email, or HubSpot user ID
+ * @returns {Promise<string|null>} HubSpot user ID or null if not found
  */
-function resolveTeamMemberToId(nameOrId) {
-  // TODO: Implement HubSpot Owners API lookup
-  // For now, just pass through - HubSpot will handle both IDs and names
-  // via CONTAINS_TOKEN operator
-  return nameOrId;
+async function resolveTeamMemberToId(nameOrId) {
+  if (!nameOrId) return null;
+
+  // If already a numeric ID, return it
+  if (/^\d+$/.test(nameOrId.toString())) {
+    return nameOrId.toString();
+  }
+
+  // Fetch owners from HubSpot (uses cache if available)
+  const owners = await fetchHubSpotOwners();
+
+  if (owners.length === 0) {
+    console.warn(`⚠️  No HubSpot owners found, returning input as-is: ${nameOrId}`);
+    return nameOrId;
+  }
+
+  const searchTerm = nameOrId.toLowerCase().trim();
+
+  // Try to match by:
+  // 1. Email (exact match)
+  // 2. Full name (case-insensitive contains)
+  // 3. First name (case-insensitive contains)
+  // 4. Last name (case-insensitive contains)
+
+  const match = owners.find(owner => {
+    const email = (owner.email || '').toLowerCase();
+    const firstName = (owner.firstName || '').toLowerCase();
+    const lastName = (owner.lastName || '').toLowerCase();
+    const fullName = `${firstName} ${lastName}`.trim();
+
+    // Exact email match
+    if (email === searchTerm) return true;
+
+    // Full name contains search term
+    if (fullName.includes(searchTerm)) return true;
+
+    // First name contains search term
+    if (firstName.includes(searchTerm)) return true;
+
+    // Last name contains search term
+    if (lastName.includes(searchTerm)) return true;
+
+    return false;
+  });
+
+  if (match) {
+    console.log(`  ✓ Resolved "${nameOrId}" to HubSpot owner: ${match.firstName} ${match.lastName} (ID: ${match.id})`);
+    return match.id;
+  }
+
+  console.warn(`⚠️  Could not resolve "${nameOrId}" to HubSpot owner ID. Available owners:`);
+  owners.slice(0, 10).forEach(owner => {
+    console.warn(`     - ${owner.firstName} ${owner.lastName} (${owner.email}) - ID: ${owner.id}`);
+  });
+  if (owners.length > 10) {
+    console.warn(`     ... and ${owners.length - 10} more`);
+  }
+
+  return null; // Return null instead of the input to prevent false matches
 }
 
 /**
@@ -1011,13 +1136,24 @@ export async function searchGrantApplications(filters = {}, agentType = null) {
     // ============================================================================
 
     if (filters.owner_id) {
-      const ownerId = resolveTeamMemberToId(filters.owner_id);
-      hsFilters.push({
-        propertyName: 'hubspot_owner_id',
-        operator: 'EQ',
-        value: ownerId
-      });
-      console.log(`  ✓ Owner filter: "${filters.owner_id}"`);
+      const ownerId = await resolveTeamMemberToId(filters.owner_id);
+      if (ownerId) {
+        hsFilters.push({
+          propertyName: 'hubspot_owner_id',
+          operator: 'EQ',
+          value: ownerId
+        });
+        console.log(`  ✓ Owner filter: "${filters.owner_id}" → HubSpot ID: ${ownerId}`);
+      } else {
+        console.warn(`  ⚠️  Could not resolve owner "${filters.owner_id}", skipping owner filter`);
+        // Return early with helpful error message
+        return {
+          success: false,
+          error: `Could not find HubSpot owner matching "${filters.owner_id}". Please check the name/email or use the HubSpot user ID directly.`,
+          applications: [],
+          count: 0
+        };
+      }
     }
 
     if (filters.writer) {

@@ -481,6 +481,14 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'list_hubspot_owners',
+    description: 'Get a list of all HubSpot users who can own deals (contacts, companies, etc.). Use this when you need to find the correct owner name/ID for filtering deals, or when an owner name search fails. Returns each owner\'s ID, full name, and email address. Very helpful when a user asks about deals for a team member but you\'re not sure of the exact name spelling.',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
     name: 'generate_hubspot_embed_link',
     description: 'Generate an interactive HubSpot embed URL for viewing records directly in HubSpot\'s interface. These links open live HubSpot views where users can see real-time data, add notes, schedule meetings, and take actions. Much better than static text responses - provides full HubSpot functionality. Use this when users want to "pull up", "show me", or "open" a record.',
     input_schema: {

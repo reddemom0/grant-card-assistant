@@ -132,6 +132,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.getCompanyById(input.company_id);
         break;
 
+      case 'list_hubspot_owners':
+        result = await hubspot.listHubSpotOwners();
+        break;
+
       case 'generate_hubspot_embed_link':
         result = await hubspot.generateHubSpotEmbedLink(
           input.object_type,
