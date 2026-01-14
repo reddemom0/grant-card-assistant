@@ -476,35 +476,48 @@ async function extractGrantList(page, limit = 10) {
 
   for (let i = 0; i < itemsToExtract; i++) {
     const item = grantItems.nth(i);
+    console.log(`   📝 Extracting grant ${i + 1}/${itemsToExtract}...`);
 
     try {
-      // Extract grant name and ID
+      // Extract grant name and ID with timeout
       const nameElement = item.locator('a, h2, h3').first();
-      const grantName = await nameElement.textContent();
+      const grantName = await nameElement.textContent({ timeout: 3000 }).catch(() => 'Unknown Grant');
 
       // Extract grant ID from text or href
-      const idText = await item.locator('text=/ID: \\d+/').textContent().catch(() => '');
-      const grantId = idText.match(/\d+/)?.[0] || '';
+      const idText = await item.locator('text=/ID: \\d+/').textContent({ timeout: 2000 }).catch(() => '');
+      const grantId = idText.match(/\d+/)?.[0] || String(i + 1);
 
-      // Extract grant type
-      const grantType = await item.locator('text=/MARKET EXPANSION|HIRING|TRAINING|CAPITAL COSTS|INVESTMENT|R&D/i').textContent().catch(() => 'Unknown');
+      // Extract grant type with timeout
+      const grantType = await item.locator('text=/MARKET EXPANSION|HIRING|TRAINING|CAPITAL COSTS|INVESTMENT|R&D/i')
+        .textContent({ timeout: 2000 })
+        .catch(() => 'Unknown');
 
-      // Extract regions
-      const regionsText = await item.locator('text=/ALL OF CANADA|BRITISH COLUMBIA|ONTARIO/i').textContent().catch(() => '');
+      // Extract regions with timeout
+      const regionsText = await item.locator('text=/ALL OF CANADA|BRITISH COLUMBIA|ONTARIO/i')
+        .textContent({ timeout: 2000 })
+        .catch(() => '');
 
-      // Extract max spend
-      const maxSpendText = await item.locator('text=/\\$[\\d,]+/').textContent().catch(() => '');
+      // Extract max spend with timeout
+      const maxSpendText = await item.locator('text=/\\$[\\d,]+/')
+        .textContent({ timeout: 2000 })
+        .catch(() => '');
       const maxSpend = maxSpendText.replace(/[^\d]/g, '');
 
-      // Extract program contribution %
-      const contributionText = await item.locator('text=/\\d+%/').textContent().catch(() => '');
+      // Extract program contribution % with timeout
+      const contributionText = await item.locator('text=/\\d+%/')
+        .textContent({ timeout: 2000 })
+        .catch(() => '');
       const contributionPercent = contributionText.replace('%', '');
 
-      // Extract difficulty (count of bars)
-      const difficultyBars = await item.locator('[class*="difficulty"] div, [class*="bar"]').count();
+      // Extract difficulty (count of bars) with timeout
+      const difficultyBars = await item.locator('[class*="difficulty"] div, [class*="bar"]')
+        .count()
+        .catch(() => 0);
 
-      // Extract deadline status if visible
-      const deadlineText = await item.locator('text=/Open until|CLOSED|deadline/i').textContent().catch(() => '');
+      // Extract deadline status if visible with timeout
+      const deadlineText = await item.locator('text=/Open until|CLOSED|deadline/i')
+        .textContent({ timeout: 2000 })
+        .catch(() => '');
 
       grants.push({
         grant_id: grantId,
@@ -518,8 +531,22 @@ async function extractGrantList(page, limit = 10) {
         url: `${GETGRANTED_URL}/grants/${grantId}`
       });
 
+      console.log(`   ✓ Extracted: ${grantName.trim().substring(0, 50)}...`);
+
     } catch (error) {
       console.warn(`   ⚠️  Failed to extract grant at index ${i}: ${error.message}`);
+      // Add a minimal grant entry so we don't lose track
+      grants.push({
+        grant_id: String(i + 1),
+        grant_name: 'Extraction Failed',
+        grant_type: 'Unknown',
+        regions: '',
+        max_spend: null,
+        contribution_percentage: null,
+        difficulty: 0,
+        deadline_status: 'Unknown',
+        url: ''
+      });
     }
   }
 
