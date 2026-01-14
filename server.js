@@ -80,6 +80,10 @@ app.use((req, res, next) => {
 import { runMigrationEndpoint } from './run-migration-endpoint.js';
 app.get('/run-migration', runMigrationEndpoint);
 
+// Import grants endpoint (for GetGranted database sync)
+import { importGrantsEndpoint } from './import-grants-endpoint.js';
+app.get('/import-grants', importGrantsEndpoint);
+
 // Version endpoint to verify deployed code
 app.get('/version', (req, res) => {
   res.json({
