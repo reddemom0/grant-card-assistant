@@ -84,6 +84,10 @@ app.get('/run-migration', runMigrationEndpoint);
 import { importGrantsEndpoint } from './import-grants-endpoint.js';
 app.get('/import-grants', importGrantsEndpoint);
 
+// Search grants endpoint (for Oracle to query GetGranted database)
+import { searchGrantsEndpoint } from './search-grants-endpoint.js';
+app.get('/search-grants', searchGrantsEndpoint);
+
 // Version endpoint to verify deployed code
 app.get('/version', (req, res) => {
   res.json({
