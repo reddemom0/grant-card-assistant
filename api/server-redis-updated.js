@@ -448,7 +448,19 @@ function buildMessageContentWithFiles(message, conversationMeta) {
 
 // Build system prompt with file context
 function buildSystemPromptWithFileContext(baseSystemPrompt, knowledgeContext, conversationMeta, agentType) {
+  // Get current date in readable format
+  const currentDate = new Date();
+  const dateString = currentDate.toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
   return `${baseSystemPrompt}
+
+CURRENT DATE: ${dateString}
+IMPORTANT: Today's date is ${dateString}. Use this for all date calculations and filtering. For example, "this year" means ${currentDate.getFullYear()}.
 
 KNOWLEDGE BASE CONTEXT:
 ${knowledgeContext}
@@ -458,7 +470,7 @@ ${conversationMeta.uploadedFiles.length > 0 ? `
 Previously uploaded documents (${conversationMeta.uploadedFiles.length} files):
 ${conversationMeta.uploadedFiles.map((f, i) => `${i + 1}. ${f.filename} (file_id: ${f.file_id})`).join('\n')}
 
-CRITICAL: These documents are available as document blocks in the user's message. Reference them directly when answering questions. Do NOT ask for documents to be uploaded again.
+CRITICAL: These documents are available as document blocks in the user's message. Reference them directly when answering questions. DO NOT ask for documents to be uploaded again.
 ` : 'No documents uploaded yet.'}
 
 Always reference uploaded documents when relevant to the user's questions.`;

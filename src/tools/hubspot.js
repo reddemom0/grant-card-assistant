@@ -1417,42 +1417,76 @@ export async function searchGrantApplications(filters = {}, agentType = null) {
     const properties = filters.properties || getFieldsForAgent(agentType);
     console.log(`  Agent type: ${agentType || 'default'}, using ${properties.length} HubSpot properties`);
 
-    // Get limit (default 50, max 100)
-    const limit = Math.min(filters.limit || 50, 100);
-
-    const searchBody = {
-      filterGroups: hsFilters.length > 0 ? [{ filters: hsFilters }] : [],
-      properties,
-      limit,
-      sorts: [
-        {
-          propertyName: 'createdate',
-          direction: 'DESCENDING'
-        }
-      ]
-    };
+    // Get requested limit (user can request any amount, we'll paginate)
+    const requestedLimit = filters.limit || 50;
+    const pageSize = 100; // HubSpot max per page
+    const maxResults = 500; // Safety limit to prevent infinite loops
 
     console.log(`\n📤 HubSpot Search API Request:`);
-    console.log(`  Endpoint: POST /crm/v3/objects/deals/search`);
+    console.log(`  Requested limit: ${requestedLimit}`);
+    console.log(`  Will paginate if needed (max ${maxResults} total)`);
     console.log(`  Filters: ${hsFilters.length} filter(s)`);
-    console.log(`  Limit: ${limit}`);
     console.log(`  Properties: ${properties.length}`);
-    console.log(`  Filter details:`, JSON.stringify(searchBody.filterGroups, null, 2));
 
-    const response = await client.post('/crm/v3/objects/deals/search', searchBody);
+    // Fetch results with pagination
+    let allResults = [];
+    let after = null;
+    let pageNum = 1;
 
-    console.log(`\n✅ HubSpot search completed: found ${response.data.results.length} result(s)`);
+    do {
+      const searchBody = {
+        filterGroups: hsFilters.length > 0 ? [{ filters: hsFilters }] : [],
+        properties,
+        limit: pageSize,
+        sorts: [
+          {
+            propertyName: 'createdate',
+            direction: 'DESCENDING'
+          }
+        ]
+      };
+
+      // Add pagination token if not first page
+      if (after) {
+        searchBody.after = after;
+      }
+
+      console.log(`  📄 Fetching page ${pageNum} (after: ${after || 'start'})...`);
+
+      const response = await client.post('/crm/v3/objects/deals/search', searchBody);
+      const results = response.data.results || [];
+
+      allResults = allResults.concat(results);
+      console.log(`  ✓ Page ${pageNum}: ${results.length} results (total so far: ${allResults.length})`);
+
+      // Check if there are more pages
+      after = response.data.paging?.next?.after;
+      pageNum++;
+
+      // Stop if we've hit the requested limit, max results, or no more pages
+      if (allResults.length >= requestedLimit || allResults.length >= maxResults || !after) {
+        break;
+      }
+
+    } while (after);
+
+    // Trim to requested limit
+    const finalResults = allResults.slice(0, requestedLimit);
+
+    console.log(`\n✅ HubSpot search completed: found ${finalResults.length} result(s) (${allResults.length > requestedLimit ? `trimmed from ${allResults.length}` : 'all'})`);
 
     // Log some sample grant_type values if we got results
-    if (response.data.results.length > 0 && filters.grant_program) {
-      const sampleTypes = response.data.results.slice(0, 3).map(d => d.properties.grant_type);
+    if (finalResults.length > 0 && filters.grant_program) {
+      const sampleTypes = finalResults.slice(0, 3).map(d => d.properties.grant_type);
       console.log(`  Sample grant_type values: ${sampleTypes.join(', ')}`);
     }
 
     return {
       success: true,
-      count: response.data.results.length,
-      applications: response.data.results.map(deal => {
+      count: finalResults.length,
+      total_available: allResults.length,
+      has_more: allResults.length > requestedLimit,
+      applications: finalResults.map(deal => {
         const app = {
           // Core info (always present)
           id: deal.id,

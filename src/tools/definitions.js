@@ -302,7 +302,23 @@ export const HUBSPOT_TOOLS = [
         // ============ PIPELINE FILTER ============
         pipeline: {
           type: 'string',
-          description: 'Filter by specific pipeline (e.g., "Hiring Grants Pipeline", "Training Grants Pipeline", "Market Expansion Grants Pipeline"). Use this to segment deals by grant category.'
+          enum: [
+            'Hiring Grants Pipeline',
+            'Training Grants Pipeline',
+            'Market Expansion Pipeline',
+            'Granted Starter Hiring Grants Pipeline',
+            'Granted Starter Training Grants Pipeline',
+            'Misc. Grant Pipeline',
+            'Pro Onboarding Pipeline',
+            'Completed Deals',
+            'Lost/Abandoned/Suspended',
+            'Review Required',
+            'Grant Research',
+            'Grant Calculator - Post Submission',
+            'Whitelabel Pipeline',
+            'Mock Applications'
+          ],
+          description: 'Filter by HubSpot pipeline. Main grant pipelines: "Hiring Grants Pipeline" (hiring/wage subsidy programs like CSJ, DS4Y), "Training Grants Pipeline" (training programs like ETG, WIL Digital, Magnet, CAPG), "Market Expansion Pipeline" (export/market expansion programs like CanExport, BCAFE), "Granted Starter Hiring Grants Pipeline" and "Granted Starter Training Grants Pipeline" (Granted Starter subscription deals). Other pipelines include Pro Onboarding, Completed Deals, Lost/Abandoned/Suspended, Review Required, Grant Research, and administrative pipelines.'
         },
 
         // ============ ADVANCED GENERIC FILTERS ============
