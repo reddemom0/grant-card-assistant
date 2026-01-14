@@ -87,24 +87,40 @@ export async function searchGetGranted(input) {
 
       // Navigate to grants page
       console.log(`   📍 Navigating to grants page...`);
-      await page.goto(`${GETGRANTED_URL}/grants`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${GETGRANTED_URL}/grants`, { waitUntil: 'networkidle', timeout: 30000 });
 
-      // Wait for grants page to load
-      await page.waitForSelector('text=/Showing \\d+ of \\d+ grants|Grant Genie/', { timeout: 10000 });
+      // Wait for grants page to load - look for multiple possible indicators
+      console.log(`   ⏳ Waiting for grants page to load...`);
+      try {
+        await page.waitForSelector('text=/Showing \\d+ of \\d+ grants|Grant Genie|Active Grants/', { timeout: 15000 });
+        console.log(`   ✓ Grants page loaded`);
+      } catch (error) {
+        console.warn(`   ⚠️  Could not find expected page elements, continuing anyway...`);
+        // Take screenshot for debugging
+        await page.screenshot({ path: '/tmp/getgranted-page-load.png', fullPage: true });
+      }
 
-      // Apply filters
+      // Apply filters (if possible)
       console.log(`   🎯 Applying filters...`);
-      await applyFilters(page, {
-        purposes,
-        regions,
-        industries,
-        business_type,
-        owner_demographics,
-        company_size_min,
-        company_size_max,
-        active_only,
-        open_intakes_only
-      });
+      try {
+        await applyFilters(page, {
+          purposes,
+          regions,
+          industries,
+          business_type,
+          owner_demographics,
+          company_size_min,
+          company_size_max,
+          active_only,
+          open_intakes_only
+        });
+        console.log(`   ✓ Filters applied successfully`);
+      } catch (filterError) {
+        console.warn(`   ⚠️  Could not apply all filters: ${filterError.message}`);
+        console.warn(`   ℹ️  Continuing with default/partial filtering...`);
+        // Take screenshot for debugging
+        await page.screenshot({ path: '/tmp/getgranted-filter-error.png', fullPage: true });
+      }
 
       // Wait for results to update
       await page.waitForTimeout(2000);
@@ -378,11 +394,23 @@ async function applyFilters(page, filters) {
     await maxInput.fill(String(company_size_max));
   }
 
-  // Click Filter button
-  await page.click('button:has-text("Filter")');
+  // Click Filter button (if it exists - some GetGranted UI versions auto-update)
+  try {
+    const filterButton = page.locator('button:has-text("Filter")');
+    const buttonExists = await filterButton.count() > 0;
+
+    if (buttonExists) {
+      console.log(`   ✓ Found Filter button, clicking...`);
+      await filterButton.click({ timeout: 5000 });
+    } else {
+      console.log(`   ℹ️  No Filter button found - filters may apply automatically`);
+    }
+  } catch (error) {
+    console.log(`   ℹ️  Could not click Filter button (may not be needed): ${error.message}`);
+  }
 
   // Wait for results to update
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(3000);
 }
 
 /**
