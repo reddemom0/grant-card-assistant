@@ -59,12 +59,18 @@ export async function searchGetGranted(input) {
       limit
     });
 
-    // Check cache first
+    // Check cache first (unless bypassed)
+    const bypassCache = input.bypass_cache || false;
     const cacheKey = `getgranted:search:${JSON.stringify(input)}`;
-    const cached = await redis.get(cacheKey);
-    if (cached) {
-      console.log(`   ✅ Cache hit - returning cached results`);
-      return JSON.parse(cached);
+
+    if (!bypassCache) {
+      const cached = await redis.get(cacheKey);
+      if (cached) {
+        console.log(`   ✅ Cache hit - returning cached results`);
+        return JSON.parse(cached);
+      }
+    } else {
+      console.log(`   🔄 Cache bypassed - forcing fresh scrape`);
     }
 
     // Launch browser in headless mode

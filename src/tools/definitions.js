@@ -835,6 +835,10 @@ This tool searches the internal GetGranted database (188+ Canadian grants) and r
         fetch_full_details: {
           type: 'boolean',
           description: 'Fetch full grant card details including eligibility criteria and best practices (slower, default false).'
+        },
+        bypass_cache: {
+          type: 'boolean',
+          description: 'Force fresh scraping, bypassing Redis cache. Use this if results seem stale or incorrect (default false).'
         }
       },
       required: []
