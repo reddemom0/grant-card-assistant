@@ -127,6 +127,11 @@ export async function searchGetGranted(input) {
 
       // Extract grant list
       console.log(`   📋 Extracting grant results...`);
+
+      // Take screenshot for debugging
+      await page.screenshot({ path: '/tmp/getgranted-results.png', fullPage: true });
+      console.log(`   📸 Screenshot saved to /tmp/getgranted-results.png`);
+
       const grants = await extractGrantList(page, limit);
 
       console.log(`   ✅ Found ${grants.length} grants`);
@@ -419,11 +424,57 @@ async function applyFilters(page, filters) {
 async function extractGrantList(page, limit = 10) {
   const grants = [];
 
-  // Find all grant items (limit to requested amount)
-  const grantItems = page.locator('.grant-card, [data-testid="grant-item"]').first(limit);
-  const count = await grantItems.count();
+  // Scroll to bottom to trigger lazy loading of grant cards
+  console.log(`   📜 Scrolling to load all grants...`);
+  for (let i = 0; i < 5; i++) {
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.waitForTimeout(1500);
+  }
+  await page.evaluate(() => window.scrollTo(0, 0)); // Scroll back to top
+  await page.waitForTimeout(1000);
 
-  for (let i = 0; i < Math.min(count, limit); i++) {
+  // Try multiple selector strategies to find grant cards
+  console.log(`   🔍 Looking for grant cards with different selectors...`);
+
+  // Strategy 1: Look for elements with grant-related classes
+  let grantItems = page.locator('.grant-card');
+  let count = await grantItems.count();
+  console.log(`   Strategy 1 (.grant-card): ${count} items`);
+
+  // Strategy 2: Look for data-testid
+  if (count === 0) {
+    grantItems = page.locator('[data-testid="grant-item"]');
+    count = await grantItems.count();
+    console.log(`   Strategy 2 ([data-testid="grant-item"]): ${count} items`);
+  }
+
+  // Strategy 3: Look for any element with "Grant" in class name
+  if (count === 0) {
+    grantItems = page.locator('[class*="rant"], [class*="Grant"]');
+    count = await grantItems.count();
+    console.log(`   Strategy 3 ([class*="Grant"]): ${count} items`);
+  }
+
+  // Strategy 4: Look for divs with links to /grants/
+  if (count === 0) {
+    grantItems = page.locator('a[href*="/grants/"]').locator('..');
+    count = await grantItems.count();
+    console.log(`   Strategy 4 (links to /grants/): ${count} items`);
+  }
+
+  // Strategy 5: Look for card-like structures with grant info
+  if (count === 0) {
+    grantItems = page.locator('div').filter({ hasText: /ID:\s*\d+/ });
+    count = await grantItems.count();
+    console.log(`   Strategy 5 (divs with ID pattern): ${count} items`);
+  }
+
+  console.log(`   ✓ Found ${count} grant card(s) on page using active strategy`);
+
+  // Limit to requested amount
+  const itemsToExtract = Math.min(count, limit);
+
+  for (let i = 0; i < itemsToExtract; i++) {
     const item = grantItems.nth(i);
 
     try {
