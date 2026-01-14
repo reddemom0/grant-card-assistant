@@ -16,6 +16,12 @@ export async function importGrantsEndpoint(req, res) {
     const { secret } = req.query;
 
     // Security check - use JWT_SECRET
+    console.log('🔐 Auth check:', {
+      provided: secret?.substring(0, 10) + '...',
+      expected: process.env.JWT_SECRET?.substring(0, 10) + '...',
+      match: secret === process.env.JWT_SECRET
+    });
+
     if (secret !== process.env.JWT_SECRET) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
