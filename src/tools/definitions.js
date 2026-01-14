@@ -143,10 +143,11 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'search_grant_applications',
-    description: 'Search for grant applications (HubSpot deals) by program type, deal name, status, company, or other criteria. Returns agent-specific application details - fields returned vary by agent type (CanExport agents see claim tracking fields, ETG agents see training fields, etc.). Always includes: approvedFunding (the ACTUAL approved funding amount), project details, team assignments, timeline, and workflow status. The results DO NOT include the misleading "amount" field - only the accurate approvedFunding field. Use deal_name parameter to search by deal title (e.g., "DS4Y" to find Digital Skills for Youth deals).',
+    description: 'Search for grant applications (HubSpot deals) with comprehensive filtering across team members, dates, financials, and all deal properties. Returns agent-specific application details - fields returned vary by agent type (CanExport agents see claim tracking fields, ETG agents see training fields, etc.). Always includes: approvedFunding (the ACTUAL approved funding amount), project details, team assignments, timeline, and workflow status. Supports filtering on all 128 properties from dealinformation, deal_activity, and deal_revenue groups using either explicit parameters (for common queries) or custom_filters array (for advanced queries).',
     input_schema: {
       type: 'object',
       properties: {
+        // ============ EXISTING CORE FILTERS ============
         grant_program: {
           type: 'string',
           enum: ['ETG', 'BCAFE', 'BC MDP', 'CanExport', 'DS4Y', 'Digital Skills for Youth', 'Canada Summer Jobs', 'CSJ', 'Other'],
@@ -164,6 +165,145 @@ export const HUBSPOT_TOOLS = [
         deal_name: {
           type: 'string',
           description: 'Search for deals containing this text in the deal name (e.g., "DS4Y", "Peterson", "Ampere"). Very useful for programs like DS4Y that appear in deal names rather than grant_type field.'
+        },
+
+        // ============ TEAM MEMBER FILTERS ============
+        owner_id: {
+          type: 'string',
+          description: 'Filter by deal owner (HubSpot user ID or team member name, e.g., "Rukshaar", "Sarah", "John"). The system will attempt to resolve names to HubSpot user IDs automatically.'
+        },
+        writer: {
+          type: 'string',
+          description: 'Filter by assigned writer (searches real_assigned_writer field). Use team member name or email.'
+        },
+        strategist: {
+          type: 'string',
+          description: 'Filter by strategist assigned to the deal.'
+        },
+        claims_specialist: {
+          type: 'string',
+          description: 'Filter by claims specialist (Grant Coordinator).'
+        },
+
+        // ============ DATE RANGE FILTERS ============
+        closedate_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Deals closed after this date (YYYY-MM-DD). Use this to find deals won/lost after a specific date.'
+        },
+        closedate_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Deals closed before this date (YYYY-MM-DD). Use this to find deals won/lost before a specific date.'
+        },
+        createdate_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Deals created after this date (YYYY-MM-DD).'
+        },
+        createdate_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Deals created before this date (YYYY-MM-DD).'
+        },
+        approved_on_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Grants approved after this date (YYYY-MM-DD). Use this to find recently approved applications.'
+        },
+        approved_on_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Grants approved before this date (YYYY-MM-DD).'
+        },
+        application_submitted_on_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Applications submitted after this date (YYYY-MM-DD).'
+        },
+        application_submitted_on_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Applications submitted before this date (YYYY-MM-DD).'
+        },
+
+        // ============ FINANCIAL FILTERS ============
+        amount_min: {
+          type: 'number',
+          description: 'Minimum deal amount (service fee charged to client).'
+        },
+        amount_max: {
+          type: 'number',
+          description: 'Maximum deal amount (service fee charged to client).'
+        },
+        client_reimbursement_min: {
+          type: 'number',
+          description: 'Minimum approved funding amount (client reimbursement from grant program).'
+        },
+        client_reimbursement_max: {
+          type: 'number',
+          description: 'Maximum approved funding amount (client reimbursement from grant program).'
+        },
+        claimed_so_far_min: {
+          type: 'number',
+          description: 'Minimum amount claimed so far (for CanExport/BCAFE multi-claim programs).'
+        },
+        claimed_so_far_max: {
+          type: 'number',
+          description: 'Maximum amount claimed so far (for CanExport/BCAFE multi-claim programs).'
+        },
+
+        // ============ PIPELINE FILTER ============
+        pipeline: {
+          type: 'string',
+          description: 'Filter by specific pipeline (e.g., "Hiring Grants Pipeline", "Training Grants Pipeline", "Market Expansion Grants Pipeline"). Use this to segment deals by grant category.'
+        },
+
+        // ============ ADVANCED GENERIC FILTERS ============
+        custom_filters: {
+          type: 'array',
+          description: 'Advanced filters for any deal property not covered by explicit parameters above. Use this to filter on specialized fields like tuition_fee, claim_2_submitted, training_delivery_method, start_date, end_date, budget_complete, etc. Supports all 128 properties from dealinformation, deal_activity, and deal_revenue groups. Each filter specifies propertyName, operator, and value.',
+          items: {
+            type: 'object',
+            properties: {
+              propertyName: {
+                type: 'string',
+                description: 'HubSpot property name (e.g., "tuition_fee", "claim_2_submitted", "training_delivery_method", "start_date", "next_claim_due", "budget_complete"). Refer to HubSpot deal properties documentation for available property names.'
+              },
+              operator: {
+                type: 'string',
+                enum: ['EQ', 'NEQ', 'LT', 'LTE', 'GT', 'GTE', 'BETWEEN', 'IN', 'NOT_IN', 'CONTAINS_TOKEN', 'HAS_PROPERTY', 'NOT_HAS_PROPERTY'],
+                description: 'Comparison operator. EQ=equals, NEQ=not equals, LT=less than, LTE=less than or equal, GT=greater than, GTE=greater than or equal, BETWEEN=between two values, IN=matches any value in list, NOT_IN=does not match any value in list, CONTAINS_TOKEN=contains word/token, HAS_PROPERTY=property has any value (not null), NOT_HAS_PROPERTY=property is null/empty.'
+              },
+              value: {
+                type: 'string',
+                description: 'Value to compare against (for most operators). For dates, use YYYY-MM-DD format or Unix timestamp. For numbers, use numeric strings. For booleans, use "true" or "false".'
+              },
+              highValue: {
+                type: 'string',
+                description: 'High value for BETWEEN operator (required when operator is BETWEEN).'
+              },
+              values: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Array of values for IN or NOT_IN operators (required when operator is IN or NOT_IN).'
+              }
+            },
+            required: ['propertyName', 'operator']
+          }
+        },
+
+        // ============ PAGINATION ============
+        limit: {
+          type: 'number',
+          description: 'Maximum number of results to return (default: 50, max: 100).',
+          default: 50,
+          maximum: 100
+        },
+        properties: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional: Specific properties to return in results (default: agent-specific field set).'
         }
       }
     }

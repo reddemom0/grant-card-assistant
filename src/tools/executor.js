@@ -121,13 +121,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       case 'search_grant_applications':
-        result = await hubspot.searchGrantApplications(
-          input.grant_program,
-          input.status,
-          input.company_name,
-          agentType,
-          input.deal_name
-        );
+        // Pass all input parameters as filters object (enhanced search with comprehensive filtering)
+        result = await hubspot.searchGrantApplications(input, agentType);
         break;
 
       case 'get_grant_application':

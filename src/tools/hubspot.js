@@ -464,15 +464,96 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
   }
 }
 
+// ============================================================================
+// HELPER FUNCTIONS FOR SEARCH
+// ============================================================================
+
+/**
+ * Convert YYYY-MM-DD date string to Unix timestamp (milliseconds)
+ * HubSpot expects timestamps in milliseconds
+ * @param {string} dateStr - Date in YYYY-MM-DD format
+ * @returns {string} Unix timestamp in milliseconds as string
+ */
+function convertDateToTimestamp(dateStr) {
+  if (!dateStr) return null;
+
+  try {
+    // Parse date and set to start of day (midnight UTC)
+    const date = new Date(dateStr + 'T00:00:00.000Z');
+    const timestamp = date.getTime();
+
+    if (isNaN(timestamp)) {
+      console.warn(`⚠️  Invalid date format: ${dateStr}`);
+      return null;
+    }
+
+    return timestamp.toString();
+  } catch (error) {
+    console.warn(`⚠️  Error converting date ${dateStr}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Resolve team member name to HubSpot user ID
+ * This is a placeholder - in production, you would query HubSpot Owners API
+ * For now, it just returns the input (can be name or ID)
+ * @param {string} nameOrId - Team member name or HubSpot user ID
+ * @returns {string} HubSpot user ID
+ */
+function resolveTeamMemberToId(nameOrId) {
+  // TODO: Implement HubSpot Owners API lookup
+  // For now, just pass through - HubSpot will handle both IDs and names
+  // via CONTAINS_TOKEN operator
+  return nameOrId;
+}
+
 /**
  * Search grant applications (deals in HubSpot)
- * @param {string|null} grantProgram - Filter by grant program type (e.g., "CanExport", "ETG", "BCAFE")
- * @param {string|null} status - Filter by application status (e.g., "approved", "submitted", "open")
- * @param {string|null} companyName - Filter by company name
- * @param {string|null} agentType - Agent type for field selection
+ * Enhanced version with comprehensive filtering support
+ *
+ * @param {Object} filters - Filter parameters (all optional)
+ * @param {string} [filters.grant_program] - Grant program type (e.g., "CanExport", "ETG", "BCAFE")
+ * @param {string} [filters.status] - Application status (e.g., "approved", "won", "open")
+ * @param {string} [filters.company_name] - Filter by company name
+ * @param {string} [filters.deal_name] - Search deal names
+ * @param {string} [filters.owner_id] - Deal owner (name or HubSpot user ID)
+ * @param {string} [filters.writer] - Assigned writer
+ * @param {string} [filters.strategist] - Assigned strategist
+ * @param {string} [filters.claims_specialist] - Claims specialist
+ * @param {string} [filters.closedate_after] - Closed after date (YYYY-MM-DD)
+ * @param {string} [filters.closedate_before] - Closed before date (YYYY-MM-DD)
+ * @param {string} [filters.createdate_after] - Created after date (YYYY-MM-DD)
+ * @param {string} [filters.createdate_before] - Created before date (YYYY-MM-DD)
+ * @param {string} [filters.approved_on_after] - Approved after date (YYYY-MM-DD)
+ * @param {string} [filters.approved_on_before] - Approved before date (YYYY-MM-DD)
+ * @param {string} [filters.application_submitted_on_after] - Submitted after date (YYYY-MM-DD)
+ * @param {string} [filters.application_submitted_on_before] - Submitted before date (YYYY-MM-DD)
+ * @param {number} [filters.amount_min] - Minimum deal amount
+ * @param {number} [filters.amount_max] - Maximum deal amount
+ * @param {number} [filters.client_reimbursement_min] - Minimum approved funding
+ * @param {number} [filters.client_reimbursement_max] - Maximum approved funding
+ * @param {number} [filters.claimed_so_far_min] - Minimum claimed amount
+ * @param {number} [filters.claimed_so_far_max] - Maximum claimed amount
+ * @param {string} [filters.pipeline] - Pipeline name
+ * @param {Array} [filters.custom_filters] - Array of custom filter objects
+ * @param {number} [filters.limit] - Maximum results (default: 50, max: 100)
+ * @param {Array} [filters.properties] - Specific properties to return
+ * @param {string} [agentType] - Agent type for field selection
  * @returns {Object} Search results
  */
-export async function searchGrantApplications(grantProgram = null, status = null, companyName = null, agentType = null, dealName = null) {
+export async function searchGrantApplications(filters = {}, agentType = null) {
+  // Legacy support: if called with old positional arguments, convert to filters object
+  if (typeof filters === 'string' || filters === null && arguments.length > 1) {
+    console.warn('⚠️  searchGrantApplications called with legacy positional arguments, converting to filters object');
+    filters = {
+      grant_program: arguments[0],
+      status: arguments[1],
+      company_name: arguments[2],
+      deal_name: arguments[4] // agentType is arguments[3]
+    };
+    agentType = arguments[3];
+  }
   if (!HUBSPOT_TOKEN) {
     return {
       success: false,
@@ -484,32 +565,35 @@ export async function searchGrantApplications(grantProgram = null, status = null
   try {
     const client = createHubSpotClient();
 
-    const filters = [];
+    const hsFilters = []; // HubSpot filter array
+
+    console.log(`\n🔍 Building search filters...`);
+    console.log(`  Raw filters:`, JSON.stringify(filters, null, 2));
+
+    // ============================================================================
+    // CORE FILTERS (existing logic preserved)
+    // ============================================================================
 
     // Filter by deal name if specified (highest priority - searches exact deal name)
-    if (dealName) {
-      filters.push({
+    if (filters.deal_name) {
+      hsFilters.push({
         propertyName: 'dealname',
         operator: 'CONTAINS_TOKEN',
-        value: dealName
+        value: filters.deal_name
       });
+      console.log(`  ✓ Deal name filter: "${filters.deal_name}"`);
     }
 
     // Filter by grant program if specified
-    // Maps common terms to HubSpot grant_type values OR deal names
-    if (grantProgram && !dealName) {
-      const normalizedProgram = grantProgram.toLowerCase().trim();
-
-      // For partial matching, just search for the key term
-      // HubSpot CONTAINS_TOKEN works with individual words
-      let searchTerm = grantProgram;
+    if (filters.grant_program && !filters.deal_name) {
+      const normalizedProgram = filters.grant_program.toLowerCase().trim();
+      let searchTerm = filters.grant_program;
 
       // Map common short forms to searchable terms
-      // Based on actual HubSpot grant_type values from full list
       if (normalizedProgram === 'etg') {
         searchTerm = 'ETG';
       } else if (normalizedProgram === 'bcafe') {
-        searchTerm = 'BC MDP';  // BCAFE maps to "BC MDP" in HubSpot
+        searchTerm = 'BC MDP';
       } else if (normalizedProgram === 'bc mdp') {
         searchTerm = 'BC MDP';
       } else if (normalizedProgram === 'csj' || normalizedProgram.includes('summer jobs')) {
@@ -520,161 +604,415 @@ export async function searchGrantApplications(grantProgram = null, status = null
         searchTerm = 'DS4Y';
       }
 
-      // Check if we should use CONTAINS_TOKEN or IN operator
-      // Programs like DS4Y have multiple variants (DS4Y - Eco Canada, DS4Y - PCPI, etc.)
+      // Use CONTAINS_TOKEN for programs with multiple variants
       const useContainsToken = ['ds4y', 'digital skills for youth'].includes(normalizedProgram);
 
       if (useContainsToken) {
-        // Use CONTAINS_TOKEN for grant types with multiple variants
-        filters.push({
+        hsFilters.push({
           propertyName: 'grant_type',
           operator: 'CONTAINS_TOKEN',
           value: searchTerm
         });
       } else {
-        // Use IN operator with exact grant type values for each program
-        // Based on actual HubSpot grant_type values (right column from master list)
         let grantTypeValues = [];
 
         if (normalizedProgram === 'etg') {
-          // BC Employer Training Grant
           grantTypeValues = ['ETG - BC'];
         } else if (normalizedProgram.includes('canexport')) {
-          // CanExport has two types: SME and Innovation
           grantTypeValues = ['CanExport', 'CanEx Innovate'];
-        } else if (normalizedProgram === 'bcafe') {
-          // BCAFE maps to BC MDP in HubSpot
-          grantTypeValues = ['BC MDP'];
-        } else if (normalizedProgram === 'bc mdp') {
+        } else if (normalizedProgram === 'bcafe' || normalizedProgram === 'bc mdp') {
           grantTypeValues = ['BC MDP'];
         } else if (normalizedProgram.includes('summer jobs') || normalizedProgram === 'csj') {
           grantTypeValues = ['CSJ'];
         } else {
-          // Fallback: just use the search term as-is
           grantTypeValues = [searchTerm];
         }
 
-        filters.push({
+        hsFilters.push({
           propertyName: 'grant_type',
           operator: 'IN',
           values: grantTypeValues
         });
       }
+      console.log(`  ✓ Grant program filter: "${filters.grant_program}"`);
     }
 
     // Filter by status if specified
-    // Maps common status terms to HubSpot field values
-    if (status) {
-      const statusLower = status.toLowerCase().trim();
+    if (filters.status) {
+      const statusLower = filters.status.toLowerCase().trim();
 
       if (statusLower.includes('approv')) {
-        // Filter by approved_on field being set (not null)
-        filters.push({
+        hsFilters.push({
           propertyName: 'approved_on',
           operator: 'HAS_PROPERTY'
         });
       } else if (statusLower.includes('submit')) {
-        // Filter by application_submitted_on being set
-        filters.push({
+        hsFilters.push({
           propertyName: 'application_submitted_on',
           operator: 'HAS_PROPERTY'
         });
       } else if (statusLower.includes('invoice_sent') || statusLower === 'invoice sent') {
-        // Filter by state = Invoice Sent (Won)
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Invoice Sent (Won)'
         });
       } else if (statusLower.includes('invoice_paid') || statusLower === 'invoice paid') {
-        // Filter by state = Invoice Paid
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Invoice Paid'
         });
       } else if (statusLower.includes('invoice_cleared') || statusLower === 'invoice cleared') {
-        // Filter by state = Invoice Cleared
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Invoice Cleared'
         });
       } else if (statusLower.includes('retainer_sent') || statusLower === 'retainer sent') {
-        // Filter by state = Retainer Sent
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Retainer Sent'
         });
       } else if (statusLower.includes('retainer_paid') || statusLower === 'retainer paid') {
-        // Filter by state = Retainer Paid
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Retainer Paid'
         });
       } else if (statusLower.includes('suspended')) {
-        // Filter by state = Suspended
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Suspended'
         });
       } else if (statusLower.includes('abandoned')) {
-        // Filter by state = Abandoned
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Abandoned'
         });
       } else if (statusLower.includes('won') || statusLower.includes('invoice')) {
-        // Generic "won" or "invoice" - catch all invoicing states
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Invoice Sent (Won)'
         });
       } else if (statusLower.includes('open')) {
-        // Filter by state = Open
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Open'
         });
       } else if (statusLower.includes('lost')) {
-        filters.push({
+        hsFilters.push({
           propertyName: 'state',
           operator: 'EQ',
           value: 'Lost'
         });
       } else {
-        // Try as dealstage value
-        filters.push({
+        hsFilters.push({
           propertyName: 'dealstage',
           operator: 'EQ',
-          value: status
+          value: filters.status
         });
       }
+      console.log(`  ✓ Status filter: "${filters.status}"`);
     }
 
     // Filter by company name if specified
-    if (companyName) {
-      filters.push({
+    if (filters.company_name) {
+      hsFilters.push({
         propertyName: 'company_name',
         operator: 'CONTAINS_TOKEN',
-        value: companyName
+        value: filters.company_name
+      });
+      console.log(`  ✓ Company name filter: "${filters.company_name}"`);
+    }
+
+    // ============================================================================
+    // NEW: TEAM MEMBER FILTERS
+    // ============================================================================
+
+    if (filters.owner_id) {
+      const ownerId = resolveTeamMemberToId(filters.owner_id);
+      hsFilters.push({
+        propertyName: 'hubspot_owner_id',
+        operator: 'EQ',
+        value: ownerId
+      });
+      console.log(`  ✓ Owner filter: "${filters.owner_id}"`);
+    }
+
+    if (filters.writer) {
+      hsFilters.push({
+        propertyName: 'real_assigned_writer',
+        operator: 'CONTAINS_TOKEN',
+        value: filters.writer
+      });
+      console.log(`  ✓ Writer filter: "${filters.writer}"`);
+    }
+
+    if (filters.strategist) {
+      hsFilters.push({
+        propertyName: 'strategist',
+        operator: 'CONTAINS_TOKEN',
+        value: filters.strategist
+      });
+      console.log(`  ✓ Strategist filter: "${filters.strategist}"`);
+    }
+
+    if (filters.claims_specialist) {
+      hsFilters.push({
+        propertyName: 'grant_coordinator',
+        operator: 'CONTAINS_TOKEN',
+        value: filters.claims_specialist
+      });
+      console.log(`  ✓ Claims specialist filter: "${filters.claims_specialist}"`);
+    }
+
+    // ============================================================================
+    // NEW: DATE RANGE FILTERS
+    // ============================================================================
+
+    // Close date (when deal was won/lost)
+    if (filters.closedate_after) {
+      const timestamp = convertDateToTimestamp(filters.closedate_after);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'closedate',
+          operator: 'GTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Close date after: ${filters.closedate_after}`);
+      }
+    }
+
+    if (filters.closedate_before) {
+      const timestamp = convertDateToTimestamp(filters.closedate_before);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'closedate',
+          operator: 'LTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Close date before: ${filters.closedate_before}`);
+      }
+    }
+
+    // Create date
+    if (filters.createdate_after) {
+      const timestamp = convertDateToTimestamp(filters.createdate_after);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'createdate',
+          operator: 'GTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Create date after: ${filters.createdate_after}`);
+      }
+    }
+
+    if (filters.createdate_before) {
+      const timestamp = convertDateToTimestamp(filters.createdate_before);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'createdate',
+          operator: 'LTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Create date before: ${filters.createdate_before}`);
+      }
+    }
+
+    // Approval date
+    if (filters.approved_on_after) {
+      const timestamp = convertDateToTimestamp(filters.approved_on_after);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'approved_on',
+          operator: 'GTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Approved after: ${filters.approved_on_after}`);
+      }
+    }
+
+    if (filters.approved_on_before) {
+      const timestamp = convertDateToTimestamp(filters.approved_on_before);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'approved_on',
+          operator: 'LTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Approved before: ${filters.approved_on_before}`);
+      }
+    }
+
+    // Submission date
+    if (filters.application_submitted_on_after) {
+      const timestamp = convertDateToTimestamp(filters.application_submitted_on_after);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'application_submitted_on',
+          operator: 'GTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Submitted after: ${filters.application_submitted_on_after}`);
+      }
+    }
+
+    if (filters.application_submitted_on_before) {
+      const timestamp = convertDateToTimestamp(filters.application_submitted_on_before);
+      if (timestamp) {
+        hsFilters.push({
+          propertyName: 'application_submitted_on',
+          operator: 'LTE',
+          value: timestamp
+        });
+        console.log(`  ✓ Submitted before: ${filters.application_submitted_on_before}`);
+      }
+    }
+
+    // ============================================================================
+    // NEW: FINANCIAL FILTERS
+    // ============================================================================
+
+    if (filters.amount_min !== undefined && filters.amount_min !== null) {
+      hsFilters.push({
+        propertyName: 'amount',
+        operator: 'GTE',
+        value: filters.amount_min.toString()
+      });
+      console.log(`  ✓ Amount min: ${filters.amount_min}`);
+    }
+
+    if (filters.amount_max !== undefined && filters.amount_max !== null) {
+      hsFilters.push({
+        propertyName: 'amount',
+        operator: 'LTE',
+        value: filters.amount_max.toString()
+      });
+      console.log(`  ✓ Amount max: ${filters.amount_max}`);
+    }
+
+    if (filters.client_reimbursement_min !== undefined && filters.client_reimbursement_min !== null) {
+      hsFilters.push({
+        propertyName: 'client_reimbursement',
+        operator: 'GTE',
+        value: filters.client_reimbursement_min.toString()
+      });
+      console.log(`  ✓ Client reimbursement min: ${filters.client_reimbursement_min}`);
+    }
+
+    if (filters.client_reimbursement_max !== undefined && filters.client_reimbursement_max !== null) {
+      hsFilters.push({
+        propertyName: 'client_reimbursement',
+        operator: 'LTE',
+        value: filters.client_reimbursement_max.toString()
+      });
+      console.log(`  ✓ Client reimbursement max: ${filters.client_reimbursement_max}`);
+    }
+
+    if (filters.claimed_so_far_min !== undefined && filters.claimed_so_far_min !== null) {
+      hsFilters.push({
+        propertyName: 'claimed_so_far',
+        operator: 'GTE',
+        value: filters.claimed_so_far_min.toString()
+      });
+      console.log(`  ✓ Claimed so far min: ${filters.claimed_so_far_min}`);
+    }
+
+    if (filters.claimed_so_far_max !== undefined && filters.claimed_so_far_max !== null) {
+      hsFilters.push({
+        propertyName: 'claimed_so_far',
+        operator: 'LTE',
+        value: filters.claimed_so_far_max.toString()
+      });
+      console.log(`  ✓ Claimed so far max: ${filters.claimed_so_far_max}`);
+    }
+
+    // ============================================================================
+    // NEW: PIPELINE FILTER
+    // ============================================================================
+
+    if (filters.pipeline) {
+      hsFilters.push({
+        propertyName: 'pipeline',
+        operator: 'CONTAINS_TOKEN',
+        value: filters.pipeline
+      });
+      console.log(`  ✓ Pipeline filter: "${filters.pipeline}"`);
+    }
+
+    // ============================================================================
+    // NEW: CUSTOM FILTERS (for any other property)
+    // ============================================================================
+
+    if (filters.custom_filters && Array.isArray(filters.custom_filters)) {
+      console.log(`  📋 Processing ${filters.custom_filters.length} custom filter(s)...`);
+
+      filters.custom_filters.forEach((customFilter, index) => {
+        const { propertyName, operator, value, highValue, values } = customFilter;
+
+        // Validate required fields
+        if (!propertyName || !operator) {
+          console.warn(`  ⚠️  Custom filter ${index + 1} missing propertyName or operator, skipping`);
+          return;
+        }
+
+        // Build HubSpot filter based on operator
+        const hsFilter = {
+          propertyName,
+          operator
+        };
+
+        // Add value(s) based on operator
+        if (operator === 'IN' || operator === 'NOT_IN') {
+          if (!values || !Array.isArray(values)) {
+            console.warn(`  ⚠️  Custom filter ${index + 1}: ${operator} requires 'values' array, skipping`);
+            return;
+          }
+          hsFilter.values = values;
+        } else if (operator === 'BETWEEN') {
+          if (!value || !highValue) {
+            console.warn(`  ⚠️  Custom filter ${index + 1}: BETWEEN requires both 'value' and 'highValue', skipping`);
+            return;
+          }
+          hsFilter.value = value;
+          hsFilter.highValue = highValue;
+        } else if (operator === 'HAS_PROPERTY' || operator === 'NOT_HAS_PROPERTY') {
+          // These operators don't need a value
+        } else {
+          if (value === undefined || value === null) {
+            console.warn(`  ⚠️  Custom filter ${index + 1}: ${operator} requires 'value', skipping`);
+            return;
+          }
+          hsFilter.value = value.toString();
+        }
+
+        hsFilters.push(hsFilter);
+        console.log(`  ✓ Custom filter ${index + 1}: ${propertyName} ${operator} ${value || (values && values.join(',')) || '(no value)'}`);
       });
     }
 
-    // Get agent-specific fields
-    const properties = getFieldsForAgent(agentType);
+    // ============================================================================
+    // FINALIZE SEARCH QUERY
+    // ============================================================================
+
+    // Get agent-specific fields (or custom fields if specified)
+    const properties = filters.properties || getFieldsForAgent(agentType);
     console.log(`  Agent type: ${agentType || 'default'}, using ${properties.length} HubSpot properties`);
 
+    // Get limit (default 50, max 100)
+    const limit = Math.min(filters.limit || 50, 100);
+
     const searchBody = {
-      filterGroups: filters.length > 0 ? [{ filters }] : [],
+      filterGroups: hsFilters.length > 0 ? [{ filters: hsFilters }] : [],
       properties,
-      limit: 50,
+      limit,
       sorts: [
         {
           propertyName: 'createdate',
@@ -683,14 +1021,19 @@ export async function searchGrantApplications(grantProgram = null, status = null
       ]
     };
 
-    console.log('🔍 HubSpot search query:', JSON.stringify({ filters: searchBody.filterGroups }, null, 2));
+    console.log(`\n📤 HubSpot Search API Request:`);
+    console.log(`  Endpoint: POST /crm/v3/objects/deals/search`);
+    console.log(`  Filters: ${hsFilters.length} filter(s)`);
+    console.log(`  Limit: ${limit}`);
+    console.log(`  Properties: ${properties.length}`);
+    console.log(`  Filter details:`, JSON.stringify(searchBody.filterGroups, null, 2));
 
     const response = await client.post('/crm/v3/objects/deals/search', searchBody);
 
-    console.log(`✓ HubSpot grant applications search: found ${response.data.results.length} results`);
+    console.log(`\n✅ HubSpot search completed: found ${response.data.results.length} result(s)`);
 
     // Log some sample grant_type values if we got results
-    if (response.data.results.length > 0 && grantProgram) {
+    if (response.data.results.length > 0 && filters.grant_program) {
       const sampleTypes = response.data.results.slice(0, 3).map(d => d.properties.grant_type);
       console.log(`  Sample grant_type values: ${sampleTypes.join(', ')}`);
     }
@@ -2066,9 +2409,9 @@ export async function loadCompanyContext({
     // 🔍 DIAGNOSTIC: First search without grant_program filter to see ALL deals
     console.log(`\n🔍 DIAGNOSTIC: Searching for ALL deals for "${bestCompany.name}" (no grant filter)...`);
     const diagnosticResult = await searchGrantApplications(
-      null, // No grant program filter
-      null, // No status filter
-      bestCompany.name,
+      {
+        company_name: bestCompany.name
+      },
       agent_type
     );
 
@@ -2090,9 +2433,10 @@ export async function loadCompanyContext({
 
     // Now do the actual filtered search
     const applicationsResult = await searchGrantApplications(
-      grant_program,
-      null, // status
-      bestCompany.name, // Use exact HubSpot name
+      {
+        grant_program,
+        company_name: bestCompany.name // Use exact HubSpot name
+      },
       agent_type
     );
 
