@@ -17,7 +17,11 @@ import { listDropboxFolder, readDropboxFile } from '../src/tools/dropbox.js';
 dotenv.config();
 
 // Configuration
-const DROPBOX_KB_PATH = process.env.DROPBOX_ORACLE_KB_PATH || '/Oracle KB';
+let DROPBOX_KB_PATH = process.env.DROPBOX_ORACLE_KB_PATH || '/Oracle KB';
+// If path is "/" and namespace is set, use empty string (root of namespace)
+if (DROPBOX_KB_PATH === '/' && process.env.DROPBOX_NAMESPACE_ID) {
+  DROPBOX_KB_PATH = '';
+}
 const BATCH_SIZE = 5; // Process 5 docs at a time to avoid rate limits
 const CONTENT_SAMPLE_SIZE = 10000; // First 10K chars for analysis
 
