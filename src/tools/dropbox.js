@@ -9,7 +9,7 @@
 
 import fetch from 'node-fetch';
 import mammoth from 'mammoth';
-import pdfParse from 'pdf-parse';
+import pdfParse from 'pdf-parse/lib/pdf-parse.js';
 
 // OAuth2 credentials from environment
 const DROPBOX_ACCESS_TOKEN = process.env.DROPBOX_ACCESS_TOKEN;
