@@ -179,9 +179,11 @@ The knowledge base includes:
 - **Marketing**: Content calendars, webinar topics, customer story templates
 - **GCs**: Branding guidelines, hiring processes, claim procedures
 
-Returns metadata about matching documents including file name, summary, keywords, and Google Drive link.
+Returns metadata about matching documents including file name, summary, keywords, and storage location (Google Drive or Dropbox).
 
-After searching, use read_google_drive_file to load the full content of relevant documents.`,
+After searching, check the 'source' field:
+- If source = 'google-drive', use read_google_drive_file with the fileId
+- If source = 'dropbox', use read_dropbox_file with the dropboxPath`,
 
   input_schema: {
     type: 'object',
@@ -248,7 +250,9 @@ After searching, use read_google_drive_file to load the full content of relevant
         keywords: doc.keywords,
         relevanceScore: doc.relevanceScore,
         webViewLink: doc.webViewLink,
-        dateModified: doc.dateModified
+        dateModified: doc.dateModified,
+        source: doc.source, // Include source (google-drive or dropbox)
+        dropboxPath: doc.dropboxPath // Include Dropbox path if available
       }))
     };
   }
