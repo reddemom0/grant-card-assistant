@@ -91,8 +91,8 @@ async function getDropboxHeaders(options = {}) {
   // Add team/namespace headers if configured
   if (DROPBOX_NAMESPACE_ID) {
     headers['Dropbox-API-Path-Root'] = JSON.stringify({
-      ".tag": "root",
-      "root": DROPBOX_NAMESPACE_ID
+      ".tag": "namespace_id",
+      "namespace_id": DROPBOX_NAMESPACE_ID
     });
   }
 
@@ -269,8 +269,8 @@ async function downloadDropboxFile(path) {
   // Add team/namespace headers if configured
   if (DROPBOX_NAMESPACE_ID) {
     headers['Dropbox-API-Path-Root'] = JSON.stringify({
-      ".tag": "root",
-      "root": DROPBOX_NAMESPACE_ID
+      ".tag": "namespace_id",
+      "namespace_id": DROPBOX_NAMESPACE_ID
     });
   }
 
