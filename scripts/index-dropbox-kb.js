@@ -178,8 +178,15 @@ async function processDropboxFiles(forceReindex) {
     throw new Error(`Failed to list Dropbox folder: ${result.error}`);
   }
 
-  const files = result.files;
-  console.log(`Found ${files.length} files`);
+  // Filter out excluded folders (SALES/Grants)
+  const excludedPaths = ['/SALES'];
+  const allFiles = result.files;
+  const files = allFiles.filter(file => {
+    return !excludedPaths.some(excludedPath => file.path.startsWith(excludedPath));
+  });
+
+  console.log(`Found ${allFiles.length} total files`);
+  console.log(`Filtered to ${files.length} files (excluded: ${allFiles.length - files.length} from SALES folder)`);
 
   let processed = 0;
   let skipped = 0;
