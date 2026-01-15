@@ -8,6 +8,7 @@
 import * as memory from './memory.js';
 import * as hubspot from './hubspot.js';
 import * as googleDrive from './google-drive.js';
+import * as dropbox from './dropbox.js';
 import * as googleDocs from './google-docs.js';
 import * as googleSheets from './google-sheets.js';
 import { createAdvancedDocumentTool } from './google-docs-advanced.js';
@@ -237,6 +238,14 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           input.file_id,
           userEmail  // For domain-wide delegation
         );
+        break;
+
+      // ============================================================================
+      // DROPBOX TOOLS
+      // ============================================================================
+
+      case 'read_dropbox_file':
+        result = await dropbox.readDropboxFile(input.file_path);
         break;
 
       // ============================================================================

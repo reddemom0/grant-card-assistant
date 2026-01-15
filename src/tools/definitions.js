@@ -664,6 +664,28 @@ export const GOOGLE_DRIVE_TOOLS = [
 ];
 
 // ============================================================================
+// DROPBOX TOOLS
+// Document search and retrieval from Dropbox team folders
+// ============================================================================
+
+export const DROPBOX_TOOLS = [
+  {
+    name: 'read_dropbox_file',
+    description: 'Read the contents of a specific Dropbox file. Works with PDFs, DOCX, and text files. Use this after search_oracle_kb returns a Dropbox document (source: dropbox). The file path is provided in the dropboxPath field of search results.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        file_path: {
+          type: 'string',
+          description: 'Dropbox file path (e.g., "/Oracle KB/Writers/template.docx"). Get this from the dropboxPath field in search_oracle_kb results.'
+        }
+      },
+      required: ['file_path']
+    }
+  }
+];
+
+// ============================================================================
 // ORACLE TOOLS
 // Internal knowledge base search for Granted Consulting documentation
 // ============================================================================
@@ -682,9 +704,11 @@ The knowledge base includes:
 - **Marketing**: Content calendars, webinar topics, customer story templates
 - **GCs**: Branding guidelines, hiring processes, claim procedures
 
-Returns metadata about matching documents including file name, summary, keywords, and Google Drive link.
+Returns metadata about matching documents including file name, summary, keywords, and source location (Google Drive or Dropbox).
 
-After searching, use read_google_drive_file to load the full content of relevant documents.`,
+After searching:
+- For Google Drive files (source: google-drive), use read_google_drive_file with the fileId
+- For Dropbox files (source: dropbox), use read_dropbox_file with the dropboxPath`,
     input_schema: {
       type: 'object',
       properties: {
@@ -1069,10 +1093,11 @@ export function getToolsForAgent(agentType) {
       // Internal Oracle gets:
       // - Server tools (WebSearch/WebFetch) for external research if needed
       // - Oracle search tool for internal knowledge base
-      // - Google Drive for reading documents
+      // - Google Drive for reading Google Drive documents
+      // - Dropbox for reading Dropbox documents
       // - HubSpot for company/project context
       // - Google Docs for creating new documentation
-      return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...HUBSPOT_TOOLS, ...GOOGLE_DOCS_TOOLS];
+      return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...HUBSPOT_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'orchestrator':
       // Orchestrator gets everything
