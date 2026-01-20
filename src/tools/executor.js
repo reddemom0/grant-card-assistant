@@ -106,7 +106,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       // ============================================================================
 
       case 'search_hubspot_contacts':
-        result = await hubspot.searchHubSpotContacts(input.query, input.limit);
+        result = await hubspot.searchHubSpotContacts(input.query, input.limit, input.lifecycle_stage);
         break;
 
       case 'get_hubspot_contact':
@@ -121,7 +121,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.searchHubSpotCompanies(
           input.query,
           input.min_revenue,
-          input.max_revenue
+          input.max_revenue,
+          input.lifecycle_stage
         );
         break;
 

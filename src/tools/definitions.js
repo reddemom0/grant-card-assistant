@@ -88,7 +88,7 @@ export const MEMORY_TOOLS = [
 export const HUBSPOT_TOOLS = [
   {
     name: 'search_hubspot_contacts',
-    description: 'Search HubSpot CRM for contacts by name, email, or company. Returns contact details including email, phone, company, and custom grant-related properties.',
+    description: 'Search HubSpot CRM for contacts by name, email, or company. Returns contact details including email, phone, company, lifecycle stage, and custom grant-related properties. Can filter by lifecycle stage to find leads at specific stages in the sales funnel.',
     input_schema: {
       type: 'object',
       properties: {
@@ -100,6 +100,11 @@ export const HUBSPOT_TOOLS = [
           type: 'number',
           description: 'Maximum number of results to return (default: 10, max: 100)',
           default: 10
+        },
+        lifecycle_stage: {
+          type: 'string',
+          enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other'],
+          description: 'Optional: Filter contacts by lifecycle stage. Use this to find leads at specific points in the sales funnel. Values: subscriber (newsletter signups), lead (early interest), marketingqualifiedlead (MQL - engaged leads), salesqualifiedlead (SQL - qualified for sales), opportunity (active deal), customer (closed-won), evangelist (promoters), other (uncategorized).'
         }
       },
       required: ['query']
@@ -135,7 +140,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'search_hubspot_companies',
-    description: 'Search HubSpot for companies/organizations by name, domain, or industry. Useful for finding grant applicant organizations and their details.',
+    description: 'Search HubSpot for companies/organizations by name, domain, or industry. Useful for finding grant applicant organizations and their details. Can filter by lifecycle stage to find companies at specific stages in the sales funnel.',
     input_schema: {
       type: 'object',
       properties: {
@@ -150,6 +155,11 @@ export const HUBSPOT_TOOLS = [
         max_revenue: {
           type: 'number',
           description: 'Optional: Filter by maximum annual revenue (in dollars)'
+        },
+        lifecycle_stage: {
+          type: 'string',
+          enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other'],
+          description: 'Optional: Filter companies by lifecycle stage. Use this to find prospects at specific points in the sales funnel. Values: subscriber (newsletter signups), lead (early interest), marketingqualifiedlead (MQL - engaged leads), salesqualifiedlead (SQL - qualified for sales), opportunity (active deal), customer (closed-won), evangelist (promoters), other (uncategorized).'
         }
       },
       required: ['query']

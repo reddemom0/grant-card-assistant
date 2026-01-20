@@ -210,7 +210,7 @@ function createHubSpotClient() {
  * @param {number} limit - Maximum results to return
  * @returns {Object} Search results
  */
-export async function searchHubSpotContacts(query, limit = 10) {
+export async function searchHubSpotContacts(query, limit = 10, lifecycle_stage = null) {
   if (!HUBSPOT_TOKEN) {
     return {
       success: false,
@@ -222,45 +222,60 @@ export async function searchHubSpotContacts(query, limit = 10) {
   try {
     const client = createHubSpotClient();
 
+    // Build filter groups (OR logic between groups, AND within groups)
+    const filterGroups = [
+      {
+        filters: [
+          {
+            propertyName: 'email',
+            operator: 'CONTAINS_TOKEN',
+            value: query
+          }
+        ]
+      },
+      {
+        filters: [
+          {
+            propertyName: 'firstname',
+            operator: 'CONTAINS_TOKEN',
+            value: query
+          }
+        ]
+      },
+      {
+        filters: [
+          {
+            propertyName: 'lastname',
+            operator: 'CONTAINS_TOKEN',
+            value: query
+          }
+        ]
+      },
+      {
+        filters: [
+          {
+            propertyName: 'company',
+            operator: 'CONTAINS_TOKEN',
+            value: query
+          }
+        ]
+      }
+    ];
+
+    // Add lifecycle_stage filter to ALL filter groups (AND condition)
+    if (lifecycle_stage) {
+      filterGroups.forEach(group => {
+        group.filters.push({
+          propertyName: 'lifecyclestage',
+          operator: 'EQ',
+          value: lifecycle_stage
+        });
+      });
+      console.log(`  🎯 Filtering by lifecycle stage: ${lifecycle_stage}`);
+    }
+
     const response = await client.post('/crm/v3/objects/contacts/search', {
-      filterGroups: [
-        {
-          filters: [
-            {
-              propertyName: 'email',
-              operator: 'CONTAINS_TOKEN',
-              value: query
-            }
-          ]
-        },
-        {
-          filters: [
-            {
-              propertyName: 'firstname',
-              operator: 'CONTAINS_TOKEN',
-              value: query
-            }
-          ]
-        },
-        {
-          filters: [
-            {
-              propertyName: 'lastname',
-              operator: 'CONTAINS_TOKEN',
-              value: query
-            }
-          ]
-        },
-        {
-          filters: [
-            {
-              propertyName: 'company',
-              operator: 'CONTAINS_TOKEN',
-              value: query
-            }
-          ]
-        }
-      ],
+      filterGroups,
       properties: [
         'email',
         'firstname',
@@ -270,7 +285,8 @@ export async function searchHubSpotContacts(query, limit = 10) {
         'jobtitle',
         'city',
         'state',
-        'country'
+        'country',
+        'lifecyclestage'
       ],
       limit: Math.min(limit, 100)
     });
@@ -291,7 +307,8 @@ export async function searchHubSpotContacts(query, limit = 10) {
           contact.properties.city,
           contact.properties.state,
           contact.properties.country
-        ].filter(Boolean).join(', ')
+        ].filter(Boolean).join(', '),
+        lifecycleStage: contact.properties.lifecyclestage
       }))
     };
   } catch (error) {
@@ -651,9 +668,10 @@ export async function generateHubSpotEmbedLink(objectType, recordId, view = 'ove
  * @param {string} query - Search query (name, domain, industry)
  * @param {number|null} minRevenue - Minimum annual revenue filter
  * @param {number|null} maxRevenue - Maximum annual revenue filter
+ * @param {string|null} lifecycle_stage - Lifecycle stage filter
  * @returns {Object} Search results
  */
-export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenue = null) {
+export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenue = null, lifecycle_stage = null) {
   if (!HUBSPOT_TOKEN) {
     return {
       success: false,
@@ -722,11 +740,23 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
       });
     }
 
+    // Add lifecycle_stage filter to ALL filter groups (AND condition)
+    if (lifecycle_stage) {
+      filterGroups.forEach(group => {
+        group.filters.push({
+          propertyName: 'lifecyclestage',
+          operator: 'EQ',
+          value: lifecycle_stage
+        });
+      });
+      console.log(`  🎯 Filtering by lifecycle stage: ${lifecycle_stage}`);
+    }
+
     const response = await client.post('/crm/v3/objects/companies/search', {
       filterGroups,
       properties: [
         'name', 'domain', 'industry', 'city', 'state', 'country',
-        'numberofemployees', 'annualrevenue', 'description'
+        'numberofemployees', 'annualrevenue', 'description', 'lifecyclestage'
       ],
       limit: 10
     });
@@ -748,7 +778,8 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
         ].filter(Boolean).join(', '),
         employees: company.properties.numberofemployees,
         revenue: company.properties.annualrevenue,
-        description: company.properties.description
+        description: company.properties.description,
+        lifecycleStage: company.properties.lifecyclestage
       }))
     };
   } catch (error) {
