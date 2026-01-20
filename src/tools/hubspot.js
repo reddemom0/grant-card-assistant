@@ -222,6 +222,16 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
   try {
     const client = createHubSpotClient();
 
+    // Backwards compatibility: if filters is a string, treat it as lifecycle_stage
+    if (typeof filters === 'string') {
+      filters = { lifecycle_stage: filters };
+    }
+
+    // Ensure filters is an object
+    if (!filters || typeof filters !== 'object') {
+      filters = {};
+    }
+
     // Extract filters (support both old lifecycle_stage param and new filters object)
     const {
       lifecycle_stage = null,
@@ -779,6 +789,16 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
 
   try {
     const client = createHubSpotClient();
+
+    // Backwards compatibility: if filters is a string, treat it as lifecycle_stage
+    if (typeof filters === 'string') {
+      filters = { lifecycle_stage: filters };
+    }
+
+    // Ensure filters is an object
+    if (!filters || typeof filters !== 'object') {
+      filters = {};
+    }
 
     // Extract filters (support both old parameters and new filters object)
     const {
