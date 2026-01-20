@@ -209,6 +209,40 @@
             font-weight: 500;
         }
         
+        .featured-agent {
+            margin-bottom: 3rem;
+        }
+
+        .featured-agent .agent-card {
+            background: linear-gradient(135deg, rgba(234, 88, 12, 0.05) 0%, rgba(234, 88, 12, 0.02) 100%);
+            border: 2px solid rgba(234, 88, 12, 0.2);
+            box-shadow: 0 12px 48px rgba(234, 88, 12, 0.15);
+        }
+
+        .featured-agent .agent-icon {
+            width: 90px;
+            height: 90px;
+            font-size: 2.5rem;
+        }
+
+        .featured-agent .agent-info h3 {
+            font-size: 2rem;
+        }
+
+        .featured-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #ea580c;
+            background: rgba(234, 88, 12, 0.1);
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(234, 88, 12, 0.2);
+            margin-top: 0.5rem;
+        }
+
         .agents-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
@@ -608,6 +642,44 @@
             </div>
         </div>
 
+        <!-- Featured Agent: Internal Oracle -->
+        <div class="featured-agent" id="featured-agent" style="display: none;">
+            <div class="agent-card internal-oracle" onclick="openAgent('internal-oracle')">
+                <div class="agent-header">
+                    <div class="agent-icon">🔮</div>
+                    <div class="agent-info">
+                        <h3>Internal Knowledge Oracle</h3>
+                        <span class="agent-status">
+                            <div class="status-indicator"></div>
+                            Active
+                        </span>
+                        <div class="featured-badge">
+                            ⭐ MAIN AGENT
+                        </div>
+                    </div>
+                </div>
+                <p class="agent-description">
+                    Your comprehensive Granted Consulting knowledge expert. Search across Google Drive and Dropbox files,
+                    access GetGranted database, query HubSpot, and get instant answers about company processes,
+                    client history, and internal documentation.
+                </p>
+                <ul class="agent-features">
+                    <li>Search 3,861+ Dropbox files & Google Drive knowledge base</li>
+                    <li>Query GetGranted database (1,000+ grants)</li>
+                    <li>Access HubSpot CRM data & deal information</li>
+                    <li>Company policies, procedures & best practices</li>
+                    <li>Client history, case studies & internal processes</li>
+                </ul>
+                <div class="agent-action">
+                    <button class="agent-button">
+                        <span>Launch Oracle</span>
+                        <span>→</span>
+                    </button>
+                    <div class="usage-stats">Most powerful agent</div>
+                </div>
+            </div>
+        </div>
+
         <!-- AI Agents Grid -->
         <div class="agents-grid" id="agents-grid" style="display: none;">
             <!-- Grant Card Assistant -->
@@ -802,55 +874,24 @@
                 </div>
             </div>
 
-            <!-- Granted Internal Oracle -->
-            <div class="agent-card internal-oracle" onclick="openAgent('internal-oracle')">
-                <div class="agent-header">
-                    <div class="agent-icon">🔮</div>
-                    <div class="agent-info">
-                        <h3>Internal Knowledge Oracle</h3>
-                        <span class="agent-status coming-soon">
-                            <div style="width: 8px; height: 8px; background: #d97706; border-radius: 50%;"></div>
-                            Coming Soon
-                        </span>
-                    </div>
-                </div>
-                <p class="agent-description">
-                    Your comprehensive Granted Consulting knowledge expert. Trained on all company data, processes, 
-                    client history, and internal documentation. Answers any staff query with institutional wisdom.
-                </p>
-                <ul class="agent-features">
-                    <li>Company policies & procedures lookup</li>
-                    <li>Client history & case studies</li>
-                    <li>Internal process guidance</li>
-                    <li>Best practices & methodology</li>
-                    <li>Team resources & documentation</li>
-                </ul>
-                <div class="agent-action">
-                    <button class="agent-button" disabled>
-                        <span>Coming Soon</span>
-                        <span>⏳</span>
-                    </button>
-                    <div class="usage-stats">In development</div>
-                </div>
-            </div>
         </div>
 
         <!-- Bottom Section -->
         <div class="bottom-section" id="bottom-section" style="display: none;">
-            <h2>Ready to Transform Your Workflow?</h2>
+            <h2>Ready to Access Your Knowledge Base?</h2>
             <p>
-                Each AI agent is trained on your proprietary knowledge base and industry best practices. 
-                Start with the Grant Card Assistant or try our newest CanExport Claims auditing specialist.
+                Start with the Internal Oracle to search across all company knowledge, or choose a specialized agent
+                for grant writing, claims auditing, or application development.
             </p>
             <div class="cta-buttons">
-                <a href="#" class="cta-button primary" onclick="openAgent('grant-cards')">
-                    Start with Grant Cards
+                <a href="#" class="cta-button primary" onclick="openAgent('internal-oracle')">
+                    Launch Oracle →
+                </a>
+                <a href="#" class="cta-button" onclick="openAgent('grant-cards')">
+                    Grant Cards
                 </a>
                 <a href="#" class="cta-button" onclick="openAgent('canexport-claims')">
-                    Try Claims Assistant
-                </a>
-                <a href="#" class="cta-button" onclick="openAgent('bcafe-writer')">
-                    BC Agriculture Export
+                    Claims Assistant
                 </a>
                 <a href="#" class="cta-button" onclick="openAgent('etg-writer')">
                     ETG Specialist
@@ -911,7 +952,7 @@
                 },
                 'internal-oracle': {
                     url: '/internal-oracle',
-                    active: false
+                    active: true
                 }
             };
             
