@@ -106,7 +106,18 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       // ============================================================================
 
       case 'search_hubspot_contacts':
-        result = await hubspot.searchHubSpotContacts(input.query, input.limit, input.lifecycle_stage);
+        // Extract filters into object (all filter params except query and limit)
+        const contactFilters = {
+          lifecycle_stage: input.lifecycle_stage,
+          createdate_after: input.createdate_after,
+          createdate_before: input.createdate_before,
+          lastmodifieddate_after: input.lastmodifieddate_after,
+          lastmodifieddate_before: input.lastmodifieddate_before,
+          owner_id: input.owner_id,
+          hs_lead_status: input.hs_lead_status,
+          custom_filters: input.custom_filters || []
+        };
+        result = await hubspot.searchHubSpotContacts(input.query, input.limit, contactFilters);
         break;
 
       case 'get_hubspot_contact':
@@ -118,11 +129,22 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       case 'search_hubspot_companies':
+        // Extract filters into object (all filter params except query, min_revenue, max_revenue)
+        const companyFilters = {
+          lifecycle_stage: input.lifecycle_stage,
+          createdate_after: input.createdate_after,
+          createdate_before: input.createdate_before,
+          lastmodifieddate_after: input.lastmodifieddate_after,
+          lastmodifieddate_before: input.lastmodifieddate_before,
+          owner_id: input.owner_id,
+          type: input.type,
+          custom_filters: input.custom_filters || []
+        };
         result = await hubspot.searchHubSpotCompanies(
           input.query,
           input.min_revenue,
           input.max_revenue,
-          input.lifecycle_stage
+          companyFilters
         );
         break;
 

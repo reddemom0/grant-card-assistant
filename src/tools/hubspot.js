@@ -210,7 +210,7 @@ function createHubSpotClient() {
  * @param {number} limit - Maximum results to return
  * @returns {Object} Search results
  */
-export async function searchHubSpotContacts(query, limit = 10, lifecycle_stage = null) {
+export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
   if (!HUBSPOT_TOKEN) {
     return {
       success: false,
@@ -221,6 +221,18 @@ export async function searchHubSpotContacts(query, limit = 10, lifecycle_stage =
 
   try {
     const client = createHubSpotClient();
+
+    // Extract filters (support both old lifecycle_stage param and new filters object)
+    const {
+      lifecycle_stage = null,
+      createdate_after = null,
+      createdate_before = null,
+      lastmodifieddate_after = null,
+      lastmodifieddate_before = null,
+      owner_id = null,
+      hs_lead_status = null,
+      custom_filters = []
+    } = filters;
 
     // Build filter groups (OR logic between groups, AND within groups)
     const filterGroups = [
@@ -262,16 +274,93 @@ export async function searchHubSpotContacts(query, limit = 10, lifecycle_stage =
       }
     ];
 
-    // Add lifecycle_stage filter to ALL filter groups (AND condition)
+    // Collect common filters to apply to ALL filter groups (AND conditions)
+    const commonFilters = [];
+
+    // Add lifecycle_stage filter
     if (lifecycle_stage) {
-      filterGroups.forEach(group => {
-        group.filters.push({
-          propertyName: 'lifecyclestage',
-          operator: 'EQ',
-          value: lifecycle_stage
-        });
+      commonFilters.push({
+        propertyName: 'lifecyclestage',
+        operator: 'EQ',
+        value: lifecycle_stage
       });
       console.log(`  🎯 Filtering by lifecycle stage: ${lifecycle_stage}`);
+    }
+
+    // Add date filters
+    if (createdate_after) {
+      const timestamp = new Date(createdate_after).getTime();
+      commonFilters.push({
+        propertyName: 'createdate',
+        operator: 'GTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Created after: ${createdate_after}`);
+    }
+
+    if (createdate_before) {
+      const timestamp = new Date(createdate_before).getTime();
+      commonFilters.push({
+        propertyName: 'createdate',
+        operator: 'LTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Created before: ${createdate_before}`);
+    }
+
+    if (lastmodifieddate_after) {
+      const timestamp = new Date(lastmodifieddate_after).getTime();
+      commonFilters.push({
+        propertyName: 'lastmodifieddate',
+        operator: 'GTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Modified after: ${lastmodifieddate_after}`);
+    }
+
+    if (lastmodifieddate_before) {
+      const timestamp = new Date(lastmodifieddate_before).getTime();
+      commonFilters.push({
+        propertyName: 'lastmodifieddate',
+        operator: 'LTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Modified before: ${lastmodifieddate_before}`);
+    }
+
+    // Add owner filter
+    if (owner_id) {
+      commonFilters.push({
+        propertyName: 'hubspot_owner_id',
+        operator: 'EQ',
+        value: owner_id
+      });
+      console.log(`  👤 Owner ID: ${owner_id}`);
+    }
+
+    // Add lead status filter
+    if (hs_lead_status) {
+      commonFilters.push({
+        propertyName: 'hs_lead_status',
+        operator: 'EQ',
+        value: hs_lead_status
+      });
+      console.log(`  🏷️  Lead status: ${hs_lead_status}`);
+    }
+
+    // Add custom filters
+    if (custom_filters && custom_filters.length > 0) {
+      custom_filters.forEach(filter => {
+        commonFilters.push(filter);
+        console.log(`  🔧 Custom filter: ${filter.propertyName} ${filter.operator} ${filter.value || filter.values?.join(',')}`);
+      });
+    }
+
+    // Apply common filters to ALL filter groups
+    if (commonFilters.length > 0) {
+      filterGroups.forEach(group => {
+        group.filters.push(...commonFilters);
+      });
     }
 
     const response = await client.post('/crm/v3/objects/contacts/search', {
@@ -286,7 +375,11 @@ export async function searchHubSpotContacts(query, limit = 10, lifecycle_stage =
         'city',
         'state',
         'country',
-        'lifecyclestage'
+        'lifecyclestage',
+        'createdate',
+        'lastmodifieddate',
+        'hubspot_owner_id',
+        'hs_lead_status'
       ],
       limit: Math.min(limit, 100)
     });
@@ -308,7 +401,11 @@ export async function searchHubSpotContacts(query, limit = 10, lifecycle_stage =
           contact.properties.state,
           contact.properties.country
         ].filter(Boolean).join(', '),
-        lifecycleStage: contact.properties.lifecyclestage
+        lifecycleStage: contact.properties.lifecyclestage,
+        createDate: contact.properties.createdate ? new Date(parseInt(contact.properties.createdate)).toISOString() : null,
+        lastModifiedDate: contact.properties.lastmodifieddate ? new Date(parseInt(contact.properties.lastmodifieddate)).toISOString() : null,
+        ownerId: contact.properties.hubspot_owner_id,
+        leadStatus: contact.properties.hs_lead_status
       }))
     };
   } catch (error) {
@@ -671,7 +768,7 @@ export async function generateHubSpotEmbedLink(objectType, recordId, view = 'ove
  * @param {string|null} lifecycle_stage - Lifecycle stage filter
  * @returns {Object} Search results
  */
-export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenue = null, lifecycle_stage = null) {
+export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenue = null, filters = {}) {
   if (!HUBSPOT_TOKEN) {
     return {
       success: false,
@@ -682,6 +779,18 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
 
   try {
     const client = createHubSpotClient();
+
+    // Extract filters (support both old parameters and new filters object)
+    const {
+      lifecycle_stage = null,
+      createdate_after = null,
+      createdate_before = null,
+      lastmodifieddate_after = null,
+      lastmodifieddate_before = null,
+      owner_id = null,
+      type = null,
+      custom_filters = []
+    } = filters;
 
     // Build filter groups for OR search across multiple fields
     const filterGroups = [
@@ -714,49 +823,120 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
       }
     ];
 
+    // Collect common filters to apply to ALL filter groups (AND conditions)
+    const commonFilters = [];
+
     // Add revenue filters if provided
-    if (minRevenue !== null || maxRevenue !== null) {
-      const revenueFilters = [];
+    if (minRevenue !== null) {
+      commonFilters.push({
+        propertyName: 'annualrevenue',
+        operator: 'GTE',
+        value: minRevenue.toString()
+      });
+      console.log(`  💰 Min revenue: $${minRevenue}`);
+    }
 
-      if (minRevenue !== null) {
-        revenueFilters.push({
-          propertyName: 'annualrevenue',
-          operator: 'GTE',
-          value: minRevenue.toString()
-        });
-      }
+    if (maxRevenue !== null) {
+      commonFilters.push({
+        propertyName: 'annualrevenue',
+        operator: 'LTE',
+        value: maxRevenue.toString()
+      });
+      console.log(`  💰 Max revenue: $${maxRevenue}`);
+    }
 
-      if (maxRevenue !== null) {
-        revenueFilters.push({
-          propertyName: 'annualrevenue',
-          operator: 'LTE',
-          value: maxRevenue.toString()
-        });
-      }
+    // Add lifecycle_stage filter
+    if (lifecycle_stage) {
+      commonFilters.push({
+        propertyName: 'lifecyclestage',
+        operator: 'EQ',
+        value: lifecycle_stage
+      });
+      console.log(`  🎯 Filtering by lifecycle stage: ${lifecycle_stage}`);
+    }
 
-      // Apply revenue filter to all filter groups (AND condition)
-      filterGroups.forEach(group => {
-        group.filters.push(...revenueFilters);
+    // Add date filters
+    if (createdate_after) {
+      const timestamp = new Date(createdate_after).getTime();
+      commonFilters.push({
+        propertyName: 'createdate',
+        operator: 'GTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Created after: ${createdate_after}`);
+    }
+
+    if (createdate_before) {
+      const timestamp = new Date(createdate_before).getTime();
+      commonFilters.push({
+        propertyName: 'createdate',
+        operator: 'LTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Created before: ${createdate_before}`);
+    }
+
+    if (lastmodifieddate_after) {
+      const timestamp = new Date(lastmodifieddate_after).getTime();
+      commonFilters.push({
+        propertyName: 'hs_lastmodifieddate',
+        operator: 'GTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Modified after: ${lastmodifieddate_after}`);
+    }
+
+    if (lastmodifieddate_before) {
+      const timestamp = new Date(lastmodifieddate_before).getTime();
+      commonFilters.push({
+        propertyName: 'hs_lastmodifieddate',
+        operator: 'LTE',
+        value: timestamp.toString()
+      });
+      console.log(`  📅 Modified before: ${lastmodifieddate_before}`);
+    }
+
+    // Add owner filter
+    if (owner_id) {
+      commonFilters.push({
+        propertyName: 'hubspot_owner_id',
+        operator: 'EQ',
+        value: owner_id
+      });
+      console.log(`  👤 Owner ID: ${owner_id}`);
+    }
+
+    // Add company type filter
+    if (type) {
+      commonFilters.push({
+        propertyName: 'type',
+        operator: 'EQ',
+        value: type
+      });
+      console.log(`  🏢 Company type: ${type}`);
+    }
+
+    // Add custom filters
+    if (custom_filters && custom_filters.length > 0) {
+      custom_filters.forEach(filter => {
+        commonFilters.push(filter);
+        console.log(`  🔧 Custom filter: ${filter.propertyName} ${filter.operator} ${filter.value || filter.values?.join(',')}`);
       });
     }
 
-    // Add lifecycle_stage filter to ALL filter groups (AND condition)
-    if (lifecycle_stage) {
+    // Apply common filters to ALL filter groups
+    if (commonFilters.length > 0) {
       filterGroups.forEach(group => {
-        group.filters.push({
-          propertyName: 'lifecyclestage',
-          operator: 'EQ',
-          value: lifecycle_stage
-        });
+        group.filters.push(...commonFilters);
       });
-      console.log(`  🎯 Filtering by lifecycle stage: ${lifecycle_stage}`);
     }
 
     const response = await client.post('/crm/v3/objects/companies/search', {
       filterGroups,
       properties: [
         'name', 'domain', 'industry', 'city', 'state', 'country',
-        'numberofemployees', 'annualrevenue', 'description', 'lifecyclestage'
+        'numberofemployees', 'annualrevenue', 'description', 'lifecyclestage',
+        'createdate', 'hs_lastmodifieddate', 'hubspot_owner_id', 'type'
       ],
       limit: 10
     });
@@ -779,7 +959,11 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
         employees: company.properties.numberofemployees,
         revenue: company.properties.annualrevenue,
         description: company.properties.description,
-        lifecycleStage: company.properties.lifecyclestage
+        lifecycleStage: company.properties.lifecyclestage,
+        createDate: company.properties.createdate ? new Date(parseInt(company.properties.createdate)).toISOString() : null,
+        lastModifiedDate: company.properties.hs_lastmodifieddate ? new Date(parseInt(company.properties.hs_lastmodifieddate)).toISOString() : null,
+        ownerId: company.properties.hubspot_owner_id,
+        type: company.properties.type
       }))
     };
   } catch (error) {

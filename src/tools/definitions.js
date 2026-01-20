@@ -88,7 +88,7 @@ export const MEMORY_TOOLS = [
 export const HUBSPOT_TOOLS = [
   {
     name: 'search_hubspot_contacts',
-    description: 'Search HubSpot CRM for contacts by name, email, or company. Returns contact details including email, phone, company, lifecycle stage, and custom grant-related properties. Can filter by lifecycle stage to find leads at specific stages in the sales funnel.',
+    description: 'Search HubSpot CRM for contacts with advanced cross-filtering. Search by name, email, or company, then filter by lifecycle stage, creation/modification dates, owner, lead status, and any custom properties. Perfect for finding leads like "all MQLs created in the last 30 days" or "leads owned by Sarah modified this week".',
     input_schema: {
       type: 'object',
       properties: {
@@ -104,7 +104,58 @@ export const HUBSPOT_TOOLS = [
         lifecycle_stage: {
           type: 'string',
           enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other'],
-          description: 'Optional: Filter contacts by lifecycle stage. Use this to find leads at specific points in the sales funnel. Values: subscriber (newsletter signups), lead (early interest), marketingqualifiedlead (MQL - engaged leads), salesqualifiedlead (SQL - qualified for sales), opportunity (active deal), customer (closed-won), evangelist (promoters), other (uncategorized).'
+          description: 'Filter by lifecycle stage: subscriber (newsletter signups), lead (early interest), marketingqualifiedlead (MQL), salesqualifiedlead (SQL), opportunity (active deal), customer (closed-won), evangelist (promoters), other (uncategorized)'
+        },
+        createdate_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter contacts created after this date (YYYY-MM-DD format, e.g., "2025-01-01")'
+        },
+        createdate_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter contacts created before this date (YYYY-MM-DD format)'
+        },
+        lastmodifieddate_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter contacts modified after this date (YYYY-MM-DD format) - useful for finding recently updated leads'
+        },
+        lastmodifieddate_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter contacts modified before this date (YYYY-MM-DD format)'
+        },
+        owner_id: {
+          type: 'string',
+          description: 'Filter by HubSpot owner ID - use list_hubspot_owners to find owner IDs'
+        },
+        hs_lead_status: {
+          type: 'string',
+          description: 'Filter by lead status (e.g., "NEW", "OPEN", "IN_PROGRESS", "OPEN_DEAL", "UNQUALIFIED", "ATTEMPTED_TO_CONTACT", "CONNECTED", "BAD_TIMING")'
+        },
+        custom_filters: {
+          type: 'array',
+          description: 'Advanced: Array of custom property filters for any HubSpot contact property not covered above. Each filter has propertyName, operator (EQ, NEQ, LT, LTE, GT, GTE, CONTAINS_TOKEN, etc.), and value.',
+          items: {
+            type: 'object',
+            properties: {
+              propertyName: {
+                type: 'string',
+                description: 'HubSpot contact property name (e.g., "jobtitle", "industry", "num_notes")'
+              },
+              operator: {
+                type: 'string',
+                enum: ['EQ', 'NEQ', 'LT', 'LTE', 'GT', 'GTE', 'CONTAINS_TOKEN', 'HAS_PROPERTY', 'NOT_HAS_PROPERTY'],
+                description: 'Filter operator'
+              },
+              value: {
+                type: 'string',
+                description: 'Value to filter by'
+              }
+            },
+            required: ['propertyName', 'operator']
+          }
         }
       },
       required: ['query']
@@ -140,7 +191,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'search_hubspot_companies',
-    description: 'Search HubSpot for companies/organizations by name, domain, or industry. Useful for finding grant applicant organizations and their details. Can filter by lifecycle stage to find companies at specific stages in the sales funnel.',
+    description: 'Search HubSpot for companies with advanced cross-filtering. Search by name, domain, or industry, then filter by lifecycle stage, revenue range, creation/modification dates, owner, company type, and any custom properties. Perfect for queries like "all lead companies created in Q1 2025" or "technology companies with $1M+ revenue that are opportunities".',
     input_schema: {
       type: 'object',
       properties: {
@@ -150,16 +201,68 @@ export const HUBSPOT_TOOLS = [
         },
         min_revenue: {
           type: 'number',
-          description: 'Optional: Filter by minimum annual revenue (in dollars)'
+          description: 'Filter by minimum annual revenue (in dollars, e.g., 1000000 for $1M+)'
         },
         max_revenue: {
           type: 'number',
-          description: 'Optional: Filter by maximum annual revenue (in dollars)'
+          description: 'Filter by maximum annual revenue (in dollars)'
         },
         lifecycle_stage: {
           type: 'string',
           enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other'],
-          description: 'Optional: Filter companies by lifecycle stage. Use this to find prospects at specific points in the sales funnel. Values: subscriber (newsletter signups), lead (early interest), marketingqualifiedlead (MQL - engaged leads), salesqualifiedlead (SQL - qualified for sales), opportunity (active deal), customer (closed-won), evangelist (promoters), other (uncategorized).'
+          description: 'Filter by lifecycle stage: subscriber, lead, marketingqualifiedlead (MQL), salesqualifiedlead (SQL), opportunity, customer, evangelist, other'
+        },
+        createdate_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter companies created after this date (YYYY-MM-DD format, e.g., "2025-01-01")'
+        },
+        createdate_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter companies created before this date (YYYY-MM-DD format)'
+        },
+        lastmodifieddate_after: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter companies modified after this date (YYYY-MM-DD format) - useful for finding recently updated prospects'
+        },
+        lastmodifieddate_before: {
+          type: 'string',
+          format: 'date',
+          description: 'Filter companies modified before this date (YYYY-MM-DD format)'
+        },
+        owner_id: {
+          type: 'string',
+          description: 'Filter by HubSpot owner ID - use list_hubspot_owners to find owner IDs'
+        },
+        type: {
+          type: 'string',
+          enum: ['PROSPECT', 'PARTNER', 'RESELLER', 'VENDOR', 'OTHER'],
+          description: 'Filter by company type: PROSPECT (potential customers), PARTNER (business partners), RESELLER (resellers/distributors), VENDOR (suppliers), OTHER'
+        },
+        custom_filters: {
+          type: 'array',
+          description: 'Advanced: Array of custom property filters for any HubSpot company property not covered above. Each filter has propertyName, operator (EQ, NEQ, LT, LTE, GT, GTE, CONTAINS_TOKEN, etc.), and value.',
+          items: {
+            type: 'object',
+            properties: {
+              propertyName: {
+                type: 'string',
+                description: 'HubSpot company property name (e.g., "numberofemployees", "city", "num_associated_deals")'
+              },
+              operator: {
+                type: 'string',
+                enum: ['EQ', 'NEQ', 'LT', 'LTE', 'GT', 'GTE', 'CONTAINS_TOKEN', 'HAS_PROPERTY', 'NOT_HAS_PROPERTY'],
+                description: 'Filter operator'
+              },
+              value: {
+                type: 'string',
+                description: 'Value to filter by'
+              }
+            },
+            required: ['propertyName', 'operator']
+          }
         }
       },
       required: ['query']
