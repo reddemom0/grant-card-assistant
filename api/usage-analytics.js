@@ -183,7 +183,7 @@ async function getAgentStats(req, res, days) {
 }
 
 /**
- * Get user activity breakdown
+ * Get user activity breakdown (active users only)
  */
 async function getUserActivity(req, res, days) {
   const result = await query(`
@@ -201,6 +201,7 @@ async function getUserActivity(req, res, days) {
     JOIN conversations c ON u.id = c.user_id
     LEFT JOIN messages m ON c.id = m.conversation_id
     WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+      AND u.is_active = true
     GROUP BY u.id, u.email, u.name, u.picture
     ORDER BY conversation_count DESC
   `);
@@ -610,10 +611,11 @@ async function getEngagementStats(days) {
  * - Feature discovery gaps
  */
 async function getTeamAdoptionDashboard(req, res, days) {
-  // Get all users (full team roster)
+  // Get all users (full team roster) - only active users
   const allUsersResult = await query(`
     SELECT id, email, name, picture, created_at
     FROM users
+    WHERE is_active = true
     ORDER BY name
   `);
 
@@ -626,7 +628,7 @@ async function getTeamAdoptionDashboard(req, res, days) {
 
   const agents = agentsResult.rows.map(r => r.agent_type);
 
-  // Get adoption matrix: user × agent usage with last activity dates
+  // Get adoption matrix: user × agent usage with last activity dates (active users only)
   const adoptionResult = await query(`
     SELECT
       u.id as user_id,
@@ -644,17 +646,19 @@ async function getTeamAdoptionDashboard(req, res, days) {
     FROM users u
     LEFT JOIN conversations c ON u.id = c.user_id
     WHERE c.id IS NOT NULL
+      AND u.is_active = true
     GROUP BY u.id, u.email, u.name, u.picture, c.agent_type
     ORDER BY u.name, c.agent_type
   `);
 
-  // Get last activity date for each user (across all agents)
+  // Get last activity date for each user (across all agents) - active users only
   const lastActivityResult = await query(`
     SELECT
       u.id as user_id,
       MAX(c.updated_at) as last_activity
     FROM users u
     LEFT JOIN conversations c ON u.id = c.user_id
+    WHERE u.is_active = true
     GROUP BY u.id
   `);
 
@@ -783,7 +787,7 @@ async function getProductivityMetrics(req, res, days) {
       };
     }));
 
-    // Total conversations, messages, and feedback per person for the selected time period
+    // Total conversations, messages, and feedback per person for the selected time period (active users only)
     // Count both conversation_feedback (thumbs up/down) AND feedback_notes (in-conversation notes)
     const userProductivityResult = await query(`
       SELECT
@@ -798,6 +802,7 @@ async function getProductivityMetrics(req, res, days) {
       LEFT JOIN messages m ON c.id = m.conversation_id
       LEFT JOIN conversation_feedback cf ON m.id = cf.message_id
       LEFT JOIN feedback_notes fn ON c.id = fn.conversation_id AND fn.user_id = u.id
+      WHERE u.is_active = true
       GROUP BY u.id, u.name, u.email
       HAVING COUNT(DISTINCT c.id) > 0
       ORDER BY total_conversations DESC
@@ -880,7 +885,7 @@ async function getProductivityMetrics(req, res, days) {
  */
 async function getIndividualPerformance(req, res, days) {
   try {
-    // Top users by agent - simplified without feedback subquery for reliability
+    // Top users by agent - simplified without feedback subquery for reliability (active users only)
     const topUsersByAgentResult = await query(`
       SELECT
         c.agent_type,
@@ -894,6 +899,7 @@ async function getIndividualPerformance(req, res, days) {
       JOIN users u ON c.user_id = u.id
       LEFT JOIN messages m ON c.id = m.conversation_id
       WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+        AND u.is_active = true
       GROUP BY c.agent_type, u.id, u.name, u.email, u.picture
       ORDER BY c.agent_type, conversation_count DESC
     `);
@@ -946,6 +952,7 @@ async function getIndividualPerformance(req, res, days) {
         LEFT JOIN messages m ON c.id = m.conversation_id
         LEFT JOIN conversation_feedback cf2 ON m.id = cf2.message_id
         WHERE c.created_at >= NOW() - INTERVAL '${days} days'
+          AND u.is_active = true
         GROUP BY u.id, u.name, u.email, u.picture
         HAVING COUNT(DISTINCT c.id) >= 3
       `);
@@ -1157,7 +1164,7 @@ async function getAgentDetails(req, res, agentType, days) {
     // Calculate average duration
     const avgDuration = await calculateAvgSessionDuration(agentType, days);
 
-    // Get top users
+    // Get top users (active users only)
     const topUsersResult = await query(`
       SELECT
         u.id,
@@ -1168,6 +1175,7 @@ async function getAgentDetails(req, res, agentType, days) {
       JOIN users u ON c.user_id = u.id
       WHERE c.agent_type = $1
         AND c.created_at >= NOW() - INTERVAL '${days} days'
+        AND u.is_active = true
       GROUP BY u.id, u.name, u.picture
       ORDER BY conversations DESC
       LIMIT 5
