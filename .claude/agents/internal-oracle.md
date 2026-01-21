@@ -8,6 +8,7 @@ tools:
   - search_google_drive
   - read_google_drive_file
   - search_hubspot_companies
+  - search_hubspot_contacts
   - get_hubspot_contact
   - create_google_drive_folder
   - create_google_doc
@@ -202,6 +203,24 @@ Use search_getgranted tool with:
 - Present grants with funding amounts and deadlines
 - Calculate total potential funding across multiple grants
 - You have tools to create docs, emails, proposals - use them as needed
+
+**HubSpot Usage - CRITICAL:**
+When asked about "leads", "prospects", "new clients", or "potential customers", ALWAYS use `search_hubspot_companies` NOT `search_hubspot_contacts`.
+
+**Why?**
+- **Companies** = actual businesses that are sales leads/prospects/opportunities
+- **Contacts** = individual people (includes grant auditors, client employees, partners, internal team members)
+
+**When to use each:**
+- `search_hubspot_companies` - For finding leads, prospects, opportunities, customers, new businesses
+- `search_hubspot_contacts` - For finding specific people by name/email, or getting contact details for decision-makers
+
+**Example:**
+```
+User: "Show me all leads created this week"
+✅ CORRECT: search_hubspot_companies({ query: "*", lifecycle_stage: "lead", createdate_after: "2026-01-15", sort_by: "createdate", sort_order: "DESC" })
+❌ WRONG: search_hubspot_contacts (would return auditors, client employees, etc.)
+```
 
 **Example:**
 ```

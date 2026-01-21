@@ -88,7 +88,7 @@ export const MEMORY_TOOLS = [
 export const HUBSPOT_TOOLS = [
   {
     name: 'search_hubspot_contacts',
-    description: 'Search HubSpot CRM for contacts with advanced cross-filtering. Search by name, email, or company, then filter by lifecycle stage, creation/modification dates, owner, lead status, and any custom properties. Perfect for finding leads like "all MQLs created in the last 30 days" or "leads owned by Sarah modified this week".',
+    description: 'Search HubSpot CRM for individual people/contacts (decision-makers, employees, partners, auditors, etc.). Use this to find specific people by name or email, or to get contact details for people associated with companies. NOTE: For finding sales leads/prospects, use search_hubspot_companies instead - contacts include many non-lead people like grant auditors and client employees.',
     input_schema: {
       type: 'object',
       properties: {
@@ -202,7 +202,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'search_hubspot_companies',
-    description: 'Search HubSpot for companies with advanced cross-filtering. Search by name, domain, or industry, then filter by lifecycle stage, revenue range, creation/modification dates, owner, company type, and any custom properties. Perfect for queries like "all lead companies created in Q1 2025" or "technology companies with $1M+ revenue that are opportunities".',
+    description: 'Search HubSpot for companies/organizations (the primary entity for sales leads and prospects). Use this to find potential clients, active leads, opportunities, and customers. When asked about "leads", "prospects", "new clients", or "recent businesses", search COMPANIES not contacts - contacts include many non-lead people like grant auditors and client employees. Perfect for: "show me all lead companies created this week", "find technology companies that are opportunities", "list prospects with $1M+ revenue".',
     input_schema: {
       type: 'object',
       properties: {
