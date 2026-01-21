@@ -733,42 +733,28 @@ export async function listHubSpotOwners() {
  */
 export async function generateHubSpotEmbedLink(objectType, recordId, view = 'overview') {
   try {
-    // Map object types to HubSpot objectTypeIds
-    const objectTypeIdMap = {
-      'contact': '0-1',
-      'company': '0-2',
-      'deal': '0-3',
-      'ticket': '0-5',
-      'email': '0-19'
+    // Map object types to HubSpot URL paths (modern format)
+    const objectTypePathMap = {
+      'contact': 'contact',
+      'company': 'company',
+      'deal': 'deal',
+      'ticket': 'ticket',
+      'email': 'email'
     };
 
-    // Map view names to HubSpot view paths
-    const viewPathMap = {
-      'overview': 'record',
-      'activity': 'record',
-      'timeline': 'record',
-      'associations': 'associations',
-      'properties': 'record',
-      'meetings': 'meetings',
-      'emails': 'emails',
-      'tasks': 'tasks',
-      'notes': 'notes',
-      'calls': 'calls'
-    };
+    const objectPath = objectTypePathMap[objectType.toLowerCase()];
 
-    const objectTypeId = objectTypeIdMap[objectType.toLowerCase()];
-    const viewPath = viewPathMap[view.toLowerCase()] || 'record';
-
-    if (!objectTypeId) {
+    if (!objectPath) {
       return {
         success: false,
         error: `Invalid object type: ${objectType}. Must be one of: contact, company, deal, ticket, email`
       };
     }
 
-    // Generate HubSpot embed URL
-    // Format: https://app.hubspot.com/contacts/{portalId}/{objectTypeId}/{recordId}
-    const embedUrl = `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/${objectTypeId}/${recordId}`;
+    // Generate HubSpot URL (modern format)
+    // Format: https://app.hubspot.com/contacts/{portalId}/{objectType}/{recordId}
+    // Example: https://app.hubspot.com/contacts/21088260/contact/35474251
+    const embedUrl = `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/${objectPath}/${recordId}`;
 
     console.log(`🔗 Generated HubSpot embed link: ${objectType} ${recordId} (view: ${view})`);
 
