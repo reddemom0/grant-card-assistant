@@ -115,7 +115,9 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           lastmodifieddate_before: input.lastmodifieddate_before,
           owner_id: input.owner_id,
           hs_lead_status: input.hs_lead_status,
-          custom_filters: input.custom_filters || []
+          custom_filters: input.custom_filters || [],
+          sort_by: input.sort_by,
+          sort_order: input.sort_order || 'DESC'
         };
         result = await hubspot.searchHubSpotContacts(input.query, input.limit, contactFilters);
         break;
@@ -138,7 +140,9 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           lastmodifieddate_before: input.lastmodifieddate_before,
           owner_id: input.owner_id,
           type: input.type,
-          custom_filters: input.custom_filters || []
+          custom_filters: input.custom_filters || [],
+          sort_by: input.sort_by,
+          sort_order: input.sort_order || 'DESC'
         };
         result = await hubspot.searchHubSpotCompanies(
           input.query,

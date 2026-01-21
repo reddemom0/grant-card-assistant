@@ -241,7 +241,9 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
       lastmodifieddate_before = null,
       owner_id = null,
       hs_lead_status = null,
-      custom_filters = []
+      custom_filters = [],
+      sort_by = null,
+      sort_order = 'DESC'
     } = filters;
 
     // Build filter groups (OR logic between groups, AND within groups)
@@ -373,7 +375,17 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
       });
     }
 
-    const response = await client.post('/crm/v3/objects/contacts/search', {
+    // Build sorts array if sort_by is specified
+    const sorts = [];
+    if (sort_by) {
+      sorts.push({
+        propertyName: sort_by,
+        direction: sort_order === 'ASC' ? 'ASCENDING' : 'DESCENDING'
+      });
+      console.log(`  📊 Sorting by ${sort_by} ${sort_order}`);
+    }
+
+    const searchRequest = {
       filterGroups,
       properties: [
         'email',
@@ -392,7 +404,14 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
         'hs_lead_status'
       ],
       limit: Math.min(limit, 100)
-    });
+    };
+
+    // Add sorts if specified
+    if (sorts.length > 0) {
+      searchRequest.sorts = sorts;
+    }
+
+    const response = await client.post('/crm/v3/objects/contacts/search', searchRequest);
 
     console.log(`✓ HubSpot contact search: found ${response.data.results.length} results`);
 
@@ -809,7 +828,9 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
       lastmodifieddate_before = null,
       owner_id = null,
       type = null,
-      custom_filters = []
+      custom_filters = [],
+      sort_by = null,
+      sort_order = 'DESC'
     } = filters;
 
     // Build filter groups for OR search across multiple fields
@@ -951,7 +972,17 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
       });
     }
 
-    const response = await client.post('/crm/v3/objects/companies/search', {
+    // Build sorts array if sort_by is specified
+    const sorts = [];
+    if (sort_by) {
+      sorts.push({
+        propertyName: sort_by,
+        direction: sort_order === 'ASC' ? 'ASCENDING' : 'DESCENDING'
+      });
+      console.log(`  📊 Sorting by ${sort_by} ${sort_order}`);
+    }
+
+    const searchRequest = {
       filterGroups,
       properties: [
         'name', 'domain', 'industry', 'city', 'state', 'country',
@@ -959,7 +990,14 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
         'createdate', 'hs_lastmodifieddate', 'hubspot_owner_id', 'type'
       ],
       limit: 10
-    });
+    };
+
+    // Add sorts if specified
+    if (sorts.length > 0) {
+      searchRequest.sorts = sorts;
+    }
+
+    const response = await client.post('/crm/v3/objects/companies/search', searchRequest);
 
     console.log(`✓ HubSpot company search: found ${response.data.results.length} results`);
 

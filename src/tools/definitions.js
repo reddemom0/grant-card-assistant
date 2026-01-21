@@ -156,6 +156,17 @@ export const HUBSPOT_TOOLS = [
             },
             required: ['propertyName', 'operator']
           }
+        },
+        sort_by: {
+          type: 'string',
+          enum: ['createdate', 'lastmodifieddate', 'email', 'firstname', 'lastname', 'hs_lead_status'],
+          description: 'Sort results by this property. Most useful: "createdate" (find newest/oldest contacts), "lastmodifieddate" (find recently updated contacts)'
+        },
+        sort_order: {
+          type: 'string',
+          enum: ['DESC', 'ASC'],
+          default: 'DESC',
+          description: 'Sort order: DESC = newest/highest first (default), ASC = oldest/lowest first. Use DESC with createdate to find most recent contacts.'
         }
       },
       required: ['query']
@@ -263,6 +274,17 @@ export const HUBSPOT_TOOLS = [
             },
             required: ['propertyName', 'operator']
           }
+        },
+        sort_by: {
+          type: 'string',
+          enum: ['createdate', 'hs_lastmodifieddate', 'name', 'annualrevenue', 'numberofemployees'],
+          description: 'Sort results by this property. Most useful: "createdate" (find newest/oldest companies), "hs_lastmodifieddate" (find recently updated companies), "annualrevenue" (sort by size)'
+        },
+        sort_order: {
+          type: 'string',
+          enum: ['DESC', 'ASC'],
+          default: 'DESC',
+          description: 'Sort order: DESC = newest/highest first (default), ASC = oldest/lowest first. Use DESC with createdate to find most recent companies.'
         }
       },
       required: ['query']
