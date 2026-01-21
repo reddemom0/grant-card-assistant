@@ -919,6 +919,13 @@ This tool provides proactive market intelligence - check it regularly or when cl
     name: 'search_getgranted',
     description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
 
+**CRITICAL - Active vs Inactive Grants:**
+- By default, this tool ONLY returns ACTIVE grants (grants you can apply to NOW)
+- When users ask "find grants for X", they mean ACTIVE grants unless stated otherwise
+- NEVER return inactive grants unless the user explicitly asks for historical/inactive grants
+- Always use active_only=true (default) for normal grant searches
+- If an inactive grant is returned, CLEARLY label it as INACTIVE and suggest active alternatives
+
 Use this to:
 - Find grants for specific clients based on their industry, location, and needs
 - Discover hiring, training, export, R&D, or capital grants
@@ -928,10 +935,10 @@ Use this to:
 This tool searches the internal GetGranted database (188+ Canadian grants) and returns matching opportunities with eligibility, funding details, and deadlines.
 
 **Common use cases:**
-- "Find hiring grants for a BC tech company with 25 employees"
-- "Show market expansion grants for Indigenous-owned businesses"
-- "Search for R&D grants in Ontario with open intakes"
-- "Find all grants for female-owned manufacturing companies"`,
+- "Find hiring grants for a BC tech company with 25 employees" → active_only=true (default)
+- "Show market expansion grants for Indigenous-owned businesses" → active_only=true
+- "Search for R&D grants in Ontario with open intakes" → active_only=true, open_intakes_only=true
+- "What grants did we have for digitization in 2023?" → active_only=false (historical search)`,
     input_schema: {
       type: 'object',
       properties: {
@@ -979,7 +986,8 @@ This tool searches the internal GetGranted database (188+ Canadian grants) and r
         },
         active_only: {
           type: 'boolean',
-          description: 'Only show active grants (default true).'
+          default: true,
+          description: 'Only show ACTIVE grants that can be applied to NOW (default: true). Set to false ONLY if user explicitly asks for inactive/historical/closed grants. When users ask "find grants for X", they mean active grants - keep this as true.'
         },
         open_intakes_only: {
           type: 'boolean',

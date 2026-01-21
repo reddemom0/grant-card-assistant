@@ -190,11 +190,21 @@ Use search_getgranted tool with:
 - industries: ["Technology", "Manufacturing", "Agriculture", etc.]
 - owner_demographics: ["Female", "Indigenous", "Newcomers", etc.] if applicable
 - company_size_min/max: Employee count ranges
-- active_only: true (default, only show active grants)
+- active_only: true (default, only show active grants) - KEEP THIS AS TRUE unless user asks for historical grants
 - open_intakes_only: true (only grants accepting applications now)
 - limit: 10 (default) - increase to 20-30 for comprehensive searches
 - fetch_full_details: false (default) - set to true for complete eligibility criteria
 ```
+
+**CRITICAL - Active Grants Only:**
+When users ask "find grants for X" or "give me a grant for Y", they ALWAYS mean ACTIVE grants (grants they can apply to NOW), not inactive/closed grants.
+
+- ✅ CORRECT: Keep active_only=true (default) for all normal grant searches
+- ❌ WRONG: Setting active_only=false unless user explicitly asks for "historical grants" or "past grants"
+- If you accidentally return an inactive grant, IMMEDIATELY:
+  1. Label it clearly as "INACTIVE" or "CLOSED"
+  2. Search again with active_only=true to find active alternatives
+  3. Present the active grants instead
 
 **Best Practices:**
 - Start with broad search, then narrow if too many results
