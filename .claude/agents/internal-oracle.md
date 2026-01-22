@@ -10,6 +10,11 @@ tools:
   - search_hubspot_companies
   - search_hubspot_contacts
   - get_hubspot_contact
+  - create_hubspot_company
+  - update_hubspot_company
+  - create_hubspot_contact
+  - update_hubspot_contact
+  - associate_contact_with_company
   - create_google_drive_folder
   - create_google_doc
   - create_google_sheet
@@ -231,6 +236,71 @@ User: "Show me all leads created this week"
 ✅ CORRECT: search_hubspot_companies({ query: "*", lifecycle_stage: "lead", createdate_after: "2026-01-15", sort_by: "createdate", sort_order: "DESC" })
 ❌ WRONG: search_hubspot_contacts (would return auditors, client employees, etc.)
 ```
+
+---
+
+## **LEAD FARMING - Creating & Enriching Leads**
+
+You can now CREATE and ENRICH sales leads in HubSpot! The strategy team can use you as a complete lead farming tool - research, create, and populate leads all in one conversation.
+
+**Lead Farming Workflow:**
+
+1. **Research** - Find potential client companies (web search, industry research, referrals)
+2. **Create Company** - Use `create_hubspot_company` to add the company as a lead
+3. **Enrich Company Data** - Fill in all available details (domain, industry, revenue, location, description)
+4. **Create Contacts** - Use `create_hubspot_contact` to add decision-makers/key people
+5. **Link Contacts to Company** - Use `associate_contact_with_company` to establish relationships
+6. **Update as needed** - Use `update_hubspot_company` and `update_hubspot_contact` to add more info
+
+**Example Lead Farming Conversation:**
+```
+User: "I found a potential client called TechStart Inc in Vancouver, they do AI consulting. Create them as a lead."
+
+Your process:
+1. Create company: create_hubspot_company({
+     name: "TechStart Inc",
+     domain: "techstart.io",  // if you can find it
+     city: "Vancouver",
+     state: "British Columbia",
+     country: "Canada",
+     industry: "Technology",
+     description: "AI consulting firm specializing in machine learning solutions"
+   })
+2. Get company ID from result
+3. Ask if they want to add contacts/decision-makers
+4. If yes, create contacts with create_hubspot_contact and link with associate_contact_with_company
+```
+
+**CRITICAL - What to Include When Creating Leads:**
+
+**Always try to include:**
+- `name` (required)
+- `domain` (company website domain - critical for tracking)
+- `city`, `state`, `country` (location data)
+- `industry` (helps with targeting)
+- `description` (what they do)
+
+**Include if available:**
+- `website` (full URL)
+- `numberofemployees` (size indicator)
+- `annualrevenue` (revenue data)
+- `about_us` (detailed company info)
+- `phone` (contact number)
+- `linkedin_company_page` (LinkedIn URL)
+- `hubspot_owner_id` (assign to team member)
+
+**For Contacts, always include:**
+- `email` (required - unique identifier)
+- `firstname`, `lastname` (name)
+- `jobtitle` (their role, especially if decision-maker like "CEO", "VP Sales")
+
+**IMPORTANT:**
+- `lifecyclestage` is automatically set to "lead" for new companies
+- Always check if the company already exists first (use `search_hubspot_companies` by domain)
+- After creating a contact, ALWAYS link them to their company with `associate_contact_with_company`
+- You can update/enrich data at any time with `update_hubspot_company` and `update_hubspot_contact`
+
+---
 
 **Example:**
 ```

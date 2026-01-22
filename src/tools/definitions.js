@@ -319,6 +319,217 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'create_hubspot_company',
+    description: 'Create a new company (sales lead) in HubSpot CRM. Use this for lead farming when you identify a potential client company. Automatically sets lifecyclestage to "lead". Returns the created company ID which you can use with update_hubspot_company or create_hubspot_contact. IMPORTANT: After creating a company, you should typically create associated contacts (decision-makers) using create_hubspot_contact and link them with associate_contact_with_company.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Company name (REQUIRED) - e.g., "Acme Corp", "TechStart Inc"'
+        },
+        domain: {
+          type: 'string',
+          description: 'Company website domain (recommended) - e.g., "acmecorp.com", "techstart.io". Do not include "www." or "https://"'
+        },
+        website: {
+          type: 'string',
+          description: 'Full website URL - e.g., "https://www.acmecorp.com"'
+        },
+        industry: {
+          type: 'string',
+          description: 'Industry/sector - e.g., "Technology", "Manufacturing", "Healthcare", "Agriculture"'
+        },
+        description: {
+          type: 'string',
+          description: 'Brief company description (1-2 sentences about what they do)'
+        },
+        about_us: {
+          type: 'string',
+          description: 'Detailed "About Us" section (longer description of company history, mission, products/services)'
+        },
+        city: {
+          type: 'string',
+          description: 'City location - e.g., "Vancouver", "Toronto"'
+        },
+        state: {
+          type: 'string',
+          description: 'Province/State - e.g., "British Columbia", "Ontario", "BC"'
+        },
+        country: {
+          type: 'string',
+          description: 'Country - e.g., "Canada", "United States"'
+        },
+        phone: {
+          type: 'string',
+          description: 'Company phone number'
+        },
+        numberofemployees: {
+          type: 'number',
+          description: 'Number of employees'
+        },
+        annualrevenue: {
+          type: 'number',
+          description: 'Annual revenue in dollars (e.g., 1000000 for $1M)'
+        },
+        hubspot_owner_id: {
+          type: 'string',
+          description: 'HubSpot owner ID to assign this lead to (get from team members in your context)'
+        },
+        linkedin_company_page: {
+          type: 'string',
+          description: 'LinkedIn company page URL'
+        }
+      },
+      required: ['name']
+    }
+  },
+  {
+    name: 'update_hubspot_company',
+    description: 'Update/enrich an existing company in HubSpot with additional information. Use this to fill in missing data after creating a company or to update outdated information. Only include properties you want to change - existing values for other properties will be preserved.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        company_id: {
+          type: 'string',
+          description: 'HubSpot company ID to update (from create_hubspot_company or search results)'
+        },
+        properties: {
+          type: 'object',
+          description: 'Properties to update (any combination of: name, domain, website, industry, description, about_us, city, state, country, phone, numberofemployees, annualrevenue, lifecyclestage, hubspot_owner_id, linkedin_company_page)',
+          properties: {
+            name: { type: 'string' },
+            domain: { type: 'string' },
+            website: { type: 'string' },
+            industry: { type: 'string' },
+            description: { type: 'string' },
+            about_us: { type: 'string' },
+            city: { type: 'string' },
+            state: { type: 'string' },
+            country: { type: 'string' },
+            phone: { type: 'string' },
+            numberofemployees: { type: 'number' },
+            annualrevenue: { type: 'number' },
+            lifecyclestage: {
+              type: 'string',
+              enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other']
+            },
+            hubspot_owner_id: { type: 'string' },
+            linkedin_company_page: { type: 'string' }
+          }
+        }
+      },
+      required: ['company_id', 'properties']
+    }
+  },
+  {
+    name: 'create_hubspot_contact',
+    description: 'Create a new contact (person) in HubSpot CRM. Use this to add decision-makers, employees, or key contacts when lead farming. After creating, use associate_contact_with_company to link them to their company. Email is required - this is how HubSpot identifies unique contacts.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          description: 'Email address (REQUIRED) - e.g., "john.doe@acmecorp.com". Must be unique in HubSpot.'
+        },
+        firstname: {
+          type: 'string',
+          description: 'First name - e.g., "John"'
+        },
+        lastname: {
+          type: 'string',
+          description: 'Last name - e.g., "Doe"'
+        },
+        jobtitle: {
+          type: 'string',
+          description: 'Job title - e.g., "CEO", "VP of Sales", "Marketing Director"'
+        },
+        phone: {
+          type: 'string',
+          description: 'Work phone number'
+        },
+        mobilephone: {
+          type: 'string',
+          description: 'Mobile phone number'
+        },
+        city: {
+          type: 'string',
+          description: 'City'
+        },
+        state: {
+          type: 'string',
+          description: 'Province/State'
+        },
+        country: {
+          type: 'string',
+          description: 'Country'
+        },
+        lifecyclestage: {
+          type: 'string',
+          enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other'],
+          description: 'Lifecycle stage for this contact'
+        },
+        hubspot_owner_id: {
+          type: 'string',
+          description: 'HubSpot owner ID to assign this contact to'
+        }
+      },
+      required: ['email']
+    }
+  },
+  {
+    name: 'update_hubspot_contact',
+    description: 'Update/enrich an existing contact in HubSpot with additional information. Only include properties you want to change - existing values will be preserved.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contact_id: {
+          type: 'string',
+          description: 'HubSpot contact ID to update'
+        },
+        properties: {
+          type: 'object',
+          description: 'Properties to update (any combination of: email, firstname, lastname, jobtitle, phone, mobilephone, city, state, country, lifecyclestage, hubspot_owner_id)',
+          properties: {
+            email: { type: 'string' },
+            firstname: { type: 'string' },
+            lastname: { type: 'string' },
+            jobtitle: { type: 'string' },
+            phone: { type: 'string' },
+            mobilephone: { type: 'string' },
+            city: { type: 'string' },
+            state: { type: 'string' },
+            country: { type: 'string' },
+            lifecyclestage: {
+              type: 'string',
+              enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other']
+            },
+            hubspot_owner_id: { type: 'string' }
+          }
+        }
+      },
+      required: ['contact_id', 'properties']
+    }
+  },
+  {
+    name: 'associate_contact_with_company',
+    description: 'Link a contact (person) to a company in HubSpot. Use this after creating both a company and contact to establish the relationship (e.g., "John Doe works at Acme Corp"). This creates the association visible in HubSpot UI showing the contact is employed by/related to the company.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        contact_id: {
+          type: 'string',
+          description: 'HubSpot contact ID (from create_hubspot_contact or search)'
+        },
+        company_id: {
+          type: 'string',
+          description: 'HubSpot company ID (from create_hubspot_company or search)'
+        }
+      },
+      required: ['contact_id', 'company_id']
+    }
+  },
+  {
     name: 'search_grant_applications',
     description: 'Search for grant applications (HubSpot deals) with comprehensive filtering across team members, dates, financials, and all deal properties. Returns agent-specific application details - fields returned vary by agent type (CanExport agents see claim tracking fields, ETG agents see training fields, etc.). Always includes: approvedFunding (the ACTUAL approved funding amount), project details, team assignments, timeline, and workflow status. Supports filtering on all 128 properties from dealinformation, deal_activity, and deal_revenue groups using either explicit parameters (for common queries) or custom_filters array (for advanced queries).',
     input_schema: {

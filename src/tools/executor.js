@@ -160,6 +160,26 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.getCompanyById(input.company_id);
         break;
 
+      case 'create_hubspot_company':
+        result = await hubspot.createHubSpotCompany(input);
+        break;
+
+      case 'update_hubspot_company':
+        result = await hubspot.updateHubSpotCompany(input.company_id, input.properties);
+        break;
+
+      case 'create_hubspot_contact':
+        result = await hubspot.createHubSpotContact(input);
+        break;
+
+      case 'update_hubspot_contact':
+        result = await hubspot.updateHubSpotContact(input.contact_id, input.properties);
+        break;
+
+      case 'associate_contact_with_company':
+        result = await hubspot.associateContactWithCompany(input.contact_id, input.company_id);
+        break;
+
       case 'list_hubspot_owners':
         result = await hubspot.listHubSpotOwners();
         break;

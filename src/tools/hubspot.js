@@ -1021,6 +1021,337 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
 }
 
 // ============================================================================
+// COMPANY & CONTACT WRITE OPERATIONS
+// ============================================================================
+
+/**
+ * Create a new company in HubSpot
+ * @param {Object} companyData - Company properties
+ * @param {string} companyData.name - Company name (REQUIRED)
+ * @param {string} companyData.domain - Company domain (e.g., "techco.com")
+ * @param {string} companyData.website - Website URL
+ * @param {string} companyData.industry - Industry (use industry1 property)
+ * @param {string} companyData.description - Company description
+ * @param {string} companyData.about_us - About us section
+ * @param {string} companyData.city - City
+ * @param {string} companyData.state - State/province
+ * @param {string} companyData.country - Country
+ * @param {string} companyData.phone - Phone number
+ * @param {number} companyData.numberofemployees - Number of employees
+ * @param {number} companyData.annualrevenue - Annual revenue (in default currency)
+ * @param {string} companyData.lifecyclestage - Lifecycle stage (default: "lead")
+ * @param {string} companyData.hubspot_owner_id - Owner ID
+ * @param {string} companyData.linkedin_company_page - LinkedIn URL
+ * @returns {Object} Created company with id and properties
+ */
+export async function createHubSpotCompany(companyData) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!companyData.name) {
+    return {
+      success: false,
+      error: 'Company name is required'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🏢 Creating company: ${companyData.name}`);
+
+    // Build properties object, filtering out undefined/null values
+    const properties = {};
+
+    // Required field
+    properties.name = companyData.name;
+
+    // Optional fields - only include if provided
+    if (companyData.domain) properties.domain = companyData.domain;
+    if (companyData.website) properties.website = companyData.website;
+    if (companyData.industry) properties.industry = companyData.industry;
+    if (companyData.description) properties.description = companyData.description;
+    if (companyData.about_us) properties.about_us = companyData.about_us;
+    if (companyData.city) properties.city = companyData.city;
+    if (companyData.state) properties.state = companyData.state;
+    if (companyData.country) properties.country = companyData.country;
+    if (companyData.phone) properties.phone = companyData.phone;
+    if (companyData.numberofemployees !== undefined) properties.numberofemployees = companyData.numberofemployees;
+    if (companyData.annualrevenue !== undefined) properties.annualrevenue = companyData.annualrevenue;
+    if (companyData.hubspot_owner_id) properties.hubspot_owner_id = companyData.hubspot_owner_id;
+    if (companyData.linkedin_company_page) properties.linkedin_company_page = companyData.linkedin_company_page;
+
+    // Set lifecycle stage to "lead" by default if not specified
+    properties.lifecyclestage = companyData.lifecyclestage || 'lead';
+
+    const response = await client.post('/crm/v3/objects/companies', {
+      properties
+    });
+
+    console.log(`✅ Company created with ID: ${response.data.id}`);
+
+    return {
+      success: true,
+      company: {
+        id: response.data.id,
+        ...response.data.properties
+      }
+    };
+  } catch (error) {
+    console.error('Create HubSpot company error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+/**
+ * Update an existing company in HubSpot
+ * @param {string} companyId - HubSpot company ID
+ * @param {Object} properties - Properties to update (same as createHubSpotCompany)
+ * @returns {Object} Updated company
+ */
+export async function updateHubSpotCompany(companyId, properties) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!companyId) {
+    return {
+      success: false,
+      error: 'Company ID is required'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔄 Updating company ID: ${companyId}`);
+
+    // Filter out undefined/null values
+    const cleanedProperties = {};
+    Object.keys(properties).forEach(key => {
+      if (properties[key] !== undefined && properties[key] !== null) {
+        cleanedProperties[key] = properties[key];
+      }
+    });
+
+    const response = await client.patch(`/crm/v3/objects/companies/${companyId}`, {
+      properties: cleanedProperties
+    });
+
+    console.log(`✅ Company updated: ${companyId}`);
+
+    return {
+      success: true,
+      company: {
+        id: response.data.id,
+        ...response.data.properties
+      }
+    };
+  } catch (error) {
+    console.error('Update HubSpot company error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+/**
+ * Create a new contact in HubSpot
+ * @param {Object} contactData - Contact properties
+ * @param {string} contactData.email - Email address (REQUIRED)
+ * @param {string} contactData.firstname - First name
+ * @param {string} contactData.lastname - Last name
+ * @param {string} contactData.jobtitle - Job title
+ * @param {string} contactData.phone - Phone number
+ * @param {string} contactData.mobilephone - Mobile phone
+ * @param {string} contactData.city - City
+ * @param {string} contactData.state - State/province
+ * @param {string} contactData.country - Country
+ * @param {string} contactData.lifecyclestage - Lifecycle stage
+ * @param {string} contactData.hubspot_owner_id - Owner ID
+ * @returns {Object} Created contact with id and properties
+ */
+export async function createHubSpotContact(contactData) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!contactData.email) {
+    return {
+      success: false,
+      error: 'Contact email is required'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`👤 Creating contact: ${contactData.email}`);
+
+    // Build properties object
+    const properties = {};
+
+    // Required field
+    properties.email = contactData.email;
+
+    // Optional fields
+    if (contactData.firstname) properties.firstname = contactData.firstname;
+    if (contactData.lastname) properties.lastname = contactData.lastname;
+    if (contactData.jobtitle) properties.jobtitle = contactData.jobtitle;
+    if (contactData.phone) properties.phone = contactData.phone;
+    if (contactData.mobilephone) properties.mobilephone = contactData.mobilephone;
+    if (contactData.city) properties.city = contactData.city;
+    if (contactData.state) properties.state = contactData.state;
+    if (contactData.country) properties.country = contactData.country;
+    if (contactData.lifecyclestage) properties.lifecyclestage = contactData.lifecyclestage;
+    if (contactData.hubspot_owner_id) properties.hubspot_owner_id = contactData.hubspot_owner_id;
+
+    const response = await client.post('/crm/v3/objects/contacts', {
+      properties
+    });
+
+    console.log(`✅ Contact created with ID: ${response.data.id}`);
+
+    return {
+      success: true,
+      contact: {
+        id: response.data.id,
+        ...response.data.properties
+      }
+    };
+  } catch (error) {
+    console.error('Create HubSpot contact error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+/**
+ * Update an existing contact in HubSpot
+ * @param {string} contactId - HubSpot contact ID
+ * @param {Object} properties - Properties to update (same as createHubSpotContact)
+ * @returns {Object} Updated contact
+ */
+export async function updateHubSpotContact(contactId, properties) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!contactId) {
+    return {
+      success: false,
+      error: 'Contact ID is required'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔄 Updating contact ID: ${contactId}`);
+
+    // Filter out undefined/null values
+    const cleanedProperties = {};
+    Object.keys(properties).forEach(key => {
+      if (properties[key] !== undefined && properties[key] !== null) {
+        cleanedProperties[key] = properties[key];
+      }
+    });
+
+    const response = await client.patch(`/crm/v3/objects/contacts/${contactId}`, {
+      properties: cleanedProperties
+    });
+
+    console.log(`✅ Contact updated: ${contactId}`);
+
+    return {
+      success: true,
+      contact: {
+        id: response.data.id,
+        ...response.data.properties
+      }
+    };
+  } catch (error) {
+    console.error('Update HubSpot contact error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+/**
+ * Associate a contact with a company in HubSpot
+ * @param {string} contactId - HubSpot contact ID
+ * @param {string} companyId - HubSpot company ID
+ * @returns {Object} Association result
+ */
+export async function associateContactWithCompany(contactId, companyId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!contactId || !companyId) {
+    return {
+      success: false,
+      error: 'Both contact ID and company ID are required'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔗 Associating contact ${contactId} with company ${companyId}`);
+
+    // Association type ID for contact-to-company: 279
+    // https://developers.hubspot.com/docs/api/crm/associations
+    await client.put(
+      `/crm/v4/objects/contacts/${contactId}/associations/default/companies/${companyId}`,
+      []
+    );
+
+    console.log(`✅ Association created successfully`);
+
+    return {
+      success: true,
+      message: `Contact ${contactId} associated with company ${companyId}`
+    };
+  } catch (error) {
+    console.error('Associate contact with company error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+// ============================================================================
 // HELPER FUNCTIONS FOR SEARCH
 // ============================================================================
 
