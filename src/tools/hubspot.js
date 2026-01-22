@@ -368,13 +368,6 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
       });
     }
 
-    // Apply common filters to ALL filter groups
-    if (commonFilters.length > 0) {
-      filterGroups.forEach(group => {
-        group.filters.push(...commonFilters);
-      });
-    }
-
     // Build sorts array if sort_by is specified
     const sorts = [];
     if (sort_by) {
@@ -383,6 +376,23 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
         direction: sort_order === 'ASC' ? 'ASCENDING' : 'DESCENDING'
       });
       console.log(`  📊 Sorting by ${sort_by} ${sort_order}`);
+
+      // CRITICAL: When sorting by date fields, exclude records without that date
+      // This prevents contacts with null/0 dates (1970-01-01) from filling results
+      if (sort_by === 'createdate' || sort_by === 'lastmodifieddate') {
+        commonFilters.push({
+          propertyName: sort_by,
+          operator: 'HAS_PROPERTY'
+        });
+        console.log(`  ✓ Filtering to only include contacts with ${sort_by} set`);
+      }
+    }
+
+    // Apply common filters to ALL filter groups
+    if (commonFilters.length > 0) {
+      filterGroups.forEach(group => {
+        group.filters.push(...commonFilters);
+      });
     }
 
     const searchRequest = {
@@ -951,13 +961,6 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
       });
     }
 
-    // Apply common filters to ALL filter groups
-    if (commonFilters.length > 0) {
-      filterGroups.forEach(group => {
-        group.filters.push(...commonFilters);
-      });
-    }
-
     // Build sorts array if sort_by is specified
     const sorts = [];
     if (sort_by) {
@@ -966,6 +969,23 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
         direction: sort_order === 'ASC' ? 'ASCENDING' : 'DESCENDING'
       });
       console.log(`  📊 Sorting by ${sort_by} ${sort_order}`);
+
+      // CRITICAL: When sorting by date fields, exclude records without that date
+      // This prevents companies with null/0 dates (1970-01-01) from filling results
+      if (sort_by === 'createdate' || sort_by === 'hs_lastmodifieddate') {
+        commonFilters.push({
+          propertyName: sort_by,
+          operator: 'HAS_PROPERTY'
+        });
+        console.log(`  ✓ Filtering to only include companies with ${sort_by} set`);
+      }
+    }
+
+    // Apply common filters to ALL filter groups
+    if (commonFilters.length > 0) {
+      filterGroups.forEach(group => {
+        group.filters.push(...commonFilters);
+      });
     }
 
     const searchRequest = {
