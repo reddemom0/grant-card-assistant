@@ -530,6 +530,88 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'verify_company_website',
+    description: 'Verify if a company\'s website is still active and accessible. Checks HTTP status, handles redirects, and identifies if the business appears to still be operating. Use this for lead verification to identify inactive/defunct companies. Returns status (active/inactive/unknown), HTTP status code, and detailed message about accessibility.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        domain: {
+          type: 'string',
+          description: 'Company domain or full URL to verify (e.g., "techco.com", "https://www.example.com")'
+        }
+      },
+      required: ['domain']
+    }
+  },
+  {
+    name: 'find_duplicate_companies',
+    description: 'Find potential duplicate company records in HubSpot by domain, name, or both. Use this to identify companies that may have been entered multiple times. Returns all matching records with key details (ID, name, domain, creation date, lifecycle stage) so you can decide which to merge. IMPORTANT: Always review results before merging - some matches may be legitimate separate entities (e.g., subsidiaries, franchises).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        domain: {
+          type: 'string',
+          description: 'Company domain to search for duplicates (e.g., "techco.com"). Most reliable method.'
+        },
+        name: {
+          type: 'string',
+          description: 'Company name to search for exact matches (e.g., "Acme Corp")'
+        }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'find_duplicate_contacts',
+    description: 'Find potential duplicate contact records in HubSpot by email address. Use this to identify contacts that may have been entered multiple times. Returns all matching records with details (ID, name, job title, company, creation date) so you can decide which to merge.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          description: 'Email address to search for duplicates (e.g., "john@techco.com")'
+        }
+      },
+      required: ['email']
+    }
+  },
+  {
+    name: 'merge_duplicate_companies',
+    description: 'Merge two duplicate company records in HubSpot. The primary company receives all data from the secondary company, and the secondary is deleted. All associations (contacts, deals, notes) are transferred to the primary. CRITICAL: This action is irreversible! Always use find_duplicate_companies first to confirm duplicates, and ask user which record to keep as primary.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        primary_company_id: {
+          type: 'string',
+          description: 'HubSpot ID of the company to KEEP (receives all data). Usually the older/more complete record.'
+        },
+        secondary_company_id: {
+          type: 'string',
+          description: 'HubSpot ID of the company to MERGE and DELETE (data transferred to primary)'
+        }
+      },
+      required: ['primary_company_id', 'secondary_company_id']
+    }
+  },
+  {
+    name: 'merge_duplicate_contacts',
+    description: 'Merge two duplicate contact records in HubSpot. The primary contact receives all data from the secondary contact, and the secondary is deleted. All associations (companies, deals, notes) are transferred to the primary. CRITICAL: This action is irreversible! Always use find_duplicate_contacts first to confirm duplicates, and ask user which record to keep as primary.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        primary_contact_id: {
+          type: 'string',
+          description: 'HubSpot ID of the contact to KEEP (receives all data). Usually the older/more complete record.'
+        },
+        secondary_contact_id: {
+          type: 'string',
+          description: 'HubSpot ID of the contact to MERGE and DELETE (data transferred to primary)'
+        }
+      },
+      required: ['primary_contact_id', 'secondary_contact_id']
+    }
+  },
+  {
     name: 'search_grant_applications',
     description: 'Search for grant applications (HubSpot deals) with comprehensive filtering across team members, dates, financials, and all deal properties. Returns agent-specific application details - fields returned vary by agent type (CanExport agents see claim tracking fields, ETG agents see training fields, etc.). Always includes: approvedFunding (the ACTUAL approved funding amount), project details, team assignments, timeline, and workflow status. Supports filtering on all 128 properties from dealinformation, deal_activity, and deal_revenue groups using either explicit parameters (for common queries) or custom_filters array (for advanced queries).',
     input_schema: {

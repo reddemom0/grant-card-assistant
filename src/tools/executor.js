@@ -180,6 +180,26 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.associateContactWithCompany(input.contact_id, input.company_id);
         break;
 
+      case 'verify_company_website':
+        result = await hubspot.verifyCompanyWebsite(input.domain);
+        break;
+
+      case 'find_duplicate_companies':
+        result = await hubspot.findDuplicateCompanies(input);
+        break;
+
+      case 'find_duplicate_contacts':
+        result = await hubspot.findDuplicateContacts(input.email);
+        break;
+
+      case 'merge_duplicate_companies':
+        result = await hubspot.mergeDuplicateCompanies(input.primary_company_id, input.secondary_company_id);
+        break;
+
+      case 'merge_duplicate_contacts':
+        result = await hubspot.mergeDuplicateContacts(input.primary_contact_id, input.secondary_contact_id);
+        break;
+
       case 'list_hubspot_owners':
         result = await hubspot.listHubSpotOwners();
         break;

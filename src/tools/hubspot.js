@@ -1352,6 +1352,418 @@ export async function associateContactWithCompany(contactId, companyId) {
 }
 
 // ============================================================================
+// LEAD VERIFICATION & MANAGEMENT
+// ============================================================================
+
+/**
+ * Verify if a company's website is still active/operating
+ * Checks HTTP status, redirects, and basic accessibility
+ * @param {string} domain - Company domain or full URL
+ * @returns {Object} Verification result with status and details
+ */
+export async function verifyCompanyWebsite(domain) {
+  try {
+    // Clean domain (remove protocol, www, trailing slash)
+    let cleanDomain = domain
+      .toLowerCase()
+      .replace(/^(https?:\/\/)?(www\.)?/, '')
+      .replace(/\/$/, '');
+
+    // Build test URL
+    const testUrl = `https://${cleanDomain}`;
+
+    console.log(`🔍 Verifying website: ${testUrl}`);
+
+    // Use axios with timeout and redirect following
+    const axios = (await import('axios')).default;
+    const response = await axios.get(testUrl, {
+      timeout: 10000, // 10 second timeout
+      maxRedirects: 5,
+      validateStatus: null // Don't throw on any status
+    });
+
+    const status = response.status;
+    const finalUrl = response.request.res.responseUrl || testUrl;
+
+    let verification = {
+      success: true,
+      domain: cleanDomain,
+      testedUrl: testUrl,
+      finalUrl: finalUrl,
+      statusCode: status,
+      isActive: status >= 200 && status < 400,
+      redirected: finalUrl !== testUrl
+    };
+
+    // Determine status message
+    if (status >= 200 && status < 300) {
+      verification.message = '✅ Website is active and accessible';
+    } else if (status >= 300 && status < 400) {
+      verification.message = `⚠️ Website redirects (${status}) - may have moved`;
+    } else if (status === 404) {
+      verification.message = '❌ Website not found (404) - domain may be inactive';
+      verification.isActive = false;
+    } else if (status === 403) {
+      verification.message = '⚠️ Website is accessible but blocking automated requests (403)';
+    } else if (status >= 500) {
+      verification.message = `⚠️ Website is down or having issues (${status})`;
+      verification.isActive = false;
+    } else {
+      verification.message = `⚠️ Unexpected status code: ${status}`;
+    }
+
+    console.log(`  ${verification.message}`);
+    return verification;
+
+  } catch (error) {
+    console.error(`  ❌ Verification failed: ${error.message}`);
+
+    let message = '❌ Website verification failed';
+    let isActive = false;
+
+    if (error.code === 'ENOTFOUND') {
+      message = '❌ Domain not found (DNS) - company may no longer exist';
+    } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      message = '⚠️ Website timeout - may be slow or blocking requests';
+      isActive = null; // Unknown
+    } else if (error.code === 'ECONNREFUSED') {
+      message = '❌ Connection refused - website may be down';
+    }
+
+    return {
+      success: false,
+      domain: domain,
+      isActive: isActive,
+      error: error.message,
+      errorCode: error.code,
+      message: message
+    };
+  }
+}
+
+/**
+ * Find duplicate companies in HubSpot by domain, name, or email
+ * @param {Object} criteria - Search criteria
+ * @param {string} criteria.domain - Company domain to check for duplicates
+ * @param {string} criteria.name - Company name to check for duplicates
+ * @param {string} criteria.email - Company email to check for duplicates
+ * @returns {Object} List of potential duplicate companies
+ */
+export async function findDuplicateCompanies(criteria) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!criteria.domain && !criteria.name && !criteria.email) {
+    return {
+      success: false,
+      error: 'At least one search criterion required (domain, name, or email)'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+    const filterGroups = [];
+
+    console.log(`🔍 Finding duplicate companies...`);
+
+    // Search by domain (most reliable)
+    if (criteria.domain) {
+      const cleanDomain = criteria.domain
+        .toLowerCase()
+        .replace(/^(https?:\/\/)?(www\.)?/, '')
+        .replace(/\/$/, '');
+
+      filterGroups.push({
+        filters: [{
+          propertyName: 'domain',
+          operator: 'EQ',
+          value: cleanDomain
+        }]
+      });
+      console.log(`  🔎 Searching by domain: ${cleanDomain}`);
+    }
+
+    // Search by exact name match
+    if (criteria.name) {
+      filterGroups.push({
+        filters: [{
+          propertyName: 'name',
+          operator: 'EQ',
+          value: criteria.name
+        }]
+      });
+      console.log(`  🔎 Searching by name: ${criteria.name}`);
+    }
+
+    const searchRequest = {
+      filterGroups,
+      properties: [
+        'name', 'domain', 'city', 'state', 'country',
+        'createdate', 'hs_lastmodifieddate', 'lifecyclestage',
+        'numberofemployees', 'annualrevenue'
+      ],
+      limit: 100 // Get all potential duplicates
+    };
+
+    const response = await client.post('/crm/v3/objects/companies/search', searchRequest);
+
+    const companies = response.data.results;
+    console.log(`  ✓ Found ${companies.length} potential duplicates`);
+
+    if (companies.length <= 1) {
+      return {
+        success: true,
+        hasDuplicates: false,
+        count: companies.length,
+        companies: companies.map(c => ({
+          id: c.id,
+          name: c.properties.name,
+          domain: c.properties.domain,
+          createDate: parseHubSpotDate(c.properties.createdate),
+          lifecycleStage: c.properties.lifecyclestage
+        })),
+        message: 'No duplicates found'
+      };
+    }
+
+    return {
+      success: true,
+      hasDuplicates: true,
+      count: companies.length,
+      companies: companies.map(c => ({
+        id: c.id,
+        name: c.properties.name,
+        domain: c.properties.domain,
+        location: [c.properties.city, c.properties.state, c.properties.country].filter(Boolean).join(', '),
+        createDate: parseHubSpotDate(c.properties.createdate),
+        lastModified: parseHubSpotDate(c.properties.hs_lastmodifieddate),
+        lifecycleStage: c.properties.lifecyclestage,
+        employees: c.properties.numberofemployees,
+        revenue: c.properties.annualrevenue
+      })),
+      message: `Found ${companies.length} duplicate companies`
+    };
+
+  } catch (error) {
+    console.error('Find duplicate companies error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message
+    };
+  }
+}
+
+/**
+ * Find duplicate contacts in HubSpot by email
+ * @param {string} email - Email address to check for duplicates
+ * @returns {Object} List of potential duplicate contacts
+ */
+export async function findDuplicateContacts(email) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!email) {
+    return {
+      success: false,
+      error: 'Email address is required'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔍 Finding duplicate contacts for: ${email}`);
+
+    const searchRequest = {
+      filterGroups: [{
+        filters: [{
+          propertyName: 'email',
+          operator: 'EQ',
+          value: email
+        }]
+      }],
+      properties: [
+        'email', 'firstname', 'lastname', 'jobtitle', 'company',
+        'createdate', 'lastmodifieddate', 'lifecyclestage'
+      ],
+      limit: 100
+    };
+
+    const response = await client.post('/crm/v3/objects/contacts/search', searchRequest);
+
+    const contacts = response.data.results;
+    console.log(`  ✓ Found ${contacts.length} potential duplicates`);
+
+    if (contacts.length <= 1) {
+      return {
+        success: true,
+        hasDuplicates: false,
+        count: contacts.length,
+        contacts: contacts.map(c => ({
+          id: c.id,
+          email: c.properties.email,
+          name: `${c.properties.firstname || ''} ${c.properties.lastname || ''}`.trim(),
+          createDate: parseHubSpotDate(c.properties.createdate)
+        })),
+        message: 'No duplicates found'
+      };
+    }
+
+    return {
+      success: true,
+      hasDuplicates: true,
+      count: contacts.length,
+      contacts: contacts.map(c => ({
+        id: c.id,
+        email: c.properties.email,
+        firstname: c.properties.firstname,
+        lastname: c.properties.lastname,
+        name: `${c.properties.firstname || ''} ${c.properties.lastname || ''}`.trim(),
+        jobtitle: c.properties.jobtitle,
+        company: c.properties.company,
+        createDate: parseHubSpotDate(c.properties.createdate),
+        lastModified: parseHubSpotDate(c.properties.lastmodifieddate),
+        lifecycleStage: c.properties.lifecyclestage
+      })),
+      message: `Found ${contacts.length} duplicate contacts`
+    };
+
+  } catch (error) {
+    console.error('Find duplicate contacts error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message
+    };
+  }
+}
+
+/**
+ * Merge duplicate companies in HubSpot
+ * @param {string} primaryCompanyId - ID of company to keep (will receive all data)
+ * @param {string} secondaryCompanyId - ID of company to merge and delete
+ * @returns {Object} Merge result
+ */
+export async function mergeDuplicateCompanies(primaryCompanyId, secondaryCompanyId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!primaryCompanyId || !secondaryCompanyId) {
+    return {
+      success: false,
+      error: 'Both primary and secondary company IDs are required'
+    };
+  }
+
+  if (primaryCompanyId === secondaryCompanyId) {
+    return {
+      success: false,
+      error: 'Cannot merge a company with itself'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔀 Merging companies: ${secondaryCompanyId} → ${primaryCompanyId}`);
+
+    // HubSpot Merge API
+    // Primary company receives all data from secondary
+    // Secondary company is deleted
+    const response = await client.post('/crm/v3/objects/companies/merge', {
+      primaryObjectId: primaryCompanyId,
+      objectIdToMerge: secondaryCompanyId
+    });
+
+    console.log(`  ✅ Merge successful`);
+
+    return {
+      success: true,
+      primaryCompanyId: primaryCompanyId,
+      mergedCompanyId: secondaryCompanyId,
+      message: `Successfully merged company ${secondaryCompanyId} into ${primaryCompanyId}. All associations and data have been transferred.`
+    };
+
+  } catch (error) {
+    console.error('Merge companies error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+/**
+ * Merge duplicate contacts in HubSpot
+ * @param {string} primaryContactId - ID of contact to keep (will receive all data)
+ * @param {string} secondaryContactId - ID of contact to merge and delete
+ * @returns {Object} Merge result
+ */
+export async function mergeDuplicateContacts(primaryContactId, secondaryContactId) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!primaryContactId || !secondaryContactId) {
+    return {
+      success: false,
+      error: 'Both primary and secondary contact IDs are required'
+    };
+  }
+
+  if (primaryContactId === secondaryContactId) {
+    return {
+      success: false,
+      error: 'Cannot merge a contact with itself'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔀 Merging contacts: ${secondaryContactId} → ${primaryContactId}`);
+
+    // HubSpot Merge API
+    const response = await client.post('/crm/v3/objects/contacts/merge', {
+      primaryObjectId: primaryContactId,
+      objectIdToMerge: secondaryContactId
+    });
+
+    console.log(`  ✅ Merge successful`);
+
+    return {
+      success: true,
+      primaryContactId: primaryContactId,
+      mergedContactId: secondaryContactId,
+      message: `Successfully merged contact ${secondaryContactId} into ${primaryContactId}. All associations and data have been transferred.`
+    };
+
+  } catch (error) {
+    console.error('Merge contacts error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+// ============================================================================
 // HELPER FUNCTIONS FOR SEARCH
 // ============================================================================
 
