@@ -376,16 +376,6 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
         direction: sort_order === 'ASC' ? 'ASCENDING' : 'DESCENDING'
       });
       console.log(`  📊 Sorting by ${sort_by} ${sort_order}`);
-
-      // CRITICAL: When sorting by date fields, exclude records without that date
-      // This prevents contacts with null/0 dates (1970-01-01) from filling results
-      if (sort_by === 'createdate' || sort_by === 'lastmodifieddate') {
-        commonFilters.push({
-          propertyName: sort_by,
-          operator: 'HAS_PROPERTY'
-        });
-        console.log(`  ✓ Filtering to only include contacts with ${sort_by} set`);
-      }
     }
 
     // Apply common filters to ALL filter groups
@@ -441,8 +431,8 @@ export async function searchHubSpotContacts(query, limit = 10, filters = {}) {
           contact.properties.country
         ].filter(Boolean).join(', '),
         lifecycleStage: contact.properties.lifecyclestage,
-        createDate: contact.properties.createdate ? new Date(parseInt(contact.properties.createdate)).toISOString() : null,
-        lastModifiedDate: contact.properties.lastmodifieddate ? new Date(parseInt(contact.properties.lastmodifieddate)).toISOString() : null,
+        createDate: parseHubSpotDate(contact.properties.createdate),
+        lastModifiedDate: parseHubSpotDate(contact.properties.lastmodifieddate),
         ownerId: contact.properties.hubspot_owner_id,
         leadStatus: contact.properties.hs_lead_status
       }))
@@ -969,16 +959,6 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
         direction: sort_order === 'ASC' ? 'ASCENDING' : 'DESCENDING'
       });
       console.log(`  📊 Sorting by ${sort_by} ${sort_order}`);
-
-      // CRITICAL: When sorting by date fields, exclude records without that date
-      // This prevents companies with null/0 dates (1970-01-01) from filling results
-      if (sort_by === 'createdate' || sort_by === 'hs_lastmodifieddate') {
-        commonFilters.push({
-          propertyName: sort_by,
-          operator: 'HAS_PROPERTY'
-        });
-        console.log(`  ✓ Filtering to only include companies with ${sort_by} set`);
-      }
     }
 
     // Apply common filters to ALL filter groups
@@ -1024,8 +1004,8 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
         revenue: company.properties.annualrevenue,
         description: company.properties.description,
         lifecycleStage: company.properties.lifecyclestage,
-        createDate: company.properties.createdate ? new Date(parseInt(company.properties.createdate)).toISOString() : null,
-        lastModifiedDate: company.properties.hs_lastmodifieddate ? new Date(parseInt(company.properties.hs_lastmodifieddate)).toISOString() : null,
+        createDate: parseHubSpotDate(company.properties.createdate),
+        lastModifiedDate: parseHubSpotDate(company.properties.hs_lastmodifieddate),
         ownerId: company.properties.hubspot_owner_id,
         type: company.properties.type
       }))
@@ -1081,6 +1061,36 @@ async function fetchHubSpotOwners() {
   } catch (error) {
     console.error('Error fetching HubSpot owners:', error.response?.data || error.message);
     return [];
+  }
+}
+
+/**
+ * Parse HubSpot date property value to ISO string
+ * HubSpot can return dates as either Unix timestamps (numbers) or ISO 8601 strings
+ * @param {string|number} dateValue - Date value from HubSpot API
+ * @returns {string|null} ISO 8601 date string or null if invalid
+ */
+function parseHubSpotDate(dateValue) {
+  if (!dateValue) return null;
+
+  try {
+    // If it's already an ISO string (contains 'T'), use it directly
+    if (typeof dateValue === 'string' && dateValue.includes('T')) {
+      const date = new Date(dateValue);
+      return !isNaN(date.getTime()) ? date.toISOString() : null;
+    }
+
+    // If it's a numeric string or number, treat as Unix timestamp
+    const timestamp = typeof dateValue === 'string' ? parseInt(dateValue) : dateValue;
+    if (!isNaN(timestamp)) {
+      const date = new Date(timestamp);
+      return !isNaN(date.getTime()) ? date.toISOString() : null;
+    }
+
+    return null;
+  } catch (error) {
+    console.warn(`⚠️  Error parsing HubSpot date ${dateValue}:`, error.message);
+    return null;
   }
 }
 
