@@ -1301,12 +1301,18 @@
                         </select>
                     </div>
                     <div class="input-group">
-                        <label for="revenue-2023">2023 Annual Revenue:</label>
-                        <input type="number" id="revenue-2023" placeholder="$100,000 minimum">
-                    </div>
-                    <div class="input-group">
                         <label for="revenue-2024">2024 Annual Revenue:</label>
                         <input type="number" id="revenue-2024" placeholder="$100,000 minimum">
+                    </div>
+                    <div class="input-group">
+                        <label for="revenue-2025">2025 Annual Revenue:</label>
+                        <input type="number" id="revenue-2025" placeholder="$100,000 minimum">
+                    </div>
+                    <div class="input-group" style="grid-column: 1 / -1;">
+                        <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem;">
+                            <input type="checkbox" id="repeat-project" style="width: auto;">
+                            <span>Repeat project (same activities in same locations as previous year)</span>
+                        </label>
                     </div>
                 </div>
                 <div class="funding-result">
@@ -1559,6 +1565,95 @@
                     console.log('✅ Feedback Panel initialized');
                 }
             });
+
+            // BCAFE Funding Calculator (2026 Cycle Rules)
+            function calculateBCAFEFunding() {
+                const orgType = document.getElementById('org-type').value;
+                const revenue2024 = parseFloat(document.getElementById('revenue-2024').value) || 0;
+                const revenue2025 = parseFloat(document.getElementById('revenue-2025').value) || 0;
+                const isRepeatProject = document.getElementById('repeat-project').checked;
+
+                const maxFundingDisplay = document.getElementById('max-funding');
+                const fundingDetails = document.getElementById('funding-details');
+
+                // Validate inputs
+                if (!orgType || revenue2024 === 0 || revenue2025 === 0) {
+                    maxFundingDisplay.textContent = 'Enter all details to calculate funding';
+                    fundingDetails.textContent = '2026 cycle: Applications due February 13, 2026 (4:00 PM PST)';
+                    return;
+                }
+
+                // Check minimum revenue requirement
+                if (revenue2024 < 100000 || revenue2025 < 100000) {
+                    maxFundingDisplay.textContent = 'Minimum $100,000 revenue required for both years';
+                    fundingDetails.textContent = 'Both 2024 and 2025 revenue must meet the $100,000 minimum';
+                    return;
+                }
+
+                let maxEligible;
+                let cashMatch;
+                let ministryShare;
+
+                // Calculate maximum eligible funding based on organization type
+                if (orgType === 'association') {
+                    // Associations: $5K - $75K
+                    maxEligible = 75000;
+
+                    // Funding split
+                    if (isRepeatProject) {
+                        ministryShare = 35; // Repeat project penalty
+                        cashMatch = 65;
+                    } else {
+                        ministryShare = 70; // Standard for associations
+                        cashMatch = 30;
+                    }
+                } else {
+                    // Producers/Processors/Cooperatives: $5K - $50K OR 30% of previous year revenue (whichever is LOWER)
+                    const revenueBasedMax = revenue2025 * 0.30; // 30% of 2025 revenue
+                    maxEligible = Math.min(50000, revenueBasedMax);
+
+                    // Funding split
+                    if (isRepeatProject) {
+                        ministryShare = 35; // Repeat project penalty
+                        cashMatch = 65;
+                    } else {
+                        ministryShare = 50; // Standard for producers/processors/cooperatives
+                        cashMatch = 50;
+                    }
+                }
+
+                // Ensure minimum of $5,000
+                maxEligible = Math.max(5000, maxEligible);
+
+                // Calculate ministry contribution and recipient contribution
+                const ministryContribution = maxEligible * (ministryShare / 100);
+                const recipientContribution = maxEligible * (cashMatch / 100);
+
+                // Display results
+                const formatter = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                });
+
+                let details = `Maximum project cost: ${formatter.format(maxEligible)} | `;
+                details += `Ministry: ${formatter.format(ministryContribution)} (${ministryShare}%) | `;
+                details += `Your match: ${formatter.format(recipientContribution)} (${cashMatch}%)`;
+
+                if (isRepeatProject) {
+                    details += ` | ⚠️ Repeat project penalty applies`;
+                }
+
+                maxFundingDisplay.textContent = `Maximum Eligible: ${formatter.format(maxEligible)}`;
+                fundingDetails.innerHTML = details;
+            }
+
+            // Attach event listeners to calculator inputs
+            document.getElementById('org-type').addEventListener('change', calculateBCAFEFunding);
+            document.getElementById('revenue-2024').addEventListener('input', calculateBCAFEFunding);
+            document.getElementById('revenue-2025').addEventListener('input', calculateBCAFEFunding);
+            document.getElementById('repeat-project').addEventListener('change', calculateBCAFEFunding);
         });
     </script>
 </body>
