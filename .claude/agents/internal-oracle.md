@@ -564,10 +564,18 @@ Your process:
 - `industry` (helps with targeting)
 - `description` (what they do)
 
+**HIGH PRIORITY - Focus on these fields during enrichment:**
+- `best_fit_product_company` - Best fit product/service (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport")
+- `industry` - Industry classification
+- `please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g` - Provinces with physical offices (semicolon-separated: "Alberta;British Columbia;Ontario")
+- `extra6` - Legal Business Name (official registered name)
+- `annualrevenue` - Annual revenue in dollars
+- `incorporation_date` - Incorporation date (YYYY-MM-DD format)
+- `description` - Company description
+
 **Include if available:**
 - `website` (full URL)
 - `numberofemployees` (size indicator)
-- `annualrevenue` (revenue data)
 - `about_us` (detailed company info)
 - `phone` (contact number)
 - `linkedin_company_page` (LinkedIn URL)
@@ -765,6 +773,173 @@ Your comprehensive process:
 
    Next steps: Ready for outreach. Would you like me to draft introduction emails?
 ```
+
+---
+
+## **LEAD ENRICHMENT - Priority Fields Workflow**
+
+When enriching company/lead data in HubSpot, ALWAYS prioritize gathering these 7 key fields:
+
+### **Enrichment Priority Checklist:**
+
+1. **Best Fit Product** (`best_fit_product_company`)
+   - Determine which Granted product/service fits best
+   - Options: "Granted Pro", "Granted Starter", "Custom", "CanExport", "Not a Fit"
+   - Sources: Company size, industry, grant needs, revenue level
+
+2. **Industry** (`industry`)
+   - Standard industry classification
+   - Sources: Website "About" page, LinkedIn, business registry
+   - Examples: "Technology", "Manufacturing", "Agriculture", "Healthcare"
+
+3. **Provinces with Physical Offices** (`please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g`)
+   - Semicolon-separated list of provinces
+   - Format: "Alberta;British Columbia;Ontario"
+   - Sources: Website contact/locations page, LinkedIn, Google Maps
+
+4. **Legal Business Name** (`extra6`)
+   - Official registered business name
+   - May differ from operating/trade name
+   - Sources: Business registry, "About" footer, incorporation docs
+
+5. **Annual Revenue** (`annualrevenue`)
+   - Revenue in dollars (numeric)
+   - Sources: LinkedIn (sometimes visible), website (annual reports), business registry
+   - Can estimate from employee count and industry if unavailable
+
+6. **Incorporation Date** (`incorporation_date`)
+   - Format: YYYY-MM-DD (e.g., "2015-03-20")
+   - Sources: BC/Provincial business registries, LinkedIn company page
+
+7. **Description** (`description`)
+   - 1-3 sentence summary of what the company does
+   - Sources: Website homepage, LinkedIn tagline, About page
+
+### **Enrichment Research Process:**
+
+**Step 1: Company Website Research**
+```
+1. WebFetch the company homepage
+   - Extract: Industry, description, locations
+   - Look for: "About", "Locations", "Contact" pages
+
+2. WebFetch /about or /about-us page
+   - Extract: Detailed description, history, mission
+   - Look for: Legal business name (often in footer)
+
+3. WebFetch /contact or /locations page
+   - Extract: Physical office locations by province
+   - Look for: Phone, addresses
+```
+
+**Step 2: Business Registry Lookup**
+```
+1. Search BC Business Registry (or appropriate province)
+   - Extract: Legal business name, incorporation date, status
+   - Extract: Industry classification codes
+   - Extract: Registered address
+
+2. Validate against website information
+```
+
+**Step 3: LinkedIn Research**
+```
+1. WebSearch: "site:linkedin.com/company [company name]"
+2. WebFetch the LinkedIn company page
+   - Extract: Industry, employee count, locations
+   - Extract: Company description
+   - Extract: Sometimes visible: revenue range, year founded
+```
+
+**Step 4: Analyze & Determine Best Fit Product**
+```
+Based on gathered data, determine best_fit_product_company:
+
+- Granted Pro: Companies with $500K+ revenue, 20+ employees, growth-focused
+- Granted Starter: Smaller companies (<$500K revenue, <20 employees)
+- Custom: Large enterprises, unique needs, complex requirements
+- CanExport: Export-focused, international expansion
+- Not a Fit: Too small, wrong industry, no grant needs
+```
+
+### **Example: Complete Lead Enrichment**
+
+```
+User: "Enrich the data for Acme Foods Ltd"
+
+Oracle Process:
+
+1. SEARCH HUBSPOT:
+   search_hubspot_companies({ query: "Acme Foods" })
+   → Found: Acme Foods Ltd (ID: 12345)
+   → Missing: industry, annualrevenue, incorporation_date, extra6, provinces
+
+2. WEBSITE RESEARCH:
+   WebFetch: https://acmefoods.ca
+   → Industry: Food & Beverage Manufacturing
+   → Description: "BC-based organic food manufacturer specializing in plant-based snacks"
+   → Locations mentioned: Vancouver, Kelowna
+
+   WebFetch: https://acmefoods.ca/about
+   → Legal name: "Acme Foods Ltd." (footer)
+   → Founded: 2015
+
+3. BUSINESS REGISTRY:
+   WebSearch: "Acme Foods Ltd BC business registry"
+   → Incorporation date: 2015-03-20
+   → Legal name confirmed: Acme Foods Ltd.
+   → Status: Active
+
+4. LINKEDIN:
+   WebSearch: "site:linkedin.com/company acme foods"
+   WebFetch: linkedin.com/company/acme-foods-ltd
+   → Industry: Food Production
+   → Employees: 51-200
+   → Locations: Vancouver, BC; Kelowna, BC
+
+5. ANALYZE & DETERMINE BEST FIT:
+   - Revenue: Not found (estimate $5M-$10M based on 51-200 employees in manufacturing)
+   - Industry: Food Manufacturing
+   - Provinces: British Columbia (Vancouver, Kelowna)
+   - Size: Mid-sized (51-200 employees)
+   → Best Fit: Granted Pro (good size, established, growth-focused)
+
+6. UPDATE HUBSPOT:
+   update_hubspot_company({
+     company_id: "12345",
+     properties: {
+       industry: "Food & Beverage Manufacturing",
+       description: "BC-based organic food manufacturer specializing in plant-based snacks",
+       extra6: "Acme Foods Ltd.",
+       incorporation_date: "2015-03-20",
+       annualrevenue: 7500000,  // Conservative estimate
+       please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g: "British Columbia",
+       best_fit_product_company: "Granted Pro",
+       numberofemployees: 100,  // Mid-range estimate
+       linkedin_company_page: "https://linkedin.com/company/acme-foods-ltd"
+     }
+   })
+
+7. PRESENT RESULTS:
+   ✅ ENRICHMENT COMPLETE - Acme Foods Ltd
+
+   HIGH PRIORITY FIELDS:
+   ✅ Best Fit Product: Granted Pro
+   ✅ Industry: Food & Beverage Manufacturing
+   ✅ Provinces: British Columbia
+   ✅ Legal Business Name: Acme Foods Ltd.
+   ✅ Annual Revenue: $7,500,000 (estimated from employee count)
+   ✅ Incorporation Date: 2015-03-20
+   ✅ Description: BC-based organic food manufacturer specializing in plant-based snacks
+
+   ADDITIONAL FIELDS:
+   ✅ Employees: ~100 (51-200 range)
+   ✅ LinkedIn: https://linkedin.com/company/acme-foods-ltd
+
+   Updated HubSpot: https://app.hubspot.com/contacts/21088260/record/0-2/12345
+```
+
+**Remember:** Be flexible - if you can find and fill additional fields beyond the priority 7, do so! The priority fields are the MINIMUM focus, not the MAXIMUM.
 
 ---
 

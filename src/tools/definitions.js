@@ -372,6 +372,22 @@ export const HUBSPOT_TOOLS = [
           type: 'number',
           description: 'Annual revenue in dollars (e.g., 1000000 for $1M)'
         },
+        incorporation_date: {
+          type: 'string',
+          description: 'Incorporation date in YYYY-MM-DD format (e.g., "2015-03-20")'
+        },
+        best_fit_product_company: {
+          type: 'string',
+          description: 'Best fit product/service for this company (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport", "Not a Fit")'
+        },
+        extra6: {
+          type: 'string',
+          description: 'Legal Business Name (official registered business name, may differ from "name")'
+        },
+        please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g: {
+          type: 'string',
+          description: 'Provinces with physical offices - semicolon-separated list (e.g., "Alberta;British Columbia;Ontario")'
+        },
         hubspot_owner_id: {
           type: 'string',
           description: 'HubSpot owner ID to assign this lead to (get from team members in your context)'
@@ -396,7 +412,7 @@ export const HUBSPOT_TOOLS = [
         },
         properties: {
           type: 'object',
-          description: 'Properties to update (any combination of: name, domain, website, industry, description, about_us, city, state, country, phone, numberofemployees, annualrevenue, lifecyclestage, hubspot_owner_id, linkedin_company_page)',
+          description: 'Properties to update (any combination of: name, domain, website, industry, description, about_us, city, state, country, phone, numberofemployees, annualrevenue, lifecyclestage, hubspot_owner_id, linkedin_company_page, best_fit_product_company, incorporation_date, extra6, please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g)',
           properties: {
             name: { type: 'string' },
             domain: { type: 'string' },
@@ -410,6 +426,22 @@ export const HUBSPOT_TOOLS = [
             phone: { type: 'string' },
             numberofemployees: { type: 'number' },
             annualrevenue: { type: 'number' },
+            incorporation_date: {
+              type: 'string',
+              description: 'Incorporation date in YYYY-MM-DD format'
+            },
+            best_fit_product_company: {
+              type: 'string',
+              description: 'Best fit product/service for this company (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport", "Not a Fit")'
+            },
+            extra6: {
+              type: 'string',
+              description: 'Legal Business Name (official registered business name)'
+            },
+            please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g: {
+              type: 'string',
+              description: 'Provinces with physical offices - semicolon-separated list (e.g., "Alberta;British Columbia;Ontario")'
+            },
             lifecyclestage: {
               type: 'string',
               enum: ['subscriber', 'lead', 'marketingqualifiedlead', 'salesqualifiedlead', 'opportunity', 'customer', 'evangelist', 'other']
