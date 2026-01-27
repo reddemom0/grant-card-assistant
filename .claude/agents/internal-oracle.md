@@ -567,11 +567,14 @@ Your process:
 **HIGH PRIORITY - Focus on these fields during enrichment:**
 - `best_fit_product_company` - Best fit product/service (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport")
 - `industry` - Industry classification
-- `please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g` - Provinces with physical offices (semicolon-separated: "Alberta;British Columbia;Ontario")
 - `extra6` - Legal Business Name (official registered name)
 - `annualrevenue` - Annual revenue in dollars
 - `incorporation_date` - Incorporation date (YYYY-MM-DD format)
 - `description` - Company description
+- `state` - Province/State (for Canadian companies, use province name like "British Columbia" or abbreviation like "BC")
+- `city` - City location
+
+**NOTE:** Provinces with physical offices data is tracked in HubSpot but requires manual entry in the UI due to property name length limitations.
 
 **Include if available:**
 - `website` (full URL)
@@ -778,7 +781,7 @@ Your comprehensive process:
 
 ## **LEAD ENRICHMENT - Priority Fields Workflow**
 
-When enriching company/lead data in HubSpot, ALWAYS prioritize gathering these 7 key fields:
+When enriching company/lead data in HubSpot, ALWAYS prioritize gathering these key fields:
 
 ### **Enrichment Priority Checklist:**
 
@@ -792,28 +795,28 @@ When enriching company/lead data in HubSpot, ALWAYS prioritize gathering these 7
    - Sources: Website "About" page, LinkedIn, business registry
    - Examples: "Technology", "Manufacturing", "Agriculture", "Healthcare"
 
-3. **Provinces with Physical Offices** (`please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g`)
-   - Semicolon-separated list of provinces
-   - Format: "Alberta;British Columbia;Ontario"
-   - Sources: Website contact/locations page, LinkedIn, Google Maps
-
-4. **Legal Business Name** (`extra6`)
+3. **Legal Business Name** (`extra6`)
    - Official registered business name
    - May differ from operating/trade name
    - Sources: Business registry, "About" footer, incorporation docs
 
-5. **Annual Revenue** (`annualrevenue`)
+4. **Annual Revenue** (`annualrevenue`)
    - Revenue in dollars (numeric)
    - Sources: LinkedIn (sometimes visible), website (annual reports), business registry
    - Can estimate from employee count and industry if unavailable
 
-6. **Incorporation Date** (`incorporation_date`)
+5. **Incorporation Date** (`incorporation_date`)
    - Format: YYYY-MM-DD (e.g., "2015-03-20")
    - Sources: BC/Provincial business registries, LinkedIn company page
 
-7. **Description** (`description`)
+6. **Description** (`description`)
    - 1-3 sentence summary of what the company does
    - Sources: Website homepage, LinkedIn tagline, About page
+
+7. **Location** (`city`, `state`, `country`)
+   - City, province/state, and country
+   - Sources: Website contact page, LinkedIn, business registry
+   - Examples: city="Vancouver", state="British Columbia", country="Canada"
 
 ### **Enrichment Research Process:**
 
@@ -872,7 +875,7 @@ Oracle Process:
 1. SEARCH HUBSPOT:
    search_hubspot_companies({ query: "Acme Foods" })
    → Found: Acme Foods Ltd (ID: 12345)
-   → Missing: industry, annualrevenue, incorporation_date, extra6, provinces
+   → Missing: industry, annualrevenue, incorporation_date, extra6, best_fit_product
 
 2. WEBSITE RESEARCH:
    WebFetch: https://acmefoods.ca
@@ -900,7 +903,7 @@ Oracle Process:
 5. ANALYZE & DETERMINE BEST FIT:
    - Revenue: Not found (estimate $5M-$10M based on 51-200 employees in manufacturing)
    - Industry: Food Manufacturing
-   - Provinces: British Columbia (Vancouver, Kelowna)
+   - Location: British Columbia (Vancouver, Kelowna - multiple locations)
    - Size: Mid-sized (51-200 employees)
    → Best Fit: Granted Pro (good size, established, growth-focused)
 
@@ -913,7 +916,9 @@ Oracle Process:
        extra6: "Acme Foods Ltd.",
        incorporation_date: "2015-03-20",
        annualrevenue: 7500000,  // Conservative estimate
-       please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g: "British Columbia",
+       city: "Vancouver",
+       state: "British Columbia",
+       country: "Canada",
        best_fit_product_company: "Granted Pro",
        numberofemployees: 100,  // Mid-range estimate
        linkedin_company_page: "https://linkedin.com/company/acme-foods-ltd"
@@ -926,11 +931,11 @@ Oracle Process:
    HIGH PRIORITY FIELDS:
    ✅ Best Fit Product: Granted Pro
    ✅ Industry: Food & Beverage Manufacturing
-   ✅ Provinces: British Columbia
    ✅ Legal Business Name: Acme Foods Ltd.
    ✅ Annual Revenue: $7,500,000 (estimated from employee count)
    ✅ Incorporation Date: 2015-03-20
    ✅ Description: BC-based organic food manufacturer specializing in plant-based snacks
+   ✅ Location: Vancouver, British Columbia, Canada
 
    ADDITIONAL FIELDS:
    ✅ Employees: ~100 (51-200 range)
@@ -939,7 +944,7 @@ Oracle Process:
    Updated HubSpot: https://app.hubspot.com/contacts/21088260/record/0-2/12345
 ```
 
-**Remember:** Be flexible - if you can find and fill additional fields beyond the priority 7, do so! The priority fields are the MINIMUM focus, not the MAXIMUM.
+**Remember:** Be flexible - if you can find and fill additional fields beyond the priority list, do so! The priority fields are the MINIMUM focus, not the MAXIMUM.
 
 ---
 

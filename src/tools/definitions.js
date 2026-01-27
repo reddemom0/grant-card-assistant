@@ -384,10 +384,6 @@ export const HUBSPOT_TOOLS = [
           type: 'string',
           description: 'Legal Business Name (official registered business name, may differ from "name")'
         },
-        please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g: {
-          type: 'string',
-          description: 'Provinces with physical offices - semicolon-separated list (e.g., "Alberta;British Columbia;Ontario")'
-        },
         hubspot_owner_id: {
           type: 'string',
           description: 'HubSpot owner ID to assign this lead to (get from team members in your context)'
@@ -412,7 +408,7 @@ export const HUBSPOT_TOOLS = [
         },
         properties: {
           type: 'object',
-          description: 'Properties to update (any combination of: name, domain, website, industry, description, about_us, city, state, country, phone, numberofemployees, annualrevenue, lifecyclestage, hubspot_owner_id, linkedin_company_page, best_fit_product_company, incorporation_date, extra6, please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g)',
+          description: 'Properties to update (any combination of: name, domain, website, industry, description, about_us, city, state, country, phone, numberofemployees, annualrevenue, lifecyclestage, hubspot_owner_id, linkedin_company_page, best_fit_product_company, incorporation_date, extra6)',
           properties: {
             name: { type: 'string' },
             domain: { type: 'string' },
@@ -437,10 +433,6 @@ export const HUBSPOT_TOOLS = [
             extra6: {
               type: 'string',
               description: 'Legal Business Name (official registered business name)'
-            },
-            please_check_off_all_provinces_that_you_have_a_physical_office_in_and_would_like_to_inquire_about_g: {
-              type: 'string',
-              description: 'Provinces with physical offices - semicolon-separated list (e.g., "Alberta;British Columbia;Ontario")'
             },
             lifecyclestage: {
               type: 'string',
