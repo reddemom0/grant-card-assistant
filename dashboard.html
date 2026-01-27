@@ -264,7 +264,11 @@
         .agent-card.bcafe-writer {
             --accent-color: #2d5016;
         }
-        
+
+        .agent-card.buybc-writer {
+            --accent-color: #003366;
+        }
+
         .agent-card.canexport-claims {
             --accent-color: #1e3a8a;
         }
@@ -754,6 +758,38 @@
                 </div>
             </div>
 
+            <!-- Buy BC Partnership Program Specialist -->
+            <div class="agent-card buybc-writer" onclick="openAgent('buybc-writer')">
+                <div class="agent-header">
+                    <div class="agent-icon">🛒</div>
+                    <div class="agent-info">
+                        <h3>Buy BC Partnership Specialist</h3>
+                        <span class="agent-status new">
+                            <div style="width: 8px; height: 8px; background: #003366; border-radius: 50%;"></div>
+                            New
+                        </span>
+                    </div>
+                </div>
+                <p class="agent-description">
+                    Expert Buy BC Partnership Program specialist. Creates submission-ready applications
+                    promoting BC agriculture and food products within the BC market.
+                </p>
+                <ul class="agent-features">
+                    <li>Buy BC eligibility verification & logo licence support</li>
+                    <li>Merit-optimized application writing (4 evaluation criteria)</li>
+                    <li>BC market promotion strategy development</li>
+                    <li>Budget development with activity-specific caps</li>
+                    <li>Funding calculation (first-time vs. returning recipients)</li>
+                </ul>
+                <div class="agent-action">
+                    <button class="agent-button">
+                        <span>Open Specialist</span>
+                        <span>→</span>
+                    </button>
+                    <div class="usage-stats">Active agent</div>
+                </div>
+            </div>
+
             <!-- CanExport Writing Assistant -->
             <div class="agent-card canexport-writer" onclick="openAgent('canexport-writer')">
                 <div class="agent-header">
@@ -840,6 +876,9 @@
                 <a href="#" class="cta-button" onclick="openAgent('bcafe-writer')">
                     BC Agriculture Export
                 </a>
+                <a href="#" class="cta-button" onclick="openAgent('buybc-writer')">
+                    Buy BC Partnership
+                </a>
                 <a href="#" class="cta-button" onclick="openAgent('etg-writer')">
                     ETG Specialist
                 </a>
@@ -913,6 +952,10 @@
                 },
                 'bcafe-writer': {
                     url: '/bcafe-writer/new',
+                    active: true
+                },
+                'buybc-writer': {
+                    url: '/buybc-writer/new',
                     active: true
                 },
                 'canexport-writer': {

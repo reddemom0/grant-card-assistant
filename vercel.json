@@ -76,6 +76,19 @@
       "status": 301
     },
     {
+      "src": "/buybc-writer/new",
+      "dest": "/buybc-agent.html"
+    },
+    {
+      "src": "/buybc-writer/chat/([^/]+)",
+      "dest": "/buybc-agent.html"
+    },
+    {
+      "src": "/buybc-writer",
+      "dest": "/buybc-writer/new",
+      "status": 301
+    },
+    {
       "src": "/canexport-claims/new",
       "dest": "/canexport-claims.html"
     },

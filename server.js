@@ -508,6 +508,10 @@ app.get('/bcafe-writer*', (req, res) => {
   res.sendFile('bcafe-agent.html', { root: '.' });
 });
 
+app.get('/buybc-writer*', (req, res) => {
+  res.sendFile('buybc-agent.html', { root: '.' });
+});
+
 app.get('/canexport-claims*', (req, res) => {
   res.sendFile('canexport-claims.html', { root: '.' });
 });
