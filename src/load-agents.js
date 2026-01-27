@@ -16,6 +16,7 @@ export function loadAgentDefinitions() {
     'grant-card-generator': parseAgentFile(join(agentDir, 'grant-card-generator.md')),
     'etg-writer': parseAgentFile(join(agentDir, 'etg-writer.md')),
     'bcafe-writer': parseAgentFile(join(agentDir, 'bcafe-writer.md')),
+    'buybc-writer': parseAgentFile(join(agentDir, 'buybc-writer.md')),
     'canexport-claims': parseAgentFile(join(agentDir, 'canexport-claims.md')),
     'readiness-strategist': parseAgentFile(join(agentDir, 'readiness-strategist.md')),
     'orchestrator': parseAgentFile(join(agentDir, 'orchestrator.md')),
