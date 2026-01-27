@@ -26,7 +26,7 @@ export async function handleChatRequest(req, res) {
   try {
     const {
       agentType,
-      message,
+      message: rawMessage,
       conversationId,
       attachments = []
     } = req.body;
@@ -45,16 +45,16 @@ export async function handleChatRequest(req, res) {
     }
 
     // Message is required unless there are attachments
-    if ((!message || typeof message !== 'string' || message.trim().length === 0) && attachments.length === 0) {
+    if ((!rawMessage || typeof rawMessage !== 'string' || rawMessage.trim().length === 0) && attachments.length === 0) {
       return res.status(400).json({
         error: 'Missing or invalid required field: message (message or attachments required)'
       });
     }
 
     // If no message but has attachments, use a default message
-    if (!message || message.trim().length === 0) {
-      message = 'Analyze the attached document(s).';
-    }
+    const message = (!rawMessage || rawMessage.trim().length === 0)
+      ? 'Analyze the attached document(s).'
+      : rawMessage;
 
     // Validate agent type exists
     if (!isValidAgentType(agentType)) {
