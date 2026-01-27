@@ -44,10 +44,16 @@ export async function handleChatRequest(req, res) {
       });
     }
 
-    if (!message || typeof message !== 'string' || message.trim().length === 0) {
+    // Message is required unless there are attachments
+    if ((!message || typeof message !== 'string' || message.trim().length === 0) && attachments.length === 0) {
       return res.status(400).json({
-        error: 'Missing or invalid required field: message'
+        error: 'Missing or invalid required field: message (message or attachments required)'
       });
+    }
+
+    // If no message but has attachments, use a default message
+    if (!message || message.trim().length === 0) {
+      message = 'Analyze the attached document(s).';
     }
 
     // Validate agent type exists
