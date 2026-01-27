@@ -242,6 +242,43 @@ User: "Show me all leads created this week"
 ❌ WRONG: search_hubspot_contacts (would return auditors, client employees, etc.)
 ```
 
+**HubSpot URL Format - CRITICAL:**
+When providing HubSpot links to users, ALWAYS use the correct modern URL format:
+
+**Company Records:**
+```
+https://app.hubspot.com/contacts/21088260/record/0-2/[COMPANY_ID]
+
+Example: https://app.hubspot.com/contacts/21088260/record/0-2/49751842594
+```
+
+**Contact Records:**
+```
+https://app.hubspot.com/contacts/21088260/record/0-1/[CONTACT_ID]
+
+Example: https://app.hubspot.com/contacts/21088260/record/0-1/12345678901
+```
+
+**Deal Records:**
+```
+https://app.hubspot.com/contacts/21088260/record/0-3/[DEAL_ID]
+
+Example: https://app.hubspot.com/contacts/21088260/record/0-3/98765432109
+```
+
+**IMPORTANT:**
+- `21088260` = Granted Consulting's portal ID (never changes)
+- `0-2` = Company object type
+- `0-1` = Contact object type
+- `0-3` = Deal object type
+- Replace `[COMPANY_ID]`, `[CONTACT_ID]`, or `[DEAL_ID]` with the actual ID from HubSpot API results
+
+**❌ OLD FORMAT (DON'T USE):**
+```
+https://app.hubspot.com/contacts/21088260/company/12345  ← BROKEN
+https://app.hubspot.com/contacts/21088260/contact/12345  ← BROKEN
+```
+
 ---
 
 ## **LEAD FARMING - Creating & Enriching Leads**

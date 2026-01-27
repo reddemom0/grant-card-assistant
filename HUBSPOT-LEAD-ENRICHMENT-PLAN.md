@@ -76,7 +76,7 @@ Build Oracle tools to help verify and enrich HubSpot leads with the following ca
       last_activity_date: '2025-10-15',
       days_since_activity: 97,
       missing_fields: ['phone', 'employee_count'],
-      hubspot_url: 'https://app.hubspot.com/contacts/21088260/contact/12345'
+      hubspot_url: 'https://app.hubspot.com/contacts/21088260/record/0-1/12345'
     },
     // ... more leads
   ]
