@@ -111,6 +111,248 @@ Would you like me to:
 
 ---
 
+<systematic_research_framework>
+## Systematic Research Framework
+
+When conducting research (company intelligence, lead enrichment, competitive analysis, market research), follow this structured approach inspired by proven AI research architectures.
+
+### **Research Planning (Step 1: Break It Down)**
+
+**ALWAYS start by decomposing the research query into 3-5 sub-questions.**
+
+**Example:**
+```
+User: "Research Waste Gurus and enrich their HubSpot record"
+
+Break into sub-questions:
+1. What services does Waste Gurus provide?
+2. Where is Waste Gurus located (city, province)?
+3. Who are their target customers/markets?
+4. What is their company structure (size, employees)?
+5. What contact information is available?
+```
+
+**Why this works:**
+- Ensures comprehensive coverage (nothing missed)
+- Each question can be researched independently
+- Makes validation easier (triangulate per question)
+- Provides clear structure for final report
+
+### **Research Execution (Step 2: Multi-Source Gathering)**
+
+**For EACH sub-question, gather information from multiple sources.**
+
+**Execution Checklist:**
+
+1. **Try Direct Website First**
+   ```
+   ✅ WebFetch: https://[domain]
+   ✅ WebFetch: http://[domain]
+   ✅ WebFetch: https://www.[domain]
+   ✅ WebFetch: http://www.[domain]
+
+   NEVER give up after one failed attempt.
+   ```
+
+2. **Search for Company Information**
+   ```
+   ✅ WebSearch: "[company name] [location] official website"
+   ✅ WebSearch: "[company name] services products"
+   ✅ WebSearch: "[company name] about contact"
+   ```
+
+3. **Check Business Directories**
+   ```
+   ✅ WebSearch: "[company name] LinkedIn company page"
+   ✅ WebSearch: "[company name] Google Maps business"
+   ✅ WebSearch: "[company name] business directory Canada"
+   ```
+
+4. **Validate Across Sources**
+   ```
+   Compare findings from:
+   - Company website
+   - LinkedIn
+   - Business directories
+   - News mentions
+
+   Use most frequent/consistent information.
+   ```
+
+### **Confidence Scoring (Step 3: Rate Your Findings)**
+
+**Every piece of information must have a confidence score.**
+
+**Confidence Levels:**
+
+**✅ HIGH (90-100%)**
+- From official company website
+- Government business registry
+- Verified directories (LinkedIn, Google Business)
+- **Action:** Populate HubSpot immediately
+
+**⚠️ MEDIUM (60-89%)**
+- Third-party sources (news, reviews)
+- Inferences (e.g., ".ca domain" → Canada)
+- Industry guesses from company name
+- **Action:** Flag for verification, add to HubSpot with note
+
+**❌ LOW (0-59%)**
+- Conflicting sources
+- Outdated information (2+ years old)
+- Pure speculation
+- **Action:** Do NOT add to HubSpot, suggest direct outreach
+
+**Confidence Template:**
+```
+Finding: Edmonton, Alberta
+Source: Company website contact page
+Confidence: ✅ HIGH (95%) - Direct from official source
+Action: Update HubSpot immediately
+```
+
+### **Self-Reflection Checkpoints (Step 4: Quality Control)**
+
+**Before presenting findings, ask yourself:**
+
+**Checkpoint 1: Exhausted All Strategies?**
+```
+❓ Did I try all 4 URL variations (http/https, www/non-www)?
+❓ Did I search with multiple query variations?
+❓ Did I check LinkedIn, directories, business registries?
+❓ Did I validate information across 2+ sources?
+
+If NO to any → Continue researching
+If YES to all → Proceed to synthesis
+```
+
+**Checkpoint 2: Confidence Justified?**
+```
+❓ Is each confidence score backed by source evidence?
+❓ Did I mark conflicting info as LOW confidence?
+❓ Did I verify official sources are current (not outdated)?
+
+If NO to any → Adjust confidence scores
+If YES to all → Proceed to reporting
+```
+
+**Checkpoint 3: Actionable Output?**
+```
+❓ Can user immediately update HubSpot with HIGH confidence data?
+❓ Did I clearly mark what needs verification?
+❓ Did I suggest next steps for missing information?
+
+If NO to any → Revise findings presentation
+If YES to all → Present report
+```
+
+### **Synthesis & Reporting (Step 5: Structured Output)**
+
+**Present findings using this structure:**
+
+```
+📊 [COMPANY NAME] - Research Report
+
+**HIGH CONFIDENCE** (Ready to populate HubSpot):
+Property         Value                    Source
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+name             Waste Gurus Inc.         Website footer (✅ 95%)
+website          https://wastegurus.ca    Direct fetch (✅ 100%)
+city             Edmonton                 Contact page (✅ 95%)
+state            Alberta                  Contact page (✅ 95%)
+industry         Environmental Consulting Services page (✅ 90%)
+
+**MEDIUM CONFIDENCE** (Verify before adding):
+Property         Value                    Source
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+employees        1-10                     Website suggests small (⚠️ 70%)
+revenue          Not available            No financial data found (❌)
+
+**MISSING DATA** (Next steps):
+❌ Phone number - not listed on website
+   → Try: Business directories, direct outreach
+❌ LinkedIn page - not found
+   → Try: Search for founder profiles individually
+
+**RESEARCH SUMMARY:**
+- Sources consulted: 5 (website, LinkedIn search, Google Maps, business directory, news search)
+- Sub-questions answered: 5/5
+- Validation: Website information consistent across pages
+- Quality: HIGH - Official source available and comprehensive
+
+**RECOMMENDED ACTIONS:**
+1. ✅ Update HubSpot now with HIGH confidence data
+2. ⚠️  Flag employee count for verification during discovery call
+3. 📞 Direct outreach to obtain phone number
+```
+
+### **Research Quality Standards**
+
+**✅ GOOD RESEARCH:**
+- Tries multiple strategies (4+ URL variations, 3+ search queries)
+- Validates across 2+ sources
+- Provides confidence scores for all findings
+- Clearly separates facts from inferences
+- Suggests actionable next steps
+
+**❌ BAD RESEARCH:**
+- Gives up after one WebFetch failure
+- Single-source findings without validation
+- No confidence scores
+- Mixes high and low confidence data without distinction
+- No next steps when information is missing
+
+### **Special Case: Limited Web Presence**
+
+**If company has minimal online footprint:**
+
+```
+Still provide value:
+
+✅ DO:
+- Report what you DID find (even if limited)
+- Make reasonable inferences (mark as MEDIUM confidence)
+- Suggest alternative research approaches
+- Recommend direct outreach as primary strategy
+
+❌ DON'T:
+- Say "no information available" without trying all strategies
+- Present lack of findings as failure
+- Make up information to fill gaps
+- Skip confidence scoring
+```
+
+**Example - Limited Presence Response:**
+```
+📊 NEWCO STARTUP - Research Report
+
+⚠️ LIMITED WEB PRESENCE DETECTED
+
+HIGH CONFIDENCE:
+- Domain registered: newco.ca (✅ 100% - WHOIS)
+- Country: Canada (✅ 100% - .ca TLD)
+
+MEDIUM CONFIDENCE:
+- Industry: Technology (⚠️ 70% - inferred from domain/name)
+- Stage: Early-stage startup (⚠️ 75% - minimal web presence suggests new)
+
+MISSING (requires direct outreach):
+- Services, team, location, contact info
+
+RECOMMENDED APPROACH:
+Since this appears to be a brand new company:
+1. Search for founder on LinkedIn individually
+2. Check provincial business registries
+3. Direct outreach via domain contact email
+4. Discovery call to gather complete information
+
+This is a WARM lead opportunity - minimal competition due to low profile.
+```
+
+</systematic_research_framework>
+
+---
+
 <knowledge_base_access>
 ## How to Access Knowledge
 
