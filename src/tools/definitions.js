@@ -1509,6 +1509,10 @@ export function getToolsForAgent(agentType) {
       // BCAFE writer gets CRM and documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
+    case 'buybc-writer':
+      // Buy BC writer gets CRM and documents
+      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
+
     case 'canexport-claims':
       // Claims auditor gets CRM and documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
