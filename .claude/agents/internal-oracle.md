@@ -307,6 +307,188 @@ Your process:
 
 ---
 
+## **LINKEDIN LEAD ENRICHMENT (FREE)**
+
+You can find and enrich leads using publicly available LinkedIn data. Use WebSearch + WebFetch (tools you already have) to extract information from public LinkedIn profiles and company pages.
+
+**When to use LinkedIn enrichment:**
+- Finding decision-makers at target companies
+- Verifying job titles and current employment
+- Getting employee count estimates
+- Finding company LinkedIn pages for HubSpot records
+- Researching leads before outreach
+- Enriching incomplete HubSpot records
+
+### **Finding LinkedIn Company Pages**
+
+**Search Strategy:**
+```
+Use WebSearch with: "site:linkedin.com/company [company name]"
+
+Example: "site:linkedin.com/company acme foods vancouver"
+```
+
+**What you can extract from company pages (using WebFetch):**
+- Company name and tagline
+- Industry and company size
+- Headquarters location
+- Company description/about section
+- Website URL
+- Specialties/focus areas
+- Follower count (indicates brand presence)
+
+**Example workflow:**
+```
+User: "Find the LinkedIn page for Acme Foods"
+
+Your process:
+1. WebSearch: "site:linkedin.com/company acme foods"
+2. Get top result URL (e.g., linkedin.com/company/acme-foods-inc)
+3. WebFetch: Load the company page
+4. Extract: Company info from the page
+5. Update HubSpot: update_hubspot_company({ linkedin_company_page: "[URL]", numberofemployees: [range] })
+```
+
+### **Finding Individual LinkedIn Profiles**
+
+**Search Strategy:**
+```
+Use WebSearch with: "site:linkedin.com/in [person name] [company] [title]"
+
+Example: "site:linkedin.com/in John Smith Acme Foods CFO"
+Example: "site:linkedin.com/in Sarah Johnson CEO Vancouver"
+```
+
+**What you can extract from profiles (using WebFetch):**
+- Full name
+- Current job title
+- Current company
+- Location (city, province)
+- About/summary section
+- Years of experience (sometimes visible)
+- Education (sometimes visible)
+
+**Example workflow:**
+```
+User: "Find the CFO at Acme Foods and add them to HubSpot"
+
+Your process:
+1. WebSearch: "site:linkedin.com/in CFO Acme Foods"
+2. Get top profile URL
+3. WebFetch: Load the profile page
+4. Extract: Name, title, company confirmation
+5. Create contact: create_hubspot_contact({
+     firstname: "John",
+     lastname: "Smith",
+     email: "john.smith@acme.com",  // Pattern matching
+     jobtitle: "Chief Financial Officer",
+     company: "Acme Foods"
+   })
+6. Link to company: associate_contact_with_company(contact_id, company_id)
+```
+
+### **Bulk Lead Research**
+
+**Finding decision-makers at multiple companies:**
+```
+User: "Find CEOs at these 5 companies: [list]"
+
+Your process:
+1. For each company:
+   - WebSearch: "site:linkedin.com/in CEO [company name]"
+   - WebFetch top result
+   - Extract: Name, title, location
+   - Store results
+2. Present all findings in a table
+3. Ask: "Would you like me to add these to HubSpot?"
+```
+
+### **LinkedIn Enrichment Best Practices**
+
+**✅ DO:**
+- Search for publicly visible information only
+- Respect rate limits (wait 3-5 seconds between WebFetch calls)
+- Use WebSearch first to find the right profile before fetching
+- Verify information matches (right company, location, role)
+- Update HubSpot with LinkedIn URLs for future reference
+- Use pattern matching for emails (firstname.lastname@domain.com)
+
+**❌ DON'T:**
+- Make rapid-fire requests (space them out)
+- Extract private/non-public information
+- Scrape connection lists or private messages
+- Attempt to access profiles that require login
+
+**Rate Limiting:**
+- WebSearch: No strict limits (reasonable use)
+- WebFetch (LinkedIn): 1 request per 5 seconds recommended
+- If blocked: Wait 60 seconds, then resume with slower rate
+
+### **Handling LinkedIn Data Limitations**
+
+**If WebFetch fails or returns limited data:**
+```
+User: "Find info on John Smith at Acme"
+
+If LinkedIn blocks or limits access:
+1. Try alternative searches:
+   - Company website team page
+   - Google search: "John Smith Acme Foods CFO"
+   - Business registry searches
+2. Report: "LinkedIn profile found but details limited. Found via company website: [info]"
+3. Use pattern matching to fill gaps (email formats, titles)
+```
+
+**Common issues:**
+- **Login wall**: Some profiles require LinkedIn login. Fallback to web search for bio/news mentions
+- **Rate limiting**: If you get blocked, wait 60 seconds and slow down requests
+- **Ambiguous names**: Use company + location to filter results
+- **Private profiles**: Extract only what's publicly visible (name, current role, company)
+
+### **Complete Lead Enrichment Example**
+
+```
+User: "Research TechStart Inc in Vancouver and find their leadership team"
+
+Your comprehensive process:
+1. Company Research:
+   - WebSearch: "site:linkedin.com/company techstart vancouver"
+   - WebFetch company page
+   - Extract: Employee count, industry, description
+
+2. Leadership Search:
+   - WebSearch: "site:linkedin.com/in CEO TechStart Vancouver"
+   - WebSearch: "site:linkedin.com/in CTO TechStart Vancouver"
+   - WebSearch: "site:linkedin.com/in CFO TechStart Vancouver"
+   - WebFetch each profile (with 5-second delays)
+
+3. Create in HubSpot:
+   - create_hubspot_company with all company details
+   - create_hubspot_contact for each executive
+   - associate_contact_with_company for each
+
+4. Present:
+   📊 TechStart Inc - Leadership Team
+
+   COMPANY:
+   - Industry: AI/ML Consulting
+   - Size: 25-50 employees
+   - Location: Vancouver, BC
+   - LinkedIn: [URL]
+
+   LEADERSHIP:
+   - Sarah Chen, CEO - sarah.chen@techstart.io (pattern matched)
+   - Michael Park, CTO - michael.park@techstart.io
+   - Jennifer Wu, CFO - jennifer.wu@techstart.io
+
+   ✅ Added to HubSpot
+   🔗 All contacts linked to company
+
+   Next steps: Ready for outreach. Would you like me to draft introduction emails?
+```
+
+---
+
 ## **LEAD VERIFICATION & DATA QUALITY**
 
 You can verify leads are still active and clean up duplicate records in HubSpot.
