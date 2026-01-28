@@ -60,6 +60,15 @@ function extractCompanyInfo(payload) {
     };
   }
 
+  // Handle company.creation event webhook (most common for lead enrichment)
+  if (payload.objectId && payload.subscriptionType === 'company.creation') {
+    return {
+      objectId: payload.objectId,
+      objectType: 'company',
+      subscriptionType: payload.subscriptionType
+    };
+  }
+
   // Handle contact/company property change webhook
   if (payload.objectId && payload.propertyName) {
     return {
@@ -71,7 +80,7 @@ function extractCompanyInfo(payload) {
     };
   }
 
-  // Handle workflow webhook (most common)
+  // Handle workflow webhook
   if (payload.properties) {
     return {
       objectId: payload.objectId || payload.vid || payload.dealId,
@@ -91,6 +100,20 @@ function extractCompanyInfo(payload) {
  * @returns {string} - Enrichment prompt for Internal Oracle
  */
 function generateOracleInsightPrompt(companyInfo) {
+  // If we only have objectId, tell Oracle to fetch the company first
+  if (companyInfo.objectId && !companyInfo.companyName) {
+    return `# AUTOMATIC LEAD ENRICHMENT - ORACLE INSIGHT GENERATION
+
+A new company was just created in HubSpot (ID: ${companyInfo.objectId}).
+
+**FIRST STEP:** Use \`search_hubspot_companies\` to fetch this company's details by searching for companies with the exact ID or using filters.
+
+Once you have the company details, conduct COMPREHENSIVE research and generate an **Oracle Insight** for the sales team following the complete research checklist below.
+
+---`;
+  }
+
+  // If we have company details from a form submission
   return `# AUTOMATIC LEAD ENRICHMENT - ORACLE INSIGHT GENERATION
 
 A new lead has been created in HubSpot. You must conduct COMPREHENSIVE research and generate an **Oracle Insight** for the sales team.
@@ -401,37 +424,46 @@ export async function handleHubSpotWebhook(req, res) {
     const payload = req.body;
     console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 
-    // Extract company information
-    const companyInfo = extractCompanyInfo(payload);
-
-    if (!companyInfo) {
-      console.error('❌ Could not extract company information from payload');
+    // HubSpot sends an array of events
+    if (!Array.isArray(payload) || payload.length === 0) {
+      console.error('❌ Invalid payload format - expected array of events');
       return res.status(400).json({
         error: 'Invalid payload format',
-        message: 'Could not extract company information'
+        message: 'Expected array of webhook events'
       });
     }
-
-    console.log('🏢 Extracted company info:', companyInfo);
 
     // Respond immediately to HubSpot (don't make them wait)
     res.status(200).json({
       success: true,
-      message: 'Webhook received, enrichment queued'
+      message: `Webhook received, processing ${payload.length} event(s)`
     });
 
-    // Process enrichment asynchronously (don't block response)
-    enrichLead(companyInfo)
-      .then(result => {
-        if (result.success) {
-          console.log(`✅ Async enrichment completed: ${companyInfo.companyName || companyInfo.contactEmail}`);
-        } else {
-          console.error(`❌ Async enrichment failed: ${result.error}`);
-        }
-      })
-      .catch(error => {
-        console.error('❌ Async enrichment error:', error);
-      });
+    // Process each event asynchronously (don't block response)
+    payload.forEach((event, index) => {
+      // Extract company information from this event
+      const companyInfo = extractCompanyInfo(event);
+
+      if (!companyInfo) {
+        console.error(`❌ Could not extract company information from event ${index}`);
+        return;
+      }
+
+      console.log(`🏢 Event ${index + 1}/${payload.length} - Extracted company info:`, companyInfo);
+
+      // Process enrichment asynchronously
+      enrichLead(companyInfo)
+        .then(result => {
+          if (result.success) {
+            console.log(`✅ Async enrichment completed for event ${index + 1}: ${companyInfo.objectId || companyInfo.companyName}`);
+          } else {
+            console.error(`❌ Async enrichment failed for event ${index + 1}: ${result.error}`);
+          }
+        })
+        .catch(error => {
+          console.error(`❌ Async enrichment error for event ${index + 1}:`, error);
+        });
+    });
 
   } catch (error) {
     console.error('❌ Webhook processing error:', error);
