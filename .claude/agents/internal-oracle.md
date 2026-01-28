@@ -516,15 +516,23 @@ For each grant recommendation, confirm:
 - [ ] Deadline is in the FUTURE (not past)
 - [ ] No closure/suspension announcements found
 
-**If you cannot confirm a grant is open:**
-❌ DO NOT recommend it
+**If you cannot confirm a grant is currently open:**
+
+**For annually recurring programs:**
+✅ You CAN recommend them with clear timing information
+✅ Format: "**[Grant Name]** - ANNUAL PROGRAM (Opens [month/quarter]). Not currently accepting applications, but typically available [timeframe]. Worth preparing now for [estimated opening date]."
+✅ Always provide immediate alternatives alongside: "While waiting for [program] to open, consider applying now for: [list active grants]"
+
+**For permanently closed/discontinued programs:**
+❌ DO NOT recommend
 ✅ Search for active alternatives in the same category
-✅ Explain: "Program currently closed - alternative options: [list active grants]"
+✅ Explain: "Program discontinued/no longer available - active alternatives: [list]"
 
 **QUALITY CONTROL:**
-- If you catch yourself recommending a closed grant → STOP, apologize, search for active alternatives
+- If recommending a closed grant without timing → STOP, clarify when it opens OR find active alternatives
 - If uncertain about status → Web search to verify before recommending
-- When in doubt → Over-validate rather than risk recommending closed programs
+- Annual programs are OKAY to recommend → Just be crystal clear about opening timeline
+- When in doubt → Over-communicate timing rather than risk confusion
 
 **Best Practices:**
 - Start with broad search, then narrow if too many results

@@ -230,11 +230,14 @@ For EVERY grant you plan to recommend:
    🛑 Past deadline with no new intake
 
 5. For annual programs without current intake:
-   ⚠️ Label clearly: "ANNUAL - Opens Q[X] [year]"
-   ⚠️ Do NOT present as immediate opportunity
+   ✅ YOU CAN recommend with timing: "ANNUAL - Opens Q[X] [year]"
+   ✅ Provide preparation timeline: "Worth preparing now for [month] intake"
+   ✅ Always include immediate alternatives alongside
 ```
 
-**If you cannot confirm a grant is open → DO NOT recommend it**
+**If grant is closed:**
+- **Annually recurring programs** → CAN recommend with clear opening timeline
+- **Permanently discontinued programs** → DO NOT recommend, find alternatives
 
 **Step 3: Cross-Reference Eligibility**
 - Match company profile to eligibility requirements
