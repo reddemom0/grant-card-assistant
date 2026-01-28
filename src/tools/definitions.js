@@ -384,6 +384,10 @@ export const HUBSPOT_TOOLS = [
           type: 'string',
           description: 'Legal Business Name (official registered business name, may differ from "name")'
         },
+        oracle_insight: {
+          type: 'string',
+          description: 'Oracle AI-generated lead insight (200-300 words): Company overview, grant program fit analysis, service offering recommendation, and recommended next action for sales team'
+        },
         hubspot_owner_id: {
           type: 'string',
           description: 'HubSpot owner ID to assign this lead to (get from team members in your context)'
@@ -408,7 +412,7 @@ export const HUBSPOT_TOOLS = [
         },
         properties: {
           type: 'object',
-          description: 'Properties to update (any combination of: name, domain, website, industry, description, about_us, city, state, country, phone, numberofemployees, annualrevenue, lifecyclestage, hubspot_owner_id, linkedin_company_page, best_fit_product_company, incorporation_date, extra6)',
+          description: 'Properties to update (any combination of: name, domain, website, industry, description, about_us, city, state, country, phone, numberofemployees, annualrevenue, lifecyclestage, hubspot_owner_id, linkedin_company_page, best_fit_product_company, incorporation_date, extra6, oracle_insight)',
           properties: {
             name: { type: 'string' },
             domain: { type: 'string' },
@@ -433,6 +437,10 @@ export const HUBSPOT_TOOLS = [
             extra6: {
               type: 'string',
               description: 'Legal Business Name (official registered business name)'
+            },
+            oracle_insight: {
+              type: 'string',
+              description: 'Oracle AI-generated lead insight (200-300 words): Company overview, grant program fit analysis, service offering recommendation, and recommended next action for sales team'
             },
             lifecyclestage: {
               type: 'string',

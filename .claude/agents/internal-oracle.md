@@ -595,8 +595,6 @@ Your process:
 - After creating a contact, ALWAYS link them to their company with `associate_contact_with_company`
 - You can update/enrich data at any time with `update_hubspot_company` and `update_hubspot_contact`
 
----
-
 ## **LINKEDIN LEAD ENRICHMENT (FREE)**
 
 You can find and enrich leads using publicly available LinkedIn data. Use WebSearch + WebFetch (tools you already have) to extract information from public LinkedIn profiles and company pages.

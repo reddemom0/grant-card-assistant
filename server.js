@@ -427,6 +427,15 @@ import visualPingHandler from './src/api/visualping-webhook.js';
 // Webhook endpoint (no authentication - VisualPing needs to POST directly)
 app.post('/api/visualping-webhook', visualPingHandler.handleVisualPingWebhook);
 
+// HubSpot Webhook for Automatic Lead Enrichment
+import * as hubspotWebhookHandler from './src/api/hubspot-webhook.js';
+
+// POST endpoint for HubSpot to send webhook notifications
+app.post('/api/hubspot-webhook', hubspotWebhookHandler.handleHubSpotWebhook);
+
+// GET endpoint for HubSpot to verify webhook during setup
+app.get('/api/hubspot-webhook', hubspotWebhookHandler.verifyHubSpotWebhook);
+
 // Get recent alerts (authenticated - for Oracle and admin dashboard)
 app.get('/api/visualping/alerts', authenticateUser, async (req, res) => {
   try {
