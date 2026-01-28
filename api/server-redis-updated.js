@@ -2812,31 +2812,37 @@ async function handleStreamingRequest(req, res, agentType) {
     console.log(`📜 Loaded conversation: ${fullConversationId} (${conversation.length} messages)`);
   }
   
-  // Load agent-specific knowledge base
-  const agentDocs = await loadAgentSpecificKnowledgeBase(agentType);
-  const loadTime = Date.now() - startTime;
-  logAgentPerformance(agentType, agentDocs.length, loadTime);
-  
-  // Select relevant documents based on agent type
+  // Load agent-specific knowledge base (skip for internal-oracle - it uses tools on-demand)
+  let agentDocs = [];
   let relevantDocs = [];
   let knowledgeContext = '';
-  
-  if (agentType === 'grant-cards') {
-    relevantDocs = selectGrantCardDocuments(task, message, '', conversation, agentDocs);
-  } else if (agentType === 'etg-writer') {
-    relevantDocs = selectETGDocuments(message, conversation, agentDocs);
-  } else if (agentType === 'bcafe-writer') {
-    relevantDocs = selectBCAFEDocuments(message, null, conversation, agentDocs);
-  } else if (agentType === 'canexport-claims') {
-    relevantDocs = selectCanExportClaimsDocuments(message, conversation, agentDocs);
+
+  if (agentType !== 'internal-oracle') {
+    agentDocs = await loadAgentSpecificKnowledgeBase(agentType);
+    const loadTime = Date.now() - startTime;
+    logAgentPerformance(agentType, agentDocs.length, loadTime);
+
+    // Select relevant documents based on agent type
+    if (agentType === 'grant-cards') {
+      relevantDocs = selectGrantCardDocuments(task, message, '', conversation, agentDocs);
+    } else if (agentType === 'etg-writer') {
+      relevantDocs = selectETGDocuments(message, conversation, agentDocs);
+    } else if (agentType === 'bcafe-writer') {
+      relevantDocs = selectBCAFEDocuments(message, null, conversation, agentDocs);
+    } else if (agentType === 'canexport-claims') {
+      relevantDocs = selectCanExportClaimsDocuments(message, conversation, agentDocs);
+    } else {
+      relevantDocs = agentDocs.slice(0, 3);
+    }
+
+    if (relevantDocs.length > 0) {
+      knowledgeContext = relevantDocs
+        .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
+        .join('\n\n');
+    }
   } else {
-    relevantDocs = agentDocs.slice(0, 3);
-  }
-  
-  if (relevantDocs.length > 0) {
-    knowledgeContext = relevantDocs
-      .map(doc => `=== ${doc.filename} ===\n${doc.content}`)
-      .join('\n\n');
+    // internal-oracle uses tools to search on-demand (search_google_drive, read_google_drive_file, etc.)
+    console.log('🔮 Oracle agent using on-demand tool-based knowledge retrieval (no upfront loading)');
   }
   
   // Build system prompt based on agent type
