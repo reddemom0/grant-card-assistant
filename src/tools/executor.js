@@ -21,6 +21,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
+ * Parse JSON string parameters that Claude sometimes sends as strings
+ * @param {any} value - Value that might be a JSON string
+ * @returns {any} Parsed value or original value
+ */
+function parseJSONParameter(value) {
+  // If not a string, return as-is
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  // If string doesn't look like JSON, return as-is
+  const trimmed = value.trim();
+  if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) {
+    return value;
+  }
+
+  // Try to parse as JSON
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    // If parsing fails, return original value
+    console.warn(`⚠️  Failed to parse JSON parameter: ${value.substring(0, 100)}...`);
+    return value;
+  }
+}
+
+/**
  * Execute a tool call from Claude
  * @param {string} toolName - Name of the tool to execute
  * @param {Object} input - Tool input parameters
@@ -131,7 +158,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           lastmodifieddate_before: input.lastmodifieddate_before,
           owner_id: input.owner_id,
           hs_lead_status: input.hs_lead_status,
-          custom_filters: input.custom_filters || [],
+          custom_filters: parseJSONParameter(input.custom_filters) || [],
           sort_by: input.sort_by,
           sort_order: input.sort_order || 'DESC'
         };
@@ -156,7 +183,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           lastmodifieddate_before: input.lastmodifieddate_before,
           owner_id: input.owner_id,
           type: input.type,
-          custom_filters: input.custom_filters || [],
+          custom_filters: parseJSONParameter(input.custom_filters) || [],
           sort_by: input.sort_by,
           sort_order: input.sort_order || 'DESC'
         };
@@ -181,7 +208,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       case 'update_hubspot_company':
-        result = await hubspot.updateHubSpotCompany(input.company_id, input.properties);
+        result = await hubspot.updateHubSpotCompany(input.company_id, parseJSONParameter(input.properties));
         break;
 
       case 'create_hubspot_contact':
@@ -189,7 +216,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       case 'update_hubspot_contact':
-        result = await hubspot.updateHubSpotContact(input.contact_id, input.properties);
+        result = await hubspot.updateHubSpotContact(input.contact_id, parseJSONParameter(input.properties));
         break;
 
       case 'associate_contact_with_company':
@@ -357,11 +384,11 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       case 'search_getgranted':
         const { searchGetGranted } = await import('./getgranted-search.js');
         result = await searchGetGranted({
-          purposes: input.purposes,
-          regions: input.regions,
-          industries: input.industries,
+          purposes: parseJSONParameter(input.purposes),
+          regions: parseJSONParameter(input.regions),
+          industries: parseJSONParameter(input.industries),
           business_type: input.business_type,
-          owner_demographics: input.owner_demographics,
+          owner_demographics: parseJSONParameter(input.owner_demographics),
           company_size_min: input.company_size_min,
           company_size_max: input.company_size_max,
           active_only: input.active_only,
