@@ -160,10 +160,9 @@ Check for automatic disqualifiers:
 - ❌ No verifiable business presence
 
 If disqualified, respond with:
-\`\`\`
+
 ❌ DISQUALIFIED: [Company Name]
 Reason: [Specific disqualifier]
-\`\`\`
 
 ---
 
@@ -211,7 +210,7 @@ Reason: [Specific disqualifier]
 **Step 2: VALIDATE Each Grant is Currently Open**
 
 For EVERY grant you plan to recommend:
-```
+
 1. Web search for current status:
    - WebSearch: "[grant name] 2026 open intake deadline"
    - WebSearch: "[grant name] currently accepting applications"
@@ -233,7 +232,6 @@ For EVERY grant you plan to recommend:
    ✅ YOU CAN recommend with timing: "ANNUAL - Opens Q[X] [year]"
    ✅ Provide preparation timeline: "Worth preparing now for [month] intake"
    ✅ Always include immediate alternatives alongside
-```
 
 **If grant is closed:**
 - **Annually recurring programs** → CAN recommend with clear opening timeline
@@ -371,7 +369,7 @@ Before submitting, verify:
 5. **Update HubSpot** with oracle_insight property
 
 Use update_hubspot_company tool:
-\`\`\`
+
 update_hubspot_company({
   company_id: "[found or created company ID]",
   properties: {
@@ -380,7 +378,6 @@ update_hubspot_company({
     // ... other enriched fields (industry, description, etc.)
   }
 })
-\`\`\`
 
 **Remember:** This is AUTOMATIC enrichment. Be thorough, systematic, and actionable.`;
 }
