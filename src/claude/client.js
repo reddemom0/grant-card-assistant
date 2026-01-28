@@ -237,6 +237,7 @@ export async function runAgent({
 
     // Track discovered tools (for tool search pattern)
     const discoveredTools = new Set();
+    let toolsLocked = false; // Lock tools after first discovery to enable cache reuse
 
     // ============================================================================
     // 6. Agent execution loop
@@ -279,6 +280,13 @@ export async function runAgent({
         }
         const addedCount = activeTools.length - tools.length;
         console.log(`🔧 Active tools: ${tools.length} base + ${addedCount} discovered = ${activeTools.length} total`);
+      }
+
+      // If tools are locked (after first discovery), remove tool_search to prevent further discoveries
+      // This keeps the tools array static for cache reuse
+      if (toolsLocked) {
+        activeTools = activeTools.filter(t => t.name !== 'tool_search');
+        console.log(`🔒 Tools locked - removed tool_search to maintain static tool array for caching`);
       }
 
       const apiParams = {
@@ -464,6 +472,12 @@ export async function runAgent({
                 }
               });
               console.log(`  🔍 Discovered ${result.tool_references.length} tools:`, Array.from(result.tool_references.map(r => r.tool_name)));
+
+              // Lock tools after first discovery to maintain static tool array for cache reuse
+              if (!toolsLocked) {
+                toolsLocked = true;
+                console.log(`  🔒 Locking tool set after first discovery (enables prompt caching)`);
+              }
 
               toolResults.push({
                 type: 'tool_result',
