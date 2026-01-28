@@ -16,6 +16,12 @@ import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE } from './streaming.js';
 import { getQueryConfig, logConfigDecision } from './query-classifier.js';
+import {
+  getMaxTurnsForAgent,
+  calculateRequestCost,
+  shouldWarnAboutCost,
+  COST_SETTINGS
+} from '../config/cost-settings.js';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -126,8 +132,13 @@ export async function runAgent({
 
     console.log(`💬 Loading conversation history...`);
     const { getConversationMessages } = await import('../database/messages.js');
-    const history = await getConversationMessages(conversationId);
-    console.log(`✓ Loaded ${history.length} previous messages`);
+
+    // Get max turns for this agent (cost optimization)
+    const maxTurns = getMaxTurnsForAgent(agentType);
+    const maxMessages = maxTurns * 2; // Each turn = user + assistant message
+
+    const history = await getConversationMessages(conversationId, maxMessages);
+    console.log(`✓ Loaded ${history.length} previous messages (max: ${maxMessages})`);
 
     // ============================================================================
     // 4. Build user message with attachments
@@ -190,9 +201,28 @@ export async function runAgent({
       text: message
     });
 
-    // Build messages array
+    // ============================================================================
+    // Build messages array with caching
+    // ============================================================================
+
+    // Apply prompt caching to conversation history (cost optimization)
+    // Cache every Nth assistant message to create checkpoints
+    // This reduces cost from $3/M to $0.30/M for cached content
+    const historyWithCaching = history.map((msg, idx) => {
+      // Cache every 5th assistant message (configurable)
+      if (msg.role === 'assistant' &&
+          idx > 0 &&
+          (idx + 1) % COST_SETTINGS.cacheEveryNMessages === 0) {
+        return {
+          ...msg,
+          cache_control: { type: 'ephemeral' }
+        };
+      }
+      return msg;
+    });
+
     let messages = [
-      ...history,
+      ...historyWithCaching,
       { role: 'user', content: userContent }
     ];
 
@@ -264,6 +294,40 @@ export async function runAgent({
       const fullResponse = await streamToSSE(stream, res, sessionId);
 
       console.log(`✓ Response received - stop_reason: ${fullResponse.stop_reason}`);
+
+      // ============================================================================
+      // Cost monitoring and logging
+      // ============================================================================
+
+      if (fullResponse.usage) {
+        const usage = fullResponse.usage;
+        const cost = calculateRequestCost(usage, MODEL);
+
+        // Log token usage for monitoring
+        console.log(`📊 Token usage: {`,
+          `input: ${usage.input_tokens || 0},`,
+          `output: ${usage.output_tokens || 0},`,
+          `cache_creation: ${usage.cache_creation_input_tokens || 0},`,
+          `cache_read: ${usage.cache_read_input_tokens || 0}`,
+        `}`);
+
+        console.log(`💰 Request cost: $${cost.toFixed(4)}`);
+
+        // Warn if cost is unusually high
+        if (shouldWarnAboutCost(cost)) {
+          console.warn(`⚠️  HIGH COST ALERT: Request cost ($${cost.toFixed(2)}) exceeds threshold ($${COST_SETTINGS.monitoring.warnThreshold})`);
+          console.warn(`   Agent: ${agentType}, Model: ${MODEL}, Conversation: ${conversationId}`);
+        }
+
+        // Calculate cache hit rate for this request
+        const totalInput = (usage.input_tokens || 0) +
+                          (usage.cache_creation_input_tokens || 0) +
+                          (usage.cache_read_input_tokens || 0);
+        if (totalInput > 0 && usage.cache_read_input_tokens) {
+          const cacheHitRate = (usage.cache_read_input_tokens / totalInput) * 100;
+          console.log(`📈 Cache hit rate: ${cacheHitRate.toFixed(1)}%`);
+        }
+      }
 
       // ============================================================================
       // Handle stop reason

@@ -42,16 +42,24 @@ export async function saveMessage(conversationId, role, content) {
 /**
  * Get all messages for a conversation
  * @param {string} conversationId - UUID of the conversation
+ * @param {number} maxMessages - Maximum number of messages to retrieve (default: 60 = 30 turns)
  * @returns {Promise<Array>} Array of messages in Claude API format
  */
-export async function getConversationMessages(conversationId) {
+export async function getConversationMessages(conversationId, maxMessages = 60) {
   try {
+    // Retrieve the most recent N messages
+    // Use subquery to get latest messages, then re-order for Claude API (oldest first)
     const result = await query(
       `SELECT role, content, created_at
-       FROM messages
-       WHERE conversation_id = $1
+       FROM (
+         SELECT role, content, created_at
+         FROM messages
+         WHERE conversation_id = $1
+         ORDER BY created_at DESC
+         LIMIT $2
+       ) recent_messages
        ORDER BY created_at ASC`,
-      [conversationId]
+      [conversationId, maxMessages]
     );
 
     // Parse content JSON and format for Claude API
@@ -114,7 +122,17 @@ export async function getConversationMessages(conversationId) {
         return true;
       });
 
-    console.log(`✓ Retrieved ${messages.length} messages for conversation ${conversationId}`);
+    const totalMessagesQuery = await query(
+      `SELECT COUNT(*) as total FROM messages WHERE conversation_id = $1`,
+      [conversationId]
+    );
+    const totalMessages = parseInt(totalMessagesQuery.rows[0]?.total || 0);
+
+    if (totalMessages > maxMessages) {
+      console.log(`✓ Retrieved ${messages.length} messages (limited from ${totalMessages} total) for conversation ${conversationId}`);
+    } else {
+      console.log(`✓ Retrieved ${messages.length} messages for conversation ${conversationId}`);
+    }
 
     return messages;
   } catch (error) {
