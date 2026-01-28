@@ -284,9 +284,9 @@ export async function runAgent({
       }
 
       const stream = await anthropic.messages.create(apiParams, {
-        // Beta headers for web fetch tool, interleaved thinking, memory tool, and files API
+        // Beta headers for web fetch tool, interleaved thinking, memory tool, files API, and advanced tool use (tool search)
         headers: {
-          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27,files-api-2025-04-14'
+          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27,files-api-2025-04-14,advanced-tool-use-2025-11-20'
         }
       });
 
@@ -431,11 +431,21 @@ export async function runAgent({
               sessionId
             });
 
-            toolResults.push({
-              type: 'tool_result',
-              tool_use_id: block.id,
-              content: JSON.stringify(result)
-            });
+            // Special handling for tool_search - return tool_reference objects
+            if (block.name === 'tool_search' && result.tool_references) {
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: result.tool_references  // Array of tool_reference objects
+              });
+            } else {
+              // Standard tool result
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: block.id,
+                content: JSON.stringify(result)
+              });
+            }
           }
         }
 

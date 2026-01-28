@@ -1522,61 +1522,74 @@ export const ALL_TOOLS = [
 /**
  * Get tools for a specific agent type
  * @param {string} agentType - The type of agent
+ * @param {boolean} useToolSearch - If true, use tool search pattern (default: true)
  * @returns {Array} Array of tool definitions for this agent
  */
-export function getToolsForAgent(agentType) {
+export function getToolsForAgent(agentType, useToolSearch = true) {
+  // Import tool_search definition
+  const TOOL_SEARCH = {
+    name: 'tool_search',
+    description: 'Search for available tools that can help with a task. Returns tool definitions for matching tools. Use this when you need a capability but don\'t have the right tool available yet. Discovers tools on-demand using semantic search.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Natural language description of what you need to do (e.g., "search HubSpot for companies", "create a Google document", "find grants for a client", "read files from Google Drive")'
+        },
+        top_k: {
+          type: 'number',
+          description: 'Number of tools to return (default: 5, max: 10)',
+          default: 5,
+          minimum: 1,
+          maximum: 10
+        }
+      },
+      required: ['query']
+    }
+  };
+
   // All agents get server tools and memory (file-based + database)
   const baseTools = [...SERVER_TOOLS, ANTHROPIC_MEMORY_TOOL, ...MEMORY_TOOLS];
 
+  // NEW: Tool Search Pattern - all agents start with just tool_search
+  // They discover other tools on-demand, reducing initial context by ~40K tokens
+  if (useToolSearch) {
+    console.log(`🔍 Agent ${agentType} using tool search pattern (on-demand tool discovery)`);
+    return [...baseTools, TOOL_SEARCH];
+  }
+
+  // LEGACY: Full tool loading (for backward compatibility or testing)
+  console.log(`⚠️  Agent ${agentType} using legacy full tool loading (40K+ tokens upfront)`);
   switch (agentType) {
     case 'grant-card-generator':
-      // Grant card generator gets all tools
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'etg-writer':
-      // ETG writer gets CRM and documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'bcafe-writer':
-      // BCAFE writer gets CRM and documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'buybc-writer':
-      // Buy BC writer gets CRM and documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'canexport-claims':
-      // Claims auditor gets CRM and documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'canexport-writer':
-      // CanExport Writer gets full toolset including character counter
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'readiness-strategist':
-      // Readiness strategist gets full toolset:
-      // - Server tools (WebSearch/WebFetch) for grant program research
-      // - Google Drive for example assessments and Question Bank
-      // - HubSpot for client context, deal integration, and assessment storage
-      // - Google Docs for creating formatted readiness assessment documents
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'internal-oracle':
-      // Internal Oracle gets:
-      // - Server tools (WebSearch/WebFetch) for external research if needed
-      // - Oracle search tool for internal knowledge base
-      // - Google Drive for reading Google Drive documents
-      // - Dropbox for reading Dropbox documents
-      // - HubSpot for company/project context
-      // - Google Docs for creating new documentation
       return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...HUBSPOT_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'orchestrator':
-      // Orchestrator gets everything
       return ALL_TOOLS;
 
     default:
-      // Unknown agent types get base tools only
       console.warn(`Unknown agent type: ${agentType}, using base tools only`);
       return baseTools;
   }

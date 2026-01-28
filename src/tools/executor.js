@@ -102,6 +102,22 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       // ============================================================================
+      // TOOL SEARCH
+      // On-demand tool discovery using semantic search
+      // ============================================================================
+
+      case 'tool_search':
+        const { handleToolSearch } = await import('./tool-search.js');
+        const toolReferences = await handleToolSearch(input.query, input.top_k || 5);
+        // Return tool_reference objects for Claude to use
+        result = {
+          success: true,
+          tools_found: toolReferences.length,
+          tool_references: toolReferences
+        };
+        break;
+
+      // ============================================================================
       // HUBSPOT TOOLS
       // ============================================================================
 
