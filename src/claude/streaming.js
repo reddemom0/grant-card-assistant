@@ -25,10 +25,12 @@ export async function streamToSSE(stream, res, sessionId) {
     for await (const event of stream) {
       // Message start event
       if (event.type === 'message_start') {
-        res.write(`data: ${JSON.stringify({
-          type: 'message_start',
-          sessionId
-        })}\n\n`);
+        if (res) {
+          res.write(`data: ${JSON.stringify({
+            type: 'message_start',
+            sessionId
+          })}\n\n`);
+        }
       }
 
       // Content block start
@@ -65,10 +67,12 @@ export async function streamToSSE(stream, res, sessionId) {
           currentContent.signature = ''; // Initialize signature field
 
           // Notify frontend that thinking started
-          res.write(`data: ${JSON.stringify({
-            type: 'thinking_start',
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'thinking_start',
+              sessionId
+            })}\n\n`);
+          }
         }
       }
 
@@ -78,30 +82,36 @@ export async function streamToSSE(stream, res, sessionId) {
           currentContent.text += event.delta.text;
 
           // Stream text to frontend
-          res.write(`data: ${JSON.stringify({
-            type: 'text_delta',
-            text: event.delta.text,
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'text_delta',
+              text: event.delta.text,
+              sessionId
+            })}\n\n`);
+          }
         } else if (event.delta.type === 'input_json_delta') {
           currentContent.input += event.delta.partial_json;
 
           // Optionally stream tool use progress
-          res.write(`data: ${JSON.stringify({
-            type: 'tool_input_delta',
-            toolName: currentContent.name,
-            delta: event.delta.partial_json,
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'tool_input_delta',
+              toolName: currentContent.name,
+              delta: event.delta.partial_json,
+              sessionId
+            })}\n\n`);
+          }
         } else if (event.delta.type === 'thinking_delta') {
           currentContent.thinking += event.delta.thinking;
 
           // Stream thinking to frontend (optional - can be hidden from users)
-          res.write(`data: ${JSON.stringify({
-            type: 'thinking_delta',
-            thinking: event.delta.thinking,
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'thinking_delta',
+              thinking: event.delta.thinking,
+              sessionId
+            })}\n\n`);
+          }
         } else if (event.delta.type === 'signature_delta') {
           // Capture signature for thinking blocks
           // Signature is required when passing thinking blocks back to API
@@ -124,13 +134,15 @@ export async function streamToSSE(stream, res, sessionId) {
           }
 
           // Notify frontend of complete tool use
-          res.write(`data: ${JSON.stringify({
-            type: 'tool_use_complete',
-            toolId: currentContent.id,
-            toolName: currentContent.name,
-            input: currentContent.input,
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'tool_use_complete',
+              toolId: currentContent.id,
+              toolName: currentContent.name,
+              input: currentContent.input,
+              sessionId
+            })}\n\n`);
+          }
         } else if (currentContent.type === 'server_tool_use') {
           // Server tool complete (web_search, web_fetch)
           // Parse accumulated JSON input
@@ -141,28 +153,34 @@ export async function streamToSSE(stream, res, sessionId) {
             currentContent.input = {};
           }
 
-          res.write(`data: ${JSON.stringify({
-            type: 'server_tool_use_complete',
-            toolId: currentContent.id,
-            toolName: currentContent.name,
-            input: currentContent.input,
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'server_tool_use_complete',
+              toolId: currentContent.id,
+              toolName: currentContent.name,
+              input: currentContent.input,
+              sessionId
+            })}\n\n`);
+          }
         } else if (currentContent.type === 'web_fetch_tool_result' || currentContent.type === 'web_search_tool_result') {
           // Server tool result complete
           // Content field should remain as string (not parsed as JSON)
-          res.write(`data: ${JSON.stringify({
-            type: 'server_tool_result_complete',
-            toolUseId: currentContent.tool_use_id,
-            resultType: currentContent.type,
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'server_tool_result_complete',
+              toolUseId: currentContent.tool_use_id,
+              resultType: currentContent.type,
+              sessionId
+            })}\n\n`);
+          }
         } else if (currentContent.type === 'thinking') {
           // Thinking block complete
-          res.write(`data: ${JSON.stringify({
-            type: 'thinking_stop',
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'thinking_stop',
+              sessionId
+            })}\n\n`);
+          }
         }
 
         fullResponse.content.push(currentContent);
@@ -183,11 +201,13 @@ export async function streamToSSE(stream, res, sessionId) {
       if (event.type === 'message_stop') {
         // Message complete
         if (fullResponse.usage) {
-          res.write(`data: ${JSON.stringify({
-            type: 'usage',
-            usage: fullResponse.usage,
-            sessionId
-          })}\n\n`);
+          if (res) {
+            res.write(`data: ${JSON.stringify({
+              type: 'usage',
+              usage: fullResponse.usage,
+              sessionId
+            })}\n\n`);
+          }
 
           // Log token usage
           console.log(`📊 Token usage:`, {
@@ -202,11 +222,13 @@ export async function streamToSSE(stream, res, sessionId) {
       // Error event
       if (event.type === 'error') {
         console.error('Stream error:', event.error);
-        res.write(`data: ${JSON.stringify({
-          type: 'error',
-          error: event.error.message || 'Unknown error',
-          sessionId
-        })}\n\n`);
+        if (res) {
+          res.write(`data: ${JSON.stringify({
+            type: 'error',
+            error: event.error.message || 'Unknown error',
+            sessionId
+          })}\n\n`);
+        }
 
         throw new Error(event.error.message || 'Stream error');
       }
@@ -218,11 +240,13 @@ export async function streamToSSE(stream, res, sessionId) {
     console.error('Streaming error:', error);
 
     // Send error to frontend if not already sent
-    res.write(`data: ${JSON.stringify({
-      type: 'error',
-      error: error.message,
-      sessionId
-    })}\n\n`);
+    if (res) {
+      res.write(`data: ${JSON.stringify({
+        type: 'error',
+        error: error.message,
+        sessionId
+      })}\n\n`);
+    }
 
     throw error;
   }
