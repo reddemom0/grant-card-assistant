@@ -57,16 +57,18 @@ export async function runAgent({
   console.log(`🔑 Session: ${sessionId}`);
   console.log('='.repeat(80) + '\n');
 
-  // Setup SSE headers
-  setupSSE(res);
+  // Setup SSE headers (only if res exists - webhook enrichment has no client)
+  if (res) {
+    setupSSE(res);
 
-  // Send connection confirmation
-  sendSSE(res, {
-    type: 'connected',
-    sessionId,
-    conversationId,
-    agentType
-  });
+    // Send connection confirmation
+    sendSSE(res, {
+      type: 'connected',
+      sessionId,
+      conversationId,
+      agentType
+    });
+  }
 
   try {
     // ============================================================================

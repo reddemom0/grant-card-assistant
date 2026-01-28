@@ -234,14 +234,16 @@ export async function streamToSSE(stream, res, sessionId) {
  * @param {Object} data - Data to send
  */
 export function sendSSE(res, data) {
+  if (!res) return; // No streaming for webhook enrichment
   res.write(`data: ${JSON.stringify(data)}\n\n`);
 }
 
 /**
  * Setup SSE headers on Express response
- * @param {Object} res - Express response object
+ * @param {Object} res - Express response object (null for webhook enrichment)
  */
 export function setupSSE(res) {
+  if (!res) return; // No streaming for webhook enrichment
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -251,9 +253,10 @@ export function setupSSE(res) {
 
 /**
  * Close SSE connection gracefully
- * @param {Object} res - Express response object
+ * @param {Object} res - Express response object (null for webhook enrichment)
  */
 export function closeSSE(res) {
+  if (!res) return; // No streaming for webhook enrichment
   res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
   res.end();
 }
