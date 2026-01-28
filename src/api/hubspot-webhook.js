@@ -199,11 +199,45 @@ Reason: [Specific disqualifier]
 - Search: "[company name] grant consultant" (competitor check)
 - Check website/LinkedIn for testimonials from other consultants
 
-### 5. Grant Program Matching
-- **CRITICAL:** Use search_getgranted with **active_only=true**
-- Check **open_intakes_only=true** for urgent opportunities
+### 5. Grant Program Matching & Validation
+
+**🚨 THE CARDINAL RULE: NEVER recommend a closed grant 🚨**
+
+**Step 1: Find Active Grants**
+- **CRITICAL:** Use search_getgranted with **active_only=true** (MANDATORY)
+- Check **open_intakes_only=true** for immediate opportunities
 - **Consult get_visualping_alerts (past 30 days)** for program changes
-- Cross-reference eligibility vs company profile
+
+**Step 2: VALIDATE Each Grant is Currently Open**
+
+For EVERY grant you plan to recommend:
+```
+1. Web search for current status:
+   - WebSearch: "[grant name] 2026 open intake deadline"
+   - WebSearch: "[grant name] currently accepting applications"
+
+2. Check official program page:
+   - WebFetch: [official URL from GetGranted]
+
+3. Look for OPEN signals:
+   ✅ "Now accepting applications"
+   ✅ "Apply now" / "Open intake"
+   ✅ Future deadline visible
+
+4. Look for CLOSED signals:
+   🛑 "Applications closed"
+   🛑 "No longer accepting"
+   🛑 Past deadline with no new intake
+
+5. For annual programs without current intake:
+   ⚠️ Label clearly: "ANNUAL - Opens Q[X] [year]"
+   ⚠️ Do NOT present as immediate opportunity
+```
+
+**If you cannot confirm a grant is open → DO NOT recommend it**
+
+**Step 3: Cross-Reference Eligibility**
+- Match company profile to eligibility requirements
 - Verify deadlines are realistic (3-4 weeks minimum)
 - Check province-specific programs:
   - BC: BCAFE, InnovateBC, New Ventures BC

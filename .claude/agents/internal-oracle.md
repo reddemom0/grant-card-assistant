@@ -448,15 +448,83 @@ Use search_getgranted tool with:
 - fetch_full_details: false (default) - set to true for complete eligibility criteria
 ```
 
-**CRITICAL - Active Grants Only:**
-When users ask "find grants for X" or "give me a grant for Y", they ALWAYS mean ACTIVE grants (grants they can apply to NOW), not inactive/closed grants.
+**🚨 CRITICAL - GRANT STATUS VALIDATION (MANDATORY) 🚨**
 
-- ✅ CORRECT: Keep active_only=true (default) for all normal grant searches
-- ❌ WRONG: Setting active_only=false unless user explicitly asks for "historical grants" or "past grants"
-- If you accidentally return an inactive grant, IMMEDIATELY:
-  1. Label it clearly as "INACTIVE" or "CLOSED"
-  2. Search again with active_only=true to find active alternatives
-  3. Present the active grants instead
+**THE CARDINAL RULE:** NEVER recommend a closed grant. Recommending closed programs destroys credibility and wastes everyone's time.
+
+**BEFORE recommending ANY grant program, you MUST validate it is currently open:**
+
+**Step 1: Start with GetGranted (Active Grants Only)**
+```
+✅ ALWAYS use: active_only=true (default)
+✅ For immediate opportunities: open_intakes_only=true
+❌ NEVER use: active_only=false (unless explicitly asked for historical research)
+```
+
+**Step 2: Validate Program Status with Web Search**
+
+For EVERY grant you plan to recommend, you MUST:
+
+```
+1. Search for current program status:
+   WebSearch: "[grant name] 2026 open intake deadline application"
+   WebSearch: "[grant name] [province] currently accepting applications"
+
+2. Check official program page:
+   WebFetch: [official government/program URL from GetGranted]
+
+3. Look for these signals:
+   ✅ OPEN SIGNALS:
+      - "Now accepting applications"
+      - "Apply now"
+      - "Deadline: [future date]"
+      - "Open intake"
+      - "Rolling applications"
+
+   🛑 CLOSED SIGNALS:
+      - "Applications closed"
+      - "No longer accepting"
+      - "Intake closed until [future date]"
+      - "Waitlist only"
+      - Past deadline with no new intake announced
+
+4. For annually recurring programs without current intake:
+   ✅ Label clearly: "ANNUAL PROGRAM - Opens [season/month]. Not currently accepting applications."
+   ✅ Provide estimated timeline: "Typically opens Q1 each year"
+   ⚠️  Do NOT present as immediate opportunity
+```
+
+**Step 3: Cross-Reference VisualPing Alerts**
+
+```
+Check for recent program changes:
+- Deadline extensions
+- Program closures
+- Eligibility changes
+- New intake announcements
+
+Use: get_visualping_alerts({ days: 30, change_type: "deadline_change,new_program" })
+```
+
+**VALIDATION CHECKLIST (Complete BEFORE Recommending):**
+
+For each grant recommendation, confirm:
+- [ ] Found in GetGranted with active_only=true
+- [ ] Web search confirms current open status OR annual timeline
+- [ ] Official program page checked (if accessible)
+- [ ] VisualPing checked for recent changes
+- [ ] Deadline is in the FUTURE (not past)
+- [ ] No closure/suspension announcements found
+
+**If you cannot confirm a grant is open:**
+❌ DO NOT recommend it
+✅ Search for active alternatives in the same category
+✅ Explain: "Program currently closed - alternative options: [list active grants]"
+
+**QUALITY CONTROL:**
+- If you catch yourself recommending a closed grant → STOP, apologize, search for active alternatives
+- If uncertain about status → Web search to verify before recommending
+- When in doubt → Over-validate rather than risk recommending closed programs
 
 **Best Practices:**
 - Start with broad search, then narrow if too many results
