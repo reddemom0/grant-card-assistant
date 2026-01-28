@@ -260,17 +260,25 @@ export async function runAgent({
       // Call Claude API with streaming
       console.log(`📡 Calling Claude API...`);
 
-      // Build tools array: base tools + discovered tools
+      // Build tools array: base tools + discovered tools (deduplicated)
       let activeTools = [...tools];
       if (discoveredTools.size > 0) {
         const { getToolDefinition } = await import('../tools/definitions.js');
+        const baseToolNames = new Set(tools.map(t => t.name));
+
         for (const toolName of discoveredTools) {
+          // Skip if already in base tools
+          if (baseToolNames.has(toolName)) {
+            continue;
+          }
+
           const toolDef = getToolDefinition(toolName);
           if (toolDef) {
             activeTools.push(toolDef);
           }
         }
-        console.log(`🔧 Active tools: ${tools.length} base + ${discoveredTools.size} discovered = ${activeTools.length} total`);
+        const addedCount = activeTools.length - tools.length;
+        console.log(`🔧 Active tools: ${tools.length} base + ${addedCount} discovered = ${activeTools.length} total`);
       }
 
       const apiParams = {
