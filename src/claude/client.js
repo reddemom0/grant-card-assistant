@@ -235,6 +235,9 @@ export async function runAgent({
     const tools = getToolsForAgent(agentType);
     console.log(`🔧 Loaded ${tools.length} tools for agent`);
 
+    // Track discovered tools (for tool search pattern)
+    const discoveredTools = new Set();
+
     // ============================================================================
     // 6. Agent execution loop
     // ============================================================================
@@ -257,6 +260,19 @@ export async function runAgent({
       // Call Claude API with streaming
       console.log(`📡 Calling Claude API...`);
 
+      // Build tools array: base tools + discovered tools
+      let activeTools = [...tools];
+      if (discoveredTools.size > 0) {
+        const { getToolDefinition } = await import('../tools/definitions.js');
+        for (const toolName of discoveredTools) {
+          const toolDef = getToolDefinition(toolName);
+          if (toolDef) {
+            activeTools.push(toolDef);
+          }
+        }
+        console.log(`🔧 Active tools: ${tools.length} base + ${discoveredTools.size} discovered = ${activeTools.length} total`);
+      }
+
       const apiParams = {
         model: MODEL,
         max_tokens: MAX_TOKENS,
@@ -272,7 +288,7 @@ export async function runAgent({
         ],
 
         messages,
-        tools,
+        tools: activeTools,
 
         // Enable streaming
         stream: true
@@ -433,6 +449,14 @@ export async function runAgent({
 
             // Special handling for tool_search - return tool_reference objects
             if (block.name === 'tool_search' && result.tool_references) {
+              // Track discovered tools so we can add them to the next API call
+              result.tool_references.forEach(ref => {
+                if (ref.tool_name) {
+                  discoveredTools.add(ref.tool_name);
+                }
+              });
+              console.log(`  🔍 Discovered ${result.tool_references.length} tools:`, Array.from(result.tool_references.map(r => r.tool_name)));
+
               toolResults.push({
                 type: 'tool_result',
                 tool_use_id: block.id,
