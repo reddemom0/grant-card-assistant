@@ -375,13 +375,14 @@ async function enrichLead(companyInfo) {
 
     console.log(`📝 Oracle Insight enrichment prompt prepared (${enrichmentPrompt.length} chars)`);
 
-    // Run the Internal Oracle agent
+    // Run the Internal Oracle agent (no streaming - webhook enrichment)
     const result = await runAgent({
       agentType,
       conversationId,
       userId,
       message: enrichmentPrompt,
-      sessionId: crypto.randomUUID()
+      sessionId: crypto.randomUUID(),
+      res: null // No SSE streaming for webhook enrichment
     });
 
     console.log(`✅ Lead enrichment completed for: ${companyInfo.companyName || companyInfo.contactEmail}`);
