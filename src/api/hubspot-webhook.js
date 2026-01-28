@@ -62,10 +62,12 @@ function extractCompanyInfo(payload) {
 
   // Handle company.creation event webhook (most common for lead enrichment)
   if (payload.objectId && payload.subscriptionType === 'company.creation') {
+    console.log(`✅ Detected company.creation event - objectId: ${payload.objectId}, changeSource: ${payload.changeSource || 'unknown'}`);
     return {
       objectId: payload.objectId,
       objectType: 'company',
-      subscriptionType: payload.subscriptionType
+      subscriptionType: payload.subscriptionType,
+      changeSource: payload.changeSource || 'unknown'
     };
   }
 
@@ -456,15 +458,21 @@ export async function handleHubSpotWebhook(req, res) {
       });
     }
 
-    const payload = req.body;
+    let payload = req.body;
     console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 
-    // HubSpot sends an array of events
-    if (!Array.isArray(payload) || payload.length === 0) {
-      console.error('❌ Invalid payload format - expected array of events');
+    // HubSpot can send either a single event object or an array of events
+    // Normalize to array format
+    if (!Array.isArray(payload)) {
+      console.log('📝 Converting single event to array format');
+      payload = [payload];
+    }
+
+    if (payload.length === 0) {
+      console.error('❌ Empty payload received');
       return res.status(400).json({
-        error: 'Invalid payload format',
-        message: 'Expected array of webhook events'
+        error: 'Empty payload',
+        message: 'No events to process'
       });
     }
 
@@ -473,6 +481,8 @@ export async function handleHubSpotWebhook(req, res) {
       success: true,
       message: `Webhook received, processing ${payload.length} event(s)`
     });
+
+    console.log(`🔄 Processing ${payload.length} event(s)...`);
 
     // Process each event asynchronously (don't block response)
     payload.forEach((event, index) => {
