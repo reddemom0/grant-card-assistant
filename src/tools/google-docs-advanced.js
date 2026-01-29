@@ -7,6 +7,7 @@ import { google } from 'googleapis';
 import { getTemplate } from './doc-templates/index.js';
 import { createGoogleDocFromTemplate } from './google-docs-construction.js';
 import Anthropic from '@anthropic-ai/sdk';
+import { calculateRequestCost } from '../config/cost-settings.js';
 
 /**
  * Logo URL - can be overridden via GRANTED_LOGO_URL environment variable
@@ -1510,6 +1511,12 @@ Example format:
       }]
     });
 
+    // Log cost
+    if (message.usage) {
+      const cost = calculateRequestCost(message.usage, 'claude-3-5-haiku-20241022');
+      console.log(`💰 [Google Docs - Interview Questions] Request cost: $${cost.toFixed(4)} (Program: ${programName || 'unknown'})`);
+    }
+
     const responseText = message.content[0].text;
 
     let fitAssessment = null;
@@ -1740,6 +1747,12 @@ NEXT STEPS:
         content: prompt
       }]
     });
+
+    // Log cost
+    if (message.usage) {
+      const cost = calculateRequestCost(message.usage, 'claude-3-5-haiku-20241022');
+      console.log(`💰 [Google Docs - Evaluation Rubric] Request cost: $${cost.toFixed(4)} (Program: ${program_name}, Client: ${client_name})`);
+    }
 
     const responseText = message.content[0].text;
 

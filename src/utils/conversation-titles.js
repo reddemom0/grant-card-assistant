@@ -6,6 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { calculateRequestCost } from '../config/cost-settings.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -40,6 +41,12 @@ ${agentType ? `This is a conversation with a ${agentType} agent.` : ''}
 Return ONLY the title, no quotes, no punctuation at the end, no explanation.`
       }]
     });
+
+    // Log cost
+    if (response.usage) {
+      const cost = calculateRequestCost(response.usage, 'claude-3-5-haiku-20241022');
+      console.log(`💰 [Conversation Titles] Request cost: $${cost.toFixed(4)} (Agent: ${agentType || 'unknown'})`);
+    }
 
     const title = response.content[0].text.trim()
       .replace(/^["']|["']$/g, '') // Remove quotes if added

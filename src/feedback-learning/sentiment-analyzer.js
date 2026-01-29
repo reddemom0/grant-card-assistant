@@ -6,6 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { calculateRequestCost } from '../config/cost-settings.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -65,6 +66,12 @@ Guidelines:
         content: prompt
       }]
     });
+
+    // Log cost
+    if (response.usage) {
+      const cost = calculateRequestCost(response.usage, 'claude-sonnet-4-5-20250929');
+      console.log(`💰 [Sentiment Analysis] Request cost: $${cost.toFixed(4)} (Feedback: ${agentType || 'unknown'})`);
+    }
 
     // Extract JSON from response
     const content = response.content[0].text.trim();
@@ -273,6 +280,12 @@ Guidelines:
         content: prompt
       }]
     });
+
+    // Log cost
+    if (response.usage) {
+      const cost = calculateRequestCost(response.usage, 'claude-sonnet-4-5-20250929');
+      console.log(`💰 [Insight Generation] Request cost: $${cost.toFixed(4)} (Agent: ${agentType}, Feedback count: ${feedbackItems.length})`);
+    }
 
     // Extract JSON from response
     const content = response.content[0].text.trim();

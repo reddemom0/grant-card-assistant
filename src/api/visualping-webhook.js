@@ -7,6 +7,7 @@
 
 import Redis from 'ioredis';
 import Anthropic from '@anthropic-ai/sdk';
+import { calculateRequestCost } from '../config/cost-settings.js';
 
 const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -164,6 +165,12 @@ Return your analysis as valid JSON only, no other text:
         content: analysisPrompt
       }]
     });
+
+    // Log cost
+    if (response.usage) {
+      const cost = calculateRequestCost(response.usage, 'claude-sonnet-4-5-20250929');
+      console.log(`💰 [VisualPing Webhook] Request cost: $${cost.toFixed(4)} (URL: ${payload.url})`);
+    }
 
     const analysisText = response.content[0].text;
     const jsonMatch = analysisText.match(/\{[\s\S]*\}/);

@@ -14,6 +14,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { calculateRequestCost } from '../config/cost-settings.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -288,6 +289,12 @@ Feedback: "${feedbackText}"
 What tags apply?`
       }]
     });
+
+    // Log cost
+    if (response.usage) {
+      const cost = calculateRequestCost(response.usage, 'claude-3-haiku-20240307');
+      console.log(`💰 [Tag Classifier] Request cost: $${cost.toFixed(4)} (Agent: ${agentType})`);
+    }
 
     const content = response.content[0].text;
 
