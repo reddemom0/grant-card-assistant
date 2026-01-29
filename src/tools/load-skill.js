@@ -33,6 +33,17 @@ const SKILL_PATHS = {
   },
   research: {
     company_intelligence: '.claude/skills/research-consultant/COMPANY_INTELLIGENCE.md'
+  },
+  'canexport-writer': {
+    overview: '.claude/skills/canexport-writer/SKILL.md',
+    PROGRAM_DETAILS: '.claude/skills/canexport-writer/PROGRAM_DETAILS.md',
+    APPLICATION_STRUCTURE: '.claude/skills/canexport-writer/APPLICATION_STRUCTURE.md',
+    KNOWLEDGE_BASE_INDEX: '.claude/skills/canexport-writer/KNOWLEDGE_BASE_INDEX.md',
+    STAGE_1_READINESS: '.claude/skills/canexport-writer/STAGE_1_READINESS.md',
+    STAGE_1_BUDGET_GUIDE: '.claude/skills/canexport-writer/STAGE_1_BUDGET_GUIDE.md',
+    STAGE_1_INTERVIEW_QUESTIONS: '.claude/skills/canexport-writer/STAGE_1_INTERVIEW_QUESTIONS.md',
+    STAGE_2_DRAFTING: '.claude/skills/canexport-writer/STAGE_2_DRAFTING.md',
+    STAGE_3_REVIEW: '.claude/skills/canexport-writer/STAGE_3_REVIEW.md'
   }
   // Add more skills as they're created: writing, etc.
 };
