@@ -233,11 +233,7 @@ export async function runAgent({
     // ============================================================================
 
     const tools = getToolsForAgent(agentType);
-    console.log(`🔧 Loaded ${tools.length} tools for agent`);
-
-    // Track discovered tools (for tool search pattern)
-    const discoveredTools = new Set();
-    let toolsLocked = false; // Lock tools after first discovery to enable cache reuse
+    console.log(`🔧 Loaded ${tools.length} tools for agent`)
 
     // ============================================================================
     // 6. Agent execution loop
@@ -261,34 +257,6 @@ export async function runAgent({
       // Call Claude API with streaming
       console.log(`📡 Calling Claude API...`);
 
-      // Build tools array: base tools + discovered tools (deduplicated)
-      let activeTools = [...tools];
-      if (discoveredTools.size > 0) {
-        const { getToolDefinition } = await import('../tools/definitions.js');
-        const baseToolNames = new Set(tools.map(t => t.name));
-
-        for (const toolName of discoveredTools) {
-          // Skip if already in base tools
-          if (baseToolNames.has(toolName)) {
-            continue;
-          }
-
-          const toolDef = getToolDefinition(toolName);
-          if (toolDef) {
-            activeTools.push(toolDef);
-          }
-        }
-        const addedCount = activeTools.length - tools.length;
-        console.log(`🔧 Active tools: ${tools.length} base + ${addedCount} discovered = ${activeTools.length} total`);
-      }
-
-      // If tools are locked (after first discovery), remove tool_search to prevent further discoveries
-      // This keeps the tools array static for cache reuse
-      if (toolsLocked) {
-        activeTools = activeTools.filter(t => t.name !== 'tool_search');
-        console.log(`🔒 Tools locked - removed tool_search to maintain static tool array for caching`);
-      }
-
       const apiParams = {
         model: MODEL,
         max_tokens: MAX_TOKENS,
@@ -304,7 +272,7 @@ export async function runAgent({
         ],
 
         messages,
-        tools: activeTools,
+        tools: tools,
 
         // Enable streaming
         stream: true
@@ -316,9 +284,9 @@ export async function runAgent({
       }
 
       const stream = await anthropic.messages.create(apiParams, {
-        // Beta headers for web fetch tool, interleaved thinking, memory tool, files API, and advanced tool use (tool search)
+        // Beta headers for web fetch tool, interleaved thinking, memory tool, and files API
         headers: {
-          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27,files-api-2025-04-14,advanced-tool-use-2025-11-20'
+          'anthropic-beta': 'web-fetch-2025-09-10,interleaved-thinking-2025-05-14,context-management-2025-06-27,files-api-2025-04-14'
         }
       });
 
@@ -463,35 +431,12 @@ export async function runAgent({
               sessionId
             });
 
-            // Special handling for tool_search - return tool_reference objects
-            if (block.name === 'tool_search' && result.tool_references) {
-              // Track discovered tools so we can add them to the next API call
-              result.tool_references.forEach(ref => {
-                if (ref.tool_name) {
-                  discoveredTools.add(ref.tool_name);
-                }
-              });
-              console.log(`  🔍 Discovered ${result.tool_references.length} tools:`, Array.from(result.tool_references.map(r => r.tool_name)));
-
-              // Lock tools after first discovery to maintain static tool array for cache reuse
-              if (!toolsLocked) {
-                toolsLocked = true;
-                console.log(`  🔒 Locking tool set after first discovery (enables prompt caching)`);
-              }
-
-              toolResults.push({
-                type: 'tool_result',
-                tool_use_id: block.id,
-                content: result.tool_references  // Array of tool_reference objects
-              });
-            } else {
-              // Standard tool result
-              toolResults.push({
-                type: 'tool_result',
-                tool_use_id: block.id,
-                content: JSON.stringify(result)
-              });
-            }
+            // Standard tool result
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: block.id,
+              content: JSON.stringify(result)
+            });
           }
         }
 

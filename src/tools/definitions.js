@@ -1525,72 +1525,55 @@ export const ALL_TOOLS = [
  * @param {boolean} useToolSearch - If true, use tool search pattern (default: true)
  * @returns {Array} Array of tool definitions for this agent
  */
-export function getToolsForAgent(agentType, useToolSearch = true) {
-  // Import tool_search definition
-  const TOOL_SEARCH = {
-    name: 'tool_search',
-    description: 'Search for available tools that can help with a task. Returns tool definitions for matching tools. Use this when you need a capability but don\'t have the right tool available yet. Discovers tools on-demand using semantic search.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Natural language description of what you need to do (e.g., "search HubSpot for companies", "create a Google document", "find grants for a client", "read files from Google Drive")'
-        },
-        top_k: {
-          type: 'number',
-          description: 'Number of tools to return (default: 5, max: 10)',
-          default: 5,
-          minimum: 1,
-          maximum: 10
-        }
-      },
-      required: ['query']
-    }
-  };
-
+export function getToolsForAgent(agentType) {
   // All agents get server tools and memory (file-based + database)
   const baseTools = [...SERVER_TOOLS, ANTHROPIC_MEMORY_TOOL, ...MEMORY_TOOLS];
 
-  // NEW: Tool Search Pattern - all agents start with just tool_search
-  // They discover other tools on-demand, reducing initial context by ~40K tokens
-  if (useToolSearch) {
-    console.log(`🔍 Agent ${agentType} using tool search pattern (on-demand tool discovery)`);
-    return [...baseTools, TOOL_SEARCH];
-  }
+  // Core HubSpot tools needed for most agents (enrichment, search, CRUD operations)
+  const coreHubSpotTools = HUBSPOT_TOOLS.filter(tool =>
+    ['search_hubspot_contacts', 'search_hubspot_companies', 'search_hubspot_deals',
+     'get_hubspot_contact', 'get_hubspot_company', 'get_hubspot_deal',
+     'create_hubspot_contact', 'create_hubspot_company',
+     'update_hubspot_contact', 'update_hubspot_company', 'update_hubspot_deal',
+     'associate_contact_with_company', 'search_getgranted',
+     'generate_hubspot_embed_link'].includes(tool.name)
+  );
 
-  // LEGACY: Full tool loading (for backward compatibility or testing)
-  console.log(`⚠️  Agent ${agentType} using legacy full tool loading (40K+ tokens upfront)`);
+  // Curated tool sets per agent - only include what each agent actually uses
   switch (agentType) {
     case 'grant-card-generator':
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
+      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
 
     case 'etg-writer':
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
-
     case 'bcafe-writer':
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
-
     case 'buybc-writer':
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
+      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
 
     case 'canexport-claims':
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'canexport-writer':
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + CANEXPORT_WRITER_TOOLS.length + GOOGLE_DOCS_TOOLS.length} tools)`);
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'readiness-strategist':
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_DOCS_TOOLS.length} tools)`);
+      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'internal-oracle':
-      return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...HUBSPOT_TOOLS, ...GOOGLE_DOCS_TOOLS];
+      // Oracle needs: search/enrichment tools + Oracle KB + minimal HubSpot
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length} tools)`);
+      return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools];
 
     case 'orchestrator':
+      console.log(`🔧 Agent ${agentType} using ALL tools (${ALL_TOOLS.length} tools)`);
       return ALL_TOOLS;
 
     default:
-      console.warn(`Unknown agent type: ${agentType}, using base tools only`);
+      console.warn(`Unknown agent type: ${agentType}, using base tools only (${baseTools.length} tools)`);
       return baseTools;
   }
 }
