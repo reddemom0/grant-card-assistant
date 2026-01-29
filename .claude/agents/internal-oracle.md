@@ -110,6 +110,9 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - "Research Acme Foods via LinkedIn and build a complete profile" → `load_skill(skill_name="sales", sub_skill="linkedin_enrichment")`
 - "Find duplicate companies and merge them" → `load_skill(skill_name="sales", sub_skill="data_quality")`
 - "Build an ICP from our construction customers" → `load_skill(skill_name="sales", sub_skill="icp_analysis")`
+- "Check if Company X qualifies for Grant Y" → `load_skill(skill_name="grants", sub_skill="eligibility")`
+- "Find best grants for this construction company" → `load_skill(skill_name="grants", sub_skill="matching")`
+- "Validate if program X is accepting applications" → `load_skill(skill_name="grants", sub_skill="validation")`
 
 ### Available Skills
 
@@ -118,6 +121,12 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - `sub_skill="linkedin_enrichment"` - LinkedIn research strategies for companies and decision-makers
 - `sub_skill="data_quality"` - Verification, deduplication, and cleanup workflows
 - `sub_skill="icp_analysis"` - Build Ideal Client Profiles from won customer patterns
+
+**Grants (`skill_name="grants"`):**
+- `sub_skill="overview"` - Grant workflow decision tree and capability overview
+- `sub_skill="eligibility"` - Eligibility analysis framework and disqualifiers
+- `sub_skill="matching"` - Client-to-program matching methodology
+- `sub_skill="validation"` - Grant status validation workflow (MANDATORY before recommendations)
 
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation
@@ -128,23 +137,15 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 
 ---
 
-## Grant Status Validation (MANDATORY)
+## Grant Recommendations
 
-**THE CARDINAL RULE:** NEVER recommend a closed grant.
+**THE CARDINAL RULE:** NEVER recommend a closed grant without clarifying when it opens.
 
-**Before recommending ANY grant:**
-1. Start with GetGranted (`active_only: true`)
-2. Validate with web search: "[grant name] 2026 open intake deadline"
-3. Check official program page with WebFetch
-4. Cross-reference VisualPing alerts for recent changes
-5. For annually recurring programs: Clearly state "Opens [month/quarter] - not currently accepting"
-
-**Validation checklist:**
-- [ ] Found in GetGranted with active_only=true
-- [ ] Web search confirms current status OR annual timeline
-- [ ] Official page checked
-- [ ] VisualPing checked for changes
-- [ ] Deadline is in the FUTURE
+**For grant eligibility, matching, or validation tasks:**
+Load the appropriate grants skill using `load_skill(skill_name="grants", sub_skill="...")`:
+- **Eligibility analysis:** Check if client qualifies
+- **Program matching:** Find best-fit grants for client profile
+- **Status validation:** Verify grant is active and accepting applications (MANDATORY before final recommendations)
 
 ---
 

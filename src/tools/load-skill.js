@@ -15,6 +15,8 @@ const __dirname = path.dirname(__filename);
 /**
  * Skill file mappings
  * Each sub_skill maps to one specific markdown file
+ *
+ * NOTE: Sub-skill names must be unique within each skill domain (not globally)
  */
 const SKILL_PATHS = {
   sales: {
@@ -23,10 +25,16 @@ const SKILL_PATHS = {
     data_quality: '.claude/skills/sales-consultant/DATA_QUALITY.md',
     icp_analysis: '.claude/skills/sales-consultant/ICP_ANALYSIS.md'
   },
+  grants: {
+    overview: '.claude/skills/grants-consultant/SKILL.md',
+    eligibility: '.claude/skills/grants-consultant/ELIGIBILITY.md',
+    matching: '.claude/skills/grants-consultant/MATCHING.md',
+    validation: '.claude/skills/grants-consultant/VALIDATION.md'
+  },
   research: {
     company_intelligence: '.claude/skills/research-consultant/COMPANY_INTELLIGENCE.md'
   }
-  // Add more skills as they're created: grants, writing, etc.
+  // Add more skills as they're created: writing, etc.
 };
 
 /**

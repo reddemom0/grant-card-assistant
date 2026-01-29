@@ -1351,6 +1351,12 @@ Use when simple information retrieval is insufficient and you need specialized e
 - \`data_quality\` - Verification, deduplication, and cleanup workflows
 - \`icp_analysis\` - Build Ideal Client Profiles from won customer patterns
 
+**Grants Skill:**
+- \`overview\` - Grant workflow decision tree and capability overview
+- \`eligibility\` - Eligibility analysis framework and disqualifiers
+- \`matching\` - Client-to-program matching methodology
+- \`validation\` - Grant status validation workflow (MANDATORY before recommendations)
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1361,9 +1367,11 @@ Use when simple information retrieval is insufficient and you need specialized e
 
 **Load skills for specialized tasks:**
 - "Enrich TechCo's HubSpot record with 12 priority fields" → load_skill(sales, lead_farming)
-- "Research Acme Foods and build a complete profile" → load_skill(sales, lead_farming)
 - "Find duplicate companies and merge them" → load_skill(sales, data_quality)
-- "Build an ICP from our construction customers" → load_skill(sales, icp_analysis)`,
+- "Build an ICP from our construction customers" → load_skill(sales, icp_analysis)
+- "Check if Company X qualifies for Grant Y" → load_skill(grants, eligibility)
+- "Find best grants for this construction company" → load_skill(grants, matching)
+- "Validate if program X is accepting applications" → load_skill(grants, validation)`,
     input_schema: {
       type: 'object',
       properties: {
@@ -1374,8 +1382,8 @@ Use when simple information retrieval is insufficient and you need specialized e
         },
         sub_skill: {
           type: 'string',
-          enum: ['lead_farming', 'linkedin_enrichment', 'data_quality', 'icp_analysis', 'company_intelligence'],
-          description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns)'
+          enum: ['lead_farming', 'linkedin_enrichment', 'data_quality', 'icp_analysis', 'overview', 'eligibility', 'matching', 'validation', 'company_intelligence'],
+          description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification).'
         }
       },
       required: ['skill_name', 'sub_skill']
