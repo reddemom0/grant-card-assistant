@@ -208,27 +208,22 @@ export async function runAgent({
     });
 
     // ============================================================================
-    // Build messages array with caching
+    // Build messages array
     // ============================================================================
 
-    // Apply prompt caching to conversation history (cost optimization)
-    // Cache every Nth assistant message to create checkpoints
-    // This reduces cost from $3/M to $0.30/M for cached content
-    const historyWithCaching = history.map((msg, idx) => {
-      // Cache every 5th assistant message (configurable)
-      if (msg.role === 'assistant' &&
-          idx > 0 &&
-          (idx + 1) % COST_SETTINGS.cacheEveryNMessages === 0) {
-        return {
-          ...msg,
-          cache_control: { type: 'ephemeral' }
-        };
-      }
-      return msg;
-    });
+    // IMPORTANT: Do NOT add cache_control to historical messages
+    // Anthropic's API only allows cache_control on:
+    // 1. System prompt blocks (already applied above)
+    // 2. Static tool arrays (enabled via curated tool sets)
+    // 3. Current user message content blocks (not historical ones)
+    //
+    // Caching is achieved through:
+    // - Cached system prompt (largest component)
+    // - Static tools array (reused across calls)
+    // - NOT through historical message caching
 
     let messages = [
-      ...historyWithCaching,
+      ...history,
       { role: 'user', content: userContent }
     ];
 
