@@ -412,13 +412,15 @@ async function enrichLead(companyInfo) {
     console.log(`📝 Oracle Insight enrichment prompt prepared (${enrichmentPrompt.length} chars)`);
 
     // Run the Internal Oracle agent (no streaming - webhook enrichment)
+    // Use Haiku for cost efficiency - enrichment is structured/templated work
     const result = await runAgent({
       agentType,
       conversationId,
       userId,
       message: enrichmentPrompt,
       sessionId: crypto.randomUUID(),
-      res: null // No SSE streaming for webhook enrichment
+      res: null, // No SSE streaming for webhook enrichment
+      forceModel: 'claude-haiku-4-5' // Force Haiku: 5x cheaper than Sonnet
     });
 
     console.log(`✅ Lead enrichment completed for: ${companyInfo.companyName || companyInfo.contactEmail}`);

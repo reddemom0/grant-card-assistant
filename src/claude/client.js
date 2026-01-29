@@ -15,7 +15,7 @@ import { loadLearningMemory } from '../tools/learning-memory.js';
 import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE } from './streaming.js';
-import { getQueryConfig, logConfigDecision } from './query-classifier.js';
+import { getQueryConfig, getQueryConfigForModel, logConfigDecision } from './query-classifier.js';
 import {
   getMaxTurnsForAgent,
   calculateRequestCost,
@@ -45,6 +45,7 @@ const FALLBACK_THINKING_BUDGET = 10000;
  * @param {string} params.sessionId - Session UUID for this request
  * @param {Array} params.attachments - File attachments (images/PDFs)
  * @param {Object} params.res - Express response object for SSE streaming
+ * @param {string} params.forceModel - Optional model to force (bypasses query classifier)
  * @returns {Promise<Object>} Execution result
  */
 export async function runAgent({
@@ -54,7 +55,8 @@ export async function runAgent({
   userId,
   sessionId,
   attachments = [],
-  res
+  res,
+  forceModel = null
 }) {
   console.log('\n' + '='.repeat(80));
   console.log(`🤖 Running agent: ${agentType}`);
@@ -116,7 +118,9 @@ export async function runAgent({
     // 2.6. Get query-specific configuration (NEW: Performance Optimization)
     // ============================================================================
 
-    const queryConfig = getQueryConfig(message, agentType);
+    const queryConfig = forceModel
+      ? getQueryConfigForModel(forceModel)
+      : getQueryConfig(message, agentType);
     logConfigDecision(queryConfig, message);
 
     // Extract configuration values

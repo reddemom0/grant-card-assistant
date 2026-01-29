@@ -197,6 +197,31 @@ export function getQueryConfig(message, agentType) {
 }
 
 /**
+ * Get configuration for a forced model (bypasses query classification)
+ * @param {string} model - Model identifier to force
+ * @returns {Object} Complete configuration for the forced model
+ */
+export function getQueryConfigForModel(model) {
+  // Determine if this is Haiku or Sonnet
+  const isHaiku = model.includes('haiku');
+
+  return {
+    complexity: isHaiku ? 'simple' : 'complex',
+    model: model,
+    thinking: isHaiku ? undefined : { type: 'enabled', budget_tokens: 10000 },
+    maxTokens: isHaiku ? 8000 : 16000,
+    temperature: isHaiku ? 0.3 : 1.0,
+    maxIterations: isHaiku ? 6 : 20,
+
+    metadata: {
+      forcedModel: true,
+      modelName: model,
+      timestamp: new Date().toISOString()
+    }
+  };
+}
+
+/**
  * Log configuration decision (for monitoring and refinement)
  * @param {Object} config - Configuration object
  * @param {string} message - User's query
@@ -207,7 +232,7 @@ export function logConfigDecision(config, message) {
   console.log('🎯 Query Configuration:');
   console.log(`   Query: "${preview}${message.length > 100 ? '...' : ''}"`);
   console.log(`   Complexity: ${config.complexity}`);
-  console.log(`   Model: ${config.model}`);
+  console.log(`   Model: ${config.model}${config.metadata?.forcedModel ? ' (FORCED)' : ''}`);
   console.log(`   Extended Thinking: ${config.thinking ? 'ENABLED' : 'DISABLED'}`);
   console.log(`   Max Tokens: ${config.maxTokens}`);
   console.log(`   Temperature: ${config.temperature}`);
