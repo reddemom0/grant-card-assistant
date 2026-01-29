@@ -610,6 +610,8 @@ When users ask you to perform sales, lead generation, lead enrichment, LinkedIn 
 - Verify lead data quality
 - Deduplicate CRM records
 - Determine best-fit products for prospects
+- Build Ideal Client Profiles (ICPs) from won customer data
+- Analyze customer patterns for sales targeting and segmentation
 
 **How to activate Sales Consultant expertise:**
 
@@ -637,6 +639,7 @@ cat .claude/skills/sales-consultant/DATA_QUALITY.md
 - ✅ **Lead Farming** - Complete lead creation & enrichment workflows (12 priority fields)
 - ✅ **LinkedIn Enrichment** - Free research strategies for companies and decision-makers
 - ✅ **Data Quality** - Verification, deduplication, and cleanup workflows
+- ✅ **ICP Analysis** - Build Ideal Client Profiles from won customer patterns
 - ✅ **HubSpot Operations** - Advanced operations via Python scripts (0 context tokens)
 
 **Key Concepts to Remember:**

@@ -26,6 +26,8 @@ Activate this skill when you need to:
 - **Qualify prospects** and determine best-fit products
 - **Verify lead data quality** and deduplicate records
 - **Build comprehensive lead profiles** with complete company information
+- **Build Ideal Client Profiles (ICPs)** from won customer data
+- **Analyze customer patterns** for sales targeting and segmentation
 
 ## Quick Capabilities Overview
 
@@ -55,6 +57,15 @@ Maintain clean, accurate CRM data:
 - Validate contact information
 - Flag incomplete records for enrichment
 
+### 🎯 Ideal Client Profile (ICP) Analysis
+Build data-driven targeting from won customers:
+- Analyze patterns across won deals
+- Segment customers by value (Tier 1/2/3)
+- Identify geographic, size, and industry patterns
+- Calculate lifetime value by segment
+- Create qualification criteria and lead scoring
+- Generate outreach messaging and templates
+
 ### 🎯 Advanced HubSpot Operations
 Access specialized HubSpot functionality via Python scripts:
 - Deal creation and pipeline management
@@ -71,6 +82,7 @@ For comprehensive workflows and best practices, see:
 - **[LEAD_FARMING.md](./LEAD_FARMING.md)** - Complete lead creation and enrichment process
 - **[LINKEDIN_ENRICHMENT.md](./LINKEDIN_ENRICHMENT.md)** - Free LinkedIn research strategies
 - **[DATA_QUALITY.md](./DATA_QUALITY.md)** - Verification and deduplication workflows
+- **[ICP_ANALYSIS.md](./ICP_ANALYSIS.md)** - Ideal Client Profile building and customer pattern analysis
 
 ### Available Scripts
 All HubSpot operations available in `./scripts/`:
@@ -94,6 +106,9 @@ cat .claude/skills/sales-consultant/LINKEDIN_ENRICHMENT.md
 
 # Load data quality workflows
 cat .claude/skills/sales-consultant/DATA_QUALITY.md
+
+# Load ICP analysis framework
+cat .claude/skills/sales-consultant/ICP_ANALYSIS.md
 
 # List all available scripts
 ls -la .claude/skills/sales-consultant/scripts/
@@ -155,6 +170,25 @@ Process:
 4. Ask user which to keep as primary
 5. Merge duplicates
 6. Verify associations transferred
+```
+
+### Use Case 5: Build Ideal Client Profile
+```
+User: "Tell me about the deals we've won with construction companies. Help me build an ICP."
+
+Process:
+1. Load ICP_ANALYSIS.md for framework
+2. Search HubSpot for won construction customers
+3. Analyze patterns:
+   - Geographic (90% BC, 10% AB)
+   - Size (Tier 1: 100+ emp, Tier 2: 30-50 emp, Tier 3: 10-30 emp)
+   - Industry specializations
+   - Service patterns (Hiring 80%, Training 60%, Export 20%)
+4. Calculate LTV by tier
+5. Create qualification criteria
+6. Generate lead scoring model
+7. Provide outreach messaging templates
+8. Save ICP to memory for future reference
 ```
 
 ## Integration with Oracle Agent
