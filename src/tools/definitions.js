@@ -1335,6 +1335,51 @@ This tool searches the internal GetGranted database (188+ Canadian grants) and r
       },
       required: []
     }
+  },
+  {
+    name: 'load_skill',
+    description: `Load specialized skill documentation with methodologies, frameworks, and best practices for complex workflows.
+
+**When to use this tool:**
+Use when simple information retrieval is insufficient and you need specialized expertise for complex tasks.
+
+**Available skills:**
+
+**Sales Skill:**
+- \`lead_farming\` - Complete lead creation & enrichment workflow (12 priority fields, confidence scoring)
+- \`linkedin_enrichment\` - Free LinkedIn research strategies for companies and decision-makers
+- \`data_quality\` - Verification, deduplication, and cleanup workflows
+- \`icp_analysis\` - Build Ideal Client Profiles from won customer patterns
+
+**Research Skill (coming soon):**
+- \`company_intelligence\` - Systematic company research with multi-source validation
+
+**Do NOT load skills for simple queries:**
+- "Tell me about Company X" → Use tools directly
+- "Find grants for BC tech companies" → Use search_getgranted
+- "Show me recent alerts" → Use get_visualping_alerts
+
+**Load skills for specialized tasks:**
+- "Enrich TechCo's HubSpot record with 12 priority fields" → load_skill(sales, lead_farming)
+- "Research Acme Foods and build a complete profile" → load_skill(sales, lead_farming)
+- "Find duplicate companies and merge them" → load_skill(sales, data_quality)
+- "Build an ICP from our construction customers" → load_skill(sales, icp_analysis)`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        skill_name: {
+          type: 'string',
+          enum: ['sales', 'research', 'grants', 'writing'],
+          description: 'The skill domain to load'
+        },
+        sub_skill: {
+          type: 'string',
+          enum: ['lead_farming', 'linkedin_enrichment', 'data_quality', 'icp_analysis', 'company_intelligence'],
+          description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns)'
+        }
+      },
+      required: ['skill_name', 'sub_skill']
+    }
   }
 ];
 

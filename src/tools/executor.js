@@ -398,6 +398,14 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'load_skill':
+        const { loadSkill } = await import('./load-skill.js');
+        result = await loadSkill({
+          skill_name: input.skill_name,
+          sub_skill: input.sub_skill
+        });
+        break;
+
       // ============================================================================
       // GOOGLE DOCS & SHEETS TOOLS
       // ============================================================================
