@@ -436,9 +436,9 @@ async function enrichLead(companyInfo) {
     let companyName = companyInfo.companyName;
     if (!companyName && companyId) {
       try {
-        const company = await getCompanyById(companyId);
-        if (company) {
-          companyName = company.properties.name || 'Unknown';
+        const result = await getCompanyById(companyId);
+        if (result && result.success && result.company) {
+          companyName = result.company.name || 'Unknown';
         }
       } catch (err) {
         console.warn(`⚠️  Could not fetch company name for ${companyId}:`, err.message);

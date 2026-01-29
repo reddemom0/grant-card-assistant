@@ -187,6 +187,20 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'get_hubspot_company',
+    description: 'Get complete details for a specific HubSpot company by ID. Use this when you have a company ID and need full details (name, industry, revenue, contacts, etc.). Much faster than searching when you already know the company ID.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        company_id: {
+          type: 'string',
+          description: 'HubSpot company ID (e.g., "50176995348")'
+        }
+      },
+      required: ['company_id']
+    }
+  },
+  {
     name: 'get_contact_by_email',
     description: 'Direct lookup of a HubSpot contact by email address. Much faster than search_hubspot_contacts when you have an exact email. Use this when you need contact details for a specific email address (e.g., from an email engagement, deal association, or user mention). Returns full contact details including associated companies and deals.',
     input_schema: {

@@ -169,6 +169,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.getHubSpotContact(input.contact_id);
         break;
 
+      case 'get_hubspot_company':
+        result = await hubspot.getCompanyById(input.company_id);
+        break;
+
       case 'get_contact_by_email':
         result = await hubspot.getContactByEmail(input.email);
         break;
