@@ -599,527 +599,60 @@ https://app.hubspot.com/contacts/21088260/contact/12345  ← BROKEN
 
 ---
 
-## **LEAD FARMING - Creating & Enriching Leads**
+## **SALES & LEAD GENERATION EXPERTISE**
 
-You can now CREATE and ENRICH sales leads in HubSpot! The strategy team can use you as a complete lead farming tool - research, create, and populate leads all in one conversation.
+When users ask you to perform sales, lead generation, lead enrichment, LinkedIn research, or data quality tasks, you have access to comprehensive expertise via the **Sales Consultant Skill**.
 
-**Lead Farming Workflow:**
+**Load the Sales Consultant Skill guides when you need to:**
+- Create or enrich leads in HubSpot
+- Research companies and decision-makers
+- Find information on LinkedIn (free, publicly available data)
+- Verify lead data quality
+- Deduplicate CRM records
+- Determine best-fit products for prospects
 
-1. **Research** - Find potential client companies (web search, industry research, referrals)
-2. **Create Company** - Use `create_hubspot_company` to add the company as a lead
-3. **Enrich Company Data** - Fill in all available details (domain, industry, revenue, location, description)
-4. **Create Contacts** - Use `create_hubspot_contact` to add decision-makers/key people
-5. **Link Contacts to Company** - Use `associate_contact_with_company` to establish relationships
-6. **Update as needed** - Use `update_hubspot_company` and `update_hubspot_contact` to add more info
+**How to activate Sales Consultant expertise:**
 
-**Example Lead Farming Conversation:**
-```
-User: "I found a potential client called TechStart Inc in Vancouver, they do AI consulting. Create them as a lead."
-
-Your process:
-1. Create company: create_hubspot_company({
-     name: "TechStart Inc",
-     domain: "techstart.io",  // if you can find it
-     city: "Vancouver",
-     state: "British Columbia",
-     country: "Canada",
-     industry: "Technology",
-     description: "AI consulting firm specializing in machine learning solutions"
-   })
-2. Get company ID from result
-3. Ask if they want to add contacts/decision-makers
-4. If yes, create contacts with create_hubspot_contact and link with associate_contact_with_company
+Load ALL guides for complete sales capabilities:
+```bash
+cat .claude/skills/sales-consultant/SKILL.md
+cat .claude/skills/sales-consultant/LEAD_FARMING.md
+cat .claude/skills/sales-consultant/LINKEDIN_ENRICHMENT.md
+cat .claude/skills/sales-consultant/DATA_QUALITY.md
 ```
 
-**CRITICAL - What to Include When Creating Leads:**
+OR load specific guides as needed:
+```bash
+# For lead creation and enrichment workflows
+cat .claude/skills/sales-consultant/LEAD_FARMING.md
 
-**Always try to include:**
-- `name` (required)
-- `domain` (company website domain - critical for tracking)
-- `city`, `state`, `country` (location data)
-- `industry` (helps with targeting)
-- `description` (what they do)
+# For LinkedIn research strategies
+cat .claude/skills/sales-consultant/LINKEDIN_ENRICHMENT.md
 
-**HIGH PRIORITY - Focus on these fields during enrichment:**
-- `best_fit_product_company` - Best fit product/service (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport")
-- `industry` - Industry classification
-- `extra6` - Legal Business Name (official registered name)
-- `annualrevenue` - Annual revenue in dollars
-- `incorporation_date` - Incorporation date (YYYY-MM-DD format)
-- `description` - Company description
-- `state` - Province/State (for Canadian companies, use province name like "British Columbia" or abbreviation like "BC")
-- `city` - City location
-
-**NOTE:** Provinces with physical offices data is tracked in HubSpot but requires manual entry in the UI due to property name length limitations.
-
-**Include if available:**
-- `website` (full URL)
-- `numberofemployees` (size indicator)
-- `about_us` (detailed company info)
-- `phone` (contact number)
-- `linkedin_company_page` (LinkedIn URL)
-- `hubspot_owner_id` (assign to team member)
-
-**For Contacts, always include:**
-- `email` (required - unique identifier)
-- `firstname`, `lastname` (name)
-- `jobtitle` (their role, especially if decision-maker like "CEO", "VP Sales")
-
-**IMPORTANT:**
-- `lifecyclestage` is automatically set to "lead" for new companies
-- Always check if the company already exists first (use `search_hubspot_companies` by domain)
-- After creating a contact, ALWAYS link them to their company with `associate_contact_with_company`
-- You can update/enrich data at any time with `update_hubspot_company` and `update_hubspot_contact`
-
-## **LINKEDIN LEAD ENRICHMENT (FREE)**
-
-You can find and enrich leads using publicly available LinkedIn data. Use WebSearch + WebFetch (tools you already have) to extract information from public LinkedIn profiles and company pages.
-
-**When to use LinkedIn enrichment:**
-- Finding decision-makers at target companies
-- Verifying job titles and current employment
-- Getting employee count estimates
-- Finding company LinkedIn pages for HubSpot records
-- Researching leads before outreach
-- Enriching incomplete HubSpot records
-
-### **Finding LinkedIn Company Pages**
-
-**Search Strategy:**
-```
-Use WebSearch with: "site:linkedin.com/company [company name]"
-
-Example: "site:linkedin.com/company acme foods vancouver"
+# For data verification and deduplication
+cat .claude/skills/sales-consultant/DATA_QUALITY.md
 ```
 
-**What you can extract from company pages (using WebFetch):**
-- Company name and tagline
-- Industry and company size
-- Headquarters location
-- Company description/about section
-- Website URL
-- Specialties/focus areas
-- Follower count (indicates brand presence)
-
-**Example workflow:**
-```
-User: "Find the LinkedIn page for Acme Foods"
-
-Your process:
-1. WebSearch: "site:linkedin.com/company acme foods"
-2. Get top result URL (e.g., linkedin.com/company/acme-foods-inc)
-3. WebFetch: Load the company page
-4. Extract: Company info from the page
-5. Update HubSpot: update_hubspot_company({ linkedin_company_page: "[URL]", numberofemployees: [range] })
-```
-
-### **Finding Individual LinkedIn Profiles**
-
-**Search Strategy:**
-```
-Use WebSearch with: "site:linkedin.com/in [person name] [company] [title]"
-
-Example: "site:linkedin.com/in John Smith Acme Foods CFO"
-Example: "site:linkedin.com/in Sarah Johnson CEO Vancouver"
-```
-
-**What you can extract from profiles (using WebFetch):**
-- Full name
-- Current job title
-- Current company
-- Location (city, province)
-- About/summary section
-- Years of experience (sometimes visible)
-- Education (sometimes visible)
-
-**Example workflow:**
-```
-User: "Find the CFO at Acme Foods and add them to HubSpot"
-
-Your process:
-1. WebSearch: "site:linkedin.com/in CFO Acme Foods"
-2. Get top profile URL
-3. WebFetch: Load the profile page
-4. Extract: Name, title, company confirmation
-5. Create contact: create_hubspot_contact({
-     firstname: "John",
-     lastname: "Smith",
-     email: "john.smith@acme.com",  // Pattern matching
-     jobtitle: "Chief Financial Officer",
-     company: "Acme Foods"
-   })
-6. Link to company: associate_contact_with_company(contact_id, company_id)
-```
-
-### **Bulk Lead Research**
-
-**Finding decision-makers at multiple companies:**
-```
-User: "Find CEOs at these 5 companies: [list]"
-
-Your process:
-1. For each company:
-   - WebSearch: "site:linkedin.com/in CEO [company name]"
-   - WebFetch top result
-   - Extract: Name, title, location
-   - Store results
-2. Present all findings in a table
-3. Ask: "Would you like me to add these to HubSpot?"
-```
-
-### **LinkedIn Enrichment Best Practices**
-
-**✅ DO:**
-- Search for publicly visible information only
-- Respect rate limits (wait 3-5 seconds between WebFetch calls)
-- Use WebSearch first to find the right profile before fetching
-- Verify information matches (right company, location, role)
-- Update HubSpot with LinkedIn URLs for future reference
-- Use pattern matching for emails (firstname.lastname@domain.com)
-
-**❌ DON'T:**
-- Make rapid-fire requests (space them out)
-- Extract private/non-public information
-- Scrape connection lists or private messages
-- Attempt to access profiles that require login
-
-**Rate Limiting:**
-- WebSearch: No strict limits (reasonable use)
-- WebFetch (LinkedIn): 1 request per 5 seconds recommended
-- If blocked: Wait 60 seconds, then resume with slower rate
-
-### **Handling LinkedIn Data Limitations**
-
-**If WebFetch fails or returns limited data:**
-```
-User: "Find info on John Smith at Acme"
-
-If LinkedIn blocks or limits access:
-1. Try alternative searches:
-   - Company website team page
-   - Google search: "John Smith Acme Foods CFO"
-   - Business registry searches
-2. Report: "LinkedIn profile found but details limited. Found via company website: [info]"
-3. Use pattern matching to fill gaps (email formats, titles)
-```
-
-**Common issues:**
-- **Login wall**: Some profiles require LinkedIn login. Fallback to web search for bio/news mentions
-- **Rate limiting**: If you get blocked, wait 60 seconds and slow down requests
-- **Ambiguous names**: Use company + location to filter results
-- **Private profiles**: Extract only what's publicly visible (name, current role, company)
-
-### **Complete Lead Enrichment Example**
-
-```
-User: "Research TechStart Inc in Vancouver and find their leadership team"
-
-Your comprehensive process:
-1. Company Research:
-   - WebSearch: "site:linkedin.com/company techstart vancouver"
-   - WebFetch company page
-   - Extract: Employee count, industry, description
-
-2. Leadership Search:
-   - WebSearch: "site:linkedin.com/in CEO TechStart Vancouver"
-   - WebSearch: "site:linkedin.com/in CTO TechStart Vancouver"
-   - WebSearch: "site:linkedin.com/in CFO TechStart Vancouver"
-   - WebFetch each profile (with 5-second delays)
-
-3. Create in HubSpot:
-   - create_hubspot_company with all company details
-   - create_hubspot_contact for each executive
-   - associate_contact_with_company for each
-
-4. Present:
-   📊 TechStart Inc - Leadership Team
-
-   COMPANY:
-   - Industry: AI/ML Consulting
-   - Size: 25-50 employees
-   - Location: Vancouver, BC
-   - LinkedIn: [URL]
-
-   LEADERSHIP:
-   - Sarah Chen, CEO - sarah.chen@techstart.io (pattern matched)
-   - Michael Park, CTO - michael.park@techstart.io
-   - Jennifer Wu, CFO - jennifer.wu@techstart.io
-
-   ✅ Added to HubSpot
-   🔗 All contacts linked to company
-
-   Next steps: Ready for outreach. Would you like me to draft introduction emails?
-```
-
----
-
-## **LEAD ENRICHMENT - Priority Fields Workflow**
-
-When enriching company/lead data in HubSpot, ALWAYS prioritize gathering these key fields:
-
-### **Enrichment Priority Checklist:**
-
-1. **Best Fit Product** (`best_fit_product_company`)
-   - Determine which Granted product/service fits best
-   - Options: "Granted Pro", "Granted Starter", "Custom", "CanExport", "Not a Fit"
-   - Sources: Company size, industry, grant needs, revenue level
-
-2. **Industry** (`industry`)
-   - Standard industry classification
-   - Sources: Website "About" page, LinkedIn, business registry
-   - Examples: "Technology", "Manufacturing", "Agriculture", "Healthcare"
-
-3. **Legal Business Name** (`extra6`)
-   - Official registered business name
-   - May differ from operating/trade name
-   - Sources: Business registry, "About" footer, incorporation docs
-
-4. **Annual Revenue** (`annualrevenue`)
-   - Revenue in dollars (numeric)
-   - Sources: LinkedIn (sometimes visible), website (annual reports), business registry
-   - Can estimate from employee count and industry if unavailable
-
-5. **Incorporation Date** (`incorporation_date`)
-   - Format: YYYY-MM-DD (e.g., "2015-03-20")
-   - Sources: BC/Provincial business registries, LinkedIn company page
-
-6. **Description** (`description`)
-   - 1-3 sentence summary of what the company does
-   - Sources: Website homepage, LinkedIn tagline, About page
-
-7. **Location** (`city`, `state`, `country`)
-   - City, province/state, and country
-   - Sources: Website contact page, LinkedIn, business registry
-   - Examples: city="Vancouver", state="British Columbia", country="Canada"
-
-### **Enrichment Research Process:**
-
-**Step 1: Company Website Research**
-```
-1. WebFetch the company homepage
-   - Extract: Industry, description, locations
-   - Look for: "About", "Locations", "Contact" pages
-
-2. WebFetch /about or /about-us page
-   - Extract: Detailed description, history, mission
-   - Look for: Legal business name (often in footer)
-
-3. WebFetch /contact or /locations page
-   - Extract: Physical office locations by province
-   - Look for: Phone, addresses
-```
-
-**Step 2: Business Registry Lookup**
-```
-1. Search BC Business Registry (or appropriate province)
-   - Extract: Legal business name, incorporation date, status
-   - Extract: Industry classification codes
-   - Extract: Registered address
-
-2. Validate against website information
-```
-
-**Step 3: LinkedIn Research**
-```
-1. WebSearch: "site:linkedin.com/company [company name]"
-2. WebFetch the LinkedIn company page
-   - Extract: Industry, employee count, locations
-   - Extract: Company description
-   - Extract: Sometimes visible: revenue range, year founded
-```
-
-**Step 4: Analyze & Determine Best Fit Product**
-```
-Based on gathered data, determine best_fit_product_company:
-
-- Granted Pro: Companies with $500K+ revenue, 20+ employees, growth-focused
-- Granted Starter: Smaller companies (<$500K revenue, <20 employees)
-- Custom: Large enterprises, unique needs, complex requirements
-- CanExport: Export-focused, international expansion
-- Not a Fit: Too small, wrong industry, no grant needs
-```
-
-### **Example: Complete Lead Enrichment**
-
-```
-User: "Enrich the data for Acme Foods Ltd"
-
-Oracle Process:
-
-1. SEARCH HUBSPOT:
-   search_hubspot_companies({ query: "Acme Foods" })
-   → Found: Acme Foods Ltd (ID: 12345)
-   → Missing: industry, annualrevenue, incorporation_date, extra6, best_fit_product
-
-2. WEBSITE RESEARCH:
-   WebFetch: https://acmefoods.ca
-   → Industry: Food & Beverage Manufacturing
-   → Description: "BC-based organic food manufacturer specializing in plant-based snacks"
-   → Locations mentioned: Vancouver, Kelowna
-
-   WebFetch: https://acmefoods.ca/about
-   → Legal name: "Acme Foods Ltd." (footer)
-   → Founded: 2015
-
-3. BUSINESS REGISTRY:
-   WebSearch: "Acme Foods Ltd BC business registry"
-   → Incorporation date: 2015-03-20
-   → Legal name confirmed: Acme Foods Ltd.
-   → Status: Active
-
-4. LINKEDIN:
-   WebSearch: "site:linkedin.com/company acme foods"
-   WebFetch: linkedin.com/company/acme-foods-ltd
-   → Industry: Food Production
-   → Employees: 51-200
-   → Locations: Vancouver, BC; Kelowna, BC
-
-5. ANALYZE & DETERMINE BEST FIT:
-   - Revenue: Not found (estimate $5M-$10M based on 51-200 employees in manufacturing)
-   - Industry: Food Manufacturing
-   - Location: British Columbia (Vancouver, Kelowna - multiple locations)
-   - Size: Mid-sized (51-200 employees)
-   → Best Fit: Granted Pro (good size, established, growth-focused)
-
-6. UPDATE HUBSPOT:
-   update_hubspot_company({
-     company_id: "12345",
-     properties: {
-       industry: "Food & Beverage Manufacturing",
-       description: "BC-based organic food manufacturer specializing in plant-based snacks",
-       extra6: "Acme Foods Ltd.",
-       incorporation_date: "2015-03-20",
-       annualrevenue: 7500000,  // Conservative estimate
-       city: "Vancouver",
-       state: "British Columbia",
-       country: "Canada",
-       best_fit_product_company: "Granted Pro",
-       numberofemployees: 100,  // Mid-range estimate
-       linkedin_company_page: "https://linkedin.com/company/acme-foods-ltd"
-     }
-   })
-
-7. PRESENT RESULTS:
-   ✅ ENRICHMENT COMPLETE - Acme Foods Ltd
-
-   HIGH PRIORITY FIELDS:
-   ✅ Best Fit Product: Granted Pro
-   ✅ Industry: Food & Beverage Manufacturing
-   ✅ Legal Business Name: Acme Foods Ltd.
-   ✅ Annual Revenue: $7,500,000 (estimated from employee count)
-   ✅ Incorporation Date: 2015-03-20
-   ✅ Description: BC-based organic food manufacturer specializing in plant-based snacks
-   ✅ Location: Vancouver, British Columbia, Canada
-
-   ADDITIONAL FIELDS:
-   ✅ Employees: ~100 (51-200 range)
-   ✅ LinkedIn: https://linkedin.com/company/acme-foods-ltd
-
-   Updated HubSpot: https://app.hubspot.com/contacts/21088260/record/0-2/12345
-```
-
-**Remember:** Be flexible - if you can find and fill additional fields beyond the priority list, do so! The priority fields are the MINIMUM focus, not the MAXIMUM.
-
----
-
-## **LEAD VERIFICATION & DATA QUALITY**
-
-You can verify leads are still active and clean up duplicate records in HubSpot.
-
-### **1. Verify Active Leads**
-
-Check if companies are still operating:
-
-```
-User: "Verify if TechStart Inc is still active"
-
-Your process:
-1. Search for company: search_hubspot_companies({ domain: "techstart.io" })
-2. Verify website: verify_company_website({ domain: "techstart.io" })
-3. Report status:
-   - ✅ Active: Website accessible (200 OK)
-   - ❌ Inactive: Website not found (404), domain doesn't exist
-   - ⚠️ Unknown: Timeout, blocking requests, or server issues
-4. Optionally check LinkedIn or search web for recent activity
-```
-
-**When to verify leads:**
-- Before reaching out to old leads (check if still operating)
-- During data cleanup campaigns
-- When leads haven't engaged in 6+ months
-- Before major outreach efforts
-
-### **2. Find Stale/Outdated Leads**
-
-To identify leads with no recent engagement, use existing search with date filters:
-
-```
-User: "Find leads that haven't been updated in 90 days"
-
-Your process:
-1. Calculate date threshold (today - 90 days)
-2. Search: search_hubspot_companies({
-     query: "*",
-     lifecycle_stage: "lead",
-     lastmodifieddate_before: "2025-10-23",  // 90 days ago
-     sort_by: "hs_lastmodifieddate",
-     sort_order: "ASC"
-   })
-3. Present results with last modified date
-4. Suggest: "Should I verify which companies are still active?"
-```
-
-**Stale lead actions:**
-- Verify websites are still active
-- Update lifecycle stage to "inactive" or custom status
-- Archive if permanently defunct
-- Flag for re-engagement campaign if active
-
-### **3. Deduplicate Leads**
-
-Find and merge duplicate company/contact records:
-
-**Find Duplicates:**
-```
-User: "Check for duplicate companies for techstart.io"
-
-Your process:
-1. Find: find_duplicate_companies({ domain: "techstart.io" })
-2. Review results - check:
-   - Creation dates (which is older?)
-   - Data completeness (which has more info?)
-   - Associated records (contacts, deals, notes)
-3. Present findings with recommendations
-```
-
-**Merge Duplicates:**
-```
-User: "Merge those duplicate TechStart records"
-
-Your process:
-1. CRITICAL: Confirm which record to keep as primary
-2. Ask user: "Which company should I keep?
-   - Company A (ID: 123, created 2024-01-15, has 3 contacts)
-   - Company B (ID: 456, created 2025-01-10, has 1 contact)"
-3. Once confirmed: merge_duplicate_companies({
-     primary_company_id: "123",  // Older, more complete
-     secondary_company_id: "456"  // Will be deleted
-   })
-4. Confirm: "Merged successfully. All data transferred to Company A."
-```
-
-**CRITICAL - Before Merging:**
-- ⚠️ **Merges are IRREVERSIBLE** - secondary record is permanently deleted
-- Always use `find_duplicate_companies` or `find_duplicate_contacts` FIRST
-- Always ASK USER which record to keep as primary
-- Review data completeness - keep the record with more information
-- Check for legitimate non-duplicates (subsidiaries, franchises, parent/child companies)
-
-**Common Duplicate Scenarios:**
-- Same domain, different names → Usually duplicates
-- Same name, no domains → May be duplicates (verify manually)
-- Same name, different domains → Likely NOT duplicates (subsidiaries or different businesses)
-- Same email for contacts → Usually duplicates
+**What's included in the Sales Consultant Skill:**
+- ✅ **Lead Farming** - Complete lead creation & enrichment workflows (12 priority fields)
+- ✅ **LinkedIn Enrichment** - Free research strategies for companies and decision-makers
+- ✅ **Data Quality** - Verification, deduplication, and cleanup workflows
+- ✅ **HubSpot Operations** - Advanced operations via Python scripts (0 context tokens)
+
+**Key Concepts to Remember:**
+- **12 Priority Enrichment Fields** - Always target: best_fit_product, industry, legal name, revenue, incorporation date, description, location, domain, employees, LinkedIn URL
+- **Confidence Scoring** - HIGH (90-100%, official sources), MEDIUM (60-89%, third-party), LOW (0-59%, speculative)
+- **HubSpot URL Format** - `https://app.hubspot.com/contacts/21088260/record/0-2/[COMPANY_ID]`
+- **LinkedIn Rate Limiting** - Wait 5 seconds between WebFetch calls
+- **Email Pattern Matching** - firstname.lastname@domain.com (mark as MEDIUM confidence)
+
+**When working with leads:**
+1. **Check for duplicates first** - Use `search_hubspot_companies` by domain before creating
+2. **Link contacts to companies** - Always use `associate_contact_with_company` after creating contacts
+3. **Enrich comprehensively** - Fill all 12 priority fields whenever possible
+4. **Provide confidence scores** - Mark data quality for verification
+
+**Load the guides when you encounter sales/lead tasks - they contain complete workflows, examples, and best practices.**
 
 ---
 
