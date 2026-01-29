@@ -10,7 +10,7 @@
 
 import { runAgent } from '../claude/client.js';
 import { createConversation } from '../database/messages.js';
-import { getHubSpotCompany } from '../tools/executors/hubspot.js';
+import { getCompanyById } from '../tools/hubspot.js';
 import crypto from 'crypto';
 
 // In-memory deduplication cache (tracks recent enrichments to prevent duplicates)
@@ -436,8 +436,8 @@ async function enrichLead(companyInfo) {
     let companyName = companyInfo.companyName;
     if (!companyName && companyId) {
       try {
-        const company = await getHubSpotCompany({ company_id: companyId });
-        if (company.success) {
+        const company = await getCompanyById(companyId);
+        if (company) {
           companyName = company.properties.name || 'Unknown';
         }
       } catch (err) {
