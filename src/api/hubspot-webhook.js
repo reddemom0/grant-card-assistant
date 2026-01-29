@@ -420,7 +420,8 @@ async function enrichLead(companyInfo) {
       message: enrichmentPrompt,
       sessionId: crypto.randomUUID(),
       res: null, // No SSE streaming for webhook enrichment
-      forceModel: 'claude-haiku-4-5' // Force Haiku: 5x cheaper than Sonnet
+      forceModel: 'claude-haiku-4-5', // Force Haiku: 5x cheaper than Sonnet
+      modelConfig: { maxIterations: 15 } // More iterations for complex enrichments
     });
 
     console.log(`✅ Lead enrichment completed for: ${companyInfo.companyName || companyInfo.contactEmail}`);

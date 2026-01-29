@@ -199,9 +199,11 @@ export function getQueryConfig(message, agentType) {
 /**
  * Get configuration for a forced model (bypasses query classification)
  * @param {string} model - Model identifier to force
+ * @param {Object} overrides - Optional configuration overrides
+ * @param {number} overrides.maxIterations - Custom iteration limit
  * @returns {Object} Complete configuration for the forced model
  */
-export function getQueryConfigForModel(model) {
+export function getQueryConfigForModel(model, overrides = {}) {
   // Determine if this is Haiku or Sonnet
   const isHaiku = model.includes('haiku');
 
@@ -211,7 +213,7 @@ export function getQueryConfigForModel(model) {
     thinking: isHaiku ? undefined : { type: 'enabled', budget_tokens: 10000 },
     maxTokens: isHaiku ? 8000 : 16000,
     temperature: isHaiku ? 0.3 : 1.0,
-    maxIterations: isHaiku ? 6 : 20,
+    maxIterations: overrides.maxIterations || (isHaiku ? 6 : 20),
 
     metadata: {
       forcedModel: true,

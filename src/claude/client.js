@@ -46,6 +46,7 @@ const FALLBACK_THINKING_BUDGET = 10000;
  * @param {Array} params.attachments - File attachments (images/PDFs)
  * @param {Object} params.res - Express response object for SSE streaming
  * @param {string} params.forceModel - Optional model to force (bypasses query classifier)
+ * @param {Object} params.modelConfig - Optional model configuration overrides (maxIterations, etc)
  * @returns {Promise<Object>} Execution result
  */
 export async function runAgent({
@@ -56,7 +57,8 @@ export async function runAgent({
   sessionId,
   attachments = [],
   res,
-  forceModel = null
+  forceModel = null,
+  modelConfig = {}
 }) {
   console.log('\n' + '='.repeat(80));
   console.log(`🤖 Running agent: ${agentType}`);
@@ -119,7 +121,7 @@ export async function runAgent({
     // ============================================================================
 
     const queryConfig = forceModel
-      ? getQueryConfigForModel(forceModel)
+      ? getQueryConfigForModel(forceModel, modelConfig)
       : getQueryConfig(message, agentType);
     logConfigDecision(queryConfig, message);
 
