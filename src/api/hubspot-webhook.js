@@ -10,7 +10,12 @@
 
 import { runAgent } from '../claude/client.js';
 import { createConversation } from '../database/messages.js';
+import { getHubSpotCompany } from '../tools/executors/hubspot.js';
 import crypto from 'crypto';
+
+// In-memory deduplication cache (tracks recent enrichments to prevent duplicates)
+const recentEnrichments = new Map(); // Map<companyId, timestamp>
+const DEDUPE_WINDOW_MS = 60000; // 60 seconds
 
 /**
  * Verify HubSpot webhook signature (optional but recommended)
@@ -108,7 +113,11 @@ function generateOracleInsightPrompt(companyInfo) {
 
 A new company was just created in HubSpot (ID: ${companyInfo.objectId}).
 
-**FIRST STEP:** Use \`search_hubspot_companies\` to fetch this company's details by searching for companies with the exact ID or using filters.
+**FIRST STEP:** Use \`get_hubspot_company\` to fetch this company's full details:
+
+\`\`\`
+get_hubspot_company({ company_id: "${companyInfo.objectId}" })
+\`\`\`
 
 Once you have the company details, conduct COMPREHENSIVE research and generate an **Oracle Insight** for the sales team following the complete research checklist below.
 
@@ -390,9 +399,55 @@ update_hubspot_company({
  * @returns {Promise<Object>} - Enrichment result
  */
 async function enrichLead(companyInfo) {
-  console.log(`🔬 Starting automatic lead enrichment for: ${companyInfo.companyName || companyInfo.contactEmail}`);
-
   try {
+    // Check deduplication cache
+    const companyId = companyInfo.objectId || companyInfo.companyId;
+    const now = Date.now();
+
+    if (recentEnrichments.has(companyId)) {
+      const lastEnrichment = recentEnrichments.get(companyId);
+      const timeSince = now - lastEnrichment;
+
+      if (timeSince < DEDUPE_WINDOW_MS) {
+        console.log(`⏭️  Skipping duplicate enrichment for company ${companyId} (enriched ${Math.round(timeSince/1000)}s ago)`);
+        return {
+          success: false,
+          error: 'Duplicate enrichment (deduplicated)',
+          skipped: true
+        };
+      }
+    }
+
+    // Mark this enrichment in cache
+    recentEnrichments.set(companyId, now);
+
+    // Clean up old entries from cache (older than dedupe window)
+    for (const [id, timestamp] of recentEnrichments.entries()) {
+      if (now - timestamp > DEDUPE_WINDOW_MS) {
+        recentEnrichments.delete(id);
+      }
+    }
+
+    // Wait 3 seconds to allow HubSpot to index the new company
+    console.log(`⏳ Waiting 3 seconds for HubSpot to index company ${companyId}...`);
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    // Fetch company name from HubSpot if not provided (fixes "undefined" bug)
+    let companyName = companyInfo.companyName;
+    if (!companyName && companyId) {
+      try {
+        const company = await getHubSpotCompany({ company_id: companyId });
+        if (company.success) {
+          companyName = company.properties.name || 'Unknown';
+        }
+      } catch (err) {
+        console.warn(`⚠️  Could not fetch company name for ${companyId}:`, err.message);
+        companyName = `Company ${companyId}`;
+      }
+    }
+
+    console.log(`🔬 Starting automatic lead enrichment for: ${companyName}`);
+
     // Create a system conversation for the automated enrichment
     const conversationId = crypto.randomUUID();
     const agentType = 'internal-oracle';
@@ -403,7 +458,7 @@ async function enrichLead(companyInfo) {
       conversationId,
       userId,
       agentType,
-      `Auto-enrichment: ${companyInfo.companyName || companyInfo.contactEmail}`
+      `Auto-enrichment: ${companyName}`
     );
 
     // Build comprehensive enrichment prompt with Oracle Insight instructions
@@ -424,7 +479,7 @@ async function enrichLead(companyInfo) {
       modelConfig: { maxIterations: 15 } // More iterations for complex enrichments
     });
 
-    console.log(`✅ Lead enrichment completed for: ${companyInfo.companyName || companyInfo.contactEmail}`);
+    console.log(`✅ Lead enrichment completed for: ${companyName}`);
 
     return {
       success: true,
