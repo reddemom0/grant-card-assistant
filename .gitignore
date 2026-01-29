@@ -10,3 +10,4 @@ dist
 # MCP Google Drive Credentials
 mcp-servers/gdrive/credentials/
 mcp-servers/gdrive/node_modules/
+*.backup
