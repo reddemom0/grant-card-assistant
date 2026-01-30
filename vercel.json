@@ -115,8 +115,33 @@
       "status": 301
     },
     {
+      "src": "/canexport-writer/new",
+      "dest": "/canexport-writer.html"
+    },
+    {
+      "src": "/canexport-writer/chat/([^/]+)",
+      "dest": "/canexport-writer.html"
+    },
+    {
+      "src": "/canexport-writer",
+      "dest": "/canexport-writer/new",
+      "status": 301
+    },
+    {
+      "src": "/oracle/new",
+      "dest": "/dashboard-v2.html"
+    },
+    {
+      "src": "/oracle/chat/([^/]+)",
+      "dest": "/dashboard-v2.html"
+    },
+    {
+      "src": "/oracle",
+      "dest": "/dashboard-v2.html"
+    },
+    {
       "src": "/dashboard",
-      "dest": "/dashboard.html"
+      "dest": "/dashboard-v2.html"
     },
     {
       "src": "/metrics",

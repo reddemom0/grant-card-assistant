@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Granted AI Hub</title>
+
+    <!-- Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Brand Colors */
+            --primary-teal: #6b9dad;
+            --teal-dark: #4a9b9b;
+            --teal-bright: #5eead4;
+
+            /* Dark Theme */
+            --dark-bg: #0a0a0b;
+            --dark-surface: rgba(255, 255, 255, 0.02);
+            --dark-border: rgba(255, 255, 255, 0.06);
+            --dark-border-hover: rgba(255, 255, 255, 0.12);
+            --dark-text-primary: #ffffff;
+            --dark-text-secondary: rgba(255, 255, 255, 0.55);
+            --dark-text-tertiary: rgba(255, 255, 255, 0.3);
+
+            /* Light Theme */
+            --light-bg: #ffffff;
+            --light-surface: #fafafa;
+            --light-border: #e5e7eb;
+            --light-border-hover: #d1d5db;
+            --light-text-primary: #0a0a0b;
+            --light-text-secondary: #6b7280;
+            --light-text-tertiary: #9ca3af;
+        }
+
+        /* Theme Variables (default dark) */
+        body {
+            --bg: var(--dark-bg);
+            --surface: var(--dark-surface);
+            --border: var(--dark-border);
+            --border-hover: var(--dark-border-hover);
+            --text-primary: var(--dark-text-primary);
+            --text-secondary: var(--dark-text-secondary);
+            --text-tertiary: var(--dark-text-tertiary);
+        }
+
+        /* Light mode class */
+        body.light-mode {
+            --bg: var(--light-bg);
+            --surface: var(--light-surface);
+            --border: var(--light-border);
+            --border-hover: var(--light-border-hover);
+            --text-primary: var(--light-text-primary);
+            --text-secondary: var(--light-text-secondary);
+            --text-tertiary: var(--light-text-tertiary);
+        }
+
+        body {
+            font-family: 'Space Grotesk', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: background 0.2s, color 0.2s;
+        }
+
+        h1, h2, h3, h4 {
+            font-family: 'Syne', sans-serif;
+            font-weight: 700;
+        }
+
+        /* Layout */
+        .app-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 240px;
+            background: var(--bg);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 1rem 0;
+        }
+
+        .sidebar-header {
+            padding: 0 1rem 1.5rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--primary-teal), var(--teal-dark));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .logo-text {
+            font-family: 'Syne', sans-serif;
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary-teal), var(--teal-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Navigation */
+        .nav-section {
+            flex: 1;
+            padding: 1.5rem 0.75rem;
+            overflow-y: auto;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.15s;
+            margin-bottom: 0.25rem;
+            border: 1px solid transparent;
+            text-decoration: none;
+            color: var(--text-secondary);
+        }
+
+        .nav-item:hover {
+            background: var(--surface);
+            border-color: var(--border);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active {
+            background: var(--surface);
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .nav-item.active .nav-icon {
+            color: var(--primary-teal);
+        }
+
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            transition: color 0.15s;
+        }
+
+        .nav-label {
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .nav-divider {
+            height: 1px;
+            background: var(--border);
+            margin: 0.75rem 0;
+        }
+
+        /* Agent Popout Menu (Perplexity-style) */
+        .nav-item-wrapper {
+            position: relative;
+        }
+
+        .agent-popout {
+            position: absolute;
+            left: 100%;
+            top: 0;
+            margin-left: 0.5rem;
+            width: 320px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            visibility: hidden;
+            transform: translateX(-8px);
+            transition: all 0.2s ease;
+            z-index: 1000;
+            overflow: hidden;
+        }
+
+        .nav-item-wrapper:hover .agent-popout {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(0);
+        }
+
+        .popout-header {
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .popout-title {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .popout-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            margin-top: 0.25rem;
+        }
+
+        .popout-section {
+            padding: 1rem 0;
+        }
+
+        .popout-section-title {
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-tertiary);
+            padding: 0 1.25rem 0.75rem;
+        }
+
+        .popout-item {
+            padding: 0.75rem 1.25rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            transition: all 0.15s;
+            cursor: pointer;
+        }
+
+        .popout-item:hover {
+            background: var(--surface);
+            color: var(--text-primary);
+        }
+
+        .popout-item-icon {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+            margin-top: 0.125rem;
+            color: var(--text-tertiary);
+        }
+
+        .popout-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .popout-item-title {
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: inherit;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .popout-item-meta {
+            font-size: 0.6875rem;
+            color: var(--text-tertiary);
+            margin-top: 0.125rem;
+        }
+
+        .popout-empty {
+            padding: 1rem 1.25rem;
+            text-align: center;
+            color: var(--text-tertiary);
+            font-size: 0.8125rem;
+        }
+
+        .popout-footer {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .popout-action {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+
+        .popout-action:hover {
+            border-color: var(--border-hover);
+            color: var(--text-primary);
+        }
+
+        .popout-action svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        /* Sidebar Footer */
+        .sidebar-footer {
+            padding: 1rem 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .user-profile:hover {
+            background: var(--surface);
+        }
+
+        .user-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: var(--surface);
+            border: 1px solid var(--border);
+        }
+
+        .user-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-name {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-role {
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .new-chat-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s;
+            font-family: 'Space Grotesk', sans-serif;
+        }
+
+        .new-chat-btn:hover {
+            border-color: var(--border-hover);
+            background: var(--border);
+        }
+
+        .new-chat-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header-nav {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .header-nav a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.15s;
+        }
+
+        .header-nav a:hover {
+            color: var(--text-primary);
+            background: var(--surface);
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .theme-toggle:hover {
+            border-color: var(--border-hover);
+        }
+
+        .theme-toggle svg {
+            width: 18px;
+            height: 18px;
+            color: var(--text-secondary);
+        }
+
+        /* Chat Container */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-welcome {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        .welcome-logo {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 2rem;
+        }
+
+        .welcome-logo svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .welcome-title {
+            font-family: 'Syne', sans-serif;
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.03em;
+        }
+
+        .welcome-title .gradient-text {
+            background: linear-gradient(135deg, var(--primary-teal), var(--teal-dark));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .welcome-subtitle {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            margin-bottom: 3rem;
+            max-width: 600px;
+        }
+
+        /* Search Input */
+        .search-container {
+            width: 100%;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .search-wrapper {
+            position: relative;
+            width: 100%;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1.25rem 3.5rem 1.25rem 1.5rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1rem;
+            color: var(--text-primary);
+            transition: all 0.2s;
+            outline: none;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary-teal);
+            box-shadow: 0 0 0 3px rgba(107, 157, 173, 0.1);
+        }
+
+        .search-input::placeholder {
+            color: var(--text-tertiary);
+        }
+
+        .search-actions {
+            position: absolute;
+            right: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .search-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, var(--primary-teal), var(--teal-dark));
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .search-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .search-btn svg {
+            width: 20px;
+            height: 20px;
+            color: white;
+        }
+
+        .attach-btn {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .attach-btn:hover {
+            background: var(--border);
+        }
+
+        .attach-btn svg {
+            width: 20px;
+            height: 20px;
+            color: var(--text-secondary);
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            max-width: 800px;
+            margin: 2rem auto 0;
+        }
+
+        .quick-action-card {
+            padding: 1.25rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .quick-action-card:hover {
+            border-color: var(--border-hover);
+            transform: translateY(-2px);
+        }
+
+        .quick-action-title {
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .quick-action-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* Messages Area (hidden by default) */
+        .messages-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+            display: none;
+        }
+
+        .messages-area.active {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .sidebar {
+                width: 70px;
+            }
+
+            .sidebar-header,
+            .nav-label,
+            .user-info {
+                display: none;
+            }
+
+            .nav-item {
+                justify-content: center;
+                padding: 0.75rem;
+            }
+
+            .sidebar-footer {
+                padding: 0.5rem;
+            }
+
+            .user-profile {
+                justify-content: center;
+                padding: 0.5rem;
+            }
+
+            /* Hide popouts on smaller screens */
+            .agent-popout {
+                display: none;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .header-nav {
+                display: none;
+            }
+
+            .welcome-title {
+                font-size: 2rem;
+            }
+
+            .quick-actions {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <!-- Oracle Ripple Logo -->
+                        <svg viewBox="0 0 160 160" fill="none">
+                            <circle cx="80" cy="55" r="28" stroke="#5eead4" stroke-width="5" fill="none"/>
+                            <circle cx="80" cy="55" r="5" fill="#5eead4"/>
+                            <ellipse cx="80" cy="115" rx="40" ry="8" stroke="#5eead4" stroke-width="1.5" fill="none" opacity="0.3"/>
+                        </svg>
+                    </div>
+                    <div class="logo-text">Granted</div>
+                </div>
+            </div>
+
+            <nav class="nav-section">
+                <!-- Oracle (default) -->
+                <a href="/oracle" class="nav-item active" data-agent="oracle">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                    </svg>
+                    <span class="nav-label">Oracle</span>
+                </a>
+
+                <div class="nav-divider"></div>
+
+                <!-- Grant Cards -->
+                <div class="nav-item-wrapper">
+                    <a href="/grant-cards" class="nav-item" data-agent="grant-cards">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        <span class="nav-label">Grant Cards</span>
+                    </a>
+
+                    <!-- Popout Menu -->
+                    <div class="agent-popout">
+                        <div class="popout-header">
+                            <div class="popout-title">
+                                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width: 18px; height: 18px;">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                </svg>
+                                Grant Cards
+                            </div>
+                            <div class="popout-subtitle">Extract grant criteria from documents</div>
+                        </div>
+
+                        <!-- Recent Conversations -->
+                        <div class="popout-section">
+                            <div class="popout-section-title">Recent Conversations</div>
+                            <div class="popout-empty" id="grant-cards-history">No recent conversations</div>
+                        </div>
+
+                        <!-- Suggested Prompts -->
+                        <div class="popout-section" style="border-top: 1px solid var(--border);">
+                            <div class="popout-section-title">Get Started</div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('grant-cards', 'Extract eligibility criteria from this grant document')">
+                                <svg class="popout-item-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+                                </svg>
+                                <div class="popout-item-content">
+                                    <div class="popout-item-title">Extract eligibility criteria</div>
+                                </div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('grant-cards', 'Create a grant card from this document')">
+                                <svg class="popout-item-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                </svg>
+                                <div class="popout-item-content">
+                                    <div class="popout-item-title">Create new grant card</div>
+                                </div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('grant-cards', 'Review and validate this grant card')">
+                                <svg class="popout-item-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <div class="popout-item-content">
+                                    <div class="popout-item-title">Review grant card</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="popout-footer">
+                            <a href="/grant-cards" class="popout-action">
+                                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                </svg>
+                                Open Grant Cards
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Claims -->
+                <div class="nav-item-wrapper">
+                    <a href="/canexport-claims/new" class="nav-item" data-agent="claims">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                        </svg>
+                        <span class="nav-label">Claims</span>
+                    </a>
+                    <div class="agent-popout">
+                        <div class="popout-header">
+                            <div class="popout-title">CanExport Claims</div>
+                            <div class="popout-subtitle">Claims verification and compliance</div>
+                        </div>
+                        <div class="popout-section">
+                            <div class="popout-section-title">Recent Conversations</div>
+                            <div class="popout-empty" id="claims-history">No recent conversations</div>
+                        </div>
+                        <div class="popout-section" style="border-top: 1px solid var(--border);">
+                            <div class="popout-section-title">Get Started</div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('claims', 'Review this invoice for CanExport eligibility')">
+                                <div class="popout-item-content"><div class="popout-item-title">Review invoice eligibility</div></div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('claims', 'Audit expense claims for compliance')">
+                                <div class="popout-item-content"><div class="popout-item-title">Audit expense claims</div></div>
+                            </div>
+                        </div>
+                        <div class="popout-footer">
+                            <a href="/canexport-claims/new" class="popout-action">Open Claims Auditor</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ETG -->
+                <div class="nav-item-wrapper">
+                    <a href="/etg-writer/new" class="nav-item" data-agent="etg">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                        </svg>
+                        <span class="nav-label">ETG</span>
+                    </a>
+                    <div class="agent-popout">
+                        <div class="popout-header">
+                            <div class="popout-title">ETG Specialist</div>
+                            <div class="popout-subtitle">BC Employee Training Grant applications</div>
+                        </div>
+                        <div class="popout-section">
+                            <div class="popout-section-title">Recent Conversations</div>
+                            <div class="popout-empty" id="etg-history">No recent conversations</div>
+                        </div>
+                        <div class="popout-section" style="border-top: 1px solid var(--border);">
+                            <div class="popout-section-title">Get Started</div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('etg', 'Create an ETG business case')">
+                                <div class="popout-item-content"><div class="popout-item-title">Create business case</div></div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('etg', 'Calculate training budget and costs')">
+                                <div class="popout-item-content"><div class="popout-item-title">Calculate training budget</div></div>
+                            </div>
+                        </div>
+                        <div class="popout-footer">
+                            <a href="/etg-writer/new" class="popout-action">Open ETG Specialist</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BCAFE -->
+                <div class="nav-item-wrapper">
+                    <a href="/bcafe-writer/new" class="nav-item" data-agent="bcafe">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                        </svg>
+                        <span class="nav-label">BCAFE</span>
+                    </a>
+                    <div class="agent-popout">
+                        <div class="popout-header">
+                            <div class="popout-title">BC Agriculture Export</div>
+                            <div class="popout-subtitle">BCAFE program applications</div>
+                        </div>
+                        <div class="popout-section">
+                            <div class="popout-section-title">Recent Conversations</div>
+                            <div class="popout-empty" id="bcafe-history">No recent conversations</div>
+                        </div>
+                        <div class="popout-section" style="border-top: 1px solid var(--border);">
+                            <div class="popout-section-title">Get Started</div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('bcafe', 'Create a BCAFE application')">
+                                <div class="popout-item-content"><div class="popout-item-title">Create application</div></div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('bcafe', 'Develop export market strategy')">
+                                <div class="popout-item-content"><div class="popout-item-title">Export market strategy</div></div>
+                            </div>
+                        </div>
+                        <div class="popout-footer">
+                            <a href="/bcafe-writer/new" class="popout-action">Open BCAFE Writer</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buy BC -->
+                <div class="nav-item-wrapper">
+                    <a href="/buybc-writer/new" class="nav-item" data-agent="buybc">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
+                        </svg>
+                        <span class="nav-label">Buy BC</span>
+                    </a>
+                    <div class="agent-popout">
+                        <div class="popout-header">
+                            <div class="popout-title">Buy BC Partnership</div>
+                            <div class="popout-subtitle">Market promotion strategy</div>
+                        </div>
+                        <div class="popout-section">
+                            <div class="popout-section-title">Recent Conversations</div>
+                            <div class="popout-empty" id="buybc-history">No recent conversations</div>
+                        </div>
+                        <div class="popout-section" style="border-top: 1px solid var(--border);">
+                            <div class="popout-section-title">Get Started</div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('buybc', 'Create a Buy BC application')">
+                                <div class="popout-item-content"><div class="popout-item-title">Create application</div></div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('buybc', 'Develop promotional strategy')">
+                                <div class="popout-item-content"><div class="popout-item-title">Promotional strategy</div></div>
+                            </div>
+                        </div>
+                        <div class="popout-footer">
+                            <a href="/buybc-writer/new" class="popout-action">Open Buy BC Writer</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CanExport Writer -->
+                <div class="nav-item-wrapper">
+                    <a href="/canexport-writer/new" class="nav-item" data-agent="canexport">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20.893 13.393l-1.135-1.135a2.252 2.252 0 01-.421-.585l-1.08-2.16a.414.414 0 00-.663-.107.827.827 0 01-.812.21l-1.273-.363a.89.89 0 00-.738 1.595l.587.39c.59.395.674 1.23.172 1.732l-.2.2c-.212.212-.33.498-.33.796v.41c0 .409-.11.809-.32 1.158l-1.315 2.191a2.11 2.11 0 01-1.81 1.025 1.055 1.055 0 01-1.055-1.055v-1.172c0-.92-.56-1.747-1.414-2.089l-.655-.261a2.25 2.25 0 01-1.383-2.46l.007-.042a2.25 2.25 0 01.29-.787l.09-.15a2.25 2.25 0 012.37-1.048l1.178.236a1.125 1.125 0 001.302-.795l.208-.73a1.125 1.125 0 00-.578-1.315l-.665-.332-.091.091a2.25 2.25 0 01-1.591.659h-.18c-.249 0-.487.1-.662.274a.931.931 0 01-1.458-1.137l1.411-2.353a2.25 2.25 0 00.286-.76m11.928 9.869A9 9 0 008.965 3.525m11.928 9.868A9 9 0 118.965 3.525" />
+                        </svg>
+                        <span class="nav-label">CanExport</span>
+                    </a>
+                    <div class="agent-popout">
+                        <div class="popout-header">
+                            <div class="popout-title">CanExport Writer</div>
+                            <div class="popout-subtitle">Market entry strategy applications</div>
+                        </div>
+                        <div class="popout-section">
+                            <div class="popout-section-title">Recent Conversations</div>
+                            <div class="popout-empty" id="canexport-history">No recent conversations</div>
+                        </div>
+                        <div class="popout-section" style="border-top: 1px solid var(--border);">
+                            <div class="popout-section-title">Get Started</div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('canexport', 'Create a CanExport application')">
+                                <div class="popout-item-content"><div class="popout-item-title">Create application</div></div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('canexport', 'Develop market entry strategy')">
+                                <div class="popout-item-content"><div class="popout-item-title">Market entry strategy</div></div>
+                            </div>
+                        </div>
+                        <div class="popout-footer">
+                            <a href="/canexport-writer/new" class="popout-action">Open CanExport Writer</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Readiness -->
+                <div class="nav-item-wrapper">
+                    <a href="/readiness-strategist/new" class="nav-item" data-agent="readiness">
+                        <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span class="nav-label">Readiness</span>
+                    </a>
+                    <div class="agent-popout">
+                        <div class="popout-header">
+                            <div class="popout-title">Readiness Strategist</div>
+                            <div class="popout-subtitle">Grant readiness assessment</div>
+                        </div>
+                        <div class="popout-section">
+                            <div class="popout-section-title">Recent Conversations</div>
+                            <div class="popout-empty" id="readiness-history">No recent conversations</div>
+                        </div>
+                        <div class="popout-section" style="border-top: 1px solid var(--border);">
+                            <div class="popout-section-title">Get Started</div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('readiness', 'Assess grant readiness')">
+                                <div class="popout-item-content"><div class="popout-item-title">Assess readiness</div></div>
+                            </div>
+                            <div class="popout-item" onclick="startAgentWithPrompt('readiness', 'Create readiness action plan')">
+                                <div class="popout-item-content"><div class="popout-item-title">Create action plan</div></div>
+                            </div>
+                        </div>
+                        <div class="popout-footer">
+                            <a href="/readiness-strategist/new" class="popout-action">Open Readiness Strategist</a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="nav-divider"></div>
+
+                <!-- History -->
+                <a href="#" class="nav-item" onclick="showHistory(); return false;">
+                    <svg class="nav-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span class="nav-label">History</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile" onclick="toggleUserMenu()">
+                    <img class="user-avatar" id="user-avatar" src="" alt="">
+                    <div class="user-info">
+                        <div class="user-name" id="user-name">Loading...</div>
+                        <div class="user-role">Pro</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <button class="new-chat-btn" onclick="startNewChat()">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        New Chat
+                    </button>
+                </div>
+                <div class="header-right">
+                    <nav class="header-nav">
+                        <a href="/metrics">Metrics</a>
+                        <a href="/usage">Analytics</a>
+                    </nav>
+                    <button class="theme-toggle" onclick="toggleTheme()">
+                        <svg class="sun-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                        </svg>
+                        <svg class="moon-icon" style="display: none;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+                        </svg>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Chat Container -->
+            <div class="chat-container">
+                <!-- Welcome Screen -->
+                <div class="chat-welcome">
+                    <div class="welcome-logo">
+                        <!-- Oracle Ripples Logo -->
+                        <svg viewBox="0 0 160 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="rippleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#8ab4bf"/>
+                                    <stop offset="100%" stop-color="#4a9b9b"/>
+                                </linearGradient>
+                            </defs>
+                            <circle cx="80" cy="60" r="36" stroke="url(#rippleGrad)" stroke-width="6" fill="none"/>
+                            <circle cx="80" cy="60" r="20" stroke="rgba(138,180,191,0.3)" stroke-width="2" fill="none"/>
+                            <circle cx="80" cy="60" r="6" fill="url(#rippleGrad)"/>
+                            <ellipse cx="80" cy="125" rx="55" ry="12" stroke="url(#rippleGrad)" stroke-width="1.5" fill="none" opacity="0.25"/>
+                            <ellipse cx="80" cy="125" rx="42" ry="9" stroke="url(#rippleGrad)" stroke-width="1.5" fill="none" opacity="0.45"/>
+                            <ellipse cx="80" cy="125" rx="28" ry="6" stroke="url(#rippleGrad)" stroke-width="1.5" fill="none" opacity="0.65"/>
+                            <ellipse cx="80" cy="125" rx="14" ry="3" stroke="url(#rippleGrad)" stroke-width="2" fill="none" opacity="0.9"/>
+                        </svg>
+                    </div>
+                    <h1 class="welcome-title">Team <span class="gradient-text">Oracle</span></h1>
+                    <p class="welcome-subtitle">Search across all company knowledge, Dropbox, Google Drive, GetGranted database, and HubSpot CRM.</p>
+                </div>
+
+                <!-- Messages Area (hidden initially) -->
+                <div class="messages-area" id="messages-area">
+                    <!-- Messages will be added here dynamically -->
+                </div>
+
+                <!-- Search Input -->
+                <div class="search-container">
+                    <div class="search-wrapper">
+                        <input
+                            type="text"
+                            class="search-input"
+                            id="search-input"
+                            placeholder="Ask anything. Type @ for mentions and / for shortcuts."
+                            onkeypress="handleKeyPress(event)"
+                        >
+                        <div class="search-actions">
+                            <button class="attach-btn" title="Attach file">
+                                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                                </svg>
+                            </button>
+                            <button class="search-btn" onclick="submitQuery()" title="Send">
+                                <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions -->
+                    <div class="quick-actions">
+                        <div class="quick-action-card" onclick="fillQuery('Search for grants related to manufacturing in BC')">
+                            <div class="quick-action-title">Find grants</div>
+                            <div class="quick-action-desc">Search the GetGranted database</div>
+                        </div>
+                        <div class="quick-action-card" onclick="fillQuery('Look up company information in HubSpot')">
+                            <div class="quick-action-title">Company lookup</div>
+                            <div class="quick-action-desc">Search HubSpot CRM</div>
+                        </div>
+                        <div class="quick-action-card" onclick="fillQuery('Find documents about')">
+                            <div class="quick-action-title">Search knowledge</div>
+                            <div class="quick-action-desc">Dropbox & Google Drive</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Theme Toggle
+        function toggleTheme() {
+            const body = document.body;
+            const sunIcon = document.querySelector('.sun-icon');
+            const moonIcon = document.querySelector('.moon-icon');
+
+            body.classList.toggle('light-mode');
+            const isLight = body.classList.contains('light-mode');
+
+            sunIcon.style.display = isLight ? 'none' : 'block';
+            moonIcon.style.display = isLight ? 'block' : 'none';
+
+            // Save preference
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }
+
+        // Load theme preference
+        document.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme');
+            if (savedTheme === 'light') {
+                toggleTheme();
+            }
+
+            // Load user info
+            loadUserInfo();
+        });
+
+        // User Authentication
+        function loadUserInfo() {
+            const cookies = document.cookie.split(';');
+            const authCookie = cookies.find(c => c.trim().startsWith('granted_session='));
+            if (!authCookie) {
+                window.location.href = '/';
+                return;
+            }
+
+            const token = authCookie.split('=')[1];
+            try {
+                const payload = token.split('.')[1];
+                const userInfo = JSON.parse(atob(payload));
+
+                document.getElementById('user-name').textContent = userInfo.name || userInfo.email;
+                if (userInfo.picture) {
+                    document.getElementById('user-avatar').src = userInfo.picture;
+                }
+            } catch (e) {
+                console.error('Error loading user info:', e);
+            }
+        }
+
+        // Chat Functions
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                submitQuery();
+            }
+        }
+
+        function submitQuery() {
+            const input = document.getElementById('search-input');
+            const query = input.value.trim();
+
+            if (!query) return;
+
+            // TODO: Implement actual Oracle API call
+            console.log('Submitting query:', query);
+
+            // For now, redirect to Oracle with query
+            window.location.href = `/oracle?q=${encodeURIComponent(query)}`;
+        }
+
+        function fillQuery(text) {
+            document.getElementById('search-input').value = text;
+            document.getElementById('search-input').focus();
+        }
+
+        function startNewChat() {
+            window.location.href = '/oracle';
+        }
+
+        function showHistory() {
+            // TODO: Implement history view
+            alert('History view coming soon!');
+        }
+
+        function toggleUserMenu() {
+            // TODO: Implement user menu dropdown
+            console.log('User menu clicked');
+        }
+
+        // Start agent with a suggested prompt
+        function startAgentWithPrompt(agentType, prompt) {
+            const agentUrls = {
+                'grant-cards': '/grant-cards',
+                'claims': '/canexport-claims/new',
+                'etg': '/etg-writer/new',
+                'bcafe': '/bcafe-writer/new',
+                'buybc': '/buybc-writer/new',
+                'canexport': '/canexport-writer/new',
+                'readiness': '/readiness-strategist/new',
+                'oracle': '/oracle'
+            };
+
+            const url = agentUrls[agentType];
+            if (url) {
+                // Store the prompt to be used when the agent page loads
+                sessionStorage.setItem('initialPrompt', prompt);
+                window.location.href = url;
+            }
+        }
+
+        // Load recent conversations for an agent
+        async function loadAgentHistory(agentType, elementId) {
+            try {
+                const response = await fetch(`/api/conversations?agent=${agentType}&limit=3`);
+                if (!response.ok) return;
+
+                const conversations = await response.json();
+                const container = document.getElementById(elementId);
+
+                if (!conversations || conversations.length === 0) {
+                    container.innerHTML = '<div class="popout-empty">No recent conversations</div>';
+                    return;
+                }
+
+                container.innerHTML = conversations.map(conv => `
+                    <a href="/${agentType}/chat/${conv.id}" class="popout-item">
+                        <svg class="popout-item-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                        </svg>
+                        <div class="popout-item-content">
+                            <div class="popout-item-title">${conv.title || 'Untitled conversation'}</div>
+                            <div class="popout-item-meta">${timeAgo(conv.updated_at)}</div>
+                        </div>
+                    </a>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading agent history:', error);
+            }
+        }
+
+        // Format time ago
+        function timeAgo(dateString) {
+            const date = new Date(dateString);
+            const seconds = Math.floor((new Date() - date) / 1000);
+
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        // Set active nav item based on current page
+        function updateActiveNav() {
+            const path = window.location.pathname;
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+                const href = item.getAttribute('href');
+                if (href && path.includes(href.split('/')[1])) {
+                    item.classList.add('active');
+                }
+            });
+        }
+
+        updateActiveNav();
+    </script>
+</body>
+</html>
