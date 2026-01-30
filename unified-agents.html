@@ -18,7 +18,7 @@
         .welcome-container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 4rem 2rem;
+            padding: 4rem 2rem 8rem 2rem;
             text-align: center;
             animation: fadeIn 0.4s ease-out;
         }
@@ -101,7 +101,7 @@
             height: calc(100vh - 60px);
             max-width: 900px;
             margin: 0 auto;
-            padding: 0 2rem;
+            padding: 0 2rem 6rem 2rem;
         }
 
         .chat-messages {
@@ -111,9 +111,19 @@
         }
 
         .chat-input-container {
-            padding: 1.5rem 0;
+            position: fixed;
+            bottom: 0;
+            left: 240px;
+            right: 0;
+            padding: 1.5rem 2rem;
             background: var(--bg);
             border-top: 1px solid var(--border);
+            z-index: 100;
+        }
+
+        .chat-input-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
         }
 
         .message {
@@ -192,6 +202,19 @@
         .hidden {
             display: none;
         }
+
+        /* Responsive adjustments for sidebar collapse */
+        @media (max-width: 1024px) {
+            .chat-input-container {
+                left: 70px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .chat-input-container {
+                left: 0;
+            }
+        }
     </style>
 </head>
 <body>
@@ -205,8 +228,11 @@
     <!-- Chat Interface (hidden until first message) -->
     <div id="chat-screen" class="chat-wrapper hidden">
         <div id="chat-messages" class="chat-messages"></div>
+    </div>
 
-        <div class="chat-input-container">
+    <!-- Chat Input (always visible) -->
+    <div class="chat-input-container">
+        <div class="chat-input-wrapper">
             <form id="message-form" class="input-form">
                 <input
                     type="text"
@@ -407,9 +433,15 @@
 
         // Send message to API
         async function sendMessage(message) {
-            // Show chat screen, hide welcome
-            document.getElementById('welcome-screen').classList.add('hidden');
-            document.getElementById('chat-screen').classList.remove('hidden');
+            // Show chat screen (keep welcome visible - it will scroll up)
+            const welcomeScreen = document.getElementById('welcome-screen');
+            const chatScreen = document.getElementById('chat-screen');
+
+            // On first message, hide welcome and show chat
+            if (chatScreen.classList.contains('hidden')) {
+                welcomeScreen.classList.add('hidden');
+                chatScreen.classList.remove('hidden');
+            }
 
             // Add user message to UI
             addMessageToUI('user', message);
