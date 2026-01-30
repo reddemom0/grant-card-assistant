@@ -505,46 +505,41 @@ app.get('/api/pdf/batch/:batchId/results', pdfHandler.getBatchResults);
 // ============================================================================
 
 // Serve agent HTML pages with clean URLs (including sub-routes like /new and /chat/:id)
+// Unified agent interface - all agents use the same page
 app.get('/grant-cards*', (req, res) => {
-  res.sendFile('grant-cards.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/etg-writer*', (req, res) => {
-  res.sendFile('etg-agent.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/bcafe-writer*', (req, res) => {
-  res.sendFile('bcafe-agent.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/buybc-writer*', (req, res) => {
-  res.sendFile('buybc-agent.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/canexport-claims*', (req, res) => {
-  res.sendFile('canexport-claims.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/canexport-writer*', (req, res) => {
-  res.sendFile('canexport-writer.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/readiness-strategist*', (req, res) => {
-  res.sendFile('readiness-strategist.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
-// Specific /oracle route FIRST (exact match for homepage)
-app.get('/oracle', (req, res) => {
-  res.sendFile('dashboard-v2.html', { root: '.' });
-});
-
-// Wildcard /oracle* AFTER (matches /oracle/new, /oracle/chat/:id, etc.)
 app.get('/oracle*', (req, res) => {
-  res.sendFile('oracle.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/dashboard', (req, res) => {
-  res.sendFile('dashboard-v2.html', { root: '.' });
+  res.sendFile('unified-agents.html', { root: '.' });
 });
 
 app.get('/metrics', (req, res) => {
