@@ -533,12 +533,18 @@ app.get('/readiness-strategist*', (req, res) => {
   res.sendFile('readiness-strategist.html', { root: '.' });
 });
 
+// Specific /oracle route FIRST (exact match for homepage)
+app.get('/oracle', (req, res) => {
+  res.sendFile('dashboard-v2.html', { root: '.' });
+});
+
+// Wildcard /oracle* AFTER (matches /oracle/new, /oracle/chat/:id, etc.)
 app.get('/oracle*', (req, res) => {
   res.sendFile('oracle.html', { root: '.' });
 });
 
 app.get('/dashboard', (req, res) => {
-  res.sendFile('dashboard.html', { root: '.' });
+  res.sendFile('dashboard-v2.html', { root: '.' });
 });
 
 app.get('/metrics', (req, res) => {
