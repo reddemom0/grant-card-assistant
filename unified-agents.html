@@ -197,28 +197,26 @@
 <body>
     <!-- The shared-layout.js will inject sidebar and header here -->
 
-    <div class="page-content">
-        <!-- Welcome Screen (shown by default) -->
-        <div id="welcome-screen" class="welcome-container">
-            <!-- Will be populated by JS based on selected agent -->
-        </div>
+    <!-- Welcome Screen (shown by default) -->
+    <div id="welcome-screen" class="welcome-container">
+        <!-- Will be populated by JS based on selected agent -->
+    </div>
 
-        <!-- Chat Interface (hidden until first message) -->
-        <div id="chat-screen" class="chat-wrapper hidden">
-            <div id="chat-messages" class="chat-messages"></div>
+    <!-- Chat Interface (hidden until first message) -->
+    <div id="chat-screen" class="chat-wrapper hidden">
+        <div id="chat-messages" class="chat-messages"></div>
 
-            <div class="chat-input-container">
-                <form id="message-form" class="input-form">
-                    <input
-                        type="text"
-                        id="message-input"
-                        class="message-input"
-                        placeholder="Type your message..."
-                        autocomplete="off"
-                    />
-                    <button type="submit" id="send-button" class="send-button">Send</button>
-                </form>
-            </div>
+        <div class="chat-input-container">
+            <form id="message-form" class="input-form">
+                <input
+                    type="text"
+                    id="message-input"
+                    class="message-input"
+                    placeholder="Type your message..."
+                    autocomplete="off"
+                />
+                <button type="submit" id="send-button" class="send-button">Send</button>
+            </form>
         </div>
     </div>
 
