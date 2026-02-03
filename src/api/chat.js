@@ -76,14 +76,14 @@ export async function handleChatRequest(req, res) {
     let convId = conversationId;
     let isNewConversation = false;
 
+    // Get userId from authenticated user (set by middleware)
+    // If no user is authenticated, use null (anonymous)
+    const effectiveUserId = req.user?.id || null;
+
     if (!convId) {
       // Create new conversation
       convId = uuidv4();
       isNewConversation = true;
-
-      // Get userId from authenticated user (set by middleware)
-      // If no user is authenticated, use null (anonymous)
-      const effectiveUserId = req.user?.id || null;
 
       // Create conversation with placeholder title (will be updated with smart title)
       const placeholderTitle = message.substring(0, 60).trim() + (message.length > 60 ? '...' : '');
