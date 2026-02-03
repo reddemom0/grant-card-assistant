@@ -17,6 +17,16 @@ import { query } from '../database/connection.js';
  */
 export async function authenticateUser(req, res, next) {
   try {
+    // Debug: Log request info for /api/conversations
+    if (req.path.includes('/conversations')) {
+      console.log(`\n🔐 [Auth] ${req.method} ${req.path}`);
+      console.log(`🍪 [Auth] Cookie header present:`, !!req.headers.cookie);
+      if (req.headers.cookie) {
+        const cookies = req.headers.cookie.split('; ').map(c => c.split('=')[0]);
+        console.log(`🍪 [Auth] Cookie names:`, cookies.join(', '));
+      }
+    }
+
     // Get token from cookie
     const token = req.headers.cookie
       ?.split('; ')
@@ -25,6 +35,9 @@ export async function authenticateUser(req, res, next) {
 
     if (!token) {
       // No token - user is anonymous
+      if (req.path.includes('/conversations')) {
+        console.log(`❌ [Auth] No granted_session cookie found`);
+      }
       req.user = null;
       return next();
     }
