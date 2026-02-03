@@ -1039,10 +1039,8 @@
             // Add user message to UI
             addMessageToUI('user', message);
 
-            // Show thinking indicator
-            const thinkingIndicator = addThinkingIndicator();
-
             // Create abort controller for this request
+            const thinkingIndicator = null; // Removed thinking box - state shown via disabled input and stop button
             currentAbortController = new AbortController();
 
             // Show stop button, hide send button
