@@ -329,16 +329,28 @@ export async function handleChatRequest(req, res) {
 export async function handleGetConversation(req, res) {
   try {
     const { id } = req.params;
+    const userId = req.user?.id;
+
+    console.log(`\n🔍 Loading conversation: ${id} for user ${userId}`);
 
     const conversation = await getConversation(id);
 
     if (!conversation) {
+      console.log(`❌ Conversation not found: ${id}`);
       return res.status(404).json({ error: 'Conversation not found' });
+    }
+
+    // Verify conversation belongs to current user
+    if (conversation.userId !== userId && conversation.user_id !== userId) {
+      console.log(`❌ Unauthorized access attempt: conversation ${id} belongs to user ${conversation.userId || conversation.user_id}, not ${userId}`);
+      return res.status(403).json({ error: 'Unauthorized to access this conversation' });
     }
 
     // Load messages for this conversation
     const { getConversationMessages } = await import('../database/messages.js');
     const messages = await getConversationMessages(id);
+
+    console.log(`✅ Loaded conversation ${id} with ${messages.length} messages`);
 
     // Return conversation with messages
     res.json({
