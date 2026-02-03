@@ -7,7 +7,7 @@ import { google } from 'googleapis';
 import { getTemplate } from './doc-templates/index.js';
 import { createGoogleDocFromTemplate } from './google-docs-construction.js';
 import Anthropic from '@anthropic-ai/sdk';
-import { calculateRequestCost } from '../config/cost-settings.js';
+import { logAPICost } from '../utils/cost-logger.js';
 
 /**
  * Logo URL - can be overridden via GRANTED_LOGO_URL environment variable
@@ -1511,10 +1511,17 @@ Example format:
       }]
     });
 
-    // Log cost
+    // Log cost with full context
     if (message.usage) {
-      const cost = calculateRequestCost(message.usage, 'claude-3-5-haiku-20241022');
-      console.log(`💰 [Google Docs - Interview Questions] Request cost: $${cost.toFixed(4)} (Program: ${programName || 'unknown'})`);
+      logAPICost({
+        usage: message.usage,
+        model: 'claude-3-5-haiku-20241022',
+        source: 'google-docs-interview-questions',
+        metadata: {
+          programName: programName || 'unknown',
+          hasCompanyContext: !!companyContext
+        }
+      });
     }
 
     const responseText = message.content[0].text;
@@ -1748,10 +1755,17 @@ NEXT STEPS:
       }]
     });
 
-    // Log cost
+    // Log cost with full context
     if (message.usage) {
-      const cost = calculateRequestCost(message.usage, 'claude-3-5-haiku-20241022');
-      console.log(`💰 [Google Docs - Evaluation Rubric] Request cost: $${cost.toFixed(4)} (Program: ${program_name}, Client: ${client_name})`);
+      logAPICost({
+        usage: message.usage,
+        model: 'claude-3-5-haiku-20241022',
+        source: 'google-docs-evaluation-rubric',
+        metadata: {
+          programName: program_name,
+          clientName: client_name
+        }
+      });
     }
 
     const responseText = message.content[0].text;

@@ -6,7 +6,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import { calculateRequestCost } from '../config/cost-settings.js';
+import { logAPICost } from '../utils/cost-logger.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -67,10 +67,19 @@ Guidelines:
       }]
     });
 
-    // Log cost
+    // Log cost with full context
     if (response.usage) {
-      const cost = calculateRequestCost(response.usage, 'claude-sonnet-4-5-20250929');
-      console.log(`💰 [Sentiment Analysis] Request cost: $${cost.toFixed(4)} (Feedback: ${agentType || 'unknown'})`);
+      logAPICost({
+        usage: response.usage,
+        model: 'claude-sonnet-4-5-20250929',
+        source: 'sentiment-analysis',
+        agentType: agentType || 'unknown',
+        metadata: {
+          feedbackLength: text?.length || 0,
+          qualityScore,
+          rating
+        }
+      });
     }
 
     // Extract JSON from response
@@ -281,10 +290,18 @@ Guidelines:
       }]
     });
 
-    // Log cost
+    // Log cost with full context
     if (response.usage) {
-      const cost = calculateRequestCost(response.usage, 'claude-sonnet-4-5-20250929');
-      console.log(`💰 [Insight Generation] Request cost: $${cost.toFixed(4)} (Agent: ${agentType}, Feedback count: ${feedbackItems.length})`);
+      logAPICost({
+        usage: response.usage,
+        model: 'claude-sonnet-4-5-20250929',
+        source: 'insight-generation',
+        agentType,
+        metadata: {
+          feedbackCount: feedbackItems.length,
+          timeframe: `${timeframe}d`
+        }
+      });
     }
 
     // Extract JSON from response

@@ -6,7 +6,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from 'dotenv';
-import { calculateRequestCost } from './config/cost-settings.js';
+import { logAPICost } from './utils/cost-logger.js';
 
 config();
 
@@ -368,9 +368,18 @@ export const pdfAPI = {
       });
 
       const model = config.model || 'claude-sonnet-4-5-20250929';
-      const cost = calculateRequestCost(message.usage, model);
       console.log(`✅ [PDF Processing] PDF processed: ${message.usage.input_tokens} input, ${message.usage.output_tokens} output tokens`);
-      console.log(`💰 [PDF Processing] Request cost: $${cost.toFixed(4)} (Model: ${model})`);
+
+      // Log cost with full context
+      logAPICost({
+        usage: message.usage,
+        model,
+        source: 'pdf-processing',
+        metadata: {
+          fileName: file.name,
+          pdfPages: file.pdfPages || 'unknown'
+        }
+      });
 
       // Extract text and citations
       const textBlocks = message.content.filter(block => block.type === 'text');
