@@ -461,6 +461,7 @@
                 // Call API
                 const response = await fetch('/api/chat', {
                     method: 'POST',
+                    credentials: 'include', // Send cookies with request
                     headers: {
                         'Content-Type': 'application/json'
                     },

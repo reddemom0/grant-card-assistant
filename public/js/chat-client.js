@@ -38,6 +38,7 @@ class ChatClient {
 
             const response = await fetch(`${this.apiBaseUrl}/api/chat`, {
                 method: 'POST',
+                credentials: 'include', // Send cookies with request
                 headers: {
                     'Content-Type': 'application/json'
                 },
