@@ -129,15 +129,15 @@
     },
     {
       "src": "/oracle/new",
-      "dest": "/dashboard-v2.html"
+      "dest": "/unified-agents.html"
     },
     {
       "src": "/oracle/chat/([^/]+)",
-      "dest": "/dashboard-v2.html"
+      "dest": "/unified-agents.html"
     },
     {
       "src": "/oracle",
-      "dest": "/dashboard-v2.html"
+      "dest": "/unified-agents.html"
     },
     {
       "src": "/dashboard",
