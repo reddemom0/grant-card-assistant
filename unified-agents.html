@@ -1333,14 +1333,35 @@
                     messages = data.messages;
                     console.log('[LOAD_CONV] Rendering', messages.length, 'messages');
                     messages.forEach((msg, idx) => {
-                        const contentPreview = typeof msg.content === 'string'
-                            ? msg.content.substring(0, 50)
-                            : JSON.stringify(msg.content).substring(0, 50);
-                        console.log(`[LOAD_CONV] Adding message ${idx + 1}:`, msg.role, contentPreview);
-                        console.log(`[LOAD_CONV] Message ${idx + 1} full data:`, msg);
+                        console.log(`[LOAD_CONV] Message ${idx + 1} raw:`, msg);
 
-                        // Handle content that might be an object or string
-                        const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+                        // Parse Claude API content format: [{"type":"text","text":"..."}]
+                        let content = msg.content;
+
+                        // If it's a string, try to parse it as JSON
+                        if (typeof content === 'string') {
+                            try {
+                                const parsed = JSON.parse(content);
+                                if (Array.isArray(parsed)) {
+                                    // Extract text from content blocks
+                                    content = parsed
+                                        .filter(block => block.type === 'text')
+                                        .map(block => block.text)
+                                        .join('\n');
+                                }
+                            } catch (e) {
+                                // Not JSON, use as-is
+                                console.log('[LOAD_CONV] Content is plain string');
+                            }
+                        } else if (Array.isArray(content)) {
+                            // Already parsed array
+                            content = content
+                                .filter(block => block.type === 'text')
+                                .map(block => block.text)
+                                .join('\n');
+                        }
+
+                        console.log(`[LOAD_CONV] Adding message ${idx + 1}:`, msg.role, content.substring(0, 50));
                         addMessageToUI(msg.role, content);
                     });
                 }
