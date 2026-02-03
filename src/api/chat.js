@@ -96,23 +96,31 @@ export async function handleChatRequest(req, res) {
         console.error('Failed to generate smart title:', err);
       });
     } else {
-      // Verify existing conversation
+      // Check if conversation exists, create if it doesn't
       const conversation = await getConversation(convId);
 
       if (!conversation) {
-        return res.status(404).json({
-          error: `Conversation not found: ${convId}`
+        // Conversation ID provided but doesn't exist - create it
+        console.log(`📝 Creating new conversation with provided ID: ${convId}`);
+        const placeholderTitle = `New ${agentType} Chat`;
+        await createConversation(convId, effectiveUserId, agentType, placeholderTitle);
+
+        console.log(`✓ New conversation created: ${convId} (user: ${req.user?.email || 'anonymous'})`);
+
+        // Generate smart title asynchronously
+        generateAndSaveTitle(convId, message, agentType).catch(err => {
+          console.error('Failed to generate smart title:', err);
         });
-      }
+      } else {
+        // Conversation exists - verify agent type matches
+        if (conversation.agent_type !== agentType) {
+          console.warn(
+            `⚠️  Agent type mismatch: conversation=${conversation.agent_type}, request=${agentType}`
+          );
+        }
 
-      // Optionally verify agent type matches
-      if (conversation.agent_type !== agentType) {
-        console.warn(
-          `⚠️  Agent type mismatch: conversation=${conversation.agent_type}, request=${agentType}`
-        );
+        console.log(`✓ Existing conversation: ${convId}`);
       }
-
-      console.log(`✓ Existing conversation: ${convId}`);
     }
 
     // ============================================================================
