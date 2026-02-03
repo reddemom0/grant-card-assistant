@@ -127,6 +127,37 @@
         </header>
     `;
 
+    // History Modal HTML Template
+    const historyModalHTML = `
+        <div id="history-modal" class="history-modal" style="display: none;">
+            <div class="history-modal-backdrop" onclick="closeHistory()"></div>
+            <div class="history-modal-content">
+                <div class="history-modal-header">
+                    <h2>Conversation History</h2>
+                    <button class="history-modal-close" onclick="closeHistory()">
+                        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width: 20px; height: 20px;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="history-modal-filters">
+                    <button class="history-filter-btn active" onclick="filterHistory('all')">All</button>
+                    <button class="history-filter-btn" onclick="filterHistory('internal-oracle')">Oracle</button>
+                    <button class="history-filter-btn" onclick="filterHistory('grant-card-generator')">Grant Cards</button>
+                    <button class="history-filter-btn" onclick="filterHistory('canexport-claims')">Claims</button>
+                    <button class="history-filter-btn" onclick="filterHistory('etg-writer')">ETG</button>
+                    <button class="history-filter-btn" onclick="filterHistory('bcafe-writer')">BCAFE</button>
+                </div>
+                <div id="history-conversations" class="history-conversations">
+                    <div class="history-loading">
+                        <div class="history-spinner"></div>
+                        <div>Loading conversations...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
     // Initialize when DOM is ready
     function init() {
         // Inject sidebar and header
@@ -158,6 +189,11 @@
 
         container.appendChild(mainContent);
         body.appendChild(container);
+
+        // Add history modal to body
+        const historyModalContainer = document.createElement('div');
+        historyModalContainer.innerHTML = historyModalHTML;
+        body.appendChild(historyModalContainer.firstElementChild);
 
         // Load user info
         loadUserInfo();
@@ -243,9 +279,156 @@
         }
     };
 
-    window.showHistory = function() {
-        alert('History view coming soon!');
+    window.showHistory = async function() {
+        const modal = document.getElementById('history-modal');
+        modal.style.display = 'flex';
+
+        // Load conversations
+        await loadConversations();
     };
+
+    window.closeHistory = function() {
+        const modal = document.getElementById('history-modal');
+        modal.style.display = 'none';
+    };
+
+    let allConversations = [];
+    let currentFilter = 'all';
+
+    async function loadConversations() {
+        const container = document.getElementById('history-conversations');
+        container.innerHTML = '<div class="history-loading"><div class="history-spinner"></div><div>Loading conversations...</div></div>';
+
+        try {
+            const response = await fetch('/api/conversations', {
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load conversations');
+            }
+
+            const data = await response.json();
+            allConversations = data.conversations || [];
+
+            renderConversations();
+        } catch (error) {
+            console.error('Error loading conversations:', error);
+            container.innerHTML = '<div class="history-error">Failed to load conversations. Please try again.</div>';
+        }
+    }
+
+    window.filterHistory = function(agentType) {
+        currentFilter = agentType;
+
+        // Update active filter button
+        document.querySelectorAll('.history-filter-btn').forEach(btn => {
+            btn.classList.remove('active');
+        });
+        event.target.classList.add('active');
+
+        renderConversations();
+    };
+
+    function renderConversations() {
+        const container = document.getElementById('history-conversations');
+
+        // Filter conversations
+        const filtered = currentFilter === 'all'
+            ? allConversations
+            : allConversations.filter(c => c.agentType === currentFilter);
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="history-empty">No conversations found.</div>';
+            return;
+        }
+
+        // Group by agent type
+        const grouped = {};
+        filtered.forEach(conv => {
+            if (!grouped[conv.agentType]) {
+                grouped[conv.agentType] = [];
+            }
+            grouped[conv.agentType].push(conv);
+        });
+
+        // Render
+        let html = '';
+        Object.keys(grouped).forEach(agentType => {
+            const agentName = getAgentDisplayName(agentType);
+            const conversations = grouped[agentType];
+
+            html += `<div class="history-group">`;
+            if (currentFilter === 'all') {
+                html += `<div class="history-group-title">${agentName}</div>`;
+            }
+
+            conversations.forEach(conv => {
+                const timeAgo = formatTimeAgo(conv.updatedAt || conv.createdAt);
+                html += `
+                    <div class="history-item" onclick="loadHistoryConversation('${conv.id}', '${conv.agentType}')">
+                        <div class="history-item-title">${conv.title}</div>
+                        <div class="history-item-meta">
+                            <span>${conv.messageCount} messages</span>
+                            <span>•</span>
+                            <span>${timeAgo}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    window.loadHistoryConversation = function(conversationId, agentType) {
+        // Map backend agent type to URL-friendly name
+        const urlAgentMap = {
+            'internal-oracle': 'oracle',
+            'grant-card-generator': 'grant-cards',
+            'canexport-claims': 'canexport-claims',
+            'etg-writer': 'etg-writer',
+            'bcafe-writer': 'bcafe-writer',
+            'buybc-writer': 'buybc-writer',
+            'canexport-writer': 'canexport-writer',
+            'readiness-strategist': 'readiness-strategist'
+        };
+
+        const urlAgent = urlAgentMap[agentType] || agentType;
+
+        // Close modal and navigate
+        closeHistory();
+        window.location.href = `/${urlAgent}/chat/${conversationId}`;
+    };
+
+    function getAgentDisplayName(agentType) {
+        const names = {
+            'internal-oracle': 'Team Oracle',
+            'grant-card-generator': 'Grant Cards',
+            'canexport-claims': 'Claims Auditor',
+            'etg-writer': 'ETG Business Case',
+            'bcafe-writer': 'BCAFE Applications',
+            'buybc-writer': 'Buy BC Partnership',
+            'canexport-writer': 'CanExport Applications',
+            'readiness-strategist': 'Grant Readiness'
+        };
+        return names[agentType] || agentType;
+    }
+
+    function formatTimeAgo(timestamp) {
+        const date = new Date(timestamp);
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+
+        if (seconds < 60) return 'just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+        if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+
+        return date.toLocaleDateString();
+    }
 
     window.toggleUserMenu = function() {
         console.log('User menu clicked');

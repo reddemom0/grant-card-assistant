@@ -339,6 +339,83 @@
             cursor: not-allowed;
         }
 
+        /* File upload styles */
+        .file-upload-button {
+            padding: 0.75rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        .file-upload-button:hover {
+            border-color: var(--primary-cyan);
+            color: var(--primary-cyan);
+        }
+
+        .file-upload-button svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        .file-input-hidden {
+            display: none;
+        }
+
+        .selected-files {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .file-chip {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .file-chip-icon {
+            width: 16px;
+            height: 16px;
+            color: var(--primary-cyan);
+        }
+
+        .file-chip-name {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-chip-remove {
+            cursor: pointer;
+            color: var(--text-tertiary);
+            transition: color 0.2s;
+            display: flex;
+            align-items: center;
+        }
+
+        .file-chip-remove:hover {
+            color: var(--coral-red);
+        }
+
+        .file-chip-remove svg {
+            width: 14px;
+            height: 14px;
+        }
+
         .hidden {
             display: none;
         }
@@ -373,7 +450,26 @@
     <!-- Chat Input (always visible) -->
     <div class="chat-input-container">
         <div class="chat-input-wrapper">
+            <!-- Selected files display -->
+            <div id="selected-files" class="selected-files"></div>
+
             <form id="message-form" class="input-form">
+                <!-- Hidden file input -->
+                <input
+                    type="file"
+                    id="file-input"
+                    class="file-input-hidden"
+                    multiple
+                    accept=".pdf,.docx,.xlsx,.csv,.txt,.vtt,.png,.jpg,.jpeg,.webp"
+                />
+
+                <!-- File upload button -->
+                <button type="button" id="file-upload-button" class="file-upload-button" title="Attach files">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                    </svg>
+                </button>
+
                 <input
                     type="text"
                     id="message-input"
@@ -508,6 +604,7 @@
         let currentAgent = 'oracle';
         let conversationId = null;
         let messages = [];
+        let selectedFiles = [];
 
         // Initialize
         function init() {
@@ -589,7 +686,69 @@
         // Setup event listeners
         function setupEventListeners() {
             document.getElementById('message-form').addEventListener('submit', handleSubmit);
+
+            // File upload button
+            document.getElementById('file-upload-button').addEventListener('click', () => {
+                document.getElementById('file-input').click();
+            });
+
+            // File input change
+            document.getElementById('file-input').addEventListener('change', handleFileSelect);
         }
+
+        // Handle file selection
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            selectedFiles = [...selectedFiles, ...files];
+            renderSelectedFiles();
+
+            // Clear the file input so the same file can be selected again
+            e.target.value = '';
+        }
+
+        // Remove a selected file
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            renderSelectedFiles();
+        }
+
+        // Render selected files UI
+        function renderSelectedFiles() {
+            const container = document.getElementById('selected-files');
+
+            if (selectedFiles.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = selectedFiles.map((file, index) => {
+                // Determine file icon based on type
+                let icon = '<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />';
+
+                if (file.type.startsWith('image/')) {
+                    icon = '<path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />';
+                } else if (file.type === 'application/pdf') {
+                    icon = '<path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />';
+                }
+
+                return `
+                    <div class="file-chip">
+                        <svg class="file-chip-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            ${icon}
+                        </svg>
+                        <span class="file-chip-name" title="${file.name}">${file.name}</span>
+                        <span class="file-chip-remove" onclick="removeFile(${index})">
+                            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Expose removeFile globally for onclick
+        window.removeFile = removeFile;
 
         // Handle form submission
         async function handleSubmit(e) {
@@ -598,22 +757,40 @@
             const input = document.getElementById('message-input');
             const message = input.value.trim();
 
-            if (!message) return;
+            // Allow sending if there's a message or files
+            if (!message && selectedFiles.length === 0) return;
 
             // Clear input
             input.value = '';
 
-            // Send message
-            await sendMessage(message);
+            // Send message with files
+            await sendMessage(message, selectedFiles);
+
+            // Clear selected files after sending
+            selectedFiles = [];
+            renderSelectedFiles();
         }
 
         // Send a suggested prompt
         window.sendPrompt = async function(prompt) {
-            await sendMessage(prompt);
+            await sendMessage(prompt, []);
         };
 
+        // Convert file to base64
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const base64 = reader.result.split(',')[1];
+                    resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
         // Send message to API
-        async function sendMessage(message) {
+        async function sendMessage(message, files = []) {
             // Show chat screen (keep welcome visible - it will scroll up)
             const welcomeScreen = document.getElementById('welcome-screen');
             const chatScreen = document.getElementById('chat-screen');
@@ -647,11 +824,45 @@
                     window.history.pushState({}, '', `/${currentAgent}/chat/${conversationId}`);
                 }
 
+                // Process file attachments
+                const attachments = [];
+                if (files && files.length > 0) {
+                    console.log(`[DEBUG] Processing ${files.length} file(s)...`);
+
+                    for (const file of files) {
+                        try {
+                            const base64Data = await fileToBase64(file);
+                            const attachment = {
+                                filename: file.name,
+                                data: base64Data
+                            };
+
+                            // Determine attachment type
+                            if (file.type.startsWith('image/')) {
+                                attachment.type = 'image';
+                                attachment.mimeType = file.type;
+                            } else if (file.type === 'application/pdf') {
+                                attachment.type = 'pdf';
+                                attachment.mimeType = 'application/pdf';
+                            } else {
+                                attachment.type = 'document';
+                                attachment.mimeType = file.type || 'text/plain';
+                            }
+
+                            attachments.push(attachment);
+                            console.log(`[DEBUG] Processed file: ${file.name} (${file.type})`);
+                        } catch (error) {
+                            console.error(`[DEBUG] Failed to process file ${file.name}:`, error);
+                        }
+                    }
+                }
+
                 console.log('[DEBUG] Sending message:', {
                     message: message.substring(0, 50),
                     conversationId,
                     currentAgent,
-                    backendAgent: getBackendAgentType(currentAgent)
+                    backendAgent: getBackendAgentType(currentAgent),
+                    attachments: attachments.length
                 });
 
                 // Call API
@@ -662,9 +873,10 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        message,
+                        message: message || 'Analyze the attached document(s).',
                         conversationId,
-                        agentType: getBackendAgentType(currentAgent)
+                        agentType: getBackendAgentType(currentAgent),
+                        attachments
                     })
                 });
 
