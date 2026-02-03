@@ -204,6 +204,39 @@
             padding: 0;
         }
 
+        /* Thinking indicator */
+        .thinking-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 1rem 1.25rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--primary-cyan);
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            animation: messageSlideIn 0.3s ease-out;
+        }
+
+        .thinking-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary-cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .thinking-text {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
         .input-form {
             display: flex;
             gap: 0.75rem;
@@ -536,6 +569,9 @@
             // Add user message to UI
             addMessageToUI('user', message);
 
+            // Show thinking indicator
+            const thinkingIndicator = addThinkingIndicator();
+
             // Disable input
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
@@ -621,6 +657,10 @@
                                     // Create or update message element
                                     if (!messageElement) {
                                         console.log('[DEBUG] Creating assistant message element');
+                                        // Remove thinking indicator when first response arrives
+                                        if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                            thinkingIndicator.remove();
+                                        }
                                         messageElement = addMessageToUI('assistant', '');
                                     }
 
@@ -646,13 +686,23 @@
                 // If no message element was created, show the collected message (defensive programming)
                 if (!messageElement && assistantMessage) {
                     console.log('[DEBUG] Creating message element after stream ended');
+                    if (thinkingIndicator && thinkingIndicator.parentNode) {
+                        thinkingIndicator.remove();
+                    }
                     addMessageToUI('assistant', assistantMessage);
                 } else if (!messageElement && !assistantMessage) {
                     console.error('[DEBUG] No assistant message received!');
+                    if (thinkingIndicator && thinkingIndicator.parentNode) {
+                        thinkingIndicator.remove();
+                    }
                     addMessageToUI('assistant', 'No response received from the assistant.');
                 }
             } catch (error) {
                 console.error('Error sending message:', error);
+                // Remove thinking indicator on error
+                if (thinkingIndicator && thinkingIndicator.parentNode) {
+                    thinkingIndicator.remove();
+                }
                 addMessageToUI('assistant', 'Sorry, there was an error processing your message.');
             } finally {
                 // Re-enable input
@@ -697,6 +747,23 @@
             }
         }
 
+        // Add thinking indicator to UI
+        function addThinkingIndicator() {
+            const chatMessages = document.getElementById('chat-messages');
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.className = 'thinking-indicator';
+            thinkingDiv.innerHTML = `
+                <div class="thinking-spinner"></div>
+                <div class="thinking-text">${AGENTS[currentAgent].name} is thinking...</div>
+            `;
+            chatMessages.appendChild(thinkingDiv);
+
+            // Auto-scroll
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            return thinkingDiv;
+        }
+
         // Add message to UI
         function addMessageToUI(role, content) {
             const chatMessages = document.getElementById('chat-messages');
@@ -728,7 +795,7 @@
         }
 
         // Log version for debugging
-        console.log('[VERSION] unified-agents.html v2026-02-03-13:30 (with markdown rendering) loaded');
+        console.log('[VERSION] unified-agents.html v2026-02-03-13:40 (with thinking indicator) loaded');
     </script>
 </body>
 </html>
