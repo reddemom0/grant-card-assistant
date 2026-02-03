@@ -250,7 +250,24 @@
     <script src="/public/js/shared-layout.js" defer></script>
 
     <script>
-        // Agent Configuration
+        // Map URL-friendly agent names to backend agent types
+        const AGENT_TYPE_MAP = {
+            'oracle': 'internal-oracle',
+            'grant-cards': 'grant-card-generator',
+            'canexport-claims': 'canexport-claims',
+            'etg-writer': 'etg-writer',
+            'bcafe-writer': 'bcafe-writer',
+            'buybc-writer': 'buybc-writer',
+            'canexport-writer': 'canexport-writer',
+            'readiness-strategist': 'readiness-strategist'
+        };
+
+        // Helper function to get backend agent type from URL name
+        function getBackendAgentType(urlAgentName) {
+            return AGENT_TYPE_MAP[urlAgentName] || urlAgentName;
+        }
+
+        // Agent Configuration (using URL-friendly names)
         const AGENTS = {
             oracle: {
                 name: 'Team Oracle',
@@ -483,7 +500,7 @@
                     body: JSON.stringify({
                         message,
                         conversationId,
-                        agentType: currentAgent
+                        agentType: getBackendAgentType(currentAgent)
                     })
                 });
 
