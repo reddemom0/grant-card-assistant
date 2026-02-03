@@ -552,8 +552,9 @@
                                 const parsed = JSON.parse(data);
                                 console.log('[DEBUG] Parsed SSE event:', parsed.type);
 
-                                if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-                                    assistantMessage += parsed.delta.text;
+                                // Handle text delta events (actual response content)
+                                if (parsed.type === 'text_delta' && parsed.text) {
+                                    assistantMessage += parsed.text;
 
                                     // Create or update message element
                                     if (!messageElement) {
@@ -652,7 +653,7 @@
         }
 
         // Log version for debugging
-        console.log('[VERSION] unified-agents.html v2026-02-03-13:15 (with stream debugging) loaded');
+        console.log('[VERSION] unified-agents.html v2026-02-03-13:20 (FIXED: text_delta event handling) loaded');
     </script>
 </body>
 </html>
