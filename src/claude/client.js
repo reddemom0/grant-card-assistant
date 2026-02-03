@@ -82,21 +82,20 @@ export async function runAgent({
 
   try {
     // ============================================================================
-    // 1. Load agent prompt
+    // 1. Load agent prompt (BASE PROMPT - CACHEABLE)
     // ============================================================================
 
     console.log(`📋 Loading agent prompt for: ${agentType}`);
-    let systemPrompt = loadAgentPromptCached(agentType);
-    console.log(`✓ Agent prompt loaded (${systemPrompt.length} characters)`);
+    const baseAgentPrompt = loadAgentPromptCached(agentType);
+    console.log(`✓ Agent prompt loaded (${baseAgentPrompt.length} characters)`);
 
     // ============================================================================
-    // 2. Load conversation memories
+    // 2. Load conversation memories (CONVERSATION-SPECIFIC - NOT CACHEABLE)
     // ============================================================================
 
     console.log(`🧠 Loading conversation memories...`);
     const memories = await loadConversationMemories(conversationId);
     if (memories) {
-      systemPrompt += memories;
       const memoryCount = memories.split('\n').length - 2; // Subtract header lines
       console.log(`✓ Loaded ${memoryCount} memories into context`);
     } else {
@@ -104,13 +103,12 @@ export async function runAgent({
     }
 
     // ============================================================================
-    // 2.5. Load learning memory from feedback analysis
+    // 2.5. Load learning memory from feedback (USER-SPECIFIC - NOT CACHEABLE)
     // ============================================================================
 
     console.log(`📚 Loading learned patterns from user feedback...`);
     const learningMemory = await loadLearningMemory(agentType, conversationId, userId);
     if (learningMemory) {
-      systemPrompt += learningMemory;
       console.log(`✓ Injected learned patterns from feedback into system prompt`);
     } else {
       console.log(`✓ No learned patterns available yet (feedback learning will run as feedback is collected)`);
@@ -258,19 +256,44 @@ export async function runAgent({
       // Call Claude API with streaming
       console.log(`📡 Calling Claude API...`);
 
+      // ============================================================================
+      // Build system blocks (CACHE FIX: Separate cacheable from non-cacheable)
+      // ============================================================================
+      // Only the base agent prompt is cached (shared across all conversations)
+      // Memories and learning are conversation/user-specific (NOT cached)
+      // This prevents creating a new cache for every conversation
+
+      const systemBlocks = [
+        {
+          type: 'text',
+          text: baseAgentPrompt,
+          cache_control: { type: 'ephemeral' }  // ✅ CACHED (reused across conversations)
+        }
+      ];
+
+      // Add conversation memories (if present) - NOT CACHED
+      if (memories) {
+        systemBlocks.push({
+          type: 'text',
+          text: memories  // ❌ NOT CACHED (conversation-specific)
+        });
+      }
+
+      // Add learning memory (if present) - NOT CACHED
+      if (learningMemory) {
+        systemBlocks.push({
+          type: 'text',
+          text: learningMemory  // ❌ NOT CACHED (user-specific)
+        });
+      }
+
       const apiParams = {
         model: MODEL,
         max_tokens: MAX_TOKENS,
         temperature: TEMPERATURE,
 
-        // System prompt with caching
-        system: [
-          {
-            type: 'text',
-            text: systemPrompt,
-            cache_control: { type: 'ephemeral' }
-          }
-        ],
+        // System prompt blocks (with proper cache separation)
+        system: systemBlocks,
 
         messages,
         tools: tools,
