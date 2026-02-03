@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Team Oracle - Granted AI Hub</title>
+    <title id="page-title">Team Oracle - GetGranted AI</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&family=Source+Sans+3:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Shared Layout Styles -->
     <link rel="stylesheet" href="/public/css/shared-layout.css">
@@ -36,7 +36,7 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-radius: 20px;
-            color: var(--primary-teal);
+            color: var(--primary-cyan);
         }
 
         .welcome-icon svg {
@@ -45,11 +45,11 @@
         }
 
         .welcome-title {
-            font-family: 'Syne', sans-serif;
+            font-family: 'Montserrat', sans-serif;
             font-size: 2.5rem;
             font-weight: 700;
             margin-bottom: 1rem;
-            color: var(--text);
+            color: var(--text-primary);
         }
 
         .welcome-subtitle {
@@ -77,9 +77,9 @@
         }
 
         .welcome-prompt:hover {
-            border-color: var(--primary-teal);
+            border-color: var(--primary-cyan);
             transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(94, 234, 212, 0.1);
+            box-shadow: 0 4px 12px rgba(54, 202, 250, 0.15);
         }
 
         .welcome-prompt-title {
@@ -254,11 +254,11 @@
         const AGENTS = {
             oracle: {
                 name: 'Team Oracle',
-                subtitle: 'Your internal knowledge expert for Granted Consulting',
+                subtitle: 'Your internal knowledge expert for GetGranted',
                 icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />',
                 prompts: [
-                    { title: 'Company Info', description: 'Tell me about Granted Consulting', prompt: 'Tell me about Granted Consulting - what we do and how we help clients' },
-                    { title: 'Grant Programs', description: 'What grants do we specialize in?', prompt: 'What grant programs does Granted Consulting specialize in?' },
+                    { title: 'Company Info', description: 'Tell me about GetGranted', prompt: 'Tell me about GetGranted - what we do and how we help clients' },
+                    { title: 'Grant Programs', description: 'What grants do we specialize in?', prompt: 'What grant programs does GetGranted specialize in?' },
                     { title: 'Internal Resources', description: 'Find internal documentation', prompt: 'Where can I find our internal process documentation?' }
                 ]
             },
@@ -388,7 +388,7 @@
             `;
 
             // Update page title
-            document.getElementById('page-title').textContent = `${agent.name} - Granted AI Hub`;
+            document.getElementById('page-title').textContent = `${agent.name} - GetGranted AI`;
         }
 
         // Switch agent
