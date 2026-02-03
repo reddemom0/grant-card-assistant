@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Team Oracle - GetGranted AI</title>
+    <title id="page-title">Team Oracle - Granted AI</title>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +18,7 @@
         .welcome-container {
             max-width: 800px;
             margin: 0 auto;
-            padding: 4rem 2rem 8rem 2rem;
+            padding: 4rem 2rem 12rem 2rem;
             text-align: center;
             animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
@@ -165,7 +165,7 @@
             height: calc(100vh - 60px);
             max-width: 900px;
             margin: 0 auto;
-            padding: 0 2rem 6rem 2rem;
+            padding: 0 2rem 10rem 2rem;
         }
 
         .chat-messages {
@@ -179,17 +179,24 @@
             bottom: 0;
             left: 240px;
             right: 0;
-            padding: 1.5rem 2rem;
-            background: linear-gradient(180deg, transparent 0%, var(--bg) 20%, var(--bg) 100%);
-            border-top: 1px solid var(--border);
+            padding: 2rem;
+            background: transparent;
+            border-top: none;
             z-index: 100;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+            pointer-events: none;
         }
 
         .chat-input-wrapper {
             max-width: 900px;
             margin: 0 auto;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2),
+                        0 0 0 1px rgba(54, 202, 250, 0.1) inset;
+            backdrop-filter: blur(12px);
+            pointer-events: auto;
         }
 
         .message {
@@ -465,6 +472,45 @@
             box-shadow: none;
         }
 
+        .send-button.hidden {
+            display: none;
+        }
+
+        .stop-button {
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, var(--coral-red) 0%, #b83640 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(214, 69, 80, 0.3);
+            display: none;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stop-button.visible {
+            display: flex;
+        }
+
+        .stop-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(214, 69, 80, 0.4);
+        }
+
+        .stop-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(214, 69, 80, 0.3);
+        }
+
+        .stop-button svg {
+            width: 16px;
+            height: 16px;
+        }
+
         /* File upload styles */
         .file-upload-button {
             padding: 0.75rem;
@@ -589,6 +635,12 @@
         @media (max-width: 768px) {
             .chat-input-container {
                 left: 0;
+                padding: 1rem;
+            }
+
+            .chat-input-wrapper {
+                border-radius: 12px;
+                padding: 0.75rem;
             }
         }
     </style>
@@ -638,6 +690,12 @@
                 />
                 <button type="submit" id="send-button" class="send-button">
                     <span>Send</span>
+                </button>
+                <button type="button" id="stop-button" class="stop-button" onclick="stopStreaming()">
+                    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <rect x="6" y="6" width="12" height="12" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <span>Stop</span>
                 </button>
             </form>
         </div>
@@ -766,6 +824,7 @@
         let conversationId = null;
         let messages = [];
         let selectedFiles = [];
+        let currentAbortController = null;
 
         // Initialize
         function init() {
@@ -816,7 +875,7 @@
             `;
 
             // Update page title
-            document.getElementById('page-title').textContent = `${agent.name} - GetGranted AI`;
+            document.getElementById('page-title').textContent = `${agent.name} - Granted AI`;
         }
 
         // Switch agent
@@ -911,6 +970,21 @@
         // Expose removeFile globally for onclick
         window.removeFile = removeFile;
 
+        // Stop streaming function
+        window.stopStreaming = function() {
+            if (currentAbortController) {
+                console.log('[DEBUG] Stopping stream...');
+                currentAbortController.abort();
+                currentAbortController = null;
+
+                // Hide stop button, show send button
+                const stopButton = document.getElementById('stop-button');
+                const sendButton = document.getElementById('send-button');
+                stopButton.classList.remove('visible');
+                sendButton.classList.remove('hidden');
+            }
+        };
+
         // Handle form submission
         async function handleSubmit(e) {
             e.preventDefault();
@@ -968,10 +1042,16 @@
             // Show thinking indicator
             const thinkingIndicator = addThinkingIndicator();
 
-            // Disable input
+            // Create abort controller for this request
+            currentAbortController = new AbortController();
+
+            // Show stop button, hide send button
+            const stopButton = document.getElementById('stop-button');
             const sendButton = document.getElementById('send-button');
             const messageInput = document.getElementById('message-input');
-            sendButton.disabled = true;
+
+            stopButton.classList.add('visible');
+            sendButton.classList.add('hidden');
             messageInput.disabled = true;
 
             try {
@@ -1038,7 +1118,8 @@
                         conversationId,
                         agentType: getBackendAgentType(currentAgent),
                         attachments
-                    })
+                    }),
+                    signal: currentAbortController.signal
                 });
 
                 console.log('[DEBUG] Response received:', response.status, response.ok);
@@ -1129,17 +1210,30 @@
                     addMessageToUI('assistant', 'No response received from the assistant.');
                 }
             } catch (error) {
-                console.error('Error sending message:', error);
-                // Remove thinking indicator on error
-                if (thinkingIndicator && thinkingIndicator.parentNode) {
-                    thinkingIndicator.remove();
+                // Handle abort separately from other errors
+                if (error.name === 'AbortError') {
+                    console.log('[DEBUG] Request was aborted by user');
+                    // Remove thinking indicator on abort
+                    if (thinkingIndicator && thinkingIndicator.parentNode) {
+                        thinkingIndicator.remove();
+                    }
+                    // Optionally show a message that streaming was stopped
+                    // addMessageToUI('assistant', '[Response stopped by user]');
+                } else {
+                    console.error('Error sending message:', error);
+                    // Remove thinking indicator on error
+                    if (thinkingIndicator && thinkingIndicator.parentNode) {
+                        thinkingIndicator.remove();
+                    }
+                    addMessageToUI('assistant', 'Sorry, there was an error processing your message.');
                 }
-                addMessageToUI('assistant', 'Sorry, there was an error processing your message.');
             } finally {
-                // Re-enable input
-                sendButton.disabled = false;
+                // Clean up: hide stop button, show send button
+                stopButton.classList.remove('visible');
+                sendButton.classList.remove('hidden');
                 messageInput.disabled = false;
                 messageInput.focus();
+                currentAbortController = null;
             }
         }
 

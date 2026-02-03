@@ -11,14 +11,8 @@
         <aside class="sidebar">
             <div class="sidebar-header">
                 <div class="logo">
-                    <div class="logo-icon">
-                        <svg viewBox="0 0 24 24" fill="none" style="width: 20px; height: 20px;">
-                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" fill="currentColor" opacity="0.2"/>
-                            <path d="M12 2L2 7v10c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V7l-10-5z" stroke="currentColor" stroke-width="1.5" fill="none"/>
-                            <path d="M7 12l3 3 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                        </svg>
-                    </div>
-                    <div class="logo-text">GetGranted AI</div>
+                    <img src="/public/images/granted-logo.png" alt="Granted AI" class="logo-image" style="width: 32px; height: 32px; border-radius: 8px;">
+                    <div class="logo-text">Granted AI</div>
                 </div>
             </div>
 
