@@ -227,22 +227,22 @@ router.get('/auth-callback', async (req, res) => {
       email: user.email,
       picture: user.picture
     }));
-    console.log('🔵 Sending HTML redirect to dashboard...');
+    console.log('🔵 Sending HTML redirect to Team Oracle...');
 
     res.status(200).setHeader('Content-Type', 'text/html').send(`
       <!DOCTYPE html>
       <html>
       <head>
-        <meta http-equiv="refresh" content="0;url=/dashboard.html#user=${userDataEncoded}">
+        <meta http-equiv="refresh" content="0;url=/oracle/new#user=${userDataEncoded}">
         <script>
           // Verify cookie was set
           console.log('Auth callback: Cookies after login:', document.cookie);
           // Immediate redirect as backup
-          window.location.href = '/dashboard.html#user=${userDataEncoded}';
+          window.location.href = '/oracle/new#user=${userDataEncoded}';
         </script>
       </head>
       <body>
-        <p>Login successful! Redirecting to dashboard...</p>
+        <p>Login successful! Redirecting to Team Oracle...</p>
       </body>
       </html>
     `);
