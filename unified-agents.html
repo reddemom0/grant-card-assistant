@@ -341,15 +341,26 @@
 
         // Initialize
         function init() {
-            // Get agent from URL or default to oracle
-            const pathParts = window.location.pathname.split('/');
-            const agentFromPath = pathParts[1];
+            // Parse URL: /{agent}/new or /{agent}/chat/{conversationId}
+            const pathParts = window.location.pathname.split('/').filter(p => p);
+            const agentFromPath = pathParts[0];
+            const routeType = pathParts[1]; // 'new' or 'chat'
+            const conversationIdFromPath = pathParts[2];
 
+            // Set current agent
             if (AGENTS[agentFromPath]) {
                 currentAgent = agentFromPath;
             }
 
-            renderWelcomeScreen();
+            // If conversation ID in URL, load it
+            if (routeType === 'chat' && conversationIdFromPath) {
+                conversationId = conversationIdFromPath;
+                loadConversation(conversationId);
+            } else {
+                // Show welcome screen for new chat
+                renderWelcomeScreen();
+            }
+
             setupEventListeners();
         }
 
@@ -396,8 +407,8 @@
 
             renderWelcomeScreen();
 
-            // Update URL without reload
-            window.history.pushState({}, '', `/${agentType}`);
+            // Update URL without reload - use /agent/new format
+            window.history.pushState({}, '', `/${agentType}/new`);
 
             // Update active nav item
             if (window.updateActiveNav) {
@@ -454,8 +465,12 @@
 
             try {
                 // Create conversation ID if needed
+                const isFirstMessage = !conversationId;
                 if (!conversationId) {
                     conversationId = `${currentAgent}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+                    // Update URL to /agent/chat/{conversationId} on first message
+                    window.history.pushState({}, '', `/${currentAgent}/chat/${conversationId}`);
                 }
 
                 // Call API
@@ -523,6 +538,41 @@
                 sendButton.disabled = false;
                 messageInput.disabled = false;
                 messageInput.focus();
+            }
+        }
+
+        // Load existing conversation from server
+        async function loadConversation(convId) {
+            try {
+                const response = await fetch(`/api/conversations/${convId}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    console.error('Failed to load conversation');
+                    renderWelcomeScreen();
+                    return;
+                }
+
+                const data = await response.json();
+
+                // Hide welcome, show chat
+                document.getElementById('welcome-screen').classList.add('hidden');
+                document.getElementById('chat-screen').classList.remove('hidden');
+
+                // Render messages
+                const chatMessages = document.getElementById('chat-messages');
+                chatMessages.innerHTML = '';
+
+                if (data.messages && data.messages.length > 0) {
+                    messages = data.messages;
+                    messages.forEach(msg => {
+                        addMessageToUI(msg.role, msg.content);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading conversation:', error);
+                renderWelcomeScreen();
             }
         }
 

@@ -238,7 +238,7 @@
         if (currentAgent) {
             window.location.href = `/${currentAgent}/new`;
         } else {
-            window.location.href = '/oracle';
+            window.location.href = '/oracle/new';
         }
     };
 

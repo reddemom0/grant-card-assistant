@@ -402,9 +402,9 @@
             const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
 
             if (authToken) {
-                // User is already authenticated, redirect to dashboard
-                console.log('✅ User already logged in, redirecting to dashboard...');
-                window.location.href = '/dashboard';
+                // User is already authenticated, redirect to Oracle
+                console.log('✅ User already logged in, redirecting to Oracle...');
+                window.location.href = '/oracle/new';
                 return true;
             }
             return false;
@@ -413,7 +413,7 @@
         // Run auth check immediately
         if (checkAuth()) {
             // Exit early if redirecting
-            throw new Error('Redirecting to dashboard');
+            throw new Error('Redirecting to Oracle');
         }
 
         const loginForm = document.getElementById('loginForm');

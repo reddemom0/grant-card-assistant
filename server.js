@@ -539,7 +539,8 @@ app.get('/oracle*', (req, res) => {
 });
 
 app.get('/dashboard', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
+  // Redirect old dashboard route to Oracle
+  res.redirect('/oracle/new');
 });
 
 app.get('/metrics', (req, res) => {
@@ -562,9 +563,9 @@ app.get('/login', (req, res) => {
   res.sendFile('login.html', { root: '.' });
 });
 
-// Serve root as login page
+// Serve root - redirect to Oracle (it will handle auth check)
 app.get('/', (req, res) => {
-  res.sendFile('login.html', { root: '.' });
+  res.redirect('/oracle/new');
 });
 
 // ============================================================================
