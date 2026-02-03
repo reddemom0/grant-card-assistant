@@ -776,7 +776,7 @@
         const AGENTS = {
             oracle: {
                 name: 'Team Oracle',
-                subtitle: 'Your internal knowledge expert for GetGranted',
+                subtitle: 'Your internal knowledge expert',
                 icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />',
                 prompts: [
                     { title: 'Company Info', description: 'Tell me about GetGranted', prompt: 'Tell me about GetGranted - what we do and how we help clients' },
@@ -1333,8 +1333,15 @@
                     messages = data.messages;
                     console.log('[LOAD_CONV] Rendering', messages.length, 'messages');
                     messages.forEach((msg, idx) => {
-                        console.log(`[LOAD_CONV] Adding message ${idx + 1}:`, msg.role, msg.content.substring(0, 50));
-                        addMessageToUI(msg.role, msg.content);
+                        const contentPreview = typeof msg.content === 'string'
+                            ? msg.content.substring(0, 50)
+                            : JSON.stringify(msg.content).substring(0, 50);
+                        console.log(`[LOAD_CONV] Adding message ${idx + 1}:`, msg.role, contentPreview);
+                        console.log(`[LOAD_CONV] Message ${idx + 1} full data:`, msg);
+
+                        // Handle content that might be an object or string
+                        const content = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content);
+                        addMessageToUI(msg.role, content);
                     });
                 }
 
