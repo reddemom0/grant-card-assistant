@@ -491,6 +491,13 @@
                     window.history.pushState({}, '', `/${currentAgent}/chat/${conversationId}`);
                 }
 
+                console.log('[DEBUG] Sending message:', {
+                    message: message.substring(0, 50),
+                    conversationId,
+                    currentAgent,
+                    backendAgent: getBackendAgentType(currentAgent)
+                });
+
                 // Call API
                 const response = await fetch('/api/chat', {
                     method: 'POST',
@@ -504,6 +511,8 @@
                         agentType: getBackendAgentType(currentAgent)
                     })
                 });
+
+                console.log('[DEBUG] Response received:', response.status, response.ok);
 
                 if (!response.ok) {
                     throw new Error('Failed to send message');
@@ -617,6 +626,9 @@
         } else {
             init();
         }
+
+        // Log version for debugging
+        console.log('[VERSION] unified-agents.html v2026-02-03-13:00 loaded');
     </script>
 </body>
 </html>

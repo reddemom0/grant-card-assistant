@@ -506,37 +506,24 @@ app.get('/api/pdf/batch/:batchId/results', pdfHandler.getBatchResults);
 
 // Serve agent HTML pages with clean URLs (including sub-routes like /new and /chat/:id)
 // Unified agent interface - all agents use the same page
-app.get('/grant-cards*', (req, res) => {
+// Set no-cache headers to prevent browser from caching the HTML
+const serveUnifiedAgents = (req, res) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Pragma': 'no-cache',
+    'Expires': '0'
+  });
   res.sendFile('unified-agents.html', { root: '.' });
-});
+};
 
-app.get('/etg-writer*', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
-});
-
-app.get('/bcafe-writer*', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
-});
-
-app.get('/buybc-writer*', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
-});
-
-app.get('/canexport-claims*', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
-});
-
-app.get('/canexport-writer*', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
-});
-
-app.get('/readiness-strategist*', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
-});
-
-app.get('/oracle*', (req, res) => {
-  res.sendFile('unified-agents.html', { root: '.' });
-});
+app.get('/grant-cards*', serveUnifiedAgents);
+app.get('/etg-writer*', serveUnifiedAgents);
+app.get('/bcafe-writer*', serveUnifiedAgents);
+app.get('/buybc-writer*', serveUnifiedAgents);
+app.get('/canexport-claims*', serveUnifiedAgents);
+app.get('/canexport-writer*', serveUnifiedAgents);
+app.get('/readiness-strategist*', serveUnifiedAgents);
+app.get('/oracle*', serveUnifiedAgents);
 
 app.get('/dashboard', (req, res) => {
   // Redirect old dashboard route to Oracle
