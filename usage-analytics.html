@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usage Analytics - Granted AI</title>
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Open+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Shared Layout Styles -->
+    <link rel="stylesheet" href="/public/css/shared-layout.css">
+
+    <style>
+        /* Usage Analytics Specific Styles */
+        .analytics-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-header h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .page-header .subtitle {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .time-filter {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--surface);
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border: 1px solid var(--border);
+        }
+
+        .time-filter button {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-primary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .time-filter button:hover {
+            background: var(--background);
+            border-color: var(--primary-cyan);
+        }
+
+        .time-filter button.active {
+            background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--secondary-teal) 100%);
+            color: white;
+            border-color: var(--primary-cyan);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            border-color: var(--primary-cyan);
+            box-shadow: 0 4px 12px rgba(54, 202, 250, 0.1);
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin: 0.5rem 0;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .stat-icon {
+            font-size: 1.5rem;
+            opacity: 0.8;
+        }
+
+        .section {
+            background: var(--surface);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        .section-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-family: 'Montserrat', sans-serif;
+            color: var(--text-primary);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.75rem;
+            background: var(--background);
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 1rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            color: var(--text-primary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        tr:hover {
+            background: var(--background);
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .user-avatar {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+        }
+
+        .user-name {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .user-email {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 4rem 0;
+            color: var(--text-secondary);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 3rem;
+            height: 3rem;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary-cyan);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+
+        .agent-bar {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .agent-name {
+            min-width: 200px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 2rem;
+            background: var(--background);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--secondary-teal) 100%);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            padding: 0 0.75rem;
+            color: white;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .metric {
+            display: inline-block;
+            margin-left: 1rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Modal styles */
+        #detailsModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            overflow: auto;
+            display: none;
+        }
+
+        #detailsModal > div {
+            position: relative;
+            background: var(--surface);
+            margin: 2rem auto;
+            max-width: 900px;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        #detailsModal button {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: color 0.2s;
+        }
+
+        #detailsModal button:hover {
+            color: var(--text-primary);
+        }
+
+        #modalContent {
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="analytics-container">
+        <div class="page-header">
+            <h1>📊 Usage Analytics</h1>
+            <p class="subtitle">Real-time platform usage and user activity metrics</p>
+        </div>
+
+        <div class="time-filter">
+            <button onclick="setTimeRange(1)">Last 24 Hours</button>
+            <button class="active" onclick="setTimeRange(7)">7 Days</button>
+            <button onclick="setTimeRange(30)">One Month</button>
+            <button onclick="setTimeRange(90)">Three Months</button>
+        </div>
+
+        <div id="overview-stats"></div>
+        <div id="team-adoption"></div>
+        <div id="productivity-impact"></div>
+    </div>
+
+    <!-- Modal for user/agent details -->
+    <div id="detailsModal">
+        <div>
+            <button onclick="closeDetailsModal()">×</button>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        console.log('📊 Usage Analytics loaded');
+
+        let currentDays = 7;
+        let currentTimeFilter = '7days';
+
+        async function setTimeRange(days) {
+            currentDays = days;
+
+            const filterMap = {
+                1: '24hours',
+                7: '7days',
+                30: '30days',
+                90: '90days'
+            };
+            currentTimeFilter = filterMap[days] || '7days';
+
+            document.querySelectorAll('.time-filter button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            await loadAllData();
+        }
+
+        async function loadAllData() {
+            await Promise.all([
+                loadOverview(),
+                loadTeamAdoption(),
+                loadProductivityImpact()
+            ]);
+        }
+
+        async function loadOverview() {
+            const container = document.getElementById('overview-stats');
+            container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=overview&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Failed to load overview');
+                }
+
+                const data = await response.json();
+                const stats = data.overview;
+
+                container.innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-value">${stats.totalConversations}</div>
+                            <div class="stat-label">Total Conversations</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-value">${stats.uniqueUsers}</div>
+                            <div class="stat-label">Active Team Members</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🤖</div>
+                            <div class="stat-value">${stats.activeAgents}</div>
+                            <div class="stat-label">Agents in Use</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📝</div>
+                            <div class="stat-value">${stats.totalMessages}</div>
+                            <div class="stat-label">Total Messages</div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading overview:', error);
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Error loading overview: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadTeamAdoption() {
+            const container = document.getElementById('team-adoption');
+            container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=team-adoption&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load team adoption');
+                }
+
+                const data = await response.json();
+
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">👥 Team Adoption Dashboard</h3>
+                        <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+                            <div class="stat-card">
+                                <div class="stat-icon">👥</div>
+                                <div class="stat-value">${data.summary.activeUsers}/${data.teamSize}</div>
+                                <div class="stat-label">Active ${getTimePeriodLabel()}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">✅</div>
+                                <div class="stat-value">${data.summary.fullyAdopted}</div>
+                                <div class="stat-label">Full Adoption</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">⚠️</div>
+                                <div class="stat-value">${data.summary.partialAdoption}</div>
+                                <div class="stat-label">Partial Adoption</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-icon">❌</div>
+                                <div class="stat-value">${data.summary.noUsage}</div>
+                                <div class="stat-label">No Usage</div>
+                            </div>
+                        </div>
+
+                        <h4 style="margin-bottom: 1rem; color: var(--text-secondary); font-size: 0.875rem;">Click on any user or agent for detailed breakdown</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Team Member</th>
+                                    ${data.availableAgents.map(agent => `
+                                        <th style="text-align: center; cursor: pointer;"
+                                            onclick="viewAgentDetails('${agent}')"
+                                            title="Click to view ${formatAgentName(agent)} details">
+                                            ${formatAgentName(agent)}
+                                        </th>
+                                    `).join('')}
+                                    <th style="text-align: center;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.adoptionMatrix.map(user => `
+                                    <tr style="cursor: pointer;">
+                                        <td onclick="viewUserDetails(${user.userId}, '${user.name}')" title="Click to view ${user.name}'s usage">
+                                            <div class="user-info">
+                                                <img src="${user.picture || '/default-avatar.png'}" alt="${user.name}" class="user-avatar">
+                                                <div>
+                                                    <div class="user-name">${user.name}</div>
+                                                    <div class="user-email" style="font-size: 0.75rem;">
+                                                        ${user.lastActivity ? 'Last active: ' + formatDate(user.lastActivity) : 'No activity'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        ${data.availableAgents.map(agent => {
+                                            const usage = user.agentUsage[agent];
+                                            let showCheckmark = false;
+                                            if (currentTimeFilter === '24hours') showCheckmark = usage.usedLastDay;
+                                            else if (currentTimeFilter === '7days') showCheckmark = usage.usedLastWeek;
+                                            else if (currentTimeFilter === '30days') showCheckmark = usage.usedLastMonth;
+                                            else if (currentTimeFilter === '90days') showCheckmark = usage.usedLast3Months;
+
+                                            const tooltipText = usage.lastUsed
+                                                ? `Last used: ${formatDate(usage.lastUsed)}\\n${usage.conversationCount} conversation${usage.conversationCount !== 1 ? 's' : ''} total`
+                                                : 'Never used';
+
+                                            return `
+                                                <td style="text-align: center;">
+                                                    ${showCheckmark
+                                                        ? `<span style="color: var(--primary-cyan); font-size: 1.25rem; cursor: help;" title="${tooltipText}">✓</span>`
+                                                        : `<span style="color: var(--text-secondary); opacity: 0.3;" title="${tooltipText}">—</span>`
+                                                    }
+                                                </td>
+                                            `;
+                                        }).join('')}
+                                        <td style="text-align: center;">
+                                            <strong>${user.totalAgentsUsed}/${data.availableAgents.length}</strong>
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading team adoption:', error);
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">👥 Team Adoption Dashboard</h3>
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <p>Error loading team adoption</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadProductivityImpact() {
+            const container = document.getElementById('productivity-impact');
+            container.innerHTML = '<div class="loading"><div class="loading-spinner"></div></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=productivity-impact&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load productivity metrics');
+                }
+
+                const data = await response.json();
+
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">⚡ Productivity & Impact</h3>
+
+                        <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Average Time per Agent</h4>
+                        ${data.agentProductivity.map(agent => `
+                            <div class="agent-bar">
+                                <div class="agent-name">${formatAgentName(agent.agentType)}</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width: 100%;">
+                                        ${agent.avgDurationMinutes.toFixed(0)} min average
+                                    </div>
+                                </div>
+                                <span class="metric">${agent.totalConversations} conversations</span>
+                                <span class="metric">${agent.conversationsPerUser} per user</span>
+                            </div>
+                        `).join('')}
+
+                        <h4 style="margin-top: 2rem; margin-bottom: 1rem; color: var(--text-primary);">Team Productivity (${getTimePeriodLabel()})</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Team Member</th>
+                                    <th>Total Conversations</th>
+                                    <th>Total Messages</th>
+                                    <th>Total Feedback</th>
+                                    <th>Avg Messages/Conv</th>
+                                    <th>Avg Feedback/Msg</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${data.userProductivity.map(user => `
+                                    <tr>
+                                        <td>${user.name}</td>
+                                        <td><strong>${user.totalConversations}</strong></td>
+                                        <td><strong>${user.totalMessages}</strong></td>
+                                        <td><strong>${user.totalFeedback}</strong></td>
+                                        <td>${user.avgMessagesPerConversation}</td>
+                                        <td>${user.avgFeedbackPerMessage}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading productivity metrics:', error);
+                container.innerHTML = `
+                    <div class="section">
+                        <h3 class="section-title">⚡ Productivity & Impact</h3>
+                        <div class="empty-state">
+                            <div class="empty-state-icon">⚠️</div>
+                            <p>Error loading productivity metrics</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function formatAgentName(agentType) {
+            const names = {
+                'etg-writer': 'ETG',
+                'grant-card-generator': 'Grant Cards',
+                'canexport-claims': 'Claims',
+                'bcafe-writer': 'BCAFE',
+                'readiness-strategist': 'Readiness',
+                'canexport-writer': 'CanExport',
+                'buybc-writer': 'Buy BC',
+                'internal-oracle': 'Oracle'
+            };
+            return names[agentType] || agentType;
+        }
+
+        function formatDuration(minutes) {
+            if (minutes < 60) return `${Math.round(minutes)} min`;
+            const hours = Math.floor(minutes / 60);
+            const mins = Math.round(minutes % 60);
+            return `${hours}h ${mins}m`;
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+
+            if (diffMins < 60) return `${diffMins} min ago`;
+            else if (diffMins < 1440) return `${Math.floor(diffMins / 60)} hours ago`;
+            else return date.toLocaleDateString();
+        }
+
+        function getTimePeriodLabel() {
+            const labels = {
+                '24hours': 'Last 24 Hours',
+                '7days': 'This Week',
+                '30days': 'This Month',
+                '90days': 'Last 3 Months'
+            };
+            return labels[currentTimeFilter] || 'This Week';
+        }
+
+        let currentModalContext = null;
+
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+            currentModalContext = null;
+        }
+
+        function openDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'block';
+        }
+
+        document.getElementById('detailsModal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'detailsModal') closeDetailsModal();
+        });
+
+        async function viewUserDetails(userId, userName) {
+            currentModalContext = { type: 'user', userId, userName };
+            openDetailsModal();
+            document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading user details...</p></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=user-details&userId=${userId}&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) throw new Error('Failed to load user details');
+
+                const data = await response.json();
+
+                document.getElementById('modalContent').innerHTML = `
+                    <h2 style="margin-bottom: 1rem; color: var(--primary-cyan);">📊 ${userName}'s Usage (${getTimePeriodLabel()})</h2>
+
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-value">${data.totalConversations}</div>
+                            <div class="stat-label">Conversations</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">🤖</div>
+                            <div class="stat-value">${data.agentsUsed}</div>
+                            <div class="stat-label">Agents Used</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-value">${formatDuration(data.totalMinutes)}</div>
+                            <div class="stat-label">Total Time</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📅</div>
+                            <div class="stat-value">${formatDate(data.lastActivity)}</div>
+                            <div class="stat-label">Last Active</div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-bottom: 1rem;">Usage by Agent</h3>
+                    ${data.agentBreakdown.map(agent => `
+                        <div class="agent-bar">
+                            <div class="agent-name">${formatAgentName(agent.agentType)}</div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${(agent.conversations / data.totalConversations) * 100}%;">
+                                    ${agent.conversations} conversations
+                                </div>
+                            </div>
+                            <span class="metric">${formatDuration(agent.avgDuration)} avg</span>
+                        </div>
+                    `).join('')}
+                `;
+            } catch (error) {
+                console.error('Error loading user details:', error);
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Error loading user details</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function viewAgentDetails(agentType) {
+            currentModalContext = { type: 'agent', agentType };
+            openDetailsModal();
+            document.getElementById('modalContent').innerHTML = '<div class="loading"><div class="loading-spinner"></div><p>Loading agent details...</p></div>';
+
+            try {
+                const response = await fetch(`/api/usage-analytics?action=agent-details&agentType=${agentType}&days=${currentDays}`, {
+                    credentials: 'include'
+                });
+
+                if (!response.ok) throw new Error('Failed to load agent details');
+
+                const data = await response.json();
+
+                document.getElementById('modalContent').innerHTML = `
+                    <h2 style="margin-bottom: 1rem; color: var(--primary-cyan);">🤖 ${formatAgentName(agentType)} (${getTimePeriodLabel()})</h2>
+
+                    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 2rem;">
+                        <div class="stat-card">
+                            <div class="stat-icon">💬</div>
+                            <div class="stat-value">${data.totalConversations}</div>
+                            <div class="stat-label">Conversations</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-value">${data.uniqueUsers}</div>
+                            <div class="stat-label">Users</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">⏱️</div>
+                            <div class="stat-value">${formatDuration(data.avgDuration)}</div>
+                            <div class="stat-label">Avg Duration</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon">📝</div>
+                            <div class="stat-value">${data.avgMessages}</div>
+                            <div class="stat-label">Avg Messages</div>
+                        </div>
+                    </div>
+
+                    <h3 style="margin-bottom: 1rem;">🏆 Top Users</h3>
+                    ${data.topUsers.map((user, idx) => `
+                        <div style="padding: 0.75rem; background: var(--background); border-left: 3px solid ${idx === 0 ? '#FFD700' : idx === 1 ? '#C0C0C0' : '#CD7F32'}; border-radius: 8px; margin-bottom: 0.5rem; display: flex; justify-content: space-between; align-items: center;">
+                            <div class="user-info">
+                                <img src="${user.picture}" alt="${user.name}" class="user-avatar">
+                                <div>
+                                    <div class="user-name">${user.name}</div>
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div><strong>${user.conversations}</strong> conversations</div>
+                                <div style="font-size: 0.875rem; color: var(--text-secondary);">${formatDuration(user.totalTime)}</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                `;
+            } catch (error) {
+                console.error('Error loading agent details:', error);
+                document.getElementById('modalContent').innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">⚠️</div>
+                        <p>Error loading agent details</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Load data on page load
+        loadAllData();
+    </script>
+
+    <!-- Shared Layout Script -->
+    <script src="/public/js/shared-layout.js"></script>
+</body>
+</html>
