@@ -865,27 +865,41 @@
 
         // Initialize
         function init() {
+            console.log('[INIT] Starting initialization...');
+            console.log('[INIT] Full URL:', window.location.href);
+            console.log('[INIT] Pathname:', window.location.pathname);
+
             // Parse URL: /{agent}/new or /{agent}/chat/{conversationId}
             const pathParts = window.location.pathname.split('/').filter(p => p);
+            console.log('[INIT] Path parts:', pathParts);
+
             const agentFromPath = pathParts[0];
             const routeType = pathParts[1]; // 'new' or 'chat'
             const conversationIdFromPath = pathParts[2];
 
+            console.log('[INIT] Parsed - Agent:', agentFromPath, 'RouteType:', routeType, 'ConvID:', conversationIdFromPath);
+
             // Set current agent
             if (AGENTS[agentFromPath]) {
                 currentAgent = agentFromPath;
+                console.log('[INIT] Set current agent to:', currentAgent);
+            } else {
+                console.warn('[INIT] Agent not found:', agentFromPath, 'Available:', Object.keys(AGENTS));
             }
 
             // If conversation ID in URL, load it
             if (routeType === 'chat' && conversationIdFromPath) {
                 conversationId = conversationIdFromPath;
+                console.log('[INIT] Loading conversation from URL:', conversationId);
                 loadConversation(conversationId);
             } else {
+                console.log('[INIT] Showing welcome screen');
                 // Show welcome screen for new chat
                 renderWelcomeScreen();
             }
 
             setupEventListeners();
+            console.log('[INIT] Initialization complete');
         }
 
         // Render welcome screen for current agent
@@ -1276,22 +1290,40 @@
 
         // Load existing conversation from server
         async function loadConversation(convId) {
+            console.log('[LOAD_CONV] Starting to load conversation:', convId);
             try {
-                const response = await fetch(`/api/conversations/${convId}`, {
+                const url = `/api/conversations/${convId}`;
+                console.log('[LOAD_CONV] Fetching from:', url);
+
+                const response = await fetch(url, {
                     credentials: 'include'
                 });
 
+                console.log('[LOAD_CONV] Response status:', response.status, response.statusText);
+
                 if (!response.ok) {
-                    console.error('Failed to load conversation');
+                    const errorText = await response.text();
+                    console.error('[LOAD_CONV] Failed to load conversation. Status:', response.status);
+                    console.error('[LOAD_CONV] Error response:', errorText);
                     renderWelcomeScreen();
                     return;
                 }
 
                 const data = await response.json();
+                console.log('[LOAD_CONV] Received data:', data);
+                console.log('[LOAD_CONV] Messages count:', data.messages?.length || 0);
 
                 // Hide welcome, show chat
-                document.getElementById('welcome-screen').classList.add('hidden');
-                document.getElementById('chat-screen').classList.remove('hidden');
+                const welcomeScreen = document.getElementById('welcome-screen');
+                const chatScreen = document.getElementById('chat-screen');
+
+                console.log('[LOAD_CONV] Welcome screen element:', welcomeScreen);
+                console.log('[LOAD_CONV] Chat screen element:', chatScreen);
+
+                welcomeScreen.classList.add('hidden');
+                chatScreen.classList.remove('hidden');
+
+                console.log('[LOAD_CONV] Toggled screen visibility');
 
                 // Render messages
                 const chatMessages = document.getElementById('chat-messages');
@@ -1299,12 +1331,17 @@
 
                 if (data.messages && data.messages.length > 0) {
                     messages = data.messages;
-                    messages.forEach(msg => {
+                    console.log('[LOAD_CONV] Rendering', messages.length, 'messages');
+                    messages.forEach((msg, idx) => {
+                        console.log(`[LOAD_CONV] Adding message ${idx + 1}:`, msg.role, msg.content.substring(0, 50));
                         addMessageToUI(msg.role, msg.content);
                     });
                 }
+
+                console.log('[LOAD_CONV] Conversation loaded successfully');
             } catch (error) {
-                console.error('Error loading conversation:', error);
+                console.error('[LOAD_CONV] Error loading conversation:', error);
+                console.error('[LOAD_CONV] Error stack:', error.stack);
                 renderWelcomeScreen();
             }
         }
