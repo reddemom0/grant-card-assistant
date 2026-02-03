@@ -481,10 +481,11 @@
             messageInput.disabled = true;
 
             try {
-                // Create conversation ID if needed
+                // Create conversation ID if needed (must be UUID for Postgres)
                 const isFirstMessage = !conversationId;
                 if (!conversationId) {
-                    conversationId = `${currentAgent}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+                    // Generate a proper UUID v4
+                    conversationId = crypto.randomUUID();
 
                     // Update URL to /agent/chat/{conversationId} on first message
                     window.history.pushState({}, '', `/${currentAgent}/chat/${conversationId}`);
