@@ -346,11 +346,10 @@ export async function handleGetConversation(req, res) {
     console.log(`🔍 Conversation belongs to user: ${conversationUserId} (type: ${typeof conversationUserId})`);
     console.log(`🔍 Current user: ${userId} (type: ${typeof userId})`);
 
-    // Verify conversation belongs to current user (handle type coercion)
-    if (conversationUserId && userId && String(conversationUserId) !== String(userId)) {
-      console.log(`❌ Unauthorized: conversation belongs to user ${conversationUserId}, not ${userId}`);
-      return res.status(403).json({ error: 'Unauthorized to access this conversation' });
-    }
+    // Allow any authenticated user to view conversations (for sharing)
+    // No authorization check - if you have the link and are logged in, you can view it
+    console.log(`✅ Allowing access to conversation ${id} for user ${userId} (sharing enabled)`);
+
 
     // Load messages for this conversation
     const { getConversationMessages } = await import('../database/messages.js');

@@ -1091,7 +1091,9 @@
             addMessageToUI('user', message);
 
             // Show thinking indicator
+            console.log('[SEND_MSG] About to add thinking indicator');
             const thinkingIndicator = addThinkingIndicator();
+            console.log('[SEND_MSG] Thinking indicator reference:', thinkingIndicator);
 
             // Create abort controller for this request
             currentAbortController = new AbortController();
@@ -1377,6 +1379,15 @@
         // Add thinking indicator to UI with animated dots
         function addThinkingIndicator() {
             const chatMessages = document.getElementById('chat-messages');
+
+            // Remove any existing thinking indicators first (defensive)
+            const existingIndicators = chatMessages.querySelectorAll('.thinking-indicator');
+            existingIndicators.forEach(indicator => {
+                console.log('[THINKING] Removing existing thinking indicator');
+                indicator.remove();
+            });
+
+            console.log('[THINKING] Adding new thinking indicator');
             const thinkingDiv = document.createElement('div');
             thinkingDiv.className = 'thinking-indicator';
             thinkingDiv.innerHTML = `
@@ -1388,6 +1399,7 @@
                 <div class="thinking-text">${AGENTS[currentAgent].name} is thinking...</div>
             `;
             chatMessages.appendChild(thinkingDiv);
+            console.log('[THINKING] Thinking indicator added to DOM');
 
             // Auto-scroll
             chatMessages.scrollTop = chatMessages.scrollHeight;
