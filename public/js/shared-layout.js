@@ -308,21 +308,27 @@
         container.innerHTML = '<div class="history-loading"><div class="history-spinner"></div><div>Loading conversations...</div></div>';
 
         try {
+            console.log('📥 Fetching conversations from /api/conversations');
             const response = await fetch('/api/conversations', {
                 credentials: 'include'
             });
 
+            console.log('📥 Response status:', response.status, response.statusText);
+
             if (!response.ok) {
-                throw new Error('Failed to load conversations');
+                const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                console.error('❌ Failed to load conversations:', errorData);
+                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
+            console.log('✅ Loaded conversations:', data);
             allConversations = data.conversations || [];
 
             renderConversations();
         } catch (error) {
             console.error('Error loading conversations:', error);
-            container.innerHTML = '<div class="history-error">Failed to load conversations. Please try again.</div>';
+            container.innerHTML = `<div class="history-error">Failed to load conversations: ${error.message}<br><br>Please check console for details.</div>`;
         }
     }
 

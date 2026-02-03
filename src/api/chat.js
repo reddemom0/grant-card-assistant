@@ -379,16 +379,22 @@ export async function handleListConversations(req, res) {
     // Get userId from authenticated session
     const userId = req.user?.id;
 
+    console.log(`\n📋 Listing conversations for user: ${userId}`);
+
     if (!userId) {
+      console.log('❌ No userId found in session');
       return res.status(401).json({
         error: 'Unauthorized: Please log in'
       });
     }
 
     const { agentType } = req.query;
+    console.log(`📋 Agent filter: ${agentType || 'all'}`);
 
     const { listConversations } = await import('../database/messages.js');
     const conversations = await listConversations(userId, agentType);
+
+    console.log(`✅ Found ${conversations.length} conversations for user ${userId}`);
 
     // Transform snake_case to camelCase for frontend
     const formattedConversations = conversations.map(conv => ({
@@ -406,8 +412,9 @@ export async function handleListConversations(req, res) {
       conversations: formattedConversations
     });
   } catch (error) {
-    console.error('List conversations error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('❌ List conversations error:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ error: error.message || 'Failed to list conversations' });
   }
 }
 
