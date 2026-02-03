@@ -20,11 +20,11 @@
             margin: 0 auto;
             padding: 4rem 2rem 8rem 2rem;
             text-align: center;
-            animation: fadeIn 0.4s ease-out;
+            animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
@@ -33,23 +33,37 @@
             height: 80px;
             margin: 0 auto 2rem;
             padding: 20px;
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.1) 0%, rgba(38, 196, 182, 0.05) 100%);
+            border: 1px solid rgba(54, 202, 250, 0.2);
             border-radius: 20px;
             color: var(--primary-cyan);
+            box-shadow: 0 8px 24px rgba(54, 202, 250, 0.15),
+                        0 0 0 1px rgba(54, 202, 250, 0.1) inset;
+            animation: iconFloat 3s ease-in-out infinite;
+        }
+
+        @keyframes iconFloat {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
         }
 
         .welcome-icon svg {
             width: 100%;
             height: 100%;
+            filter: drop-shadow(0 2px 4px rgba(54, 202, 250, 0.3));
         }
 
         .welcome-title {
             font-family: 'Montserrat', sans-serif;
-            font-size: 2.5rem;
-            font-weight: 700;
+            font-size: 2.75rem;
+            font-weight: 800;
             margin-bottom: 1rem;
-            color: var(--text-primary);
+            background: linear-gradient(135deg, var(--text-primary) 0%, var(--primary-cyan) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+            animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.1s backwards;
         }
 
         .welcome-subtitle {
@@ -57,6 +71,8 @@
             color: var(--text-secondary);
             margin-bottom: 3rem;
             line-height: 1.6;
+            font-weight: 500;
+            animation: fadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.2s backwards;
         }
 
         .welcome-prompts {
@@ -68,30 +84,78 @@
 
         .welcome-prompt {
             padding: 1.25rem;
-            background: var(--surface);
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.03) 0%, rgba(38, 196, 182, 0.02) 100%);
             border: 1px solid var(--border);
+            border-left: 3px solid transparent;
             border-radius: 12px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             text-align: left;
+            position: relative;
+            overflow: hidden;
+            animation: slideInFromBottom 0.5s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+        }
+
+        @keyframes slideInFromBottom {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .welcome-prompt:nth-child(1) { animation-delay: 0.3s; }
+        .welcome-prompt:nth-child(2) { animation-delay: 0.4s; }
+        .welcome-prompt:nth-child(3) { animation-delay: 0.5s; }
+
+        .welcome-prompt::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 3px;
+            height: 100%;
+            background: linear-gradient(180deg, var(--primary-cyan) 0%, var(--teal) 100%);
+            transform: scaleY(0);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: bottom;
         }
 
         .welcome-prompt:hover {
-            border-color: var(--primary-cyan);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(54, 202, 250, 0.15);
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.08) 0%, rgba(38, 196, 182, 0.05) 100%);
+            border-color: rgba(54, 202, 250, 0.3);
+            border-left-color: var(--primary-cyan);
+            transform: translateY(-4px) translateX(4px);
+            box-shadow: 0 8px 24px rgba(54, 202, 250, 0.2),
+                        0 0 0 1px rgba(54, 202, 250, 0.1) inset;
+        }
+
+        .welcome-prompt:hover::before {
+            transform: scaleY(1);
+            transform-origin: top;
+        }
+
+        .welcome-prompt:active {
+            transform: translateY(-2px) translateX(2px) scale(0.98);
         }
 
         .welcome-prompt-title {
-            font-weight: 600;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 0.9375rem;
             margin-bottom: 0.5rem;
-            color: var(--text);
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
         }
 
         .welcome-prompt-description {
             font-size: 0.875rem;
             color: var(--text-secondary);
             line-height: 1.5;
+            font-weight: 500;
         }
 
         /* Chat container */
@@ -116,9 +180,11 @@
             left: 240px;
             right: 0;
             padding: 1.5rem 2rem;
-            background: var(--bg);
+            background: linear-gradient(180deg, transparent 0%, var(--bg) 20%, var(--bg) 100%);
             border-top: 1px solid var(--border);
             z-index: 100;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
         }
 
         .chat-input-wrapper {
@@ -268,21 +334,35 @@
             align-items: center;
             gap: 0.75rem;
             padding: 1rem 1.25rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.05) 0%, rgba(38, 196, 182, 0.03) 100%);
+            border: 1px solid rgba(54, 202, 250, 0.2);
             border-left: 3px solid var(--primary-cyan);
             border-radius: 12px;
             margin-bottom: 1.5rem;
-            animation: messageSlideIn 0.3s ease-out;
+            animation: messageSlideIn 0.3s ease-out, pulse 2s ease-in-out infinite;
+            box-shadow: 0 4px 12px rgba(54, 202, 250, 0.1);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 4px 12px rgba(54, 202, 250, 0.1);
+                border-left-color: var(--primary-cyan);
+            }
+            50% {
+                box-shadow: 0 4px 16px rgba(54, 202, 250, 0.2);
+                border-left-color: var(--teal);
+            }
         }
 
         .thinking-spinner {
             width: 20px;
             height: 20px;
-            border: 2px solid var(--border);
+            border: 2.5px solid rgba(54, 202, 250, 0.2);
             border-top-color: var(--primary-cyan);
+            border-right-color: var(--teal);
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
+            box-shadow: 0 0 8px rgba(54, 202, 250, 0.3);
         }
 
         @keyframes spin {
@@ -292,7 +372,13 @@
         .thinking-text {
             color: var(--text-secondary);
             font-size: 0.875rem;
-            font-weight: 500;
+            font-weight: 600;
+            animation: textPulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes textPulse {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
         }
 
         .input-form {
@@ -303,64 +389,117 @@
         .message-input {
             flex: 1;
             padding: 1rem 1.25rem;
-            background: var(--surface);
+            background: rgba(54, 202, 250, 0.03);
             border: 1px solid var(--border);
             border-radius: 12px;
             font-size: 1rem;
             color: var(--text);
             font-family: inherit;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .message-input:focus {
             outline: none;
-            border-color: var(--primary-teal);
-            box-shadow: 0 0 0 3px rgba(94, 234, 212, 0.1);
+            background: rgba(54, 202, 250, 0.05);
+            border-color: var(--primary-cyan);
+            box-shadow: 0 0 0 3px rgba(54, 202, 250, 0.1),
+                        0 4px 12px rgba(54, 202, 250, 0.15);
+            transform: translateY(-1px);
         }
 
         .send-button {
             padding: 1rem 1.5rem;
-            background: var(--primary-teal);
+            background: linear-gradient(135deg, var(--primary-cyan) 0%, var(--teal) 100%);
             color: white;
             border: none;
             border-radius: 12px;
-            font-weight: 600;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(54, 202, 250, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .send-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--teal) 0%, var(--primary-cyan) 100%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
         .send-button:hover {
-            background: var(--teal-dark);
-            transform: translateY(-1px);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(54, 202, 250, 0.4);
+        }
+
+        .send-button:hover::before {
+            opacity: 1;
+        }
+
+        .send-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(54, 202, 250, 0.3);
+        }
+
+        .send-button span {
+            position: relative;
+            z-index: 1;
         }
 
         .send-button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .send-button:disabled:hover {
+            transform: none;
+            box-shadow: none;
         }
 
         /* File upload styles */
         .file-upload-button {
             padding: 0.75rem;
-            background: var(--surface);
+            background: rgba(54, 202, 250, 0.03);
             border: 1px solid var(--border);
             border-radius: 12px;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             align-items: center;
             justify-content: center;
             color: var(--text-secondary);
+            position: relative;
         }
 
         .file-upload-button:hover {
+            background: rgba(54, 202, 250, 0.08);
             border-color: var(--primary-cyan);
             color: var(--primary-cyan);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(54, 202, 250, 0.2);
+        }
+
+        .file-upload-button:active {
+            transform: translateY(0);
         }
 
         .file-upload-button svg {
             width: 20px;
             height: 20px;
+            transition: transform 0.3s ease;
+        }
+
+        .file-upload-button:hover svg {
+            transform: rotate(-12deg) scale(1.1);
         }
 
         .file-input-hidden {
@@ -379,17 +518,32 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.5rem 0.75rem;
-            background: var(--surface);
-            border: 1px solid var(--border);
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.08) 0%, rgba(38, 196, 182, 0.05) 100%);
+            border: 1px solid rgba(54, 202, 250, 0.2);
             border-radius: 8px;
             font-size: 0.875rem;
             color: var(--text-secondary);
+            font-weight: 600;
+            animation: slideInFromTop 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 8px rgba(54, 202, 250, 0.1);
+        }
+
+        @keyframes slideInFromTop {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .file-chip-icon {
             width: 16px;
             height: 16px;
             color: var(--primary-cyan);
+            filter: drop-shadow(0 1px 2px rgba(54, 202, 250, 0.3));
         }
 
         .file-chip-name {
@@ -397,18 +551,23 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            color: var(--text-primary);
         }
 
         .file-chip-remove {
             cursor: pointer;
             color: var(--text-tertiary);
-            transition: color 0.2s;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
+            padding: 0.125rem;
+            border-radius: 4px;
         }
 
         .file-chip-remove:hover {
             color: var(--coral-red);
+            background: rgba(214, 69, 80, 0.1);
+            transform: scale(1.1);
         }
 
         .file-chip-remove svg {
@@ -477,7 +636,9 @@
                     placeholder="Type your message..."
                     autocomplete="off"
                 />
-                <button type="submit" id="send-button" class="send-button">Send</button>
+                <button type="submit" id="send-button" class="send-button">
+                    <span>Send</span>
+                </button>
             </form>
         </div>
     </div>
