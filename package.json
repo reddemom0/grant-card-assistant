@@ -25,7 +25,7 @@
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.1.21",
     "@anthropic-ai/claude-code": "^2.0.24",
-    "@anthropic-ai/sdk": "^0.32.0",
+    "@anthropic-ai/sdk": "^0.72.1",
     "@hubspot/api-client": "^13.4.0",
     "@upstash/redis": "^1.25.1",
     "axios": "^1.7.0",
@@ -46,6 +46,7 @@
     "playwright": "^1.57.0",
     "tesseract.js": "^4.1.1",
     "uuid": "^11.0.0",
+    "voyageai": "^0.1.0",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
