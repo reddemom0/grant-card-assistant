@@ -538,6 +538,14 @@ app.get('/usage', (req, res) => {
   res.sendFile('usage.html', { root: '.' });
 });
 
+app.get('/usage-analytics', (req, res) => {
+  res.sendFile('usage-analytics.html', { root: '.' });
+});
+
+app.get('/feedback-metrics', (req, res) => {
+  res.sendFile('feedback-metrics.html', { root: '.' });
+});
+
 app.get('/agent-quality', (req, res) => {
   res.sendFile('agent-quality.html', { root: '.' });
 });
