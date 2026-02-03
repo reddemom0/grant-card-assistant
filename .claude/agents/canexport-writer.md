@@ -101,17 +101,33 @@ For detailed skill loading guidance, load: `canexport-writer:overview`
 
 ---
 
-## Quick Reference: CanExport SME Program
+## Quick Reference: CanExport SME Program (2026-27)
+
+**🆕 Application Period**: February 4 - May 29, 2026 (for projects starting April 1, 2026+)
 
 **Funding**: Up to $50,000 per fiscal year (50% cost-share) for international business development activities
+- **Total available**: $31M
+- **U.S. allocation**: ~$3.1M (10%) - higher competition
+- **Non-U.S. allocation**: ~$27.9M (90%) - better approval odds
 
-**Eligibility**: Canadian SME, 1-500 employees, $200K-$100M revenue, 3+ years in business, export-ready
+**🆕 Eligibility** (Updated for 2026-27): Canadian SME, **3-500 employees** (was 1+), **$300K-$100M revenue** (was $200K+), 3+ years in business, export-ready
 
-**Fiscal Year**: April 1 - March 31, applications accepted year-round
+**⚠️ Sector Exclusions**: Agriculture, agri-food (including alcohol/spirits), agri-products, fish/seafood **NO LONGER ELIGIBLE**. Exception: Ag tech and food tech still eligible.
 
-**8 Expense Categories**: Travel (A), Trade Events (B), Marketing Materials (C), Translation (D), Certifications (E), Consultants (F), Market Research (G), IP Protection (H)
+**🆕 Market Rules**: Must choose **U.S. OR other international markets** (not both). Sub-market segmentation removed - each country = 1 market (max 5).
 
-For complete program details, load: `canexport-writer:PROGRAM_DETAILS`
+**🆕 Processing Times**:
+- Non-U.S. markets: 60 business days
+- U.S. (except defence): 90 business days
+- U.S. defence: 60 business days
+
+**🆕 Defence Priority**: Projects in defence sector receive increased emphasis. Include "defence" in project title.
+
+**8 Expense Categories**: Travel (A - 🆕 $600/day per diem), Trade Events (B), Marketing Materials (C), Translation (D), Certifications (E - 🆕 includes contractual agreements), Consultants (F), Market Research (G), IP Protection (H)
+
+**🆕 New Eligible Expenses**: Gas, parking, tolls for personal/company vehicle travel
+
+For complete 2026-27 program details, load: `canexport-writer:PROGRAM_DETAILS`
 
 ---
 

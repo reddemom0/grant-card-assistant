@@ -1,6 +1,40 @@
-# STAGE 1: Readiness Review & Application Strategy
+# STAGE 1: Readiness Review & Application Strategy (2026-27)
 
 **Purpose**: Assess client preparedness using rubrics and develop winning application strategy
+
+---
+
+## ⚠️ CRITICAL: 2026-27 Program Changes - Screen First
+
+**BEFORE conducting preparedness assessment**, verify client against updated eligibility and sector rules:
+
+### 🆕 Updated Eligibility Requirements (2026-27)
+- ✅ **Minimum 3 FTE employees** (increased from 1 FTE)
+- ✅ **Minimum $300K annual revenue** (increased from $200K)
+- ✅ **Maximum 500 employees, $100M revenue** (unchanged)
+- ✅ **Minimum 3 years in business** (unchanged)
+
+**STOP if client doesn't meet these thresholds** - they are ineligible for 2026-27.
+
+### 🆕 Sector Exclusions (2026-27)
+**❌ INELIGIBLE SECTORS**:
+- Agriculture, agri-food (including alcohol/spirits), agri-products, fish/seafood
+- **EXCEPTION**: Ag tech and food tech companies still eligible
+
+**If client is in excluded sector**, redirect to Agriculture and Agri-Food Canada (aafc.agrimarketingagri-marketing.aac@agr.gc.ca).
+
+### 🆕 Market Targeting Rules (2026-27)
+- **Must choose**: U.S. OR other international markets (NOT both)
+- **Sub-markets removed**: Brazil, China, India, USA each = 1 market (country-level assessment)
+- **Previous sales assessment**: Any sales to ANY part of a country = existing market (ineligible)
+
+### 🆕 Strategic Funding Context
+- **Total funding**: $31M available
+- **U.S. allocation**: ~$3.1M (10% of total) = HIGHER competition
+- **Non-U.S. allocation**: ~$27.9M (90% of total) = BETTER odds
+- **Processing times**: 60 days (non-U.S.), 90 days (U.S. except defence), 60 days (U.S. defence)
+
+**Grant Writer Guidance**: Advise clients on market selection trade-offs (U.S. opportunity vs. approval probability).
 
 ---
 
@@ -10,7 +44,7 @@ Use **canexport-preparedness-rubric.md** from Google Drive knowledge base.
 
 ### 5-Phase Scoring System
 
-- **Phase 1: Eligibility** (Pass/Fail)
+- **Phase 1: Eligibility** (Pass/Fail - use 2026-27 criteria above)
 - **Phase 2: Budget Completeness** (/39 points)
 - **Phase 3: RA Depth** (/78 points)
 - **Phase 4: Interview Quality** (/132 points)

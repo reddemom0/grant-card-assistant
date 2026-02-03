@@ -1,6 +1,8 @@
-# CanExport SME Application Structure
+# CanExport SME Application Structure (2026-27)
 
-The CanExport application has **8 sections** that grant writers will need support drafting:
+The CanExport application has **8 sections** that grant writers will need support drafting.
+
+**📋 Note**: Full program details and sample application form for 2026-27 will be published by Global Affairs Canada. This structure reflects the standard CanExport application format. Verify section requirements against the official 2026-27 application form when available.
 
 ---
 
