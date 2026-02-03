@@ -519,30 +519,45 @@
                 }
 
                 // Read streaming response
+                console.log('[DEBUG] Starting to read stream...');
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let assistantMessage = '';
                 let messageElement = null;
+                let chunkCount = 0;
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
+                    chunkCount++;
+                    console.log(`[DEBUG] Chunk ${chunkCount}: done=${done}, bytes=${value?.length || 0}`);
+
+                    if (done) {
+                        console.log('[DEBUG] Stream ended, total message length:', assistantMessage.length);
+                        break;
+                    }
 
                     const chunk = decoder.decode(value);
+                    console.log(`[DEBUG] Chunk text:`, chunk.substring(0, 100));
                     const lines = chunk.split('\n');
 
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             const data = line.slice(6);
-                            if (data === '[DONE]') continue;
+                            if (data === '[DONE]') {
+                                console.log('[DEBUG] Received [DONE] signal');
+                                continue;
+                            }
 
                             try {
                                 const parsed = JSON.parse(data);
+                                console.log('[DEBUG] Parsed SSE event:', parsed.type);
+
                                 if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
                                     assistantMessage += parsed.delta.text;
 
                                     // Create or update message element
                                     if (!messageElement) {
+                                        console.log('[DEBUG] Creating assistant message element');
                                         messageElement = addMessageToUI('assistant', '');
                                     }
                                     messageElement.querySelector('.message-content').textContent = assistantMessage;
@@ -552,10 +567,19 @@
                                     chatMessages.scrollTop = chatMessages.scrollHeight;
                                 }
                             } catch (e) {
-                                // Ignore parse errors
+                                console.error('[DEBUG] Parse error:', e, 'for line:', line);
                             }
                         }
                     }
+                }
+
+                // If no message element was created, show the collected message (defensive programming)
+                if (!messageElement && assistantMessage) {
+                    console.log('[DEBUG] Creating message element after stream ended');
+                    addMessageToUI('assistant', assistantMessage);
+                } else if (!messageElement && !assistantMessage) {
+                    console.error('[DEBUG] No assistant message received!');
+                    addMessageToUI('assistant', 'No response received from the assistant.');
                 }
             } catch (error) {
                 console.error('Error sending message:', error);
@@ -628,7 +652,7 @@
         }
 
         // Log version for debugging
-        console.log('[VERSION] unified-agents.html v2026-02-03-13:00 loaded');
+        console.log('[VERSION] unified-agents.html v2026-02-03-13:15 (with stream debugging) loaded');
     </script>
 </body>
 </html>
