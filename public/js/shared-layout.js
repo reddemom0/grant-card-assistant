@@ -363,10 +363,11 @@
                 html += `<div class="history-group-title">${agentName}</div>`;
             }
 
-            conversations.forEach(conv => {
+            conversations.forEach((conv, index) => {
                 const timeAgo = formatTimeAgo(conv.updatedAt || conv.createdAt);
+                const delay = index * 0.05; // Stagger by 50ms
                 html += `
-                    <div class="history-item" onclick="loadHistoryConversation('${conv.id}', '${conv.agentType}')">
+                    <div class="history-item" onclick="loadHistoryConversation('${conv.id}', '${conv.agentType}')" style="animation-delay: ${delay}s">
                         <div class="history-item-title">${conv.title}</div>
                         <div class="history-item-meta">
                             <span>${conv.messageCount} messages</span>
