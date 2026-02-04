@@ -23,7 +23,7 @@ const DROPBOX_NAMESPACE_ID = process.env.DROPBOX_NAMESPACE_ID;
 
 // Token refresh logic
 let currentAccessToken = DROPBOX_ACCESS_TOKEN;
-let tokenExpiry = Date.now() + 14400000; // 4 hours from now (default)
+let tokenExpiry = 0; // Start expired to force refresh on first use
 
 /**
  * Refresh access token using refresh token
