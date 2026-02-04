@@ -91,8 +91,11 @@ app.get('/search-grants', searchGrantsEndpoint);
 // Generate embeddings endpoint (one-time setup for RAG)
 app.get('/generate-embeddings', async (req, res) => {
   try {
-    // Simple secret-based auth for one-time operations
-    if (req.query.secret !== process.env.JWT_SECRET) {
+    // Simple secret-based auth for one-time operations (trim to handle whitespace)
+    const receivedSecret = req.query.secret?.trim();
+    const expectedSecret = process.env.JWT_SECRET?.trim();
+
+    if (receivedSecret !== expectedSecret) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
