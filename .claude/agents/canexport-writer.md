@@ -103,31 +103,120 @@ For detailed skill loading guidance, load: `canexport-writer:overview`
 
 ## Quick Reference: CanExport SME Program (2026-27)
 
-**🆕 Application Period**: February 4 - May 29, 2026 (for projects starting April 1, 2026+)
+### Application Window & Assessment
+**Application Period**: February 4 - May 29, 2026 at 12:00pm ET
+- **Assessment**: Rolling competitive basis while funding available
+- **Decision Timeline**:
+  - Non-U.S. markets: 60 business days
+  - U.S. markets (non-defence): 90 business days
+  - U.S. defence sector: 60 business days
 
-**Funding**: Up to $50,000 per fiscal year (50% cost-share) for international business development activities
-- **Total available**: $31M
-- **U.S. allocation**: ~$3.1M (10%) - higher competition
-- **Non-U.S. allocation**: ~$27.9M (90%) - better approval odds
+**How Applications Are Assessed**:
+- Feasibility of proposed activities
+- Adherence to program guidelines
+- Alignment with program objectives and Government's trade diversification goals
+- **Key Success Factors**: Readiness, clear export strategy, specific activities tied to outcomes, evidence-based planning, coherent market development plan
 
-**🆕 Eligibility** (Updated for 2026-27): Canadian SME, **3-500 employees** (was 1+), **$300K-$100M revenue** (was $200K+), 3+ years in business, export-ready
+### Funding & Allocation
+Up to $50,000 per fiscal year (50% cost-share)
+- **Total available**: $31M CAD
+- **U.S. allocation**: ~$3.1M (10%) - higher competition, longer processing
+- **Non-U.S. allocation**: ~$27.9M (90%) - priority focus for trade diversification
+- **Strategic Priority**: Support Canada's goal to **double non-U.S. exports over next decade**
 
-**⚠️ Sector Exclusions**: Agriculture, agri-food (including alcohol/spirits), agri-products, fish/seafood **NO LONGER ELIGIBLE**. Exception: Ag tech and food tech still eligible.
+### Eligibility Requirements (Updated 2026-27)
+**Company Requirements**:
+- Canadian incorporated entity, LLP, or cooperative
+- **3-500 full-time employees** (increased from 1-500)
+- **$300K-$100M annual revenue** (increased from $100K-$100M)
+- Active CRA business number
+- Must **demonstrate meaningful economic ties to Canada** (products/services of Canadian origin or Canadian value-add)
+- Must own goods/services for export
 
-**🆕 Market Rules**: Must choose **U.S. OR other international markets** (not both). Sub-market segmentation removed - each country = 1 market (max 5).
+**Ineligible Business Types**:
+- Sole proprietorships, limited partnerships
+- Third-party representatives (agents, distributors, wholesalers, franchisees)
+- Trading houses and export brokers (except agriculture/agri-food sector - but sector now excluded anyway)
 
-**🆕 Processing Times**:
-- Non-U.S. markets: 60 business days
-- U.S. (except defence): 90 business days
-- U.S. defence: 60 business days
+### Sector Guidelines (Major Changes for 2026-27)
 
-**🆕 Defence Priority**: Projects in defence sector receive increased emphasis. Include "defence" in project title.
+**❌ NO LONGER ELIGIBLE**:
+- Agriculture, agri-food (including alcohol/spirits), agri-products
+- Fish and seafood
+- **Refer to Agriculture Canada**: aafc.agrimarketingagri-marketing.aac@agr.gc.ca
 
-**8 Expense Categories**: Travel (A - 🆕 $600/day per diem), Trade Events (B), Marketing Materials (C), Translation (D), Certifications (E - 🆕 includes contractual agreements), Consultants (F), Market Research (G), IP Protection (H)
+**✅ STILL ELIGIBLE**:
+- **AgTech and FoodTech** sectors (technology companies, not commodity producers)
 
-**🆕 New Eligible Expenses**: Gas, parking, tolls for personal/company vehicle travel
+**✅ PRIORITIZED**:
+- **Defence and dual-use** sectors - include "defence" in project title for priority processing
 
-For complete 2026-27 program details, load: `canexport-writer:PROGRAM_DETAILS`
+**❌ EXCLUDED**:
+- Unabated fossil fuels (extraction, production, transportation, refining, marketing, power generation)
+- Recreational cannabis, tobacco, vaping
+- **✅ Medical cannabis allowed** (must demonstrate medical use and policy compliance)
+
+**⚠️ ADDITIONAL ASSESSMENT**:
+- Trade disputes and trade remedy sectors (may be declined)
+
+### Market Selection Rules (U.S. Exclusivity)
+
+**CRITICAL RULE**: Cannot mix U.S. with other markets
+- **U.S.-only projects**: Can only target U.S., no other markets allowed
+- **Non-U.S. projects**: Cannot include U.S. as a target market
+
+**Market Definition Changes**:
+- **Sub-market segmentation REMOVED**: Brazil, China, India, U.S. each = 1 market (was subdivided in prior years)
+- Maximum 5 target markets per project
+- "New" market = <$100K sales OR <10% of total sales in last tax year
+- Each market must be a specific country, not continent/region
+
+**Strategic Focus**: Strong emphasis on **export diversification** to non-U.S. markets
+
+### Eligible Expenses (8 Categories)
+
+**Category A - Travel** (🆕 changes):
+- $600/day per diem (increased from $400)
+- Max 90 days total, 30 days per trip
+- 2 travelers max
+- **🆕 NEW**: Gas, parking, tolls for personal/company vehicle
+- **🆕 CLARIFIED**: Training costs eligible if providing presentation/demo as part of market-entry process
+
+**Category B - Trade Events**:
+- **Must be in-person** (virtual NO LONGER eligible)
+- 2 travelers, booth costs, shipping demos (must return to Canada)
+- **🆕 CHANGED**: Advertising/sponsorship limited to lowest tier that includes event visibility
+
+**Category C - Marketing Materials**:
+- **🆕 NARROWED**: Website adaptation = translation only (landing pages no longer eligible)
+- Creation/translation of promotional materials
+
+**Category D - Interpretation**: In-person only
+
+**Category E - Contractual Agreements** (🆕 expanded):
+- **🆕 NEW**: Creation of contracts (was only adaptation/translation before)
+- Translation of contracts
+- Supplier diversity certification
+
+**Category F - Business/Tax/Legal Consultants**:
+- Expert advice on international business, tax, legal, regulatory matters
+- **Must be advice only**, not implementation
+
+**Category G - Market Research/B2B**:
+- Feasibility studies, lead generation, B2B matchmaking, contact lists
+- **🆕 CLARIFIED**: In-market representatives NOT eligible (defined as consultants executing strategies/managing on-ground activities)
+
+**Category H - IP Protection**: Patent/trademark filing, IP strategy
+
+### Program Integrity (Strengthened Requirements)
+- Must disclose all pre-existing relationships (consultants, service providers, foreign partners)
+- Failure to disclose may result in rejection or termination
+- Program may verify/validate information at any stage
+
+### Buy Canadian Policy
+Applicants encouraged to align with federal Buy Canadian Policy (prioritize Canadian suppliers, content, materials)
+
+For complete 2026-27 program details and skills, load: `canexport-writer:PROGRAM_DETAILS`
 
 ---
 
