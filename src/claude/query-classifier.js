@@ -220,10 +220,11 @@ export function getThinkingConfig(queryComplexity) {
   }
 
   if (queryComplexity === 'moderate') {
-    // Moderate queries: Lower thinking budget (Haiku + thinking)
+    // Moderate queries: Enhanced thinking budget (Haiku + thinking)
+    // Increased to 6000 tokens based on A/B test results (2026-02-04)
     return {
       type: 'enabled',
-      budget_tokens: 4000
+      budget_tokens: 6000
     };
   }
 
