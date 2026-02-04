@@ -135,14 +135,67 @@ export async function runAgent({
     // ============================================================================
 
     console.log(`💬 Loading conversation history...`);
-    const { getConversationMessages } = await import('../database/messages.js');
+    const {
+      getConversationMessages,
+      getCompactionSummary,
+      saveCompactionSummary,
+      deleteOldMessages
+    } = await import('../database/messages.js');
 
     // Get max turns for this agent (cost optimization)
     const maxTurns = getMaxTurnsForAgent(agentType);
     const maxMessages = maxTurns * 2; // Each turn = user + assistant message
 
-    const history = await getConversationMessages(conversationId, maxMessages);
+    let history = await getConversationMessages(conversationId, maxMessages);
     console.log(`✓ Loaded ${history.length} previous messages (max: ${maxMessages})`);
+
+    // ============================================================================
+    // 3.5. AUTO-COMPACTION: Check if conversation needs summarization
+    // ============================================================================
+
+    // Load existing summary if any
+    const existingSummary = await getCompactionSummary(conversationId);
+
+    // Check if compaction is needed
+    const { shouldCompact, compactConversation, formatSummary } = await import('../utils/conversation-compaction.js');
+    const { needsCompaction, estimatedTokens } = shouldCompact(history, existingSummary);
+
+    let conversationSummary = existingSummary;
+
+    if (needsCompaction) {
+      console.log(`🗜️  Conversation exceeds threshold (${estimatedTokens.toLocaleString()} tokens) - triggering auto-compaction`);
+
+      // Compact the conversation
+      const compactionResult = await compactConversation(history, agentType);
+
+      if (compactionResult.summarizedCount > 0) {
+        // Save the summary to database
+        await saveCompactionSummary(
+          conversationId,
+          compactionResult.summary,
+          compactionResult.metadata
+        );
+
+        // Delete old messages from database (keep only recent ones)
+        await deleteOldMessages(conversationId, compactionResult.keptMessages.length);
+
+        // Update conversation history to use only kept messages
+        history = compactionResult.keptMessages;
+        conversationSummary = {
+          content: compactionResult.summary,
+          metadata: compactionResult.metadata
+        };
+
+        console.log(`✓ Compaction complete: ${compactionResult.summarizedCount} messages summarized, ${history.length} kept`);
+      }
+    }
+
+    // Add summary to system blocks if it exists (will be prepended to memories)
+    let summaryForSystem = null;
+    if (conversationSummary) {
+      summaryForSystem = formatSummary(conversationSummary.content);
+      console.log(`✓ Including conversation summary (${Math.ceil(conversationSummary.content.length / 4).toLocaleString()} tokens estimated)`);
+    }
 
     // ============================================================================
     // 4. Build user message with attachments
@@ -260,7 +313,7 @@ export async function runAgent({
       // Build system blocks (CACHE FIX: Separate cacheable from non-cacheable)
       // ============================================================================
       // Only the base agent prompt is cached (shared across all conversations)
-      // Memories and learning are conversation/user-specific (NOT cached)
+      // Summary, memories, and learning are conversation/user-specific (NOT cached)
       // This prevents creating a new cache for every conversation
 
       const systemBlocks = [
@@ -270,6 +323,15 @@ export async function runAgent({
           cache_control: { type: 'ephemeral' }  // ✅ CACHED (reused across conversations)
         }
       ];
+
+      // Add conversation summary (if present) - NOT CACHED
+      // Summary contains condensed history of old messages
+      if (summaryForSystem) {
+        systemBlocks.push({
+          type: 'text',
+          text: summaryForSystem  // ❌ NOT CACHED (conversation-specific)
+        });
+      }
 
       // Add conversation memories (if present) - NOT CACHED
       if (memories) {

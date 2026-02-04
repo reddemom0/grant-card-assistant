@@ -338,3 +338,113 @@ export async function getMessageCount(conversationId) {
     throw error;
   }
 }
+
+// ============================================================================
+// CONVERSATION COMPACTION FUNCTIONS
+// ============================================================================
+
+/**
+ * Save a compaction summary for a conversation
+ * @param {string} conversationId - UUID of the conversation
+ * @param {string} summary - Summary text
+ * @param {Object} metadata - Metadata about the compaction (tokens saved, etc.)
+ * @returns {Promise<Object>} Saved summary record
+ */
+export async function saveCompactionSummary(conversationId, summary, metadata = {}) {
+  try {
+    // First, check if a summary already exists
+    const existingResult = await query(
+      `SELECT id FROM conversation_summaries WHERE conversation_id = $1`,
+      [conversationId]
+    );
+
+    let result;
+    if (existingResult.rows.length > 0) {
+      // Update existing summary
+      result = await query(
+        `UPDATE conversation_summaries
+         SET summary = $2, metadata = $3, updated_at = NOW()
+         WHERE conversation_id = $1
+         RETURNING *`,
+        [conversationId, summary, JSON.stringify(metadata)]
+      );
+      console.log(`✓ Updated compaction summary for conversation ${conversationId}`);
+    } else {
+      // Create new summary
+      result = await query(
+        `INSERT INTO conversation_summaries (conversation_id, summary, metadata)
+         VALUES ($1, $2, $3)
+         RETURNING *`,
+        [conversationId, summary, JSON.stringify(metadata)]
+      );
+      console.log(`✓ Created compaction summary for conversation ${conversationId}`);
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error('Error saving compaction summary:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get the compaction summary for a conversation
+ * @param {string} conversationId - UUID of the conversation
+ * @returns {Promise<Object|null>} Summary object or null
+ */
+export async function getCompactionSummary(conversationId) {
+  try {
+    const result = await query(
+      `SELECT summary, metadata, created_at, updated_at
+       FROM conversation_summaries
+       WHERE conversation_id = $1`,
+      [conversationId]
+    );
+
+    if (result.rows.length === 0) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      content: row.summary,
+      metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
+  } catch (error) {
+    console.error('Error retrieving compaction summary:', error);
+    throw error;
+  }
+}
+
+/**
+ * Delete old messages after compaction
+ * Keeps recent messages and deletes the rest
+ * @param {string} conversationId - UUID of the conversation
+ * @param {number} keepCount - Number of recent messages to keep
+ * @returns {Promise<number>} Number of messages deleted
+ */
+export async function deleteOldMessages(conversationId, keepCount) {
+  try {
+    // Delete all but the most recent N messages
+    const result = await query(
+      `DELETE FROM messages
+       WHERE conversation_id = $1
+       AND id NOT IN (
+         SELECT id FROM messages
+         WHERE conversation_id = $1
+         ORDER BY created_at DESC
+         LIMIT $2
+       )`,
+      [conversationId, keepCount]
+    );
+
+    const deletedCount = result.rowCount;
+    console.log(`✓ Deleted ${deletedCount} old messages from conversation ${conversationId}`);
+    return deletedCount;
+  } catch (error) {
+    console.error('Error deleting old messages:', error);
+    throw error;
+  }
+}
