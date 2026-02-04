@@ -382,6 +382,11 @@ export async function saveCompactionSummary(conversationId, summary, metadata = 
 
     return result.rows[0];
   } catch (error) {
+    // Handle missing table gracefully (42P01 = relation does not exist)
+    if (error.code === '42P01') {
+      console.warn('⚠️ conversation_summaries table does not exist, skipping save');
+      return null;
+    }
     console.error('Error saving compaction summary:', error);
     throw error;
   }
@@ -413,6 +418,11 @@ export async function getCompactionSummary(conversationId) {
       updatedAt: row.updated_at
     };
   } catch (error) {
+    // Handle missing table gracefully (42P01 = relation does not exist)
+    if (error.code === '42P01') {
+      console.warn('⚠️ conversation_summaries table does not exist, returning null');
+      return null;
+    }
     console.error('Error retrieving compaction summary:', error);
     throw error;
   }
