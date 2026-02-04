@@ -363,10 +363,27 @@ async function main() {
 
       stats.totalFiles += filtered.length;
 
-      for (let i = 0; i < filtered.length; i++) {
-        console.log(`\n[${i + 1}/${filtered.length}] ${Math.round((i / filtered.length) * 100)}%`);
-        await processFile(filtered[i], folder.path.split('/').pop());
-        await new Promise(resolve => setTimeout(resolve, 100)); // Rate limit pause
+      // Process in batches to avoid memory buildup
+      const BATCH_SIZE = 50;
+      for (let batchStart = 0; batchStart < filtered.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, filtered.length);
+        const batch = filtered.slice(batchStart, batchEnd);
+
+        console.log(`\n🔄 Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(filtered.length / BATCH_SIZE)} (files ${batchStart + 1}-${batchEnd})`);
+
+        for (let i = 0; i < batch.length; i++) {
+          const fileIndex = batchStart + i;
+          console.log(`\n[${fileIndex + 1}/${filtered.length}] ${Math.round((fileIndex / filtered.length) * 100)}%`);
+          await processFile(batch[i], folder.path.split('/').pop());
+          await new Promise(resolve => setTimeout(resolve, 100)); // Rate limit pause
+        }
+
+        // Force garbage collection between batches
+        if (global.gc) {
+          global.gc();
+          console.log(`   🗑️  Memory cleared after batch`);
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000)); // Pause between batches
       }
     }
 
