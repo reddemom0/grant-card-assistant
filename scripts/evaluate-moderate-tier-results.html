@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Moderate Tier Evaluation - Blind A/B Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      color: #333;
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 10px;
+    }
+
+    .instructions {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      padding: 15px;
+      margin-bottom: 30px;
+    }
+
+    .instructions h3 {
+      margin-top: 0;
+      color: #92400e;
+    }
+
+    .test-case {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .query {
+      font-size: 18px;
+      font-weight: 600;
+      color: #1f2937;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #eff6ff;
+      border-left: 4px solid #2563eb;
+    }
+
+    .responses {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .response {
+      border: 2px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 15px;
+      background: #fafafa;
+    }
+
+    .response h4 {
+      margin: 0 0 10px 0;
+      color: #6b7280;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .response-content {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #374151;
+      white-space: pre-wrap;
+      max-height: 400px;
+      overflow-y: auto;
+      background: white;
+      padding: 10px;
+      border-radius: 4px;
+    }
+
+    .tool-calls {
+      margin-top: 10px;
+      padding: 10px;
+      background: #f0fdf4;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .tool-call {
+      margin: 5px 0;
+      padding: 5px;
+      background: white;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+
+    .evaluation {
+      border-top: 2px solid #e5e7eb;
+      padding-top: 20px;
+    }
+
+    .evaluation h3 {
+      color: #1f2937;
+      margin-bottom: 15px;
+    }
+
+    .question {
+      background: #fef2f2;
+      border-left: 4px solid #dc2626;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 4px;
+    }
+
+    .question p {
+      margin: 0 0 10px 0;
+      font-weight: 600;
+      color: #991b1b;
+    }
+
+    .rating {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .rating label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      padding: 8px 12px;
+      border: 2px solid #e5e7eb;
+      border-radius: 4px;
+      transition: all 0.2s;
+    }
+
+    .rating label:hover {
+      border-color: #2563eb;
+      background: #eff6ff;
+    }
+
+    .rating input:checked + span {
+      font-weight: 700;
+      color: #2563eb;
+    }
+
+    .rating input {
+      margin: 0;
+    }
+
+    .save-button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 30px;
+    }
+
+    .save-button:hover {
+      background: #1d4ed8;
+    }
+
+    .stats {
+      background: #f0fdf4;
+      border: 2px solid #10b981;
+      border-radius: 8px;
+      padding: 20px;
+      margin-top: 30px;
+    }
+
+    .stats h3 {
+      margin-top: 0;
+      color: #065f46;
+    }
+  </style>
+</head>
+<body>
+  <h1>🧪 Moderate Tier Quality Evaluation</h1>
+
+  <div class="instructions">
+    <h3>📋 Evaluation Instructions</h3>
+    <p><strong>Goal:</strong> Determine if Haiku+thinking can match Sonnet quality for moderate-complexity Oracle queries.</p>
+
+    <p><strong>This is a blind test.</strong> Response A and Response B are randomly assigned - one is Haiku, one is Sonnet. You won't know which is which until you save your results.</p>
+
+    <p><strong>Key Question (Actionability):</strong><br>
+    "Would you trust this response enough to act on it without checking?"</p>
+
+    <ul>
+      <li><strong>5 - Highly Actionable:</strong> Complete, accurate, I'd act on this immediately</li>
+      <li><strong>4 - Mostly Actionable:</strong> Good quality, might double-check one thing</li>
+      <li><strong>3 - Somewhat Actionable:</strong> Decent but I'd need to verify key points</li>
+      <li><strong>2 - Barely Actionable:</strong> Incomplete or concerning gaps, significant checking needed</li>
+      <li><strong>1 - Not Actionable:</strong> Wrong approach, missing critical info, can't trust this</li>
+    </ul>
+
+    <p><strong>What to look for:</strong></p>
+    <ul>
+      <li>Did it identify the right information sources?</li>
+      <li>Are the tool calls appropriate and complete?</li>
+      <li>Does the approach make sense for this query?</li>
+      <li>Would the output (if tools were executed) be useful?</li>
+    </ul>
+
+    <p><strong>⚠️ Watch for shallow reasoning:</strong></p>
+    <p>For boundary-case queries (research + judgment), a response might <em>answer</em> the question but with shallow reasoning. Score based on <strong>"is the reasoning sound enough to trust"</strong> not just "did it answer the question."</p>
+    <p><strong>Example:</strong><br>
+    ❌ Shallow: "Yes, good fit for IRAP because they're in tech and have 20 employees"<br>
+    ✅ Sound: "Needs verification: IRAP requires Canadian-controlled, 2+ employees (✓), eligible R&D activities (need to confirm), experimental development approach (need project details)"</p>
+  </div>
+
+  <div id="test-cases">
+    <!-- Test cases will be loaded here -->
+  </div>
+
+  <div class="stats" id="stats" style="display: none;">
+    <h3>📊 Evaluation Summary</h3>
+    <div id="stats-content"></div>
+  </div>
+
+  <button class="save-button" onclick="saveResults()">💾 Save Results & Reveal Models</button>
+
+  <script>
+    let testData = [];
+    let evaluations = [];
+
+    // Load test results
+    function loadResults() {
+      // In production, this would load from the JSON file
+      // For now, prompt user to paste results
+      const input = prompt('Paste the contents of moderate-tier-test-results.json:');
+
+      if (input) {
+        try {
+          testData = JSON.parse(input);
+          renderTestCases();
+        } catch (e) {
+          alert('Error parsing JSON: ' + e.message);
+        }
+      }
+    }
+
+    // Randomly assign A/B to avoid bias
+    function randomizeResponses(haiku, sonnet) {
+      return Math.random() > 0.5
+        ? { A: haiku, B: sonnet, AisHaiku: true }
+        : { A: sonnet, B: haiku, AisHaiku: false };
+    }
+
+    // Render test cases
+    function renderTestCases() {
+      const container = document.getElementById('test-cases');
+      container.innerHTML = '';
+
+      testData.forEach((test, index) => {
+        const { A, B, AisHaiku } = randomizeResponses(test.haiku, test.sonnet);
+
+        const caseDiv = document.createElement('div');
+        caseDiv.className = 'test-case';
+        caseDiv.innerHTML = `
+          <div class="query">Query ${index + 1}: ${test.query}</div>
+
+          <div class="responses">
+            <div class="response">
+              <h4>Response A</h4>
+              <div class="response-content">${A.responseText || '(No response text)'}</div>
+              ${A.toolCalls && A.toolCalls.length > 0 ? `
+                <div class="tool-calls">
+                  <strong>Tool Calls:</strong>
+                  ${A.toolCalls.map(t => `
+                    <div class="tool-call">${t.name}(${JSON.stringify(t.input, null, 2)})</div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+
+            <div class="response">
+              <h4>Response B</h4>
+              <div class="response-content">${B.responseText || '(No response text)'}</div>
+              ${B.toolCalls && B.toolCalls.length > 0 ? `
+                <div class="tool-calls">
+                  <strong>Tool Calls:</strong>
+                  ${B.toolCalls.map(t => `
+                    <div class="tool-call">${t.name}(${JSON.stringify(t.input, null, 2)})</div>
+                  `).join('')}
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="evaluation">
+            <h3>Evaluate Actionability</h3>
+
+            <div class="question">
+              <p>Response A: "Would you trust this enough to act on it without checking?"</p>
+              <div class="rating">
+                ${[5, 4, 3, 2, 1].map(score => `
+                  <label>
+                    <input type="radio" name="scoreA_${index}" value="${score}" onchange="updateEvaluation(${index}, 'A', ${score})">
+                    <span>${score}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="question">
+              <p>Response B: "Would you trust this enough to act on it without checking?"</p>
+              <div class="rating">
+                ${[5, 4, 3, 2, 1].map(score => `
+                  <label>
+                    <input type="radio" name="scoreB_${index}" value="${score}" onchange="updateEvaluation(${index}, 'B', ${score})">
+                    <span>${score}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+
+        container.appendChild(caseDiv);
+
+        // Store randomization for later reveal
+        evaluations[index] = {
+          query: test.query,
+          AisHaiku,
+          scoreA: null,
+          scoreB: null
+        };
+      });
+    }
+
+    // Update evaluation scores
+    function updateEvaluation(index, response, score) {
+      if (response === 'A') {
+        evaluations[index].scoreA = score;
+      } else {
+        evaluations[index].scoreB = score;
+      }
+
+      checkCompletion();
+    }
+
+    // Check if all evaluations are complete
+    function checkCompletion() {
+      const allScored = evaluations.every(e => e.scoreA !== null && e.scoreB !== null);
+
+      if (allScored) {
+        showStats();
+      }
+    }
+
+    // Show statistics
+    function showStats() {
+      const statsDiv = document.getElementById('stats');
+      const statsContent = document.getElementById('stats-content');
+
+      let haikuScores = [];
+      let sonnetScores = [];
+
+      evaluations.forEach(e => {
+        if (e.AisHaiku) {
+          haikuScores.push(e.scoreA);
+          sonnetScores.push(e.scoreB);
+        } else {
+          haikuScores.push(e.scoreB);
+          sonnetScores.push(e.scoreA);
+        }
+      });
+
+      const avgHaiku = haikuScores.reduce((a, b) => a + b, 0) / haikuScores.length;
+      const avgSonnet = sonnetScores.reduce((a, b) => a + b, 0) / sonnetScores.length;
+
+      const haikuWins = evaluations.filter((e, i) =>
+        (e.AisHaiku && e.scoreA > e.scoreB) || (!e.AisHaiku && e.scoreB > e.scoreA)
+      ).length;
+
+      const sonnetWins = evaluations.filter((e, i) =>
+        (e.AisHaiku && e.scoreB > e.scoreA) || (!e.AisHaiku && e.scoreA > e.scoreB)
+      ).length;
+
+      const ties = evaluations.filter(e => e.scoreA === e.scoreB).length;
+
+      statsContent.innerHTML = `
+        <p><strong>Average Actionability Score:</strong></p>
+        <ul>
+          <li>Haiku+thinking: ${avgHaiku.toFixed(2)}/5</li>
+          <li>Sonnet+thinking: ${avgSonnet.toFixed(2)}/5</li>
+        </ul>
+
+        <p><strong>Head-to-Head:</strong></p>
+        <ul>
+          <li>Haiku wins: ${haikuWins}</li>
+          <li>Sonnet wins: ${sonnetWins}</li>
+          <li>Ties: ${ties}</li>
+        </ul>
+
+        <p><strong>Decision Criteria:</strong></p>
+        <ul>
+          <li>✅ Ship moderate tier if: Haiku avg ≥ 4.0 AND Haiku wins/ties ≥ 80%</li>
+          <li>⚠️  Needs tuning if: Haiku avg 3.5-4.0</li>
+          <li>❌ Default to complex if: Haiku avg < 3.5 OR Haiku wins/ties < 70%</li>
+        </ul>
+
+        <p><strong>Current recommendation:</strong> ${
+          avgHaiku >= 4.0 && (haikuWins + ties) / evaluations.length >= 0.8
+            ? '✅ SHIP MODERATE TIER - Quality maintained'
+            : avgHaiku >= 3.5
+              ? '⚠️  NEEDS TUNING - Close but not quite there'
+              : '❌ DEFAULT TO COMPLEX - Quality gap too large'
+        }</p>
+      `;
+
+      statsDiv.style.display = 'block';
+    }
+
+    // Save results
+    function saveResults() {
+      const results = {
+        evaluations,
+        timestamp: new Date().toISOString(),
+        summary: {
+          totalTests: evaluations.length,
+          haikuAvg: evaluations.reduce((sum, e) =>
+            sum + (e.AisHaiku ? e.scoreA : e.scoreB), 0) / evaluations.length,
+          sonnetAvg: evaluations.reduce((sum, e) =>
+            sum + (e.AisHaiku ? e.scoreB : e.scoreA), 0) / evaluations.length
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'moderate-tier-evaluation-results.json';
+      a.click();
+
+      alert('Results saved! Check the downloaded JSON file.');
+    }
+
+    // Load results on page load
+    window.addEventListener('load', () => {
+      if (confirm('Load test results from file?')) {
+        loadResults();
+      }
+    });
+  </script>
+</body>
+</html>

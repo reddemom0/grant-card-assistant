@@ -46,10 +46,77 @@ export function classifyQuery(message, agentType) {
     /\b(compare|comparison|versus|vs\.|difference between)\b/i,
   ];
 
+  // ============================================================================
+  // AGENT-SPECIFIC CLASSIFICATION OVERRIDES
+  // ============================================================================
+
   // CanExport Claims agent: ALWAYS use complex (auditing requires maximum precision)
   if (agentType === 'canexport-claims') {
     return 'complex';
   }
+
+  // Readiness Strategist: Default to complex (high-stakes strategic assessments)
+  if (agentType === 'readiness-strategist') {
+    // Only greetings/continuations are simple
+    const greetingContinuationPatterns = [
+      /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|sure|got it)$/i,
+      /^[0-9]{1,2}\.?$/,
+      /^(continue|next|more|go ahead|proceed)$/i,
+    ];
+
+    if (greetingContinuationPatterns.some(p => p.test(lowerMessage))) {
+      return 'simple';
+    }
+
+    // Everything else is strategic work requiring Sonnet
+    return 'complex';
+  }
+
+  // Internal Oracle: Optimize for lookup/research/synthesis workflows
+  if (agentType === 'internal-oracle') {
+    // Complex: Synthesis across sources and strategic reasoning (needs Sonnet)
+    const synthesisPatterns = [
+      /\b(synthesize|synthesis|combine|integrate|cross-reference)\b/i,
+      /\b(why|how|explain|reasoning|rationale)\b/i,
+      /\b(recommend|strategy|should.*consider|advice)\b/i,
+      /\b(compare|comparison|versus|vs\.|difference between)\b/i,
+      /\b(across|between).*\b(sources|systems|departments)\b/i,
+    ];
+
+    if (synthesisPatterns.some(p => p.test(lowerMessage))) {
+      return 'complex';
+    }
+
+    // Moderate: Research and enrichment (web search + summarization, Haiku+thinking)
+    const researchPatterns = [
+      /\b(research|enrich|enrichment|analyze|investigate)\b/i,
+      /\b(find.*about|tell me about|learn about)\b/i,
+      /\b(gather|collect|compile).*\b(information|data|details)\b/i,
+      /\b(summarize|summary).*\b(from|across)\b/i,
+    ];
+
+    if (researchPatterns.some(p => p.test(lowerMessage))) {
+      return 'moderate';
+    }
+
+    // Simple: Pure lookups and retrieval (Haiku, no thinking)
+    const lookupPatterns = [
+      /^(show|list|get|find|display|search)\b/i,
+      /^(what is|who is|where is|when is)\b/i,
+      /^(how many|how much)\b/i,
+    ];
+
+    if (lookupPatterns.some(p => p.test(lowerMessage))) {
+      return 'simple';
+    }
+
+    // Default to moderate (research/enrichment is common)
+    return 'moderate';
+  }
+
+  // ============================================================================
+  // GENERAL PATTERN MATCHING (for agents without specific overrides)
+  // ============================================================================
 
   // Check if query matches complex patterns
   if (complexPatterns.some(pattern => pattern.test(lowerMessage))) {

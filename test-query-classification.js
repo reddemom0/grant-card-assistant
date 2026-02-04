@@ -49,6 +49,35 @@ const testCases = [
   // AGENT-SPECIFIC: Claims agent always complex
   // ========================================
   { query: "show me the claims", expected: "complex", description: "Claims agent - forced complex", agentType: "canexport-claims" },
+  { query: "check eligibility", expected: "complex", description: "Claims agent - always complex", agentType: "canexport-claims" },
+
+  // ========================================
+  // AGENT-SPECIFIC: Readiness Strategist defaults to complex
+  // ========================================
+  { query: "hi", expected: "simple", description: "Readiness - greeting is simple", agentType: "readiness-strategist" },
+  { query: "create readiness assessment", expected: "complex", description: "Readiness - strategic work is complex", agentType: "readiness-strategist" },
+  { query: "should they apply?", expected: "complex", description: "Readiness - recommendations are complex", agentType: "readiness-strategist" },
+  { query: "draft section 3", expected: "complex", description: "Readiness - even drafting is complex", agentType: "readiness-strategist" },
+
+  // ========================================
+  // AGENT-SPECIFIC: Internal Oracle - Retrieval/Research/Synthesis tiers
+  // ========================================
+  // SIMPLE: Pure lookups
+  { query: "show companies", expected: "simple", description: "Oracle - lookup is simple", agentType: "internal-oracle" },
+  { query: "find leads in Ontario", expected: "simple", description: "Oracle - search is simple", agentType: "internal-oracle" },
+  { query: "what is the deadline", expected: "simple", description: "Oracle - question is simple", agentType: "internal-oracle" },
+  { query: "list all clients", expected: "simple", description: "Oracle - list is simple", agentType: "internal-oracle" },
+
+  // MODERATE: Research and enrichment
+  { query: "research this company", expected: "moderate", description: "Oracle - research is moderate", agentType: "internal-oracle" },
+  { query: "enrich these leads", expected: "moderate", description: "Oracle - enrichment is moderate", agentType: "internal-oracle" },
+  { query: "analyze this prospect", expected: "moderate", description: "Oracle - analysis is moderate", agentType: "internal-oracle" },
+
+  // COMPLEX: Synthesis and strategic reasoning
+  { query: "why did they choose competitor?", expected: "complex", description: "Oracle - strategic analysis is complex", agentType: "internal-oracle" },
+  { query: "synthesize data from HubSpot and Drive", expected: "complex", description: "Oracle - synthesis is complex", agentType: "internal-oracle" },
+  { query: "compare these three opportunities", expected: "complex", description: "Oracle - comparison is complex", agentType: "internal-oracle" },
+  { query: "recommend which leads to prioritize", expected: "complex", description: "Oracle - recommendations are complex", agentType: "internal-oracle" },
 ];
 
 console.log('\n' + '='.repeat(80));
@@ -67,7 +96,9 @@ const resultsByTier = {
 };
 
 for (const testCase of testCases) {
-  const agentType = testCase.agentType || 'internal-oracle';
+  // Use specified agentType, or default to 'etg-writer' for general tests
+  // (Don't use 'internal-oracle' as default since it has special classification)
+  const agentType = testCase.agentType || 'etg-writer';
   const classification = classifyQuery(testCase.query, agentType);
   const config = getQueryConfig(testCase.query, agentType);
 
