@@ -3,52 +3,53 @@
  *
  * Determines optimal model and configuration based on query complexity.
  *
- * CONSERVATIVE APPROACH:
- * - Only classifies queries as "simple" when we're VERY confident
- * - Defaults to "complex" (Sonnet + Extended Thinking) when uncertain
- * - Preserves full AI power for any query that might need it
+ * THREE-TIER APPROACH (Optimized for cost efficiency):
+ * - SIMPLE: Greetings, continuations, basic lookups → Haiku, no thinking
+ * - MODERATE: Writing, review, basic analysis → Haiku WITH thinking
+ * - COMPLEX: Deep reasoning, compliance, strategic work → Sonnet WITH thinking
+ *
+ * This approach leverages Haiku 4.5's extended thinking support for moderate tasks,
+ * significantly reducing costs while maintaining quality.
  */
 
 /**
  * Classify query complexity
  * @param {string} message - User's query
  * @param {string} agentType - Type of agent handling the query
- * @returns {'simple'|'complex'} Query classification
+ * @returns {'simple'|'moderate'|'complex'} Query classification
  */
 export function classifyQuery(message, agentType) {
   const lowerMessage = message.toLowerCase();
 
   // ============================================================================
-  // COMPLEX PATTERNS - These ALWAYS need full power (Sonnet + Extended Thinking)
+  // TIER 3: COMPLEX - Deep reasoning requiring Sonnet + Full Extended Thinking
   // ============================================================================
 
   const complexPatterns = [
-    // Analysis & Reasoning
-    /\b(analyze|analyse|assessment|evaluate|review|examine)\b/i,
-    /\b(eligibility|eligible|qualify|qualifies)\b/i,
-    /\b(compliance|compliant|regulations?)\b/i,
-
-    // Auditing & Validation (canexport-claims agent specialty)
-    /\b(audit|verify|validate|check.*expense|check.*claim)\b/i,
-    /\b(reimbursement|reimbursable|allowable)\b/i,
-    /\b(budget|financial|cost|expense).*\b(review|analysis|breakdown)\b/i,
-
-    // Document Processing
-    /\b(compare|comparison|difference|versus|vs\.)\b/i,
-    /\b(summarize|summary|extract|parse)\b/i,
-
-    // Writing & Generation
-    /\b(write|create|generate|draft|compose)\b/i,
-    /\b(recommend|suggestion|advice|should)\b/i,
-
-    // Complex queries
+    // Deep reasoning & explanation
     /\b(why|how|explain|reasoning|rationale)\b/i,
     /\b(what if|scenario|hypothetical)\b/i,
 
+    // Compliance & Audit (high-stakes analysis)
+    /\b(compliance|compliant|audit|regulations?)\b/i,
+    /\b(reimbursement|reimbursable|allowable)\b/i,
+
+    // Strategic recommendations
+    /\b(recommend|recommendation|strategy|strategic|should.*consider)\b/i,
+    /\b(advice|guidance|suggest)\b/i,
+
     // Multi-step operations
-    /\b(and then|after that|next|also)\b/i,
-    /\b(both.*and|either.*or)\b/i,
+    /\b(and then|after that|first.*then)\b/i,
+    /\b(both.*and.*also)\b/i,
+
+    // Comparisons requiring deep analysis
+    /\b(compare|comparison|versus|vs\.|difference between)\b/i,
   ];
+
+  // CanExport Claims agent: ALWAYS use complex (auditing requires maximum precision)
+  if (agentType === 'canexport-claims') {
+    return 'complex';
+  }
 
   // Check if query matches complex patterns
   if (complexPatterns.some(pattern => pattern.test(lowerMessage))) {
@@ -56,23 +57,54 @@ export function classifyQuery(message, agentType) {
   }
 
   // ============================================================================
-  // SIMPLE PATTERNS - Basic lookups, status checks, retrieval
+  // TIER 2: MODERATE - Tasks benefiting from thinking but not requiring Sonnet
+  // ============================================================================
+
+  const moderatePatterns = [
+    // Writing & Generation
+    /\b(write|create|generate|draft|compose)\b/i,
+
+    // Document review (not deep audit)
+    /\b(review|check|verify)\b/i,
+
+    // Basic analysis
+    /\b(analyze|analyse|assess|evaluate|examine)\b/i,
+
+    // Summarization
+    /\b(summarize|summary|extract|parse)\b/i,
+
+    // Eligibility (general, not compliance-focused)
+    /\b(eligible|eligibility|qualify|qualifies)\b/i,
+  ];
+
+  // Check if query matches moderate patterns
+  if (moderatePatterns.some(pattern => pattern.test(lowerMessage))) {
+    return 'moderate';
+  }
+
+  // ============================================================================
+  // TIER 1: SIMPLE - Greetings, continuations, basic lookups
   // ============================================================================
 
   const simplePatterns = [
-    // Status checks (most common simple query)
-    /^(has|have).*\b(been approved|been submitted|been paid|received)\b/i,
-    /^(is|are).*\b(approved|submitted|complete|ready|available)\b/i,
-    /^(what|what's|whats) (is )?the status (of|for)/i,
-    /^(when|when's|whens) (was|were|did).*\b(approved|submitted|paid)\b/i,
+    // Greetings & social
+    /^(hi|hello|hey|thanks|thank you|ok|okay|yes|no|sure|got it)$/i,
+    /^(good morning|good afternoon|good evening)$/i,
+
+    // Continuations
+    /^[0-9]{1,2}\.?$/,  // Numbers like "1", "2.", "10"
+    /^(continue|next|more|go ahead|proceed)$/i,
 
     // Simple retrieval
-    /^(find|search|lookup|look up|get|show|display|list)\b/i,
-    /^(can you find|can you show|can you get|can you list)\b/i,
+    /^(show|list|get|find) (me )?(all |the )?[a-z]+$/i,
+
+    // Status checks
+    /^(what|what's|whats) (is )?the status/i,
+    /^(has|have).*\b(been approved|been submitted|been paid|received)\b/i,
+    /^(is|are).*\b(approved|submitted|complete|ready|available)\b/i,
 
     // Simple questions with specific answers
     /^(what|who|where|which) (is|are|was|were) (the|a|an)/i,
-    /^(how (much|many)).*\b(left|remaining|available|total)\b/i,
   ];
 
   // Check if query matches simple patterns
@@ -80,38 +112,37 @@ export function classifyQuery(message, agentType) {
     return 'simple';
   }
 
-  // ============================================================================
-  // AGENT-SPECIFIC DEFAULTS
-  // ============================================================================
-
-  // CanExport Claims agent: Default to complex (auditing requires precision)
-  if (agentType === 'canexport-claims') {
-    return 'complex';
+  // Character count check: Very short queries without complex keywords → simple
+  if (message.length < 15 && !complexPatterns.some(p => p.test(lowerMessage))) {
+    return 'simple';
   }
 
   // ============================================================================
-  // DEFAULT: When in doubt, use full power
+  // DEFAULT: Moderate tier (balanced approach)
   // ============================================================================
+  // Changed from defaulting to 'complex' - most queries benefit from thinking
+  // but don't need Sonnet's full power
 
-  return 'complex';
+  return 'moderate';
 }
 
 /**
  * Get optimal model for query
- * @param {string} queryComplexity - 'simple' or 'complex'
+ * @param {string} queryComplexity - 'simple', 'moderate', or 'complex'
  * @returns {string} Model identifier
  */
 export function getModelForQuery(queryComplexity) {
-  if (queryComplexity === 'simple') {
-    return 'claude-haiku-4-5'; // Fast, cost-effective
+  if (queryComplexity === 'complex') {
+    return 'claude-sonnet-4-5-20250929'; // Full power - Sonnet 4.5
   }
 
-  return 'claude-sonnet-4-5-20250929'; // Full power - Sonnet 4.5
+  // Both simple and moderate use Haiku (moderate adds extended thinking)
+  return 'claude-haiku-4-5'; // Fast, cost-effective
 }
 
 /**
  * Get extended thinking configuration
- * @param {string} queryComplexity - 'simple' or 'complex'
+ * @param {string} queryComplexity - 'simple', 'moderate', or 'complex'
  * @returns {Object|undefined} Thinking configuration (undefined = disabled)
  */
 export function getThinkingConfig(queryComplexity) {
@@ -121,7 +152,15 @@ export function getThinkingConfig(queryComplexity) {
     return undefined;
   }
 
-  // Complex queries: Full thinking budget
+  if (queryComplexity === 'moderate') {
+    // Moderate queries: Lower thinking budget (Haiku + thinking)
+    return {
+      type: 'enabled',
+      budget_tokens: 4000
+    };
+  }
+
+  // Complex queries: Full thinking budget (Sonnet + thinking)
   return {
     type: 'enabled',
     budget_tokens: 10000
@@ -130,7 +169,7 @@ export function getThinkingConfig(queryComplexity) {
 
 /**
  * Get max tokens based on query complexity
- * @param {string} queryComplexity - 'simple' or 'complex'
+ * @param {string} queryComplexity - 'simple', 'moderate', or 'complex'
  * @returns {number} Max tokens
  */
 export function getMaxTokens(queryComplexity) {
@@ -138,27 +177,32 @@ export function getMaxTokens(queryComplexity) {
     return 8000; // Shorter responses expected
   }
 
-  return 16000; // Allow longer analysis
+  if (queryComplexity === 'moderate') {
+    return 12000; // Medium-length responses
+  }
+
+  return 16000; // Allow longer analysis for complex queries
 }
 
 /**
  * Get temperature based on query complexity
- * @param {string} queryComplexity - 'simple' or 'complex'
+ * @param {string} queryComplexity - 'simple', 'moderate', or 'complex'
  * @returns {number} Temperature value
  */
 export function getTemperature(queryComplexity) {
   if (queryComplexity === 'simple') {
-    return 0.3; // More focused, less verbose
+    return 0.3; // More focused, less verbose (no thinking)
   }
 
   // IMPORTANT: When extended thinking is enabled, Anthropic requires temperature = 1.0
   // See: https://docs.claude.com/en/docs/build-with-claude/extended-thinking
+  // Both moderate and complex use thinking, so both need temperature = 1.0
   return 1.0; // Required for extended thinking
 }
 
 /**
  * Get iteration limit based on query complexity
- * @param {string} queryComplexity - 'simple' or 'complex'
+ * @param {string} queryComplexity - 'simple', 'moderate', or 'complex'
  * @returns {number} Max iterations
  */
 export function getIterationLimit(queryComplexity) {
@@ -166,7 +210,11 @@ export function getIterationLimit(queryComplexity) {
     return 6; // Should resolve quickly
   }
 
-  return 20; // Allow thorough exploration
+  if (queryComplexity === 'moderate') {
+    return 10; // Moderate exploration
+  }
+
+  return 20; // Allow thorough exploration for complex queries
 }
 
 /**
