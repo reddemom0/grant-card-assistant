@@ -1266,6 +1266,7 @@ This tool provides proactive market intelligence - check it regularly or when cl
 - If an inactive grant is returned, CLEARLY label it as INACTIVE and suggest active alternatives
 
 Use this to:
+- Search grants by name or keywords (e.g., "BuyBC", "hiring grant", "export funding")
 - Find grants for specific clients based on their industry, location, and needs
 - Discover hiring, training, export, R&D, or capital grants
 - Filter by region, company size, owner demographics
@@ -1273,14 +1274,24 @@ Use this to:
 
 This tool searches the internal GetGranted database (188+ Canadian grants) and returns matching opportunities with eligibility, funding details, and deadlines.
 
+**Search Strategy:**
+1. Start with 'query' parameter for text-based search (searches grant names, criteria, descriptions)
+2. Add filters (purposes, regions, industries) to narrow results
+3. Use 'fetch_full_details' to get complete grant card information
+
 **Common use cases:**
-- "Find hiring grants for a BC tech company with 25 employees" → active_only=true (default)
-- "Show market expansion grants for Indigenous-owned businesses" → active_only=true
-- "Search for R&D grants in Ontario with open intakes" → active_only=true, open_intakes_only=true
-- "What grants did we have for digitization in 2023?" → active_only=false (historical search)`,
+- "Find the BuyBC grant" → query: "BuyBC", active_only: true
+- "Find hiring grants for a BC tech company" → query: "hiring", regions: ["British Columbia"], industries: ["Technology"], active_only: true
+- "Show market expansion grants for Indigenous-owned businesses" → purposes: ["Market Expansion"], owner_demographics: ["Indigenous"], active_only: true
+- "Search for R&D grants in Ontario with open intakes" → query: "R&D", regions: ["Ontario"], open_intakes_only: true, active_only: true
+- "What grants did we have for digitization in 2023?" → query: "digitization", active_only: false (historical search)`,
     input_schema: {
       type: 'object',
       properties: {
+        query: {
+          type: 'string',
+          description: 'Text search query to match against grant names, descriptions, criteria, and other text fields. Use this for searching specific grant names or keywords (e.g., "BuyBC", "export", "training"). Leave empty to browse all grants with filters only.'
+        },
         purposes: {
           type: 'array',
           items: {

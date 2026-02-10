@@ -388,6 +388,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       case 'search_getgranted':
         const { searchGetGranted } = await import('./getgranted-search.js');
         result = await searchGetGranted({
+          query: input.query,
           purposes: parseJSONParameter(input.purposes),
           regions: parseJSONParameter(input.regions),
           industries: parseJSONParameter(input.industries),
@@ -398,7 +399,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           active_only: input.active_only,
           open_intakes_only: input.open_intakes_only,
           limit: input.limit,
-          fetch_full_details: input.fetch_full_details
+          fetch_full_details: input.fetch_full_details,
+          bypass_cache: input.bypass_cache
         });
         break;
 

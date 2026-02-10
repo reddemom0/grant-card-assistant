@@ -20,6 +20,7 @@ const CACHE_TTL = 3600; // Cache results for 1 hour
  * Search GetGranted database
  *
  * @param {Object} input - Search parameters
+ * @param {string} input.query - Text search query (searches grant names, criteria, descriptions)
  * @param {string[]} input.purposes - Grant purposes (Hiring, Training, Market Expansion, etc.)
  * @param {string[]} input.regions - Canadian provinces/territories
  * @param {string[]} input.industries - Industry sectors
@@ -36,6 +37,7 @@ const CACHE_TTL = 3600; // Cache results for 1 hour
 export async function searchGetGranted(input) {
   try {
     const {
+      query = '',              // Text search query
       purposes = [],
       regions = [],
       industries = [],
@@ -49,7 +51,8 @@ export async function searchGetGranted(input) {
       fetch_full_details = false
     } = input;
 
-    console.log(`🔍 Searching GetGranted database with filters:`, {
+    console.log(`🔍 Searching GetGranted database:`, {
+      query,
       purposes,
       regions,
       industries,
@@ -100,14 +103,23 @@ export async function searchGetGranted(input) {
     // Set max results
     params.append('maxResults', limit.toString());
 
-    // Build keywords from various inputs
+    // Build keywords from query and additional filters
     const keywords = [];
+
+    // Add main search query (split into individual words for better matching)
+    if (query && query.trim()) {
+      // Keep the full query as one keyword for phrase matching
+      keywords.push(query.trim());
+    }
+
+    // Add additional keyword filters
     if (business_type) {
       keywords.push(business_type);
     }
     if (owner_demographics.length > 0) {
       keywords.push(...owner_demographics);
     }
+
     if (keywords.length > 0) {
       params.append('keywords', keywords.join(','));
     }
@@ -184,6 +196,7 @@ export const getGrantedSearchTool = {
   description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
 
 Use this to:
+- Search grants by name or keywords (e.g., "BuyBC", "hiring grant", "export funding")
 - Find grants for specific clients based on their industry, location, and needs
 - Discover hiring, training, export, R&D, or capital grants
 - Filter by region, company size, owner demographics
@@ -191,15 +204,24 @@ Use this to:
 
 This tool searches the internal GetGranted database (598 Canadian grants, synced weekly) and returns matching opportunities with eligibility, funding details, and deadlines.
 
+**Search Strategy:**
+1. Start with 'query' parameter for text-based search (searches grant names, criteria, descriptions)
+2. Add filters (purposes, regions, industries) to narrow results
+3. Use 'fetch_full_details' to get complete grant card information
+
 **Common use cases:**
-- "Find hiring grants for a BC tech company with 25 employees"
-- "Show market expansion grants for Indigenous-owned businesses"
-- "Search for R&D grants in Ontario with open intakes"
-- "Find all grants for female-owned manufacturing companies"`,
+- "Find the BuyBC grant" → query: "BuyBC"
+- "Find hiring grants for a BC tech company" → query: "hiring", regions: ["British Columbia"], industries: ["Technology"]
+- "Show market expansion grants for Indigenous-owned businesses" → purposes: ["Market Expansion"], owner_demographics: ["Indigenous"]
+- "Search for R&D grants in Ontario with open intakes" → query: "R&D", regions: ["Ontario"], open_intakes_only: true`,
 
   input_schema: {
     type: 'object',
     properties: {
+      query: {
+        type: 'string',
+        description: 'Text search query to match against grant names, descriptions, criteria, and other text fields. Use this for searching specific grant names or keywords (e.g., "BuyBC", "export", "training"). Leave empty to browse all grants with filters only.'
+      },
       purposes: {
         type: 'array',
         items: {
