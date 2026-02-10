@@ -4,7 +4,7 @@
  * Allows Oracle to search Granted Consulting's GetGranted database
  * for grant opportunities matching client criteria.
  *
- * Uses database API endpoint (synced weekly from GetGranted).
+ * Uses database API endpoint (synced daily at 2 AM PT from GetGranted).
  */
 
 import Redis from 'ioredis';
@@ -169,7 +169,7 @@ export async function searchGetGranted(input) {
       },
       grants,
       data_source: 'database',
-      last_synced: 'Weekly on Sundays at 2 AM UTC'
+      last_synced: 'Daily at 2 AM Pacific Time'
     };
 
     // Cache results
@@ -202,7 +202,7 @@ Use this to:
 - Filter by region, company size, owner demographics
 - Get quick summaries or full grant card details
 
-This tool searches the internal GetGranted database (598 Canadian grants, synced weekly) and returns matching opportunities with eligibility, funding details, and deadlines.
+This tool searches the internal GetGranted database (598 Canadian grants, synced daily at 2 AM PT) and returns matching opportunities with eligibility, funding details, and deadlines.
 
 **Search Strategy:**
 1. Start with 'query' parameter for text-based search (searches grant names, criteria, descriptions)

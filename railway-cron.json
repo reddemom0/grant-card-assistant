@@ -8,7 +8,7 @@
     "restartPolicyType": "NEVER"
   },
   "cron": {
-    "schedule": "0 2 * * 0",
-    "description": "Sync GetGranted database every Sunday at 2 AM UTC"
+    "schedule": "0 10 * * *",
+    "description": "Sync GetGranted database daily at 2 AM Pacific Time (10 AM UTC)"
   }
 }
