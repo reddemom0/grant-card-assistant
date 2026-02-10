@@ -48,6 +48,7 @@ async function searchGrants({
         difficulty,
         grant_criteria,
         best_practices,
+        recently_changed,
         last_updated,
         is_active
       FROM grants

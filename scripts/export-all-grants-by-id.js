@@ -114,6 +114,15 @@ async function extractGrantDetails(page, grantId) {
         }
       }
 
+      // Recently Changed section (CRITICAL for deadline updates)
+      const recentlyChangedHeader = page.locator('text=/^Recently Changed$/i').first();
+      if (await recentlyChangedHeader.count() > 0) {
+        const rcSection = recentlyChangedHeader.locator('xpath=following-sibling::*[1]');
+        if (await rcSection.count() > 0) {
+          details.recently_changed = await rcSection.textContent().catch(() => '');
+        }
+      }
+
       // Last updated
       const updatedText = await page.locator('text=/Updated on/i').first().textContent().catch(() => '');
       if (updatedText) {
