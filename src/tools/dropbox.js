@@ -9,7 +9,7 @@
 
 import fetch from 'node-fetch';
 import mammoth from 'mammoth';
-import pdfParse from 'pdf-parse';
+// Lazy import pdf-parse to avoid startup crash from test file loading
 
 // OAuth2 credentials from environment
 const DROPBOX_ACCESS_TOKEN = process.env.DROPBOX_ACCESS_TOKEN;
@@ -298,6 +298,8 @@ async function downloadDropboxFile(path) {
  */
 async function extractTextFromPDF(buffer) {
   try {
+    // Lazy load pdf-parse to avoid startup crash
+    const pdfParse = (await import('pdf-parse')).default;
     const data = await pdfParse(buffer);
     return data.text;
   } catch (error) {
