@@ -312,6 +312,10 @@
         .agent-card.internal-oracle {
             --accent-color: #ea580c;
         }
+
+        .agent-card.getgranted-ai {
+            --accent-color: #10b981;
+        }
         
         .agent-header {
             display: flex;
@@ -870,6 +874,38 @@
                 </div>
             </div>
 
+            <!-- GetGrantedAI -->
+            <div class="agent-card getgranted-ai" onclick="openAgent('getgranted-ai')">
+                <div class="agent-header">
+                    <div class="agent-icon">🎯</div>
+                    <div class="agent-info">
+                        <h3>GetGrantedAI</h3>
+                        <span class="agent-status new">
+                            <div style="width: 8px; height: 8px; background: #1e3a8a; border-radius: 50%;"></div>
+                            New
+                        </span>
+                    </div>
+                </div>
+                <p class="agent-description">
+                    Client-facing AI grant consultant for Canadian small-to-medium businesses. Provides grant strategy,
+                    application guidance, financial calculations (MERCs), and pay stub verification for hiring and training programs.
+                </p>
+                <ul class="agent-features">
+                    <li>Grant program expertise (hiring & training)</li>
+                    <li>Step-by-step application guidance</li>
+                    <li>MERC & salary calculations</li>
+                    <li>Pay stub verification & compliance</li>
+                    <li>GetGranted platform integration</li>
+                </ul>
+                <div class="agent-action">
+                    <button class="agent-button">
+                        <span>Launch GetGrantedAI</span>
+                        <span>→</span>
+                    </button>
+                    <div class="usage-stats">Newly launched</div>
+                </div>
+            </div>
+
         </div>
 
         <!-- Bottom Section -->
@@ -944,6 +980,10 @@
                 },
                 'readiness-strategist': {
                     url: '/readiness-strategist/new',
+                    active: true
+                },
+                'getgranted-ai': {
+                    url: '/getgranted-ai',
                     active: true
                 },
                 'internal-oracle': {
