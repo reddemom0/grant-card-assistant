@@ -14,6 +14,8 @@ import * as googleSheets from './google-sheets.js';
 import { createAdvancedDocumentTool } from './google-docs-advanced.js';
 import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 import { isServerTool } from './definitions.js';
+import * as getgrantedTools from './getgranted-tools.js';
+import * as programCards from '../utils/program-cards.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -465,6 +467,30 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
 
       case 'check_character_count':
         result = checkCharacterCount(input.section_number, input.section_name, input.text);
+        break;
+
+      // ============================================================================
+      // GETGRANTED AI TOOLS
+      // ============================================================================
+
+      case 'listAvailablePrograms':
+        result = programCards.listAvailablePrograms();
+        break;
+
+      case 'loadProgramCard':
+        result = programCards.loadProgramCard(input.programId);
+        break;
+
+      case 'calculateMERCs':
+        result = getgrantedTools.calculateMERCs(input);
+        break;
+
+      case 'convertSalary':
+        result = getgrantedTools.convertSalary(input.amount, input.direction, input.hoursPerWeek);
+        break;
+
+      case 'getGrantedLookup':
+        result = await getgrantedTools.getGrantedLookup(input.query, input.filters);
         break;
 
       // ============================================================================

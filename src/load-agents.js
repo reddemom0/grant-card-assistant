@@ -19,7 +19,9 @@ export function loadAgentDefinitions() {
     'buybc-writer': parseAgentFile(join(agentDir, 'buybc-writer.md')),
     'canexport-claims': parseAgentFile(join(agentDir, 'canexport-claims.md')),
     'readiness-strategist': parseAgentFile(join(agentDir, 'readiness-strategist.md')),
+    'canexport-writer': parseAgentFile(join(agentDir, 'canexport-writer.md')),
     'orchestrator': parseAgentFile(join(agentDir, 'orchestrator.md')),
+    'getgranted-ai': parseAgentFile(join(agentDir, 'getgranted-ai.md')),
   };
 
   return agents;

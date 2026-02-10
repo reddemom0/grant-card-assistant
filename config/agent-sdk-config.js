@@ -73,6 +73,7 @@ export const agentSDKConfig = {
     'bcafe-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
     'buybc-writer': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'],
     'canexport-claims': ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebSearch', 'TodoWrite', 'Memory'],
+    'getgranted-ai': ['Read', 'Glob', 'Grep', 'WebSearch', 'WebFetch', 'TodoWrite', 'Memory'], // Client-facing grant assistant
     'orchestrator': ['Read', 'Glob', 'Grep', 'Agent', 'TodoWrite', 'Memory'], // Can spawn other agents
   },
 

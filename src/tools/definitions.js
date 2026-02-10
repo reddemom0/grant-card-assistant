@@ -1585,6 +1585,117 @@ export const GOOGLE_DOCS_TOOLS = [
 ];
 
 // ============================================================================
+// GETGRANTED AI TOOLS
+// Financial calculations, program cards, and GetGranted integration
+// ============================================================================
+
+export const GETGRANTED_AI_TOOLS = [
+  {
+    name: 'listAvailablePrograms',
+    description: 'List all available grant program cards organized by type (hiring/training). Use this when a user asks what programs are available or needs to explore options.',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  {
+    name: 'loadProgramCard',
+    description: 'Load a specific grant program card by ID to get detailed information including eligibility requirements, financial details, application process, required documents, and program-specific rules. Use this when a user mentions a specific program by name or wants to work on an application.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        programId: {
+          type: 'string',
+          description: 'Program identifier (filename without .md extension, e.g. "workbc-wage-subsidy", "canada-job-grant", "etg")'
+        }
+      },
+      required: ['programId']
+    }
+  },
+  {
+    name: 'calculateMERCs',
+    description: 'Calculate Mandatory Employment Related Costs (MERCs) including CPP, EI, QPIP (Quebec), Vacation Pay, and WCB. Returns detailed breakdown of base wage, all MERCs components, total employment cost, and MERC percentage. Use this when calculating total employment costs for grant applications.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        hourlyWage: {
+          type: 'number',
+          description: 'Hourly wage rate in dollars'
+        },
+        hoursPerWeek: {
+          type: 'number',
+          description: 'Hours worked per week'
+        },
+        province: {
+          type: 'string',
+          description: 'Province code (BC, ON, QC, AB, etc.)',
+          default: 'BC'
+        },
+        vacationPct: {
+          type: 'number',
+          description: 'Vacation pay percentage: 4 (standard) or 6 (after 5 years)',
+          enum: [4, 6],
+          default: 4
+        },
+        industry: {
+          type: 'string',
+          description: 'Industry type for WCB calculation: office, retail, manufacturing, construction, hospitality, healthcare, technology, or default',
+          default: 'default'
+        }
+      },
+      required: ['hourlyWage', 'hoursPerWeek']
+    }
+  },
+  {
+    name: 'convertSalary',
+    description: 'Convert between hourly wage and annual salary. Returns detailed breakdown with hourly, weekly, and annual amounts.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        amount: {
+          type: 'number',
+          description: 'Amount to convert (hourly wage or annual salary depending on direction)'
+        },
+        direction: {
+          type: 'string',
+          description: 'Conversion direction',
+          enum: ['hourlyToAnnual', 'annualToHourly']
+        },
+        hoursPerWeek: {
+          type: 'number',
+          description: 'Hours worked per week',
+          default: 40
+        }
+      },
+      required: ['amount', 'direction']
+    }
+  },
+  {
+    name: 'getGrantedLookup',
+    description: 'Query GetGranted platform for available grants and client details (STUB - returns placeholder response). Future implementation will search GetGranted database for matching programs and client information.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query'
+        },
+        filters: {
+          type: 'object',
+          description: 'Optional filters (type, deadline, province, etc.)',
+          properties: {
+            type: { type: 'string' },
+            deadline: { type: 'string' },
+            province: { type: 'string' }
+          }
+        }
+      },
+      required: ['query']
+    }
+  }
+];
+
+// ============================================================================
 // TOOL AGGREGATION
 // ============================================================================
 
@@ -1599,7 +1710,8 @@ export const ALL_TOOLS = [
   ...GOOGLE_DRIVE_TOOLS,
   ...ORACLE_TOOLS,
   ...CANEXPORT_WRITER_TOOLS,
-  ...GOOGLE_DOCS_TOOLS
+  ...GOOGLE_DOCS_TOOLS,
+  ...GETGRANTED_AI_TOOLS
 ];
 
 /**
@@ -1650,6 +1762,11 @@ export function getToolsForAgent(agentType) {
       // Oracle needs: search/enrichment tools + Oracle KB + minimal HubSpot
       console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length} tools)`);
       return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools];
+
+    case 'getgranted-ai':
+      // GetGrantedAI needs: base tools + GetGrantedAI-specific tools (no HubSpot, no Google Drive)
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + GETGRANTED_AI_TOOLS.length} tools)`);
+      return [...baseTools, ...GETGRANTED_AI_TOOLS];
 
     case 'orchestrator':
       console.log(`🔧 Agent ${agentType} using ALL tools (${ALL_TOOLS.length} tools)`);
