@@ -7,7 +7,24 @@
 
 import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
+// Initialize Redis with proper error handling for invalid/missing config
+let redis = null;
+try {
+  const redisUrl = process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL;
+  // Only create Redis client if URL is valid (has a host)
+  if (redisUrl && redisUrl.includes('://') && redisUrl.split('://')[1]) {
+    redis = new Redis(redisUrl);
+    redis.on('error', (err) => {
+      console.warn('⚠️ Redis connection error in visualping-alerts, service disabled:', err.message);
+      redis = null; // Disable Redis on error
+    });
+  } else {
+    console.warn('⚠️ Invalid or missing REDIS_URL, VisualPing alerts disabled');
+  }
+} catch (err) {
+  console.warn('⚠️ Failed to initialize Redis for VisualPing alerts, service disabled:', err.message);
+  redis = null;
+}
 
 /**
  * Get recent VisualPing alerts
@@ -30,79 +47,103 @@ export async function getVisualPingAlerts(input) {
 
     console.log(`🔍 Fetching VisualPing alerts (limit: ${limit}, priority: ${priority || 'all'}, type: ${change_type || 'all'})`);
 
+    // Check if Redis is available
+    if (!redis) {
+      console.warn('⚠️ VisualPing alerts service unavailable (Redis not connected)');
+      return {
+        success: false,
+        error: 'VisualPing alerts service is temporarily unavailable. Redis connection required.',
+        alerts: []
+      };
+    }
+
     // Calculate timestamp cutoff for date filtering
     const cutoffTimestamp = Date.now() - (days * 24 * 60 * 60 * 1000);
 
     let alertIds = [];
 
     // Get alerts filtered by priority or change type
-    if (priority) {
-      alertIds = await redis.smembers(`vp:alerts:priority:${priority}`);
-    } else if (change_type) {
-      alertIds = await redis.smembers(`vp:alerts:type:${change_type}`);
-    } else {
-      // Get most recent across all
-      alertIds = await redis.zrevrange('vp:alerts:recent', 0, limit * 2); // Get extra to filter by date
+    try {
+      if (priority) {
+        alertIds = await redis.smembers(`vp:alerts:priority:${priority}`);
+      } else if (change_type) {
+        alertIds = await redis.smembers(`vp:alerts:type:${change_type}`);
+      } else {
+        // Get most recent across all
+        alertIds = await redis.zrevrange('vp:alerts:recent', 0, limit * 2); // Get extra to filter by date
+      }
+    } catch (err) {
+      console.error('❌ Failed to fetch alert IDs from Redis:', err.message);
+      return {
+        success: false,
+        error: 'Failed to retrieve alerts from database',
+        alerts: []
+      };
     }
 
     // Load full alert data and analysis
     const alerts = await Promise.all(
       alertIds.map(async (alertId) => {
-        const alert = await redis.hgetall(alertId);
-        const analysisId = `vp:analysis:${alertId}`;
-        const analysis = await redis.hgetall(analysisId);
+        try {
+          const alert = await redis.hgetall(alertId);
+          const analysisId = `vp:analysis:${alertId}`;
+          const analysis = await redis.hgetall(analysisId);
 
-        // Skip empty alerts
-        if (!alert || !alert.url) {
-          return null;
-        }
-
-        // Parse timestamp from alertId
-        const timestampMatch = alertId.match(/vp:alert:(\d+)/);
-        const alertTimestamp = timestampMatch ? parseInt(timestampMatch[1]) : 0;
-
-        // Filter by date
-        if (alertTimestamp < cutoffTimestamp) {
-          return null;
-        }
-
-        // Parse action items from JSON
-        let actionItems = [];
-        if (analysis.action_items) {
-          try {
-            actionItems = JSON.parse(analysis.action_items);
-          } catch (e) {
-            actionItems = [];
+          // Skip empty alerts
+          if (!alert || !alert.url) {
+            return null;
           }
+
+          // Parse timestamp from alertId
+          const timestampMatch = alertId.match(/vp:alert:(\d+)/);
+          const alertTimestamp = timestampMatch ? parseInt(timestampMatch[1]) : 0;
+
+          // Filter by date
+          if (alertTimestamp < cutoffTimestamp) {
+            return null;
+          }
+
+          // Parse action items from JSON
+          let actionItems = [];
+          if (analysis.action_items) {
+            try {
+              actionItems = JSON.parse(analysis.action_items);
+            } catch (e) {
+              actionItems = [];
+            }
+          }
+
+          return {
+            alert_id: alertId,
+            url: alert.url,
+            change_percentage: parseFloat(alert.change_percentage) || 0,
+            date_detected: alert.datetime,
+            status: alert.status,
+
+            // VisualPing provided info
+            ai_summary: alert.ai_summary || '',
+            added_text: alert.added_text || '',
+            removed_text: alert.removed_text || '',
+            preview_url: alert.preview_url || '',
+
+            // Our analysis
+            change_type: analysis.change_type || 'unknown',
+            priority: analysis.priority || 'medium',
+            program_name: analysis.program_name || 'Not identified',
+            funding_amount: analysis.funding_amount || '',
+            deadline: analysis.deadline || '',
+            eligibility: analysis.eligibility || '',
+            sector: analysis.sector || '',
+            impact_summary: analysis.impact_summary || '',
+            action_items: actionItems,
+
+            analyzed_at: analysis.analyzed_at || '',
+            created_at: alert.created_at || ''
+          };
+        } catch (err) {
+          console.warn(`⚠️ Failed to load alert ${alertId}:`, err.message);
+          return null; // Skip this alert on error
         }
-
-        return {
-          alert_id: alertId,
-          url: alert.url,
-          change_percentage: parseFloat(alert.change_percentage) || 0,
-          date_detected: alert.datetime,
-          status: alert.status,
-
-          // VisualPing provided info
-          ai_summary: alert.ai_summary || '',
-          added_text: alert.added_text || '',
-          removed_text: alert.removed_text || '',
-          preview_url: alert.preview_url || '',
-
-          // Our analysis
-          change_type: analysis.change_type || 'unknown',
-          priority: analysis.priority || 'medium',
-          program_name: analysis.program_name || 'Not identified',
-          funding_amount: analysis.funding_amount || '',
-          deadline: analysis.deadline || '',
-          eligibility: analysis.eligibility || '',
-          sector: analysis.sector || '',
-          impact_summary: analysis.impact_summary || '',
-          action_items: actionItems,
-
-          analyzed_at: analysis.analyzed_at || '',
-          created_at: alert.created_at || ''
-        };
       })
     );
 
