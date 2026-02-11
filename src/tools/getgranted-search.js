@@ -9,7 +9,24 @@
 
 import Redis from 'ioredis';
 
-const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
+// Initialize Redis with proper error handling for invalid/missing config
+let redis = null;
+try {
+  const redisUrl = process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL;
+  // Only create Redis client if URL is valid (has a host)
+  if (redisUrl && redisUrl.includes('://') && redisUrl.split('://')[1]) {
+    redis = new Redis(redisUrl);
+    redis.on('error', (err) => {
+      console.warn('⚠️ Redis connection error in getgranted-search, caching disabled:', err.message);
+      redis = null; // Disable Redis on error
+    });
+  } else {
+    console.warn('⚠️ Invalid or missing REDIS_URL, caching disabled for GetGranted search');
+  }
+} catch (err) {
+  console.warn('⚠️ Failed to initialize Redis for GetGranted search, caching disabled:', err.message);
+  redis = null;
+}
 
 const SEARCH_ENDPOINT_URL = process.env.RAILWAY_STATIC_URL
   ? `https://${process.env.RAILWAY_STATIC_URL}/search-grants`
@@ -63,17 +80,22 @@ export async function searchGetGranted(input) {
       limit
     });
 
-    // Check cache first (unless bypassed)
+    // Check cache first (unless bypassed or Redis unavailable)
     const bypassCache = input.bypass_cache || false;
     const cacheKey = `getgranted:search:${JSON.stringify(input)}`;
 
-    if (!bypassCache) {
-      const cached = await redis.get(cacheKey);
-      if (cached) {
-        console.log(`   ✅ Cache hit - returning cached results`);
-        return JSON.parse(cached);
+    if (!bypassCache && redis) {
+      try {
+        const cached = await redis.get(cacheKey);
+        if (cached) {
+          console.log(`   ✅ Cache hit - returning cached results`);
+          return JSON.parse(cached);
+        }
+      } catch (err) {
+        console.warn(`   ⚠️ Cache read failed:`, err.message);
+        // Continue without cache
       }
-    } else {
+    } else if (bypassCache) {
       console.log(`   🔄 Cache bypassed - forcing fresh search`);
     }
 
@@ -172,8 +194,15 @@ export async function searchGetGranted(input) {
       last_synced: 'Daily at 2 AM Pacific Time'
     };
 
-    // Cache results
-    await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(result));
+    // Cache results (if Redis is available)
+    if (redis) {
+      try {
+        await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(result));
+      } catch (err) {
+        console.warn(`   ⚠️ Cache write failed:`, err.message);
+        // Continue without caching
+      }
+    }
 
     return result;
 
