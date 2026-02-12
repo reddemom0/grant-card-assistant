@@ -74,9 +74,9 @@ export default async function handler(req, res) {
             grant_id, grant_name, grant_type, grant_amount, url,
             regions, industries, program_provider, deadline,
             max_spend, contribution_percentage, difficulty,
-            grant_criteria, best_practices, full_page_text,
+            grant_criteria, best_practices, recently_changed, full_page_text,
             last_updated, extracted_at, is_active
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
         `, [
           grant.grant_id,
           grant.grant_name,
@@ -92,6 +92,7 @@ export default async function handler(req, res) {
           grant.difficulty,
           grant.grant_criteria,
           grant.best_practices,
+          grant.recently_changed,
           grant.full_page_text,
           grant.last_updated,
           grant.extracted_at,
