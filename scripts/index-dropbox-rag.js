@@ -282,19 +282,13 @@ async function indexDropboxRAG(forceReindex) {
     throw new Error(`Failed to list Dropbox folder: ${result.error}`);
   }
 
-  // Filter files with smart rules
+  // Filter files: exclude entire /SALES/grants folder (where the bulk is)
   const files = result.files.filter(file => {
     const lowerPath = file.path.toLowerCase();
 
-    // Check if file is in /SALES/grants folder
+    // Exclude entire /SALES/grants folder
     if (lowerPath.includes('/sales/grants/')) {
-      // Only include files from 2025 or later
-      const fileDate = new Date(file.modified);
-      const cutoffDate = new Date('2025-01-01');
-
-      if (fileDate < cutoffDate) {
-        return false; // Exclude old files in /SALES/grants
-      }
+      return false;
     }
 
     return true; // Include everything else
