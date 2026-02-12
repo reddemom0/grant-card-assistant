@@ -279,16 +279,23 @@ async function indexDropboxRAG(forceReindex) {
     throw new Error(`Failed to list Dropbox folder: ${result.error}`);
   }
 
-  // Filter out excluded folders (case-insensitive)
-  const excludedPaths = [
-    '/SALES/grants',
-    '/sales/grants',
-    '/Sales/Grants',
-    '/SALES/Grants'
-  ];
-  const files = result.files.filter(file =>
-    !excludedPaths.some(excluded => file.path.toLowerCase().startsWith(excluded.toLowerCase()))
-  );
+  // Filter files with smart rules
+  const files = result.files.filter(file => {
+    const lowerPath = file.path.toLowerCase();
+
+    // Check if file is in /SALES/grants folder
+    if (lowerPath.includes('/sales/grants/')) {
+      // Only include files from 2025 or later
+      const fileDate = new Date(file.modified);
+      const cutoffDate = new Date('2025-01-01');
+
+      if (fileDate < cutoffDate) {
+        return false; // Exclude old files in /SALES/grants
+      }
+    }
+
+    return true; // Include everything else
+  });
 
   console.log(`Found ${result.files.length} total files`);
   console.log(`Processing ${files.length} files (excluded: ${result.files.length - files.length})`);
