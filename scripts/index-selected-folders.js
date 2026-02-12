@@ -8,14 +8,14 @@
  *   railway run node scripts/index-selected-folders.js
  */
 
+// Load environment variables BEFORE any imports that use them
+import 'dotenv/config';
+
 import { readDropboxFile } from '../src/tools/dropbox.js';
 import { Index } from '@upstash/vector';
 import { VoyageAIClient } from 'voyageai';
 import Anthropic from '@anthropic-ai/sdk';
-import { config } from 'dotenv';
 import fetch from 'node-fetch';
-
-config();
 
 // Dropbox OAuth credentials
 const DROPBOX_REFRESH_TOKEN = process.env.DROPBOX_REFRESH_TOKEN;

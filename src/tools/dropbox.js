@@ -298,10 +298,12 @@ async function downloadDropboxFile(path) {
  */
 async function extractTextFromPDF(buffer) {
   try {
-    const parser = new PDFParse({ verbosity: VerbosityLevel.ERRORS });
-    await parser.load(buffer);
-    const text = await parser.getText();
-    return text;
+    const parser = new PDFParse({
+      data: buffer,
+      verbosity: VerbosityLevel.ERRORS
+    });
+    const result = await parser.getText();
+    return result.text;
   } catch (error) {
     console.error('PDF extraction error:', error.message);
     return '[Error extracting PDF text]';
