@@ -188,8 +188,11 @@ async function processDocument(file, department, forceReindex) {
   const embeddings = [];
   for (let i = 0; i < textsToEmbed.length; i += EMBEDDING_BATCH_SIZE) {
     const batch = textsToEmbed.slice(i, i + EMBEDDING_BATCH_SIZE);
-    const result = await voyage.embed(batch, { model: 'voyage-2' });
-    embeddings.push(...result.embeddings);
+    const result = await voyage.embed({
+      input: batch,
+      model: 'voyage-2'
+    });
+    embeddings.push(...result.data);
   }
 
   // STEP 5: Store chunks with embeddings in Redis

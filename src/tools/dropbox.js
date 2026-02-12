@@ -299,8 +299,9 @@ async function downloadDropboxFile(path) {
 async function extractTextFromPDF(buffer) {
   try {
     // Lazy load pdf-parse to avoid startup crash
-    const pdfParse = (await import('pdf-parse')).default;
-    const data = await pdfParse(buffer);
+    const { PDFParse } = await import('pdf-parse');
+    const pdfParse = new PDFParse();
+    const data = await pdfParse.parse(buffer);
     return data.text;
   } catch (error) {
     console.error('PDF extraction error:', error.message);
