@@ -12,7 +12,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import voyageai from 'voyageai';
+import { VoyageAIClient } from 'voyageai';
 import Redis from 'ioredis';
 import dotenv from 'dotenv';
 import { listDropboxFolder, readDropboxFile } from '../src/tools/dropbox.js';
@@ -32,7 +32,7 @@ const CONTENT_MAX_SIZE = 50000; // Max chars to process per document
 
 // Initialize clients
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-const voyage = new voyageai.Client(process.env.VOYAGE_API_KEY);
+const voyage = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
 const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
 
 /**
