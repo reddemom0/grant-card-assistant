@@ -33,6 +33,10 @@
       "dest": "/api/admin-import-grants.js"
     },
     {
+      "src": "/api/import-from-file",
+      "dest": "/api/import-from-file.js"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/api/server.js"
     },
