@@ -117,9 +117,16 @@ async function extractGrantDetails(page, grantId) {
       // Recently Changed section (CRITICAL for deadline updates)
       const recentlyChangedHeader = page.locator('text=/^Recently Changed$/i').first();
       if (await recentlyChangedHeader.count() > 0) {
-        const rcSection = recentlyChangedHeader.locator('xpath=following-sibling::*[1]');
-        if (await rcSection.count() > 0) {
-          details.recently_changed = await rcSection.textContent().catch(() => '');
+        // Get the parent container (the highlighted card div)
+        const parentCard = recentlyChangedHeader.locator('..');
+        if (await parentCard.count() > 0) {
+          // Get all content from the parent card, then remove the header text
+          const fullContent = await parentCard.textContent().catch(() => '');
+          // Remove "Recently Changed" header and clean up whitespace
+          details.recently_changed = fullContent
+            .replace(/Recently Changed\s*/gi, '')
+            .trim()
+            .replace(/\s+/g, ' '); // Normalize whitespace
         }
       }
 
