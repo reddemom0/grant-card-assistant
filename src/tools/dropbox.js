@@ -9,7 +9,7 @@
 
 import fetch from 'node-fetch';
 import mammoth from 'mammoth';
-// Lazy import pdf-parse to avoid startup crash from test file loading
+import { PDFParse, VerbosityLevel } from 'pdf-parse';
 
 // OAuth2 credentials from environment
 const DROPBOX_ACCESS_TOKEN = process.env.DROPBOX_ACCESS_TOKEN;
@@ -298,8 +298,6 @@ async function downloadDropboxFile(path) {
  */
 async function extractTextFromPDF(buffer) {
   try {
-    // Lazy load pdf-parse to avoid startup crash
-    const { PDFParse, VerbosityLevel } = await import('pdf-parse');
     const parser = new PDFParse({ verbosity: VerbosityLevel.ERRORS });
     await parser.load(buffer);
     const text = await parser.getText();
