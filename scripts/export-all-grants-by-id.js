@@ -96,37 +96,84 @@ async function extractGrantDetails(page, grantId) {
       details.max_spend = await extractField(/^Max Spend$/i);
       details.contribution_percentage = await extractField(/Program Contribution Percentage/i);
 
-      // Grant Criteria
+      // Grant Criteria - collect all content until next header
       const criteriaHeader = page.locator('text=/^Grant Criteria$/i').first();
       if (await criteriaHeader.count() > 0) {
-        const criteriaSection = criteriaHeader.locator('xpath=following-sibling::*[1]');
-        if (await criteriaSection.count() > 0) {
-          details.grant_criteria = await criteriaSection.textContent().catch(() => '');
+        const criteriaContent = await page.evaluate(() => {
+          const headers = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+          const criteriaHeader = headers.find(h => h.textContent.trim().match(/^Grant Criteria$/i));
+          if (!criteriaHeader) return '';
+
+          let content = '';
+          let currentElement = criteriaHeader.nextElementSibling;
+
+          // Collect content until we hit another header
+          while (currentElement) {
+            const tagName = currentElement.tagName.toLowerCase();
+            if (['h1', 'h2', 'h3', 'h4'].includes(tagName)) break;
+            content += currentElement.textContent + '\n';
+            currentElement = currentElement.nextElementSibling;
+          }
+
+          return content.trim();
+        });
+
+        if (criteriaContent) {
+          details.grant_criteria = criteriaContent;
         }
       }
 
-      // Best Practices
+      // Best Practices - collect all content until next header
       const bestPracticesHeader = page.locator('text=/^Best Practices & Forms$/i').first();
       if (await bestPracticesHeader.count() > 0) {
-        const bpSection = bestPracticesHeader.locator('xpath=following-sibling::*[1]');
-        if (await bpSection.count() > 0) {
-          details.best_practices = await bpSection.textContent().catch(() => '');
+        const bpContent = await page.evaluate(() => {
+          const headers = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+          const bpHeader = headers.find(h => h.textContent.trim().match(/^Best Practices & Forms$/i));
+          if (!bpHeader) return '';
+
+          let content = '';
+          let currentElement = bpHeader.nextElementSibling;
+
+          // Collect content until we hit another header
+          while (currentElement) {
+            const tagName = currentElement.tagName.toLowerCase();
+            if (['h1', 'h2', 'h3', 'h4'].includes(tagName)) break;
+            content += currentElement.textContent + '\n';
+            currentElement = currentElement.nextElementSibling;
+          }
+
+          return content.trim();
+        });
+
+        if (bpContent) {
+          details.best_practices = bpContent;
         }
       }
 
       // Recently Changed section (CRITICAL for deadline updates)
       const recentlyChangedHeader = page.locator('text=/^Recently Changed$/i').first();
       if (await recentlyChangedHeader.count() > 0) {
-        // Get the parent container (the highlighted card div)
-        const parentCard = recentlyChangedHeader.locator('..');
-        if (await parentCard.count() > 0) {
-          // Get all content from the parent card, then remove the header text
-          const fullContent = await parentCard.textContent().catch(() => '');
-          // Remove "Recently Changed" header and clean up whitespace
-          details.recently_changed = fullContent
-            .replace(/Recently Changed\s*/gi, '')
-            .trim()
-            .replace(/\s+/g, ' '); // Normalize whitespace
+        const rcContent = await page.evaluate(() => {
+          const headers = Array.from(document.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+          const rcHeader = headers.find(h => h.textContent.trim().match(/^Recently Changed$/i));
+          if (!rcHeader) return '';
+
+          let content = '';
+          let currentElement = rcHeader.nextElementSibling;
+
+          // Collect content until we hit another header
+          while (currentElement) {
+            const tagName = currentElement.tagName.toLowerCase();
+            if (['h1', 'h2', 'h3', 'h4'].includes(tagName)) break;
+            content += currentElement.textContent + '\n';
+            currentElement = currentElement.nextElementSibling;
+          }
+
+          return content.trim();
+        });
+
+        if (rcContent) {
+          details.recently_changed = rcContent;
         }
       }
 
