@@ -300,9 +300,10 @@ async function extractTextFromPDF(buffer) {
   try {
     // Lazy load pdf-parse to avoid startup crash
     const { PDFParse } = await import('pdf-parse');
-    const pdfParse = new PDFParse();
-    const data = await pdfParse.parse(buffer);
-    return data.text;
+    const parser = new PDFParse({});
+    await parser.load(buffer);
+    const text = await parser.getText();
+    return text;
   } catch (error) {
     console.error('PDF extraction error:', error.message);
     return '[Error extracting PDF text]';
