@@ -49,7 +49,7 @@ const CACHE_TTL = 3600; // Cache results for 1 hour
  * @param {boolean} input.open_intakes_only - Only show grants with open intakes
  * @param {number} input.limit - Max results to return (default 10, max 50)
  * @param {boolean} input.fetch_full_details - Fetch full grant card details (slower)
- * @returns {Promise<Object>} Search results
+ * @returns {Promise<Object>} Search results (includes recently_changed field with recent updates)
  */
 export async function searchGetGranted(input) {
   try {
@@ -174,6 +174,7 @@ export async function searchGetGranted(input) {
       grant_criteria: fetch_full_details ? grant.grant_criteria : undefined,
       best_practices: fetch_full_details ? grant.best_practices : undefined,
       full_page_text: fetch_full_details ? grant.full_page_text : undefined,
+      recently_changed: grant.recently_changed,
       last_updated: grant.last_updated,
       is_active: grant.is_active
     }));
@@ -230,8 +231,9 @@ Use this to:
 - Discover hiring, training, export, R&D, or capital grants
 - Filter by region, company size, owner demographics
 - Get quick summaries or full grant card details
+- See recent changes and updates to grant programs
 
-This tool searches the internal GetGranted database (598 Canadian grants, synced daily at 2 AM PT) and returns matching opportunities with eligibility, funding details, and deadlines.
+This tool searches the internal GetGranted database (598 Canadian grants, synced daily at 2 AM PT) and returns matching opportunities with eligibility, funding details, deadlines, and recent changes.
 
 **Search Strategy:**
 1. Start with 'query' parameter for text-based search (searches grant names, criteria, descriptions)
