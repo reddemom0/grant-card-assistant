@@ -1726,8 +1726,10 @@ export function getToolsForAgent(agentType) {
 
   // Core HubSpot tools needed for most agents (enrichment, search, CRUD operations)
   const coreHubSpotTools = HUBSPOT_TOOLS.filter(tool =>
-    ['search_hubspot_contacts', 'search_hubspot_companies', 'search_hubspot_deals',
-     'get_hubspot_contact', 'get_hubspot_company', 'get_hubspot_deal',
+    ['search_hubspot_contacts', 'search_hubspot_companies',
+     'search_grant_applications',  // Deal search (actual name, not search_hubspot_deals)
+     'get_hubspot_contact', 'get_hubspot_company',
+     'get_grant_application',  // Get deal by ID (actual name, not get_hubspot_deal)
      'create_hubspot_contact', 'create_hubspot_company',
      'update_hubspot_contact', 'update_hubspot_company', 'update_hubspot_deal',
      'associate_contact_with_company', 'search_getgranted',
