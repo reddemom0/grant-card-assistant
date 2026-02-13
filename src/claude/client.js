@@ -147,10 +147,32 @@ export async function runAgent({
     const maxMessages = maxTurns * 2; // Each turn = user + assistant message
 
     let history = await getConversationMessages(conversationId, maxMessages);
+    console.log(`✓ Retrieved ${history.length} messages for conversation ${conversationId}`);
+
+    // ============================================================================
+    // 3.5. Strip thinking blocks from historical assistant messages
+    // ============================================================================
+    // CRITICAL FIX: Anthropic API throws 400 error if thinking blocks are modified
+    // in multi-turn conversations. We must remove all thinking/redacted_thinking blocks
+    // from historical assistant messages before sending them back to the API.
+    // Reference: https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
+
+    history = history.map(msg => {
+      if (msg.role === 'assistant' && Array.isArray(msg.content)) {
+        return {
+          ...msg,
+          content: msg.content.filter(block =>
+            block.type !== 'thinking' && block.type !== 'redacted_thinking'
+          )
+        };
+      }
+      return msg;
+    });
+
     console.log(`✓ Loaded ${history.length} previous messages (max: ${maxMessages})`);
 
     // ============================================================================
-    // 3.5. AUTO-COMPACTION: Check if conversation needs summarization
+    // 3.6. AUTO-COMPACTION: Check if conversation needs summarization
     // ============================================================================
 
     // Load existing summary if any
@@ -460,12 +482,16 @@ export async function runAgent({
         console.log('🔧 Agent requested tool use');
 
         // Clean content blocks: remove index field and filter out empty text blocks
-        // NOTE: Thinking blocks MUST be kept in both conversation history AND database
-        // (Claude API requirement when extended thinking is enabled - context needed across turns)
+        // CRITICAL: Also remove thinking/redacted_thinking blocks to prevent 400 errors
+        // when messages are sent back to API in multi-turn tool use loops
         const cleanedContent = fullResponse.content
           .filter(block => {
             // Remove empty text blocks that would cause API errors
             if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
+              return false;
+            }
+            // Remove thinking blocks (they cannot be modified/resent to API)
+            if (block.type === 'thinking' || block.type === 'redacted_thinking') {
               return false;
             }
             return true;
@@ -475,7 +501,7 @@ export async function runAgent({
             return cleanBlock;
           });
 
-        // Add assistant response to messages
+        // Add assistant response to messages (WITHOUT thinking blocks)
         messages.push({
           role: 'assistant',
           content: cleanedContent
