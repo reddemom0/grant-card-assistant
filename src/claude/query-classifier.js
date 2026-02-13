@@ -110,8 +110,10 @@ export function classifyQuery(message, agentType) {
       return 'simple';
     }
 
-    // Default to moderate (research/enrichment is common)
-    return 'moderate';
+    // Default to complex for Oracle (strategic knowledge work requires Sonnet)
+    // Oracle is designed for deep reasoning, multi-step analysis, and synthesis
+    // Most queries benefit from Sonnet's full reasoning capabilities
+    return 'complex';
   }
 
   // ============================================================================
