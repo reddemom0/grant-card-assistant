@@ -1,6 +1,6 @@
 # CanExport SME Application Structure (2026-27)
 
-The CanExport application has **8 sections** that grant writers will need support drafting.
+The CanExport application has **7 sections** that grant writers will need support drafting.
 
 **📋 Note**: Full program details and sample application form for 2026-27 will be published by Global Affairs Canada. This structure reflects the standard CanExport application format. Verify section requirements against the official 2026-27 application form when available.
 
@@ -51,30 +51,23 @@ The CanExport application has **8 sections** that grant writers will need suppor
 
 ---
 
-## SECTION 5: Market potential & strategy
+## SECTION 5: Market Potential, Opportunities, and Competitive Advantages
 **Character Limit**: 4,000 characters
+
+**Official Question**: Please provide an overview of the potential within the selected target market, including any relevant opportunities, strategic partnerships, or any competitive advantages your company may have, if applicable.
 
 **What to include**:
 - **Market potential**: Size, growth trends, demand evidence
-- **International business development strategy**: How activities support market entry
 - **Opportunities**: Market gaps, buyer interest, competitive openings
-- **Local partner/client leads**: Identified distributors, agents, buyers (letters of intent if available)
-- **Challenges**: Regulatory barriers, competition, market entry costs, how project addresses them
+- **Strategic partnerships**: Identified distributors, agents, buyers (letters of intent if available)
+- **Competitive advantages**: What makes company's products/services superior
+- **Value proposition**: Why target market buyers would choose this company
+- **Competitive landscape** (if applicable): Who are main competitors in target market
+- **Differentiation strategy** (if applicable): Pricing, quality, innovation, service, relationships
 
 ---
 
-## SECTION 6: Competitive differentiation
-**Character Limit**: 4,000 characters
-
-**What to include**:
-- **Competitive advantage**: What makes company's products/services superior
-- **Value proposition**: Why target market buyers would choose this company over competitors
-- **Competitive landscape**: Who are main competitors in target market
-- **Differentiation strategy**: Pricing, quality, innovation, service, relationships, etc.
-
----
-
-## SECTION 7: Benefits to Canada
+## SECTION 6: Benefits to Canada
 **Character Limit**: 4,000 characters **PER BENEFIT TYPE** (7 separate fields)
 
 Each benefit type has its own text field (4,000 char limit per field):
@@ -95,7 +88,7 @@ Each benefit type has its own text field (4,000 char limit per field):
 
 ---
 
-## SECTION 8: Project Budget - Activity Descriptions
+## SECTION 7: Project Budget - Activity Descriptions
 **Format**: TABLE with multiple rows
 **Character Limit**: 4,000 characters **PER ACTIVITY ROW**
 
@@ -139,10 +132,9 @@ Each benefit type has its own text field (4,000 char limit per field):
 | 2 - Project Summary | 4,000 | Single field |
 | 3 - Capacity | 4,000 | Single field |
 | 4 - IP Strategy | 2,000 | Single field |
-| 5 - Market Potential | 4,000 | Single field |
-| 6 - Differentiation | 4,000 | Single field |
-| 7 - Benefits to Canada | 4,000 EACH | 7 separate fields |
-| 8 - Budget Activities | 4,000 EACH | One per activity row |
+| 5 - Market Potential & Competitive Advantages | 4,000 | Single field |
+| 6 - Benefits to Canada | 4,000 EACH | 7 separate fields |
+| 7 - Budget Activities | 4,000 EACH | One per activity row |
 
 ---
 
