@@ -4,6 +4,8 @@
  * Defines all tools available to agents:
  * - Server tools (executed by Anthropic)
  * - Client tools (executed locally)
+ *
+ * Last updated: 2026-02-16 - Added canexport-writer skills to load_skill enum
  */
 
 // ============================================================================
