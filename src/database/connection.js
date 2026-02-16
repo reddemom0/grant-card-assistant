@@ -130,6 +130,41 @@ export async function transaction(callback) {
 }
 
 /**
+ * Initialize database schema
+ * Creates required tables if they don't exist
+ * @returns {Promise<void>}
+ */
+export async function initializeSchema() {
+  try {
+    console.log('🔧 Initializing database schema...');
+
+    // Create conversation_summaries table if it doesn't exist
+    await query(`
+      CREATE TABLE IF NOT EXISTS conversation_summaries (
+        id SERIAL PRIMARY KEY,
+        conversation_id UUID NOT NULL,
+        summary TEXT NOT NULL,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(conversation_id)
+      )
+    `);
+
+    // Create index if it doesn't exist
+    await query(`
+      CREATE INDEX IF NOT EXISTS idx_conversation_summaries_conversation_id
+        ON conversation_summaries(conversation_id)
+    `);
+
+    console.log('✅ Database schema initialized (conversation_summaries table ready)');
+  } catch (error) {
+    // Non-fatal - log warning but don't crash
+    console.warn('⚠️  Schema initialization warning:', error.message);
+  }
+}
+
+/**
  * Test database connection
  * @returns {Promise<boolean>} True if connection successful
  */
@@ -139,6 +174,10 @@ export async function testConnection() {
     console.log('✅ Database connection test successful');
     console.log(`   Time: ${result.rows[0].current_time}`);
     console.log(`   Version: ${result.rows[0].version.substring(0, 50)}...`);
+
+    // Initialize schema after successful connection
+    await initializeSchema();
+
     return true;
   } catch (error) {
     console.error('❌ Database connection test failed:', error.message);
