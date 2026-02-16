@@ -339,14 +339,24 @@ class AgentInterface {
             }
         };
 
-        this.chatClient.onTextDelta = (text) => {
-            this.streamingContent += text;
-            this.updateStreamingMessage(this.streamingMessageDiv, this.streamingContent, false);
+        this.chatClient.onThinkingStart = () => {
+            this.showThinkingIndicator();
         };
 
         this.chatClient.onThinkingDelta = (thinking) => {
             this.streamingThinkingContent += thinking;
             this.updateThinkingContent(this.streamingThinkingDiv, this.streamingThinkingContent);
+        };
+
+        this.chatClient.onThinkingStop = () => {
+            this.hideThinkingIndicator();
+        };
+
+        this.chatClient.onTextDelta = (text) => {
+            // Hide thinking indicator when actual text starts streaming
+            this.hideThinkingIndicator();
+            this.streamingContent += text;
+            this.updateStreamingMessage(this.streamingMessageDiv, this.streamingContent, false);
         };
 
         this.chatClient.onToolUse = (toolName, input) => {
@@ -723,19 +733,36 @@ class AgentInterface {
         thinkingContainer.appendChild(thinkingHeader);
         thinkingContainer.appendChild(thinkingContent);
 
+        // Create thinking indicator (animated dots that show before streaming)
+        const thinkingIndicator = document.createElement('div');
+        thinkingIndicator.className = 'thinking-indicator';
+        thinkingIndicator.style.display = 'none'; // Hidden until thinking starts
+        thinkingIndicator.innerHTML = `
+            <div class="thinking-animation">
+                <svg class="thinking-icon-animate" width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" fill="none" opacity="0.2"/>
+                    <path d="M12 2 A10 10 0 0 1 22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span class="thinking-text">thinking</span>
+                <span class="thinking-dots"></span>
+            </div>
+        `;
+
         // Create main content container
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         contentDiv.innerHTML = '<span class="typing-cursor">▎</span>';
 
         messageDiv.appendChild(thinkingContainer);
+        messageDiv.appendChild(thinkingIndicator);
         messageDiv.appendChild(contentDiv);
         messagesContainer.appendChild(messageDiv);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
-        // Store reference to thinking content div
+        // Store references
         this.streamingThinkingDiv = thinkingContent;
         this.streamingThinkingContent = '';
+        this.streamingThinkingIndicator = thinkingIndicator;
 
         // Store a temporary message index (will be updated with real ID if available)
         const messageIndex = messagesContainer.querySelectorAll('.message.assistant').length - 1;
@@ -1220,6 +1247,27 @@ class AgentInterface {
         const sendButton = document.getElementById('send-button');
         if (stopButton) stopButton.classList.remove('visible');
         if (sendButton) sendButton.style.display = 'flex';
+    }
+
+    /**
+     * Show thinking indicator animation
+     */
+    showThinkingIndicator() {
+        if (this.streamingThinkingIndicator) {
+            this.streamingThinkingIndicator.style.display = 'flex';
+            console.log('💭 Thinking indicator shown');
+        }
+        this.showStopButton();
+    }
+
+    /**
+     * Hide thinking indicator animation
+     */
+    hideThinkingIndicator() {
+        if (this.streamingThinkingIndicator) {
+            this.streamingThinkingIndicator.style.display = 'none';
+            console.log('💭 Thinking indicator hidden');
+        }
     }
 
     /**

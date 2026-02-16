@@ -12,7 +12,9 @@ class ChatClient {
         this.conversationId = null;
         this.userId = null;
         this.onTextDelta = null;
+        this.onThinkingStart = null;
         this.onThinkingDelta = null;
+        this.onThinkingStop = null;
         this.onToolUse = null;
         this.onToolResult = null;
         this.onComplete = null;
@@ -141,6 +143,9 @@ class ChatClient {
 
             case 'thinking_start':
                 console.log('💭 Thinking started');
+                if (this.onThinkingStart) {
+                    this.onThinkingStart();
+                }
                 break;
 
             case 'thinking_delta':
@@ -152,6 +157,9 @@ class ChatClient {
 
             case 'thinking_stop':
                 console.log('💭 Thinking stopped');
+                if (this.onThinkingStop) {
+                    this.onThinkingStop();
+                }
                 break;
 
             case 'tool_use':

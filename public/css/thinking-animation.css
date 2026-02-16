@@ -1,0 +1,65 @@
+/* Thinking Indicator Animation - Shared across all agents */
+
+.thinking-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem 0;
+    max-width: 700px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.thinking-animation {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.05), rgba(220, 38, 38, 0.08));
+    border: 1px solid rgba(220, 38, 38, 0.15);
+    border-radius: 20px;
+    color: var(--primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.thinking-icon-animate {
+    flex-shrink: 0;
+    animation: thinking-rotate 1.2s linear infinite;
+    color: var(--primary);
+}
+
+@keyframes thinking-rotate {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.thinking-text {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.thinking-dots::after {
+    content: '';
+    animation: thinking-dots 1.5s steps(4, end) infinite;
+    color: var(--text-secondary);
+}
+
+@keyframes thinking-dots {
+    0%, 20% {
+        content: '';
+    }
+    40% {
+        content: '.';
+    }
+    60% {
+        content: '..';
+    }
+    80%, 100% {
+        content: '...';
+    }
+}
