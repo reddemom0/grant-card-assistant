@@ -653,10 +653,10 @@ app.get('/login', (req, res) => {
   res.sendFile('login.html', { root: '.' });
 });
 
-// Serve root - redirect to Oracle (it will handle auth check)
-app.get('/', (req, res) => {
-  res.redirect('/oracle/new');
-});
+// Serve root - let static middleware serve index.html (it will handle auth check)
+// app.get('/', (req, res) => {
+//   res.redirect('/oracle/new');
+// });
 
 // ============================================================================
 // STATIC FILES
