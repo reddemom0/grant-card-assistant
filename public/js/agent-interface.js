@@ -273,23 +273,59 @@ class AgentInterface {
             stopButton.addEventListener('click', () => this.stopGeneration());
         }
 
-        // Drag and drop file upload
-        const inputBox = document.getElementById('input-box');
-        if (inputBox && this.config.enableFileUploads) {
-            inputBox.addEventListener('dragover', (e) => {
+        // Full-page drag and drop file upload with visual overlay
+        if (this.config.enableFileUploads) {
+            // Create drag overlay if it doesn't exist
+            let dragOverlay = document.getElementById('drag-drop-overlay');
+            if (!dragOverlay) {
+                dragOverlay = document.createElement('div');
+                dragOverlay.id = 'drag-drop-overlay';
+                dragOverlay.innerHTML = `
+                    <div class="drag-drop-content">
+                        <div class="drag-drop-icon">📎</div>
+                        <div class="drag-drop-text">Drop files here to upload</div>
+                        <div class="drag-drop-subtext">PDF, DOCX, TXT, images, and spreadsheets supported</div>
+                    </div>
+                `;
+                document.body.appendChild(dragOverlay);
+            }
+
+            let dragCounter = 0;
+
+            // Prevent default drag behavior on whole document
+            document.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                inputBox.classList.add('drag-over');
+                e.stopPropagation();
             });
 
-            inputBox.addEventListener('dragleave', () => {
-                inputBox.classList.remove('drag-over');
+            document.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragCounter++;
+                if (e.dataTransfer.types.includes('Files')) {
+                    dragOverlay.classList.add('active');
+                }
             });
 
-            inputBox.addEventListener('drop', (e) => {
+            document.addEventListener('dragleave', (e) => {
                 e.preventDefault();
-                inputBox.classList.remove('drag-over');
-                const files = Array.from(e.dataTransfer.files);
-                this.handleFileDrop(files);
+                e.stopPropagation();
+                dragCounter--;
+                if (dragCounter === 0) {
+                    dragOverlay.classList.remove('active');
+                }
+            });
+
+            document.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragCounter = 0;
+                dragOverlay.classList.remove('active');
+
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const files = Array.from(e.dataTransfer.files);
+                    this.handleFileDrop(files);
+                }
             });
         }
 

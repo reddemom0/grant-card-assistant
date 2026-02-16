@@ -629,3 +629,78 @@ h1, h2, h3, h4 {
 .history-item-meta span:first-child {
     color: var(--primary-cyan);
 }
+
+/* ============================================================================
+   DRAG AND DROP OVERLAY
+   Full-page file drop zone with visual feedback
+   ============================================================================ */
+
+#drag-drop-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(7, 51, 74, 0.95);
+    backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+#drag-drop-overlay.active {
+    opacity: 1;
+    pointer-events: all;
+}
+
+.drag-drop-content {
+    text-align: center;
+    padding: 3rem;
+    border: 3px dashed var(--primary-cyan);
+    border-radius: 24px;
+    background: rgba(54, 202, 250, 0.05);
+    max-width: 500px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+        border-color: var(--primary-cyan);
+    }
+    50% {
+        transform: scale(1.02);
+        border-color: var(--light-teal);
+    }
+}
+
+.drag-drop-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    animation: bounce 1s ease-in-out infinite;
+}
+
+@keyframes bounce {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+.drag-drop-text {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary-cyan);
+    margin-bottom: 0.5rem;
+}
+
+.drag-drop-subtext {
+    font-size: 0.95rem;
+    color: rgba(255, 255, 255, 0.7);
+}
