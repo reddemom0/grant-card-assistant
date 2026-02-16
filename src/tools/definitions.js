@@ -1162,6 +1162,86 @@ export const DROPBOX_TOOLS = [
 ];
 
 // ============================================================================
+// LOAD SKILL TOOL
+// Standalone skill loading utility for agents that need it
+// ============================================================================
+
+export const LOAD_SKILL_TOOL = {
+  name: 'load_skill',
+  description: `Load specialized skill documentation with methodologies, frameworks, and best practices for complex workflows.
+
+**When to use this tool:**
+Use when simple information retrieval is insufficient and you need specialized expertise for complex tasks.
+
+**Available skills:**
+
+**Sales Skill:**
+- \`lead_farming\` - Complete lead creation & enrichment workflow (12 priority fields, confidence scoring)
+- \`linkedin_enrichment\` - Free LinkedIn research strategies for companies and decision-makers
+- \`data_quality\` - Verification, deduplication, and cleanup workflows
+- \`icp_analysis\` - Build Ideal Client Profiles from won customer patterns
+
+**Grants Skill:**
+- \`overview\` - Grant workflow decision tree and capability overview
+- \`eligibility\` - Eligibility analysis framework and disqualifiers
+- \`matching\` - Client-to-program matching methodology
+- \`validation\` - Grant status validation workflow (MANDATORY before recommendations)
+
+**CanExport Writer Skill:**
+- \`overview\` - Skills overview and decision tree for CanExport application lifecycle
+- \`PROGRAM_DETAILS\` - Complete CanExport SME program details (eligibility, expenses, compliance rules)
+- \`APPLICATION_STRUCTURE\` - All 8 application sections with character limits and requirements
+- \`KNOWLEDGE_BASE_INDEX\` - Index of Google Drive knowledge base documents
+- \`STAGE_1_READINESS\` - Preparedness assessment methodology and rubrics
+- \`STAGE_1_BUDGET_GUIDE\` - Budget Building Guide creation methodology
+- \`STAGE_1_INTERVIEW_QUESTIONS\` - Budget Review Interview Questions generation
+- \`STAGE_2_DRAFTING\` - Section-by-section application drafting guidance
+- \`STAGE_3_REVIEW\` - Application review and optimization using evaluation criteria
+
+**Research Skill (coming soon):**
+- \`company_intelligence\` - Systematic company research with multi-source validation
+
+**Do NOT load skills for simple queries:**
+- "Tell me about Company X" → Use tools directly
+- "Find grants for BC tech companies" → Use search_getgranted
+- "Show me recent alerts" → Use get_visualping_alerts
+
+**Load skills for specialized tasks:**
+- "Enrich TechCo's HubSpot record with 12 priority fields" → load_skill(sales, lead_farming)
+- "Find duplicate companies and merge them" → load_skill(sales, data_quality)
+- "Build an ICP from our construction customers" → load_skill(sales, icp_analysis)
+- "Check if Company X qualifies for Grant Y" → load_skill(grants, eligibility)
+- "Find best grants for this construction company" → load_skill(grants, matching)
+- "Validate if program X is accepting applications" → load_skill(grants, validation)
+- "What are the CanExport application questions?" → load_skill(canexport-writer, APPLICATION_STRUCTURE)
+- "Assess client readiness for CanExport" → load_skill(canexport-writer, STAGE_1_READINESS)
+- "Draft Section 2 of the application" → load_skill(canexport-writer, STAGE_2_DRAFTING)
+- "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)`,
+  input_schema: {
+    type: 'object',
+    properties: {
+      skill_name: {
+        type: 'string',
+        enum: ['sales', 'research', 'grants', 'writing', 'canexport-writer'],
+        description: 'The skill domain to load'
+      },
+      sub_skill: {
+        type: 'string',
+        enum: [
+          'lead_farming', 'linkedin_enrichment', 'data_quality', 'icp_analysis',
+          'overview', 'eligibility', 'matching', 'validation', 'company_intelligence',
+          'PROGRAM_DETAILS', 'APPLICATION_STRUCTURE', 'KNOWLEDGE_BASE_INDEX',
+          'STAGE_1_READINESS', 'STAGE_1_BUDGET_GUIDE', 'STAGE_1_INTERVIEW_QUESTIONS',
+          'STAGE_2_DRAFTING', 'STAGE_3_REVIEW'
+        ],
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review).'
+      }
+    },
+    required: ['skill_name', 'sub_skill']
+  }
+};
+
+// ============================================================================
 // ORACLE TOOLS
 // Internal knowledge base search for Granted Consulting documentation
 // ============================================================================
@@ -1776,8 +1856,8 @@ export function getToolsForAgent(agentType) {
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
 
     case 'canexport-writer':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + CANEXPORT_WRITER_TOOLS.length + GOOGLE_DOCS_TOOLS.length} tools)`);
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + CANEXPORT_WRITER_TOOLS.length + GOOGLE_DOCS_TOOLS.length} tools)`);
+      return [...baseTools, LOAD_SKILL_TOOL, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS];
 
     case 'readiness-strategist':
       console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_DOCS_TOOLS.length} tools)`);
