@@ -396,26 +396,6 @@
     </div>
 
     <script>
-        // Check if user is already logged in
-        function checkAuth() {
-            const cookies = document.cookie.split(';');
-            const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
-
-            if (authToken) {
-                // User is already authenticated, redirect to Oracle
-                console.log('✅ User already logged in, redirecting to Oracle...');
-                window.location.href = '/oracle/new';
-                return true;
-            }
-            return false;
-        }
-
-        // Run auth check immediately
-        if (checkAuth()) {
-            // Exit early if redirecting
-            throw new Error('Redirecting to Oracle');
-        }
-
         const loginForm = document.getElementById('loginForm');
         const passwordInput = document.getElementById('password');
         const loginButton = document.getElementById('loginButton');
