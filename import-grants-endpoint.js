@@ -72,6 +72,25 @@ function classifyGrant(grant) {
     };
   }
 
+  // 2b. full_page_text contains the GetGranted "This grant is inactive" badge.
+  // GetGranted renders this as a UI element for grants where all spots are filled
+  // or the program has ended — but does NOT reflect it in is_active or recently_changed.
+  // The scraper captures the full page HTML-as-text, so we can detect it here.
+  const fpt = (grant.full_page_text || '').toLowerCase();
+  const inactiveBadgePhrases = [
+    'this grant is inactive',
+    'no longer active because all spots have been filled',
+    'no longer active because the program has ended',
+    'no longer active because the deadline has passed',
+  ];
+  const inactiveBadge = inactiveBadgePhrases.find(p => fpt.includes(p));
+  if (inactiveBadge) {
+    return {
+      currentlyAccepting: false,
+      exclusionReason: `GetGranted "inactive" badge detected in page text: "${inactiveBadge}"`
+    };
+  }
+
   // 3. GetGranted itself marked it inactive
   if (grant.is_active === false) {
     return {
