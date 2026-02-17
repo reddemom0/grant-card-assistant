@@ -33,6 +33,9 @@ import {
   handleDeleteConversation
 } from './src/api/chat.js';
 
+// Lead-gen chatbot (public — no auth)
+import { handleLeadGenChat } from './src/api/lead-gen.js';
+
 // Authentication
 import authRouter from './src/api/auth.js';
 import { authenticateUser } from './src/middleware/auth.js';
@@ -92,7 +95,7 @@ app.get('/import-grants', importGrantsEndpoint);
 import { searchGrantsEndpoint } from './search-grants-endpoint.js';
 app.get('/search-grants', searchGrantsEndpoint);
 
-// Generate embeddings endpoint (one-time setup for RAG)
+// Generate embeddings endpoint — re-embeds all currently_accepting grants with full text
 app.get('/generate-embeddings', async (req, res) => {
   try {
     // Simple secret-based auth for one-time operations (trim to handle whitespace)
@@ -112,15 +115,32 @@ app.get('/generate-embeddings', async (req, res) => {
 
     const stats = { total: 0, processed: 0, errors: [], cost: 0 };
 
-    // Fetch active grants without embeddings
+    // Build full searchable text including recently_changed (critical for freshness signal)
+    function buildGrantText(grant) {
+      const parts = [];
+      parts.push(grant.grant_name);
+      if (grant.grant_type) parts.push(`Type: ${grant.grant_type}`);
+      if (grant.program_provider) parts.push(`Provider: ${grant.program_provider}`);
+      if (grant.regions) parts.push(`Regions: ${grant.regions}`);
+      if (grant.industries) parts.push(`Industries: ${grant.industries}`);
+      if (grant.deadline) parts.push(`Deadline: ${grant.deadline}`);
+      if (grant.grant_amount) parts.push(`Amount: ${grant.grant_amount}`);
+      if (grant.recently_changed) parts.push(`Recent Status: ${grant.recently_changed.slice(0, 500)}`);
+      if (grant.grant_criteria) parts.push(`Criteria: ${grant.grant_criteria.slice(0, 2000)}`);
+      if (grant.best_practices) parts.push(`Best Practices: ${grant.best_practices.slice(0, 800)}`);
+      return parts.join('\n\n');
+    }
+
+    // Fetch all currently-accepting grants (re-embed even if already embedded)
     const result = await pool.query(`
       SELECT grant_id, grant_name, grant_type, grant_amount,
              regions, industries, program_provider, deadline,
-             grant_criteria, best_practices, is_active
+             grant_criteria, best_practices, recently_changed,
+             is_active, currently_accepting
       FROM grants
-      WHERE is_active = true AND embedding IS NULL
+      WHERE currently_accepting = true
+         OR (currently_accepting IS NULL AND is_active = true)
       ORDER BY grant_id::integer
-      LIMIT 100
     `);
 
     stats.total = result.rows.length;
@@ -128,18 +148,7 @@ app.get('/generate-embeddings', async (req, res) => {
     // Process each grant
     for (const grant of result.rows) {
       try {
-        // Build searchable text
-        const parts = [
-          grant.grant_name,
-          grant.grant_type ? `Type: ${grant.grant_type}` : '',
-          grant.program_provider ? `Provider: ${grant.program_provider}` : '',
-          grant.regions ? `Regions: ${grant.regions}` : '',
-          grant.industries ? `Industries: ${grant.industries}` : '',
-          grant.grant_criteria ? `Criteria: ${grant.grant_criteria.slice(0, 2000)}` : '',
-          grant.best_practices ? `Best Practices: ${grant.best_practices.slice(0, 1000)}` : ''
-        ].filter(Boolean);
-
-        const text = parts.join('\n\n');
+        const text = buildGrantText(grant);
 
         // Generate embedding
         const response = await voyage.embed({
@@ -158,6 +167,9 @@ app.get('/generate-embeddings', async (req, res) => {
         );
 
         stats.processed++;
+
+        // Small delay to avoid rate limits
+        await new Promise(resolve => setTimeout(resolve, 100));
 
       } catch (error) {
         stats.errors.push({ grant_id: grant.grant_id, error: error.message });
@@ -222,6 +234,13 @@ app.get('/health', async (req, res) => {
 // ============================================================================
 // NEW DIRECT API ENDPOINTS
 // ============================================================================
+
+// ============================================================================
+// LEAD-GEN CHATBOT (PUBLIC — NO AUTH)
+// ============================================================================
+
+// Chat endpoint — no authenticateUser middleware (public-facing)
+app.post('/api/lead-gen/chat', handleLeadGenChat);
 
 // Main chat endpoint (SSE streaming) - with authentication
 app.post('/api/chat', authenticateUser, handleChatRequest);
@@ -610,6 +629,11 @@ const serveUnifiedAgents = (req, res) => {
   });
   res.sendFile('unified-agents.html', { root: '.' });
 };
+
+// Lead-gen public chat page
+app.get('/lead-gen*', (req, res) => {
+  res.sendFile('lead-gen.html', { root: '.' });
+});
 
 app.get('/grant-cards*', serveUnifiedAgents);
 app.get('/etg-writer*', serveUnifiedAgents);
