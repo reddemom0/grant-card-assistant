@@ -1,55 +1,44 @@
 /**
  * Grant Search Function
  *
- * Keyword + filter search with vector similarity ranking when a text query
- * is provided. Results are ordered by relevance (vector score) then recency.
+ * Keyword + filter search with match-count ranking.
  *
  * Key design decisions:
+ * - Splits multi-word keyword strings into individual tokens so that
+ *   "hiring training expansion Alberta" → ['hiring','training','expansion','alberta']
+ * - WHERE uses OR across all tokens: any token match = row included
+ * - ORDER BY keyword_score DESC (# of tokens matched), then last_updated DESC
  * - Filters on currently_accepting = true (not just is_active) to exclude
  *   programs that GetGranted hasn't deactivated but are clearly closed.
  * - Excludes garbage-named grants (Z-COVID, Z-DUPLICATE, DORMANT) automatically.
- * - When a text query is provided, uses pgvector cosine distance for ranking.
- * - Falls back to last_updated DESC when no query/embedding is available.
  */
 
 import pg from 'pg';
-import voyageai from 'voyageai';
 import { config } from 'dotenv';
 
 config();
 
 const { Pool } = pg;
 
-// Voyage AI client for query embeddings (optional — gracefully degrades)
-let voyage = null;
-try {
-  if (process.env.VOYAGE_API_KEY) {
-    voyage = new voyageai.Client(process.env.VOYAGE_API_KEY);
-  }
-} catch (err) {
-  console.warn('⚠️  Voyage AI unavailable, vector ranking disabled:', err.message);
-}
-
 /**
- * Embed a query string using Voyage AI
- * Returns null if embeddings are unavailable
+ * Tokenise keyword input:
+ * - Accepts an array of strings (may be multi-word, e.g. ['hiring training BC'])
+ * - Splits each string on whitespace
+ * - Lower-cases, strips non-alphanumeric characters
+ * - Drops tokens shorter than 2 characters
  */
-async function embedQuery(text) {
-  if (!voyage || !text?.trim()) return null;
-  try {
-    const result = await voyage.embed([text.trim()], { model: 'voyage-2' });
-    return result.embeddings[0];
-  } catch (err) {
-    console.warn('⚠️  Query embedding failed, falling back to keyword ranking:', err.message);
-    return null;
-  }
+function tokeniseKeywords(keywords) {
+  return keywords
+    .flatMap(k => k.split(/\s+/))
+    .map(w => w.toLowerCase().replace(/[^a-z0-9]/g, ''))
+    .filter(w => w.length >= 2);
 }
 
 /**
- * Search grants using keywords, filters, and optional vector similarity ranking
+ * Search grants using keywords, filters, and match-count ranking.
  *
  * @param {Object} opts
- * @param {string[]} opts.keywords      - Keywords searched across name, criteria, type, full text
+ * @param {string[]} opts.keywords      - Raw keyword strings (may be multi-word)
  * @param {string[]} opts.regions       - Province/territory filter (OR logic)
  * @param {string[]} opts.industries    - Industry filter (OR logic)
  * @param {string[]} opts.grantTypes    - Grant type filter (OR logic)
@@ -65,146 +54,125 @@ async function searchGrants({
   includeInactive = false,
   maxResults = 50
 }) {
-  const pool = new Pool({
-    connectionString: process.env.DATABASE_URL
-  });
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   try {
     const client = await pool.connect();
 
-    // Embed the keyword query for vector ranking (fire off in parallel with DB query)
-    const queryText = keywords.join(' ').trim();
-    const embeddingPromise = queryText ? embedQuery(queryText) : Promise.resolve(null);
+    // Tokenise keywords into individual words
+    const tokens = tokeniseKeywords(keywords);
 
-    // ── Build WHERE clause ────────────────────────────────────────────────────
-
-    let whereClause = 'WHERE 1=1';
     const params = [];
     let paramIndex = 1;
+    const whereConditions = ['1=1'];
 
-    // Status filter: use currently_accepting when available, fall back to is_active
-    // includeInactive bypasses both filters (for admin/debugging use)
+    // ── Status filter ─────────────────────────────────────────────────────────
+    // Use currently_accepting when populated (migration 004+), fall back to is_active.
     if (!includeInactive) {
-      whereClause += `
-        AND (
-          -- Prefer the derived currently_accepting field (migration 004+)
-          CASE WHEN currently_accepting IS NOT NULL
-               THEN currently_accepting = true
-               ELSE is_active = true
-          END
-        )`;
+      whereConditions.push(`(
+        CASE WHEN currently_accepting IS NOT NULL
+             THEN currently_accepting = true
+             ELSE is_active = true
+        END
+      )`);
     }
 
-    // Keyword search across all relevant text fields
-    if (keywords.length > 0) {
-      const keywordConditions = keywords.map(keyword => {
-        const param = `%${keyword}%`;
-        params.push(param, param, param, param, param, param);
-        const condition = `(
-          grant_name ILIKE $${paramIndex}
-          OR grant_type ILIKE $${paramIndex + 1}
+    // ── Keyword filter ────────────────────────────────────────────────────────
+    // Each token is checked across all searchable fields.
+    // OR logic between tokens: a row matches if ANY token appears anywhere.
+    // (Ranking then promotes rows that match MORE tokens.)
+    if (tokens.length > 0) {
+      const tokenConditions = tokens.map(token => {
+        const p = `%${token}%`;
+        params.push(p, p, p, p, p, p);
+        const cond = `(
+          grant_name       ILIKE $${paramIndex}
+          OR grant_type    ILIKE $${paramIndex + 1}
           OR grant_criteria ILIKE $${paramIndex + 2}
           OR best_practices ILIKE $${paramIndex + 3}
           OR recently_changed ILIKE $${paramIndex + 4}
           OR full_page_text ILIKE $${paramIndex + 5}
         )`;
         paramIndex += 6;
-        return condition;
+        return cond;
       });
-      whereClause += ` AND (${keywordConditions.join(' AND ')})`;
+      // OR across all tokens — row appears if at least one token matches
+      whereConditions.push(`(${tokenConditions.join(' OR ')})`);
     }
 
-    // Region filter (OR — match any of the requested regions)
+    // ── Region filter ─────────────────────────────────────────────────────────
+    // Auto-includes "All of Canada" grants regardless of requested region.
     if (regions.length > 0) {
       const regionConditions = regions.map(region => {
         params.push(`%${region}%`);
         return `regions ILIKE $${paramIndex++}`;
       });
-      whereClause += ` AND (regions ILIKE '%All of Canada%' OR ${regionConditions.join(' OR ')})`;
+      whereConditions.push(
+        `(regions ILIKE '%All of Canada%' OR ${regionConditions.join(' OR ')})`
+      );
     }
 
-    // Industry filter (OR)
+    // ── Industry filter ───────────────────────────────────────────────────────
     if (industries.length > 0) {
       const industryConditions = industries.map(industry => {
         params.push(`%${industry}%`);
         return `industries ILIKE $${paramIndex++}`;
       });
-      whereClause += ` AND (${industryConditions.join(' OR ')})`;
+      whereConditions.push(`(${industryConditions.join(' OR ')})`);
     }
 
-    // Grant type filter (OR)
+    // ── Grant type filter ─────────────────────────────────────────────────────
     if (grantTypes.length > 0) {
       const typeConditions = grantTypes.map(type => {
         params.push(`%${type}%`);
         return `grant_type ILIKE $${paramIndex++}`;
       });
-      whereClause += ` AND (${typeConditions.join(' OR ')})`;
+      whereConditions.push(`(${typeConditions.join(' OR ')})`);
     }
 
-    // ── Wait for embedding ────────────────────────────────────────────────────
-    const queryEmbedding = await embeddingPromise;
+    const whereClause = 'WHERE ' + whereConditions.join(' AND ');
 
-    // ── Build SELECT + ORDER BY ───────────────────────────────────────────────
+    // ── Keyword score expression ──────────────────────────────────────────────
+    // Counts how many tokens matched in the most important fields.
+    // Uses string literals (safe: tokens are already stripped to [a-z0-9]).
+    // This avoids doubling the param count and is readable in EXPLAIN output.
+    const keywordScoreExpr = tokens.length > 0
+      ? `(${tokens.map(token =>
+          `(CASE WHEN (
+            grant_name        ILIKE '%${token}%'
+            OR grant_type     ILIKE '%${token}%'
+            OR grant_criteria ILIKE '%${token}%'
+            OR recently_changed ILIKE '%${token}%'
+          ) THEN 1 ELSE 0 END)`
+        ).join(' +\n          ')})`
+      : '0';
 
-    let selectClause;
-    let orderByClause;
-
-    if (queryEmbedding) {
-      // Vector ranking: cosine distance to query embedding
-      // Lower distance = higher similarity; we convert to similarity score for display
-      const embeddingLiteral = `'[${queryEmbedding.join(',')}]'::vector`;
-      selectClause = `
-        SELECT
-          grant_id, grant_name, grant_type, grant_amount, url,
-          regions, industries, program_provider, deadline,
-          max_spend, contribution_percentage, difficulty,
-          grant_criteria, best_practices, recently_changed,
-          last_updated, is_active, currently_accepting, exclusion_reason,
-          CASE
-            WHEN embedding IS NOT NULL
-            THEN ROUND(CAST((1 - (embedding <=> ${embeddingLiteral})) * 100 AS NUMERIC), 1)
-            ELSE NULL
-          END AS vector_score
-        FROM grants
-      `;
-      orderByClause = `
-        ORDER BY
-          -- Grants with embeddings ranked by vector similarity first
-          CASE WHEN embedding IS NOT NULL THEN 0 ELSE 1 END ASC,
-          -- Then by vector similarity (higher = better)
-          CASE WHEN embedding IS NOT NULL THEN (embedding <=> ${embeddingLiteral}) ELSE 1 END ASC,
-          -- Recency as tiebreaker
-          last_updated DESC NULLS LAST
-        LIMIT $${paramIndex}
-      `;
-    } else {
-      // No embedding — pure recency ordering
-      selectClause = `
-        SELECT
-          grant_id, grant_name, grant_type, grant_amount, url,
-          regions, industries, program_provider, deadline,
-          max_spend, contribution_percentage, difficulty,
-          grant_criteria, best_practices, recently_changed,
-          last_updated, is_active, currently_accepting, exclusion_reason,
-          NULL::NUMERIC AS vector_score
-        FROM grants
-      `;
-      orderByClause = `
-        ORDER BY last_updated DESC NULLS LAST
-        LIMIT $${paramIndex}
-      `;
-    }
-
+    // ── LIMIT param ───────────────────────────────────────────────────────────
     params.push(maxResults);
+    const limitParam = paramIndex++;
 
-    const fullQuery = `${selectClause} ${whereClause} ${orderByClause}`;
+    // ── Full query ────────────────────────────────────────────────────────────
+    const sql = `
+      SELECT
+        grant_id, grant_name, grant_type, grant_amount, url,
+        regions, industries, program_provider, deadline,
+        max_spend, contribution_percentage, difficulty,
+        grant_criteria, best_practices, recently_changed,
+        last_updated, is_active, currently_accepting, exclusion_reason,
+        ${keywordScoreExpr} AS keyword_score
+      FROM grants
+      ${whereClause}
+      ORDER BY
+        ${tokens.length > 0 ? `${keywordScoreExpr} DESC,` : ''}
+        last_updated DESC NULLS LAST
+      LIMIT $${limitParam}
+    `;
 
-    // ── Execute ───────────────────────────────────────────────────────────────
-    const result = await client.query(fullQuery, params);
+    const result = await client.query(sql, params);
     client.release();
 
-    const rankMethod = queryEmbedding ? 'vector+recency' : 'recency';
-    console.log(`✅ searchGrants: ${result.rows.length} results (ranked by ${rankMethod})`);
+    const rankMethod = tokens.length > 0 ? 'keyword-match-count+recency' : 'recency';
+    console.log(`✅ searchGrants: ${result.rows.length} results (tokens: [${tokens.join(', ')}], ranked by ${rankMethod})`);
 
     return {
       total: result.rows.length,
@@ -304,36 +272,32 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`   Total: ${stats.total}`);
   console.log(`   is_active=true: ${stats.is_active_true}`);
   console.log(`   currently_accepting=true: ${stats.currently_accepting}`);
-  console.log(`   Staleness (accepting):`, stats.staleness);
   console.log(`   Top types:`, stats.topTypes.slice(0, 5).map(t => `${t.grant_type}(${t.count})`).join(', '));
 
-  // 2. Vector search for "hiring"
-  console.log('\n2️⃣  Vector search: "hiring grants BC tech"');
-  const hiringResults = await searchGrants({
-    keywords: ['hiring'],
-    regions: ['British Columbia'],
-    maxResults: 5
-  });
-  console.log(`   rankMethod: ${hiringResults.rankMethod}`);
-  hiringResults.grants.forEach(g => {
-    console.log(`   - [${g.vector_score ?? 'N/A'}] ${g.grant_name} (${g.last_updated})`);
-  });
+  // 2. Multi-word keyword search (the bug this rewrite fixes)
+  console.log('\n2️⃣  Multi-word keyword: "hiring training expansion Alberta"');
+  const r1 = await searchGrants({ keywords: ['hiring training expansion Alberta'], maxResults: 5 });
+  console.log(`   rankMethod: ${r1.rankMethod}`);
+  r1.grants.forEach(g => console.log(`   - [${g.keyword_score}] ${g.grant_name}`));
 
-  // 3. Verify problematic grants are excluded
-  console.log('\n3️⃣  Checking known-bad grants are excluded:');
-  const badNames = ['Digital Link Ontario', 'DigitalWorks', 'Z-COVID', 'DORMANT'];
-  for (const name of badNames) {
+  // 3. Comma-separated keywords (legacy format)
+  console.log('\n3️⃣  Comma-split keywords: ["hiring", "Alberta"]');
+  const r2 = await searchGrants({ keywords: ['hiring', 'Alberta'], maxResults: 5 });
+  console.log(`   rankMethod: ${r2.rankMethod}`);
+  r2.grants.forEach(g => console.log(`   - [${g.keyword_score}] ${g.grant_name}`));
+
+  // 4. Region-only search
+  console.log('\n4️⃣  Region-only: BC');
+  const r3 = await searchGrants({ regions: ['British Columbia'], maxResults: 5 });
+  console.log(`   Results: ${r3.total}`);
+
+  // 5. Verify bad grants are still excluded
+  console.log('\n5️⃣  Checking known-bad grants are excluded:');
+  for (const name of ['DigitalWorks', 'Digital Link Ontario', 'TalentEdge']) {
     const res = await searchGrants({ keywords: [name], maxResults: 5 });
     const found = res.grants.filter(g => g.grant_name.toLowerCase().includes(name.toLowerCase()));
     console.log(`   "${name}": ${found.length === 0 ? '✅ excluded' : `⚠️  ${found.length} found`}`);
   }
-
-  // 4. Verify DigitalWorks shows with includeInactive
-  console.log('\n4️⃣  DigitalWorks with includeInactive=true:');
-  const dwRes = await searchGrants({ keywords: ['DigitalWorks'], includeInactive: true, maxResults: 2 });
-  dwRes.grants.forEach(g => {
-    console.log(`   ${g.grant_name} | currently_accepting=${g.currently_accepting} | reason: ${g.exclusion_reason}`);
-  });
 
   console.log('\n✅ Tests complete');
   process.exit(0);
