@@ -52,27 +52,39 @@ async function generateEmbedding(text) {
 }
 
 /**
- * Build searchable text from grant data
+ * Build searchable text from grant data for embedding.
+ *
+ * Includes recently_changed so the embedding captures current program status
+ * (e.g. "program is closed", "intake open until March 31") — critical for
+ * ranking currently-active programs above stale or closed ones in vector search.
  */
 function buildGrantText(grant) {
   const parts = [];
 
-  // Core fields (always include)
+  // Core identity fields
   parts.push(grant.grant_name);
   if (grant.grant_type) parts.push(`Type: ${grant.grant_type}`);
   if (grant.program_provider) parts.push(`Provider: ${grant.program_provider}`);
   if (grant.regions) parts.push(`Regions: ${grant.regions}`);
   if (grant.industries) parts.push(`Industries: ${grant.industries}`);
+  if (grant.deadline) parts.push(`Deadline: ${grant.deadline}`);
+  if (grant.grant_amount) parts.push(`Amount: ${grant.grant_amount}`);
 
-  // Rich content (most important for semantic search)
+  // Current status — most important for freshness signal
+  // Include in full so "at capacity", "closed", "open until X" all get encoded
+  if (grant.recently_changed) {
+    parts.push(`Recent Status: ${grant.recently_changed.slice(0, 500)}`);
+  }
+
+  // Rich eligibility content (most important for semantic matching)
   if (grant.grant_criteria) {
-    // Truncate criteria to 2000 chars to avoid huge embeddings
+    // Truncate criteria to 2000 chars — captures key eligibility without bloat
     const criteria = grant.grant_criteria.slice(0, 2000);
     parts.push(`Criteria: ${criteria}`);
   }
 
   if (grant.best_practices) {
-    const practices = grant.best_practices.slice(0, 1000);
+    const practices = grant.best_practices.slice(0, 800);
     parts.push(`Best Practices: ${practices}`);
   }
 
@@ -121,21 +133,27 @@ async function main() {
   console.log('\nAdding semantic search to GetGranted database...\n');
 
   try {
-    // Fetch all grants
+    // Fetch all currently-accepting grants for embedding.
+    // We embed currently_accepting grants only — stale/archived grants don't
+    // need vector search since they're filtered out at query time anyway.
+    // recently_changed, deadline, and grant_amount are included in the embedding
+    // text so vector search captures program status and funding signals.
     console.log('📊 Fetching grants from database...');
     const result = await pool.query(`
       SELECT grant_id, grant_name, grant_type, grant_amount,
              regions, industries, program_provider, deadline,
-             grant_criteria, best_practices, is_active
+             grant_criteria, best_practices, recently_changed,
+             is_active, currently_accepting
       FROM grants
-      WHERE is_active = true
+      WHERE currently_accepting = true
+         OR (currently_accepting IS NULL AND is_active = true)
       ORDER BY grant_id::integer
     `);
 
     const grants = result.rows;
     stats.total = grants.length;
 
-    console.log(`✅ Found ${grants.length} active grants\n`);
+    console.log(`✅ Found ${grants.length} currently-accepting grants to embed\n`);
     console.log('─'.repeat(80));
     console.log('Processing grants...\n');
 
