@@ -67,12 +67,13 @@ function extractCompanyInfo(payload) {
 
   // Handle company.creation event webhook (most common for lead enrichment)
   if (payload.objectId && payload.subscriptionType === 'company.creation') {
-    console.log(`✅ Detected company.creation event - objectId: ${payload.objectId}, changeSource: ${payload.changeSource || 'unknown'}`);
+    const changeSource = payload.changeSource || 'unknown';
+    console.log(`✅ Detected company.creation event - objectId: ${payload.objectId}, changeSource: ${changeSource}`);
     return {
       objectId: payload.objectId,
       objectType: 'company',
       subscriptionType: payload.subscriptionType,
-      changeSource: payload.changeSource || 'unknown'
+      changeSource
     };
   }
 
@@ -553,6 +554,22 @@ export async function handleHubSpotWebhook(req, res) {
       }
 
       console.log(`🏢 Event ${index + 1}/${payload.length} - Extracted company info:`, companyInfo);
+
+      // -----------------------------------------------------------------------
+      // Anti-loop guard: skip oracle enrichment for companies created by our
+      // own API (changeSource === "INTEGRATION"). These are created by the
+      // save_lead_data tool during lead-gen sessions. The HubSpot Note created
+      // by save_lead_data already gives the sales team full context, so running
+      // a concurrent oracle enrichment during the active lead-gen conversation
+      // is unnecessary and can cause interleaving issues in the agent loop.
+      // -----------------------------------------------------------------------
+      if (
+        companyInfo.subscriptionType === 'company.creation' &&
+        companyInfo.changeSource === 'INTEGRATION'
+      ) {
+        console.log(`⏭️  Skipping oracle enrichment for INTEGRATION company creation (objectId: ${companyInfo.objectId}) — created by save_lead_data, HubSpot Note already contains full context`);
+        return;
+      }
 
       // Process enrichment asynchronously
       enrichLead(companyInfo)
