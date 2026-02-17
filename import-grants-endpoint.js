@@ -15,20 +15,30 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // ── Closed-status phrases detected in recently_changed ───────────────────────
+// IMPORTANT: match substrings against the lowercased recently_changed text.
+// Phrase order doesn't matter — all are checked.
 const CLOSED_PHRASES = [
-  'no longer accepting',
+  'no longer accepting',        // "is no longer accepting applications"
+  'no longer be accepting',     // "will no longer be accepting applications" (DigitalWorks pattern)
+  'no longer accepting applications',
   'at capacity',
   'program is closed',
+  'program has been closed',
   'intake is closed',
+  'intake has closed',
   'applications are closed',
   'applications closed',
+  'application intake is closed',
   'funding exhausted',
   'funding has been fully allocated',
+  'fully allocated',
   'program has ended',
   'program has been cancelled',
+  'program is cancelled',
   'no longer available',
   'not currently accepting',
   'temporarily closed',
+  'paused',                     // catch "applications are paused"
 ];
 
 // ── Name patterns indicating archived/internal records ───────────────────────
@@ -70,11 +80,13 @@ function classifyGrant(grant) {
     };
   }
 
-  // 4. Last updated before 2020 — clearly stale
-  if (grant.last_updated && grant.last_updated < '2020/01/01') {
+  // 4. Last updated before 2022 — not reviewed in 4+ years, very likely discontinued.
+  // 2022 cutoff catches early-COVID-era programs (2020-2021) while preserving
+  // legitimate ongoing programs that may not update frequently.
+  if (grant.last_updated && grant.last_updated < '2022/01/01') {
     return {
       currentlyAccepting: false,
-      exclusionReason: 'Last updated before 2020 — program is likely discontinued'
+      exclusionReason: 'Last updated before 2022 — program has not been reviewed in 4+ years and is likely discontinued'
     };
   }
 

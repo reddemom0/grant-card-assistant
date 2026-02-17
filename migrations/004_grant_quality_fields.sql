@@ -72,19 +72,24 @@ WHERE
   AND recently_changed IS NOT NULL
   AND (
     recently_changed ILIKE '%no longer accepting%'
+    OR recently_changed ILIKE '%no longer be accepting%'
     OR recently_changed ILIKE '%at capacity%'
+    OR recently_changed ILIKE '%fully allocated%'
     OR recently_changed ILIKE '%program is closed%'
+    OR recently_changed ILIKE '%program has been closed%'
     OR recently_changed ILIKE '%intake is closed%'
+    OR recently_changed ILIKE '%intake has closed%'
     OR recently_changed ILIKE '%applications are closed%'
     OR recently_changed ILIKE '%applications closed%'
+    OR recently_changed ILIKE '%application intake is closed%'
     OR recently_changed ILIKE '%funding exhausted%'
-    OR recently_changed ILIKE '%funding has been fully allocated%'
     OR recently_changed ILIKE '%program has ended%'
     OR recently_changed ILIKE '%program has been cancelled%'
+    OR recently_changed ILIKE '%program is cancelled%'
     OR recently_changed ILIKE '%no longer available%'
     OR recently_changed ILIKE '%not currently accepting%'
     OR recently_changed ILIKE '%temporarily closed%'
-    OR recently_changed ILIKE '%paused%applications%'
+    OR recently_changed ILIKE '%paused%'
   );
 
 -- Step D: Exclude grants that GetGranted itself marked inactive
@@ -96,15 +101,16 @@ WHERE
   currently_accepting = true
   AND is_active = false;
 
--- Step E: Exclude grants not updated since 2020 (clearly stale, pre-COVID era programs)
+-- Step E: Exclude grants not updated since 2022 (4+ years stale)
+-- Catches 2020-2021 COVID-era programs and other long-dormant programs.
 UPDATE grants
 SET
   currently_accepting = false,
-  exclusion_reason = COALESCE(exclusion_reason, 'Last updated before 2020 — program is likely discontinued')
+  exclusion_reason = COALESCE(exclusion_reason, 'Last updated before 2022 — program has not been reviewed in 4+ years and is likely discontinued')
 WHERE
   currently_accepting = true
   AND last_updated IS NOT NULL
-  AND last_updated < '2020/01/01';
+  AND last_updated < '2022/01/01';
 
 -- ========================================
 -- VERIFY RESULTS
