@@ -34,7 +34,7 @@ import {
 } from './src/api/chat.js';
 
 // Lead-gen chatbot (public — no auth)
-import { handleLeadGenChat } from './src/api/lead-gen.js';
+import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js';
 
 // Authentication
 import authRouter from './src/api/auth.js';
@@ -241,6 +241,9 @@ app.get('/health', async (req, res) => {
 
 // Chat endpoint — no authenticateUser middleware (public-facing)
 app.post('/api/lead-gen/chat', handleLeadGenChat);
+
+// Analytics endpoint — authenticated team members only
+app.get('/api/lead-gen/analytics', authenticateUser, handleLeadGenAnalytics);
 
 // Main chat endpoint (SSE streaming) - with authentication
 app.post('/api/chat', authenticateUser, handleChatRequest);

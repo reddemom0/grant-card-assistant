@@ -1,0 +1,92 @@
+[
+  {
+    "id": "faq_1",
+    "topic": "grant_types_available",
+    "question": "What kinds of grants could my business actually get?",
+    "keywords": ["types", "kinds", "qualify", "eligible", "what grants", "non-profit", "startup", "regular business"],
+    "knowledge": "Most business owners assume grants are for non-profits, academic researchers, or early-stage tech startups. In reality, the majority of Canadian business grants target established, operating businesses doing normal business activities. The three main pillars are: hiring grants (wage subsidies covering a portion of new employees' wages), training grants (reimbursement for external professional development for staff), and market expansion grants (funding for trade shows, prospecting trips, legal, accounting, and marketing costs for entering new markets — domestic or international). Most businesses qualify across at least two pillars without realizing it. The key reframe: if you've hired someone, trained someone, or are growing into new markets, the government likely has a program designed to help offset those costs.",
+    "database_hook": "If discovery info is collected, query GetGranted database and name specific programs with dollar ranges. If not, use as pivot to ask discovery questions.",
+    "cta_bridge": "A strategy consultant can walk you through which to prioritize and how to maximize them. Want to book a quick call?"
+  },
+  {
+    "id": "faq_2",
+    "topic": "how_grants_work_reimbursement",
+    "question": "So the government just gives you money? How does that actually work?",
+    "keywords": ["free money", "how it works", "catch", "up front", "lump sum", "receive", "get paid", "reimbursement"],
+    "knowledge": "Grants are not a lump sum cheque you receive up front. They're a claim-back reimbursement process — you do the activity first (hire the person, attend the trade show, pay for the training), submit your receipts and proof, and then the government reimburses a portion. Typically it's a 50/50 match for market expansion grants (you spend $40K, they reimburse $20K) and a fixed wage subsidy amount for hiring grants. You need the cash flow to cover costs first, which is an important planning consideration. It also means there's essentially no risk to applying — you're spending money on activities you were already planning to do, and the grant just offsets a chunk of it.",
+    "database_hook": "Make it concrete with the prospect's own situation — tie the reimbursement model to their specific hiring/training/expansion plans and name programs with dollar ranges.",
+    "cta_bridge": "The reimbursement process varies by program — each has its own documentation requirements and claim timelines. That's one of the big things our consultants help with. Want to walk through how it would work for your situation?"
+  },
+  {
+    "id": "faq_3",
+    "topic": "business_expansion_grants",
+    "question": "Can I get a grant for expanding my business?",
+    "keywords": ["expansion", "expanding", "grow", "growing", "scale", "new location", "equipment", "operations"],
+    "knowledge": "Business expansion isn't a grant category. Grants fund specific activities: hiring, training, market expansion, R&D — not equipment, operations, office space, or inventory. The strategic insight: most expansion plans contain multiple fundable activities buried inside them. A consultant's job is unpacking 'I'm expanding' into specific fundable pieces. A prospect who says they want equipment funding might actually have a huge opportunity in market expansion grants for US sales they barely mentioned. The real value is in reframing what they're already planning into the language that grant programs use.",
+    "database_hook": "Dig into what expansion actually means for them — hiring, training, new markets, R&D? Match specific activities to programs. 'Expansion itself isn't a grant category, but hiring 2 people and expanding into the US market absolutely are — and programs X and Y could offset $X-$Y of those costs.'",
+    "cta_bridge": "There's often more grant-eligible activity buried in expansion plans than people realize. A consultant can make sure nothing gets left on the table."
+  },
+  {
+    "id": "faq_4",
+    "topic": "approval_chances",
+    "question": "What are my chances of actually getting approved?",
+    "keywords": ["chances", "odds", "approved", "approval", "rejected", "success rate", "competitive", "get in"],
+    "knowledge": "General approval rates across programs sit around 35-40%. Most rejections aren't because the business was a bad fit — they're because the application was weak: missing documents, vague business case, poor alignment with program priorities, bad timing. Approval is less about 'do I qualify' and more about 'how well is the application written and timed.' Granted Consulting has a 92% success rate on applications, compared to the 35-40% general rate. The reason: they're selective about which clients and applications they take on (they turn away weak applications rather than submit and hope), and they know exactly what each program is looking for. Rejection isn't always final — sometimes the funding cycle is tapped out and you can resubmit next intake. Programs sometimes tell you why you were rejected so you can fix and reapply.",
+    "database_hook": "Add program-specific context — competitive vs. rolling vs. first-come-first-served. Flag timing considerations for specific programs the prospect matches.",
+    "cta_bridge": "It really comes down to how the application is written and when it's submitted. Our consultants know what each program wants and the best time to apply."
+  },
+  {
+    "id": "faq_5",
+    "topic": "specialized_grants_background",
+    "question": "Are there specific grants for my type of business or my background?",
+    "keywords": ["specific", "my industry", "women", "BIPOC", "indigenous", "youth", "immigrant", "newcomer", "minority", "background", "sector"],
+    "knowledge": "Yes — and serious money gets left on the table here. Beyond general programs, there are dedicated programs for BIPOC-owned, women-owned, Indigenous, youth-owned businesses, plus sector-specific programs for clean tech, food processing, forestry, and more. These specialized programs often have better terms, less competition, and higher funding amounts. Knowing which door to walk through matters enormously — a Black-owned business could get a general business loan at standard rates OR a dedicated entrepreneurship program with significantly better terms. Same business, completely different outcome based on which path they take. Hiring grants also offer higher subsidies if hiring from underrepresented groups (visible minority, disability, newcomer, youth). Both the owner's background AND employees' backgrounds can unlock more funding. Programs change frequently — what wasn't available 6 months ago might be now.",
+    "database_hook": "Natural discovery moment — ask about ownership demographics and industry if not already collected. Query with demographic and sector filters. 'Because you're [group]-owned in [industry], you've got access to programs beyond the standard ones.'",
+    "cta_bridge": "The landscape for specialized programs changes a lot. A consultant can make sure you're not missing anything designed for a business like yours."
+  },
+  {
+    "id": "faq_6",
+    "topic": "timing_strategy",
+    "question": "When should I apply? Is there a best time?",
+    "keywords": ["when", "timing", "best time", "deadline", "fiscal year", "window", "too late", "season"],
+    "knowledge": "Timing is a huge strategic lever most businesses never consider. Key insights: (1) The Canadian government fiscal year starts April 1 — many programs get fresh funding then. Early in the funding cycle gives you the best shot for first-come-first-served or limited-envelope programs. (2) Some programs have intake windows — they open, accept applications, then close. Miss the window and you wait 3-6 months. (3) Q4 of the fiscal year (January-March) has 'slippage dollars' — unused funding from other projects that gets recycled back. Late fiscal year can be a hidden sweet spot. (4) CRITICAL for hiring grants: many require you to apply BEFORE the employee starts. Hire first, apply after = disqualified. General rule: if you're hiring, training, or expanding in the next 6-12 months, explore grants NOW, not when you're mid-activity.",
+    "database_hook": "Flag time-sensitive opportunities — programs that are open now, closing soon, or opening in the next quarter. Create urgency where appropriate.",
+    "cta_bridge": "Timing can make or break an application. A consultant can look at what's open now, what's coming, and help sequence everything so you don't miss any windows."
+  },
+  {
+    "id": "faq_7",
+    "topic": "too_small_too_early",
+    "question": "Am I too small or too early for grants?",
+    "keywords": ["too small", "too early", "startup", "new business", "no revenue", "one person", "sole proprietor", "size", "minimum"],
+    "knowledge": "There are grants for businesses of many sizes, but real minimum thresholds exist. Key requirements across most programs: you need to be incorporated (sole proprietorships generally don't qualify), you typically need at least one year of operations in Canada, and you need enough cash flow to cover costs up front since grants are reimbursement-based. Pre-revenue companies face the toughest road because the claim-back model requires spending first. 'Too small' and 'too early' are different things — a company doing $500K with 5 employees can absolutely leverage grants. Student/co-op hiring grants are the lowest barrier to entry. Training grants are next. Market expansion grants typically need higher revenue ($300K+) because projects are larger and matching requirements are higher. For businesses not quite ready, the best move is getting informed now so you're ready to move as soon as you hit those thresholds.",
+    "database_hook": "Be honest based on what the prospect has shared. If they qualify, tell them. If they're pre-revenue or under one year, say so and explain what thresholds to target.",
+    "cta_bridge": "If they qualify: 'You're in a great spot to start — want to book a call and figure out which programs to prioritize?' If not ready: 'You're not far off. A quick call could help you plan your next 6-12 months so you're set up to maximize grants once you're eligible.'"
+  },
+  {
+    "id": "faq_8",
+    "topic": "diy_vs_consultant",
+    "question": "Can I just apply for these grants myself?",
+    "keywords": ["myself", "DIY", "on my own", "need consultant", "worth it", "do I need", "apply myself", "without help"],
+    "knowledge": "Yes, you can apply yourself — applications are publicly available and there's no rule requiring a consultant. But the reality: you need to research which of hundreds of programs fit, read 20-80 page applicant guides, figure out eligibility nuances, write a business case in the specific language reviewers want, gather supporting documents, submit on time, and manage claims afterward. One company spent over 300 hours on a single application and didn't get approved — not because they weren't eligible, but because the application wasn't written to what the program was looking for. The value isn't just the writing — it's the strategy: knowing which programs to target, when to apply, how to frame activities to align with government priorities, and having relationships with program managers. Granted's 92% success rate vs. the general 35-40% isn't because their clients are better businesses — it's because the applications are stronger and better targeted. The hidden value: a consultant spots programs you'd never find on your own.",
+    "database_hook": "Make it concrete: 'Based on what you've told me, you could be looking at X programs across hiring, training, and expansion. Each has its own process, timeline, and requirements. Managing all of that while running your business is doable, but it's a lot.'",
+    "cta_bridge": "Want to talk to a consultant about what your grant roadmap could look like? They can help you figure out whether it makes sense to get support or go it alone."
+  },
+  {
+    "id": "faq_9",
+    "topic": "pricing_cost",
+    "question": "How much does it cost to work with Granted?",
+    "keywords": ["cost", "price", "pricing", "fee", "how much", "expensive", "afford", "free", "ROI", "worth"],
+    "knowledge": "Granted has tiered service levels. The self-serve tier gives you access to grant matching technology, best practices, and guidance, plus a small number of assisted applications — designed for businesses that want to stay informed and handle simpler applications with some support. The full-service tier gives you a dedicated account manager, a team of researchers, writers, and coordinators, quarterly strategy meetings, and a full year of grant management with weekly program notifications. Both tiers include a success fee — Granted only earns more when you get more funding, so incentives are aligned. For larger and more complex applications, there's a writing fee that gets deducted from the success fee. The ROI framing: even at the entry level, hiring just 2-3 students through wage subsidy programs can return $10K-$21K in a year, which more than covers the subscription cost. At the full-service level, clients pursuing multiple programs often see tens of thousands in approved funding annually. Don't lead with price — lead with the funding estimate.",
+    "database_hook": "Tie cost to estimated return: 'Based on what you've told me, you're looking at potentially $X-$Y in grant funding. Our consultants can walk you through the service options and which level makes sense for your situation.'",
+    "cta_bridge": "The best way to figure out which service fits is to talk to a consultant — they can look at your full picture and recommend the right approach. Want to book a quick call?"
+  },
+  {
+    "id": "faq_10",
+    "topic": "multiple_grants_stacking",
+    "question": "Can I apply for multiple grants at the same time?",
+    "keywords": ["multiple", "stack", "stacking", "more than one", "several", "limit", "same time", "how many", "combine"],
+    "knowledge": "Yes — and this is where the real money is. Most businesses think of grants as a single program you apply to once. In reality, a well-planned grant strategy stacks multiple programs across different pillars throughout the year. You might run a hiring grant for new employees, a separate student wage subsidy for summer co-ops, a training grant for upskilling your team, and a market expansion grant for international growth — all at the same time, from different programs, with different funding bodies. They don't conflict because they fund different activities. For example, a construction company expanding into the US with 5 new hires and ongoing training could access: CanExport for US expansion, a student hiring program for summer workers, provincial training grants for certifications, and sector-specific programs for green construction — all in the same year. The businesses that get the most out of grants aren't the ones who find one program — they're the ones who build a year-round strategy that layers multiple programs. Timing, sequencing, and knowing which to prioritize separates a $5K year from a $50K+ year.",
+    "database_hook": "Show the full picture: 'I'm seeing potential matches across X programs. Some are quick wins and others are bigger but take more effort. A consultant can help you build a full roadmap.'",
+    "cta_bridge": "Stacking grants is where things get really interesting — but it takes planning to get the timing and sequencing right. A strategy call is the best way to map it all out. Want to book one?"
+  }
+]

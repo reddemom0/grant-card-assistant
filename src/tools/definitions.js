@@ -1688,6 +1688,117 @@ export const GOOGLE_DOCS_TOOLS = [
 ];
 
 // ============================================================================
+// LEAD-GEN KNOWLEDGE BASE TOOLS
+// Lightweight on-demand search for the public lead-gen chatbot.
+// Avoids stuffing knowledge into the system prompt (token cost optimization).
+// Both files are small and static — cached in memory on first call.
+// ============================================================================
+
+export const LEAD_GEN_KNOWLEDGE_TOOLS = [
+  {
+    name: 'search_lead_gen_knowledge',
+    description: 'Search the Grant Advisor FAQ knowledge base for answers to common prospect questions about how Canadian business grants work, timing strategy, pricing, eligibility requirements, DIY vs consultant, stacking grants, and other frequently asked questions. Use when a prospect asks a general question about grants.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: "The prospect's question or topic to search for"
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'search_lead_gen_strategy',
+    description: 'Search the strategic consulting knowledge base for frameworks on how to evaluate prospects, reframe business activities into fundable grant categories, prioritize programs, understand company size heuristics, CanExport insider knowledge, hiring grant nuances, and common client scenarios. Use during and after discovery to inform your recommendations and provide expert-level consulting insight.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'The strategic topic or client scenario to look up'
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'save_lead_data',
+    description: "Save the prospect's contact information and conversation summary when they provide their name and email. This creates or updates their HubSpot Contact and Company records and adds a note with the full conversation context so the sales consultant has everything before the call. Call this as soon as you have both name and email — don't wait for the conversation to end.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: "Prospect's full name"
+        },
+        email: {
+          type: 'string',
+          description: "Prospect's email address"
+        },
+        company_name: {
+          type: 'string',
+          description: 'Business name'
+        },
+        province: {
+          type: 'string',
+          description: 'Province or territory (e.g. "BC", "Ontario")'
+        },
+        industry: {
+          type: 'string',
+          description: 'Industry or sector'
+        },
+        revenue: {
+          type: 'string',
+          description: 'Approximate annual revenue range (e.g. "$500K–$1M")'
+        },
+        employee_count: {
+          type: 'string',
+          description: 'Number of employees (e.g. "12", "15-20 employees", "about 30")'
+        },
+        company_description: {
+          type: 'string',
+          description: 'Brief description of what the company does, based on conversation context'
+        },
+        activities_summary: {
+          type: 'string',
+          description: 'Summary of the business activities discussed: hiring plans, training plans, expansion plans, R&D'
+        },
+        prior_grant_experience: {
+          type: 'string',
+          description: "The prospect's prior experience with government grants — e.g. 'First time, never applied', 'Applied for IRAP once, not approved', 'Receives Canada Summer Jobs every year'"
+        },
+        prospect_summary: {
+          type: 'string',
+          description: '2-3 sentence natural language summary for the sales consultant: who the prospect is, what they need, what was recommended, and why they are booking'
+        },
+        matched_programs: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Names of grant programs discussed or matched during the conversation'
+        },
+        estimated_funding: {
+          type: 'string',
+          description: 'Estimated total grant funding potential discussed (e.g. "$15K–$40K per year")'
+        },
+        cta_selected: {
+          type: 'string',
+          enum: ['book_call', 'getgranted', 'email_summary', 'none'],
+          description: 'Which call-to-action the prospect selected'
+        },
+        lead_score: {
+          type: 'string',
+          enum: ['hot', 'warm', 'cool'],
+          description: "Your assessment of this prospect's readiness and grant potential. hot: multiple fundable activities, clear timeline, established business (1+ years, incorporated), ready to book. warm: some fundable activities but timeline unclear, or early-stage but promising. cool: very early stage, limited activities, pre-revenue, or not incorporated."
+        }
+      },
+      required: ['name', 'email', 'lead_score']
+    }
+  }
+];
+
+// ============================================================================
 // GETGRANTED AI TOOLS
 // Financial calculations, program cards, and GetGranted integration
 // ============================================================================
@@ -1876,6 +1987,28 @@ export function getToolsForAgent(agentType) {
     case 'orchestrator':
       console.log(`🔧 Agent ${agentType} using ALL tools (${ALL_TOOLS.length} tools)`);
       return ALL_TOOLS;
+
+    case 'lead-gen': {
+      // Public chatbot — deliberately restricted tool set for security.
+      // Excluded intentionally:
+      //   - ANTHROPIC_MEMORY_TOOL: file-based, cross-agent shared storage on disk.
+      //     A public (unauthenticated) user could corrupt memory files read by internal agents.
+      //   - web_fetch: fetches arbitrary URLs — prompt injection surface on a public endpoint.
+      //   - All HubSpot write tools, Google Drive, Oracle — not needed, not safe.
+      // HubSpot write tools (create_contact, etc.) will be added back in a later step
+      // once proper input validation is in place.
+      const webSearchTool = SERVER_TOOLS.find(t => t.name === 'web_search');
+      // search_getgranted is defined in ORACLE_TOOLS (not HUBSPOT_TOOLS)
+      const searchGrantedTool = ORACLE_TOOLS.find(t => t.name === 'search_getgranted');
+      const leadGenTools = [
+        ...(webSearchTool ? [webSearchTool] : []),   // Anthropic-controlled, safe
+        ...MEMORY_TOOLS,                              // session-scoped DB key-value, safe
+        ...(searchGrantedTool ? [searchGrantedTool] : []), // read-only grants DB, safe
+        ...LEAD_GEN_KNOWLEDGE_TOOLS                  // on-demand FAQ + strategy KB search
+      ];
+      console.log(`🔧 Agent lead-gen using restricted public tool set (${leadGenTools.length} tools): web_search, memory_store/recall/list, search_getgranted, search_lead_gen_knowledge, search_lead_gen_strategy, save_lead_data`);
+      return leadGenTools;
+    }
 
     default:
       console.warn(`Unknown agent type: ${agentType}, using base tools only (${baseTools.length} tools)`);

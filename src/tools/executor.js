@@ -387,7 +387,48 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
-      case 'search_getgranted':
+      // ============================================================================
+      // LEAD-GEN KNOWLEDGE BASE TOOLS
+      // ============================================================================
+
+      case 'search_lead_gen_knowledge': {
+        const { searchLeadGenKnowledge } = await import('./lead-gen-knowledge.js');
+        result = searchLeadGenKnowledge({ query: input.query });
+        break;
+      }
+
+      case 'search_lead_gen_strategy': {
+        const { searchLeadGenStrategy } = await import('./lead-gen-knowledge.js');
+        result = searchLeadGenStrategy({ query: input.query });
+        break;
+      }
+
+      case 'save_lead_data': {
+        const { saveLeadData } = await import('./save-lead-data.js');
+        // conversationId === session_id in lead_gen_conversations — injected by executeToolCall
+        result = await saveLeadData(input, conversationId);
+
+        // Log contact_captured analytics event on success
+        if (result.success && conversationId) {
+          try {
+            const { query: dbQuery } = await import('../database/connection.js');
+            await dbQuery(
+              `INSERT INTO lead_gen_analytics (conversation_id, event_type, event_data)
+               VALUES ($1, $2, $3)`,
+              [conversationId, 'contact_captured', JSON.stringify({
+                lead_score:     input.lead_score    || null,
+                cta_selected:   input.cta_selected  || null,
+                programs_count: (input.matched_programs || []).length
+              })]
+            );
+          } catch (e) {
+            console.warn('⚠️  Analytics log failed (contact_captured):', e.message);
+          }
+        }
+        break;
+      }
+
+      case 'search_getgranted': {
         const { searchGetGranted } = await import('./getgranted-search.js');
         result = await searchGetGranted({
           query: input.query,
@@ -404,7 +445,25 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           fetch_full_details: input.fetch_full_details,
           bypass_cache: input.bypass_cache
         });
+
+        // Log search_performed analytics for lead-gen agent
+        if (agentType === 'lead-gen' && conversationId) {
+          try {
+            const { query: dbQuery } = await import('../database/connection.js');
+            await dbQuery(
+              `INSERT INTO lead_gen_analytics (conversation_id, event_type, event_data)
+               VALUES ($1, $2, $3)`,
+              [conversationId, 'search_performed', JSON.stringify({
+                query:         input.query || null,
+                results_count: result.results?.length || result.grants?.length || 0
+              })]
+            );
+          } catch (e) {
+            console.warn('⚠️  Analytics log failed (search_performed):', e.message);
+          }
+        }
         break;
+      }
 
       case 'load_skill':
         const { loadSkill } = await import('./load-skill.js');
