@@ -201,6 +201,24 @@ async function getContactAssociatedCompanyId(contactId) {
 }
 
 // ============================================================================
+// HubSpot: fetch a company's name by ID
+// Used for duplicate company detection — compare existing vs. new company name
+// ============================================================================
+
+async function getCompanyName(companyId) {
+  const client = makeHubSpotClient();
+  try {
+    const res = await client.get(`/crm/v3/objects/companies/${companyId}`, {
+      params: { properties: 'name' }
+    });
+    return res.data.properties?.name || null;
+  } catch (err) {
+    console.warn('⚠️  Could not fetch company name:', err.message);
+    return null;
+  }
+}
+
+// ============================================================================
 // HubSpot: create a Note and associate it with contact + optional company
 // ============================================================================
 
@@ -236,8 +254,14 @@ async function createHubSpotNote(noteBody, contactId, companyId = null) {
 // Build the note body
 // ============================================================================
 
-function buildNoteBody(input) {
+function buildNoteBody(input, multipleCompaniesFlag = null) {
   const lines = ['=== Grant Advisor Chat — Lead Summary ===', ''];
+
+  // Multi-company warning — shown first so sales team sees it immediately
+  if (multipleCompaniesFlag) {
+    lines.push(`⚠️ ${multipleCompaniesFlag}`);
+    lines.push('');
+  }
 
   // Natural language summary — agent-provided
   if (input.prospect_summary) {
@@ -450,14 +474,67 @@ export async function saveLeadData(input, conversationId) {
 
   // 2b. Find or create Company, then populate fields
   let companyId = null;
+  let multipleCompaniesFlag = null; // Set if this contact ends up with 2+ companies
 
   try {
     if (contactHadExistingCompany && contactId) {
-      // HubSpot auto-created a company from the email domain — use it
-      companyId = await getContactAssociatedCompanyId(contactId);
-      if (companyId) {
-        console.log(`✓ Using HubSpot auto-created company (ID: ${companyId}) from contact associations`);
-        results.company = { action: 'found_via_contact', id: companyId };
+      // Contact already has an associated company in HubSpot.
+      // Fetch the existing company and compare its name to the one the prospect gave us.
+      const existingCompanyId = await getContactAssociatedCompanyId(contactId);
+
+      if (existingCompanyId) {
+        const existingCompanyName = await getCompanyName(existingCompanyId);
+        const inputName    = (input.company_name || '').trim().toLowerCase();
+        const existingName = (existingCompanyName || '').trim().toLowerCase();
+
+        const namesMatch = !inputName || inputName === existingName ||
+                           existingName.includes(inputName) || inputName.includes(existingName);
+
+        if (namesMatch) {
+          // Same company (or no company name provided) — reuse existing
+          companyId = existingCompanyId;
+          console.log(`✓ Existing company matches input (ID: ${companyId}): "${existingCompanyName}"`);
+          results.company = { action: 'found_via_contact', id: companyId };
+        } else {
+          // Different company — prospect is using the lead-gen agent for a NEW business.
+          // Create a separate company record and associate contact with both.
+          // Do NOT overwrite the existing company record.
+          console.log(`⚠️  Company name mismatch: existing="${existingCompanyName}", input="${input.company_name}". Creating new company.`);
+
+          let newCompanyId = null;
+          const byName = await findCompanyByName(input.company_name);
+          if (byName) {
+            newCompanyId = byName.id;
+            console.log(`✓ Found existing company by name: ${input.company_name} (ID: ${newCompanyId})`);
+            results.company = { action: 'found_new', id: newCompanyId };
+          } else {
+            const created = await createHubSpotCompany({
+              name:           input.company_name,
+              state:          input.province || undefined,
+              lifecyclestage: 'lead'
+            });
+            if (created.success) {
+              newCompanyId = created.company.id;
+              console.log(`✅ New company created: ${input.company_name} (ID: ${newCompanyId})`);
+              results.company = { action: 'created_new', id: newCompanyId };
+            } else {
+              console.warn('⚠️  New company creation failed:', created.error);
+              results.company = { action: 'failed', error: created.error };
+            }
+          }
+
+          if (newCompanyId) {
+            // Associate contact with the new company (keeps existing association too)
+            try {
+              await associateContactWithCompany(contactId, newCompanyId);
+              console.log(`🔗 Contact ${contactId} now also associated with new company ${newCompanyId}`);
+            } catch (err) {
+              console.warn('⚠️  Multi-company association failed:', err.message);
+            }
+            companyId = newCompanyId;
+            multipleCompaniesFlag = `This contact is associated with multiple companies. New company "${input.company_name}" created separately to preserve existing record "${existingCompanyName}".`;
+          }
+        }
       }
     }
 
@@ -493,7 +570,7 @@ export async function saveLeadData(input, conversationId) {
     results.company = { ...(results.company || {}), populateError: err.message };
   }
 
-  // 2c. Associate Contact → Company (if both exist and not already associated)
+  // 2c. Associate Contact → Company (if both exist and not already associated via contact)
   if (contactId && companyId && !contactHadExistingCompany) {
     try {
       await associateContactWithCompany(contactId, companyId);
@@ -506,7 +583,7 @@ export async function saveLeadData(input, conversationId) {
   // 2d. Create Note
   if (contactId) {
     try {
-      const noteBody = buildNoteBody(input);
+      const noteBody = buildNoteBody(input, multipleCompaniesFlag);
       const noteId   = await createHubSpotNote(noteBody, contactId, companyId);
       results.note   = { action: 'created', id: noteId };
       console.log(`✅ Note created and associated (ID: ${noteId})`);
