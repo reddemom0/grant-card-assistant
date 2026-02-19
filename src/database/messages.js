@@ -45,6 +45,48 @@ export async function saveMessage(conversationId, role, content) {
  * @param {number} maxMessages - Maximum number of messages to retrieve (default: 60 = 30 turns)
  * @returns {Promise<Array>} Array of messages in Claude API format
  */
+/**
+ * Retrieve conversation messages for lead-gen agent from lead_gen_conversations.messages JSONB
+ * @param {string} sessionId - lead_gen_conversations.session_id (same as conversationId)
+ * @param {number} maxMessages - Maximum number of messages to retrieve
+ * @returns {Array} Array of {role, content} objects formatted for Claude API
+ */
+export async function getLeadGenMessages(sessionId, maxMessages = 60) {
+  try {
+    const result = await query(
+      `SELECT messages FROM lead_gen_conversations WHERE session_id = $1`,
+      [sessionId]
+    );
+
+    if (!result.rows.length || !result.rows[0].messages) {
+      console.log(`✓ No messages found in lead_gen_conversations for session ${sessionId}`);
+      return [];
+    }
+
+    // messages is a JSONB array: [{role, content, timestamp}, ...]
+    const messagesArray = result.rows[0].messages;
+
+    // Take the most recent N messages
+    const recentMessages = messagesArray.slice(-maxMessages);
+
+    // Convert to Claude API format: {role, content: [{type: 'text', text: '...'}]}
+    const formattedMessages = recentMessages.map(msg => ({
+      role: msg.role,
+      content: [{
+        type: 'text',
+        text: msg.content
+      }]
+    }));
+
+    console.log(`✓ Retrieved ${formattedMessages.length} messages from lead_gen_conversations for session ${sessionId}`);
+    return formattedMessages;
+
+  } catch (error) {
+    console.error(`Error retrieving lead-gen messages for session ${sessionId}:`, error);
+    return [];
+  }
+}
+
 export async function getConversationMessages(conversationId, maxMessages = 60) {
   try {
     // Retrieve the most recent N messages

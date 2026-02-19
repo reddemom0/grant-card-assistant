@@ -137,6 +137,7 @@ export async function runAgent({
     console.log(`💬 Loading conversation history...`);
     const {
       getConversationMessages,
+      getLeadGenMessages,
       getCompactionSummary,
       saveCompactionSummary,
       deleteOldMessages
@@ -146,7 +147,13 @@ export async function runAgent({
     const maxTurns = getMaxTurnsForAgent(agentType);
     const maxMessages = maxTurns * 2; // Each turn = user + assistant message
 
-    let history = await getConversationMessages(conversationId, maxMessages);
+    // Use specialized retrieval for lead-gen (reads from lead_gen_conversations.messages JSONB)
+    let history;
+    if (agentType === 'lead-gen') {
+      history = await getLeadGenMessages(conversationId, maxMessages);
+    } else {
+      history = await getConversationMessages(conversationId, maxMessages);
+    }
     console.log(`✓ Retrieved ${history.length} messages for conversation ${conversationId}`);
 
     // ============================================================================
