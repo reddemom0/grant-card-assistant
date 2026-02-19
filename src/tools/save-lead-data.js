@@ -445,9 +445,13 @@ export async function saveLeadData(input, conversationId) {
       const firstname = nameParts[0];
       const lastname  = nameParts.slice(1).join(' ') || undefined;
 
-      // Map lead_score → hs_lead_status: hot→NEW, warm→OPEN, cool→UNQUALIFIED
-      const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
-      const hsLeadStatus = leadStatusMap[input.lead_score] || 'NEW';
+      // Use explicit hs_lead_status if provided, otherwise map from lead_score
+      // Map: hot→NEW, warm→OPEN, cool→UNQUALIFIED
+      let hsLeadStatus = input.hs_lead_status?.toUpperCase();
+      if (!hsLeadStatus) {
+        const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
+        hsLeadStatus = leadStatusMap[input.lead_score] || 'NEW';
+      }
 
       const created = await createHubSpotContact({
         email,

@@ -1784,13 +1784,18 @@ export const LEAD_GEN_KNOWLEDGE_TOOLS = [
         },
         cta_selected: {
           type: 'string',
-          enum: ['book_call', 'getgranted', 'email_summary', 'none'],
-          description: 'Which call-to-action the prospect selected'
+          enum: ['book_call', 'email_summary', 'resources', 'none'],
+          description: 'Which call-to-action the prospect selected: book_call (strategy call), email_summary (email breakdown), resources (service links), or none'
         },
         lead_score: {
           type: 'string',
           enum: ['hot', 'warm', 'cool'],
           description: "Your assessment of this prospect's readiness and grant potential. hot: multiple fundable activities, clear timeline, established business (1+ years, incorporated), ready to book. warm: some fundable activities but timeline unclear, or early-stage but promising. cool: very early stage, limited activities, pre-revenue, or not incorporated."
+        },
+        hs_lead_status: {
+          type: 'string',
+          enum: ['New', 'Open', 'Unqualified'],
+          description: 'HubSpot lead status. Typically set based on CTA choice: book_call → New, email_summary → Open, resources → Unqualified. If not provided, will be derived from lead_score.'
         }
       },
       required: ['name', 'email', 'lead_score']
