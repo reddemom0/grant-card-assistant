@@ -98,6 +98,40 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
 
       case 'memory_store':
         result = await memory.storeMemory(conversationId, input.key, input.value);
+
+        // For lead-gen sessions: progressively save business profile data to prospect_data JSONB
+        if (agentType === 'lead-gen' && conversationId) {
+          // Map memory keys to prospect_data fields
+          const prospectDataKeys = [
+            'province', 'industry', 'revenue', 'employee_count', 'employees',
+            'company_name', 'activities', 'years_in_operation', 'is_incorporated',
+            'hiring_plans', 'training_investment', 'market_expansion_plans',
+            'rd_activity', 'prior_grant_experience'
+          ];
+
+          if (prospectDataKeys.includes(input.key)) {
+            try {
+              const { query: dbQuery } = await import('../database/connection.js');
+
+              // Normalize employee_count vs employees
+              const fieldName = input.key === 'employees' ? 'employee_count' : input.key;
+
+              // JSONB merge: preserve existing fields, add/update this field
+              await dbQuery(
+                `UPDATE lead_gen_conversations
+                 SET prospect_data = prospect_data || $1::jsonb,
+                     updated_at = NOW()
+                 WHERE session_id = $2`,
+                [JSON.stringify({ [fieldName]: input.value }), conversationId]
+              );
+
+              console.log(`✓ Prospect data updated: ${fieldName} = ${JSON.stringify(input.value).substring(0, 100)}`);
+            } catch (err) {
+              console.warn(`⚠️  Failed to update prospect_data for ${input.key}:`, err.message);
+            }
+          }
+        }
+
         break;
 
       case 'memory_recall':

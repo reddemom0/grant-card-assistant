@@ -457,9 +457,23 @@ export async function runAgent({
         });
 
         // Save final messages to database
-        const { saveMessage } = await import('../database/messages.js');
-        await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', contentToSave);
+        if (agentType === 'lead-gen') {
+          // Lead-gen: save to lead_gen_conversations.messages JSONB array
+          // Extract text-only content for simpler storage
+          const userText = typeof message === 'string' ? message : JSON.stringify(message);
+          const assistantText = contentToSave
+            .filter(block => block.type === 'text')
+            .map(block => block.text)
+            .join('\n');
+
+          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+          await appendLeadGenMessages(conversationId, userText, assistantText);
+        } else {
+          // Standard agents: save to messages table
+          const { saveMessage } = await import('../database/messages.js');
+          await saveMessage(conversationId, 'user', userContent);
+          await saveMessage(conversationId, 'assistant', contentToSave);
+        }
 
         console.log('✓ Messages saved to database');
 
@@ -575,15 +589,26 @@ export async function runAgent({
         });
 
         // Save what we have (including thinking blocks, but filter out empty text blocks)
-        const { saveMessage } = await import('../database/messages.js');
         const contentToSave = fullResponse.content.filter(block => {
           if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
             return false;
           }
           return true;
         });
-        await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', contentToSave);
+
+        if (agentType === 'lead-gen') {
+          const userText = typeof message === 'string' ? message : JSON.stringify(message);
+          const assistantText = contentToSave
+            .filter(block => block.type === 'text')
+            .map(block => block.text)
+            .join('\n');
+          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+          await appendLeadGenMessages(conversationId, userText, assistantText);
+        } else {
+          const { saveMessage } = await import('../database/messages.js');
+          await saveMessage(conversationId, 'user', userContent);
+          await saveMessage(conversationId, 'assistant', contentToSave);
+        }
 
         closeSSE(res);
 
@@ -599,15 +624,26 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'stop_sequence') {
         console.log('✓ Agent hit stop sequence');
 
-        const { saveMessage } = await import('../database/messages.js');
         const contentToSave = fullResponse.content.filter(block => {
           if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
             return false;
           }
           return true;
         });
-        await saveMessage(conversationId, 'user', userContent);
-        await saveMessage(conversationId, 'assistant', contentToSave);
+
+        if (agentType === 'lead-gen') {
+          const userText = typeof message === 'string' ? message : JSON.stringify(message);
+          const assistantText = contentToSave
+            .filter(block => block.type === 'text')
+            .map(block => block.text)
+            .join('\n');
+          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+          await appendLeadGenMessages(conversationId, userText, assistantText);
+        } else {
+          const { saveMessage } = await import('../database/messages.js');
+          await saveMessage(conversationId, 'user', userContent);
+          await saveMessage(conversationId, 'assistant', contentToSave);
+        }
 
         closeSSE(res);
 

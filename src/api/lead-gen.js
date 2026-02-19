@@ -113,6 +113,43 @@ async function incrementMessageCount(sessionId) {
   );
 }
 
+/**
+ * Append user message and assistant response to messages JSONB array.
+ * Called after each exchange completes (streaming done).
+ *
+ * @param {string} sessionId - lead_gen_conversations.session_id
+ * @param {string} userMessage - The user's message
+ * @param {string} assistantMessage - The agent's response
+ */
+export async function appendLeadGenMessages(sessionId, userMessage, assistantMessage) {
+  const timestamp = new Date().toISOString();
+
+  const userEntry = {
+    role: 'user',
+    content: userMessage,
+    timestamp
+  };
+
+  const assistantEntry = {
+    role: 'assistant',
+    content: assistantMessage,
+    timestamp
+  };
+
+  try {
+    await query(
+      `UPDATE lead_gen_conversations
+       SET messages = messages || $1::jsonb,
+           updated_at = NOW()
+       WHERE session_id = $2`,
+      [JSON.stringify([userEntry, assistantEntry]), sessionId]
+    );
+    console.log(`✓ Messages appended to lead_gen_conversations for session ${sessionId}`);
+  } catch (err) {
+    console.warn(`⚠️  Failed to append messages for session ${sessionId}:`, err.message);
+  }
+}
+
 // ============================================================================
 // ANALYTICS ENDPOINT HANDLER
 // ============================================================================
