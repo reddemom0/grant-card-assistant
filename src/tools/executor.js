@@ -106,7 +106,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             'province', 'industry', 'revenue', 'employee_count', 'employees',
             'company_name', 'activities', 'years_in_operation', 'is_incorporated',
             'hiring_plans', 'training_investment', 'market_expansion_plans',
-            'rd_activity', 'prior_grant_experience'
+            'rd_activity', 'prior_grant_experience',
+            // Strategic qualification fields (Pass 2)
+            'timeline', 'budget_committed', 'is_decision_maker', 'growth_plans',
+            'existing_consultant'
           ];
 
           if (prospectDataKeys.includes(input.key)) {
