@@ -1796,6 +1796,27 @@ export const LEAD_GEN_KNOWLEDGE_TOOLS = [
           type: 'string',
           enum: ['New', 'Open', 'Unqualified'],
           description: 'HubSpot lead status. Typically set based on CTA choice: book_call → New, email_summary → Open, resources → Unqualified. If not provided, will be derived from lead_score.'
+        },
+        // Individual scoring signals (optional, captured via strategic questions)
+        timeline: {
+          type: 'string',
+          description: 'When they plan to hire/invest: "this quarter", "within 6 months", "next year", etc.'
+        },
+        budget_committed: {
+          type: 'string',
+          description: 'Whether budget is already allocated: "Yes, budgeted", "Exploring options", "Not yet", etc.'
+        },
+        is_decision_maker: {
+          type: 'string',
+          description: 'Whether prospect is the decision maker: "Yes, CEO", "Yes, VP Operations", "No, need to check with boss", etc.'
+        },
+        growth_plans: {
+          type: 'string',
+          description: 'Additional growth plans beyond immediate needs: "Hiring 5 more next quarter", "Expanding to Alberta", etc.'
+        },
+        existing_consultant: {
+          type: 'string',
+          description: 'Whether working with another grant consultant: "No one, handling in-house", "Working with [name]", etc.'
         }
       },
       required: ['name', 'email', 'lead_score']

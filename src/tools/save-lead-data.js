@@ -2,23 +2,21 @@
  * save_lead_data Tool
  *
  * Called by the lead-gen agent when a prospect provides their name and email.
- * Performs these operations in sequence:
  *
- *  1. UPDATE lead_gen_conversations with contact info + prospect profile
- *  2. HubSpot: find-or-create Company → find-or-create Contact → associate
- *  3. Populate Company fields (revenue, employees, state, description)
- *     - If Contact was found/created and already had an associated company
- *       (HubSpot auto-creates from email domain), use that company instead
- *  4. Create a HubSpot Note with natural-language summary + structured data
- *     + booking link for the sales team
+ * Two-trigger finalization system:
+ * - Trigger A (this tool): Contact info captured in Phase 5
+ * - Trigger B: Inactivity timeout (5 min) — handled by background job
+ *
+ * This tool:
+ *  1. Updates lead_gen_conversations with contact info + prospect profile
+ *  2. Calls finalizeLeadGenConversation() to create HubSpot records
  *
  * The `conversationId` (= lead_gen_conversations.session_id) is injected by
  * executeToolCall — the agent never needs to know or pass it.
  */
 
-import axios from 'axios';
-import axiosRetry from 'axios-retry';
 import { query } from '../database/connection.js';
+import { finalizeLeadGenConversation } from '../api/lead-gen-finalization.js';
 import {
   createHubSpotCompany,
   createHubSpotContact,
@@ -353,28 +351,33 @@ export async function saveLeadData(input, conversationId) {
     return { success: false, error: 'name and email are required' };
   }
 
-  const results = { db: null, company: null, contact: null, note: null };
-
   // -------------------------------------------------------------------------
-  // 1. Update lead_gen_conversations
+  // 1. Update lead_gen_conversations with contact info and all captured data
   // -------------------------------------------------------------------------
   try {
     const prospectData = {
-      company_name:          input.company_name           || null,
-      province:              input.province               || null,
-      revenue:               input.revenue                || null,
-      employee_count:        input.employee_count         || null,
-      company_description:   input.company_description    || null,
-      activities:            input.activities_summary     || null,
+      company_name:           input.company_name           || null,
+      province:               input.province               || null,
+      revenue:                input.revenue                || null,
+      employee_count:         input.employee_count         || null,
+      company_description:    input.company_description    || null,
+      activities:             input.activities_summary     || null,
       prior_grant_experience: input.prior_grant_experience || null,
-      lead_score:            input.lead_score             || null
+      lead_score:             input.lead_score             || null,
+      prospect_summary:       input.prospect_summary       || null,
+      // Individual scoring signals
+      timeline:               input.timeline               || null,
+      budget_committed:       input.budget_committed       || null,
+      is_decision_maker:      input.is_decision_maker      || null,
+      growth_plans:           input.growth_plans           || null,
+      existing_consultant:    input.existing_consultant    || null
     };
 
     await query(
       `UPDATE lead_gen_conversations
           SET contact_name      = $1,
               contact_email     = $2,
-              prospect_data     = $3,
+              prospect_data     = prospect_data || $3::jsonb,
               matched_programs  = $4,
               estimated_funding = $5,
               cta_selected      = $6,
@@ -391,215 +394,40 @@ export async function saveLeadData(input, conversationId) {
       ]
     );
 
-    results.db = 'updated';
     console.log(`✅ lead_gen_conversations updated for session ${conversationId}`);
   } catch (err) {
     console.error('❌ DB update failed in saveLeadData:', err.message);
-    results.db = { error: err.message };
+    return { success: false, error: err.message };
   }
 
   // -------------------------------------------------------------------------
-  // 2. HubSpot sync
+  // 2. Finalize conversation (Trigger A: contact_captured)
   // -------------------------------------------------------------------------
-  if (!HUBSPOT_TOKEN) {
-    console.warn('⚠️  HUBSPOT_ACCESS_TOKEN not set — skipping HubSpot sync');
+
+  try {
+    const result = await finalizeLeadGenConversation(conversationId, 'contact_captured');
+
+    if (result.success) {
+      console.log(`✅ Session finalized via contact_captured`);
+      return {
+        success: true,
+        message: `Lead data saved and synced to HubSpot.`,
+        ...result
+      };
+    } else {
+      console.warn(`⚠️  Finalization returned non-success:`, result);
+      return {
+        success: true,
+        message: `Lead data saved to database. HubSpot sync: ${result.error || 'unknown issue'}`,
+        ...result
+      };
+    }
+  } catch (err) {
+    console.error('❌ Finalization failed:', err.message);
     return {
       success: true,
-      message: 'Lead data saved to database. HubSpot sync skipped (no token).',
-      results
+      message: 'Lead data saved to database, but HubSpot sync failed.',
+      error: err.message
     };
   }
-
-  // 2a. Find or create Contact (first, so we can check its associated companies)
-  let contactId = null;
-  let contactHadExistingCompany = false;
-
-  try {
-    const existingContact = await getContactByEmail(email);
-
-    if (existingContact.success && existingContact.contact) {
-      contactId = existingContact.contact.id;
-      // Check if HubSpot already associated a company (e.g. auto-created from domain)
-      const existingAssociated = existingContact.contact.associations?.companies?.results || [];
-      contactHadExistingCompany = existingAssociated.length > 0;
-      console.log(`✓ Found existing contact: ${email} (ID: ${contactId})`);
-
-      // Update hs_lead_status on existing contact
-      if (input.lead_score) {
-        const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
-        const hsLeadStatus = leadStatusMap[input.lead_score];
-        if (hsLeadStatus) {
-          try {
-            const { updateHubSpotContact } = await import('./hubspot.js');
-            await updateHubSpotContact(contactId, { hs_lead_status: hsLeadStatus });
-            console.log(`✅ Updated hs_lead_status → ${hsLeadStatus} for existing contact ${contactId}`);
-          } catch (e) {
-            console.warn('⚠️  Could not update hs_lead_status on existing contact:', e.message);
-          }
-        }
-      }
-
-      results.contact = { action: 'found', id: contactId };
-    } else {
-      const nameParts = name.trim().split(/\s+/);
-      const firstname = nameParts[0];
-      const lastname  = nameParts.slice(1).join(' ') || undefined;
-
-      // Use explicit hs_lead_status if provided, otherwise map from lead_score
-      // Map: hot→NEW, warm→OPEN, cool→UNQUALIFIED
-      let hsLeadStatus = input.hs_lead_status?.toUpperCase();
-      if (!hsLeadStatus) {
-        const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
-        hsLeadStatus = leadStatusMap[input.lead_score] || 'NEW';
-      }
-
-      const created = await createHubSpotContact({
-        email,
-        firstname,
-        lastname,
-        state:          input.province || undefined,
-        lifecyclestage: 'lead',
-        hs_lead_status: hsLeadStatus
-      });
-
-      if (created.success) {
-        contactId = created.contact.id;
-        console.log(`✅ Contact created: ${email} (ID: ${contactId})`);
-        results.contact = { action: 'created', id: contactId };
-      } else {
-        console.warn('⚠️  Contact creation failed:', created.error);
-        results.contact = { action: 'failed', error: created.error };
-      }
-    }
-  } catch (err) {
-    console.warn('⚠️  Contact step failed:', err.message);
-    results.contact = { action: 'error', error: err.message };
-  }
-
-  // 2b. Find or create Company, then populate fields
-  let companyId = null;
-  let multipleCompaniesFlag = null; // Set if this contact ends up with 2+ companies
-
-  try {
-    if (contactHadExistingCompany && contactId) {
-      // Contact already has an associated company in HubSpot.
-      // Fetch the existing company and compare its name to the one the prospect gave us.
-      const existingCompanyId = await getContactAssociatedCompanyId(contactId);
-
-      if (existingCompanyId) {
-        const existingCompanyName = await getCompanyName(existingCompanyId);
-        const inputName    = (input.company_name || '').trim().toLowerCase();
-        const existingName = (existingCompanyName || '').trim().toLowerCase();
-
-        const namesMatch = !inputName || inputName === existingName ||
-                           existingName.includes(inputName) || inputName.includes(existingName);
-
-        if (namesMatch) {
-          // Same company (or no company name provided) — reuse existing
-          companyId = existingCompanyId;
-          console.log(`✓ Existing company matches input (ID: ${companyId}): "${existingCompanyName}"`);
-          results.company = { action: 'found_via_contact', id: companyId };
-        } else {
-          // Different company — prospect is using the lead-gen agent for a NEW business.
-          // Create a separate company record and associate contact with both.
-          // Do NOT overwrite the existing company record.
-          console.log(`⚠️  Company name mismatch: existing="${existingCompanyName}", input="${input.company_name}". Creating new company.`);
-
-          let newCompanyId = null;
-          const byName = await findCompanyByName(input.company_name);
-          if (byName) {
-            newCompanyId = byName.id;
-            console.log(`✓ Found existing company by name: ${input.company_name} (ID: ${newCompanyId})`);
-            results.company = { action: 'found_new', id: newCompanyId };
-          } else {
-            const created = await createHubSpotCompany({
-              name:           input.company_name,
-              state:          input.province || undefined,
-              lifecyclestage: 'lead'
-            });
-            if (created.success) {
-              newCompanyId = created.company.id;
-              console.log(`✅ New company created: ${input.company_name} (ID: ${newCompanyId})`);
-              results.company = { action: 'created_new', id: newCompanyId };
-            } else {
-              console.warn('⚠️  New company creation failed:', created.error);
-              results.company = { action: 'failed', error: created.error };
-            }
-          }
-
-          if (newCompanyId) {
-            // Associate contact with the new company (keeps existing association too)
-            try {
-              await associateContactWithCompany(contactId, newCompanyId);
-              console.log(`🔗 Contact ${contactId} now also associated with new company ${newCompanyId}`);
-            } catch (err) {
-              console.warn('⚠️  Multi-company association failed:', err.message);
-            }
-            companyId = newCompanyId;
-            multipleCompaniesFlag = `This contact is associated with multiple companies. New company "${input.company_name}" created separately to preserve existing record "${existingCompanyName}".`;
-          }
-        }
-      }
-    }
-
-    if (!companyId && input.company_name) {
-      const existing = await findCompanyByName(input.company_name);
-      if (existing) {
-        companyId = existing.id;
-        console.log(`✓ Found existing company by name: ${input.company_name} (ID: ${companyId})`);
-        results.company = { action: 'found', id: companyId };
-      } else {
-        const created = await createHubSpotCompany({
-          name:           input.company_name,
-          state:          input.province || undefined,
-          lifecyclestage: 'lead'
-        });
-        if (created.success) {
-          companyId = created.company.id;
-          console.log(`✅ Company created: ${input.company_name} (ID: ${companyId})`);
-          results.company = { action: 'created', id: companyId };
-        } else {
-          console.warn('⚠️  Company creation failed:', created.error);
-          results.company = { action: 'failed', error: created.error };
-        }
-      }
-    }
-
-    // Populate company fields (try/catch per field inside)
-    if (companyId) {
-      await populateCompanyFields(companyId, input);
-    }
-  } catch (err) {
-    console.warn('⚠️  Company step failed:', err.message);
-    results.company = { ...(results.company || {}), populateError: err.message };
-  }
-
-  // 2c. Associate Contact → Company (if both exist and not already associated via contact)
-  if (contactId && companyId && !contactHadExistingCompany) {
-    try {
-      await associateContactWithCompany(contactId, companyId);
-      console.log(`🔗 Contact ${contactId} associated with company ${companyId}`);
-    } catch (err) {
-      console.warn('⚠️  Association failed:', err.message);
-    }
-  }
-
-  // 2d. Create Note
-  if (contactId) {
-    try {
-      const noteBody = buildNoteBody(input, multipleCompaniesFlag);
-      const noteId   = await createHubSpotNote(noteBody, contactId, companyId);
-      results.note   = { action: 'created', id: noteId };
-      console.log(`✅ Note created and associated (ID: ${noteId})`);
-    } catch (err) {
-      console.warn('⚠️  Note creation failed:', err.message);
-      results.note = { action: 'failed', error: err.message };
-    }
-  }
-
-  return {
-    success: true,
-    message: `Lead data saved. Contact: ${results.contact?.action || 'skipped'}. Company: ${results.company?.action || 'skipped'}. Note: ${results.note?.action || 'skipped'}.`,
-    results
-  };
 }

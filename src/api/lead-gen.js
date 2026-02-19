@@ -101,13 +101,14 @@ async function getLeadGenSession(sessionId) {
 }
 
 /**
- * Increment message_count and touch updated_at for a session.
+ * Increment message_count and touch updated_at + last_activity_at for a session.
  */
 async function incrementMessageCount(sessionId) {
   await query(
     `UPDATE lead_gen_conversations
      SET message_count = message_count + 1,
-         updated_at    = NOW()
+         updated_at    = NOW(),
+         last_activity_at = NOW()
      WHERE session_id = $1`,
     [sessionId]
   );
