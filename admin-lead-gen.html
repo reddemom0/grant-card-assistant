@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lead-Gen Admin Dashboard - Granted Consulting</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 24px;
+      color: #1a1a1a;
+    }
+
+    .filters {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .filter-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+    }
+
+    .filter-group select,
+    .filter-group input {
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: #f9f9f9;
+      padding: 16px;
+      border-radius: 6px;
+      border-left: 4px solid #007bff;
+    }
+
+    .stat-card.hot { border-left-color: #dc3545; }
+    .stat-card.warm { border-left-color: #ffc107; }
+    .stat-card.cool { border-left-color: #6c757d; }
+
+    .stat-label {
+      font-size: 12px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #f9f9f9;
+      position: sticky;
+      top: 0;
+    }
+
+    th {
+      text-align: left;
+      padding: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      border-bottom: 2px solid #ddd;
+    }
+
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+
+    tr {
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    tbody tr:hover {
+      background: #f9f9f9;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge.hot { background: #dc3545; color: white; }
+    .badge.warm { background: #ffc107; color: #1a1a1a; }
+    .badge.cool { background: #6c757d; color: white; }
+    .badge.abandoned { background: #6c757d; color: white; }
+    .badge.captured { background: #28a745; color: white; }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #666;
+    }
+
+    .error {
+      padding: 20px;
+      background: #f8d7da;
+      color: #721c24;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .modal.active {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      max-width: 800px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+
+    .modal-header {
+      padding: 20px;
+      border-bottom: 1px solid #eee;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      background: white;
+      z-index: 1;
+    }
+
+    .modal-header h2 {
+      font-size: 18px;
+      color: #1a1a1a;
+    }
+
+    .close-btn {
+      background: none;
+      border: none;
+      font-size: 24px;
+      cursor: pointer;
+      color: #666;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+    }
+
+    .close-btn:hover {
+      background: #f5f5f5;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    .conversation-details {
+      display: grid;
+      gap: 16px;
+    }
+
+    .detail-section {
+      background: #f9f9f9;
+      padding: 16px;
+      border-radius: 6px;
+    }
+
+    .detail-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #1a1a1a;
+    }
+
+    .detail-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+
+    .detail-label {
+      color: #666;
+      font-weight: 500;
+    }
+
+    .detail-value {
+      color: #1a1a1a;
+    }
+
+    .conversation-transcript {
+      background: #f5f5f5;
+      padding: 16px;
+      border-radius: 6px;
+    }
+
+    .message {
+      margin-bottom: 16px;
+      padding: 12px;
+      border-radius: 6px;
+    }
+
+    .message.user {
+      background: #e3f2fd;
+      margin-left: 40px;
+    }
+
+    .message.assistant {
+      background: white;
+      margin-right: 40px;
+    }
+
+    .message-role {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #666;
+      margin-bottom: 6px;
+    }
+
+    .message-content {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #1a1a1a;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Lead-Gen Admin Dashboard</h1>
+
+    <div id="error" class="error" style="display: none;"></div>
+
+    <div class="filters">
+      <div class="filter-group">
+        <label>Lead Score</label>
+        <select id="filter-score">
+          <option value="">All Scores</option>
+          <option value="hot">Hot</option>
+          <option value="warm">Warm</option>
+          <option value="cool">Cool</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Contact Status</label>
+        <select id="filter-contact">
+          <option value="">All Conversations</option>
+          <option value="captured">Has Email</option>
+          <option value="abandoned">No Email (Abandoned)</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>CTA Selected</label>
+        <select id="filter-cta">
+          <option value="">All CTAs</option>
+          <option value="book_call">Book Call</option>
+          <option value="email_summary">Email Summary</option>
+          <option value="resources">Resources</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label>Last N Days</label>
+        <select id="filter-days">
+          <option value="7">Last 7 days</option>
+          <option value="14">Last 14 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="365">Last year</option>
+          <option value="">All time</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="stats" id="stats">
+      <div class="stat-card">
+        <div class="stat-label">Total Conversations</div>
+        <div class="stat-value" id="stat-total">-</div>
+      </div>
+      <div class="stat-card hot">
+        <div class="stat-label">Hot Leads</div>
+        <div class="stat-value" id="stat-hot">-</div>
+      </div>
+      <div class="stat-card warm">
+        <div class="stat-label">Warm Leads</div>
+        <div class="stat-value" id="stat-warm">-</div>
+      </div>
+      <div class="stat-card cool">
+        <div class="stat-label">Cool Leads</div>
+        <div class="stat-value" id="stat-cool">-</div>
+      </div>
+    </div>
+
+    <div id="loading" class="loading">Loading conversations...</div>
+
+    <table id="conversations-table" style="display: none;">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Company</th>
+          <th>Contact</th>
+          <th>Funding Est.</th>
+          <th>Lead Score</th>
+          <th>CTA</th>
+          <th>Messages</th>
+        </tr>
+      </thead>
+      <tbody id="conversations-body">
+      </tbody>
+    </table>
+  </div>
+
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">Conversation Details</h2>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modal-body">
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let allConversations = [];
+    let filters = {
+      score: '',
+      contact: '',
+      cta: '',
+      days: '30'
+    };
+
+    // Fetch conversations on load
+    async function loadConversations() {
+      try {
+        const response = await fetch('/api/admin/lead-gen-conversations');
+        if (!response.ok) throw new Error('Failed to load conversations');
+
+        const data = await response.json();
+        allConversations = data.conversations;
+
+        updateStats();
+        applyFilters();
+
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('conversations-table').style.display = 'table';
+      } catch (err) {
+        document.getElementById('error').textContent = err.message;
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('loading').style.display = 'none';
+      }
+    }
+
+    function updateStats() {
+      const total = allConversations.length;
+      const hot = allConversations.filter(c => c.prospect_data?.lead_score === 'hot').length;
+      const warm = allConversations.filter(c => c.prospect_data?.lead_score === 'warm').length;
+      const cool = allConversations.filter(c => c.prospect_data?.lead_score === 'cool').length;
+
+      document.getElementById('stat-total').textContent = total;
+      document.getElementById('stat-hot').textContent = hot;
+      document.getElementById('stat-warm').textContent = warm;
+      document.getElementById('stat-cool').textContent = cool;
+    }
+
+    function applyFilters() {
+      let filtered = allConversations;
+
+      // Date filter
+      if (filters.days) {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - parseInt(filters.days));
+        filtered = filtered.filter(c => new Date(c.created_at) >= cutoff);
+      }
+
+      // Lead score filter
+      if (filters.score) {
+        filtered = filtered.filter(c => c.prospect_data?.lead_score === filters.score);
+      }
+
+      // Contact status filter
+      if (filters.contact === 'captured') {
+        filtered = filtered.filter(c => c.contact_email);
+      } else if (filters.contact === 'abandoned') {
+        filtered = filtered.filter(c => !c.contact_email);
+      }
+
+      // CTA filter
+      if (filters.cta) {
+        filtered = filtered.filter(c => c.cta_selected === filters.cta);
+      }
+
+      renderTable(filtered);
+    }
+
+    function renderTable(conversations) {
+      const tbody = document.getElementById('conversations-body');
+      tbody.innerHTML = '';
+
+      conversations.forEach(conv => {
+        const row = document.createElement('tr');
+        row.onclick = () => showConversation(conv);
+
+        const date = new Date(conv.created_at).toLocaleDateString();
+        const company = conv.prospect_data?.company_name || '(unknown)';
+        const contact = conv.contact_email || '<span class="badge abandoned">No Email</span>';
+        const funding = conv.estimated_funding || '-';
+        const score = conv.prospect_data?.lead_score || '-';
+        const cta = conv.cta_selected || '-';
+        const messages = conv.message_count || 0;
+
+        row.innerHTML = `
+          <td>${date}</td>
+          <td>${company}</td>
+          <td>${contact}</td>
+          <td>${funding}</td>
+          <td><span class="badge ${score}">${score}</span></td>
+          <td>${cta}</td>
+          <td>${messages}</td>
+        `;
+
+        tbody.appendChild(row);
+      });
+    }
+
+    async function showConversation(conv) {
+      const modal = document.getElementById('modal');
+      const modalBody = document.getElementById('modal-body');
+      const modalTitle = document.getElementById('modal-title');
+
+      modalTitle.textContent = conv.prospect_data?.company_name || 'Conversation Details';
+
+      // Build details HTML
+      const pd = conv.prospect_data || {};
+      const details = `
+        <div class="conversation-details">
+          <div class="detail-section">
+            <h3>Contact Information</h3>
+            <div class="detail-row">
+              <div class="detail-label">Company</div>
+              <div class="detail-value">${pd.company_name || '-'}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Contact Name</div>
+              <div class="detail-value">${conv.contact_name || '-'}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Email</div>
+              <div class="detail-value">${conv.contact_email || '-'}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Province</div>
+              <div class="detail-value">${pd.province || '-'}</div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h3>Business Profile</h3>
+            <div class="detail-row">
+              <div class="detail-label">Revenue</div>
+              <div class="detail-value">${pd.revenue || '-'}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Employees</div>
+              <div class="detail-value">${pd.employee_count || '-'}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Description</div>
+              <div class="detail-value">${pd.company_description || '-'}</div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <h3>Grant Opportunity</h3>
+            <div class="detail-row">
+              <div class="detail-label">Funding Estimate</div>
+              <div class="detail-value">${conv.estimated_funding || '-'}</div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">Programs Matched</div>
+              <div class="detail-value">${conv.matched_programs?.length || 0} programs</div>
+            </div>
+            ${conv.matched_programs?.length > 0 ? `<div class="detail-row">
+              <div class="detail-label"></div>
+              <div class="detail-value">${conv.matched_programs.join(', ')}</div>
+            </div>` : ''}
+            <div class="detail-row">
+              <div class="detail-label">Lead Score</div>
+              <div class="detail-value"><span class="badge ${pd.lead_score}">${pd.lead_score || '-'}</span></div>
+            </div>
+            <div class="detail-row">
+              <div class="detail-label">CTA Selected</div>
+              <div class="detail-value">${conv.cta_selected || '-'}</div>
+            </div>
+          </div>
+
+          ${pd.timeline || pd.budget_committed || pd.is_decision_maker || pd.growth_plans ? `
+          <div class="detail-section">
+            <h3>Qualification Signals</h3>
+            ${pd.timeline ? `<div class="detail-row">
+              <div class="detail-label">Timeline</div>
+              <div class="detail-value">${pd.timeline}</div>
+            </div>` : ''}
+            ${pd.budget_committed ? `<div class="detail-row">
+              <div class="detail-label">Budget Committed</div>
+              <div class="detail-value">${pd.budget_committed}</div>
+            </div>` : ''}
+            ${pd.is_decision_maker ? `<div class="detail-row">
+              <div class="detail-label">Decision Maker</div>
+              <div class="detail-value">${pd.is_decision_maker}</div>
+            </div>` : ''}
+            ${pd.growth_plans ? `<div class="detail-row">
+              <div class="detail-label">Growth Plans</div>
+              <div class="detail-value">${pd.growth_plans}</div>
+            </div>` : ''}
+          </div>` : ''}
+
+          <div class="detail-section">
+            <h3>Conversation Transcript</h3>
+            <div class="conversation-transcript" id="transcript-loading">Loading messages...</div>
+          </div>
+        </div>
+      `;
+
+      modalBody.innerHTML = details;
+      modal.classList.add('active');
+
+      // Load messages
+      try {
+        const response = await fetch(`/api/admin/lead-gen-messages/${conv.session_id}`);
+        const data = await response.json();
+
+        const transcript = data.messages.map(msg => `
+          <div class="message ${msg.role}">
+            <div class="message-role">${msg.role}</div>
+            <div class="message-content">${msg.content}</div>
+          </div>
+        `).join('');
+
+        document.getElementById('transcript-loading').outerHTML = `
+          <div class="conversation-transcript">${transcript}</div>
+        `;
+      } catch (err) {
+        document.getElementById('transcript-loading').textContent = 'Failed to load messages';
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.remove('active');
+    }
+
+    // Filter handlers
+    document.getElementById('filter-score').addEventListener('change', (e) => {
+      filters.score = e.target.value;
+      applyFilters();
+    });
+
+    document.getElementById('filter-contact').addEventListener('change', (e) => {
+      filters.contact = e.target.value;
+      applyFilters();
+    });
+
+    document.getElementById('filter-cta').addEventListener('change', (e) => {
+      filters.cta = e.target.value;
+      applyFilters();
+    });
+
+    document.getElementById('filter-days').addEventListener('change', (e) => {
+      filters.days = e.target.value;
+      applyFilters();
+    });
+
+    // Close modal on ESC
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    // Load on page load
+    loadConversations();
+  </script>
+</body>
+</html>

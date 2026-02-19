@@ -35,6 +35,7 @@ import {
 
 // Lead-gen chatbot (public — no auth)
 import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js';
+import { handleListLeadGenConversations, handleGetLeadGenMessages } from './src/api/admin-lead-gen.js';
 
 // Authentication
 import authRouter from './src/api/auth.js';
@@ -244,6 +245,10 @@ app.post('/api/lead-gen/chat', handleLeadGenChat);
 
 // Analytics endpoint — authenticated team members only
 app.get('/api/lead-gen/analytics', authenticateUser, handleLeadGenAnalytics);
+
+// Admin endpoints for lead-gen dashboard — authenticated team members only
+app.get('/api/admin/lead-gen-conversations', authenticateUser, handleListLeadGenConversations);
+app.get('/api/admin/lead-gen-messages/:sessionId', authenticateUser, handleGetLeadGenMessages);
 
 // Main chat endpoint (SSE streaming) - with authentication
 app.post('/api/chat', authenticateUser, handleChatRequest);
@@ -670,6 +675,10 @@ app.get('/feedback-metrics', (req, res) => {
 
 app.get('/agent-quality', (req, res) => {
   res.sendFile('agent-quality.html', { root: '.' });
+});
+
+app.get('/admin-lead-gen', (req, res) => {
+  res.sendFile('admin-lead-gen.html', { root: '.' });
 });
 
 app.get('/admin*', (req, res) => {
