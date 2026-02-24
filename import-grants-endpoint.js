@@ -134,8 +134,8 @@ export async function importGrantsEndpoint(req, res) {
 
     console.log('📥 Starting GetGranted import...');
 
-    // Read export file
-    const exportPath = path.join(__dirname, 'data', 'getgranted-all-grants-by-id.json');
+    // Read export file (use latest export with intake_cycle field)
+    const exportPath = path.join(__dirname, 'data', 'getgranted-all-grants.json');
 
     if (!fs.existsSync(exportPath)) {
       return res.status(404).json({ error: 'Export file not found' });
@@ -174,9 +174,9 @@ export async function importGrantsEndpoint(req, res) {
             regions, industries, program_provider, deadline,
             max_spend, contribution_percentage, difficulty,
             grant_criteria, best_practices, recently_changed, full_page_text,
-            last_updated, extracted_at, is_active,
+            last_updated, extracted_at, is_active, intake_cycle,
             currently_accepting, exclusion_reason, last_verified_at
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
           ON CONFLICT (grant_id) DO UPDATE SET
             grant_name = EXCLUDED.grant_name,
             grant_type = EXCLUDED.grant_type,
@@ -196,6 +196,7 @@ export async function importGrantsEndpoint(req, res) {
             last_updated = EXCLUDED.last_updated,
             extracted_at = EXCLUDED.extracted_at,
             is_active = EXCLUDED.is_active,
+            intake_cycle = EXCLUDED.intake_cycle,
             currently_accepting = EXCLUDED.currently_accepting,
             exclusion_reason = EXCLUDED.exclusion_reason,
             last_verified_at = EXCLUDED.last_verified_at,
@@ -220,6 +221,7 @@ export async function importGrantsEndpoint(req, res) {
           grant.last_updated,
           grant.extracted_at,
           grant.is_active,
+          grant.intake_cycle || null,
           currentlyAccepting,
           exclusionReason,
           grant.extracted_at  // last_verified_at = when it was scraped
