@@ -90,6 +90,7 @@ async function getGrantIds(page, url, grantType) {
 }
 
 async function extractGrantDetails(page, grantId) {
+  // First, visit the public grant page for main details
   await page.goto(`${GETGRANTED_URL}/grants/${grantId}`, { timeout: 10000 });
   await page.waitForTimeout(1500);
 
@@ -167,6 +168,26 @@ async function extractGrantDetails(page, grantId) {
 
   } catch (error) {
     console.warn(`      Warning: Some fields failed to extract: ${error.message}`);
+  }
+
+  // Extract intake cycle from admin edit page
+  // This field is only available on the admin edit page, not the public page
+  try {
+    await page.goto(`${GETGRANTED_URL}/admin/grants/${grantId}/edit`, { timeout: 10000 });
+    await page.waitForTimeout(1500);
+
+    // Extract intake_cycle (funding_period)
+    const fundingPeriodCheckboxes = await page.locator('input[name="grant[funding_period][]"]:checked').all();
+    const fundingPeriods = [];
+    for (const checkbox of fundingPeriodCheckboxes) {
+      const value = await checkbox.getAttribute('value');
+      if (value) fundingPeriods.push(value);
+    }
+    details.intake_cycle = fundingPeriods.join(', ');
+
+  } catch (error) {
+    console.warn(`      Warning: Failed to extract intake cycle: ${error.message}`);
+    details.intake_cycle = null;
   }
 
   return details;

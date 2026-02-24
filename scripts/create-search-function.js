@@ -75,6 +75,22 @@ async function searchGrants({
              ELSE is_active = true
         END
       )`);
+    } else {
+      // When including inactive grants, still exclude obviously dead programs:
+      // - Programs not updated since 2024 (stale for over a year)
+      // - Programs with exclusion reasons indicating permanent closure
+      whereConditions.push(`(
+        last_updated >= '2024-01-01'
+        AND (
+          exclusion_reason IS NULL
+          OR (
+            exclusion_reason NOT ILIKE '%discontinued%'
+            AND exclusion_reason NOT ILIKE '%cancelled%'
+            AND exclusion_reason NOT ILIKE '%permanently closed%'
+            AND exclusion_reason NOT ILIKE '%defunded%'
+          )
+        )
+      )`);
     }
 
     // ── Keyword filter ────────────────────────────────────────────────────────

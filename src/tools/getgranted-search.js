@@ -46,6 +46,7 @@ const CACHE_TTL = 3600; // Cache results for 1 hour
  * @param {number} input.company_size_min - Minimum company size (employees)
  * @param {number} input.company_size_max - Maximum company size
  * @param {boolean} input.active_only - Only show active grants (default true)
+ * @param {boolean} input.include_inactive - Include inactive/closed grants (default false)
  * @param {boolean} input.open_intakes_only - Only show grants with open intakes
  * @param {number} input.limit - Max results to return (default 10, max 50)
  * @param {boolean} input.fetch_full_details - Fetch full grant card details (slower)
@@ -63,6 +64,7 @@ export async function searchGetGranted(input) {
       company_size_min = null,
       company_size_max = null,
       active_only = true,
+      include_inactive = false,
       open_intakes_only = false,
       limit = 10,
       fetch_full_details = false
@@ -117,8 +119,8 @@ export async function searchGetGranted(input) {
       params.append('industries', industries.join(','));
     }
 
-    // Include inactive grants if active_only is false
-    if (!active_only) {
+    // Include inactive grants if include_inactive is true OR active_only is false
+    if (include_inactive || !active_only) {
       params.append('includeInactive', 'true');
     }
 
@@ -176,7 +178,11 @@ export async function searchGetGranted(input) {
       full_page_text: fetch_full_details ? grant.full_page_text : undefined,
       recently_changed: grant.recently_changed,
       last_updated: grant.last_updated,
-      is_active: grant.is_active
+      is_active: grant.is_active,
+      currently_accepting: grant.currently_accepting,
+      exclusion_reason: grant.exclusion_reason,
+      keyword_score: grant.keyword_score,
+      intake_cycle: grant.intake_cycle
     }));
 
     // Build result
@@ -188,6 +194,7 @@ export async function searchGetGranted(input) {
         regions: regions.length > 0 ? regions : 'all',
         industries: industries.length > 0 ? industries : 'all',
         active_only,
+        include_inactive,
         open_intakes_only
       },
       grants,
@@ -325,6 +332,11 @@ This tool searches the internal GetGranted database (598 Canadian grants, synced
         type: 'boolean',
         description: 'Only show active grants (default true).',
         default: true
+      },
+      include_inactive: {
+        type: 'boolean',
+        description: 'Include inactive/closed grants in results. Use this to see programs with closed intakes or seasonal programs that may reopen. Default false (active grants only).',
+        default: false
       },
       open_intakes_only: {
         type: 'boolean',
