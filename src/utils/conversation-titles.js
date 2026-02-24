@@ -27,7 +27,7 @@ export async function generateConversationTitle(firstMessage, agentType = null) 
 
     // Use Claude to generate a concise title
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022', // Fast, cheap model for titles
+      model: 'claude-haiku-4-5-20251001', // Fast, cheap model for titles
       max_tokens: 100,
       temperature: 0.3, // Low temperature for consistent titles
       messages: [{
@@ -46,7 +46,7 @@ Return ONLY the title, no quotes, no punctuation at the end, no explanation.`
     if (response.usage) {
       logAPICost({
         usage: response.usage,
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         source: 'conversation-title-generation',
         agentType: agentType || 'unknown',
         metadata: {

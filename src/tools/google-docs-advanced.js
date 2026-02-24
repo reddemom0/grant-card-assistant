@@ -1503,7 +1503,7 @@ Example format:
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 2000,
       messages: [{
         role: 'user',
@@ -1515,7 +1515,7 @@ Example format:
     if (message.usage) {
       logAPICost({
         usage: message.usage,
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         source: 'google-docs-interview-questions',
         metadata: {
           programName: programName || 'unknown',
@@ -1747,7 +1747,7 @@ NEXT STEPS:
 
   try {
     const message = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4000,
       messages: [{
         role: 'user',
@@ -1759,7 +1759,7 @@ NEXT STEPS:
     if (message.usage) {
       logAPICost({
         usage: message.usage,
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         source: 'google-docs-evaluation-rubric',
         metadata: {
           programName: program_name,

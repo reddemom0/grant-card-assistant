@@ -400,6 +400,18 @@ export async function runAgent({
           type: 'text',
           text: leadGenFormContext  // ❌ NOT CACHED (conversation-specific)
         });
+        console.log(`🔍 DEBUG: Lead-gen context injected into system prompt:\n${leadGenFormContext}`);
+      }
+
+      // DEBUG: Log full system prompt structure for lead-gen conversations
+      if (agentType === 'lead-gen' && leadGenFormContext) {
+        console.log(`🔍 DEBUG: Full system prompt blocks (${systemBlocks.length} blocks):`);
+        systemBlocks.forEach((block, i) => {
+          if (block.type === 'text') {
+            const preview = block.text.substring(0, 200).replace(/\n/g, ' ');
+            console.log(`  Block ${i}: ${preview}${block.text.length > 200 ? '...' : ''}`);
+          }
+        });
       }
 
       const apiParams = {

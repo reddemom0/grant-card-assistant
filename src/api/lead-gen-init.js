@@ -163,7 +163,7 @@ Please extract the following information in JSON format. If information is not f
 Return ONLY the JSON object, no additional text.`;
 
     const extractionResponse = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       messages: [{
         role: 'user',
