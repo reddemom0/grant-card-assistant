@@ -50,10 +50,10 @@ export function classifyQuery(message, agentType) {
   // AGENT-SPECIFIC CLASSIFICATION OVERRIDES
   // ============================================================================
 
-  // Lead-gen agent: ALWAYS use simple (speed is critical for conversational flow)
-  // This is a public-facing chatbot that needs sub-5s responses to avoid Railway timeouts
+  // Lead-gen agent: use complex for all turns (Sonnet for reliable prompt following)
+  // We can optimize back to Haiku for early discovery turns later once the full flow is validated
   if (agentType === 'lead-gen') {
-    return 'simple'; // Haiku, no thinking - optimized for speed
+    return 'complex'; // Sonnet + thinking - needed for 28K prompt compliance
   }
 
   // CanExport Claims agent: ALWAYS use complex (auditing requires maximum precision)
