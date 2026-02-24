@@ -354,13 +354,57 @@ export async function handleLeadGenChat(req, res) {
     }
 
     // -------------------------------------------------------------------------
-    // 3. Increment message count (optimistic — before agent runs)
+    // 3. RACE CONDITION FIX: Wait for background company extraction on first message
+    // -------------------------------------------------------------------------
+
+    // Import getLeadGenMessages to check message count
+    const { getLeadGenMessages } = await import('../database/messages.js');
+    const previousMessages = await getLeadGenMessages(sessionId);
+
+    // Only on first message (no conversation history yet)
+    if (previousMessages.length === 0) {
+      const session = await getLeadGenSession(sessionId);
+
+      // If form data exists but company_background is missing/empty, wait for extraction
+      if (session && (session.company_name || session.company_website)) {
+        const hasBackground = session.company_background && Object.keys(session.company_background).length > 0;
+
+        if (!hasBackground) {
+          console.log(`⏳ First message detected — waiting up to 5s for background company extraction...`);
+
+          const maxWait = 5000;      // 5 seconds max
+          const pollInterval = 250;  // Check every 250ms
+          let waited = 0;
+
+          while (waited < maxWait) {
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            waited += pollInterval;
+
+            // Re-check session for company_background
+            const updatedSession = await getLeadGenSession(sessionId);
+            if (updatedSession.company_background && Object.keys(updatedSession.company_background).length > 0) {
+              console.log(`✓ Company background extraction completed after ${waited}ms`);
+              break;
+            }
+          }
+
+          if (waited >= maxWait) {
+            console.log(`⚠️  Company background extraction timed out after ${maxWait}ms — proceeding without it`);
+          }
+        } else {
+          console.log(`✓ Company background already available (extraction completed before first message)`);
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Increment message count (optimistic — before agent runs)
     // -------------------------------------------------------------------------
 
     await incrementMessageCount(sessionId);
 
     // -------------------------------------------------------------------------
-    // 4. Run the lead-gen agent (SSE streaming)
+    // 5. Run the lead-gen agent (SSE streaming)
     //    session_id == conversationId in the conversations/messages tables
     // -------------------------------------------------------------------------
 
