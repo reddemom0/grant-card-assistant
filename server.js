@@ -9,6 +9,7 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from 'dotenv';
+import cron from 'node-cron';
 
 // Legacy handlers (for backwards compatibility)
 import agentHandler from './api/agent-sdk-handler.js';
@@ -677,7 +678,7 @@ app.get('/agent-quality', (req, res) => {
   res.sendFile('agent-quality.html', { root: '.' });
 });
 
-app.get('/admin-lead-gen', (req, res) => {
+app.get('/admin-lead-gen', authenticateUser, (req, res) => {
   res.sendFile('admin-lead-gen.html', { root: '.' });
 });
 
@@ -770,6 +771,19 @@ async function startServer() {
     console.log(`\n📋 Available agents (${agents.length}):`);
     agents.forEach(agent => console.log(`   - ${agent}`));
 
+    // Auto-run migration 014 (add intake_cycle column if not exists)
+    try {
+      console.log('\n🔄 Running auto-migration 014 (intake_cycle)...');
+      const { query } = await import('./src/database/connection.js');
+      await query(`
+        ALTER TABLE grants ADD COLUMN IF NOT EXISTS intake_cycle TEXT;
+        CREATE INDEX IF NOT EXISTS idx_grants_intake_cycle ON grants(intake_cycle);
+      `);
+      console.log('✅ Migration 014 complete (or already applied)');
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 014 failed (non-fatal):', migrationError.message);
+    }
+
     // Start Express server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n' + '='.repeat(80));
@@ -785,6 +799,35 @@ async function startServer() {
       console.log(`  📄 PDF Processing: /api/pdf`);
       console.log('\n' + '='.repeat(80) + '\n');
     });
+
+    // ========================================================================
+    // CRON JOB: Lead-gen inactivity finalization
+    // ========================================================================
+    // Run every 10 minutes to finalize abandoned conversations
+    cron.schedule('*/10 * * * *', async () => {
+      console.log('\n🔄 Running scheduled lead-gen finalization...');
+      try {
+        const { finalizeInactiveSessions } = await import('./src/api/lead-gen-finalization.js');
+        const result = await finalizeInactiveSessions(5, 50);
+        console.log(`✅ Finalization complete: ${result.finalized} sessions finalized, ${result.errors} errors`);
+      } catch (err) {
+        console.error('❌ Scheduled finalization failed:', err.message);
+      }
+    });
+
+    console.log('⏰ Cron job scheduled: Lead-gen finalization every 10 minutes');
+
+    // Log A/B testing configuration for lead-gen
+    const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';
+    console.log(`🧪 Lead-gen A/B testing: VARIANT ${leadGenVariant.toUpperCase()}`);
+
+    // Log test mode status
+    const testMode = process.env.LEAD_GEN_TEST_MODE === 'true';
+    if (testMode) {
+      console.log('🧪 TEST MODE ENABLED — HubSpot API calls will be mocked (lead-gen only)');
+    } else {
+      console.log('✅ Production mode — HubSpot API calls active');
+    }
 
     // Graceful shutdown
     const shutdown = async (signal) => {
