@@ -134,9 +134,23 @@ export async function runAgent({
     // 2.7. Get query-specific configuration (NEW: Performance Optimization)
     // ============================================================================
 
+    // For lead-gen: load raw memories for stateful routing (estimate detection)
+    let conversationMemoriesObject = null;
+    if (agentType === 'lead-gen') {
+      const { listMemories } = await import('../tools/memory.js');
+      const memoriesResult = await listMemories(conversationId);
+      if (memoriesResult.success && memoriesResult.memories.length > 0) {
+        // Convert array of {key, value} to object {key: value}
+        conversationMemoriesObject = {};
+        memoriesResult.memories.forEach(mem => {
+          conversationMemoriesObject[mem.key] = mem.value;
+        });
+      }
+    }
+
     const queryConfig = forceModel
       ? getQueryConfigForModel(forceModel, modelConfig)
-      : getQueryConfig(message, agentType);
+      : getQueryConfig(message, agentType, conversationMemoriesObject);
     logConfigDecision(queryConfig, message);
 
     // Extract configuration values

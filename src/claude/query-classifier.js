@@ -13,12 +13,35 @@
  */
 
 /**
+ * Check if lead-gen conversation is ready for estimate delivery
+ * @param {Object} memories - Conversation memory key-value pairs
+ * @returns {boolean} True if ready for estimate (has discovery data but not estimate yet)
+ */
+function isLeadGenReadyForEstimate(memories) {
+  if (!memories || typeof memories !== 'object') {
+    return false;
+  }
+
+  // Check if discovery is complete (has key discovery data)
+  const hasActivities = !!memories.activities_summary;
+  const hasProvince = !!memories.province;
+  const hasEmployeeCount = !!memories.employee_count;
+
+  // Check if estimate hasn't been delivered yet
+  const hasEstimate = !!memories.estimated_funding;
+
+  // Ready for estimate = has discovery data AND no estimate yet
+  return hasActivities && hasProvince && hasEmployeeCount && !hasEstimate;
+}
+
+/**
  * Classify query complexity
  * @param {string} message - User's query
  * @param {string} agentType - Type of agent handling the query
+ * @param {Object} conversationMemories - Optional: conversation memories for stateful routing
  * @returns {'simple'|'moderate'|'complex'} Query classification
  */
-export function classifyQuery(message, agentType) {
+export function classifyQuery(message, agentType, conversationMemories = null) {
   const lowerMessage = message.toLowerCase();
 
   // ============================================================================
@@ -50,10 +73,18 @@ export function classifyQuery(message, agentType) {
   // AGENT-SPECIFIC CLASSIFICATION OVERRIDES
   // ============================================================================
 
-  // Lead-gen agent: use complex for all turns (Sonnet for reliable prompt following)
-  // We can optimize back to Haiku for early discovery turns later once the full flow is validated
+  // Lead-gen agent: Conditional routing based on conversation state
+  // Sonnet ONLY for estimate delivery turn, Haiku for everything else
   if (agentType === 'lead-gen') {
-    return 'complex'; // Sonnet + thinking - needed for 28K prompt compliance
+    // Check if this is the estimate delivery turn
+    if (isLeadGenReadyForEstimate(conversationMemories)) {
+      console.log('🎯 Lead-gen routing: SONNET (estimate delivery turn detected)');
+      return 'complex'; // Sonnet + thinking for estimate synthesis
+    }
+
+    // All other turns use Haiku
+    console.log('🎯 Lead-gen routing: HAIKU (discovery/post-estimate turn)');
+    return 'simple'; // Haiku for speed
   }
 
   // CanExport Claims agent: ALWAYS use complex (auditing requires maximum precision)
@@ -297,10 +328,11 @@ export function getIterationLimit(queryComplexity) {
  * Get complete configuration for query
  * @param {string} message - User's query
  * @param {string} agentType - Type of agent
+ * @param {Object} conversationMemories - Optional: conversation memories for stateful routing
  * @returns {Object} Complete configuration
  */
-export function getQueryConfig(message, agentType) {
-  const complexity = classifyQuery(message, agentType);
+export function getQueryConfig(message, agentType, conversationMemories = null) {
+  const complexity = classifyQuery(message, agentType, conversationMemories);
 
   return {
     complexity,
