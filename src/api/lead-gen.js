@@ -102,16 +102,23 @@ async function getLeadGenSession(sessionId) {
 
 /**
  * Increment message_count and touch updated_at + last_activity_at for a session.
+ * DEFENSIVE: Wrapped in try/catch to prevent crashes if columns don't exist (e.g., missing migration).
  */
 async function incrementMessageCount(sessionId) {
-  await query(
-    `UPDATE lead_gen_conversations
-     SET message_count = message_count + 1,
-         updated_at    = NOW(),
-         last_activity_at = NOW()
-     WHERE session_id = $1`,
-    [sessionId]
-  );
+  try {
+    await query(
+      `UPDATE lead_gen_conversations
+       SET message_count = message_count + 1,
+           updated_at    = NOW(),
+           last_activity_at = NOW()
+       WHERE session_id = $1`,
+      [sessionId]
+    );
+  } catch (err) {
+    // Non-fatal: Log but don't crash the conversation
+    console.warn(`⚠️  Failed to increment message count for session ${sessionId}:`, err.message);
+    console.warn('⚠️  This may indicate a missing database migration. Conversation will continue.');
+  }
 }
 
 /**
@@ -131,11 +138,20 @@ export async function appendLeadGenMessages(sessionId, userMessage, assistantMes
     timestamp
   };
 
-  const assistantEntry = {
-    role: 'assistant',
-    content: assistantMessage,
-    timestamp
-  };
+  // DEFENSIVE: Don't save empty/whitespace-only assistant messages
+  // (e.g., when agent only calls tools and returns end_turn with no text)
+  const messagesToSave = [userEntry];
+
+  if (assistantMessage && assistantMessage.trim().length > 0) {
+    const assistantEntry = {
+      role: 'assistant',
+      content: assistantMessage,
+      timestamp
+    };
+    messagesToSave.push(assistantEntry);
+  } else {
+    console.warn(`⚠️  Skipping empty assistant response for session ${sessionId} (likely tool-only turn)`);
+  }
 
   try {
     await query(
@@ -143,9 +159,9 @@ export async function appendLeadGenMessages(sessionId, userMessage, assistantMes
        SET messages = messages || $1::jsonb,
            updated_at = NOW()
        WHERE session_id = $2`,
-      [JSON.stringify([userEntry, assistantEntry]), sessionId]
+      [JSON.stringify(messagesToSave), sessionId]
     );
-    console.log(`✓ Messages appended to lead_gen_conversations for session ${sessionId}`);
+    console.log(`✓ Messages appended to lead_gen_conversations for session ${sessionId} (${messagesToSave.length} messages)`);
   } catch (err) {
     console.warn(`⚠️  Failed to append messages for session ${sessionId}:`, err.message);
   }
@@ -275,6 +291,7 @@ export async function handleLeadGenChat(req, res) {
 
     console.log(`  IP: ${ipAddress}`);
     console.log(`  Session provided: ${incomingSessionId || '(none — new session)'}`);
+    console.log(`  🧪 A/B Variant: ${(process.env.LEAD_GEN_VARIANT || 'A').toUpperCase()}`);
 
     // -------------------------------------------------------------------------
     // 1. Validate message

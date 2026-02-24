@@ -1059,34 +1059,49 @@ export async function createHubSpotCompany(companyData) {
     };
   }
 
+  // Build properties object, filtering out undefined/null values
+  const properties = {};
+
+  // Required field
+  properties.name = companyData.name;
+
+  // Optional fields - only include if provided
+  if (companyData.domain) properties.domain = companyData.domain;
+  if (companyData.website) properties.website = companyData.website;
+  if (companyData.industry) properties.industry = companyData.industry;
+  if (companyData.description) properties.description = companyData.description;
+  if (companyData.about_us) properties.about_us = companyData.about_us;
+  if (companyData.city) properties.city = companyData.city;
+  if (companyData.state) properties.state = companyData.state;
+  if (companyData.country) properties.country = companyData.country;
+  if (companyData.phone) properties.phone = companyData.phone;
+  if (companyData.numberofemployees !== undefined) properties.numberofemployees = companyData.numberofemployees;
+  if (companyData.annualrevenue !== undefined) properties.annualrevenue = companyData.annualrevenue;
+  if (companyData.hubspot_owner_id) properties.hubspot_owner_id = companyData.hubspot_owner_id;
+  if (companyData.linkedin_company_page) properties.linkedin_company_page = companyData.linkedin_company_page;
+
+  // Set lifecycle stage to "lead" by default if not specified
+  properties.lifecyclestage = companyData.lifecyclestage || 'lead';
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would create HubSpot company:');
+    console.log(JSON.stringify({ endpoint: '/crm/v3/objects/companies', method: 'POST', properties }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      company: {
+        id: 'TEST_COMPANY_' + Date.now(),
+        ...properties
+      },
+      testMode: true
+    };
+  }
+
   try {
     const client = createHubSpotClient();
 
     console.log(`🏢 Creating company: ${companyData.name}`);
-
-    // Build properties object, filtering out undefined/null values
-    const properties = {};
-
-    // Required field
-    properties.name = companyData.name;
-
-    // Optional fields - only include if provided
-    if (companyData.domain) properties.domain = companyData.domain;
-    if (companyData.website) properties.website = companyData.website;
-    if (companyData.industry) properties.industry = companyData.industry;
-    if (companyData.description) properties.description = companyData.description;
-    if (companyData.about_us) properties.about_us = companyData.about_us;
-    if (companyData.city) properties.city = companyData.city;
-    if (companyData.state) properties.state = companyData.state;
-    if (companyData.country) properties.country = companyData.country;
-    if (companyData.phone) properties.phone = companyData.phone;
-    if (companyData.numberofemployees !== undefined) properties.numberofemployees = companyData.numberofemployees;
-    if (companyData.annualrevenue !== undefined) properties.annualrevenue = companyData.annualrevenue;
-    if (companyData.hubspot_owner_id) properties.hubspot_owner_id = companyData.hubspot_owner_id;
-    if (companyData.linkedin_company_page) properties.linkedin_company_page = companyData.linkedin_company_page;
-
-    // Set lifecycle stage to "lead" by default if not specified
-    properties.lifecyclestage = companyData.lifecyclestage || 'lead';
 
     const response = await client.post('/crm/v3/objects/companies', {
       properties
@@ -1199,28 +1214,44 @@ export async function createHubSpotContact(contactData) {
     };
   }
 
+  // Build properties object
+  const properties = {};
+
+  // Required field
+  properties.email = contactData.email;
+
+  // Optional fields
+  if (contactData.firstname) properties.firstname = contactData.firstname;
+  if (contactData.lastname) properties.lastname = contactData.lastname;
+  if (contactData.jobtitle) properties.jobtitle = contactData.jobtitle;
+  if (contactData.phone) properties.phone = contactData.phone;
+  if (contactData.mobilephone) properties.mobilephone = contactData.mobilephone;
+  if (contactData.city) properties.city = contactData.city;
+  if (contactData.state) properties.state = contactData.state;
+  if (contactData.country) properties.country = contactData.country;
+  if (contactData.lifecyclestage) properties.lifecyclestage = contactData.lifecyclestage;
+  if (contactData.hubspot_owner_id) properties.hubspot_owner_id = contactData.hubspot_owner_id;
+  if (contactData.hs_lead_status) properties.hs_lead_status = contactData.hs_lead_status;
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would create HubSpot contact:');
+    console.log(JSON.stringify({ endpoint: '/crm/v3/objects/contacts', method: 'POST', properties }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      contact: {
+        id: 'TEST_CONTACT_' + Date.now(),
+        ...properties
+      },
+      testMode: true
+    };
+  }
+
   try {
     const client = createHubSpotClient();
 
     console.log(`👤 Creating contact: ${contactData.email}`);
-
-    // Build properties object
-    const properties = {};
-
-    // Required field
-    properties.email = contactData.email;
-
-    // Optional fields
-    if (contactData.firstname) properties.firstname = contactData.firstname;
-    if (contactData.lastname) properties.lastname = contactData.lastname;
-    if (contactData.jobtitle) properties.jobtitle = contactData.jobtitle;
-    if (contactData.phone) properties.phone = contactData.phone;
-    if (contactData.mobilephone) properties.mobilephone = contactData.mobilephone;
-    if (contactData.city) properties.city = contactData.city;
-    if (contactData.state) properties.state = contactData.state;
-    if (contactData.country) properties.country = contactData.country;
-    if (contactData.lifecyclestage) properties.lifecyclestage = contactData.lifecyclestage;
-    if (contactData.hubspot_owner_id) properties.hubspot_owner_id = contactData.hubspot_owner_id;
 
     const response = await client.post('/crm/v3/objects/contacts', {
       properties
@@ -1266,18 +1297,33 @@ export async function updateHubSpotContact(contactId, properties) {
     };
   }
 
+  // Filter out undefined/null values
+  const cleanedProperties = {};
+  Object.keys(properties).forEach(key => {
+    if (properties[key] !== undefined && properties[key] !== null) {
+      cleanedProperties[key] = properties[key];
+    }
+  });
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would update HubSpot contact:');
+    console.log(JSON.stringify({ endpoint: `/crm/v3/objects/contacts/${contactId}`, method: 'PATCH', properties: cleanedProperties }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      contact: {
+        id: contactId,
+        ...cleanedProperties
+      },
+      testMode: true
+    };
+  }
+
   try {
     const client = createHubSpotClient();
 
     console.log(`🔄 Updating contact ID: ${contactId}`);
-
-    // Filter out undefined/null values
-    const cleanedProperties = {};
-    Object.keys(properties).forEach(key => {
-      if (properties[key] !== undefined && properties[key] !== null) {
-        cleanedProperties[key] = properties[key];
-      }
-    });
 
     const response = await client.patch(`/crm/v3/objects/contacts/${contactId}`, {
       properties: cleanedProperties
@@ -1320,6 +1366,23 @@ export async function associateContactWithCompany(contactId, companyId) {
     return {
       success: false,
       error: 'Both contact ID and company ID are required'
+    };
+  }
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would associate contact with company:');
+    console.log(JSON.stringify({
+      endpoint: `/crm/v4/objects/contacts/${contactId}/associations/default/companies/${companyId}`,
+      method: 'PUT',
+      contactId,
+      companyId
+    }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      message: `Contact ${contactId} associated with company ${companyId}`,
+      testMode: true
     };
   }
 

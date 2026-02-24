@@ -36,6 +36,7 @@ import {
 
 // Lead-gen chatbot (public — no auth)
 import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js';
+import { handleLeadGenInit } from './src/api/lead-gen-init.js';
 import { handleListLeadGenConversations, handleGetLeadGenMessages } from './src/api/admin-lead-gen.js';
 
 // Authentication
@@ -240,6 +241,9 @@ app.get('/health', async (req, res) => {
 // ============================================================================
 // LEAD-GEN CHATBOT (PUBLIC — NO AUTH)
 // ============================================================================
+
+// Pre-chat form initialization — creates session with form data
+app.post('/api/lead-gen/init', handleLeadGenInit);
 
 // Chat endpoint — no authenticateUser middleware (public-facing)
 app.post('/api/lead-gen/chat', handleLeadGenChat);
@@ -782,6 +786,22 @@ async function startServer() {
       console.log('✅ Migration 014 complete (or already applied)');
     } catch (migrationError) {
       console.warn('⚠️  Migration 014 failed (non-fatal):', migrationError.message);
+    }
+
+    // Auto-run migration 015 (add pre-chat form fields)
+    try {
+      console.log('\n🔄 Running auto-migration 015 (pre-chat form fields)...');
+      const { query } = await import('./src/database/connection.js');
+      await query(`
+        ALTER TABLE lead_gen_conversations
+          ADD COLUMN IF NOT EXISTS company_name TEXT,
+          ADD COLUMN IF NOT EXISTS company_website TEXT,
+          ADD COLUMN IF NOT EXISTS company_background JSONB DEFAULT '{}';
+        CREATE INDEX IF NOT EXISTS idx_lead_gen_company_name ON lead_gen_conversations(company_name);
+      `);
+      console.log('✅ Migration 015 complete (or already applied)');
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 015 failed (non-fatal):', migrationError.message);
     }
 
     // Start Express server

@@ -91,6 +91,26 @@ async function findCompanyByName(name, hubspotClient) {
  * Create HubSpot Note and associate with contact + company
  */
 async function createHubSpotNote(noteBody, contactId, companyId, hubspotClient) {
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would create HubSpot note:');
+    console.log(JSON.stringify({
+      endpoint: '/crm/v3/objects/notes',
+      method: 'POST',
+      properties: {
+        hs_timestamp: new Date().toISOString(),
+        hs_note_body: noteBody
+      },
+      associations: {
+        contactId: contactId || null,
+        companyId: companyId || null
+      }
+    }, null, 2));
+    console.log('');
+    const testNoteId = 'TEST_NOTE_' + Date.now();
+    return testNoteId;
+  }
+
   const noteRes = await hubspotClient.post('/crm/v3/objects/notes', {
     properties: {
       hs_timestamp: new Date().toISOString(),
@@ -234,27 +254,55 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   console.log(`🎯 Finalizing lead-gen session ${sessionId} (trigger: ${trigger})`);
 
   // -------------------------------------------------------------------------
-  // 1. Load session data
+  // 1. Load session data AND atomically claim it for finalization
   // -------------------------------------------------------------------------
+  // Use UPDATE...RETURNING to atomically check and set finalized flag
+  // This prevents race conditions where two processes try to finalize simultaneously
 
   const sessionResult = await query(
-    `SELECT * FROM lead_gen_conversations WHERE session_id = $1`,
-    [sessionId]
+    `UPDATE lead_gen_conversations
+     SET finalized = TRUE,
+         finalized_at = NOW(),
+         finalization_trigger = $2
+     WHERE session_id = $1
+       AND finalized = FALSE
+     RETURNING *`,
+    [sessionId, trigger]
   );
 
   if (sessionResult.rows.length === 0) {
-    return { success: false, error: 'Session not found' };
+    // Either session doesn't exist, or it's already finalized
+    const checkResult = await query(
+      `SELECT finalized, finalized_at FROM lead_gen_conversations WHERE session_id = $1`,
+      [sessionId]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return { success: false, error: 'Session not found' };
+    } else {
+      console.log(`⚠️  Session ${sessionId} already finalized at ${checkResult.rows[0].finalized_at}`);
+      return { success: false, error: 'Already finalized', alreadyFinalized: true };
+    }
   }
 
   const session = sessionResult.rows[0];
-
-  // Skip if already finalized
-  if (session.finalized) {
-    console.log(`⚠️  Session ${sessionId} already finalized at ${session.finalized_at}`);
-    return { success: false, error: 'Already finalized', alreadyFinalized: true };
-  }
+  console.log(`🔒 Claimed session ${sessionId} for finalization (${trigger})`);
 
   const prospectData = session.prospect_data || {};
+
+  // Merge form data as fallbacks (form data doesn't override agent-collected data)
+  if (!prospectData.company_name && session.company_name) {
+    prospectData.company_name = session.company_name;
+  }
+  if (!prospectData.contact_name && session.contact_name) {
+    prospectData.contact_name = session.contact_name;
+  }
+  if (!prospectData.contact_email && session.contact_email) {
+    prospectData.contact_email = session.contact_email;
+  }
+  if (!prospectData.company_website && session.company_website) {
+    prospectData.company_website = session.company_website;
+  }
 
   // Require company_name for finalization
   if (!prospectData.company_name) {
@@ -349,7 +397,8 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
       const companyData = {
         name: prospectData.company_name,
         lifecyclestage: 'lead',
-        country: 'Canada'
+        country: 'Canada',
+        website: session.company_website || prospectData.company_website || null
       };
 
       if (prospectData.province) companyData.state = prospectData.province;
@@ -463,23 +512,9 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   }
 
   // -------------------------------------------------------------------------
-  // 7. Mark session as finalized
+  // 7. Log analytics event
   // -------------------------------------------------------------------------
-
-  await query(
-    `UPDATE lead_gen_conversations
-     SET finalized = TRUE,
-         finalized_at = NOW(),
-         finalization_trigger = $1
-     WHERE session_id = $2`,
-    [trigger, sessionId]
-  );
-
-  console.log(`✅ Session ${sessionId} finalized via ${trigger}`);
-
-  // -------------------------------------------------------------------------
-  // 8. Log analytics event
-  // -------------------------------------------------------------------------
+  // Note: Session was already marked as finalized atomically at the start
 
   await query(
     `INSERT INTO lead_gen_analytics (conversation_id, event_type, event_data)

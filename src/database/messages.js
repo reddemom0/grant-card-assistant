@@ -70,13 +70,24 @@ export async function getLeadGenMessages(sessionId, maxMessages = 60) {
     const recentMessages = messagesArray.slice(-maxMessages);
 
     // Convert to Claude API format: {role, content: [{type: 'text', text: '...'}]}
-    const formattedMessages = recentMessages.map(msg => ({
-      role: msg.role,
-      content: [{
-        type: 'text',
-        text: msg.content
-      }]
-    }));
+    // DEFENSIVE: Filter out empty/whitespace-only text content to prevent API errors
+    const formattedMessages = recentMessages
+      .map(msg => {
+        // If content is empty or whitespace-only, skip this message
+        if (!msg.content || msg.content.trim().length === 0) {
+          console.warn(`⚠️  Skipping message with empty content in session ${sessionId}`);
+          return null;
+        }
+
+        return {
+          role: msg.role,
+          content: [{
+            type: 'text',
+            text: msg.content
+          }]
+        };
+      })
+      .filter(msg => msg !== null); // Remove null entries
 
     console.log(`✓ Retrieved ${formattedMessages.length} messages from lead_gen_conversations for session ${sessionId}`);
     return formattedMessages;

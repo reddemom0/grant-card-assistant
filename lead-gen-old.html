@@ -21,210 +21,14 @@
       justify-content: center;
     }
 
-    /* ============================================================ */
-    /* PRE-CHAT FORM MODAL */
-    /* ============================================================ */
-
-    #form-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-      padding: 20px;
-    }
-
-    #form-overlay.hidden {
-      display: none;
-    }
-
-    #form-modal {
-      background: #ffffff;
-      border-radius: 12px;
-      padding: 32px;
-      max-width: 480px;
-      width: 100%;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-
-    #form-modal h2 {
-      font-size: 24px;
-      font-weight: 700;
-      color: #1a1a1a;
-      margin-bottom: 8px;
-      text-align: center;
-    }
-
-    #form-modal p {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 24px;
-      text-align: center;
-      line-height: 1.5;
-    }
-
-    .form-field {
-      margin-bottom: 16px;
-    }
-
-    .form-field label {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: #1a1a1a;
-      margin-bottom: 6px;
-    }
-
-    .form-field input[type="text"],
-    .form-field input[type="email"],
-    .form-field input[type="url"] {
-      width: 100%;
-      padding: 12px 14px;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: inherit;
-      transition: border-color 0.2s;
-    }
-
-    .form-field input:focus {
-      outline: none;
-      border-color: #1B6B4A;
-    }
-
-    .form-field input.error {
-      border-color: #c0392b;
-    }
-
-    .form-field .error-message {
-      font-size: 12px;
-      color: #c0392b;
-      margin-top: 4px;
-      display: none;
-    }
-
-    .form-field input.error + .error-message {
-      display: block;
-    }
-
-    .checkbox-field {
-      display: flex;
-      align-items: flex-start;
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-
-    .checkbox-field input[type="checkbox"] {
-      margin-top: 2px;
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-    }
-
-    .checkbox-field label {
-      font-size: 14px;
-      color: #1a1a1a;
-      cursor: pointer;
-      line-height: 1.4;
-    }
-
-    #no-website-message {
-      background: #FFF5E6;
-      border: 1px solid #FFE4B3;
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
-      display: none;
-    }
-
-    #no-website-message.visible {
-      display: block;
-    }
-
-    #no-website-message p {
-      font-size: 14px;
-      color: #4a4a4a;
-      margin: 0 0 8px 0;
-      text-align: left;
-    }
-
-    #no-website-message a {
-      color: #1B6B4A;
-      font-weight: 600;
-      text-decoration: none;
-    }
-
-    #no-website-message a:hover {
-      text-decoration: underline;
-    }
-
-    #form-submit-btn {
-      width: 100%;
-      padding: 14px 20px;
-      background: #1B6B4A;
-      color: #ffffff;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    #form-submit-btn:hover:not(:disabled) {
-      background: #155a3c;
-    }
-
-    #form-submit-btn:disabled {
-      background: #ccc;
-      cursor: not-allowed;
-    }
-
-    #form-loading {
-      display: none;
-      text-align: center;
-      padding: 20px;
-    }
-
-    #form-loading.visible {
-      display: block;
-    }
-
-    .spinner {
-      width: 40px;
-      height: 40px;
-      margin: 0 auto 12px;
-      border: 4px solid #f0f0f0;
-      border-top-color: #1B6B4A;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    /* ============================================================ */
-    /* CHAT INTERFACE (initially hidden) */
-    /* ============================================================ */
-
     #chat-container {
       width: 100%;
       max-width: 600px;
       height: 100vh;
-      display: none;
+      display: flex;
       flex-direction: column;
       background: #ffffff;
       box-shadow: 0 0 40px rgba(0,0,0,0.08);
-    }
-
-    #chat-container.visible {
-      display: flex;
     }
 
     #chat-header {
@@ -397,7 +201,7 @@
     }
 
     /* Error state */
-    .error-message-chat {
+    .error-message {
       align-self: center;
       font-size: 13px;
       color: #c0392b;
@@ -422,58 +226,6 @@
 </head>
 <body>
 
-<!-- Pre-Chat Form Overlay -->
-<div id="form-overlay">
-  <div id="form-modal">
-    <h2>Get Your Grant Estimate</h2>
-    <p>Tell us a bit about your business, and we'll find grant opportunities you qualify for — in about 2 minutes.</p>
-
-    <form id="prechat-form">
-      <div class="form-field">
-        <label for="contact-name">Your Name *</label>
-        <input type="text" id="contact-name" required />
-        <span class="error-message">Please enter your name</span>
-      </div>
-
-      <div class="form-field">
-        <label for="contact-email">Email *</label>
-        <input type="email" id="contact-email" required />
-        <span class="error-message">Please enter a valid email address</span>
-      </div>
-
-      <div class="form-field">
-        <label for="company-name">Company Name *</label>
-        <input type="text" id="company-name" required />
-        <span class="error-message">Please enter your company name</span>
-      </div>
-
-      <div class="form-field">
-        <label for="company-website">Company Website *</label>
-        <input type="url" id="company-website" placeholder="example.com or https://example.com" />
-        <span class="error-message">Please enter a valid website URL</span>
-      </div>
-
-      <div class="checkbox-field">
-        <input type="checkbox" id="no-website-checkbox" />
-        <label for="no-website-checkbox">I don't have a website yet</label>
-      </div>
-
-      <div id="no-website-message">
-        <p><strong>Most government grant programs require an incorporated business with an active web presence.</strong></p>
-        <p>If you're still getting started, visit <a href="https://getgranted.io" target="_blank">getgranted.io</a> to learn more about what's available when you're ready.</p>
-      </div>
-
-      <button type="submit" id="form-submit-btn">Get My Grant Estimate</button>
-    </form>
-
-    <div id="form-loading">
-      <div class="spinner"></div>
-      <p style="color: #666; font-size: 14px;">Starting your session...</p>
-    </div>
-  </div>
-</div>
-
-<!-- Chat Interface (hidden until form submitted) -->
 <div id="chat-container">
   <div id="chat-header">
     <h1>Grant Advisor</h1>
@@ -508,159 +260,16 @@
   // ============================================================
   let sessionId = null;
   let isStreaming = false;
-  let formData = null;
 
   // ============================================================
   // DOM refs
   // ============================================================
-  const formOverlay = document.getElementById('form-overlay');
-  const formModal = document.getElementById('form-modal');
-  const prechatForm = document.getElementById('prechat-form');
-  const formLoading = document.getElementById('form-loading');
-  const noWebsiteCheckbox = document.getElementById('no-website-checkbox');
-  const noWebsiteMessage = document.getElementById('no-website-message');
-  const websiteInput = document.getElementById('company-website');
-  const formSubmitBtn = document.getElementById('form-submit-btn');
-
-  const chatContainer = document.getElementById('chat-container');
   const chatMessages = document.getElementById('chat-messages');
   const messageInput = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
 
   // ============================================================
-  // Form Logic
-  // ============================================================
-
-  // Toggle website requirement when checkbox changes
-  noWebsiteCheckbox.addEventListener('change', () => {
-    if (noWebsiteCheckbox.checked) {
-      noWebsiteMessage.classList.add('visible');
-      websiteInput.disabled = true;
-      websiteInput.required = false;
-      websiteInput.value = '';
-      formSubmitBtn.disabled = true;
-    } else {
-      noWebsiteMessage.classList.remove('visible');
-      websiteInput.disabled = false;
-      websiteInput.required = true;
-      formSubmitBtn.disabled = false;
-    }
-  });
-
-  // Validate and normalize URL
-  function normalizeUrl(input) {
-    let url = input.trim();
-    if (!url) return null;
-
-    // Add https:// if no protocol
-    if (!url.match(/^https?:\/\//i)) {
-      url = 'https://' + url;
-    }
-
-    // Validate format
-    try {
-      new URL(url);
-      return url;
-    } catch {
-      return null;
-    }
-  }
-
-  // Form submission
-  prechatForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    // Clear previous errors
-    document.querySelectorAll('.form-field input').forEach(input => {
-      input.classList.remove('error');
-    });
-
-    // Validate fields
-    const contactName = document.getElementById('contact-name').value.trim();
-    const contactEmail = document.getElementById('contact-email').value.trim();
-    const companyName = document.getElementById('company-name').value.trim();
-    let companyWebsite = document.getElementById('company-website').value.trim();
-
-    let hasError = false;
-
-    if (!contactName) {
-      document.getElementById('contact-name').classList.add('error');
-      hasError = true;
-    }
-
-    if (!contactEmail || !contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      document.getElementById('contact-email').classList.add('error');
-      hasError = true;
-    }
-
-    if (!companyName) {
-      document.getElementById('company-name').classList.add('error');
-      hasError = true;
-    }
-
-    if (!noWebsiteCheckbox.checked) {
-      companyWebsite = normalizeUrl(companyWebsite);
-      if (!companyWebsite) {
-        document.getElementById('company-website').classList.add('error');
-        hasError = true;
-      }
-    } else {
-      companyWebsite = null;
-    }
-
-    if (hasError) return;
-
-    // Store form data
-    formData = {
-      contact_name: contactName,
-      email: contactEmail,
-      company_name: companyName,
-      company_website: companyWebsite
-    };
-
-    console.log('[Form] Submitting:', formData);
-
-    // Show loading state
-    prechatForm.style.display = 'none';
-    formLoading.classList.add('visible');
-
-    try {
-      // Submit form to create session with pre-populated data
-      const response = await fetch('/api/lead-gen/init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to start session');
-      }
-
-      const data = await response.json();
-      sessionId = data.session_id;
-
-      console.log('[Form] Session created:', sessionId);
-
-      // Hide form, show chat
-      formOverlay.classList.add('hidden');
-      chatContainer.classList.add('visible');
-
-      // Auto-init: send silent greeting to get opening message
-      setInputEnabled(false);
-      await sendMessage('hello', true);
-      setInputEnabled(true);
-
-    } catch (err) {
-      console.error('[Form] Error:', err);
-      alert('Something went wrong. Please try again.');
-      prechatForm.style.display = 'block';
-      formLoading.classList.remove('visible');
-    }
-  });
-
-  // ============================================================
-  // Chat UI helpers
+  // UI helpers
   // ============================================================
 
   function addMessageToUI(role, text) {
@@ -693,7 +302,7 @@
 
   function addErrorMessage(text) {
     const el = document.createElement('div');
-    el.className = 'error-message-chat';
+    el.className = 'error-message';
     el.textContent = text;
     chatMessages.appendChild(el);
     scrollToBottom();
@@ -778,7 +387,8 @@
             continue;
           }
 
-          // Session ID from server
+          // Session ID from server — read conversationId (the lead-gen session UUID).
+          // The server also sends sessionId but that's a per-request UUID, not what we need.
           if (parsed.type === 'connected' && parsed.conversationId) {
             sessionId = parsed.conversationId;
             console.log('[LeadGen] session_id received from connected event:', sessionId);
@@ -860,6 +470,15 @@
       sendMessage(text);
     }
   });
+
+  // ============================================================
+  // Auto-init: send a silent greeting to get the opening message
+  // ============================================================
+  (async function init() {
+    setInputEnabled(false);
+    await sendMessage('hello', true);
+    setInputEnabled(true);
+  })();
 </script>
 
 </body>

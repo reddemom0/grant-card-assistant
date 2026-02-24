@@ -12,6 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { loadAgentPromptCached } from '../agents/load-agents.js';
 import { loadConversationMemories } from '../tools/memory.js';
 import { loadLearningMemory } from '../tools/learning-memory.js';
+import { getLeadGenFormContext } from '../utils/lead-gen-context.js';
 import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE } from './streaming.js';
@@ -115,7 +116,22 @@ export async function runAgent({
     }
 
     // ============================================================================
-    // 2.6. Get query-specific configuration (NEW: Performance Optimization)
+    // 2.6. Load lead-gen form context (LEAD-GEN ONLY - NOT CACHEABLE)
+    // ============================================================================
+
+    let leadGenFormContext = null;
+    if (agentType === 'lead-gen') {
+      console.log(`📝 Loading lead-gen form context...`);
+      leadGenFormContext = await getLeadGenFormContext(conversationId);
+      if (leadGenFormContext) {
+        console.log(`✓ Injected lead form data and company background into system prompt`);
+      } else {
+        console.log(`✓ No form context available (may be first message before form submission)`);
+      }
+    }
+
+    // ============================================================================
+    // 2.7. Get query-specific configuration (NEW: Performance Optimization)
     // ============================================================================
 
     const queryConfig = forceModel
@@ -375,6 +391,14 @@ export async function runAgent({
         systemBlocks.push({
           type: 'text',
           text: learningMemory  // ❌ NOT CACHED (user-specific)
+        });
+      }
+
+      // Add lead-gen form context (if present) - NOT CACHED
+      if (leadGenFormContext) {
+        systemBlocks.push({
+          type: 'text',
+          text: leadGenFormContext  // ❌ NOT CACHED (conversation-specific)
         });
       }
 

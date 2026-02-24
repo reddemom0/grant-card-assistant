@@ -27,7 +27,23 @@ function getAgentsDirectory() {
  * @throws {Error} If agent definition file not found
  */
 export function loadAgentPrompt(agentType) {
-  const agentPath = path.join(getAgentsDirectory(), `${agentType}.md`);
+  // A/B Testing: Support variant switching for lead-gen agent
+  let agentFileName = `${agentType}.md`;
+  let variant = null;
+
+  if (agentType === 'lead-gen') {
+    const variantEnv = process.env.LEAD_GEN_VARIANT || 'A';
+    variant = variantEnv.toUpperCase();
+
+    if (variant === 'B') {
+      agentFileName = 'lead-gen-variant-b.md';
+    } else {
+      // Variant A (default) - use standard lead-gen.md
+      agentFileName = 'lead-gen.md';
+    }
+  }
+
+  const agentPath = path.join(getAgentsDirectory(), agentFileName);
 
   if (!fs.existsSync(agentPath)) {
     throw new Error(
@@ -49,12 +65,20 @@ export function loadAgentPrompt(agentType) {
 
     // You could parse the frontmatter YAML here if needed
     // For now, just return the body
-    console.log(`✓ Loaded agent prompt: ${agentType} (with frontmatter)`);
+    if (variant) {
+      console.log(`✓ Loaded agent prompt: ${agentType} VARIANT ${variant} (with frontmatter)`);
+    } else {
+      console.log(`✓ Loaded agent prompt: ${agentType} (with frontmatter)`);
+    }
     return body;
   }
 
   // No frontmatter - return entire content
-  console.log(`✓ Loaded agent prompt: ${agentType} (${content.length} chars)`);
+  if (variant) {
+    console.log(`✓ Loaded agent prompt: ${agentType} VARIANT ${variant} (${content.length} chars)`);
+  } else {
+    console.log(`✓ Loaded agent prompt: ${agentType} (${content.length} chars)`);
+  }
   return content.trim();
 }
 
