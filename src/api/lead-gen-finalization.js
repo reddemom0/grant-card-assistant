@@ -206,7 +206,7 @@ function buildNoteBody(sessionData, trigger) {
   // Programs matched
   if (matched_programs && matched_programs.length > 0) {
     lines.push('Programs matched:');
-    lines.push(matched_programs.join(', '));
+    lines.push(Array.isArray(matched_programs) ? matched_programs.join(', ') : matched_programs);
     lines.push('');
   }
 

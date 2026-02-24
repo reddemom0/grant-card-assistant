@@ -804,6 +804,30 @@ async function startServer() {
       console.warn('⚠️  Migration 015 failed (non-fatal):', migrationError.message);
     }
 
+    // Auto-run migration 016 (add conversation_finalized event type)
+    try {
+      console.log('\n🔄 Running auto-migration 016 (conversation_finalized event)...');
+      const { query } = await import('./src/database/connection.js');
+      await query(`
+        ALTER TABLE lead_gen_analytics DROP CONSTRAINT IF EXISTS lead_gen_analytics_event_type_check;
+        ALTER TABLE lead_gen_analytics ADD CONSTRAINT lead_gen_analytics_event_type_check
+          CHECK (event_type IN (
+            'conversation_started',
+            'discovery_complete',
+            'search_performed',
+            'programs_matched',
+            'estimate_delivered',
+            'cta_presented',
+            'contact_captured',
+            'lead_saved',
+            'conversation_finalized'
+          ));
+      `);
+      console.log('✅ Migration 016 complete (or already applied)');
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 016 failed (non-fatal):', migrationError.message);
+    }
+
     // Start Express server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n' + '='.repeat(80));
