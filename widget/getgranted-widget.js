@@ -1156,13 +1156,9 @@
       if (formContainer) formContainer.classList.add('hidden');
       if (chatInterface) chatInterface.classList.remove('hidden');
 
-      // Auto-init: send personalized instruction when form data exists (hidden from UI)
+      // Auto-init: send simple greeting (form data already in system prompt via <lead_info>)
       setInputEnabled(false);
-      if (formData && formData.contact_name && formData.company_name) {
-        await sendMessage(`User submitted pre-chat form. Name: ${formData.contact_name}. Company: ${formData.company_name}. Greet them by name, reference their industry, and ask what's driving their interest in grants. Do NOT ask for their company name — you already have it.`, true);
-      } else {
-        await sendMessage('hello', true);
-      }
+      await sendMessage('Hi', true);
       setInputEnabled(true);
 
       // Show quick actions for inline mode

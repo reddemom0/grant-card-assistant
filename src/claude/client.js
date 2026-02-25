@@ -351,6 +351,7 @@ export async function runAgent({
     // ============================================================================
 
     let loopCount = 0;
+    let accumulatedText = ''; // Track text across ALL iterations (fixes greeting loss bug)
 
     while (loopCount < MAX_AGENT_LOOPS) {
       loopCount++;
@@ -460,6 +461,23 @@ export async function runAgent({
 
       console.log(`✓ Response received - stop_reason: ${fullResponse.stop_reason}`);
 
+      // CRITICAL: Accumulate text from THIS iteration (prevents greeting loss)
+      // When agent does text + tool_use in iteration 1, then empty text in iteration 2,
+      // we need to preserve the text from iteration 1 for database persistence
+      const iterationText = fullResponse.content
+        .filter(block => block.type === 'text' && block.text && block.text.trim())
+        .map(block => block.text)
+        .join('\n');
+
+      if (iterationText) {
+        if (accumulatedText) {
+          accumulatedText += '\n' + iterationText;
+        } else {
+          accumulatedText = iterationText;
+        }
+        console.log(`  📝 Accumulated ${iterationText.length} chars of text (total: ${accumulatedText.length})`);
+      }
+
       // ============================================================================
       // Cost monitoring and logging
       // ============================================================================
@@ -516,23 +534,24 @@ export async function runAgent({
         // Save final messages to database
         if (agentType === 'lead-gen') {
           // Lead-gen: save to lead_gen_conversations.messages JSONB array
-          // Extract text-only content for simpler storage
+          // CRITICAL: Use accumulated text from ALL iterations, not just final iteration
           const userText = typeof message === 'string' ? message : JSON.stringify(message);
-          const assistantText = contentToSave
-            .filter(block => block.type === 'text')
-            .map(block => block.text)
-            .join('\n');
+          const assistantText = accumulatedText || ''; // Use accumulated text across all iterations
 
-          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
-          await appendLeadGenMessages(conversationId, userText, assistantText);
+          if (!assistantText || assistantText.trim() === '') {
+            console.warn('⚠️  Skipping empty assistant response (no text across all iterations)');
+          } else {
+            const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+            await appendLeadGenMessages(conversationId, userText, assistantText);
+            console.log(`✓ Messages saved to database (${assistantText.length} chars from ${loopCount} iterations)`);
+          }
         } else {
           // Standard agents: save to messages table
           const { saveMessage } = await import('../database/messages.js');
           await saveMessage(conversationId, 'user', userContent);
           await saveMessage(conversationId, 'assistant', contentToSave);
+          console.log('✓ Messages saved to database');
         }
-
-        console.log('✓ Messages saved to database');
 
         // Send completion event
         closeSSE(res);
@@ -655,12 +674,14 @@ export async function runAgent({
 
         if (agentType === 'lead-gen') {
           const userText = typeof message === 'string' ? message : JSON.stringify(message);
-          const assistantText = contentToSave
-            .filter(block => block.type === 'text')
-            .map(block => block.text)
-            .join('\n');
-          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
-          await appendLeadGenMessages(conversationId, userText, assistantText);
+          const assistantText = accumulatedText || ''; // Use accumulated text
+
+          if (!assistantText || assistantText.trim() === '') {
+            console.warn('⚠️  Skipping empty assistant response (max_tokens, no text)');
+          } else {
+            const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+            await appendLeadGenMessages(conversationId, userText, assistantText);
+          }
         } else {
           const { saveMessage } = await import('../database/messages.js');
           await saveMessage(conversationId, 'user', userContent);
@@ -690,12 +711,14 @@ export async function runAgent({
 
         if (agentType === 'lead-gen') {
           const userText = typeof message === 'string' ? message : JSON.stringify(message);
-          const assistantText = contentToSave
-            .filter(block => block.type === 'text')
-            .map(block => block.text)
-            .join('\n');
-          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
-          await appendLeadGenMessages(conversationId, userText, assistantText);
+          const assistantText = accumulatedText || ''; // Use accumulated text
+
+          if (!assistantText || assistantText.trim() === '') {
+            console.warn('⚠️  Skipping empty assistant response (stop_sequence, no text)');
+          } else {
+            const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+            await appendLeadGenMessages(conversationId, userText, assistantText);
+          }
         } else {
           const { saveMessage } = await import('../database/messages.js');
           await saveMessage(conversationId, 'user', userContent);
