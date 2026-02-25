@@ -388,6 +388,16 @@
           }
         }
 
+        .gg-error-message {
+          background: #fee;
+          border: 1px solid #fcc;
+          color: #c33;
+          padding: 12px 16px;
+          margin: 12px 20px;
+          border-radius: 8px;
+          font-size: 14px;
+        }
+
         .gg-quick-actions {
           padding: 0 20px 12px;
           display: flex;
@@ -813,20 +823,6 @@
     `;
   }
 
-  function addBotMessage(text) {
-    if (!messagesContainer) return;
-
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'gg-message gg-message-bot';
-    messageDiv.innerHTML = `
-      <div class="gg-message-avatar">G</div>
-      <div class="gg-message-content">${formatMessage(text)}</div>
-    `;
-
-    messagesContainer.appendChild(messageDiv);
-    scrollToBottom();
-  }
-
   function addUserMessage(text) {
     if (!messagesContainer) return;
 
@@ -834,16 +830,24 @@
     messageDiv.className = 'gg-message gg-message-user';
     messageDiv.innerHTML = `
       <div class="gg-message-avatar">U</div>
-      <div class="gg-message-content">${formatMessage(text)}</div>
+      <div class="gg-message-content">${escapeHtml(text)}</div>
     `;
 
     messagesContainer.appendChild(messageDiv);
     scrollToBottom();
   }
 
-  function showTypingIndicator() {
-    if (!messagesContainer) return;
+  function createAssistantMessage(text) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'gg-message gg-message-bot';
+    messageDiv.innerHTML = `
+      <div class="gg-message-avatar">G</div>
+      <div class="gg-message-content">${escapeHtml(text)}</div>
+    `;
+    return messageDiv;
+  }
 
+  function createTypingIndicator() {
     const typingDiv = document.createElement('div');
     typingDiv.className = 'gg-message gg-message-bot';
     typingDiv.id = 'gg-typing-indicator';
@@ -857,16 +861,17 @@
         </div>
       </div>
     `;
-
-    messagesContainer.appendChild(typingDiv);
-    scrollToBottom();
+    return typingDiv;
   }
 
-  function hideTypingIndicator() {
-    const typingDiv = shadowRoot?.getElementById('gg-typing-indicator');
-    if (typingDiv) {
-      typingDiv.remove();
-    }
+  function addErrorMessage(text) {
+    if (!messagesContainer) return;
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'gg-error-message';
+    errorDiv.textContent = text;
+    messagesContainer.appendChild(errorDiv);
+    scrollToBottom();
   }
 
   function scrollToBottom() {
@@ -910,14 +915,16 @@
   // API COMMUNICATION
   // ============================================================================
 
-  async function sendMessage(message) {
+  async function sendMessage(message, isHidden = false) {
     if (!message || message.trim().length === 0) return;
     if (isWaitingForResponse) return;
 
     const trimmedMessage = message.trim();
 
-    // Add user message to UI
-    addUserMessage(trimmedMessage);
+    // Show user message in UI (skip for hidden init messages)
+    if (!isHidden) {
+      addUserMessage(trimmedMessage);
+    }
 
     // Clear input
     if (inputField) {
@@ -930,40 +937,117 @@
     setInputEnabled(false);
 
     // Show typing indicator
-    showTypingIndicator();
+    const typingIndicator = createTypingIndicator();
+    messagesContainer.appendChild(typingIndicator);
+    scrollToBottom();
+
+    let assistantWrapper = null;
+    let assistantText = '';
 
     try {
+      const body = { message: trimmedMessage };
+      if (sessionId) body.session_id = sessionId;
+
+      console.log('[Widget] Sending message. session_id:', sessionId || '(none — new session)');
+
       const response = await fetch(`${config.apiUrl}/api/lead-gen/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          session_id: sessionId,
-          message: trimmedMessage
-        })
+        body: JSON.stringify(body)
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        typingIndicator.remove();
+        const errData = await response.json().catch(() => ({}));
+        addErrorMessage(errData.error || 'Something went wrong. Please try again.');
+        return;
       }
 
-      // Check if response is SSE or JSON
-      const contentType = response.headers.get('content-type');
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      if (contentType && contentType.includes('text/event-stream')) {
-        // SSE streaming response
-        await handleSSEResponse(response);
-      } else {
-        // JSON response (fallback)
-        const data = await response.json();
-        handleJSONResponse(data);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // keep incomplete line
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (!raw) continue;
+
+          let parsed;
+          try {
+            parsed = JSON.parse(raw);
+          } catch {
+            continue;
+          }
+
+          // Session ID from server
+          if (parsed.type === 'connected' && parsed.conversationId) {
+            sessionId = parsed.conversationId;
+            console.log('[Widget] session_id received from connected event:', sessionId);
+          }
+
+          // Streaming text
+          if (parsed.type === 'text_delta' && parsed.text) {
+            if (!assistantWrapper) {
+              typingIndicator.remove();
+              assistantWrapper = createAssistantMessage('');
+              messagesContainer.appendChild(assistantWrapper);
+            }
+            assistantText += parsed.text;
+            assistantWrapper.querySelector('.gg-message-content').textContent = assistantText;
+            scrollToBottom();
+          }
+
+          // Done event
+          if (parsed.type === 'done') {
+            if (!assistantWrapper && assistantText === '') {
+              typingIndicator.remove();
+            }
+          }
+
+          // Error from server stream
+          if (parsed.type === 'error') {
+            typingIndicator.remove();
+            addErrorMessage(parsed.message || 'An error occurred.');
+          }
+        }
+      }
+
+      // Flush remaining buffer
+      if (buffer.startsWith('data: ')) {
+        const raw = buffer.slice(6).trim();
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.type === 'text_delta' && parsed.text) {
+            if (!assistantWrapper) {
+              typingIndicator.remove();
+              assistantWrapper = createAssistantMessage('');
+              messagesContainer.appendChild(assistantWrapper);
+            }
+            assistantText += parsed.text;
+            assistantWrapper.querySelector('.gg-message-content').textContent = assistantText;
+          }
+        } catch { /* ignore */ }
+      }
+
+      // If typing indicator is still there (no response came back), remove it
+      if (typingIndicator.parentNode) {
+        typingIndicator.remove();
       }
 
     } catch (error) {
+      if (typingIndicator.parentNode) typingIndicator.remove();
+      addErrorMessage('Connection error. Please check your connection and try again.');
       console.error('Chat error:', error);
-      hideTypingIndicator();
-      addBotMessage('Sorry, something went wrong. Please try again.');
     } finally {
       isWaitingForResponse = false;
       setInputEnabled(true);
@@ -973,95 +1057,6 @@
     }
   }
 
-  async function handleSSEResponse(response) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let assistantMessage = '';
-    let firstChunk = true;
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(line.slice(6));
-
-            if (data.type === 'connected' && data.conversationId) {
-              // Store conversation ID for follow-up messages
-              // (sessionId is per-request SSE tracking, conversationId is the actual session)
-              sessionId = data.conversationId;
-              console.log('Session ID:', sessionId);
-            } else if (data.type === 'text_delta' && data.text) {
-              // Hide typing indicator on first content chunk
-              if (firstChunk) {
-                hideTypingIndicator();
-                firstChunk = false;
-              }
-
-              // Accumulate assistant message
-              assistantMessage += data.text;
-
-              // Update or create message bubble
-              updateBotMessage(assistantMessage);
-            } else if (data.type === 'done') {
-              // Stream complete
-              console.log('Stream complete');
-            } else if (data.type === 'error') {
-              throw new Error(data.error || 'Unknown error');
-            }
-          } catch (e) {
-            console.warn('Failed to parse SSE data:', line, e);
-          }
-        }
-      }
-    }
-  }
-
-  function handleJSONResponse(data) {
-    hideTypingIndicator();
-
-    if (data.error) {
-      addBotMessage(`Error: ${data.error}`);
-      return;
-    }
-
-    if (data.session_id && !sessionId) {
-      sessionId = data.session_id;
-    }
-
-    if (data.message || data.response || data.text) {
-      const text = data.message || data.response || data.text;
-      addBotMessage(text);
-    }
-  }
-
-  function updateBotMessage(text) {
-    if (!messagesContainer) return;
-
-    // Find the last bot message (excluding typing indicator)
-    const messages = messagesContainer.querySelectorAll('.gg-message-bot:not(#gg-typing-indicator)');
-    const lastMessage = messages[messages.length - 1];
-
-    if (lastMessage) {
-      const contentDiv = lastMessage.querySelector('.gg-message-content');
-      if (contentDiv) {
-        contentDiv.innerHTML = formatMessage(text);
-        scrollToBottom();
-        return;
-      }
-    }
-
-    // If no existing message, create new one
-    addBotMessage(text);
-  }
 
   // ============================================================================
   // FORM HANDLING
@@ -1152,67 +1147,20 @@
       const data = await response.json();
       sessionId = data.session_id;
 
-      console.log('Form submitted, session created:', sessionId);
+      console.log('[Widget] Form submitted, session created:', sessionId);
 
       // Transition: hide form, show chat
       if (formContainer) formContainer.classList.add('hidden');
       if (chatInterface) chatInterface.classList.remove('hidden');
 
-      // Load initial message (agent will have form context from backend)
-      await loadInitialMessage();
-
-    } catch (error) {
-      console.error('Form submission error:', error);
-      alert('Something went wrong. Please try again.');
-      if (formLoading) formLoading.classList.remove('visible');
-      if (submitBtn) submitBtn.disabled = false;
-    }
-  }
-
-  // ============================================================================
-  // CHAT INITIALIZATION
-  // ============================================================================
-
-  async function loadInitialMessage() {
-    // Guard against duplicate initialization
-    if (isInitializing) {
-      console.log('Already initializing, skipping...');
-      return;
-    }
-
-    isInitializing = true;
-
-    // Send first message to get the bot's greeting
-    // If sessionId exists (from form submission), use it
-    // Otherwise send null to create new session
-    showTypingIndicator();
-    isWaitingForResponse = true;
-    setInputEnabled(false);
-
-    try {
-      const response = await fetch(`${config.apiUrl}/api/lead-gen/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          session_id: sessionId || null,
-          message: 'Hi'
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const contentType = response.headers.get('content-type');
-
-      if (contentType && contentType.includes('text/event-stream')) {
-        await handleSSEResponse(response);
+      // Auto-init: send personalized instruction when form data exists (hidden from UI)
+      setInputEnabled(false);
+      if (formData && formData.contact_name && formData.company_name) {
+        await sendMessage(`User submitted pre-chat form. Name: ${formData.contact_name}. Company: ${formData.company_name}. Greet them by name, reference their industry, and ask what's driving their interest in grants. Do NOT ask for their company name — you already have it.`, true);
       } else {
-        const data = await response.json();
-        handleJSONResponse(data);
+        await sendMessage('hello', true);
       }
+      setInputEnabled(true);
 
       // Show quick actions for inline mode
       if (config.mode === 'inline') {
@@ -1220,13 +1168,10 @@
       }
 
     } catch (error) {
-      console.error('Failed to load initial message:', error);
-      hideTypingIndicator();
-      addBotMessage('Hi! I can help you discover what grant funding your company might qualify for. What brings you here today?');
-    } finally {
-      isWaitingForResponse = false;
-      isInitializing = false; // Reset guard
-      setInputEnabled(true);
+      console.error('Form submission error:', error);
+      alert('Something went wrong. Please try again.');
+      if (formLoading) formLoading.classList.remove('visible');
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
