@@ -54,6 +54,7 @@
   let inputField = null;
   let sendButton = null;
   let isWaitingForResponse = false;
+  let isInitializing = false; // Guard to prevent duplicate initialization
 
   // ============================================================================
   // UTILITY FUNCTIONS
@@ -808,11 +809,11 @@
           try {
             const data = JSON.parse(line.slice(6));
 
-            if (data.type === 'connected' && data.session_id) {
+            if (data.type === 'connected' && data.sessionId) {
               // Store session ID from first message
-              sessionId = data.session_id;
+              sessionId = data.sessionId;
               console.log('Session ID:', sessionId);
-            } else if (data.type === 'content' && data.text) {
+            } else if (data.type === 'text_delta' && data.text) {
               // Hide typing indicator on first content chunk
               if (firstChunk) {
                 hideTypingIndicator();
@@ -877,6 +878,14 @@
   }
 
   async function loadInitialMessage() {
+    // Guard against duplicate initialization
+    if (isInitializing || sessionId) {
+      console.log('Already initializing or initialized, skipping...');
+      return;
+    }
+
+    isInitializing = true;
+
     // Send an empty first message to get the bot's greeting
     // The lead-gen agent will respond with its opening message
     showTypingIndicator();
@@ -919,6 +928,7 @@
       addBotMessage('Hi! I can help you discover what grant funding your company might qualify for. What brings you here today?');
     } finally {
       isWaitingForResponse = false;
+      isInitializing = false; // Reset guard
       setInputEnabled(true);
     }
   }
