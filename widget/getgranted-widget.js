@@ -55,6 +55,8 @@
   let sendButton = null;
   let isWaitingForResponse = false;
   let isInitializing = false; // Guard to prevent duplicate initialization
+  let formData = null; // Store form data after submission
+  let showingForm = false; // Track if form is currently displayed
 
   // ============================================================================
   // UTILITY FUNCTIONS
@@ -809,9 +811,10 @@
           try {
             const data = JSON.parse(line.slice(6));
 
-            if (data.type === 'connected' && data.sessionId) {
-              // Store session ID from first message
-              sessionId = data.sessionId;
+            if (data.type === 'connected' && data.conversationId) {
+              // Store conversation ID for follow-up messages
+              // (sessionId is per-request SSE tracking, conversationId is the actual session)
+              sessionId = data.conversationId;
               console.log('Session ID:', sessionId);
             } else if (data.type === 'text_delta' && data.text) {
               // Hide typing indicator on first content chunk
