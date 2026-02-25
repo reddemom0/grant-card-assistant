@@ -590,11 +590,21 @@ class AgentInterface {
         let userMessageContent = message || '';
         const filesToDisplay = this.uploadedFiles.length > 0 ? [...this.uploadedFiles] : [];
 
+        // Add message to chat with file attachments
         if (filesToDisplay.length > 0) {
             this.addMessage('user', userMessageContent, false, filesToDisplay);
         } else if (userMessageContent) {
             this.addMessage('user', userMessageContent);
         }
+
+        // Clear input box and files immediately after displaying message
+        if (messageInput) {
+            messageInput.value = '';
+            messageInput.style.height = '44px';
+            messageInput.placeholder = this.config.placeholder;
+        }
+        this.uploadedFiles = []; // Clear files array
+        this.resetInputBox(); // Clear file display from input area immediately
 
         this.isLoading = true;
         if (sendButton) sendButton.disabled = true;
@@ -603,7 +613,7 @@ class AgentInterface {
         try {
             // Convert files to base64 attachments
             const attachments = [];
-            for (const file of this.uploadedFiles) {
+            for (const file of filesToDisplay) {
                 const base64Data = await this.fileToBase64(file);
 
                 // Determine attachment type

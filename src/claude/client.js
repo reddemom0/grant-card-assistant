@@ -291,6 +291,13 @@ export async function runAgent({
           text: `[File: ${attachment.filename}]\n\n${attachment.content}`
         });
         console.log(`📊 Added CSV text from ${attachment.filename} (${attachment.content.length} chars)`);
+      } else if (attachment.type === 'docx_text') {
+        // DOCX text extraction fallback - send as plain text when Files API fails
+        userContent.push({
+          type: 'text',
+          text: attachment.content
+        });
+        console.log(`📝 Added DOCX text from ${attachment.filename} (${attachment.content.length} chars)`);
       } else if (attachment.type === 'document') {
         // Other documents (DOCX, TXT, VTT) use file_id from Files API
         const docBlock = {

@@ -12,6 +12,7 @@ import { isValidAgentType, getAvailableAgents } from '../agents/load-agents.js';
 import { generateAndSaveTitle } from '../utils/conversation-titles.js';
 import { filesAPI } from '../anthropic-client.js';
 import * as XLSX from 'xlsx';
+import mammoth from 'mammoth';
 
 /**
  * Main chat endpoint handler
@@ -206,7 +207,7 @@ export async function handleChatRequest(req, res) {
             continue;
           }
         } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-          // DOCX files - upload to Files API
+          // DOCX files - upload to Files API with mammoth fallback
           try {
             // Convert base64 to Buffer
             const fileBuffer = Buffer.from(attachment.data, 'base64');
@@ -229,9 +230,32 @@ export async function handleChatRequest(req, res) {
             });
 
             console.log(`✓ DOCX uploaded to Files API: ${uploadedFile.id} (${filename})`);
-          } catch (error) {
-            console.error('❌ Failed to upload DOCX:', error.message);
-            continue;
+          } catch (uploadError) {
+            console.error('❌ Failed to upload DOCX to Files API:', uploadError.message);
+            console.log('🔄 Falling back to text extraction with mammoth...');
+
+            // Fallback: Extract text content with mammoth
+            try {
+              const fileBuffer = Buffer.from(attachment.data, 'base64');
+              const filename = attachment.filename || `document_${Date.now()}.docx`;
+
+              // Extract text from DOCX
+              const result = await mammoth.extractRawText({ buffer: fileBuffer });
+              const extractedText = result.value;
+
+              // Add as text content block instead
+              processedAttachments.push({
+                type: 'docx_text',
+                filename: filename,
+                content: `[Uploaded document: ${filename}]\n\n${extractedText}`
+              });
+
+              console.log(`✓ DOCX text extracted via mammoth (${extractedText.length} chars from ${filename})`);
+            } catch (fallbackError) {
+              console.error('❌ Mammoth fallback also failed:', fallbackError.message);
+              // Skip this attachment only if both methods fail
+              continue;
+            }
           }
         } else {
           // TXT, VTT, CSV, and other text documents - upload to Files API

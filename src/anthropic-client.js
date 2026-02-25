@@ -7,6 +7,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from 'dotenv';
 import { logAPICost } from './utils/cost-logger.js';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 config();
 
@@ -31,21 +34,55 @@ export const filesAPI = {
    * @returns {Promise<object>} File metadata with file_id
    */
   async upload(filePath, filename, mimeType, fileData) {
+    let tempFilePath = null;
+
     try {
-      const file = await anthropic.beta.files.upload({
-        file: [filename, fileData, mimeType]
-      }, {
-        headers: {
-          'anthropic-beta': FILES_API_BETA
-        }
-      });
+      // For DOCX files, use temp file approach to avoid multipart parsing issues
+      if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+          mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+        // Write buffer to temp file
+        tempFilePath = path.join(os.tmpdir(), `upload-${Date.now()}-${filename}`);
+        fs.writeFileSync(tempFilePath, fileData);
 
-      console.log(`✅ Uploaded file: ${file.id} (${filename}, ${(file.size_bytes / 1024).toFixed(2)} KB)`);
+        // Upload using fs.createReadStream
+        const fileStream = fs.createReadStream(tempFilePath);
+        const file = await anthropic.beta.files.upload({
+          file: [filename, fileStream, mimeType]
+        }, {
+          headers: {
+            'anthropic-beta': FILES_API_BETA
+          }
+        });
 
-      return file;
+        console.log(`✅ Uploaded file: ${file.id} (${filename}, ${(file.size_bytes / 1024).toFixed(2)} KB)`);
+
+        return file;
+      } else {
+        // For other file types, use direct Buffer approach
+        const file = await anthropic.beta.files.upload({
+          file: [filename, fileData, mimeType]
+        }, {
+          headers: {
+            'anthropic-beta': FILES_API_BETA
+          }
+        });
+
+        console.log(`✅ Uploaded file: ${file.id} (${filename}, ${(file.size_bytes / 1024).toFixed(2)} KB)`);
+
+        return file;
+      }
     } catch (error) {
       console.error('❌ File upload error:', error);
       throw new Error(`File upload failed: ${error.message}`);
+    } finally {
+      // Clean up temp file if it was created
+      if (tempFilePath && fs.existsSync(tempFilePath)) {
+        try {
+          fs.unlinkSync(tempFilePath);
+        } catch (cleanupError) {
+          console.warn(`⚠️ Failed to clean up temp file: ${tempFilePath}`);
+        }
+      }
     }
   },
 
