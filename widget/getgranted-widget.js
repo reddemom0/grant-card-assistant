@@ -1117,6 +1117,11 @@
     // If "no website" is checked, set website to null
     if (noWebsite) {
       companyWebsite = null;
+    } else if (companyWebsite) {
+      // Add https:// protocol if missing
+      if (!companyWebsite.match(/^https?:\/\//i)) {
+        companyWebsite = 'https://' + companyWebsite;
+      }
     }
 
     // Prepare form data
@@ -1170,15 +1175,16 @@
 
   async function loadInitialMessage() {
     // Guard against duplicate initialization
-    if (isInitializing || sessionId) {
-      console.log('Already initializing or initialized, skipping...');
+    if (isInitializing) {
+      console.log('Already initializing, skipping...');
       return;
     }
 
     isInitializing = true;
 
-    // Send an empty first message to get the bot's greeting
-    // The lead-gen agent will respond with its opening message
+    // Send first message to get the bot's greeting
+    // If sessionId exists (from form submission), use it
+    // Otherwise send null to create new session
     showTypingIndicator();
     isWaitingForResponse = true;
     setInputEnabled(false);
@@ -1190,7 +1196,7 @@
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          session_id: null,
+          session_id: sessionId || null,
           message: 'Hi'
         })
       });
