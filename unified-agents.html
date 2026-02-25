@@ -976,6 +976,85 @@
 
             // File input change
             document.getElementById('file-input').addEventListener('change', handleFileSelect);
+
+            // Drag and drop file upload
+            setupDragAndDrop();
+        }
+
+        // Setup drag and drop handlers
+        function setupDragAndDrop() {
+            // Create drag overlay if it doesn't exist
+            let dragOverlay = document.getElementById('drag-drop-overlay');
+            if (!dragOverlay) {
+                dragOverlay = document.createElement('div');
+                dragOverlay.id = 'drag-drop-overlay';
+                dragOverlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    background: rgba(7, 51, 74, 0.95);
+                    backdrop-filter: blur(8px);
+                    z-index: 10000;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.2s ease;
+                `;
+                dragOverlay.innerHTML = `
+                    <div style="text-align: center; padding: 3rem; border: 3px dashed #36CAFA; border-radius: 24px; background: rgba(54, 202, 250, 0.05); max-width: 500px;">
+                        <div style="font-size: 4rem; margin-bottom: 1rem;">📎</div>
+                        <div style="font-size: 1.5rem; font-weight: 600; color: #36CAFA; margin-bottom: 0.5rem;">Drop files here to upload</div>
+                        <div style="font-size: 0.95rem; color: rgba(255, 255, 255, 0.7);">PDF, DOCX, TXT, images, and spreadsheets supported</div>
+                    </div>
+                `;
+                document.body.appendChild(dragOverlay);
+            }
+
+            let dragCounter = 0;
+
+            // Prevent default drag behavior
+            document.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+
+            document.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragCounter++;
+                if (e.dataTransfer.types.includes('Files')) {
+                    dragOverlay.style.opacity = '1';
+                    dragOverlay.style.pointerEvents = 'all';
+                }
+            });
+
+            document.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragCounter--;
+                if (dragCounter === 0) {
+                    dragOverlay.style.opacity = '0';
+                    dragOverlay.style.pointerEvents = 'none';
+                }
+            });
+
+            document.addEventListener('drop', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dragCounter = 0;
+                dragOverlay.style.opacity = '0';
+                dragOverlay.style.pointerEvents = 'none';
+
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    const files = Array.from(e.dataTransfer.files);
+                    selectedFiles = [...selectedFiles, ...files];
+                    renderSelectedFiles();
+                }
+            });
         }
 
         // Handle file selection
@@ -1057,15 +1136,16 @@
             // Allow sending if there's a message or files
             if (!message && selectedFiles.length === 0) return;
 
-            // Clear input
+            // Store files before clearing
+            const filesToSend = [...selectedFiles];
+
+            // Clear input and files immediately
             input.value = '';
-
-            // Send message with files
-            await sendMessage(message, selectedFiles);
-
-            // Clear selected files after sending
             selectedFiles = [];
             renderSelectedFiles();
+
+            // Send message with files
+            await sendMessage(message, filesToSend);
         }
 
         // Send a suggested prompt
@@ -1098,8 +1178,8 @@
                 chatScreen.classList.remove('hidden');
             }
 
-            // Add user message to UI
-            addMessageToUI('user', message);
+            // Add user message to UI with files
+            await addMessageToUI('user', message, files);
 
             // Show thinking indicator
             console.log('[SEND_MSG] About to add thinking indicator');
@@ -1419,7 +1499,7 @@
         }
 
         // Add message to UI
-        function addMessageToUI(role, content) {
+        async function addMessageToUI(role, content, files = []) {
             const chatMessages = document.getElementById('chat-messages');
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${role}`;
@@ -1429,9 +1509,44 @@
                 ? marked.parse(content)
                 : content.replace(/\n/g, '<br>');
 
+            let fileHTML = '';
+            if (files && files.length > 0 && role === 'user') {
+                fileHTML = '<div style="margin-bottom: 0.75rem; display: flex; flex-wrap: wrap; gap: 0.5rem;">';
+                for (const file of files) {
+                    const isImage = file.type.startsWith('image/');
+                    const fileIcon = isImage ? '🖼️' : (file.type === 'application/pdf' ? '📄' : '📝');
+                    const fileName = file.name.length > 30 ? file.name.substring(0, 27) + '...' : file.name;
+
+                    if (isImage) {
+                        // Show image thumbnail
+                        const reader = new FileReader();
+                        const imagePromise = new Promise((resolve) => {
+                            reader.onload = (e) => resolve(e.target.result);
+                            reader.readAsDataURL(file);
+                        });
+                        const imageUrl = await imagePromise;
+                        fileHTML += `
+                            <div style="display: inline-block; padding: 0.5rem; background: rgba(255,255,255,0.1); border-radius: 8px; max-width: 200px;">
+                                <img src="${imageUrl}" style="max-width: 100%; height: auto; border-radius: 4px; margin-bottom: 0.25rem;" />
+                                <div style="font-size: 0.75rem; color: rgba(255,255,255,0.7); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">${fileIcon} ${fileName}</div>
+                            </div>
+                        `;
+                    } else {
+                        // Show file chip
+                        fileHTML += `
+                            <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 0.875rem; color: rgba(255,255,255,0.9);">
+                                <span>${fileIcon}</span>
+                                <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px;">${fileName}</span>
+                            </div>
+                        `;
+                    }
+                }
+                fileHTML += '</div>';
+            }
+
             messageDiv.innerHTML = `
                 <div class="message-role">${role === 'user' ? 'You' : AGENTS[currentAgent].name}</div>
-                <div class="message-content">${renderedContent}</div>
+                <div class="message-content">${fileHTML}${renderedContent}</div>
             `;
             chatMessages.appendChild(messageDiv);
 
