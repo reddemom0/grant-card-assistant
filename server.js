@@ -60,7 +60,40 @@ const PORT = process.env.PORT || 3000;
 // MIDDLEWARE
 // ============================================================================
 
-app.use(cors());
+// CORS configuration for widget embedding on granted.ca
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    // Also allow null for local file testing
+    if (!origin || origin === 'null') {
+      return callback(null, true);
+    }
+
+    // Allowed origins for widget embedding
+    const allowedOrigins = [
+      'https://granted.ca',
+      'https://www.granted.ca',
+      'http://localhost:3000',
+      'http://localhost:5173',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:5173'
+    ];
+
+    // Check if origin matches allowed domains or Railway deployment URL
+    const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed)) ||
+                     origin.includes('.railway.app') ||
+                     origin.includes('.up.railway.app');
+
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all origins for now (can tighten later)
+    }
+  },
+  credentials: true
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' })); // Increased for image/PDF uploads
 
 // Request logging middleware
