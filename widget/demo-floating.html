@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GetGranted Widget - Floating Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.6;
+      color: #1a2332;
+      background: #f8fafb;
+    }
+
+    .demo-header {
+      background: #008abf;
+      color: white;
+      padding: 40px 20px;
+      text-align: center;
+    }
+
+    .demo-header h1 {
+      font-size: 32px;
+      margin-bottom: 12px;
+    }
+
+    .demo-header p {
+      font-size: 18px;
+      opacity: 0.9;
+    }
+
+    .demo-content {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 0 20px;
+    }
+
+    .demo-section {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .demo-section h2 {
+      font-size: 24px;
+      margin-bottom: 16px;
+      color: #008abf;
+    }
+
+    .demo-section p {
+      margin-bottom: 12px;
+    }
+
+    .demo-section ul {
+      margin-left: 20px;
+      margin-bottom: 12px;
+    }
+
+    .demo-section li {
+      margin-bottom: 8px;
+    }
+
+    code {
+      background: #f0f0f0;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+    }
+
+    .demo-note {
+      background: #e5f4fa;
+      border-left: 4px solid #008abf;
+      padding: 16px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+
+    .demo-note strong {
+      color: #008abf;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-header">
+    <h1>GetGranted Chat Widget Demo</h1>
+    <p>Floating Mode - Chat Bubble</p>
+  </div>
+
+  <div class="demo-content">
+    <div class="demo-section">
+      <h2>Floating Widget Features</h2>
+      <ul>
+        <li>Chat bubble appears in bottom-right corner</li>
+        <li>Subtle pulse animation draws attention</li>
+        <li>Click to expand into 400px × 560px chat panel</li>
+        <li>Greeting tooltip appears after 3 seconds (dismisses after 10s)</li>
+        <li>Smooth open/close animations</li>
+        <li>Responsive on mobile (full-width panel)</li>
+      </ul>
+    </div>
+
+    <div class="demo-section">
+      <h2>How to Test</h2>
+      <p>Look for the blue chat bubble in the bottom-right corner. Click it to start a conversation!</p>
+      <p>Try these interactions:</p>
+      <ul>
+        <li>Click the bubble to open the chat</li>
+        <li>Type a message and press Enter (or click send)</li>
+        <li>Use Shift+Enter for multi-line messages</li>
+        <li>Click the X button to close the chat</li>
+        <li>Wait a few seconds to see the greeting tooltip</li>
+      </ul>
+    </div>
+
+    <div class="demo-section">
+      <h2>Integration Code</h2>
+      <p>To add this widget to your WordPress site, add this code before the closing <code>&lt;/body&gt;</code> tag:</p>
+      <pre style="background: #f8fafb; padding: 16px; border-radius: 8px; overflow-x: auto; margin-top: 12px;"><code>&lt;script src="https://YOUR_RAILWAY_URL/widget/getgranted-widget.js"&gt;&lt;/script&gt;
+&lt;script&gt;
+  GetGrantedWidget.init({
+    mode: 'floating',
+    apiUrl: 'https://YOUR_RAILWAY_URL',
+    greeting: true,
+    greetingDelay: 3000,
+    greetingText: '👋 Curious what grant funding your company could qualify for? I can help you figure that out in a few minutes.',
+    position: 'bottom-right'
+  });
+&lt;/script&gt;</code></pre>
+
+      <div class="demo-note">
+        <strong>Note:</strong> Replace <code>YOUR_RAILWAY_URL</code> with your actual Railway deployment URL (e.g., <code>https://your-app.up.railway.app</code>).
+      </div>
+    </div>
+
+    <div class="demo-section">
+      <h2>Sample Content</h2>
+      <p>This is a demo page showing how the widget works alongside regular website content. The widget stays accessible as users scroll through the page.</p>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
+      <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
+    </div>
+  </div>
+
+  <!-- GetGranted Widget -->
+  <script src="/widget/getgranted-widget.js"></script>
+  <script>
+    GetGrantedWidget.init({
+      mode: 'floating',
+      apiUrl: window.location.origin, // Uses the current server for demo
+      greeting: true,
+      greetingDelay: 3000,
+      greetingText: '👋 Curious what grant funding your company could qualify for? I can help you figure that out in a few minutes.',
+      position: 'bottom-right'
+    });
+  </script>
+</body>
+</html>
