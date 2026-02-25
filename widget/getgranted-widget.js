@@ -538,6 +538,145 @@
           height: 16px;
           fill: white;
         }
+
+        /* =================================================================== */
+        /* PRE-CHAT FORM STYLES */
+        /* =================================================================== */
+
+        .gg-form-container {
+          flex: 1;
+          overflow-y: auto;
+          padding: 24px;
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .gg-form-container.hidden {
+          display: none;
+        }
+
+        .gg-form-intro {
+          margin-bottom: 8px;
+        }
+
+        .gg-form-intro h3 {
+          font-size: 18px;
+          font-weight: 600;
+          margin: 0 0 8px 0;
+          color: ${BRAND_COLORS.dark};
+        }
+
+        .gg-form-intro p {
+          font-size: 14px;
+          margin: 0;
+          color: ${BRAND_COLORS.grey};
+          line-height: 1.5;
+        }
+
+        .gg-form-field {
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+
+        .gg-form-field label {
+          font-size: 13px;
+          font-weight: 600;
+          color: ${BRAND_COLORS.dark};
+        }
+
+        .gg-form-field label .required {
+          color: ${BRAND_COLORS.primary};
+        }
+
+        .gg-form-field input[type="text"],
+        .gg-form-field input[type="email"],
+        .gg-form-field input[type="url"] {
+          border: 1px solid ${BRAND_COLORS.lightGrey};
+          border-radius: 6px;
+          padding: 10px 12px;
+          font-size: 14px;
+          font-family: inherit;
+          outline: none;
+          transition: border-color 0.2s ease;
+        }
+
+        .gg-form-field input:focus {
+          border-color: ${BRAND_COLORS.primary};
+        }
+
+        .gg-form-field input.error {
+          border-color: #dc2626;
+        }
+
+        .gg-form-field .error-message {
+          font-size: 12px;
+          color: #dc2626;
+          display: none;
+        }
+
+        .gg-form-field input.error + .error-message {
+          display: block;
+        }
+
+        .gg-form-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          font-size: 13px;
+          color: ${BRAND_COLORS.grey};
+          margin-top: 8px;
+        }
+
+        .gg-form-checkbox input[type="checkbox"] {
+          width: 16px;
+          height: 16px;
+          cursor: pointer;
+        }
+
+        .gg-form-submit {
+          margin-top: 8px;
+          background: ${BRAND_COLORS.primary};
+          color: white;
+          border: none;
+          border-radius: 8px;
+          padding: 12px 24px;
+          font-size: 15px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background 0.2s ease;
+        }
+
+        .gg-form-submit:hover:not(:disabled) {
+          background: ${BRAND_COLORS.primaryHover};
+        }
+
+        .gg-form-submit:disabled {
+          background: ${BRAND_COLORS.lightGrey};
+          cursor: not-allowed;
+        }
+
+        .gg-form-loading {
+          display: none;
+          text-align: center;
+          padding: 20px;
+          color: ${BRAND_COLORS.grey};
+        }
+
+        .gg-form-loading.visible {
+          display: block;
+        }
+
+        .gg-chat-interface {
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+        }
+
+        .gg-chat-interface.hidden {
+          display: none;
+        }
       </style>
     `;
   }
@@ -612,20 +751,64 @@
         </div>
         ${closeButton}
       </div>
-      <div class="gg-chat-messages"></div>
-      ${config.quickActions.length > 0 ? '<div class="gg-quick-actions"></div>' : ''}
-      <div class="gg-chat-input-wrapper">
-        <textarea
-          class="gg-chat-input"
-          placeholder="Type your message..."
-          rows="1"
-          maxlength="500"
-        ></textarea>
-        <button class="gg-send-button" aria-label="Send message">
-          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-          </svg>
-        </button>
+
+      <!-- Pre-Chat Form -->
+      <div class="gg-form-container">
+        <div class="gg-form-intro">
+          <h3>Get Your Free Grant Estimate</h3>
+          <p>Tell us a bit about your business and we'll show you what funding programs you could qualify for. Takes about 2 minutes.</p>
+        </div>
+
+        <div class="gg-form-field">
+          <label for="gg-contact-name">Your Name <span class="required">*</span></label>
+          <input type="text" id="gg-contact-name" required />
+          <span class="error-message">Please enter your name</span>
+        </div>
+
+        <div class="gg-form-field">
+          <label for="gg-contact-email">Email <span class="required">*</span></label>
+          <input type="email" id="gg-contact-email" required />
+          <span class="error-message">Please enter a valid email address</span>
+        </div>
+
+        <div class="gg-form-field">
+          <label for="gg-company-name">Company Name <span class="required">*</span></label>
+          <input type="text" id="gg-company-name" required />
+          <span class="error-message">Please enter your company name</span>
+        </div>
+
+        <div class="gg-form-field">
+          <label for="gg-company-website">Company Website</label>
+          <input type="url" id="gg-company-website" placeholder="https://example.com" />
+          <label class="gg-form-checkbox">
+            <input type="checkbox" id="gg-no-website" />
+            <span>I don't have a website yet</span>
+          </label>
+          <span class="error-message">Please enter a valid website URL</span>
+        </div>
+
+        <button type="button" class="gg-form-submit">Get My Grant Estimate</button>
+
+        <div class="gg-form-loading">Connecting...</div>
+      </div>
+
+      <!-- Chat Interface (hidden until form submitted) -->
+      <div class="gg-chat-interface hidden">
+        <div class="gg-chat-messages"></div>
+        ${config.quickActions.length > 0 ? '<div class="gg-quick-actions"></div>' : ''}
+        <div class="gg-chat-input-wrapper">
+          <textarea
+            class="gg-chat-input"
+            placeholder="Type your message..."
+            rows="1"
+            maxlength="500"
+          ></textarea>
+          <button class="gg-send-button" aria-label="Send message">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </div>
       </div>
     `;
   }
@@ -880,6 +1063,111 @@
     addBotMessage(text);
   }
 
+  // ============================================================================
+  // FORM HANDLING
+  // ============================================================================
+
+  async function submitForm() {
+    // Get form references
+    const formContainer = shadowRoot?.querySelector('.gg-form-container');
+    const chatInterface = shadowRoot?.querySelector('.gg-chat-interface');
+    const formLoading = shadowRoot?.querySelector('.gg-form-loading');
+    const submitBtn = shadowRoot?.querySelector('.gg-form-submit');
+
+    // Get field values
+    const contactName = shadowRoot?.getElementById('gg-contact-name').value.trim();
+    const contactEmail = shadowRoot?.getElementById('gg-contact-email').value.trim();
+    const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
+    let companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
+    const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
+
+    // Clear previous errors
+    shadowRoot?.querySelectorAll('.gg-form-field input').forEach(input => {
+      input.classList.remove('error');
+    });
+
+    // Validate fields
+    let hasError = false;
+
+    if (!contactName) {
+      shadowRoot?.getElementById('gg-contact-name').classList.add('error');
+      hasError = true;
+    }
+
+    if (!contactEmail || !contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      shadowRoot?.getElementById('gg-contact-email').classList.add('error');
+      hasError = true;
+    }
+
+    if (!companyName) {
+      shadowRoot?.getElementById('gg-company-name').classList.add('error');
+      hasError = true;
+    }
+
+    // Website validation: required unless "no website" is checked
+    if (!noWebsite && !companyWebsite) {
+      shadowRoot?.getElementById('gg-company-website').classList.add('error');
+      hasError = true;
+    }
+
+    if (hasError) {
+      return;
+    }
+
+    // If "no website" is checked, set website to null
+    if (noWebsite) {
+      companyWebsite = null;
+    }
+
+    // Prepare form data
+    formData = {
+      contact_name: contactName,
+      email: contactEmail,
+      company_name: companyName,
+      company_website: companyWebsite
+    };
+
+    // Show loading, disable submit
+    if (formLoading) formLoading.classList.add('visible');
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      // Submit to /api/lead-gen/init
+      const response = await fetch(`${config.apiUrl}/api/lead-gen/init`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to start session');
+      }
+
+      const data = await response.json();
+      sessionId = data.session_id;
+
+      console.log('Form submitted, session created:', sessionId);
+
+      // Transition: hide form, show chat
+      if (formContainer) formContainer.classList.add('hidden');
+      if (chatInterface) chatInterface.classList.remove('hidden');
+
+      // Load initial message (agent will have form context from backend)
+      await loadInitialMessage();
+
+    } catch (error) {
+      console.error('Form submission error:', error);
+      alert('Something went wrong. Please try again.');
+      if (formLoading) formLoading.classList.remove('visible');
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  // ============================================================================
+  // CHAT INITIALIZATION
+  // ============================================================================
+
   async function loadInitialMessage() {
     // Guard against duplicate initialization
     if (isInitializing || sessionId) {
@@ -941,6 +1229,25 @@
   // ============================================================================
 
   function setupEventHandlers() {
+    // Form submit handler
+    const formSubmitBtn = shadowRoot?.querySelector('.gg-form-submit');
+    if (formSubmitBtn) {
+      formSubmitBtn.addEventListener('click', submitForm);
+    }
+
+    // "No website" checkbox handler
+    const noWebsiteCheckbox = shadowRoot?.getElementById('gg-no-website');
+    const websiteInput = shadowRoot?.getElementById('gg-company-website');
+    if (noWebsiteCheckbox && websiteInput) {
+      noWebsiteCheckbox.addEventListener('change', (e) => {
+        websiteInput.disabled = e.target.checked;
+        if (e.target.checked) {
+          websiteInput.value = '';
+          websiteInput.classList.remove('error');
+        }
+      });
+    }
+
     if (config.mode === 'floating') {
       const bubble = shadowRoot?.querySelector('.gg-chat-bubble');
       const panel = shadowRoot?.querySelector('.gg-chat-panel');
@@ -951,11 +1258,6 @@
           isOpen = !isOpen;
           if (panel) {
             panel.classList.toggle('open', isOpen);
-          }
-
-          // Load initial message when opened for the first time
-          if (isOpen && !sessionId) {
-            loadInitialMessage();
           }
 
           // Hide greeting tooltip when opened
@@ -990,10 +1292,8 @@
           }
         }, config.greetingDelay);
       }
-    } else if (config.mode === 'inline') {
-      // Load initial message immediately for inline mode
-      loadInitialMessage();
     }
+    // Note: For inline mode, form shows automatically (no special handling needed)
 
     // Input field handlers
     if (inputField) {
