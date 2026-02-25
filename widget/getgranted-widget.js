@@ -403,6 +403,7 @@
           display: flex;
           flex-wrap: wrap;
           gap: 8px;
+          flex-shrink: 0;
         }
 
         .gg-quick-action {
@@ -488,6 +489,7 @@
           font-size: 12px;
           color: ${BRAND_COLORS.grey};
           border-top: 1px solid ${BRAND_COLORS.lightGrey};
+          flex-shrink: 0;
         }
 
         .gg-trust-badges {
@@ -682,6 +684,7 @@
           display: flex;
           flex-direction: column;
           flex: 1;
+          min-height: 0;
         }
 
         .gg-chat-interface.hidden {
