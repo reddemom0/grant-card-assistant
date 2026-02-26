@@ -78,20 +78,11 @@
 
   function sanitizeHtml(html) {
     // Whitelist safe HTML tags for assistant messages
-    // Agent uses <strong>, <br>, and potentially <a href>
-    // Special handling for HubSpot meeting embeds
-    const allowedTags = ['strong', 'br', 'a', 'em', 'b', 'i', 'p'];
-    const allowedAttributes = {
-      'a': ['href', 'target']
-    };
-
+    // Agent uses <strong>, <br>, <a href>, and inline styles
     const div = document.createElement('div');
     div.innerHTML = html;
 
-    // Check for HubSpot meeting embed BEFORE removing scripts
-    const hubspotContainer = div.querySelector('.meetings-iframe-container');
-
-    // Remove all script tags (we'll use iframe instead)
+    // Remove all script tags
     const scripts = div.querySelectorAll('script');
     scripts.forEach(s => s.remove());
 
@@ -103,28 +94,6 @@
         }
       }
     });
-
-    // If HubSpot embed detected, replace with inline iframe
-    if (hubspotContainer) {
-      const dataSrc = hubspotContainer.getAttribute('data-src');
-      if (dataSrc) {
-        // Replace the container div with an iframe that embeds directly
-        const iframe = document.createElement('iframe');
-        iframe.src = dataSrc;
-        iframe.style.cssText = `
-          width: 100%;
-          height: 550px;
-          border: 1px solid #e0e0e0;
-          border-radius: 8px;
-          margin: 8px 0;
-        `;
-        iframe.setAttribute('frameborder', '0');
-        iframe.setAttribute('scrolling', 'auto');
-
-        hubspotContainer.replaceWith(iframe);
-        console.log('[Widget] Replaced HubSpot container with inline iframe');
-      }
-    }
 
     return div.innerHTML;
   }
