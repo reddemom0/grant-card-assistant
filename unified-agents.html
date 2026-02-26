@@ -1323,7 +1323,7 @@
                                             console.log('[SSE] 🗑️  Removing thinking indicator');
                                             thinkingIndicator.remove();
                                         }
-                                        messageElement = addMessageToUI('assistant', '');
+                                        messageElement = await addMessageToUI('assistant', '');
                                         console.log('[SSE] ✅ Message element created:', messageElement);
                                     }
 
