@@ -292,14 +292,22 @@ export async function runAgent({
         });
         console.log(`📊 Added CSV text from ${attachment.filename} (${attachment.content.length} chars)`);
       } else if (attachment.type === 'docx_text') {
-        // DOCX text extraction fallback - send as plain text when Files API fails
+        // DOCX text extraction - send as plain text (Messages API doesn't support DOCX)
         userContent.push({
           type: 'text',
           text: attachment.content
         });
         console.log(`📝 Added DOCX text from ${attachment.filename} (${attachment.content.length} chars)`);
+      } else if (attachment.type === 'text_file') {
+        // Plain text file content - send as text block
+        userContent.push({
+          type: 'text',
+          text: attachment.content
+        });
+        console.log(`📝 Added text file ${attachment.filename} (${attachment.content.length} chars)`);
       } else if (attachment.type === 'document') {
-        // Other documents (DOCX, TXT, VTT) use file_id from Files API
+        // PDF documents use file_id from Files API
+        // (Only PDFs are supported as document type in Messages API)
         const docBlock = {
           type: 'document',
           source: {

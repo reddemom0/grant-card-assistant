@@ -207,81 +207,47 @@ export async function handleChatRequest(req, res) {
             continue;
           }
         } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-          // DOCX files - upload to Files API with mammoth fallback
+          // DOCX files - Extract text with mammoth (Messages API doesn't support DOCX documents)
           try {
-            // Convert base64 to Buffer
+            console.log('📄 Extracting text from DOCX with mammoth...');
             const fileBuffer = Buffer.from(attachment.data, 'base64');
             const filename = attachment.filename || `document_${Date.now()}.docx`;
 
-            // Upload to Files API
-            console.log('📤 Uploading DOCX to Files API...');
-            const uploadedFile = await filesAPI.upload(
-              null,
-              filename,
-              mimeType,
-              fileBuffer
-            );
+            // Extract text from DOCX
+            const result = await mammoth.extractRawText({ buffer: fileBuffer });
+            const extractedText = result.value;
 
+            // Add as text content block
             processedAttachments.push({
-              type: 'document',
-              mimeType: mimeType,
-              fileId: uploadedFile.id,
-              filename: filename
+              type: 'docx_text',
+              filename: filename,
+              content: `[Uploaded document: ${filename}]\n\n${extractedText}`
             });
 
-            console.log(`✓ DOCX uploaded to Files API: ${uploadedFile.id} (${filename})`);
-          } catch (uploadError) {
-            console.error('❌ Failed to upload DOCX to Files API:', uploadError.message);
-            console.log('🔄 Falling back to text extraction with mammoth...');
-
-            // Fallback: Extract text content with mammoth
-            try {
-              const fileBuffer = Buffer.from(attachment.data, 'base64');
-              const filename = attachment.filename || `document_${Date.now()}.docx`;
-
-              // Extract text from DOCX
-              const result = await mammoth.extractRawText({ buffer: fileBuffer });
-              const extractedText = result.value;
-
-              // Add as text content block instead
-              processedAttachments.push({
-                type: 'docx_text',
-                filename: filename,
-                content: `[Uploaded document: ${filename}]\n\n${extractedText}`
-              });
-
-              console.log(`✓ DOCX text extracted via mammoth (${extractedText.length} chars from ${filename})`);
-            } catch (fallbackError) {
-              console.error('❌ Mammoth fallback also failed:', fallbackError.message);
-              // Skip this attachment only if both methods fail
-              continue;
-            }
+            console.log(`✓ DOCX text extracted (${extractedText.length} chars from ${filename})`);
+          } catch (error) {
+            console.error('❌ Failed to extract DOCX text:', error.message);
+            continue;
           }
         } else {
-          // TXT, VTT, CSV, and other text documents - upload to Files API
-          // (Claude only accepts PDF for base64 documents)
+          // TXT, VTT, CSV, MD and other text files - Read as plain text
+          // Messages API doesn't support these via Files API, send as text content
           try {
             const fileBuffer = Buffer.from(attachment.data, 'base64');
             const filename = attachment.filename || `document_${Date.now()}.txt`;
+            const textContent = fileBuffer.toString('utf-8');
 
-            console.log(`📤 Uploading ${mimeType} to Files API...`);
-            const uploadedFile = await filesAPI.upload(
-              null,
-              filename,
-              'text/plain', // Use text/plain for all text documents
-              fileBuffer
-            );
+            console.log(`📄 Reading text file: ${filename} (${mimeType})`);
 
             processedAttachments.push({
-              type: 'document',
-              mimeType: 'text/plain',
-              fileId: uploadedFile.id,
-              filename: filename
+              type: 'text_file',
+              filename: filename,
+              content: `[Uploaded file: ${filename}]\n\n${textContent}`
             });
 
-            console.log(`✓ Document uploaded to Files API: ${uploadedFile.id} (${filename})`);
+            console.log(`✓ Text file processed (${textContent.length} chars from ${filename})`);
           } catch (error) {
-            console.error(`❌ Failed to upload ${mimeType}:`, error.message);
+            console.error(`❌ Failed to read text file:`, error.message);
             continue;
           }
         }
