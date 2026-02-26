@@ -640,28 +640,25 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
       const brandedEmailHtml = wrapInBrandedTemplate(emailBodyHtml);
       console.log(`📧 Email template wrapped (total ${brandedEmailHtml.length} chars)`);
 
-      // Send via Nodemailer (fire and forget — don't block finalization)
-      // Using setImmediate to make it truly non-blocking
-      setImmediate(async () => {
-        try {
-          console.log(`📧 Calling sendEmail for ${session.contact_email}...`);
-          await sendEmail({
-            to: session.contact_email,
-            toName: session.contact_name || firstName,
-            subject: `Your funding estimate for ${prospectData.company_name || 'your company'}`,
-            htmlBody: brandedEmailHtml
-          });
-          console.log(`✅ Email summary sent to ${session.contact_email} for session ${sessionId}`);
-        } catch (err) {
-          // Don't fail finalization if email send fails
-          console.error(`⚠️  Email summary send failed for session ${sessionId}:`, err.message);
-          console.error('Error stack:', err.stack);
-        }
-      });
-
-      // Mark as sent immediately (actual send happens in background)
-      results.email = { action: 'sending', recipient: session.contact_email };
-      console.log(`📧 Email marked as sending (non-blocking)`);
+      // Send via Nodemailer (blocking with full error capture)
+      // Changed from setImmediate to blocking call to capture errors
+      try {
+        console.log(`📧 Calling sendEmail for ${session.contact_email}...`);
+        const emailResult = await sendEmail({
+          to: session.contact_email,
+          toName: session.contact_name || firstName,
+          subject: `Your funding estimate for ${prospectData.company_name || 'your company'}`,
+          htmlBody: brandedEmailHtml
+        });
+        console.log(`✅ Email summary sent to ${session.contact_email} for session ${sessionId} — Message ID: ${emailResult.messageId}`);
+        results.email = { action: 'sent', recipient: session.contact_email, messageId: emailResult.messageId };
+      } catch (err) {
+        // Don't fail finalization if email send fails, but log the full error
+        console.error(`❌ Email send FAILED for ${session.contact_email}:`, err.message);
+        console.error(`❌ Error code: ${err.code}, command: ${err.command}, response: ${err.response}`);
+        console.error(`❌ Full error object:`, JSON.stringify(err, null, 2));
+        results.email = { action: 'failed', recipient: session.contact_email, error: err.message };
+      }
     }
   } else {
     console.log(`ℹ️  Email summary NOT requested — skipping email send`);

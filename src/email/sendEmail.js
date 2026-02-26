@@ -45,14 +45,18 @@ export async function sendEmail({ to, toName, subject, htmlBody }) {
   };
 
   console.log(`📧 Sending email to ${to} with subject: "${subject}"`);
+  console.log(`📧 Mail options:`, JSON.stringify({ from: mailOptions.from, to: mailOptions.to, replyTo: mailOptions.replyTo, subject: mailOptions.subject, htmlLength: mailOptions.html.length }));
 
   try {
+    console.log('📧 About to call transporter.sendMail()...');
     const info = await transporter.sendMail(mailOptions);
+    console.log(`✅ transporter.sendMail() succeeded — Message ID: ${info.messageId}`);
     console.log(`✅ Email sent successfully to ${to} — Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error(`❌ Email send failed for ${to}:`, err.message);
-    console.error('Error details:', err);
+    console.error(`❌ transporter.sendMail() failed:`, err.message);
+    console.error(`❌ Error code: ${err.code}, command: ${err.command}, responseCode: ${err.responseCode}`);
+    console.error(`❌ Full error:`, err);
     throw err;
   }
 }
