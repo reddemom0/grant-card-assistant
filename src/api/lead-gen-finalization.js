@@ -607,12 +607,17 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   // 7. Send Email Summary via Nodemailer (if requested)
   // -------------------------------------------------------------------------
 
+  console.log(`📧 Checking email CTA — cta_selected: "${prospectData.cta_selected}", has_contact_email: ${!!session.contact_email}`);
+
   if (prospectData.cta_selected && prospectData.cta_selected.includes('email')) {
     console.log('📧 Email summary requested — preparing to send via Nodemailer...');
 
     if (!session.contact_email) {
       console.warn('⚠️  Cannot send email summary — no contact_email captured');
+      results.email = { action: 'skipped', reason: 'no_contact_email' };
     } else {
+      console.log(`📧 Preparing email for ${session.contact_email}...`);
+
       // Extract first name from contact_name
       const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
       const firstName = nameParts[0] || 'there';
@@ -627,15 +632,19 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
           session.estimated_funding || prospectData.estimated_funding,
           firstName
         );
+      } else {
+        console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
       }
 
       // Wrap in branded HTML template
       const brandedEmailHtml = wrapInBrandedTemplate(emailBodyHtml);
+      console.log(`📧 Email template wrapped (total ${brandedEmailHtml.length} chars)`);
 
       // Send via Nodemailer (fire and forget — don't block finalization)
       // Using setImmediate to make it truly non-blocking
       setImmediate(async () => {
         try {
+          console.log(`📧 Calling sendEmail for ${session.contact_email}...`);
           await sendEmail({
             to: session.contact_email,
             toName: session.contact_name || firstName,
@@ -645,13 +654,17 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
           console.log(`✅ Email summary sent to ${session.contact_email} for session ${sessionId}`);
         } catch (err) {
           // Don't fail finalization if email send fails
-          console.warn(`⚠️  Email summary send failed for session ${sessionId}:`, err.message);
+          console.error(`⚠️  Email summary send failed for session ${sessionId}:`, err.message);
+          console.error('Error stack:', err.stack);
         }
       });
 
       // Mark as sent immediately (actual send happens in background)
       results.email = { action: 'sending', recipient: session.contact_email };
+      console.log(`📧 Email marked as sending (non-blocking)`);
     }
+  } else {
+    console.log(`ℹ️  Email summary NOT requested — skipping email send`);
   }
 
   // -------------------------------------------------------------------------

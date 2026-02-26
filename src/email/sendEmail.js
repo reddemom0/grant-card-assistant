@@ -27,8 +27,13 @@ const transporter = nodemailer.createTransport({
  * @returns {Promise<Object>} Send result
  */
 export async function sendEmail({ to, toName, subject, htmlBody }) {
+  console.log(`📧 sendEmail called for recipient: ${to}`);
+  console.log(`📧 Email config — USER: ${EMAIL_USER}, PASSWORD_SET: ${!!EMAIL_APP_PASSWORD}`);
+
   if (!EMAIL_APP_PASSWORD) {
-    throw new Error('EMAIL_APP_PASSWORD environment variable not configured');
+    const error = 'EMAIL_APP_PASSWORD environment variable not configured';
+    console.error(`❌ ${error}`);
+    throw new Error(error);
   }
 
   const mailOptions = {
@@ -39,12 +44,15 @@ export async function sendEmail({ to, toName, subject, htmlBody }) {
     html: htmlBody
   };
 
+  console.log(`📧 Sending email to ${to} with subject: "${subject}"`);
+
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 Email sent to ${to} — Message ID: ${info.messageId}`);
+    console.log(`✅ Email sent successfully to ${to} — Message ID: ${info.messageId}`);
     return { success: true, messageId: info.messageId };
   } catch (err) {
-    console.error(`⚠️  Email send failed for ${to}:`, err.message);
+    console.error(`❌ Email send failed for ${to}:`, err.message);
+    console.error('Error details:', err);
     throw err;
   }
 }
