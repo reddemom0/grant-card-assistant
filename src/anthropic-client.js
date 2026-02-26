@@ -37,7 +37,7 @@ export const filesAPI = {
     let tempFilePath = null;
 
     try {
-      // For DOCX files, use temp file approach to avoid multipart parsing issues
+      // For DOCX/XLSX files, use temp file approach
       if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
           mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
         // Write buffer to temp file
@@ -45,9 +45,11 @@ export const filesAPI = {
         fs.writeFileSync(tempFilePath, fileData);
 
         // Upload using fs.createReadStream
+        // SDK documentation shows: { file: fs.createReadStream('path') }
         const fileStream = fs.createReadStream(tempFilePath);
+
         const file = await anthropic.beta.files.upload({
-          file: [filename, fileStream, mimeType]
+          file: fileStream
         }, {
           headers: {
             'anthropic-beta': FILES_API_BETA
@@ -58,7 +60,7 @@ export const filesAPI = {
 
         return file;
       } else {
-        // For other file types, use direct Buffer approach
+        // For other file types (PDFs, images), use direct Buffer approach
         const file = await anthropic.beta.files.upload({
           file: [filename, fileData, mimeType]
         }, {

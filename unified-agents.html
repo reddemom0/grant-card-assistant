@@ -1311,24 +1311,31 @@
 
                                 // Handle text delta events (actual response content)
                                 if (parsed.type === 'text_delta' && parsed.text) {
+                                    console.log('[SSE] ✅ text_delta received:', parsed.text.substring(0, 50));
                                     assistantMessage += parsed.text;
+                                    console.log('[SSE] 📊 Total message length:', assistantMessage.length);
 
                                     // Create or update message element
                                     if (!messageElement) {
-                                        console.log('[DEBUG] Creating assistant message element');
+                                        console.log('[SSE] 🆕 Creating assistant message element');
                                         // Remove thinking indicator when first response arrives
                                         if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                            console.log('[SSE] 🗑️  Removing thinking indicator');
                                             thinkingIndicator.remove();
                                         }
                                         messageElement = addMessageToUI('assistant', '');
+                                        console.log('[SSE] ✅ Message element created:', messageElement);
                                     }
 
                                     // Render markdown in real-time
                                     const contentElement = messageElement.querySelector('.message-content');
+                                    console.log('[SSE] 📝 Rendering to content element:', contentElement);
                                     if (typeof marked !== 'undefined') {
                                         contentElement.innerHTML = marked.parse(assistantMessage);
+                                        console.log('[SSE] ✅ Markdown rendered, HTML length:', contentElement.innerHTML.length);
                                     } else {
                                         contentElement.textContent = assistantMessage;
+                                        console.log('[SSE] ✅ Text rendered (no markdown)');
                                     }
 
                                     // Auto-scroll
@@ -1535,11 +1542,11 @@
                             </div>
                         `;
                     } else {
-                        // Show file chip
+                        // Show file chip with visible styling
                         fileHTML += `
-                            <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: rgba(255,255,255,0.1); border-radius: 8px; font-size: 0.875rem; color: rgba(255,255,255,0.9);">
+                            <div style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; background: #e8e8e8; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 0.875rem; color: #07334A;">
                                 <span>${fileIcon}</span>
-                                <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px;">${fileName}</span>
+                                <span style="text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 200px; font-weight: 500;">${fileName}</span>
                             </div>
                         `;
                     }
