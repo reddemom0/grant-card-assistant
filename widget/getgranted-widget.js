@@ -191,7 +191,7 @@
           position: absolute;
           bottom: 80px;
           right: 0;
-          width: 400px;
+          width: 440px;
           height: 560px;
           background: white;
           border-radius: 12px;
