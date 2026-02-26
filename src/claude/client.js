@@ -476,21 +476,32 @@ export async function runAgent({
 
       console.log(`✓ Response received - stop_reason: ${fullResponse.stop_reason}`);
 
-      // CRITICAL: Accumulate text from THIS iteration (prevents greeting loss)
-      // When agent does text + tool_use in iteration 1, then empty text in iteration 2,
-      // we need to preserve the text from iteration 1 for database persistence
+      // CRITICAL FIX: For lead-gen, only accumulate text from FINAL iteration (end_turn)
+      // This prevents tool narration like "Let me search..." from bleeding into responses
+      // For other agents, preserve old behavior (accumulate from all iterations)
       const iterationText = fullResponse.content
         .filter(block => block.type === 'text' && block.text && block.text.trim())
         .map(block => block.text)
         .join('\n');
 
       if (iterationText) {
-        if (accumulatedText) {
-          accumulatedText += '\n' + iterationText;
+        if (agentType === 'lead-gen') {
+          // Lead-gen: ONLY save text from final iteration (prevents tool narration)
+          if (fullResponse.stop_reason === 'end_turn') {
+            accumulatedText = iterationText; // Replace, don't append (only final text matters)
+            console.log(`  📝 Final iteration text: ${iterationText.length} chars (lead-gen mode: discarding tool narration)`);
+          } else {
+            console.log(`  🔇 Skipping tool narration text: ${iterationText.length} chars (stop_reason: ${fullResponse.stop_reason})`);
+          }
         } else {
-          accumulatedText = iterationText;
+          // Other agents: preserve old behavior (accumulate from all iterations)
+          if (accumulatedText) {
+            accumulatedText += '\n' + iterationText;
+          } else {
+            accumulatedText = iterationText;
+          }
+          console.log(`  📝 Accumulated ${iterationText.length} chars of text (total: ${accumulatedText.length})`);
         }
-        console.log(`  📝 Accumulated ${iterationText.length} chars of text (total: ${accumulatedText.length})`);
       }
 
       // ============================================================================

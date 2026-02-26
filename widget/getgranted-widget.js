@@ -76,9 +76,43 @@
     return div.innerHTML;
   }
 
+  function sanitizeHtml(html) {
+    // Whitelist safe HTML tags for assistant messages
+    // Agent uses <strong>, <br>, and potentially <a href>
+    // All other tags are stripped
+    const allowedTags = ['strong', 'br', 'a', 'em', 'b', 'i', 'p'];
+    const allowedAttributes = {
+      'a': ['href', 'target']
+    };
+
+    const div = document.createElement('div');
+    div.innerHTML = html;
+
+    // Remove script tags and event handlers
+    const scripts = div.querySelectorAll('script');
+    scripts.forEach(s => s.remove());
+
+    // Remove event handler attributes
+    div.querySelectorAll('*').forEach(el => {
+      for (let attr of el.attributes) {
+        if (attr.name.startsWith('on')) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    });
+
+    return div.innerHTML;
+  }
+
   function formatMessage(text) {
     // Convert newlines to <br> tags for display
     return escapeHtml(text).replace(/\n/g, '<br>');
+  }
+
+  function formatAssistantMessage(html) {
+    // Assistant messages may contain safe HTML like <strong>, <br>, <a>
+    // Sanitize but don't escape - allow whitelisted tags to render
+    return sanitizeHtml(html).replace(/\n/g, '<br>');
   }
 
   // ============================================================================
@@ -845,7 +879,7 @@
     messageDiv.className = 'gg-message gg-message-bot';
     messageDiv.innerHTML = `
       <div class="gg-message-avatar">G</div>
-      <div class="gg-message-content">${escapeHtml(text)}</div>
+      <div class="gg-message-content">${formatAssistantMessage(text)}</div>
     `;
     return messageDiv;
   }
@@ -1006,7 +1040,8 @@
               messagesContainer.appendChild(assistantWrapper);
             }
             assistantText += parsed.text;
-            assistantWrapper.querySelector('.gg-message-content').textContent = assistantText;
+            // Use innerHTML with sanitization to allow safe HTML tags like <strong>, <br>
+            assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
             scrollToBottom();
           }
 
@@ -1037,7 +1072,8 @@
               messagesContainer.appendChild(assistantWrapper);
             }
             assistantText += parsed.text;
-            assistantWrapper.querySelector('.gg-message-content').textContent = assistantText;
+            // Use innerHTML with sanitization to allow safe HTML tags like <strong>, <br>
+            assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
           }
         } catch { /* ignore */ }
       }
