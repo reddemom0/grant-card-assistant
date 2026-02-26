@@ -21,6 +21,7 @@ import {
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 const BOOKING_LINK = 'https://meetings.hubspot.com/natalie392/15min-intro-to-granted';
+const ZAPIER_EMAIL_WEBHOOK_URL = process.env.ZAPIER_EMAIL_WEBHOOK_URL;
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -237,6 +238,204 @@ function buildNoteBody(sessionData, trigger) {
   lines.push(`Booking link: ${BOOKING_LINK}`);
 
   return lines.join('\n');
+}
+
+/**
+ * Wrap email summary body in branded HTML template
+ * @param {string} emailBodyHtml - Personalized email content (HTML) from agent
+ * @param {string} firstName - Recipient's first name
+ * @returns {string} Fully branded HTML email
+ */
+function wrapEmailInBrandedTemplate(emailBodyHtml, firstName = 'there') {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: #f5f7fa;
+    }
+    .email-container {
+      max-width: 600px;
+      margin: 40px auto;
+      background-color: #ffffff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .email-header {
+      background-color: #0066cc;
+      padding: 30px 40px;
+      text-align: center;
+    }
+    .email-header img {
+      max-width: 200px;
+      height: auto;
+    }
+    .email-body {
+      padding: 40px;
+      color: #333333;
+      line-height: 1.6;
+    }
+    .email-body p {
+      margin: 0 0 16px 0;
+    }
+    .email-body a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+    .email-body a:hover {
+      text-decoration: underline;
+    }
+    .cta-button {
+      display: inline-block;
+      padding: 14px 28px;
+      margin: 20px 0;
+      background-color: #0066cc;
+      color: #ffffff !important;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      text-align: center;
+    }
+    .cta-button:hover {
+      background-color: #0052a3;
+      text-decoration: none !important;
+    }
+    .trust-signals {
+      margin: 30px 0;
+      padding: 20px;
+      background-color: #f5f7fa;
+      border-radius: 6px;
+      text-align: center;
+      font-size: 14px;
+      color: #666666;
+    }
+    .email-footer {
+      background-color: #f5f7fa;
+      padding: 30px 40px;
+      text-align: center;
+      font-size: 13px;
+      color: #666666;
+      border-top: 1px solid #e0e0e0;
+    }
+    .email-footer a {
+      color: #0066cc;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <img src="https://granted.ca/wp-content/uploads/2024/02/granted-logo-blue-300x129.png" alt="Granted Consulting" />
+    </div>
+    <div class="email-body">
+      ${emailBodyHtml}
+    </div>
+    <div class="email-footer">
+      <div class="trust-signals">
+        🔒 Confidential &nbsp;|&nbsp; ✓ No obligation &nbsp;|&nbsp; 🇨🇦 Canadian SMEs only
+      </div>
+      <p>
+        <strong>Granted Consulting Inc.</strong><br>
+        Vancouver, BC, Canada<br>
+        <a href="mailto:writers@granted.ca">writers@granted.ca</a>
+      </p>
+      <p style="margin-top: 20px; font-size: 12px; color: #999999;">
+        You received this email because you used the Grant Advisor chat on granted.ca.<br>
+        Questions? Reply to this email or <a href="${BOOKING_LINK}">book a call</a>.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Generate fallback email summary when agent didn't provide one
+ * @param {Object} prospectData - Prospect information from session
+ * @param {string} estimatedFunding - Funding estimate range
+ * @param {string} firstName - Recipient's first name
+ * @returns {string} HTML email content
+ */
+function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there') {
+  const pd = prospectData || {};
+  const activities = pd.activities || pd.activities_discussed || 'business growth activities';
+  const tier = determineFundingTier(estimatedFunding);
+  const resourceLink = getResourceLink(tier);
+
+  return `
+<p>Hi ${firstName},</p>
+
+<p>Thanks for chatting with me about <strong>${pd.company_name || 'your company'}</strong>'s funding opportunities!</p>
+
+<p>Based on what you shared about ${activities}, here's what I found:</p>
+
+<p><strong>Estimated funding potential: ${estimatedFunding || '$10-30K over 12 months'}</strong></p>
+
+<p>This includes programs available now plus seasonal intakes opening throughout the year. The exact mix depends on timing, your province, and which intakes are open.</p>
+
+<p>Next step: Our consultants can map out a 12-month funding plan tailored to your business — what to apply for, when, and how to maximize your chances.</p>
+
+<p style="text-align: center;">
+  <a href="${BOOKING_LINK}" class="cta-button">📅 Book Your Free Consultation</a>
+</p>
+
+<p>Looking forward to helping you access this funding!</p>
+
+<p>Talk soon,<br>The Granted Team</p>
+
+<p style="margin-top: 30px; font-size: 14px; color: #666;">
+  <strong>Resources for you:</strong><br>
+  <a href="${resourceLink}">Learn more about how Granted works</a>
+</p>
+  `.trim();
+}
+
+/**
+ * Determine funding tier from estimate string
+ */
+function determineFundingTier(estimateStr) {
+  if (!estimateStr) return 'medium';
+
+  // Extract numbers (e.g., "$30K-$50K" → [30, 50])
+  const matches = String(estimateStr).match(/\$?([\d,]+)([KMB]?)/gi);
+  if (!matches) return 'medium';
+
+  const amounts = matches.map(m => {
+    const clean = m.replace(/[$,]/g, '');
+    const multipliers = { K: 1000, M: 1000000, B: 1000000000 };
+    const match = clean.match(/([\d.]+)([KMB]?)/i);
+    if (!match) return 0;
+    const num = parseFloat(match[1]);
+    const suffix = match[2].toUpperCase();
+    return num * (multipliers[suffix] || 1);
+  });
+
+  const maxAmount = Math.max(...amounts);
+
+  if (maxAmount >= 30000) return 'high';
+  if (maxAmount >= 10000) return 'medium';
+  return 'low';
+}
+
+/**
+ * Get resource link based on funding tier
+ */
+function getResourceLink(tier) {
+  const links = {
+    high: 'https://granted.ca/full-service',
+    medium: 'https://granted.ca/granted-starter',
+    low: 'https://granted.ca/getgranted'
+  };
+  return links[tier] || links.medium;
 }
 
 // ============================================================================
@@ -512,7 +711,67 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   }
 
   // -------------------------------------------------------------------------
-  // 7. Log analytics event
+  // 7. Send Email Summary via Zapier (if requested)
+  // -------------------------------------------------------------------------
+
+  if (prospectData.cta_selected && prospectData.cta_selected.includes('email')) {
+    console.log('📧 Email summary requested — preparing to send via Zapier...');
+
+    if (!session.contact_email) {
+      console.warn('⚠️  Cannot send email summary — no contact_email captured');
+    } else if (!ZAPIER_EMAIL_WEBHOOK_URL) {
+      console.warn('⚠️  ZAPIER_EMAIL_WEBHOOK_URL not configured — skipping email send');
+    } else {
+      // Extract first name from contact_name
+      const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
+      const firstName = nameParts[0] || 'there';
+
+      // Get email summary body from agent or generate fallback
+      let emailBodyHtml = prospectData.email_summary_body;
+
+      if (!emailBodyHtml) {
+        console.log('⚠️  No email_summary_body from agent — generating fallback email');
+        emailBodyHtml = generateFallbackEmail(
+          prospectData,
+          session.estimated_funding || prospectData.estimated_funding,
+          firstName
+        );
+      }
+
+      // Wrap in branded HTML template
+      const brandedEmailHtml = wrapEmailInBrandedTemplate(emailBodyHtml, firstName);
+
+      // Prepare webhook payload
+      const emailPayload = {
+        to_email: session.contact_email,
+        to_name: session.contact_name || firstName,
+        company_name: prospectData.company_name || 'your company',
+        subject: `Your funding estimate for ${prospectData.company_name || 'your company'}`,
+        email_body: brandedEmailHtml
+      };
+
+      // Send to Zapier (fire and forget — don't block finalization)
+      try {
+        const webhookResponse = await hubspotClient.post(
+          ZAPIER_EMAIL_WEBHOOK_URL,
+          emailPayload,
+          {
+            baseURL: '', // Override baseURL to use full webhook URL
+            timeout: 5000 // 5-second timeout
+          }
+        );
+        console.log(`✅ Email summary sent to Zapier for ${session.contact_email}`);
+        results.email = { action: 'sent', recipient: session.contact_email };
+      } catch (err) {
+        // Don't fail finalization if email webhook fails
+        console.warn('⚠️  Zapier email webhook failed:', err.message);
+        results.email = { action: 'failed', error: err.message };
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 8. Log analytics event
   // -------------------------------------------------------------------------
   // Note: Session was already marked as finalized atomically at the start
 
