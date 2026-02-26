@@ -76,10 +76,13 @@
     return div.innerHTML;
   }
 
+  // Track whether HubSpot embed script has been loaded
+  let hubspotEmbedLoaded = false;
+
   function sanitizeHtml(html) {
     // Whitelist safe HTML tags for assistant messages
     // Agent uses <strong>, <br>, and potentially <a href>
-    // All other tags are stripped
+    // Special handling for HubSpot meeting embeds
     const allowedTags = ['strong', 'br', 'a', 'em', 'b', 'i', 'p'];
     const allowedAttributes = {
       'a': ['href', 'target']
@@ -88,7 +91,11 @@
     const div = document.createElement('div');
     div.innerHTML = html;
 
-    // Remove script tags and event handlers
+    // Check for HubSpot meeting embed BEFORE removing scripts
+    const hubspotContainer = div.querySelector('.meetings-iframe-container');
+    const hubspotScript = div.querySelector('script[src*="MeetingsEmbedCode.js"]');
+
+    // Remove all script tags (we'll handle HubSpot separately)
     const scripts = div.querySelectorAll('script');
     scripts.forEach(s => s.remove());
 
@@ -101,7 +108,120 @@
       }
     });
 
+    // If HubSpot embed detected, inject the script dynamically
+    if (hubspotContainer && hubspotScript && !hubspotEmbedLoaded) {
+      const scriptSrc = hubspotScript.getAttribute('src');
+      loadHubSpotEmbed(scriptSrc);
+      hubspotEmbedLoaded = true;
+    }
+
     return div.innerHTML;
+  }
+
+  function loadHubSpotEmbed(scriptSrc) {
+    // Load HubSpot embed script dynamically
+    // This ensures it executes properly in the shadow DOM context
+    console.log('[Widget] Loading HubSpot meeting embed script:', scriptSrc);
+
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = scriptSrc;
+    script.async = true;
+
+    script.onload = () => {
+      console.log('[Widget] HubSpot embed script loaded successfully');
+      // After script loads, trigger initialization on any containers
+      initializeHubSpotContainers();
+    };
+
+    script.onerror = (error) => {
+      console.error('[Widget] Failed to load HubSpot embed script:', error);
+    };
+
+    // Append to document head (not shadow root - external scripts need global context)
+    document.head.appendChild(script);
+  }
+
+  function initializeHubSpotContainers() {
+    // HubSpot's script can't see into shadow DOM, so we create containers in regular DOM
+    if (!shadowRoot) return;
+
+    const containers = shadowRoot.querySelectorAll('.meetings-iframe-container');
+    containers.forEach(container => {
+      const dataSrc = container.getAttribute('data-src');
+      if (!dataSrc) return;
+
+      // Replace shadow DOM container with a placeholder message
+      const placeholder = document.createElement('div');
+      placeholder.style.cssText = 'padding: 12px; background: #f0f8ff; border-radius: 8px; margin: 12px 0; font-size: 14px; color: #333;';
+      placeholder.innerHTML = '<strong>📅 Loading calendar...</strong>';
+
+      const messageContent = container.closest('.gg-message-content');
+      if (messageContent) {
+        // Replace the container with placeholder in the message
+        container.replaceWith(placeholder);
+
+        // Create the actual HubSpot container in document body (regular DOM)
+        const hubspotWrapper = document.createElement('div');
+        hubspotWrapper.className = 'gg-hubspot-calendar-modal';
+        hubspotWrapper.style.cssText = `
+          position: fixed;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+          width: 90%;
+          max-width: 800px;
+          max-height: 90vh;
+          background: white;
+          border-radius: 12px;
+          box-shadow: 0 8px 40px rgba(0, 0, 0, 0.2);
+          z-index: 1000000;
+          padding: 20px;
+          overflow: auto;
+        `;
+
+        // Add close button
+        const closeBtn = document.createElement('button');
+        closeBtn.innerHTML = '×';
+        closeBtn.style.cssText = `
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          background: transparent;
+          border: none;
+          font-size: 32px;
+          line-height: 1;
+          color: #666;
+          cursor: pointer;
+          padding: 0;
+          width: 32px;
+          height: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1;
+        `;
+        closeBtn.onclick = () => {
+          hubspotWrapper.remove();
+          placeholder.innerHTML = '<strong>📅 Calendar closed.</strong> Click <a href="#" onclick="this.closest(\'.gg-message-content\').dispatchEvent(new CustomEvent(\'reopenCalendar\')); return false;" style="color: #008ABF; text-decoration: underline; cursor: pointer;">here</a> to reopen.';
+        };
+
+        const hubspotDiv = document.createElement('div');
+        hubspotDiv.className = 'meetings-iframe-container';
+        hubspotDiv.setAttribute('data-src', dataSrc);
+
+        hubspotWrapper.appendChild(closeBtn);
+        hubspotWrapper.appendChild(hubspotDiv);
+        document.body.appendChild(hubspotWrapper);
+
+        // Update placeholder to show it's ready
+        setTimeout(() => {
+          placeholder.innerHTML = '<strong>📅 Calendar opened!</strong> Pick a time that works for you.';
+        }, 500);
+
+        console.log('[Widget] Created HubSpot container in regular DOM');
+      }
+    });
   }
 
   function formatMessage(text) {
@@ -1044,12 +1164,21 @@
             // Use innerHTML with sanitization to allow safe HTML tags like <strong>, <br>
             assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
             scrollToBottom();
+
+            // Check if HubSpot embed appeared in the message
+            if (assistantText.includes('meetings-iframe-container')) {
+              initializeHubSpotContainers();
+            }
           }
 
           // Done event
           if (parsed.type === 'done') {
             if (!assistantWrapper && assistantText === '') {
               typingIndicator.remove();
+            }
+            // Final check for HubSpot embeds after streaming completes
+            if (assistantText.includes('meetings-iframe-container')) {
+              setTimeout(() => initializeHubSpotContainers(), 100);
             }
           }
 
@@ -1075,6 +1204,11 @@
             assistantText += parsed.text;
             // Use innerHTML with sanitization to allow safe HTML tags like <strong>, <br>
             assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
+
+            // Check if HubSpot embed appeared
+            if (assistantText.includes('meetings-iframe-container')) {
+              setTimeout(() => initializeHubSpotContainers(), 100);
+            }
           }
         } catch { /* ignore */ }
       }
