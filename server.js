@@ -39,6 +39,9 @@ import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js
 import { handleLeadGenInit } from './src/api/lead-gen-init.js';
 import { handleListLeadGenConversations, handleGetLeadGenMessages } from './src/api/admin-lead-gen.js';
 
+// Test endpoint (temporary for email debugging)
+import testEmailHandler from './api/test-email.js';
+
 // Authentication
 import authRouter from './src/api/auth.js';
 import { authenticateUser } from './src/middleware/auth.js';
@@ -287,6 +290,9 @@ app.get('/api/lead-gen/analytics', authenticateUser, handleLeadGenAnalytics);
 // Admin endpoints for lead-gen dashboard — authenticated team members only
 app.get('/api/admin/lead-gen-conversations', authenticateUser, handleListLeadGenConversations);
 app.get('/api/admin/lead-gen-messages/:sessionId', authenticateUser, handleGetLeadGenMessages);
+
+// Test endpoint for email debugging (temporary - remove after email confirmed working)
+app.get('/api/test-email', testEmailHandler);
 
 // Main chat endpoint (SSE streaming) - with authentication
 app.post('/api/chat', authenticateUser, handleChatRequest);
