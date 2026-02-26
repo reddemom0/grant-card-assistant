@@ -370,7 +370,11 @@ export async function saveLeadData(input, conversationId) {
       budget_committed:       input.budget_committed       || null,
       is_decision_maker:      input.is_decision_maker      || null,
       growth_plans:           input.growth_plans           || null,
-      existing_consultant:    input.existing_consultant    || null
+      existing_consultant:    input.existing_consultant    || null,
+      // Email summary body from agent (for email sending)
+      email_summary_body:     input.email_summary_body     || null,
+      // CTA selected (stored in both prospect_data and top-level for finalization)
+      cta_selected:           input.cta_selected           || null
     };
 
     await query(
@@ -394,7 +398,7 @@ export async function saveLeadData(input, conversationId) {
       ]
     );
 
-    console.log(`✅ lead_gen_conversations updated for session ${conversationId}`);
+    console.log(`✅ lead_gen_conversations updated for session ${conversationId} — cta_selected: "${input.cta_selected}", has_email_body: ${!!input.email_summary_body}`);
   } catch (err) {
     console.error('❌ DB update failed in saveLeadData:', err.message);
     return { success: false, error: err.message };

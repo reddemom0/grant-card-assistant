@@ -74,16 +74,22 @@ export function classifyQuery(message, agentType, conversationMemories = null) {
   // ============================================================================
 
   // Lead-gen agent: Conditional routing based on conversation state
-  // Sonnet ONLY for estimate delivery turn, Haiku for everything else
+  // Sonnet for estimate delivery AND post-estimate CTA phase, Haiku for discovery
   if (agentType === 'lead-gen') {
-    // Check if this is the estimate delivery turn
+    // Check if this is the estimate delivery turn (about to deliver)
     if (isLeadGenReadyForEstimate(conversationMemories)) {
       console.log('🎯 Lead-gen routing: SONNET (estimate delivery turn detected)');
       return 'complex'; // Sonnet + thinking for estimate synthesis
     }
 
-    // All other turns use Haiku
-    console.log('🎯 Lead-gen routing: HAIKU (discovery/post-estimate turn)');
+    // Check if estimate has already been delivered (post-estimate CTA phase)
+    if (conversationMemories && (conversationMemories.estimated_funding || conversationMemories.matched_programs)) {
+      console.log('🎯 Lead-gen routing: SONNET (post-estimate CTA phase — estimated_funding in memory)');
+      return 'complex'; // Sonnet + thinking for CTA phase (better context awareness)
+    }
+
+    // Discovery phase (before estimate): use Haiku for speed
+    console.log('🎯 Lead-gen routing: HAIKU (discovery phase)');
     return 'simple'; // Haiku for speed
   }
 
