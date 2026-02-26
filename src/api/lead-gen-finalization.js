@@ -18,10 +18,10 @@ import {
   associateContactWithCompany,
   getContactByEmail
 } from '../tools/hubspot.js';
+import { sendEmail, wrapInBrandedTemplate } from '../email/sendEmail.js';
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 const BOOKING_LINK = 'https://meetings.hubspot.com/natalie392/15min-intro-to-granted';
-const ZAPIER_EMAIL_WEBHOOK_URL = process.env.ZAPIER_EMAIL_WEBHOOK_URL;
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -241,124 +241,6 @@ function buildNoteBody(sessionData, trigger) {
 }
 
 /**
- * Wrap email summary body in branded HTML template
- * @param {string} emailBodyHtml - Personalized email content (HTML) from agent
- * @param {string} firstName - Recipient's first name
- * @returns {string} Fully branded HTML email
- */
-function wrapEmailInBrandedTemplate(emailBodyHtml, firstName = 'there') {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      background-color: #f5f7fa;
-    }
-    .email-container {
-      max-width: 600px;
-      margin: 40px auto;
-      background-color: #ffffff;
-      border-radius: 8px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }
-    .email-header {
-      background-color: #0066cc;
-      padding: 30px 40px;
-      text-align: center;
-    }
-    .email-header img {
-      max-width: 200px;
-      height: auto;
-    }
-    .email-body {
-      padding: 40px;
-      color: #333333;
-      line-height: 1.6;
-    }
-    .email-body p {
-      margin: 0 0 16px 0;
-    }
-    .email-body a {
-      color: #0066cc;
-      text-decoration: none;
-    }
-    .email-body a:hover {
-      text-decoration: underline;
-    }
-    .cta-button {
-      display: inline-block;
-      padding: 14px 28px;
-      margin: 20px 0;
-      background-color: #0066cc;
-      color: #ffffff !important;
-      text-decoration: none;
-      border-radius: 6px;
-      font-weight: bold;
-      text-align: center;
-    }
-    .cta-button:hover {
-      background-color: #0052a3;
-      text-decoration: none !important;
-    }
-    .trust-signals {
-      margin: 30px 0;
-      padding: 20px;
-      background-color: #f5f7fa;
-      border-radius: 6px;
-      text-align: center;
-      font-size: 14px;
-      color: #666666;
-    }
-    .email-footer {
-      background-color: #f5f7fa;
-      padding: 30px 40px;
-      text-align: center;
-      font-size: 13px;
-      color: #666666;
-      border-top: 1px solid #e0e0e0;
-    }
-    .email-footer a {
-      color: #0066cc;
-      text-decoration: none;
-    }
-  </style>
-</head>
-<body>
-  <div class="email-container">
-    <div class="email-header">
-      <img src="https://granted.ca/wp-content/uploads/2024/02/granted-logo-blue-300x129.png" alt="Granted Consulting" />
-    </div>
-    <div class="email-body">
-      ${emailBodyHtml}
-    </div>
-    <div class="email-footer">
-      <div class="trust-signals">
-        🔒 Confidential &nbsp;|&nbsp; ✓ No obligation &nbsp;|&nbsp; 🇨🇦 Canadian SMEs only
-      </div>
-      <p>
-        <strong>Granted Consulting Inc.</strong><br>
-        Vancouver, BC, Canada<br>
-        <a href="mailto:writers@granted.ca">writers@granted.ca</a>
-      </p>
-      <p style="margin-top: 20px; font-size: 12px; color: #999999;">
-        You received this email because you used the Grant Advisor chat on granted.ca.<br>
-        Questions? Reply to this email or <a href="${BOOKING_LINK}">book a call</a>.
-      </p>
-    </div>
-  </div>
-</body>
-</html>
-  `.trim();
-}
-
-/**
  * Generate fallback email summary when agent didn't provide one
  * @param {Object} prospectData - Prospect information from session
  * @param {string} estimatedFunding - Funding estimate range
@@ -367,35 +249,46 @@ function wrapEmailInBrandedTemplate(emailBodyHtml, firstName = 'there') {
  */
 function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there') {
   const pd = prospectData || {};
-  const activities = pd.activities || pd.activities_discussed || 'business growth activities';
+  const companyName = pd.company_name || 'your company';
+  const activities = pd.activities || pd.activities_discussed || 'your growth plans';
   const tier = determineFundingTier(estimatedFunding);
   const resourceLink = getResourceLink(tier);
+
+  // Parse funding estimate for "now" vs "12 months" if available
+  const fundingNow = pd.available_now_funding || null;
+  const funding12Mo = estimatedFunding || pd.estimated_funding || '$10-30K';
+
+  // Build funding summary
+  let fundingSummary = '';
+  if (fundingNow && fundingNow !== funding12Mo) {
+    fundingSummary = `Right now, you're looking at an estimated <strong>${fundingNow}</strong> across programs currently accepting applications. Over the next 12 months, as more programs open seasonal intakes, that grows to an estimated <strong>${funding12Mo}</strong>.`;
+  } else {
+    fundingSummary = `Based on what you shared, you're looking at an estimated <strong>${funding12Mo}</strong> over the next 12 months across multiple programs.`;
+  }
 
   return `
 <p>Hi ${firstName},</p>
 
-<p>Thanks for chatting with me about <strong>${pd.company_name || 'your company'}</strong>'s funding opportunities!</p>
+<p>It was great chatting about ${companyName}. We talked about ${activities}, and I pulled together what grant funding could be available for you.</p>
 
-<p>Based on what you shared about ${activities}, here's what I found:</p>
+<p>${fundingSummary}</p>
 
-<p><strong>Estimated funding potential: ${estimatedFunding || '$10-30K over 12 months'}</strong></p>
+<p>This includes hiring support, training reimbursements, and market expansion funding — the exact mix depends on timing, your province, and which intakes are open.</p>
 
-<p>This includes programs available now plus seasonal intakes opening throughout the year. The exact mix depends on timing, your province, and which intakes are open.</p>
+<p>Next step: Our consultants can map out the exact programs, timing, and application strategy so you catch every window that makes sense for your business.</p>
 
-<p>Next step: Our consultants can map out a 12-month funding plan tailored to your business — what to apply for, when, and how to maximize your chances.</p>
+<p>If you'd like us to walk you through it, grab 15 minutes with our team:</p>
 
 <p style="text-align: center;">
-  <a href="${BOOKING_LINK}" class="cta-button">📅 Book Your Free Consultation</a>
+  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your Free Consultation</a>
 </p>
 
-<p>Looking forward to helping you access this funding!</p>
+<p style="margin-top: 30px; font-size: 14px;">
+  <strong>Resources for you:</strong><br>
+  <a href="${resourceLink}" style="color: #0066cc;">Learn more about how Granted works</a>
+</p>
 
 <p>Talk soon,<br>The Granted Team</p>
-
-<p style="margin-top: 30px; font-size: 14px; color: #666;">
-  <strong>Resources for you:</strong><br>
-  <a href="${resourceLink}">Learn more about how Granted works</a>
-</p>
   `.trim();
 }
 
@@ -711,16 +604,14 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   }
 
   // -------------------------------------------------------------------------
-  // 7. Send Email Summary via Zapier (if requested)
+  // 7. Send Email Summary via Nodemailer (if requested)
   // -------------------------------------------------------------------------
 
   if (prospectData.cta_selected && prospectData.cta_selected.includes('email')) {
-    console.log('📧 Email summary requested — preparing to send via Zapier...');
+    console.log('📧 Email summary requested — preparing to send via Nodemailer...');
 
     if (!session.contact_email) {
       console.warn('⚠️  Cannot send email summary — no contact_email captured');
-    } else if (!ZAPIER_EMAIL_WEBHOOK_URL) {
-      console.warn('⚠️  ZAPIER_EMAIL_WEBHOOK_URL not configured — skipping email send');
     } else {
       // Extract first name from contact_name
       const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
@@ -739,34 +630,27 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
       }
 
       // Wrap in branded HTML template
-      const brandedEmailHtml = wrapEmailInBrandedTemplate(emailBodyHtml, firstName);
+      const brandedEmailHtml = wrapInBrandedTemplate(emailBodyHtml);
 
-      // Prepare webhook payload
-      const emailPayload = {
-        to_email: session.contact_email,
-        to_name: session.contact_name || firstName,
-        company_name: prospectData.company_name || 'your company',
-        subject: `Your funding estimate for ${prospectData.company_name || 'your company'}`,
-        email_body: brandedEmailHtml
-      };
+      // Send via Nodemailer (fire and forget — don't block finalization)
+      // Using setImmediate to make it truly non-blocking
+      setImmediate(async () => {
+        try {
+          await sendEmail({
+            to: session.contact_email,
+            toName: session.contact_name || firstName,
+            subject: `Your funding estimate for ${prospectData.company_name || 'your company'}`,
+            htmlBody: brandedEmailHtml
+          });
+          console.log(`✅ Email summary sent to ${session.contact_email} for session ${sessionId}`);
+        } catch (err) {
+          // Don't fail finalization if email send fails
+          console.warn(`⚠️  Email summary send failed for session ${sessionId}:`, err.message);
+        }
+      });
 
-      // Send to Zapier (fire and forget — don't block finalization)
-      try {
-        const webhookResponse = await hubspotClient.post(
-          ZAPIER_EMAIL_WEBHOOK_URL,
-          emailPayload,
-          {
-            baseURL: '', // Override baseURL to use full webhook URL
-            timeout: 5000 // 5-second timeout
-          }
-        );
-        console.log(`✅ Email summary sent to Zapier for ${session.contact_email}`);
-        results.email = { action: 'sent', recipient: session.contact_email };
-      } catch (err) {
-        // Don't fail finalization if email webhook fails
-        console.warn('⚠️  Zapier email webhook failed:', err.message);
-        results.email = { action: 'failed', error: err.message };
-      }
+      // Mark as sent immediately (actual send happens in background)
+      results.email = { action: 'sending', recipient: session.contact_email };
     }
   }
 
