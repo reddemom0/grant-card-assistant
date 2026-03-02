@@ -7,7 +7,6 @@
  */
 
 import { google } from 'googleapis';
-import pdfParse from 'pdf-parse';
 
 // OAuth2 credentials from environment (for user access)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
@@ -203,6 +202,8 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
 
       try {
         // Extract text from PDF using pdf-parse
+        // Dynamic import to avoid ES module issues
+        const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
         const pdfBuffer = Buffer.from(response.data);
         const pdfData = await pdfParse(pdfBuffer);
         content = pdfData.text;
