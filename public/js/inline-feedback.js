@@ -384,19 +384,23 @@ class InlineFeedback {
      */
     async submitFeedback({ rating, messageIndex, feedbackText, quickTags }) {
         try {
+            const payload = {
+                conversationId: this.conversationId,
+                messageIndex,
+                rating,
+                feedbackText,
+                quickTags,
+                messageCount: this.messageCount,
+                completionTime: Math.floor((Date.now() - this.conversationStartTime) / 1000)
+            };
+
+            console.log('[FEEDBACK] Submitting feedback:', payload);
+
             const response = await fetch('/api/feedback', {
                 method: 'POST',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    conversationId: this.conversationId,
-                    messageIndex,
-                    rating,
-                    feedbackText,
-                    quickTags,
-                    messageCount: this.messageCount,
-                    completionTime: Math.floor((Date.now() - this.conversationStartTime) / 1000)
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
@@ -405,7 +409,9 @@ class InlineFeedback {
                 return true;
             } else {
                 console.error('Feedback submission failed:', data.error);
-                alert('Failed to submit feedback. Please try again.');
+                console.error('Full response:', data);
+                console.error('Request details:', { conversationId: this.conversationId, messageIndex, rating });
+                alert(`Failed to submit feedback: ${data.error || 'Unknown error'}`);
                 return false;
             }
         } catch (error) {
