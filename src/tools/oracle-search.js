@@ -36,7 +36,7 @@ function extractKeywords(query) {
 /**
  * Detect department from query
  */
-function detectDepartment(query) {
+export function detectDepartment(query) {
   const lowerQuery = query.toLowerCase();
 
   const departmentKeywords = {
