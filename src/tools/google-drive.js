@@ -7,6 +7,7 @@
  */
 
 import { google } from 'googleapis';
+import pdfParse from 'pdf-parse';
 
 // OAuth2 credentials from environment (for user access)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
@@ -193,15 +194,23 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
       });
       content = response.data;
     } else if (mimeType === 'application/pdf') {
-      // PDF - download as binary and convert to base64
+      // PDF - download and extract text
+      console.log('📄 Extracting text from PDF...');
       const response = await drive.files.get({
         fileId: fileId,
         alt: 'media'
       }, { responseType: 'arraybuffer' });
 
-      content = '[PDF file - binary content not displayed. File size: ' +
-                response.data.byteLength + ' bytes]';
-      // Note: For actual PDF text extraction, you'd need a PDF parser
+      try {
+        // Extract text from PDF using pdf-parse
+        const pdfBuffer = Buffer.from(response.data);
+        const pdfData = await pdfParse(pdfBuffer);
+        content = pdfData.text;
+        console.log(`✓ PDF text extracted: ${pdfData.numpages} pages, ${content.length} characters`);
+      } catch (pdfError) {
+        console.error('❌ PDF text extraction failed:', pdfError.message);
+        content = `[PDF file - text extraction failed: ${pdfError.message}. File size: ${response.data.byteLength} bytes]`;
+      }
     } else if (mimeType === 'text/plain' || mimeType.startsWith('text/')) {
       // Plain text or other text files
       const response = await drive.files.get({
