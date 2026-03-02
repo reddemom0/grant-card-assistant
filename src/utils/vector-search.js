@@ -72,7 +72,7 @@ export async function vectorSearch(query, options = {}) {
 
   // STEP 1: Embed query
   const queryEmbeddingResult = await voyage.embed({ input: [query], model: 'voyage-2' });
-  const queryEmbedding = queryEmbeddingResult.data[0];
+  const queryEmbedding = queryEmbeddingResult.data[0].embedding;
 
   console.log(`   ✓ Query embedded (${queryEmbedding.length} dimensions)`);
 
@@ -119,7 +119,8 @@ export async function vectorSearch(query, options = {}) {
         continue;
       }
 
-      const chunkEmbedding = JSON.parse(embeddingStr);
+      const embeddingObj = JSON.parse(embeddingStr);
+      const chunkEmbedding = embeddingObj.embedding || embeddingObj; // Support both formats
 
       // Calculate cosine similarity
       const similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
