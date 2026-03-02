@@ -326,12 +326,25 @@ class InlineFeedback {
      * Handle negative feedback (thumbs down) - show form
      */
     handleNegativeFeedback(messageDiv, messageIndex, upBtn, downBtn, feedbackForm) {
-        if (messageDiv.hasAttribute('data-rated')) return;
+        console.log('[FEEDBACK] Thumbs down clicked for message', messageIndex);
+        console.log('[FEEDBACK] feedbackForm element:', feedbackForm);
+
+        if (messageDiv.hasAttribute('data-rated')) {
+            console.log('[FEEDBACK] Message already rated, ignoring');
+            return;
+        }
 
         downBtn.classList.add('selected-negative');
         upBtn.disabled = true;
         feedbackForm.classList.add('visible');
-        feedbackForm.querySelector('textarea').focus();
+        console.log('[FEEDBACK] Form should now be visible, classes:', feedbackForm.className);
+
+        const textarea = feedbackForm.querySelector('textarea');
+        if (textarea) {
+            textarea.focus();
+        } else {
+            console.error('[FEEDBACK] Textarea not found in form!');
+        }
     }
 
     /**
