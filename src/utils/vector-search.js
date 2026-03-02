@@ -10,10 +10,15 @@ import { VoyageAIClient } from 'voyageai';
 import Anthropic from '@anthropic-ai/sdk';
 import Redis from 'ioredis';
 import { calculateRequestCost } from '../config/cost-settings.js';
+import { detectDepartment } from '../tools/oracle-search.js';
 
 const voyage = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
+
+// Configuration for performance
+const MAX_CHUNKS_WITHOUT_FILTER = 5000; // Cap for unfiltered searches
+const BATCH_SIZE = 500; // Redis mget batch size
 
 /**
  * Calculate cosine similarity between two vectors
@@ -59,6 +64,8 @@ export function cosineSimilarity(a, b) {
  * @returns {Promise<Array>} Array of matching chunks with similarity scores
  */
 export async function vectorSearch(query, options = {}) {
+  const startTime = Date.now();
+
   const {
     k = 15,
     similarityThreshold = 0.7,
@@ -71,32 +78,47 @@ export async function vectorSearch(query, options = {}) {
   console.log(`   k=${k}, threshold=${similarityThreshold}`);
 
   // STEP 1: Embed query
+  const embedStart = Date.now();
   const queryEmbeddingResult = await voyage.embed({ input: [query], model: 'voyage-2' });
   const queryEmbedding = queryEmbeddingResult.data[0].embedding;
+  console.log(`   ✓ Query embedded (${queryEmbedding.length} dimensions) [${Date.now() - embedStart}ms]`);
 
-  console.log(`   ✓ Query embedded (${queryEmbedding.length} dimensions)`);
-
-  // STEP 2: Get candidate chunk IDs (apply filters)
+  // STEP 2: Get candidate chunk IDs (apply filters with auto-detection)
+  const filterStart = Date.now();
   let candidateChunkIds = [];
+  let appliedFilter = null;
 
-  if (department) {
-    // Filter by department
-    candidateChunkIds = await redis.smembers(`oracle:dept:${department}`);
-    console.log(`   ✓ Department filter: ${candidateChunkIds.length} chunks`);
+  // Auto-detect department from query if not explicitly provided
+  const detectedDept = department || detectDepartment(query);
+
+  if (detectedDept) {
+    // Filter by detected or explicit department (MUCH faster!)
+    candidateChunkIds = await redis.smembers(`oracle:dept:${detectedDept}`);
+    appliedFilter = `department=${detectedDept}`;
+    console.log(`   ✓ Department filter (${detectedDept}): ${candidateChunkIds.length} chunks [${Date.now() - filterStart}ms]`);
   } else if (fileType) {
     // Filter by file type
     candidateChunkIds = await redis.smembers(`oracle:type:${fileType}`);
-    console.log(`   ✓ File type filter: ${candidateChunkIds.length} chunks`);
+    appliedFilter = `fileType=${fileType}`;
+    console.log(`   ✓ File type filter: ${candidateChunkIds.length} chunks [${Date.now() - filterStart}ms]`);
   } else if (source) {
     // Filter by source
     candidateChunkIds = await redis.smembers(`oracle:source:${source}`);
-    console.log(`   ✓ Source filter: ${candidateChunkIds.length} chunks`);
+    appliedFilter = `source=${source}`;
+    console.log(`   ✓ Source filter: ${candidateChunkIds.length} chunks [${Date.now() - filterStart}ms]`);
   } else {
-    // Get all chunk IDs (expensive for large corpus)
-    // Better: scan keys matching pattern oracle:chunk:*
+    // Get all chunk IDs but CAP to prevent timeouts
     const keys = await redis.keys('oracle:chunk:*');
     candidateChunkIds = keys.map(key => key.replace('oracle:chunk:', ''));
-    console.log(`   ✓ All chunks: ${candidateChunkIds.length}`);
+
+    // Apply cap if too many chunks
+    if (candidateChunkIds.length > MAX_CHUNKS_WITHOUT_FILTER) {
+      console.log(`   ⚠️  Capping ${candidateChunkIds.length} chunks to ${MAX_CHUNKS_WITHOUT_FILTER} for performance`);
+      candidateChunkIds = candidateChunkIds.slice(0, MAX_CHUNKS_WITHOUT_FILTER);
+    }
+
+    appliedFilter = 'none (capped)';
+    console.log(`   ✓ All chunks (capped): ${candidateChunkIds.length} [${Date.now() - filterStart}ms]`);
   }
 
   if (candidateChunkIds.length === 0) {
@@ -104,35 +126,52 @@ export async function vectorSearch(query, options = {}) {
     return [];
   }
 
-  // STEP 3: Retrieve embeddings and calculate similarity
-  console.log(`   🧮 Computing similarity for ${candidateChunkIds.length} chunks...`);
+  // STEP 3: Batch retrieve embeddings and calculate similarity
+  const similarityStart = Date.now();
+  console.log(`   🧮 Computing similarity for ${candidateChunkIds.length} chunks (batched)...`);
 
   const similarities = [];
+  let fetchedEmbeddings = 0;
+  let skippedEmbeddings = 0;
 
-  for (const chunkId of candidateChunkIds) {
-    try {
-      // Get chunk embedding
-      const embeddingStr = await redis.get(`oracle:embedding:${chunkId}`);
+  // Process in batches to avoid overwhelming Redis
+  for (let i = 0; i < candidateChunkIds.length; i += BATCH_SIZE) {
+    const batchIds = candidateChunkIds.slice(i, i + BATCH_SIZE);
+    const embeddingKeys = batchIds.map(id => `oracle:embedding:${id}`);
+
+    // Batch fetch embeddings using mget (MUCH faster than individual gets!)
+    const embeddingStrings = await redis.mget(...embeddingKeys);
+
+    for (let j = 0; j < batchIds.length; j++) {
+      const chunkId = batchIds[j];
+      const embeddingStr = embeddingStrings[j];
 
       if (!embeddingStr) {
-        // Chunk doesn't have embedding (old indexing)
+        skippedEmbeddings++;
         continue;
       }
 
-      const embeddingObj = JSON.parse(embeddingStr);
-      const chunkEmbedding = embeddingObj.embedding || embeddingObj; // Support both formats
+      try {
+        const embeddingObj = JSON.parse(embeddingStr);
+        const chunkEmbedding = embeddingObj.embedding || embeddingObj;
 
-      // Calculate cosine similarity
-      const similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
+        fetchedEmbeddings++;
 
-      if (similarity >= similarityThreshold) {
-        similarities.push({ chunkId, similarity });
+        // Calculate cosine similarity
+        const similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
+
+        if (similarity >= similarityThreshold) {
+          similarities.push({ chunkId, similarity });
+        }
+      } catch (error) {
+        // Skip chunks with parse errors
+        skippedEmbeddings++;
       }
-    } catch (error) {
-      // Skip chunks with errors
-      console.error(`   ⚠️  Error processing ${chunkId}: ${error.message}`);
     }
   }
+
+  const similarityTime = Date.now() - similarityStart;
+  console.log(`   ✓ Similarity computed: ${fetchedEmbeddings} processed, ${skippedEmbeddings} skipped, ${similarities.length} above threshold [${similarityTime}ms]`);
 
   // STEP 4: Sort by similarity (descending)
   similarities.sort((a, b) => b.similarity - a.similarity);
@@ -142,7 +181,8 @@ export async function vectorSearch(query, options = {}) {
 
   console.log(`   ✓ Found ${topResults.length} results above threshold`);
 
-  // STEP 6: Load full chunk metadata
+  // STEP 6: Load full chunk metadata (batched for performance)
+  const metadataStart = Date.now();
   const results = await Promise.all(
     topResults.map(async ({ chunkId, similarity }) => {
       const chunkData = await redis.hgetall(`oracle:chunk:${chunkId}`);
@@ -153,6 +193,9 @@ export async function vectorSearch(query, options = {}) {
       };
     })
   );
+
+  const totalTime = Date.now() - startTime;
+  console.log(`   ⏱️  Total vector search time: ${totalTime}ms (embed: ${Date.now() - embedStart}ms, filter: ${Date.now() - filterStart}ms, similarity: ${similarityTime}ms, metadata: ${Date.now() - metadataStart}ms)`);
 
   return results;
 }
