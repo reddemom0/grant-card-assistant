@@ -747,6 +747,9 @@
     <!-- Markdown rendering library -->
     <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
 
+    <!-- Inline Feedback System -->
+    <script src="/public/js/inline-feedback.js?v=20260302"></script>
+
     <script>
         // Configure marked for safe rendering
         if (typeof marked !== 'undefined') {
@@ -876,6 +879,7 @@
         let messages = [];
         let selectedFiles = [];
         let currentAbortController = null;
+        let inlineFeedback = null;  // Inline feedback system instance
 
         // Initialize
         function init() {
@@ -1208,6 +1212,12 @@
                     // Generate a proper UUID v4
                     conversationId = crypto.randomUUID();
 
+                    // Initialize inline feedback system for this conversation
+                    if (window.InlineFeedback && !inlineFeedback) {
+                        inlineFeedback = new InlineFeedback(conversationId);
+                        console.log('[FEEDBACK] Inline feedback initialized for conversation:', conversationId);
+                    }
+
                     // Update URL to /agent/chat/{conversationId} on first message
                     window.history.pushState({}, '', `/${currentAgent}/chat/${conversationId}`);
                 }
@@ -1394,6 +1404,13 @@
         // Load existing conversation from server
         async function loadConversation(convId) {
             console.log('[LOAD_CONV] Starting to load conversation:', convId);
+
+            // Initialize inline feedback system for loaded conversation
+            if (window.InlineFeedback && !inlineFeedback) {
+                inlineFeedback = new InlineFeedback(convId);
+                console.log('[FEEDBACK] Inline feedback initialized for loaded conversation:', convId);
+            }
+
             try {
                 const url = `/api/conversations/${convId}`;
                 console.log('[LOAD_CONV] Fetching from:', url);
@@ -1559,6 +1576,14 @@
                 <div class="message-content">${fileHTML}${renderedContent}</div>
             `;
             chatMessages.appendChild(messageDiv);
+
+            // Add feedback buttons for assistant messages
+            if (role === 'assistant' && inlineFeedback) {
+                const messageIndex = chatMessages.querySelectorAll('.message.assistant').length - 1;
+                messageDiv.setAttribute('data-message-index', messageIndex);
+                inlineFeedback.addFeedbackButtons(messageDiv, messageIndex);
+                inlineFeedback.incrementMessageCount();
+            }
 
             // Auto-scroll
             chatMessages.scrollTop = chatMessages.scrollHeight;

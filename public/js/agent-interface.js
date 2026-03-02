@@ -733,8 +733,11 @@ class AgentInterface {
         messageDiv.appendChild(contentDiv);
 
         // Add feedback buttons to assistant messages
-        if (role === 'assistant') {
-            this.addFeedbackButtons(contentDiv);
+        if (role === 'assistant' && window.inlineFeedback) {
+            const messageIndex = messagesContainer.querySelectorAll('.message.assistant').length - 1;
+            messageDiv.setAttribute('data-message-index', messageIndex);
+            window.inlineFeedback.addFeedbackButtons(messageDiv, messageIndex);
+            window.inlineFeedback.incrementMessageCount();
         }
 
         messagesContainer.appendChild(messageDiv);
@@ -833,8 +836,12 @@ class AgentInterface {
 
             // Add feedback buttons to assistant messages only
             const parentMessage = messageDiv.closest('.message');
-            if (parentMessage && parentMessage.classList.contains('assistant')) {
-                this.addFeedbackButtons(messageDiv);
+            if (parentMessage && parentMessage.classList.contains('assistant') && window.inlineFeedback) {
+                const messagesContainer = document.getElementById('messages');
+                const messageIndex = Array.from(messagesContainer.querySelectorAll('.message.assistant')).indexOf(parentMessage);
+                parentMessage.setAttribute('data-message-index', messageIndex);
+                window.inlineFeedback.addFeedbackButtons(parentMessage, messageIndex);
+                window.inlineFeedback.incrementMessageCount();
             }
         } else {
             messageDiv.innerHTML = processedContent + '<span class="typing-cursor">▎</span>';
