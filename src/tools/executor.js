@@ -406,8 +406,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       // ============================================================================
 
       case 'search_oracle_kb':
-        const { searchOracleKnowledgeBase } = await import('./oracle-search.js');
-        result = await searchOracleKnowledgeBase(input.query, {
+        const { searchOracleHybrid } = await import('./oracle-search-rag.js');
+        result = await searchOracleHybrid(input.query, {
           department: input.department,
           fileType: input.fileType,
           limit: input.limit
