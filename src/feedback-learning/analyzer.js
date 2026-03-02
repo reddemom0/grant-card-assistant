@@ -122,7 +122,7 @@ ${JSON.stringify(feedbackBatch.slice(0, 20), null, 2)}
 Focus on SPECIFIC, ACTIONABLE patterns. Avoid generic themes like "helpful" or "good". Extract concrete behaviors.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       messages: [{
         role: 'user',
@@ -134,7 +134,7 @@ Focus on SPECIFIC, ACTIONABLE patterns. Avoid generic themes like "helpful" or "
     if (response.usage) {
       logAPICost({
         usage: response.usage,
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         source: 'feedback-learning-success-analysis',
         agentType,
         metadata: {
@@ -257,7 +257,7 @@ ${JSON.stringify(feedbackBatch.slice(0, 20), null, 2)}
 Focus on extracting actionable corrections, not vague complaints.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       messages: [{
         role: 'user',
@@ -269,7 +269,7 @@ Focus on extracting actionable corrections, not vague complaints.`;
     if (response.usage) {
       logAPICost({
         usage: response.usage,
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         source: 'feedback-learning-error-analysis',
         agentType,
         metadata: {
@@ -392,7 +392,7 @@ ${JSON.stringify(correctionsData, null, 2)}
 Extract SPECIFIC rules. If user says "email newsletters are ineligible, only trade event ads are eligible", capture both parts.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       messages: [{
         role: 'user',
@@ -404,7 +404,7 @@ Extract SPECIFIC rules. If user says "email newsletters are ineligible, only tra
     if (response.usage) {
       logAPICost({
         usage: response.usage,
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-haiku-4-5-20251001',
         source: 'feedback-learning-corrections-analysis',
         agentType,
         metadata: {
