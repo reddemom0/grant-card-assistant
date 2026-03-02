@@ -1991,10 +1991,13 @@ export function getToolsForAgent(agentType) {
       return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
 
     case 'etg-writer':
-    case 'bcafe-writer':
     case 'buybc-writer':
       console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
       return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
+
+    case 'bcafe-writer':
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
+      return [...baseTools, LOAD_SKILL_TOOL, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
 
     case 'canexport-claims':
       console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
