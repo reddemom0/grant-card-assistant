@@ -1,61 +1,93 @@
 /**
- * Email utility for sending emails via Nodemailer (Gmail SMTP)
+ * Email utility for sending emails via Gmail API over HTTPS
+ *
+ * Uses Gmail REST API (port 443) instead of SMTP (ports 465/587)
+ * because Railway blocks outbound SMTP ports.
  */
 
-import nodemailer from 'nodemailer';
+import { google } from 'googleapis';
 
-const EMAIL_USER = process.env.EMAIL_USER || 'writers@granted.ca';
-const EMAIL_APP_PASSWORD = process.env.EMAIL_APP_PASSWORD;
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GMAIL_REFRESH_TOKEN = process.env.GMAIL_REFRESH_TOKEN;
 
-// Create reusable transporter
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_APP_PASSWORD
-  }
+// Create OAuth2 client
+const oAuth2Client = new google.auth.OAuth2(
+  GOOGLE_CLIENT_ID,
+  GOOGLE_CLIENT_SECRET,
+  'https://developers.google.com/oauthplayground'
+);
+
+oAuth2Client.setCredentials({
+  refresh_token: GMAIL_REFRESH_TOKEN
 });
 
 /**
- * Send email via Gmail SMTP
+ * Send email via Gmail API over HTTPS
  *
  * @param {Object} options - Email options
  * @param {string} options.to - Recipient email address
- * @param {string} options.toName - Recipient name
+ * @param {string} options.toName - Recipient name (not used with Gmail API)
  * @param {string} options.subject - Email subject line
  * @param {string} options.htmlBody - HTML email body
  * @returns {Promise<Object>} Send result
  */
 export async function sendEmail({ to, toName, subject, htmlBody }) {
   console.log(`📧 sendEmail called for recipient: ${to}`);
-  console.log(`📧 Email config — USER: ${EMAIL_USER}, PASSWORD_SET: ${!!EMAIL_APP_PASSWORD}`);
+  console.log(`📧 Using Gmail API over HTTPS (not SMTP — bypasses Railway port blocking)`);
+  console.log(`📧 CLIENT_ID set: ${!!GOOGLE_CLIENT_ID}, SECRET set: ${!!GOOGLE_CLIENT_SECRET}, REFRESH_TOKEN set: ${!!GMAIL_REFRESH_TOKEN}`);
 
-  if (!EMAIL_APP_PASSWORD) {
-    const error = 'EMAIL_APP_PASSWORD environment variable not configured';
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
+    const error = 'Gmail API credentials not configured (need GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GMAIL_REFRESH_TOKEN)';
     console.error(`❌ ${error}`);
     throw new Error(error);
   }
 
-  const mailOptions = {
-    from: `"Granted Consulting" <${EMAIL_USER}>`,
-    replyTo: 'marketing@granted.ca',
-    to: to,
-    subject: subject,
-    html: htmlBody
-  };
-
-  console.log(`📧 Sending email to ${to} with subject: "${subject}"`);
-  console.log(`📧 Mail options:`, JSON.stringify({ from: mailOptions.from, to: mailOptions.to, replyTo: mailOptions.replyTo, subject: mailOptions.subject, htmlLength: mailOptions.html.length }));
-
   try {
-    console.log('📧 About to call transporter.sendMail()...');
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ transporter.sendMail() succeeded — Message ID: ${info.messageId}`);
-    console.log(`✅ Email sent successfully to ${to} — Message ID: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    const gmail = google.gmail({ version: 'v1', auth: oAuth2Client });
+
+    // Encode subject as UTF-8 base64 to support special characters
+    const utf8Subject = `=?utf-8?B?${Buffer.from(subject).toString('base64')}?=`;
+
+    // Build RFC 2822 formatted message
+    const messageParts = [
+      `From: Granted Consulting <writers@granted.ca>`,
+      `To: ${to}`,
+      `Reply-To: marketing@granted.ca`,
+      `Subject: ${utf8Subject}`,
+      `MIME-Version: 1.0`,
+      `Content-Type: text/html; charset=utf-8`,
+      '',
+      htmlBody
+    ];
+    const message = messageParts.join('\n');
+
+    // Base64url encode the message
+    const encodedMessage = Buffer.from(message)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
+
+    console.log(`📧 Sending email to ${to} with subject: "${subject}"`);
+    console.log(`📧 Message encoded (${encodedMessage.length} chars base64)`);
+
+    const result = await gmail.users.messages.send({
+      userId: 'me',
+      requestBody: {
+        raw: encodedMessage
+      }
+    });
+
+    console.log(`✅ Gmail API send succeeded — Message ID: ${result.data.id}`);
+    console.log(`✅ Email sent successfully to ${to} — Message ID: ${result.data.id}`);
+    return { success: true, messageId: result.data.id };
   } catch (err) {
-    console.error(`❌ transporter.sendMail() failed:`, err.message);
-    console.error(`❌ Error code: ${err.code}, command: ${err.command}, responseCode: ${err.responseCode}`);
+    console.error(`❌ Gmail API send FAILED for ${to}:`, err.message);
+    if (err.response) {
+      console.error(`❌ Gmail API response status: ${err.response.status}`);
+      console.error(`❌ Gmail API response data:`, JSON.stringify(err.response.data, null, 2));
+    }
     console.error(`❌ Full error:`, err);
     throw err;
   }

@@ -1,8 +1,8 @@
 /**
  * Test Email Endpoint
  *
- * Temporary endpoint to verify Gmail SMTP credentials and email sending functionality.
- * Tests the same Nodemailer transporter used in lead-gen finalization.
+ * Temporary endpoint to verify Gmail API credentials and email sending functionality.
+ * Tests the same Gmail API over HTTPS used in lead-gen finalization.
  *
  * Usage: GET /api/test-email
  *
@@ -28,15 +28,15 @@ export default async function handler(req, res) {
 
 <p>If you're seeing this, it means:</p>
 <ul>
-  <li>✅ Gmail SMTP credentials are configured correctly</li>
-  <li>✅ Nodemailer transporter is working</li>
-  <li>✅ Railway can connect to Gmail servers</li>
+  <li>✅ Gmail API credentials are configured correctly</li>
+  <li>✅ Gmail API over HTTPS is working (bypassing Railway SMTP port blocking)</li>
+  <li>✅ OAuth2 authentication successful</li>
   <li>✅ Email delivery is functioning</li>
 </ul>
 
 <p><strong>Test funding estimate: $40,000 - $60,000</strong></p>
 
-<p>This email was sent from the /api/test-email endpoint.</p>
+<p>This email was sent from the GET /api/test-email endpoint using Gmail API.</p>
 
 <p>Talk soon,<br>The Granted Team</p>
     `.trim();
