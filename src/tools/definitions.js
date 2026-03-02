@@ -1198,6 +1198,9 @@ Use when simple information retrieval is insufficient and you need specialized e
 - \`STAGE_2_DRAFTING\` - Section-by-section application drafting guidance
 - \`STAGE_3_REVIEW\` - Application review and optimization using evaluation criteria
 
+**BCAFE Writer Skill:**
+- \`FINAL_REPORT\` - Final Progress Report writing guide (template-aligned, section-by-section guidance)
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1216,13 +1219,14 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "What are the CanExport application questions?" → load_skill(canexport-writer, APPLICATION_STRUCTURE)
 - "Assess client readiness for CanExport" → load_skill(canexport-writer, STAGE_1_READINESS)
 - "Draft Section 2 of the application" → load_skill(canexport-writer, STAGE_2_DRAFTING)
-- "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)`,
+- "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)
+- "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)`,
   input_schema: {
     type: 'object',
     properties: {
       skill_name: {
         type: 'string',
-        enum: ['sales', 'research', 'grants', 'writing', 'canexport-writer'],
+        enum: ['sales', 'research', 'grants', 'writing', 'canexport-writer', 'bcafe-writer'],
         description: 'The skill domain to load'
       },
       sub_skill: {
@@ -1232,9 +1236,9 @@ Use when simple information retrieval is insufficient and you need specialized e
           'overview', 'eligibility', 'matching', 'validation', 'company_intelligence',
           'PROGRAM_DETAILS', 'APPLICATION_STRUCTURE', 'KNOWLEDGE_BASE_INDEX',
           'STAGE_1_READINESS', 'STAGE_1_BUDGET_GUIDE', 'STAGE_1_INTERVIEW_QUESTIONS',
-          'STAGE_2_DRAFTING', 'STAGE_3_REVIEW'
+          'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review).'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide).'
       }
     },
     required: ['skill_name', 'sub_skill']
@@ -1480,6 +1484,9 @@ Use when simple information retrieval is insufficient and you need specialized e
 - \`STAGE_2_DRAFTING\` - Section-by-section application drafting guidance
 - \`STAGE_3_REVIEW\` - Application review and optimization using evaluation criteria
 
+**BCAFE Writer Skill:**
+- \`FINAL_REPORT\` - Final Progress Report writing guide (template-aligned, section-by-section guidance)
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1498,7 +1505,8 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "What are the CanExport application questions?" → load_skill(canexport-writer, APPLICATION_STRUCTURE)
 - "Assess client readiness for CanExport" → load_skill(canexport-writer, STAGE_1_READINESS)
 - "Draft Section 2 of the application" → load_skill(canexport-writer, STAGE_2_DRAFTING)
-- "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)`,
+- "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)
+- "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)`,
     input_schema: {
       type: 'object',
       properties: {
