@@ -44,6 +44,9 @@ const SKILL_PATHS = {
     STAGE_1_INTERVIEW_QUESTIONS: '.claude/skills/canexport-writer/STAGE_1_INTERVIEW_QUESTIONS.md',
     STAGE_2_DRAFTING: '.claude/skills/canexport-writer/STAGE_2_DRAFTING.md',
     STAGE_3_REVIEW: '.claude/skills/canexport-writer/STAGE_3_REVIEW.md'
+  },
+  'bcafe-writer': {
+    FINAL_REPORT: '.claude/skills/bcafe-writer/FINAL_REPORT.md'
   }
   // Add more skills as they're created: writing, etc.
 };
