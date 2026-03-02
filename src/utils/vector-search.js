@@ -71,8 +71,8 @@ export async function vectorSearch(query, options = {}) {
   console.log(`   k=${k}, threshold=${similarityThreshold}`);
 
   // STEP 1: Embed query
-  const queryEmbeddingResult = await voyage.embed([query], { model: 'voyage-2' });
-  const queryEmbedding = queryEmbeddingResult.embeddings[0];
+  const queryEmbeddingResult = await voyage.embed({ input: [query], model: 'voyage-2' });
+  const queryEmbedding = queryEmbeddingResult.data[0];
 
   console.log(`   ✓ Query embedded (${queryEmbedding.length} dimensions)`);
 
