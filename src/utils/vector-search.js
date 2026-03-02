@@ -6,12 +6,12 @@
  * - Claude-based reranking for improved precision
  */
 
-import voyageai from 'voyageai';
+import { VoyageAIClient } from 'voyageai';
 import Anthropic from '@anthropic-ai/sdk';
 import Redis from 'ioredis';
 import { calculateRequestCost } from '../config/cost-settings.js';
 
-const voyage = new voyageai.Client(process.env.VOYAGE_API_KEY);
+const voyage = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const redis = new Redis(process.env.REDIS_PUBLIC_URL || process.env.REDIS_URL || 'redis://localhost:6379');
 
