@@ -516,7 +516,6 @@ Always verify training and participant eligibility using the BC ETG Eligibility 
 **Training MUST meet these criteria:**
 - Skills-based and job-related
 - Specific competencies and learning outcomes
-- Substantial duration (generally 20+ hours)
 - Delivered by qualified providers
 - Not a diploma/degree program
 - Under 52 weeks in length

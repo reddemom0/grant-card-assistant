@@ -70,9 +70,6 @@ Project files and client documentation.
 ### **Web Research**
 Real-time company research, website verification, LinkedIn profiles.
 
-### **Memory**
-Long-term context storage for ongoing projects and user preferences.
-
 ---
 
 ## Cross-System Intelligence

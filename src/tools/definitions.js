@@ -2002,8 +2002,11 @@ export function getToolsForAgent(agentType) {
 
     case 'internal-oracle':
       // Oracle needs: search/enrichment tools + Oracle KB + minimal HubSpot
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length} tools)`);
-      return [...baseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools];
+      // EXCLUDE filesystem-based ANTHROPIC_MEMORY_TOOL (.memories/) - wastes iteration checking empty directory
+      // KEEP Postgres-based MEMORY_TOOLS (conversation key-value store) and SERVER_TOOLS
+      const oracleBaseTools = [...SERVER_TOOLS, ...MEMORY_TOOLS]; // No ANTHROPIC_MEMORY_TOOL
+      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length} tools, filesystem memory excluded)`);
+      return [...oracleBaseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools];
 
     case 'getgranted-ai':
       // GetGrantedAI needs: base tools + GetGrantedAI-specific tools (no HubSpot, no Google Drive)
