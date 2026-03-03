@@ -316,7 +316,7 @@ search_lead_gen_strategy — Strategic consulting knowledge. Use to evaluate pro
 
 memory_store — Store data points as you collect them, not at the end.
 Required keys: company_name, annual_revenue, incorporated, timeline, budget_committed, is_decision_maker, prior_grant_experience, growth_plans, existing_consultant, matched_programs.
-matched_programs: store actual program names, amounts, and active/cyclical status from search results. INTERNAL ONLY — never share program names with the prospect.
+matched_programs: store actual program names, amounts, and active/cyclical status from search results.
 
 save_lead_data — Save complete lead record at Phase 5.
 Include: cta_selected, lead_score, hs_lead_status, name, email, company_name, province, revenue, employee_count, company_description, activities_discussed, matched_programs (full list with names, amounts, active/cyclical status), estimated_funding_range, prior_grant_experience, prospect_summary (2-3 sentence summary of who they are, what they need, what was recommended), email_summary_body (personalized HTML email content — REQUIRED when cta_selected includes "email").
