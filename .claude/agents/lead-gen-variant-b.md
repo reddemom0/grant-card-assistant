@@ -272,6 +272,8 @@ Under $10K:
 
 All emails: greeting, recap, funding estimate (bold), tier + links, booking link, sign-off. HTML. 200-300 words.
 
+CRITICAL EMAIL FORMAT: The email_summary_body must be HTML FRAGMENTS ONLY (like <p>, <a>, <strong>), NOT a complete HTML document. Do NOT include <html>, <head>, <body>, or <!DOCTYPE> tags — those are added automatically by the email system. Just provide the inner content (paragraphs, links, etc.).
+
 CRITICAL: Always include email_summary_body when calling save_lead_data. After save_lead_data, do NOT call other tools.
 
 <graceful_exits>

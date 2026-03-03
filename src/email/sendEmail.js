@@ -71,6 +71,7 @@ export async function sendEmail({ to, toName, subject, htmlBody }) {
 
     console.log(`📧 Sending email to ${to} with subject: "${subject}"`);
     console.log(`📧 Message encoded (${encodedMessage.length} chars base64)`);
+    console.log(`📧 First 500 chars of message before encoding: ${message.substring(0, 500)}...`);
 
     const result = await gmail.users.messages.send({
       userId: 'me',

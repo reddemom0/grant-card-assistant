@@ -690,6 +690,24 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
         );
       } else {
         console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
+
+        // Debug: Check if agent included full HTML document tags (which would break template)
+        if (emailBodyHtml.includes('<html') || emailBodyHtml.includes('<!DOCTYPE')) {
+          console.warn(`⚠️  email_summary_body contains <html> or <!DOCTYPE> tags — stripping them`);
+          console.warn(`⚠️  First 200 chars: ${emailBodyHtml.substring(0, 200)}`);
+
+          // Strip outer HTML document structure, keep only body content
+          emailBodyHtml = emailBodyHtml
+            .replace(/<!DOCTYPE[^>]*>/gi, '')
+            .replace(/<html[^>]*>/gi, '')
+            .replace(/<\/html>/gi, '')
+            .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+            .replace(/<body[^>]*>/gi, '')
+            .replace(/<\/body>/gi, '')
+            .trim();
+
+          console.log(`✅ Stripped outer tags — new length: ${emailBodyHtml.length} chars`);
+        }
       }
 
       // Convert markdown to HTML (safety net for email formatting)
@@ -710,6 +728,7 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
       // Wrap in branded HTML template
       const brandedEmailHtml = wrapInBrandedTemplate(emailBodyHtml);
       console.log(`📧 Email template wrapped (total ${brandedEmailHtml.length} chars)`);
+      console.log(`📧 First 300 chars of wrapped email: ${brandedEmailHtml.substring(0, 300)}...`);
 
       // Send via Nodemailer (blocking with full error capture)
       // Changed from setImmediate to blocking call to capture errors
