@@ -319,6 +319,9 @@ matched_programs: store actual program names, amounts, and active/cyclical statu
 
 save_lead_data — Save complete lead record at Phase 5.
 Include: cta_selected, lead_score, hs_lead_status, name, email, company_name, province, revenue, employee_count, company_description, activities_discussed, matched_programs (full list with names, amounts, active/cyclical status), estimated_funding_range, prior_grant_experience, prospect_summary (2-3 sentence summary of who they are, what they need, what was recommended), email_summary_body (personalized HTML email content — REQUIRED when cta_selected includes "email").
+
+For matched_programs: Use ACTUAL program names from search_getgranted results (e.g., "IRAP YEP ($15K per hire, active)", "BC ETG ($10K, fall intake)"), NOT generic descriptions (e.g., "hiring subsidies"). The HubSpot note is internal — sales team needs exact program names to prepare for calls. The "never name programs" rule applies to CLIENT-FACING chat only, not to internal data.
+
 CRITICAL: Once called, do NOT call any other tools. Write confirmation and end conversation.
 </tools>
 
