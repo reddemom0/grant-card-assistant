@@ -284,13 +284,13 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 </p>
     `;
   } else if (tier === 'medium') {
-    // $10-29K → Starter
+    // $10-29K → GetGranted 2.0 (GetGranted or Plus tier)
     tierContent = `
-<p>For your situation, our Starter service gives you a streamlined way to find and apply for grants with support from our team — without the overhead of full-service. You'll get access to our grant database, streamlined application forms, claims assistance, and grant matching.</p>
+<p>For your situation, our GetGranted platform is the best fit — it gives you smart grant matching, guided applications, and expert support when you need it. With GetGranted 2.0, you'll get access to powerful features like Grant Navigator for step-by-step application support.</p>
 
-<p><a href="https://granted.ca/granted-starter/" style="color: #0066cc; font-weight: bold;">Learn more about Granted Starter</a></p>
+<p><strong>Join the waitlist for early access:</strong> <a href="https://getgranted.ca/waitlist/" style="color: #0066cc; font-weight: bold;">https://getgranted.ca/waitlist/</a></p>
 
-<p>We're also launching an upgraded grant management platform soon with even smarter tools — <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">get early access here</a>.</p>
+<p>In the meantime, our Starter service gives you the same level of support while we prepare the upgrade: <a href="https://granted.ca/granted-starter/" style="color: #0066cc;">https://granted.ca/granted-starter/</a></p>
     `;
     bookingCTA = `
 <p>If you'd prefer to talk through your options with someone on our team first, you can book a quick call:</p>
@@ -300,13 +300,13 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 </p>
     `;
   } else {
-    // Under $10K → GetGranted
+    // Under $10K → GetGranted 2.0 Lite
     tierContent = `
-<p>Based on what you're working with right now, our GetGranted platform is a great place to start — you'll get access to our full grant database with matching and alerts tailored to your business.</p>
+<p>Our GetGranted Lite plan is a great starting point — you'll get access to smart grant matching and alerts tailored to your business for $55/month.</p>
 
-<p><a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">Learn more about GetGranted</a></p>
+<p><strong>Join the waitlist to be first in line:</strong> <a href="https://getgranted.ca/waitlist/" style="color: #0066cc; font-weight: bold;">https://getgranted.ca/waitlist/</a></p>
 
-<p>We're also launching an upgraded platform with new features like Grant Navigator for hands-on application support — <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">join the waitlist for early access</a>.</p>
+<p>In the meantime, our current grant database gives you access right away: <a href="https://granted.ca/getgranted/" style="color: #0066cc;">https://granted.ca/getgranted/</a></p>
     `;
     bookingCTA = `
 <p>Have questions or want a second opinion? You can always book a free call with our team:</p>
@@ -676,6 +676,14 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
         );
       } else {
         console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
+      }
+
+      // Validate and fix booking link if agent hallucinated wrong URL
+      const wrongBookingLinkRegex = /https:\/\/meetings\.hubspot\.com\/[^\s"'<>]+/g;
+      const matches = emailBodyHtml.match(wrongBookingLinkRegex);
+      if (matches && matches.some(link => link !== BOOKING_LINK)) {
+        console.log(`⚠️  Found incorrect booking link in email, replacing with correct one: ${BOOKING_LINK}`);
+        emailBodyHtml = emailBodyHtml.replace(wrongBookingLinkRegex, BOOKING_LINK);
       }
 
       // Wrap in branded HTML template

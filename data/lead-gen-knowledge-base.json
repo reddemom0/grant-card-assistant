@@ -102,7 +102,7 @@
     "topic": "getgranted_database_current",
     "question": "What is GetGranted?",
     "keywords": ["getgranted", "database", "self-serve", "grant database", "platform", "subscription"],
-    "knowledge": "GetGranted is an up-to-date database of all available Canadian grants. Subscribers get matched grants based on their company profile, notifications when new grants open, and grant summaries with tips and advice. It does NOT include grant preparation, application writing, claims assistance, or proactive grant advice. Monthly or yearly subscription, no minimum commitment. Best for consultants, associations, HR teams, and businesses comfortable applying on their own. Link: https://granted.ca/getgranted/",
+    "knowledge": "GetGranted is an up-to-date database of all available Canadian grants. Subscribers get matched grants based on their company profile, notifications when new grants open, and grant summaries with tips and advice. It does NOT include grant preparation, application writing, claims assistance, or proactive grant advice. Monthly or yearly subscription, no minimum commitment. Best for consultants, associations, HR teams, and businesses comfortable applying on their own. TRANSITION NOTE: GetGranted is transitioning into GetGranted 2.0 in 2026 with enhanced features including Grant Navigator for guided applications. Join the waitlist at https://getgranted.ca/waitlist/ or access the current database now at https://granted.ca/getgranted/",
     "cta_bridge": "If you want more hands-on support beyond just the database, we have other service tiers. Want me to walk you through the options?"
   },
   {
@@ -110,7 +110,7 @@
     "topic": "granted_starter_current",
     "question": "What is Granted Starter?",
     "keywords": ["starter", "granted starter", "self-serve", "application tool", "streamlined"],
-    "knowledge": "Granted Starter is an easy-to-use self-serve grant application tool. Businesses can find, apply for, and receive grant funding through a simplified and streamlined process with administration support. Includes everything in GetGranted plus streamlined application forms, claims assistance, and submission reminders. Best for startups or recently incorporated businesses, companies new to grants, businesses with up to 3 grantable activities per year. 12-month minimum commitment, success-based fees apply. Important note: Granted Starter is evolving in 2026 — it will merge into the upgraded GetGranted 2.0 platform at getgranted.ca. Link: https://granted.ca/granted-starter/",
+    "knowledge": "Granted Starter is an easy-to-use self-serve grant application tool. Businesses can find, apply for, and receive grant funding through a simplified and streamlined process with administration support. Includes everything in GetGranted plus streamlined application forms, claims assistance, and submission reminders. Best for startups or recently incorporated businesses, companies new to grants, businesses with up to 3 grantable activities per year. 12-month minimum commitment, success-based fees apply. TRANSITION NOTE: Granted Starter is merging into GetGranted 2.0 in 2026 with enhanced tools and features. Join the waitlist for early access at https://getgranted.ca/waitlist/ or start now with Starter at https://granted.ca/granted-starter/",
     "cta_bridge": "If you're looking for a full done-for-you service, GrantedPro might be a better fit. Want to hear about that?"
   },
   {
@@ -141,8 +141,8 @@
     "id": "faq_17",
     "topic": "getgranted_2_pricing",
     "question": "How much does GetGranted 2.0 cost?",
-    "keywords": ["getgranted 2.0 price", "pricing", "lite", "plus", "monthly", "annual", "$55", "$99", "$149"],
-    "knowledge": "GetGranted 2.0 has three pricing tiers. GetGranted Lite (for grant explorers): $55/month or $499/year, 1 user, 3 Watchlists, 3 Smart Filters, chatbot access, no office hours. GetGranted (for growing teams): $99/month or $899/year, 2 users, 10 Watchlists, 10 Smart Filters, quarterly office hours, annual plan unlocks Analytics, Grant Navigator, and Strategy Consulting Session. GetGranted Plus (for guided strategic growth): $149/month or $1,499/year, 3 users, unlimited Watchlists and Smart Filters, monthly office hours, annual plan unlocks Analytics, Unlimited Grant Navigator, Strategy Consulting Session, and pay-per-use consulting calls. Save up to 25% with annual billing. Currently waitlist-only. Pricing details: https://getgranted.ca/pricing/",
+    "keywords": ["getgranted 2.0 price", "pricing", "lite", "plus", "standard", "monthly", "annual", "$55", "$99", "$149"],
+    "knowledge": "GetGranted 2.0 has three pricing tiers. GetGranted Lite (for grant explorers): $55/month or $499/year, 1 user, 3 Watchlists, 3 Smart Filters, chatbot access, no office hours. GetGranted (the middle tier for growing teams): $99/month or $899/year, 2 users, 10 Watchlists, 10 Smart Filters, quarterly office hours, annual plan unlocks Analytics, Grant Navigator, and Strategy Consulting Session. GetGranted Plus (for guided strategic growth): $149/month or $1,499/year, 3 users, unlimited Watchlists and Smart Filters, monthly office hours, annual plan unlocks Analytics, Unlimited Grant Navigator, Strategy Consulting Session, and pay-per-use consulting calls. Save up to 25% with annual billing. Currently waitlist-only at https://getgranted.ca/waitlist/. Pricing details: https://getgranted.ca/pricing/",
     "cta_bridge": "If you're ready to start now instead of waiting for the new platform, I can walk you through our current services."
   },
   {
@@ -238,7 +238,7 @@
     "topic": "which_service_right_for_me",
     "question": "Which service is right for me?",
     "keywords": ["which service", "right fit", "best option", "recommend", "choose", "decide"],
-    "knowledge": "Depends on your business size, revenue, and grant needs. If you just want to explore what's available: GetGranted database (current) or join the GetGranted 2.0 waitlist. If you have 1–3 grant needs and want streamlined self-serve tools: Granted Starter (current) or GetGranted 2.0 standard tier when it launches. If you have revenue $2M+, multiple growth initiatives, and want full done-for-you service: GrantedPro. If you're planning international expansion: Granted Export for CanExport. The best way to figure out which fits is to book a free consultation so a grant strategist can assess your situation.",
+    "knowledge": "Depends on your business size, revenue, and grant needs. If you just want to explore what's available: GetGranted database (current) or join the GetGranted 2.0 waitlist. If you have 1–3 grant needs and want streamlined self-serve tools: Granted Starter (current) or GetGranted 2.0 ($99/mo tier) when it launches. If you have revenue $2M+, multiple growth initiatives, and want full done-for-you service: GrantedPro. If you're planning international expansion: Granted Export for CanExport. The best way to figure out which fits is to book a free consultation so a grant strategist can assess your situation.",
     "cta_bridge": "I can give you a quick funding estimate based on your business profile, and that'll help narrow down which service tier makes sense. Want to run through that?"
   },
   {
@@ -248,5 +248,13 @@
     "keywords": ["upgrade", "switch", "move up", "starter to pro", "change plan"],
     "knowledge": "Yes. Starter fees pro-rate into Pro upgrades, and consultation fees credit toward annual subscriptions. Starting small and upgrading is encouraged. Better to start with Starter and realize you need Pro than to overpay for Pro when Starter would have been enough.",
     "cta_bridge": "Let's start with understanding what you qualify for, and then we can figure out which tier makes sense."
+  },
+  {
+    "id": "faq_31",
+    "topic": "getgranted_2_transition",
+    "question": "What's happening with GetGranted and Starter? Why GetGranted 2.0?",
+    "keywords": ["transition", "merger", "combining", "getgranted 2.0 launch", "when", "2026", "new platform", "upgrade"],
+    "knowledge": "Starting in 2026, Granted Starter and GetGranted are evolving into one newly enhanced, all-in-one grant management platform called GetGranted 2.0. Your account and data will be securely transferred. The new platform features smarter tools (including Grant Navigator for guided applications), faster performance, and a more intuitive interface. GetGranted 2.0 is currently waitlist-only at https://getgranted.ca/waitlist/. In the meantime, both current GetGranted and Starter services remain fully operational and accepting new subscribers.",
+    "cta_bridge": "You can join the waitlist now for early access, or start with our current services and transition automatically when the new platform launches."
   }
 ]
