@@ -252,7 +252,6 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
   const companyName = pd.company_name || 'your company';
   const activities = pd.activities || pd.activities_discussed || 'your growth plans';
   const tier = determineFundingTier(estimatedFunding);
-  const resourceLink = getResourceLink(tier);
 
   // Parse funding estimate for "now" vs "12 months" if available
   const fundingNow = pd.available_now_funding || null;
@@ -266,6 +265,58 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
     fundingSummary = `Based on what you shared, you're looking at an estimated <strong>${funding12Mo}</strong> over the next 12 months across multiple programs.`;
   }
 
+  // Build tier-specific email content
+  let tierContent = '';
+  let bookingCTA = '';
+
+  if (tier === 'high') {
+    // $30K+ → GrantedPro
+    tierContent = `
+<p>With this level of funding potential across multiple programs, having a dedicated grant team handle the applications, timing, and claims makes a real difference. Our GrantedPro service includes a dedicated Grant Strategist, unlimited applications, complete claims management, and a 93% approval rate.</p>
+
+<p><a href="https://granted.ca/grantedpro/" style="color: #0066cc; font-weight: bold;">Learn more about GrantedPro</a></p>
+    `;
+    bookingCTA = `
+<p>Book a free 15-minute call and we'll map out the exact programs, timing, and application strategy for your business:</p>
+
+<p style="text-align: center;">
+  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your Free Consultation</a>
+</p>
+    `;
+  } else if (tier === 'medium') {
+    // $10-29K → Starter
+    tierContent = `
+<p>For your situation, our Starter service gives you a streamlined way to find and apply for grants with support from our team — without the overhead of full-service. You'll get access to our grant database, streamlined application forms, claims assistance, and grant matching.</p>
+
+<p><a href="https://granted.ca/granted-starter/" style="color: #0066cc; font-weight: bold;">Learn more about Granted Starter</a></p>
+
+<p>We're also launching an upgraded grant management platform soon with even smarter tools — <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">get early access here</a>.</p>
+    `;
+    bookingCTA = `
+<p>If you'd prefer to talk through your options with someone on our team first, you can book a quick call:</p>
+
+<p style="text-align: center;">
+  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book a Call</a>
+</p>
+    `;
+  } else {
+    // Under $10K → GetGranted
+    tierContent = `
+<p>Based on what you're working with right now, our GetGranted platform is a great place to start — you'll get access to our full grant database with matching and alerts tailored to your business.</p>
+
+<p><a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">Learn more about GetGranted</a></p>
+
+<p>We're also launching an upgraded platform with new features like Grant Navigator for hands-on application support — <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">join the waitlist for early access</a>.</p>
+    `;
+    bookingCTA = `
+<p>Have questions or want a second opinion? You can always book a free call with our team:</p>
+
+<p style="text-align: center;">
+  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book a Call</a>
+</p>
+    `;
+  }
+
   return `
 <p>Hi ${firstName},</p>
 
@@ -275,18 +326,9 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 
 <p>This includes hiring support, training reimbursements, and market expansion funding — the exact mix depends on timing, your province, and which intakes are open.</p>
 
-<p>Next step: Our consultants can map out the exact programs, timing, and application strategy so you catch every window that makes sense for your business.</p>
+${tierContent}
 
-<p>If you'd like us to walk you through it, grab 15 minutes with our team:</p>
-
-<p style="text-align: center;">
-  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your Free Consultation</a>
-</p>
-
-<p style="margin-top: 30px; font-size: 14px;">
-  <strong>Resources for you:</strong><br>
-  <a href="${resourceLink}" style="color: #0066cc;">Learn more about how Granted works</a>
-</p>
+${bookingCTA}
 
 <p>Talk soon,<br>The Granted Team</p>
   `.trim();

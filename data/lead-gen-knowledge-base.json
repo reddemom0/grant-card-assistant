@@ -88,5 +88,165 @@
     "knowledge": "Yes — and this is where the real money is. Most businesses think of grants as a single program you apply to once. In reality, a well-planned grant strategy stacks multiple programs across different pillars throughout the year. You might run a hiring grant for new employees, a separate student wage subsidy for summer co-ops, a training grant for upskilling your team, and a market expansion grant for international growth — all at the same time, from different programs, with different funding bodies. They don't conflict because they fund different activities. For example, a construction company expanding into the US with 5 new hires and ongoing training could access: CanExport for US expansion, a student hiring program for summer workers, provincial training grants for certifications, and sector-specific programs for green construction — all in the same year. The businesses that get the most out of grants aren't the ones who find one program — they're the ones who build a year-round strategy that layers multiple programs. Timing, sequencing, and knowing which to prioritize separates a $5K year from a $50K+ year.",
     "database_hook": "Show the full picture: 'I'm seeing potential matches across X programs. Some are quick wins and others are bigger but take more effort. A consultant can help you build a full roadmap.'",
     "cta_bridge": "Stacking grants is where things get really interesting — but it takes planning to get the timing and sequencing right. A strategy call is the best way to map it all out. Want to book one?"
+  },
+  {
+    "id": "faq_11",
+    "topic": "about_granted_consulting",
+    "question": "Who is Granted Consulting?",
+    "keywords": ["who", "granted", "consulting", "company", "about", "founded", "history", "team"],
+    "knowledge": "Granted Consulting is a Canadian company that helps businesses secure government grant funding. Founded in 2012, Granted has submitted over 18,000 grant applications with a 92% approval rate and has served over 1,400 businesses across 20+ industries. Granted is a market leader in Canadian government grant programs for businesses. The team includes multilingual grant strategists offering services in English, French, Mandarin, Cantonese, Korean, Spanish, and Hindi.",
+    "cta_bridge": "Want to see what grants your business might qualify for? I can run a quick estimate based on your profile."
+  },
+  {
+    "id": "faq_12",
+    "topic": "getgranted_database_current",
+    "question": "What is GetGranted?",
+    "keywords": ["getgranted", "database", "self-serve", "grant database", "platform", "subscription"],
+    "knowledge": "GetGranted is an up-to-date database of all available Canadian grants. Subscribers get matched grants based on their company profile, notifications when new grants open, and grant summaries with tips and advice. It does NOT include grant preparation, application writing, claims assistance, or proactive grant advice. Monthly or yearly subscription, no minimum commitment. Best for consultants, associations, HR teams, and businesses comfortable applying on their own. Link: https://granted.ca/getgranted/",
+    "cta_bridge": "If you want more hands-on support beyond just the database, we have other service tiers. Want me to walk you through the options?"
+  },
+  {
+    "id": "faq_13",
+    "topic": "granted_starter_current",
+    "question": "What is Granted Starter?",
+    "keywords": ["starter", "granted starter", "self-serve", "application tool", "streamlined"],
+    "knowledge": "Granted Starter is an easy-to-use self-serve grant application tool. Businesses can find, apply for, and receive grant funding through a simplified and streamlined process with administration support. Includes everything in GetGranted plus streamlined application forms, claims assistance, and submission reminders. Best for startups or recently incorporated businesses, companies new to grants, businesses with up to 3 grantable activities per year. 12-month minimum commitment, success-based fees apply. Important note: Granted Starter is evolving in 2026 — it will merge into the upgraded GetGranted 2.0 platform at getgranted.ca. Link: https://granted.ca/granted-starter/",
+    "cta_bridge": "If you're looking for a full done-for-you service, GrantedPro might be a better fit. Want to hear about that?"
+  },
+  {
+    "id": "faq_14",
+    "topic": "grantedpro_full_service",
+    "question": "What is GrantedPro?",
+    "keywords": ["grantedpro", "pro", "full-service", "done for you", "managed", "dedicated strategist"],
+    "knowledge": "GrantedPro is Granted's full done-for-you grant service. Granted's expert team finds, matches, prepares, and administers grant applications on your behalf. Includes a dedicated Grant Strategist (annual and quarterly sessions), proactive grant searching, unlimited applications, complete claims management, and priority notifications. Best for established companies (5+ years in business, revenue $5M+, 25+ employees, multiple grant needs across hiring, training, and expansion). 12-month minimum, success-based fees, 93% approval rate. How it works: Grant Strategist learns your business, proactively searches for grants, informs you of matches, prepares and submits applications with your approval, and manages all claims and post-approval paperwork. Link: https://granted.ca/grantedpro/",
+    "cta_bridge": "If you'd like to see what you qualify for first, I can run a quick funding estimate."
+  },
+  {
+    "id": "faq_15",
+    "topic": "granted_export_canexport",
+    "question": "What is Granted Export?",
+    "keywords": ["export", "granted export", "canexport", "international", "expansion"],
+    "knowledge": "Granted Export is a one-time service specifically for the CanExport SMEs program — one of the most lucrative market expansion grants for Canadian businesses. Covers the entire lifecycle: application writing, budget review, submission preparation, resubmission if rejected (no extra cost), claims documentation, and claims auditing. Best for businesses with active international expansion plans, revenue $300K–$100M, 3–500 employees, registered in Canada. Requires annual Granted Starter subscription. CanExport funds 50% of eligible project expenses up to $100,000 (up to $50,000 in funding). Link: https://granted.ca/granted-export/",
+    "cta_bridge": "If you're planning international expansion, CanExport could be a major funding opportunity. Want to explore what else you might qualify for?"
+  },
+  {
+    "id": "faq_16",
+    "topic": "getgranted_2_platform",
+    "question": "What is GetGranted 2.0?",
+    "keywords": ["getgranted 2.0", "new platform", "upcoming", "waitlist", "2026", "upgrade"],
+    "knowledge": "GetGranted 2.0 is an all-in-one grant management platform where businesses can find, save, and apply to grants. Built by grant experts specifically for the Canadian grant landscape, it provides a centralized workspace to track opportunities, manage applications, and stay ahead of deadlines. It combines the functionality of the current GetGranted and Granted Starter into one enhanced platform with smarter tools, faster performance, and a more intuitive interface. Currently in waitlist mode — not yet accepting signups. Current GetGranted and Starter subscribers will have their accounts and data securely transferred when the new platform launches. Waitlist: https://getgranted.ca/waitlist/ Features: https://getgranted.ca/ Pricing: https://getgranted.ca/pricing/",
+    "cta_bridge": "The new platform is coming soon — you can join the waitlist to get early access. In the meantime, our current services are fully operational and can help you right now."
+  },
+  {
+    "id": "faq_17",
+    "topic": "getgranted_2_pricing",
+    "question": "How much does GetGranted 2.0 cost?",
+    "keywords": ["getgranted 2.0 price", "pricing", "lite", "plus", "monthly", "annual", "$55", "$99", "$149"],
+    "knowledge": "GetGranted 2.0 has three pricing tiers. GetGranted Lite (for grant explorers): $55/month or $499/year, 1 user, 3 Watchlists, 3 Smart Filters, chatbot access, no office hours. GetGranted (for growing teams): $99/month or $899/year, 2 users, 10 Watchlists, 10 Smart Filters, quarterly office hours, annual plan unlocks Analytics, Grant Navigator, and Strategy Consulting Session. GetGranted Plus (for guided strategic growth): $149/month or $1,499/year, 3 users, unlimited Watchlists and Smart Filters, monthly office hours, annual plan unlocks Analytics, Unlimited Grant Navigator, Strategy Consulting Session, and pay-per-use consulting calls. Save up to 25% with annual billing. Currently waitlist-only. Pricing details: https://getgranted.ca/pricing/",
+    "cta_bridge": "If you're ready to start now instead of waiting for the new platform, I can walk you through our current services."
+  },
+  {
+    "id": "faq_18",
+    "topic": "grant_navigator_feature",
+    "question": "What is Grant Navigator?",
+    "keywords": ["grant navigator", "navigator", "expert support", "guided", "dedicated expert"],
+    "knowledge": "Grant Navigator is a feature on the new GetGranted 2.0 platform (currently waitlist-only). It connects you with a dedicated expert who supports you through the entire grant lifecycle — from application to claims to final reporting. Everything is handled inside the platform with simplified guided applications instead of complex funder forms. Grants with Grant Navigator support are marked with a special icon. Available only on annual GetGranted and annual GetGranted Plus plans. Business must be incorporated for at least 1 year.",
+    "cta_bridge": "If you need hands-on support right now, our current GrantedPro service offers full done-for-you grant management."
+  },
+  {
+    "id": "faq_19",
+    "topic": "smart_filters_feature",
+    "question": "What are Smart Filters?",
+    "keywords": ["smart filters", "filters", "eligibility", "matching", "automated"],
+    "knowledge": "Smart Filters are a feature on the new GetGranted 2.0 platform (currently waitlist-only). Smart Filters automatically use your business profile and selected grant activities to show only grants you're eligible for. Every account starts with a 'Made for You' Smart Filter. You can create custom Smart Filters for specific projects, departments, or funding needs.",
+    "cta_bridge": "Want to find out what grants you qualify for right now? I can run a quick estimate based on your profile."
+  },
+  {
+    "id": "faq_20",
+    "topic": "watchlists_feature",
+    "question": "What are Watchlists?",
+    "keywords": ["watchlists", "save", "track", "notifications", "alerts"],
+    "knowledge": "Watchlists are a feature on the new GetGranted 2.0 platform (currently waitlist-only). Watchlists let you save and track grants you care about most. Every Smart Filter automatically creates its own watchlist. You get notified automatically when there are changes — grants opening, deadline updates, or new information.",
+    "cta_bridge": "While you're waiting for the new platform to launch, I can help you identify what grants you qualify for today."
+  },
+  {
+    "id": "faq_21",
+    "topic": "office_hours_feature",
+    "question": "What are Office Hours?",
+    "keywords": ["office hours", "live support", "expert access", "quarterly", "monthly"],
+    "knowledge": "Office Hours are live sessions with Granted's experts for support and platform guidance. On GetGranted 2.0 (currently waitlist-only): Lite gets no access, GetGranted tier gets quarterly access, Plus gets monthly access. Direct access to experts for questions, guidance, and support navigating the platform.",
+    "cta_bridge": "If you want expert guidance right now, our current GrantedPro service includes dedicated grant strategist sessions and unlimited support."
+  },
+  {
+    "id": "faq_22",
+    "topic": "grants_need_repayment",
+    "question": "Do grants need to be repaid?",
+    "keywords": ["repay", "repaid", "repayment", "pay back", "return", "non-dilutive", "loans", "need to repay", "have to repay"],
+    "knowledge": "No. Once approved and claimed, the funding is yours. Grants are non-dilutive funding — they do not need to be repaid, unlike loans. But you must comply with the program's terms (keep the employee for the required period, complete the training, use funds as specified) or you may need to return some or all of the funding. As long as you meet the program requirements, the money is yours to keep.",
+    "cta_bridge": "Grants are a powerful way to offset costs without taking on debt. Want to see what you might qualify for?"
+  },
+  {
+    "id": "faq_23",
+    "topic": "incorporation_requirement",
+    "question": "Do I need to be incorporated?",
+    "keywords": ["incorporated", "incorporation", "sole proprietor", "unincorporated", "registered"],
+    "knowledge": "For most grant programs, yes. Sole proprietors and unincorporated freelancers generally do not qualify for the majority of business grants. Incorporation is often the first step to grant eligibility. Some hiring and training grants may have flexibility, but market expansion and larger programs almost always require incorporation. If you're not incorporated yet, that's the first threshold to cross before pursuing grants.",
+    "cta_bridge": "Once you're incorporated and operating for about a year, come back and we'll find you some real funding opportunities."
+  },
+  {
+    "id": "faq_24",
+    "topic": "minimum_revenue_required",
+    "question": "What's the minimum revenue required for grants?",
+    "keywords": ["minimum revenue", "revenue requirement", "how much revenue", "pre-revenue"],
+    "knowledge": "Depends on the program. Some hiring and training grants have no strict revenue minimum as long as you're incorporated and operating. Market expansion grants like CanExport typically require $300K+ revenue. Pre-revenue startups face limited options but may qualify for student/co-op hiring grants or SR&ED tax credits if doing R&D. Generally, established revenue makes eligibility much easier.",
+    "cta_bridge": "If you're generating revenue and incorporated, let's see what funding might be available for you."
+  },
+  {
+    "id": "faq_25",
+    "topic": "how_long_grant_process",
+    "question": "How long does the grant process take?",
+    "keywords": ["how long", "timeline", "processing time", "approval time", "weeks", "months"],
+    "knowledge": "Varies by program. Hiring grants can be approved in as little as one week. Training grants take 2–4 weeks. Market expansion grants like CanExport take 3–4 months. Key rule: you generally need to apply BEFORE you start the funded activity, especially for training grants. Plan ahead — don't wait until the day before you hire or the week before training starts.",
+    "cta_bridge": "Timing matters a lot. A consultant can help you sequence applications so you don't miss any windows."
+  },
+  {
+    "id": "faq_26",
+    "topic": "retroactive_eligibility",
+    "question": "Can I apply if I've already started the activity?",
+    "keywords": ["retroactive", "already started", "after the fact", "too late", "past expenses"],
+    "knowledge": "For most programs, no — you can't apply retroactively. Training grants especially require the application before training begins. Even one day late is too late. If you've already started, check with Granted to see if any programs still apply, but generally the answer is no. The key lesson: explore grants BEFORE making hiring, training, or expansion decisions, not after.",
+    "cta_bridge": "If you're planning future activities, let's make sure you don't miss the window. Want to run through what's coming up for your business?"
+  },
+  {
+    "id": "faq_27",
+    "topic": "required_documents",
+    "question": "What documents do I need to apply?",
+    "keywords": ["documents", "paperwork", "required", "need", "T2", "GST", "incorporation", "business registration"],
+    "knowledge": "Varies by program. Commonly needed: business registration/incorporation documents, recent tax filings (T2 or GST), job descriptions and candidate resumes (hiring grants), course details and provider info (training grants), market expansion plan (export grants). Some provinces require a BCeID (BC) or Alberta Digital ID before submitting through government portals. Consultants help you gather the right documents for each program.",
+    "cta_bridge": "The document requirements vary by program. A consultant can walk you through exactly what you need for the grants you're targeting."
+  },
+  {
+    "id": "faq_28",
+    "topic": "guaranteed_funding",
+    "question": "Do you guarantee I'll get funding?",
+    "keywords": ["guarantee", "guaranteed", "promise", "certain", "assurance"],
+    "knowledge": "No one can guarantee grant approval — the government makes the final decision. Granted has a 92% approval rate across 18,000+ applications, which significantly increases your chances, but outcomes are determined solely by the funding agency. What Granted does guarantee: applications will be professionally written, submitted on time, and aligned with program priorities. They're also selective — they'll be honest if an application isn't worth pursuing.",
+    "cta_bridge": "While no one can guarantee approval, Granted's 92% success rate speaks for itself. Want to see if you're a good fit?"
+  },
+  {
+    "id": "faq_29",
+    "topic": "which_service_right_for_me",
+    "question": "Which service is right for me?",
+    "keywords": ["which service", "right fit", "best option", "recommend", "choose", "decide"],
+    "knowledge": "Depends on your business size, revenue, and grant needs. If you just want to explore what's available: GetGranted database (current) or join the GetGranted 2.0 waitlist. If you have 1–3 grant needs and want streamlined self-serve tools: Granted Starter (current) or GetGranted 2.0 standard tier when it launches. If you have revenue $2M+, multiple growth initiatives, and want full done-for-you service: GrantedPro. If you're planning international expansion: Granted Export for CanExport. The best way to figure out which fits is to book a free consultation so a grant strategist can assess your situation.",
+    "cta_bridge": "I can give you a quick funding estimate based on your business profile, and that'll help narrow down which service tier makes sense. Want to run through that?"
+  },
+  {
+    "id": "faq_30",
+    "topic": "upgrade_from_starter_to_pro",
+    "question": "Can I upgrade from Starter to Pro later?",
+    "keywords": ["upgrade", "switch", "move up", "starter to pro", "change plan"],
+    "knowledge": "Yes. Starter fees pro-rate into Pro upgrades, and consultation fees credit toward annual subscriptions. Starting small and upgrading is encouraged. Better to start with Starter and realize you need Pro than to overpay for Pro when Starter would have been enough.",
+    "cta_bridge": "Let's start with understanding what you qualify for, and then we can figure out which tier makes sense."
   }
 ]
