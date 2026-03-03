@@ -28,6 +28,20 @@ const BOOKING_LINK = 'https://meetings.hubspot.com/natalie392/15min-intro-to-gra
 // ============================================================================
 
 /**
+ * Convert markdown formatting to HTML (safety net)
+ * Handles bold, links, and basic formatting that the model might output
+ */
+function convertMarkdownToHtml(text) {
+  if (!text) return text;
+
+  return text
+    // Bold: **text** → <strong>text</strong>
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Links: [text](url) → <a href="url">text</a>
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+}
+
+/**
  * Parse revenue string to number
  * "$800K" → 800000, "$1.5M" → 1500000, "$500K-$1M" → 500000 (lower bound)
  */
@@ -676,6 +690,13 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
         );
       } else {
         console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
+      }
+
+      // Convert markdown to HTML (safety net for email formatting)
+      const originalLength = emailBodyHtml.length;
+      emailBodyHtml = convertMarkdownToHtml(emailBodyHtml);
+      if (emailBodyHtml.length !== originalLength) {
+        console.log(`  🎨 Converted markdown to HTML in email body (safety net)`);
       }
 
       // Validate and fix booking link if agent hallucinated wrong URL

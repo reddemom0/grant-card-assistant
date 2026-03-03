@@ -61,6 +61,20 @@ function stripToolNarration(text) {
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
 
+/**
+ * Convert markdown formatting to HTML (safety net)
+ * Handles bold, links, and basic formatting that the model might output
+ */
+function convertMarkdownToHtml(text) {
+  if (!text) return text;
+
+  return text
+    // Bold: **text** → <strong>text</strong>
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Links: [text](url) → <a href="url">text</a>
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+}
+
 // DEPRECATED: These are now set dynamically based on query complexity
 // Kept for backwards compatibility
 const FALLBACK_MAX_AGENT_LOOPS = 20;
@@ -527,6 +541,13 @@ export async function runAgent({
             if (cleaned !== accumulatedText) {
               console.log(`  🧹 Stripped ${accumulatedText.length - cleaned.length} chars of narration (safety net)`);
               accumulatedText = cleaned;
+            }
+
+            // Convert markdown to HTML (safety net for formatting)
+            const htmlConverted = convertMarkdownToHtml(accumulatedText);
+            if (htmlConverted !== accumulatedText) {
+              console.log(`  🎨 Converted markdown to HTML (safety net)`);
+              accumulatedText = htmlConverted;
             }
 
             console.log(`  📝 Final iteration text: ${accumulatedText.length} chars (lead-gen mode: discarding tool narration)`);

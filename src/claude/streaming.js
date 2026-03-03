@@ -6,6 +6,20 @@
  */
 
 /**
+ * Convert markdown formatting to HTML (safety net)
+ * Handles bold, links, and basic formatting that the model might output
+ */
+function convertMarkdownToHtml(text) {
+  if (!text) return text;
+
+  return text
+    // Bold: **text** → <strong>text</strong>
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    // Links: [text](url) → <a href="url">text</a>
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+}
+
+/**
  * Stream Claude response to frontend via SSE and collect full response
  * @param {AsyncIterable} stream - Claude API stream
  * @param {Object} res - Express response object
@@ -213,9 +227,13 @@ export async function streamToSSE(stream, res, sessionId, agentType = null) {
             if (event.delta.stop_reason === 'end_turn' && textBuffer && res) {
               // This is the final iteration - stream the buffered text
               console.log(`  📝 Streaming final iteration text: ${textBuffer.length} chars (lead-gen mode)`);
+
+              // Convert markdown to HTML before streaming
+              const htmlConverted = convertMarkdownToHtml(textBuffer);
+
               res.write(`data: ${JSON.stringify({
                 type: 'text_delta',
-                text: textBuffer,
+                text: htmlConverted,
                 sessionId
               })}\n\n`);
             } else if (event.delta.stop_reason === 'tool_use' && textBuffer) {
