@@ -383,7 +383,7 @@ h1, h2, h3, h4 {
     width: 90%;
     max-width: 800px;
     max-height: 80vh;
-    background: linear-gradient(180deg, var(--bg) 0%, rgba(7, 51, 74, 0.98) 100%);
+    background: var(--bg);
     border: 1px solid rgba(54, 202, 250, 0.2);
     border-radius: 20px;
     display: flex;
@@ -467,17 +467,20 @@ h1, h2, h3, h4 {
 }
 
 .history-filter-btn {
-    padding: 0.5rem 0.875rem;
+    padding: 0.5rem 1rem;
     background: transparent;
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: 20px;
     color: var(--text-secondary);
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.2s ease;
     white-space: nowrap;
     flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
 }
 
 .history-filter-btn:hover {
