@@ -443,6 +443,14 @@
             color: var(--text);
             font-family: inherit;
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            resize: none;
+            min-height: 44px;
+            max-height: 200px;
+            overflow-y: hidden;
+            overflow-x: hidden;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            line-height: 1.5;
         }
 
         .message-input:focus {
@@ -721,13 +729,13 @@
                     </svg>
                 </button>
 
-                <input
-                    type="text"
+                <textarea
                     id="message-input"
                     class="message-input"
                     placeholder="Type your message..."
                     autocomplete="off"
-                />
+                    rows="1"
+                ></textarea>
                 <button type="submit" id="send-button" class="send-button">
                     <span>Send</span>
                 </button>
@@ -984,6 +992,25 @@
             // File input change
             document.getElementById('file-input').addEventListener('change', handleFileSelect);
 
+            // Auto-resize textarea as user types
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) {
+                messageInput.addEventListener('input', function() {
+                    // Reset height to recalculate
+                    this.style.height = 'auto';
+                    // Set to scrollHeight (content height), constrained by max-height in CSS
+                    this.style.height = Math.min(this.scrollHeight, 200) + 'px';
+                });
+
+                // Handle Shift+Enter for new line, Enter alone to submit
+                messageInput.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        document.getElementById('message-form').dispatchEvent(new Event('submit'));
+                    }
+                });
+            }
+
             // Drag and drop file upload
             setupDragAndDrop();
         }
@@ -1148,6 +1175,7 @@
 
             // Clear input and files immediately
             input.value = '';
+            input.style.height = 'auto'; // Reset textarea height
             selectedFiles = [];
             renderSelectedFiles();
 
