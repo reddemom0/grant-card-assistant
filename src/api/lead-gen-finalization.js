@@ -298,13 +298,13 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 </p>
     `;
   } else if (tier === 'medium') {
-    // $10-29K → GetGranted 2.0 (GetGranted or Plus tier)
+    // $10-29K → Granted Starter (PRIMARY), GetGranted 2.0 (SECONDARY)
     tierContent = `
-<p>For your situation, our GetGranted platform is the best fit — it gives you smart grant matching, guided applications, and expert support when you need it. With GetGranted 2.0, you'll get access to powerful features like Grant Navigator for step-by-step application support.</p>
+<p>For your situation, Granted Starter is a great fit — you get expert guidance on your applications without full-service overhead. Our team reviews your applications, provides feedback, and helps you maximize your approval chances.</p>
 
-<p><strong>Join the waitlist for early access:</strong> <a href="https://getgranted.ca/waitlist/" style="color: #0066cc; font-weight: bold;">https://getgranted.ca/waitlist/</a></p>
+<p><a href="https://granted.ca/granted-starter/" style="color: #0066cc; font-weight: bold;">Learn more about Granted Starter</a></p>
 
-<p>In the meantime, our Starter service gives you the same level of support while we prepare the upgrade: <a href="https://granted.ca/granted-starter/" style="color: #0066cc;">https://granted.ca/granted-starter/</a></p>
+<p>We're also launching an upgraded platform soon (GetGranted 2.0) with smart matching and step-by-step guidance. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
     `;
     bookingCTA = `
 <p>If you'd prefer to talk through your options with someone on our team first, you can book a quick call:</p>
@@ -314,13 +314,13 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 </p>
     `;
   } else {
-    // Under $10K → GetGranted 2.0 Lite
+    // Under $10K → GetGranted database (PRIMARY), GetGranted 2.0 Lite (SECONDARY)
     tierContent = `
-<p>Our GetGranted Lite plan is a great starting point — you'll get access to smart grant matching and alerts tailored to your business for $55/month.</p>
+<p>Our GetGranted database is a great starting point — you get access to Canada's largest grant database with smart filtering tailored to your business.</p>
 
-<p><strong>Join the waitlist to be first in line:</strong> <a href="https://getgranted.ca/waitlist/" style="color: #0066cc; font-weight: bold;">https://getgranted.ca/waitlist/</a></p>
+<p><a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">Access the GetGranted database</a></p>
 
-<p>In the meantime, our current grant database gives you access right away: <a href="https://granted.ca/getgranted/" style="color: #0066cc;">https://granted.ca/getgranted/</a></p>
+<p>We're also launching an upgraded version (GetGranted 2.0 Lite) with real-time matching and alerts for $55/month. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
     `;
     bookingCTA = `
 <p>Have questions or want a second opinion? You can always book a free call with our team:</p>

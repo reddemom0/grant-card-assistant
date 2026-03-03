@@ -253,11 +253,22 @@ Same routing as above. Keep chat recommendation to one sentence with service pag
 
 **Email Generation:**
 
-$30K+: GrantedPro, booking link PRIMARY
+CRITICAL: Always lead with services that are currently available. GetGranted 2.0 is waitlist-only — it can only be a secondary mention, never the primary recommendation.
 
-$10-29K: GetGranted 2.0, waitlist + Starter bridge, booking link SECONDARY
+$30K+:
+- PRIMARY: GrantedPro (https://granted.ca/grantedpro/)
+- Booking link: PRIMARY
+- GetGranted 2.0: Do NOT mention (these prospects need consultant, not self-serve)
 
-Under $10K: GetGranted 2.0 Lite, waitlist + database bridge, booking link OPTIONAL
+$10-29K:
+- PRIMARY: Granted Starter (https://granted.ca/granted-starter/) — available now
+- SECONDARY: Optional mention of GetGranted 2.0 waitlist (https://getgranted.ca/waitlist/)
+- Booking link: SECONDARY (after Starter)
+
+Under $10K:
+- PRIMARY: GetGranted database (https://granted.ca/getgranted/) — available now
+- SECONDARY: Optional mention of GetGranted 2.0 Lite waitlist (https://getgranted.ca/waitlist/)
+- Booking link: OPTIONAL
 
 All emails: greeting, recap, funding estimate (bold), tier + links, booking link, sign-off. HTML. 200-300 words.
 
