@@ -29,6 +29,38 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
+/**
+ * Strip tool narration patterns from text (safety net)
+ * Removes lines like "Let me search...", "Let me store...", etc.
+ */
+function stripToolNarration(text) {
+  if (!text) return text;
+
+  const narrationPatterns = [
+    /^Let me search[^\n]*\.?\n?/gm,
+    /^Let me look[^\n]*\.?\n?/gm,
+    /^Let me store[^\n]*\.?\n?/gm,
+    /^Let me broaden[^\n]*\.?\n?/gm,
+    /^Let me check[^\n]*\.?\n?/gm,
+    /^Let me find[^\n]*\.?\n?/gm,
+    /^Let me save[^\n]*\.?\n?/gm,
+    /^Searching[^\n]*\.?\n?/gm,
+    /^Storing[^\n]*\.?\n?/gm,
+    /^Looking up[^\n]*\.?\n?/gm,
+    /^I'll search[^\n]*\.?\n?/gm,
+    /^I'll look[^\n]*\.?\n?/gm,
+    /^I'll check[^\n]*\.?\n?/gm,
+  ];
+
+  let cleaned = text;
+  for (const pattern of narrationPatterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+
+  // Clean up resulting multiple line breaks
+  return cleaned.replace(/\n{3,}/g, '\n\n').trim();
+}
+
 // DEPRECATED: These are now set dynamically based on query complexity
 // Kept for backwards compatibility
 const FALLBACK_MAX_AGENT_LOOPS = 20;
@@ -472,7 +504,7 @@ export async function runAgent({
       });
 
       // Stream response to frontend and collect full response
-      const fullResponse = await streamToSSE(stream, res, sessionId);
+      const fullResponse = await streamToSSE(stream, res, sessionId, agentType);
 
       console.log(`✓ Response received - stop_reason: ${fullResponse.stop_reason}`);
 
@@ -489,7 +521,15 @@ export async function runAgent({
           // Lead-gen: ONLY save text from final iteration (prevents tool narration)
           if (fullResponse.stop_reason === 'end_turn') {
             accumulatedText = iterationText; // Replace, don't append (only final text matters)
-            console.log(`  📝 Final iteration text: ${iterationText.length} chars (lead-gen mode: discarding tool narration)`);
+
+            // Apply regex safety net to strip any remaining narration patterns
+            const cleaned = stripToolNarration(accumulatedText);
+            if (cleaned !== accumulatedText) {
+              console.log(`  🧹 Stripped ${accumulatedText.length - cleaned.length} chars of narration (safety net)`);
+              accumulatedText = cleaned;
+            }
+
+            console.log(`  📝 Final iteration text: ${accumulatedText.length} chars (lead-gen mode: discarding tool narration)`);
           } else {
             console.log(`  🔇 Skipping tool narration text: ${iterationText.length} chars (stop_reason: ${fullResponse.stop_reason})`);
           }

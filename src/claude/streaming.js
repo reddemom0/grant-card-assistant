@@ -10,9 +10,10 @@
  * @param {AsyncIterable} stream - Claude API stream
  * @param {Object} res - Express response object
  * @param {string} sessionId - Unique session ID for this request
+ * @param {string} agentType - Agent type (for lead-gen specific handling)
  * @returns {Promise<Object>} Full collected response
  */
-export async function streamToSSE(stream, res, sessionId) {
+export async function streamToSSE(stream, res, sessionId, agentType = null) {
   const fullResponse = {
     content: [],
     stop_reason: null,
@@ -20,6 +21,10 @@ export async function streamToSSE(stream, res, sessionId) {
   };
 
   let currentContent = null;
+
+  // For lead-gen: buffer text instead of streaming immediately (prevents tool narration leaking)
+  let textBuffer = '';
+  let hasToolUse = false;
 
   try {
     for await (const event of stream) {
@@ -43,6 +48,10 @@ export async function streamToSSE(stream, res, sessionId) {
         if (event.content_block.type === 'text') {
           currentContent.text = '';
         } else if (event.content_block.type === 'tool_use') {
+          // Mark that this iteration includes tool use (for lead-gen filtering)
+          if (agentType === 'lead-gen') {
+            hasToolUse = true;
+          }
           currentContent.id = event.content_block.id;
           currentContent.name = event.content_block.name;
           currentContent.input = '';
@@ -81,13 +90,20 @@ export async function streamToSSE(stream, res, sessionId) {
         if (event.delta.type === 'text_delta') {
           currentContent.text += event.delta.text;
 
-          // Stream text to frontend
-          if (res) {
-            res.write(`data: ${JSON.stringify({
-              type: 'text_delta',
-              text: event.delta.text,
-              sessionId
-            })}\n\n`);
+          // For lead-gen: buffer text if we're in a tool-use iteration
+          // Only stream on final end_turn iteration
+          if (agentType === 'lead-gen') {
+            textBuffer += event.delta.text;
+            // Don't stream yet - wait for stop_reason to determine if this is final iteration
+          } else {
+            // Other agents: stream immediately (original behavior)
+            if (res) {
+              res.write(`data: ${JSON.stringify({
+                type: 'text_delta',
+                text: event.delta.text,
+                sessionId
+              })}\n\n`);
+            }
           }
         } else if (event.delta.type === 'input_json_delta') {
           currentContent.input += event.delta.partial_json;
@@ -191,6 +207,25 @@ export async function streamToSSE(stream, res, sessionId) {
       if (event.type === 'message_delta') {
         if (event.delta.stop_reason) {
           fullResponse.stop_reason = event.delta.stop_reason;
+
+          // For lead-gen: only stream buffered text if this is the final iteration (end_turn)
+          if (agentType === 'lead-gen') {
+            if (event.delta.stop_reason === 'end_turn' && textBuffer && res) {
+              // This is the final iteration - stream the buffered text
+              console.log(`  📝 Streaming final iteration text: ${textBuffer.length} chars (lead-gen mode)`);
+              res.write(`data: ${JSON.stringify({
+                type: 'text_delta',
+                text: textBuffer,
+                sessionId
+              })}\n\n`);
+            } else if (event.delta.stop_reason === 'tool_use' && textBuffer) {
+              // This was a tool-use iteration - discard the narration text
+              console.log(`  🔇 Discarding tool narration: ${textBuffer.length} chars (stop_reason: tool_use)`);
+            }
+            // Reset buffer for next iteration
+            textBuffer = '';
+            hasToolUse = false;
+          }
         }
         if (event.usage) {
           fullResponse.usage = event.usage;
