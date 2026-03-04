@@ -373,6 +373,14 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'get_hubspot_notes':
+        result = await hubspot.getHubSpotNotes(
+          input.object_type,
+          input.record_id,
+          input.limit || 20
+        );
+        break;
+
       // ============================================================================
       // GOOGLE DRIVE TOOLS
       // ============================================================================

@@ -1089,6 +1089,30 @@ export const HUBSPOT_TOOLS = [
         }
       }
     }
+  },
+  {
+    name: 'get_hubspot_notes',
+    description: 'Get notes associated with a HubSpot record (company, contact, or deal). Returns all notes logged on the record\'s timeline, sorted by most recent first. Use this to see internal team notes, client communications, and historical context. Notes can contain important context about client conversations, project updates, or internal decisions.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        object_type: {
+          type: 'string',
+          enum: ['companies', 'contacts', 'deals'],
+          description: 'Type of HubSpot record (companies, contacts, or deals)'
+        },
+        record_id: {
+          type: 'string',
+          description: 'HubSpot record ID (company ID, contact ID, or deal ID)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of notes to return (default: 20)',
+          default: 20
+        }
+      },
+      required: ['object_type', 'record_id']
+    }
   }
 ];
 

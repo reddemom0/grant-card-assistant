@@ -4348,3 +4348,85 @@ export async function findAndReadFundingAgreement({
     };
   }
 }
+
+/**
+ * Get notes associated with a HubSpot record (company, contact, or deal)
+ * @param {string} objectType - Type of record ('companies', 'contacts', 'deals')
+ * @param {string} recordId - ID of the record
+ * @param {number} limit - Maximum number of notes to return (default: 20)
+ * @returns {Object} List of notes with their details
+ */
+export async function getHubSpotNotes(objectType, recordId, limit = 20) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`📝 Getting notes for ${objectType}/${recordId}...`);
+
+    // Step 1: Get note IDs associated with the record using Associations API v4
+    const associationsResponse = await client.get(`/crm/v4/objects/${objectType}/${recordId}/associations/notes`);
+
+    if (!associationsResponse.data.results || associationsResponse.data.results.length === 0) {
+      console.log(`ℹ️  No notes found for ${objectType}/${recordId}`);
+      return {
+        success: true,
+        notes: [],
+        count: 0
+      };
+    }
+
+    const noteIds = associationsResponse.data.results.map(result => result.toObjectId).slice(0, limit);
+    console.log(`✓ Found ${noteIds.length} note(s) associated with ${objectType}/${recordId}`);
+
+    // Step 2: Batch fetch note details
+    const notesResponse = await client.post('/crm/v3/objects/notes/batch/read', {
+      properties: [
+        'hs_note_body',
+        'hs_timestamp',
+        'hs_created_by',
+        'hs_lastmodifieddate',
+        'hubspot_owner_id',
+        'hs_attachment_ids'
+      ],
+      inputs: noteIds.map(id => ({ id }))
+    });
+
+    // Format the notes for easy reading
+    const notes = notesResponse.data.results.map(note => ({
+      id: note.id,
+      body: note.properties.hs_note_body || '',
+      timestamp: note.properties.hs_timestamp || note.properties.hs_lastmodifieddate,
+      created_by_id: note.properties.hs_created_by,
+      owner_id: note.properties.hubspot_owner_id,
+      has_attachments: !!note.properties.hs_attachment_ids,
+      created_at: note.createdAt,
+      updated_at: note.updatedAt
+    }));
+
+    // Sort by timestamp descending (most recent first)
+    notes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+    console.log(`✓ Retrieved ${notes.length} note(s)`);
+
+    return {
+      success: true,
+      notes,
+      count: notes.length,
+      object_type: objectType,
+      record_id: recordId
+    };
+
+  } catch (error) {
+    console.error('Get HubSpot notes error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}

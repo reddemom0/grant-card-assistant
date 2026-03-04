@@ -36,8 +36,11 @@ Primary sales and customer data:
 - **Companies** - Business leads, prospects, customers
 - **Contacts** - Individual people, decision-makers
 - **Deals** - Sales opportunities and pipelines
+- **Notes** - Internal team notes, client communications, historical context on any record
 
 **Key Rule:** When asked about "leads", "prospects", "new clients" → search companies, NOT contacts
+
+**Notes Access:** Use `get_hubspot_notes` to read internal notes on companies, contacts, or deals. Notes contain valuable context about client conversations, project updates, and team decisions.
 
 **HubSpot URL Format (CRITICAL):**
 ```
