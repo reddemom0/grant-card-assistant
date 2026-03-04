@@ -36,7 +36,33 @@ export function loadAgentPrompt(agentType) {
     variant = variantEnv.toUpperCase();
 
     if (variant === 'B') {
-      agentFileName = 'lead-gen-variant-b.md';
+      // Variant B: Load modular skill documents and concatenate
+      const skillsDir = path.join(__dirname, '../../.claude/skills/lead-gen-variant-b');
+
+      const skillFiles = [
+        'base-system-prompt.md',
+        'client-communication.md',
+        'system-operations.md'
+      ];
+
+      const skillContents = skillFiles.map(fileName => {
+        const skillPath = path.join(skillsDir, fileName);
+
+        if (!fs.existsSync(skillPath)) {
+          throw new Error(
+            `Lead-gen variant B skill file not found: ${fileName}\n` +
+            `Expected path: ${skillPath}`
+          );
+        }
+
+        return fs.readFileSync(skillPath, 'utf-8').trim();
+      });
+
+      const concatenated = skillContents.join('\n\n---\n\n');
+
+      console.log(`✓ Loaded agent prompt: ${agentType} VARIANT ${variant} (${skillFiles.length} skill files, ${concatenated.length} chars)`);
+
+      return concatenated;
     } else {
       // Variant A (default) - use standard lead-gen.md
       agentFileName = 'lead-gen.md';
