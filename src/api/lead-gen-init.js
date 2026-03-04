@@ -68,18 +68,34 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
   // Create entry in the internal conversations table
   await createConversation(sessionId, null, 'lead-gen', 'Lead Gen Chat');
 
+  // Build prospect_data object with all form fields
+  const prospectData = {
+    contact_name: formData.contact_name,
+    email: formData.email,
+    company_name: formData.company_name,
+    company_website: formData.company_website,
+    province: formData.province,
+    industry: formData.industry,
+    revenue_range: formData.revenue_range,
+    employee_count: formData.employee_count,
+    hiring_plans: formData.hiring_plans,
+    training_budget: formData.training_budget,
+    expansion_budget: formData.expansion_budget
+  };
+
   // Create the lead-gen-specific metadata row with form data
   await query(
     `INSERT INTO lead_gen_conversations
-       (session_id, ip_address, contact_name, contact_email, company_name, company_website)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
+       (session_id, ip_address, contact_name, contact_email, company_name, company_website, prospect_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     [
       sessionId,
       ipAddress,
       formData.contact_name,
       formData.email,
       formData.company_name,
-      formData.company_website
+      formData.company_website,
+      JSON.stringify(prospectData)
     ]
   );
 
@@ -93,6 +109,11 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
   console.log(`✓ Lead-gen session created with form data: ${sessionId} (IP: ${ipAddress})`);
   console.log(`  Contact: ${formData.contact_name} <${formData.email}>`);
   console.log(`  Company: ${formData.company_name} (${formData.company_website || 'no website'})`);
+  console.log(`  Revenue: ${formData.revenue_range}, Employees: ${formData.employee_count}`);
+  console.log(`  Hiring: ${formData.hiring_plans}, Training: ${formData.training_budget || 'none'}, Expansion: ${formData.expansion_budget || 'none'}`);
+  if (formData.province && formData.industry) {
+    console.log(`  Province: ${formData.province}, Industry: ${formData.industry} (form-provided)`);
+  }
 
   return sessionId;
 }
@@ -227,7 +248,20 @@ export async function handleLeadGenInit(req, res) {
   console.log('▓'.repeat(80));
 
   try {
-    const { contact_name, email, company_name, company_website } = req.body;
+    const {
+      contact_name,
+      email,
+      company_name,
+      company_website,
+      province,
+      industry,
+      revenue_range,
+      employee_count,
+      hiring_plans,
+      training_budget,
+      expansion_budget
+    } = req.body;
+
     const ipAddress = getClientIp(req);
 
     // -------------------------------------------------------------------------
@@ -244,6 +278,13 @@ export async function handleLeadGenInit(req, res) {
     if (!email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
       return res.status(400).json({
         error: 'Invalid email address'
+      });
+    }
+
+    // Validate new required fields from page 2
+    if (!revenue_range || !employee_count || !hiring_plans) {
+      return res.status(400).json({
+        error: 'Missing required fields: revenue_range, employee_count, hiring_plans'
       });
     }
 
@@ -267,7 +308,14 @@ export async function handleLeadGenInit(req, res) {
       contact_name,
       email,
       company_name,
-      company_website: company_website || null
+      company_website: company_website || null,
+      province: province || null,
+      industry: industry || null,
+      revenue_range,
+      employee_count,
+      hiring_plans,
+      training_budget: training_budget || null,
+      expansion_budget: expansion_budget || null
     };
 
     const sessionId = await createLeadGenSessionWithFormData(ipAddress, formData);

@@ -46,6 +46,58 @@
     quickActions: []
   };
 
+  // Dropdown options for form
+  const PROVINCES = [
+    "Alberta", "British Columbia", "Manitoba", "New Brunswick",
+    "Newfoundland & Labrador", "Nova Scotia", "Ontario",
+    "Prince Edward Island", "Quebec", "Saskatchewan",
+    "Northwest Territories", "Nunavut", "Yukon"
+  ];
+
+  const INDUSTRIES = [
+    "Technology / Software", "Construction / Trades", "Manufacturing",
+    "Food & Beverage", "Healthcare / Biotech", "Professional Services",
+    "Retail / E-Commerce", "Clean Tech / Environmental",
+    "Agriculture", "Arts / Media / Entertainment",
+    "Hospitality / Tourism", "Transportation / Logistics",
+    "Natural Resources / Mining", "Financial Services", "Other"
+  ];
+
+  const REVENUE_RANGES = [
+    "Pre-revenue",
+    "Under $500K",
+    "$500K – $2.5M",
+    "$2.5M – $5M",
+    "$5M+"
+  ];
+
+  const EMPLOYEE_RANGES = [
+    "Just me",
+    "1 – 4",
+    "5 – 19",
+    "20 – 49",
+    "50 – 99",
+    "100 – 499",
+    "500+"
+  ];
+
+  const HIRING_OPTIONS = [
+    "Not hiring right now",
+    "1 – 2 people",
+    "3 – 5 people",
+    "6 – 10 people",
+    "10+"
+  ];
+
+  const BUDGET_OPTIONS = [
+    "None planned",
+    "Under $10K",
+    "$10K – $25K",
+    "$25K – $50K",
+    "$50K – $100K",
+    "$100K+"
+  ];
+
   let config = { ...DEFAULT_CONFIG };
   let sessionId = null;
   let isOpen = false;
@@ -57,6 +109,7 @@
   let isInitializing = false; // Guard to prevent duplicate initialization
   let formData = null; // Store form data after submission
   let showingForm = false; // Track if form is currently displayed
+  let currentPage = 1; // Form page state (1 or 2)
 
   // ============================================================================
   // UTILITY FUNCTIONS
@@ -719,6 +772,156 @@
         .gg-chat-interface.hidden {
           display: none;
         }
+
+        /* =================================================================== */
+        /* TWO-PAGE FORM STYLES */
+        /* =================================================================== */
+
+        .gg-step-indicator {
+          display: flex;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 20px;
+        }
+
+        .gg-step {
+          height: 4px;
+          background: ${BRAND_COLORS.lightGrey};
+          border-radius: 2px;
+          transition: all 0.3s ease;
+        }
+
+        .gg-step.inactive {
+          width: 32px;
+        }
+
+        .gg-step.active {
+          width: 48px;
+          background: ${BRAND_COLORS.primary};
+        }
+
+        .gg-form-page {
+          display: none;
+        }
+
+        .gg-form-page.active {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
+        .gg-form-field select {
+          border: 1px solid ${BRAND_COLORS.lightGrey};
+          border-radius: 6px;
+          padding: 10px 12px;
+          font-size: 14px;
+          font-family: inherit;
+          outline: none;
+          transition: border-color 0.2s ease;
+          background: white;
+          cursor: pointer;
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%236d7881' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+          padding-right: 36px;
+        }
+
+        .gg-form-field select:focus {
+          border-color: ${BRAND_COLORS.primary};
+        }
+
+        .gg-form-field select.error {
+          border-color: #dc2626;
+        }
+
+        .gg-form-field select option:first-child {
+          color: ${BRAND_COLORS.grey};
+        }
+
+        .gg-conditional-fields {
+          display: none;
+          flex-direction: column;
+          gap: 16px;
+          margin-top: 12px;
+          padding: 16px;
+          background: ${BRAND_COLORS.lightBg};
+          border-radius: 6px;
+          border: 1px solid ${BRAND_COLORS.lightGrey};
+        }
+
+        .gg-conditional-fields.visible {
+          display: flex;
+        }
+
+        .gg-form-hint {
+          font-size: 12px;
+          color: ${BRAND_COLORS.grey};
+          margin-top: -2px;
+        }
+
+        .gg-form-section-label {
+          font-size: 12px;
+          font-weight: 600;
+          color: ${BRAND_COLORS.grey};
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-top: 8px;
+          padding-bottom: 8px;
+          border-bottom: 1px solid ${BRAND_COLORS.lightGrey};
+        }
+
+        .gg-form-info-banner {
+          background: ${BRAND_COLORS.primaryLight};
+          border: 1px solid rgba(0, 138, 191, 0.2);
+          border-radius: 6px;
+          padding: 12px;
+          font-size: 13px;
+          color: ${BRAND_COLORS.dark};
+          display: flex;
+          gap: 8px;
+          align-items: flex-start;
+        }
+
+        .gg-form-info-banner-icon {
+          font-size: 16px;
+          flex-shrink: 0;
+        }
+
+        .gg-form-buttons {
+          display: flex;
+          gap: 10px;
+          margin-top: 8px;
+        }
+
+        .gg-form-back {
+          flex: 1;
+          background: ${BRAND_COLORS.lightBg};
+          color: ${BRAND_COLORS.grey};
+          border: 1px solid ${BRAND_COLORS.lightGrey};
+          border-radius: 8px;
+          padding: 12px 24px;
+          font-size: 15px;
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+
+        .gg-form-back:hover {
+          background: ${BRAND_COLORS.lightGrey};
+        }
+
+        .gg-form-next,
+        .gg-form-submit.in-page-2 {
+          flex: 2;
+        }
+
+        .gg-form-privacy {
+          text-align: center;
+          font-size: 12px;
+          color: ${BRAND_COLORS.grey};
+          margin-top: 4px;
+        }
       </style>
     `;
   }
@@ -726,6 +929,14 @@
   // ============================================================================
   // UI COMPONENTS
   // ============================================================================
+
+  function createDropdownOptions(options, placeholder = "Select...") {
+    let html = `<option value="" disabled selected>${placeholder}</option>`;
+    options.forEach(option => {
+      html += `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`;
+    });
+    return html;
+  }
 
   function createFloatingWidget() {
     const container = document.createElement('div');
@@ -796,40 +1007,130 @@
 
       <!-- Pre-Chat Form -->
       <div class="gg-form-container">
+        <div class="gg-step-indicator">
+          <div class="gg-step active" id="gg-step-1"></div>
+          <div class="gg-step inactive" id="gg-step-2"></div>
+        </div>
+
         <div class="gg-form-intro">
           <h3>Get Your Free Grant Estimate</h3>
-          <p>Tell us a bit about your business and we'll show you what funding programs you could qualify for. Takes about 2 minutes.</p>
+          <p>Tell us about your company, then our AI Grant Advisor will give you an instant funding estimate.</p>
         </div>
 
-        <div class="gg-form-field">
-          <label for="gg-contact-name">Your Name <span class="required">*</span></label>
-          <input type="text" id="gg-contact-name" required />
-          <span class="error-message">Please enter your name</span>
+        <!-- PAGE 1: Contact + Company -->
+        <div class="gg-form-page active" id="gg-form-page-1">
+          <div class="gg-form-field">
+            <label for="gg-contact-name">Your Name <span class="required">*</span></label>
+            <input type="text" id="gg-contact-name" required />
+            <span class="error-message">Please enter your name</span>
+          </div>
+
+          <div class="gg-form-field">
+            <label for="gg-contact-email">Email <span class="required">*</span></label>
+            <input type="email" id="gg-contact-email" required />
+            <span class="error-message">Please enter a valid email address</span>
+          </div>
+
+          <div class="gg-form-field">
+            <label for="gg-company-name">Company Name <span class="required">*</span></label>
+            <input type="text" id="gg-company-name" required />
+            <span class="error-message">Please enter your company name</span>
+          </div>
+
+          <div class="gg-form-field">
+            <label for="gg-company-website">Company Website</label>
+            <input type="url" id="gg-company-website" placeholder="https://example.com" />
+            <label class="gg-form-checkbox">
+              <input type="checkbox" id="gg-no-website" />
+              <span>I don't have a website yet</span>
+            </label>
+            <span class="error-message">Please enter a valid website URL</span>
+          </div>
+
+          <!-- Conditional fields shown when "no website" is checked -->
+          <div class="gg-conditional-fields" id="gg-conditional-fields">
+            <div class="gg-form-field">
+              <label for="gg-province">Province <span class="required">*</span></label>
+              <select id="gg-province">
+                ${createDropdownOptions(PROVINCES)}
+              </select>
+              <span class="error-message">Please select your province</span>
+            </div>
+
+            <div class="gg-form-field">
+              <label for="gg-industry">Industry <span class="required">*</span></label>
+              <select id="gg-industry">
+                ${createDropdownOptions(INDUSTRIES)}
+              </select>
+              <span class="error-message">Please select your industry</span>
+            </div>
+          </div>
+
+          <button type="button" class="gg-form-submit gg-form-next" id="gg-form-next" disabled>Next →</button>
         </div>
 
-        <div class="gg-form-field">
-          <label for="gg-contact-email">Email <span class="required">*</span></label>
-          <input type="email" id="gg-contact-email" required />
-          <span class="error-message">Please enter a valid email address</span>
-        </div>
+        <!-- PAGE 2: Business Profile + Plans -->
+        <div class="gg-form-page" id="gg-form-page-2">
+          <p style="font-size: 14px; color: ${BRAND_COLORS.grey}; margin-bottom: 8px;">Almost there — a few details about your plans so we can match you to the right programs.</p>
 
-        <div class="gg-form-field">
-          <label for="gg-company-name">Company Name <span class="required">*</span></label>
-          <input type="text" id="gg-company-name" required />
-          <span class="error-message">Please enter your company name</span>
-        </div>
+          <div class="gg-form-section-label">Your Business</div>
 
-        <div class="gg-form-field">
-          <label for="gg-company-website">Company Website</label>
-          <input type="url" id="gg-company-website" placeholder="https://example.com" />
-          <label class="gg-form-checkbox">
-            <input type="checkbox" id="gg-no-website" />
-            <span>I don't have a website yet</span>
-          </label>
-          <span class="error-message">Please enter a valid website URL</span>
-        </div>
+          <div class="gg-form-field">
+            <label for="gg-revenue">Annual Revenue <span class="required">*</span></label>
+            <div class="gg-form-hint">Last completed fiscal year</div>
+            <select id="gg-revenue">
+              ${createDropdownOptions(REVENUE_RANGES)}
+            </select>
+            <span class="error-message">Please select your revenue range</span>
+          </div>
 
-        <button type="button" class="gg-form-submit">Get My Grant Estimate</button>
+          <div class="gg-form-field">
+            <label for="gg-employees">Full-Time Employees <span class="required">*</span></label>
+            <select id="gg-employees">
+              ${createDropdownOptions(EMPLOYEE_RANGES)}
+            </select>
+            <span class="error-message">Please select your employee count</span>
+          </div>
+
+          <div class="gg-form-section-label">Your Plans (Next 12 Months)</div>
+
+          <div class="gg-form-info-banner">
+            <div class="gg-form-info-banner-icon">💡</div>
+            <div>Don't worry about exact numbers. Your AI Grant Advisor will refine the estimate with you after.</div>
+          </div>
+
+          <div class="gg-form-field">
+            <label for="gg-hiring">Hiring Plans <span class="required">*</span></label>
+            <div class="gg-form-hint">Full-time positions you plan to add</div>
+            <select id="gg-hiring">
+              ${createDropdownOptions(HIRING_OPTIONS)}
+            </select>
+            <span class="error-message">Please select your hiring plans</span>
+          </div>
+
+          <div class="gg-form-field">
+            <label for="gg-training">Training Budget</label>
+            <div class="gg-form-hint">External courses, certifications, professional development</div>
+            <select id="gg-training">
+              ${createDropdownOptions(BUDGET_OPTIONS)}
+            </select>
+          </div>
+
+          <div class="gg-form-field">
+            <label for="gg-expansion">Market Expansion</label>
+            <div class="gg-form-hint">International sales, trade shows, entering new markets</div>
+            <select id="gg-expansion">
+              ${createDropdownOptions(BUDGET_OPTIONS)}
+            </select>
+          </div>
+
+          <div class="gg-form-buttons">
+            <button type="button" class="gg-form-back" id="gg-form-back">← Back</button>
+            <button type="button" class="gg-form-submit in-page-2" id="gg-form-final-submit" disabled>Get My Free Estimate →</button>
+          </div>
+
+          <div class="gg-form-privacy">No commitment · Your info stays private</div>
+        </div>
 
         <div class="gg-form-loading">Connecting...</div>
       </div>
@@ -1096,69 +1397,194 @@
   // FORM HANDLING
   // ============================================================================
 
+  function validatePage1() {
+    const contactName = shadowRoot?.getElementById('gg-contact-name').value.trim();
+    const contactEmail = shadowRoot?.getElementById('gg-contact-email').value.trim();
+    const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
+    const companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
+    const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
+    const province = shadowRoot?.getElementById('gg-province').value;
+    const industry = shadowRoot?.getElementById('gg-industry').value;
+
+    let isValid = true;
+
+    // Name validation
+    if (!contactName) {
+      isValid = false;
+    }
+
+    // Email validation
+    if (!contactEmail || !contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      isValid = false;
+    }
+
+    // Company name validation
+    if (!companyName) {
+      isValid = false;
+    }
+
+    // Website validation OR province/industry validation
+    if (noWebsite) {
+      if (!province || !industry) {
+        isValid = false;
+      }
+    } else {
+      if (!companyWebsite) {
+        isValid = false;
+      }
+    }
+
+    return isValid;
+  }
+
+  function validatePage2() {
+    const revenue = shadowRoot?.getElementById('gg-revenue').value;
+    const employees = shadowRoot?.getElementById('gg-employees').value;
+    const hiring = shadowRoot?.getElementById('gg-hiring').value;
+
+    return revenue && employees && hiring;
+  }
+
+  function updateNextButtonState() {
+    const nextBtn = shadowRoot?.getElementById('gg-form-next');
+    if (nextBtn) {
+      nextBtn.disabled = !validatePage1();
+    }
+  }
+
+  function updateFinalSubmitButtonState() {
+    const submitBtn = shadowRoot?.getElementById('gg-form-final-submit');
+    if (submitBtn) {
+      submitBtn.disabled = !validatePage2();
+    }
+  }
+
+  function goToPage2() {
+    // Validate page 1
+    if (!validatePage1()) {
+      // Show errors on page 1
+      const contactName = shadowRoot?.getElementById('gg-contact-name').value.trim();
+      const contactEmail = shadowRoot?.getElementById('gg-contact-email').value.trim();
+      const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
+      const companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
+      const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
+      const province = shadowRoot?.getElementById('gg-province').value;
+      const industry = shadowRoot?.getElementById('gg-industry').value;
+
+      if (!contactName) {
+        shadowRoot?.getElementById('gg-contact-name').classList.add('error');
+      }
+      if (!contactEmail || !contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+        shadowRoot?.getElementById('gg-contact-email').classList.add('error');
+      }
+      if (!companyName) {
+        shadowRoot?.getElementById('gg-company-name').classList.add('error');
+      }
+      if (noWebsite && !province) {
+        shadowRoot?.getElementById('gg-province').classList.add('error');
+      }
+      if (noWebsite && !industry) {
+        shadowRoot?.getElementById('gg-industry').classList.add('error');
+      }
+      if (!noWebsite && !companyWebsite) {
+        shadowRoot?.getElementById('gg-company-website').classList.add('error');
+      }
+
+      return;
+    }
+
+    // Switch pages
+    currentPage = 2;
+    shadowRoot?.getElementById('gg-form-page-1')?.classList.remove('active');
+    shadowRoot?.getElementById('gg-form-page-2')?.classList.add('active');
+    shadowRoot?.getElementById('gg-step-1')?.classList.remove('active');
+    shadowRoot?.getElementById('gg-step-1')?.classList.add('inactive');
+    shadowRoot?.getElementById('gg-step-2')?.classList.remove('inactive');
+    shadowRoot?.getElementById('gg-step-2')?.classList.add('active');
+
+    // Update submit button state
+    updateFinalSubmitButtonState();
+  }
+
+  function goToPage1() {
+    currentPage = 1;
+    shadowRoot?.getElementById('gg-form-page-2')?.classList.remove('active');
+    shadowRoot?.getElementById('gg-form-page-1')?.classList.add('active');
+    shadowRoot?.getElementById('gg-step-2')?.classList.remove('active');
+    shadowRoot?.getElementById('gg-step-2')?.classList.add('inactive');
+    shadowRoot?.getElementById('gg-step-1')?.classList.remove('inactive');
+    shadowRoot?.getElementById('gg-step-1')?.classList.add('active');
+  }
+
   async function submitForm() {
+    // Validate page 2
+    if (!validatePage2()) {
+      // Show errors
+      const revenue = shadowRoot?.getElementById('gg-revenue').value;
+      const employees = shadowRoot?.getElementById('gg-employees').value;
+      const hiring = shadowRoot?.getElementById('gg-hiring').value;
+
+      if (!revenue) {
+        shadowRoot?.getElementById('gg-revenue').classList.add('error');
+      }
+      if (!employees) {
+        shadowRoot?.getElementById('gg-employees').classList.add('error');
+      }
+      if (!hiring) {
+        shadowRoot?.getElementById('gg-hiring').classList.add('error');
+      }
+
+      return;
+    }
+
     // Get form references
     const formContainer = shadowRoot?.querySelector('.gg-form-container');
     const chatInterface = shadowRoot?.querySelector('.gg-chat-interface');
     const formLoading = shadowRoot?.querySelector('.gg-form-loading');
-    const submitBtn = shadowRoot?.querySelector('.gg-form-submit');
+    const submitBtn = shadowRoot?.getElementById('gg-form-final-submit');
 
-    // Get field values
+    // Get all field values from both pages
     const contactName = shadowRoot?.getElementById('gg-contact-name').value.trim();
     const contactEmail = shadowRoot?.getElementById('gg-contact-email').value.trim();
     const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
     let companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
     const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
+    let province = shadowRoot?.getElementById('gg-province').value;
+    let industry = shadowRoot?.getElementById('gg-industry').value;
 
-    // Clear previous errors
-    shadowRoot?.querySelectorAll('.gg-form-field input').forEach(input => {
-      input.classList.remove('error');
-    });
-
-    // Validate fields
-    let hasError = false;
-
-    if (!contactName) {
-      shadowRoot?.getElementById('gg-contact-name').classList.add('error');
-      hasError = true;
-    }
-
-    if (!contactEmail || !contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
-      shadowRoot?.getElementById('gg-contact-email').classList.add('error');
-      hasError = true;
-    }
-
-    if (!companyName) {
-      shadowRoot?.getElementById('gg-company-name').classList.add('error');
-      hasError = true;
-    }
-
-    // Website validation: required unless "no website" is checked
-    if (!noWebsite && !companyWebsite) {
-      shadowRoot?.getElementById('gg-company-website').classList.add('error');
-      hasError = true;
-    }
-
-    if (hasError) {
-      return;
-    }
+    // Page 2 fields
+    const revenue = shadowRoot?.getElementById('gg-revenue').value;
+    const employees = shadowRoot?.getElementById('gg-employees').value;
+    const hiring = shadowRoot?.getElementById('gg-hiring').value;
+    const training = shadowRoot?.getElementById('gg-training').value;
+    const expansion = shadowRoot?.getElementById('gg-expansion').value;
 
     // If "no website" is checked, set website to null
     if (noWebsite) {
       companyWebsite = null;
-    } else if (companyWebsite) {
+    } else {
       // Add https:// protocol if missing
-      if (!companyWebsite.match(/^https?:\/\//i)) {
+      if (companyWebsite && !companyWebsite.match(/^https?:\/\//i)) {
         companyWebsite = 'https://' + companyWebsite;
       }
+      // Clear province/industry if website is provided (Haiku will extract)
+      province = null;
+      industry = null;
     }
 
-    // Prepare form data
+    // Prepare form data with all fields
     formData = {
       contact_name: contactName,
       email: contactEmail,
       company_name: companyName,
-      company_website: companyWebsite
+      company_website: companyWebsite,
+      province: province || null,
+      industry: industry || null,
+      revenue_range: revenue,
+      employee_count: employees,
+      hiring_plans: hiring,
+      training_budget: training || null,
+      expansion_budget: expansion || null
     };
 
     // Show loading, disable submit
@@ -1210,22 +1636,102 @@
   // ============================================================================
 
   function setupEventHandlers() {
-    // Form submit handler
-    const formSubmitBtn = shadowRoot?.querySelector('.gg-form-submit');
-    if (formSubmitBtn) {
-      formSubmitBtn.addEventListener('click', submitForm);
+    // Next button handler (page 1 → page 2)
+    const nextBtn = shadowRoot?.getElementById('gg-form-next');
+    if (nextBtn) {
+      nextBtn.addEventListener('click', goToPage2);
     }
+
+    // Back button handler (page 2 → page 1)
+    const backBtn = shadowRoot?.getElementById('gg-form-back');
+    if (backBtn) {
+      backBtn.addEventListener('click', goToPage1);
+    }
+
+    // Final submit button handler (page 2)
+    const finalSubmitBtn = shadowRoot?.getElementById('gg-form-final-submit');
+    if (finalSubmitBtn) {
+      finalSubmitBtn.addEventListener('click', submitForm);
+    }
+
+    // Page 1 field validation listeners
+    const page1Fields = [
+      shadowRoot?.getElementById('gg-contact-name'),
+      shadowRoot?.getElementById('gg-contact-email'),
+      shadowRoot?.getElementById('gg-company-name'),
+      shadowRoot?.getElementById('gg-company-website'),
+      shadowRoot?.getElementById('gg-province'),
+      shadowRoot?.getElementById('gg-industry')
+    ];
+
+    page1Fields.forEach(field => {
+      if (field) {
+        field.addEventListener('input', () => {
+          field.classList.remove('error');
+          updateNextButtonState();
+        });
+        if (field.tagName === 'SELECT') {
+          field.addEventListener('change', () => {
+            field.classList.remove('error');
+            updateNextButtonState();
+          });
+        }
+      }
+    });
+
+    // Page 2 field validation listeners
+    const page2Fields = [
+      shadowRoot?.getElementById('gg-revenue'),
+      shadowRoot?.getElementById('gg-employees'),
+      shadowRoot?.getElementById('gg-hiring'),
+      shadowRoot?.getElementById('gg-training'),
+      shadowRoot?.getElementById('gg-expansion')
+    ];
+
+    page2Fields.forEach(field => {
+      if (field) {
+        field.addEventListener('change', () => {
+          field.classList.remove('error');
+          updateFinalSubmitButtonState();
+        });
+      }
+    });
 
     // "No website" checkbox handler
     const noWebsiteCheckbox = shadowRoot?.getElementById('gg-no-website');
     const websiteInput = shadowRoot?.getElementById('gg-company-website');
-    if (noWebsiteCheckbox && websiteInput) {
+    const conditionalFields = shadowRoot?.getElementById('gg-conditional-fields');
+
+    if (noWebsiteCheckbox && websiteInput && conditionalFields) {
       noWebsiteCheckbox.addEventListener('change', (e) => {
-        websiteInput.disabled = e.target.checked;
-        if (e.target.checked) {
+        const isChecked = e.target.checked;
+
+        // Toggle website field
+        websiteInput.disabled = isChecked;
+        if (isChecked) {
           websiteInput.value = '';
           websiteInput.classList.remove('error');
         }
+
+        // Toggle conditional fields (province + industry)
+        if (isChecked) {
+          conditionalFields.classList.add('visible');
+        } else {
+          conditionalFields.classList.remove('visible');
+          // Clear province/industry when hiding
+          const provinceField = shadowRoot?.getElementById('gg-province');
+          const industryField = shadowRoot?.getElementById('gg-industry');
+          if (provinceField) {
+            provinceField.value = '';
+            provinceField.classList.remove('error');
+          }
+          if (industryField) {
+            industryField.value = '';
+            industryField.classList.remove('error');
+          }
+        }
+
+        updateNextButtonState();
       });
     }
 

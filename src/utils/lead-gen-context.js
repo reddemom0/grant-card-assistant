@@ -18,7 +18,7 @@ import { query } from '../database/connection.js';
 export async function getLeadGenFormContext(conversationId) {
   try {
     const result = await query(
-      `SELECT contact_name, contact_email, company_name, company_website, company_background
+      `SELECT contact_name, contact_email, company_name, company_website, company_background, prospect_data
        FROM lead_gen_conversations
        WHERE session_id = $1`,
       [conversationId]
@@ -40,6 +40,9 @@ export async function getLeadGenFormContext(conversationId) {
     console.log(`  Contact: ${session.contact_name} <${session.contact_email}>`);
     console.log(`  Company: ${session.company_name} (${session.company_website || 'no website'})`);
 
+    // Get prospect_data if available
+    const prospectData = session.prospect_data || {};
+
     // Build context string
     let context = `<lead_info>\nName: ${session.contact_name}\n`;
     context += `Email: ${session.contact_email}\n`;
@@ -47,6 +50,24 @@ export async function getLeadGenFormContext(conversationId) {
     if (session.company_website) {
       context += `Website: ${session.company_website}\n`;
     }
+
+    // Add new fields from prospect_data
+    if (prospectData.revenue_range) {
+      context += `Revenue: ${prospectData.revenue_range}\n`;
+    }
+    if (prospectData.employee_count) {
+      context += `Employees: ${prospectData.employee_count}\n`;
+    }
+    if (prospectData.hiring_plans) {
+      context += `Hiring Plans: ${prospectData.hiring_plans}\n`;
+    }
+    if (prospectData.training_budget) {
+      context += `Training Budget: ${prospectData.training_budget}\n`;
+    }
+    if (prospectData.expansion_budget) {
+      context += `Market Expansion: ${prospectData.expansion_budget}\n`;
+    }
+
     context += `</lead_info>\n\n`;
 
     // Add company background if extracted
@@ -59,12 +80,18 @@ export async function getLeadGenFormContext(conversationId) {
         context += `Description: ${bg.description}\n`;
       }
 
+      // Industry: prioritize Haiku extraction over form-provided
       if (bg.industry) {
         context += `Industry: ${bg.industry}\n`;
+      } else if (prospectData.industry) {
+        context += `Industry: ${prospectData.industry} (form-provided)\n`;
       }
 
+      // Location/Province: prioritize Haiku extraction over form-provided
       if (bg.location) {
         context += `Location: ${bg.location}\n`;
+      } else if (prospectData.province) {
+        context += `Province: ${prospectData.province} (form-provided)\n`;
       }
 
       if (bg.estimated_team_size) {
@@ -79,8 +106,24 @@ export async function getLeadGenFormContext(conversationId) {
 
       console.log(`✓ Company background extracted from website:\n${context}`);
     } else {
-      context += `<company_background>\nCould not extract company information from website. Proceed with standard discovery.\n</company_background>\n`;
-      console.log(`ℹ️  No company background available - website extraction may still be running`);
+      // No website extraction - use form-provided province/industry if available
+      context += `<company_background>\n`;
+
+      if (prospectData.industry) {
+        context += `Industry: ${prospectData.industry} (form-provided)\n`;
+      }
+
+      if (prospectData.province) {
+        context += `Province: ${prospectData.province} (form-provided)\n`;
+      }
+
+      if (!prospectData.industry && !prospectData.province) {
+        context += `Could not extract company information from website. Proceed with standard discovery.\n`;
+      }
+
+      context += `</company_background>\n`;
+
+      console.log(`ℹ️  No website extraction - using form-provided province/industry`);
     }
 
     return context;
