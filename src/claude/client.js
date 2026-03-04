@@ -413,6 +413,7 @@ export async function runAgent({
 
     let loopCount = 0;
     let accumulatedText = ''; // Track text across ALL iterations (fixes greeting loss bug)
+    let hasUnstreamedText = false; // Track if accumulated text from tool_use needs to be streamed
 
     while (loopCount < MAX_AGENT_LOOPS) {
       loopCount++;
@@ -540,13 +541,15 @@ export async function runAgent({
             // Substantive text: accumulate it (likely the actual response, not narration)
             if (isEndTurn) {
               accumulatedText = iterationText; // Replace (final text)
+              hasUnstreamedText = false; // end_turn text is already streamed by streamToSSE
             } else {
-              // Append substantive tool text
+              // Append substantive tool text (NOT streamed yet - will be flushed before done event)
               if (accumulatedText) {
                 accumulatedText += '\n' + iterationText;
               } else {
                 accumulatedText = iterationText;
               }
+              hasUnstreamedText = true; // Mark that we have unstreamed text from tool_use
             }
 
             // Apply regex safety net to strip any remaining narration patterns
@@ -667,6 +670,14 @@ export async function runAgent({
           await saveMessage(conversationId, 'user', userContent);
           await saveMessage(conversationId, 'assistant', contentToSave);
           console.log('✓ Messages saved to database');
+        }
+
+        // Flush any unstreamed accumulated text before sending done event
+        if (agentType === 'lead-gen' && hasUnstreamedText && accumulatedText && accumulatedText.trim()) {
+          console.log(`📤 Flushing unstreamed accumulated text (${accumulatedText.length} chars) before done event`);
+          const { sendSSEMessage } = await import('../utils/sse.js');
+          sendSSEMessage(res, 'text_delta', { text: accumulatedText });
+          sendSSEMessage(res, 'message_complete', {});
         }
 
         // Send completion event
@@ -820,6 +831,14 @@ export async function runAgent({
           await saveMessage(conversationId, 'assistant', contentToSave);
         }
 
+        // Flush any unstreamed accumulated text before sending done event
+        if (agentType === 'lead-gen' && hasUnstreamedText && accumulatedText && accumulatedText.trim()) {
+          console.log(`📤 Flushing unstreamed accumulated text (${accumulatedText.length} chars) before done event (max_tokens)`);
+          const { sendSSEMessage } = await import('../utils/sse.js');
+          sendSSEMessage(res, 'text_delta', { text: accumulatedText });
+          sendSSEMessage(res, 'message_complete', {});
+        }
+
         closeSSE(res);
 
         return {
@@ -871,6 +890,14 @@ export async function runAgent({
           const { saveMessage } = await import('../database/messages.js');
           await saveMessage(conversationId, 'user', userContent);
           await saveMessage(conversationId, 'assistant', contentToSave);
+        }
+
+        // Flush any unstreamed accumulated text before sending done event
+        if (agentType === 'lead-gen' && hasUnstreamedText && accumulatedText && accumulatedText.trim()) {
+          console.log(`📤 Flushing unstreamed accumulated text (${accumulatedText.length} chars) before done event (stop_sequence)`);
+          const { sendSSEMessage } = await import('../utils/sse.js');
+          sendSSEMessage(res, 'text_delta', { text: accumulatedText });
+          sendSSEMessage(res, 'message_complete', {});
         }
 
         closeSSE(res);
