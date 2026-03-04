@@ -186,7 +186,7 @@ export async function searchGetGranted(input) {
     }));
 
     // Build result
-    const result = {
+    let result = {
       success: true,
       count: grants.length,
       filters_applied: {
@@ -201,6 +201,79 @@ export async function searchGetGranted(input) {
       data_source: 'database',
       last_synced: 'Daily at 2 AM Pacific Time'
     };
+
+    // Auto-broaden search if zero results and industries filter was used
+    if (grants.length === 0 && industries.length > 0) {
+      console.log(`   ⚠️ Zero results with industries filter [${industries.join(', ')}] - retrying without industries`);
+
+      // Retry without industries filter
+      const retryParams = new URLSearchParams();
+
+      if (purposes.length > 0) {
+        retryParams.append('grantTypes', purposes.join(','));
+      }
+      if (regions.length > 0) {
+        retryParams.append('regions', regions.join(','));
+      }
+      if (include_inactive || !active_only) {
+        retryParams.append('includeInactive', 'true');
+      }
+      retryParams.append('maxResults', limit.toString());
+      if (keywords.length > 0) {
+        retryParams.append('keywords', keywords.join(','));
+      }
+
+      console.log(`   🔄 Retry search: ${SEARCH_ENDPOINT_URL}?${retryParams.toString()}`);
+      const retryResponse = await fetch(`${SEARCH_ENDPOINT_URL}?${retryParams.toString()}`);
+
+      if (retryResponse.ok) {
+        const retryResults = await retryResponse.json();
+        console.log(`   ✅ Retry found ${retryResults.total} grants without industries filter`);
+
+        // Format retry results
+        const retryGrants = retryResults.grants.map(grant => ({
+          grant_id: grant.grant_id,
+          grant_name: grant.grant_name,
+          grant_type: grant.grant_type,
+          grant_amount: grant.grant_amount,
+          url: grant.url,
+          regions: grant.regions,
+          industries: grant.industries,
+          program_provider: grant.program_provider,
+          deadline: grant.deadline,
+          max_spend: grant.max_spend,
+          contribution_percentage: grant.contribution_percentage,
+          difficulty: grant.difficulty,
+          grant_criteria: fetch_full_details ? grant.grant_criteria : undefined,
+          best_practices: fetch_full_details ? grant.best_practices : undefined,
+          full_page_text: fetch_full_details ? grant.full_page_text : undefined,
+          recently_changed: grant.recently_changed,
+          last_updated: grant.last_updated,
+          is_active: grant.is_active,
+          currently_accepting: grant.currently_accepting,
+          exclusion_reason: grant.exclusion_reason,
+          keyword_score: grant.keyword_score,
+          intake_cycle: grant.intake_cycle
+        }));
+
+        result = {
+          success: true,
+          count: retryGrants.length,
+          filters_applied: {
+            purposes: purposes.length > 0 ? purposes : 'all',
+            regions: regions.length > 0 ? regions : 'all',
+            industries: 'broadened (original filter returned 0 results)',
+            active_only,
+            include_inactive,
+            open_intakes_only
+          },
+          filter_note: `Your industry filter [${industries.join(', ')}] returned no matches. Most grants are industry-agnostic, so we broadened the search. Review the results below to find relevant programs.`,
+          grants: retryGrants,
+          data_source: 'database',
+          last_synced: 'Daily at 2 AM Pacific Time'
+        };
+      }
+    }
 
     // Cache results (if Redis is available)
     if (redis) {

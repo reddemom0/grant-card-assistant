@@ -623,15 +623,31 @@ export async function runAgent({
           // Lead-gen: save to lead_gen_conversations.messages JSONB array
           // CRITICAL: Use accumulated text from ALL iterations, not just final iteration
           const userText = typeof message === 'string' ? message : JSON.stringify(message);
-          const assistantText = accumulatedText || ''; // Use accumulated text across all iterations
+          let assistantText = accumulatedText || ''; // Use accumulated text across all iterations
 
           if (!assistantText || assistantText.trim() === '') {
-            console.warn('⚠️  Skipping empty assistant response (no text across all iterations)');
-          } else {
-            const { appendLeadGenMessages } = await import('../api/lead-gen.js');
-            await appendLeadGenMessages(conversationId, userText, assistantText);
-            console.log(`✓ Messages saved to database (${assistantText.length} chars from ${loopCount} iterations)`);
+            console.warn('⚠️  Empty assistant response detected - injecting fallback message');
+
+            // Get contact name from form data for personalization
+            const { query } = await import('../database/connection.js');
+            const formResult = await query(
+              'SELECT contact_name FROM lead_gen_conversations WHERE session_id = $1',
+              [conversationId]
+            );
+            const contactName = formResult.rows[0]?.contact_name || 'there';
+
+            // Inject fallback message
+            assistantText = `Hey ${contactName} — thanks for filling that out! I'm pulling together your funding estimate now. Give me just a moment and I'll have your personalized breakdown ready.`;
+
+            // Stream fallback to frontend
+            const { sendSSEMessage } = await import('../utils/sse.js');
+            sendSSEMessage(res, 'text_delta', { text: assistantText });
+            sendSSEMessage(res, 'message_complete', {});
           }
+
+          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+          await appendLeadGenMessages(conversationId, userText, assistantText);
+          console.log(`✓ Messages saved to database (${assistantText.length} chars from ${loopCount} iterations)`);
         } else {
           // Standard agents: save to messages table
           const { saveMessage } = await import('../database/messages.js');
@@ -761,14 +777,30 @@ export async function runAgent({
 
         if (agentType === 'lead-gen') {
           const userText = typeof message === 'string' ? message : JSON.stringify(message);
-          const assistantText = accumulatedText || ''; // Use accumulated text
+          let assistantText = accumulatedText || ''; // Use accumulated text
 
           if (!assistantText || assistantText.trim() === '') {
-            console.warn('⚠️  Skipping empty assistant response (max_tokens, no text)');
-          } else {
-            const { appendLeadGenMessages } = await import('../api/lead-gen.js');
-            await appendLeadGenMessages(conversationId, userText, assistantText);
+            console.warn('⚠️  Empty assistant response detected (max_tokens) - injecting fallback message');
+
+            // Get contact name from form data for personalization
+            const { query } = await import('../database/connection.js');
+            const formResult = await query(
+              'SELECT contact_name FROM lead_gen_conversations WHERE session_id = $1',
+              [conversationId]
+            );
+            const contactName = formResult.rows[0]?.contact_name || 'there';
+
+            // Inject fallback message
+            assistantText = `Hey ${contactName} — thanks for filling that out! I'm pulling together your funding estimate now. Give me just a moment and I'll have your personalized breakdown ready.`;
+
+            // Stream fallback to frontend
+            const { sendSSEMessage } = await import('../utils/sse.js');
+            sendSSEMessage(res, 'text_delta', { text: assistantText });
+            sendSSEMessage(res, 'message_complete', {});
           }
+
+          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+          await appendLeadGenMessages(conversationId, userText, assistantText);
         } else {
           const { saveMessage } = await import('../database/messages.js');
           await saveMessage(conversationId, 'user', userContent);
@@ -798,14 +830,30 @@ export async function runAgent({
 
         if (agentType === 'lead-gen') {
           const userText = typeof message === 'string' ? message : JSON.stringify(message);
-          const assistantText = accumulatedText || ''; // Use accumulated text
+          let assistantText = accumulatedText || ''; // Use accumulated text
 
           if (!assistantText || assistantText.trim() === '') {
-            console.warn('⚠️  Skipping empty assistant response (stop_sequence, no text)');
-          } else {
-            const { appendLeadGenMessages } = await import('../api/lead-gen.js');
-            await appendLeadGenMessages(conversationId, userText, assistantText);
+            console.warn('⚠️  Empty assistant response detected (stop_sequence) - injecting fallback message');
+
+            // Get contact name from form data for personalization
+            const { query } = await import('../database/connection.js');
+            const formResult = await query(
+              'SELECT contact_name FROM lead_gen_conversations WHERE session_id = $1',
+              [conversationId]
+            );
+            const contactName = formResult.rows[0]?.contact_name || 'there';
+
+            // Inject fallback message
+            assistantText = `Hey ${contactName} — thanks for filling that out! I'm pulling together your funding estimate now. Give me just a moment and I'll have your personalized breakdown ready.`;
+
+            // Stream fallback to frontend
+            const { sendSSEMessage } = await import('../utils/sse.js');
+            sendSSEMessage(res, 'text_delta', { text: assistantText });
+            sendSSEMessage(res, 'message_complete', {});
           }
+
+          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+          await appendLeadGenMessages(conversationId, userText, assistantText);
         } else {
           const { saveMessage } = await import('../database/messages.js');
           await saveMessage(conversationId, 'user', userContent);
