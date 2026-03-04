@@ -656,9 +656,8 @@ export async function runAgent({
             assistantText = `Hey ${contactName} — thanks for filling that out! I'm pulling together your funding estimate now. Give me just a moment and I'll have your personalized breakdown ready.`;
 
             // Stream fallback to frontend
-            const { sendSSEMessage } = await import('../utils/sse.js');
-            sendSSEMessage(res, 'text_delta', { text: assistantText });
-            sendSSEMessage(res, 'message_complete', {});
+            sendSSE(res, { type: 'text_delta', text: assistantText });
+            sendSSE(res, { type: 'message_complete' });
           }
 
           const { appendLeadGenMessages } = await import('../api/lead-gen.js');
@@ -675,9 +674,8 @@ export async function runAgent({
         // Flush any unstreamed accumulated text before sending done event
         if (agentType === 'lead-gen' && hasUnstreamedText && accumulatedText && accumulatedText.trim()) {
           console.log(`📤 Flushing unstreamed accumulated text (${accumulatedText.length} chars) before done event`);
-          const { sendSSEMessage } = await import('../utils/sse.js');
-          sendSSEMessage(res, 'text_delta', { text: accumulatedText });
-          sendSSEMessage(res, 'message_complete', {});
+          sendSSE(res, { type: 'text_delta', text: accumulatedText });
+          sendSSE(res, { type: 'message_complete' });
         }
 
         // Send completion event
@@ -818,9 +816,8 @@ export async function runAgent({
             assistantText = `Hey ${contactName} — thanks for filling that out! I'm pulling together your funding estimate now. Give me just a moment and I'll have your personalized breakdown ready.`;
 
             // Stream fallback to frontend
-            const { sendSSEMessage } = await import('../utils/sse.js');
-            sendSSEMessage(res, 'text_delta', { text: assistantText });
-            sendSSEMessage(res, 'message_complete', {});
+            sendSSE(res, { type: 'text_delta', text: assistantText });
+            sendSSE(res, { type: 'message_complete' });
           }
 
           const { appendLeadGenMessages } = await import('../api/lead-gen.js');
@@ -834,9 +831,8 @@ export async function runAgent({
         // Flush any unstreamed accumulated text before sending done event
         if (agentType === 'lead-gen' && hasUnstreamedText && accumulatedText && accumulatedText.trim()) {
           console.log(`📤 Flushing unstreamed accumulated text (${accumulatedText.length} chars) before done event (max_tokens)`);
-          const { sendSSEMessage } = await import('../utils/sse.js');
-          sendSSEMessage(res, 'text_delta', { text: accumulatedText });
-          sendSSEMessage(res, 'message_complete', {});
+          sendSSE(res, { type: 'text_delta', text: accumulatedText });
+          sendSSE(res, { type: 'message_complete' });
         }
 
         closeSSE(res);
@@ -879,9 +875,8 @@ export async function runAgent({
             assistantText = `Hey ${contactName} — thanks for filling that out! I'm pulling together your funding estimate now. Give me just a moment and I'll have your personalized breakdown ready.`;
 
             // Stream fallback to frontend
-            const { sendSSEMessage } = await import('../utils/sse.js');
-            sendSSEMessage(res, 'text_delta', { text: assistantText });
-            sendSSEMessage(res, 'message_complete', {});
+            sendSSE(res, { type: 'text_delta', text: assistantText });
+            sendSSE(res, { type: 'message_complete' });
           }
 
           const { appendLeadGenMessages } = await import('../api/lead-gen.js');
@@ -895,9 +890,8 @@ export async function runAgent({
         // Flush any unstreamed accumulated text before sending done event
         if (agentType === 'lead-gen' && hasUnstreamedText && accumulatedText && accumulatedText.trim()) {
           console.log(`📤 Flushing unstreamed accumulated text (${accumulatedText.length} chars) before done event (stop_sequence)`);
-          const { sendSSEMessage } = await import('../utils/sse.js');
-          sendSSEMessage(res, 'text_delta', { text: accumulatedText });
-          sendSSEMessage(res, 'message_complete', {});
+          sendSSE(res, { type: 'text_delta', text: accumulatedText });
+          sendSSE(res, { type: 'message_complete' });
         }
 
         closeSSE(res);
