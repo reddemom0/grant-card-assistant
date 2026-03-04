@@ -226,8 +226,20 @@ function buildNoteBody(sessionData, trigger) {
   }
 
   // Funding estimate
-  if (estimated_funding) {
-    lines.push(`Estimated funding potential: ${estimated_funding}`);
+  if (estimated_funding || sessionData.available_now_funding) {
+    if (sessionData.available_now_funding && sessionData.available_now_funding !== estimated_funding) {
+      // Show two-tier funding (NOW vs 12 MONTHS)
+      lines.push(`Funding available NOW: ${sessionData.available_now_funding}`);
+      lines.push(`Estimated funding potential (12 months): ${estimated_funding || 'TBD'}`);
+    } else {
+      // Show single funding estimate
+      lines.push(`Estimated funding potential: ${estimated_funding}`);
+    }
+
+    if (sessionData.programs_matched_count) {
+      lines.push(`Programs matched: ${sessionData.programs_matched_count} programs`);
+    }
+
     lines.push('');
   }
 
@@ -594,12 +606,46 @@ export async function createHubSpotRecordOnEstimate(sessionId) {
   }
 
   // -------------------------------------------------------------------------
-  // 6. Create Note
+  // 6. Load memory_store data and create Note
   // -------------------------------------------------------------------------
 
   if (companyId || contactId) {
     try {
-      const noteBody = buildNoteBody(session, 'estimate_delivered');
+      // Load enriched data from memory_store (conversation_memory table)
+      const memoryResult = await query(
+        `SELECT key, value FROM conversation_memory WHERE conversation_id = $1`,
+        [sessionId]
+      );
+
+      // Merge memory_store data into session object
+      const enrichedSession = { ...session };
+
+      memoryResult.rows.forEach(row => {
+        const { key, value } = row;
+
+        // Top-level fields that buildNoteBody expects
+        if (key === 'matched_programs') {
+          try {
+            enrichedSession.matched_programs = JSON.parse(value);
+          } catch {
+            enrichedSession.matched_programs = value;
+          }
+        } else if (key === 'estimated_funding') {
+          enrichedSession.estimated_funding = value;
+        } else if (key === 'available_now_funding') {
+          enrichedSession.available_now_funding = value;
+        } else if (key === 'programs_matched_count') {
+          enrichedSession.programs_matched_count = value;
+        } else {
+          // All other memory_store fields go into prospect_data
+          enrichedSession.prospect_data = enrichedSession.prospect_data || {};
+          enrichedSession.prospect_data[key] = value;
+        }
+      });
+
+      console.log(`✓ Loaded ${memoryResult.rows.length} memory_store items for note`);
+
+      const noteBody = buildNoteBody(enrichedSession, 'estimate_delivered');
       const noteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
       console.log(`✅ Note created (ID: ${noteId})`);
     } catch (err) {
