@@ -109,7 +109,9 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             'rd_activity', 'prior_grant_experience',
             // Strategic qualification fields (Pass 2)
             'timeline', 'budget_committed', 'is_decision_maker', 'growth_plans',
-            'existing_consultant'
+            'existing_consultant',
+            // Funding estimate fields
+            'estimated_funding', 'available_now_funding', 'programs_matched_count'
           ];
 
           if (prospectDataKeys.includes(input.key)) {
@@ -131,6 +133,46 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
               console.log(`✓ Prospect data updated: ${fieldName} = ${JSON.stringify(input.value).substring(0, 100)}`);
             } catch (err) {
               console.warn(`⚠️  Failed to update prospect_data for ${input.key}:`, err.message);
+            }
+          }
+
+          // STAGE 1 HUBSPOT CREATION: When estimated_funding is stored, create HubSpot record
+          if (input.key === 'estimated_funding' && input.value) {
+            try {
+              console.log(`📊 Estimate delivered — creating HubSpot record (Stage 1)`);
+              const { createHubSpotRecordOnEstimate } = await import('../api/lead-gen-finalization.js');
+
+              const hubspotResult = await createHubSpotRecordOnEstimate(conversationId);
+
+              if (hubspotResult.success) {
+                console.log(`✅ HubSpot record created on estimate delivery (Company ID: ${hubspotResult.companyId})`);
+              } else if (hubspotResult.alreadyExists) {
+                console.log(`ℹ️  HubSpot record already exists — skipping creation`);
+              } else {
+                console.warn(`⚠️  HubSpot creation failed: ${hubspotResult.error}`);
+              }
+            } catch (err) {
+              console.warn(`⚠️  Failed to create HubSpot record on estimate:`, err.message);
+              // Don't fail the memory_store operation if HubSpot creation fails
+            }
+          }
+
+          // Also store matched_programs in top-level field for finalization
+          if (input.key === 'matched_programs' && input.value) {
+            try {
+              const { query: dbQuery } = await import('../database/connection.js');
+
+              await dbQuery(
+                `UPDATE lead_gen_conversations
+                 SET matched_programs = $1,
+                     updated_at = NOW()
+                 WHERE session_id = $2`,
+                [JSON.stringify(input.value), conversationId]
+              );
+
+              console.log(`✓ Matched programs stored: ${Array.isArray(input.value) ? input.value.length : 0} programs`);
+            } catch (err) {
+              console.warn(`⚠️  Failed to store matched_programs:`, err.message);
             }
           }
         }
