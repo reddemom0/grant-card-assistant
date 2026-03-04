@@ -532,9 +532,22 @@ export async function runAgent({
 
       if (iterationText) {
         if (agentType === 'lead-gen') {
-          // Lead-gen: ONLY save text from final iteration (prevents tool narration)
-          if (fullResponse.stop_reason === 'end_turn') {
-            accumulatedText = iterationText; // Replace, don't append (only final text matters)
+          // Lead-gen: Save text from final iteration OR from tool_use if it's substantive (200+ chars)
+          const isEndTurn = fullResponse.stop_reason === 'end_turn';
+          const isSubstantiveToolText = fullResponse.stop_reason === 'tool_use' && iterationText.length >= 200;
+
+          if (isEndTurn || isSubstantiveToolText) {
+            // Substantive text: accumulate it (likely the actual response, not narration)
+            if (isEndTurn) {
+              accumulatedText = iterationText; // Replace (final text)
+            } else {
+              // Append substantive tool text
+              if (accumulatedText) {
+                accumulatedText += '\n' + iterationText;
+              } else {
+                accumulatedText = iterationText;
+              }
+            }
 
             // Apply regex safety net to strip any remaining narration patterns
             const cleaned = stripToolNarration(accumulatedText);
@@ -550,9 +563,9 @@ export async function runAgent({
               accumulatedText = htmlConverted;
             }
 
-            console.log(`  📝 Final iteration text: ${accumulatedText.length} chars (lead-gen mode: discarding tool narration)`);
+            console.log(`  📝 ${isEndTurn ? 'Final' : 'Substantive'} text: ${iterationText.length} chars (accumulated: ${accumulatedText.length})`);
           } else {
-            console.log(`  🔇 Skipping tool narration text: ${iterationText.length} chars (stop_reason: ${fullResponse.stop_reason})`);
+            console.log(`  🔇 Skipping short tool narration: ${iterationText.length} chars (stop_reason: ${fullResponse.stop_reason})`);
           }
         } else {
           // Other agents: preserve old behavior (accumulate from all iterations)
