@@ -110,6 +110,7 @@
   let formData = null; // Store form data after submission
   let showingForm = false; // Track if form is currently displayed
   let currentPage = 1; // Form page state (1 or 2)
+  let hasReceivedFirstMessage = false; // Track first agent message for quick actions
 
   // ============================================================================
   // UTILITY FUNCTIONS
@@ -563,6 +564,48 @@
           width: 20px;
           height: 20px;
           fill: white;
+        }
+
+        .gg-summary-bar {
+          padding: 8px 20px;
+          border-top: 1px solid ${BRAND_COLORS.lightGrey};
+          flex-shrink: 0;
+        }
+
+        .gg-summary-button {
+          width: 100%;
+          padding: 10px 16px;
+          background: white;
+          border: 1.5px solid ${BRAND_COLORS.primary};
+          border-radius: 8px;
+          color: ${BRAND_COLORS.primary};
+          font-size: 14px;
+          font-weight: 600;
+          font-family: inherit;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+        }
+
+        .gg-summary-button:hover:not(:disabled) {
+          background: ${BRAND_COLORS.primaryLight};
+        }
+
+        .gg-summary-button:disabled {
+          border-color: ${BRAND_COLORS.lightGrey};
+          color: ${BRAND_COLORS.grey};
+          cursor: not-allowed;
+          background: ${BRAND_COLORS.lightBg};
+        }
+
+        .gg-summary-button.sent {
+          background: #f0fdf4;
+          border-color: #22c55e;
+          color: #16a34a;
+          cursor: default;
         }
 
         .gg-footer {
@@ -1050,14 +1093,6 @@
           <!-- Conditional fields shown when "no website" is checked -->
           <div class="gg-conditional-fields" id="gg-conditional-fields">
             <div class="gg-form-field">
-              <label for="gg-province">Province <span class="required">*</span></label>
-              <select id="gg-province">
-                ${createDropdownOptions(PROVINCES)}
-              </select>
-              <span class="error-message">Please select your province</span>
-            </div>
-
-            <div class="gg-form-field">
               <label for="gg-industry">Industry <span class="required">*</span></label>
               <select id="gg-industry">
                 ${createDropdownOptions(INDUSTRIES)}
@@ -1074,6 +1109,14 @@
           <p style="font-size: 14px; color: ${BRAND_COLORS.grey}; margin-bottom: 8px;">Almost there — a few details about your plans so we can match you to the right programs.</p>
 
           <div class="gg-form-section-label">Your Business</div>
+
+          <div class="gg-form-field">
+            <label for="gg-province">Province <span class="required">*</span></label>
+            <select id="gg-province">
+              ${createDropdownOptions(PROVINCES)}
+            </select>
+            <span class="error-message">Please select your province</span>
+          </div>
 
           <div class="gg-form-field">
             <label for="gg-revenue">Annual Revenue <span class="required">*</span></label>
@@ -1139,6 +1182,11 @@
       <div class="gg-chat-interface hidden">
         <div class="gg-chat-messages"></div>
         ${config.quickActions.length > 0 ? '<div class="gg-quick-actions"></div>' : ''}
+        <div class="gg-summary-bar">
+          <button class="gg-summary-button" id="gg-summary-button" aria-label="Send funding summary to email">
+            📧 Send me the funding summary
+          </button>
+        </div>
         <div class="gg-chat-input-wrapper">
           <textarea
             class="gg-chat-input"
@@ -1216,12 +1264,26 @@
   }
 
   function showQuickActions() {
-    if (config.quickActions.length === 0) return;
-
     const quickActionsContainer = shadowRoot?.querySelector('.gg-quick-actions');
     if (!quickActionsContainer) return;
 
-    quickActionsContainer.innerHTML = config.quickActions
+    // Generate post-estimate conversation starters based on form data
+    const actions = [];
+    const hiringPlans = formData?.hiring_plans;
+
+    // Only show hiring-related quick actions if actively hiring
+    if (hiringPlans && hiringPlans !== "Not hiring right now") {
+      actions.push("How do the hiring subsidies work?");
+      actions.push("What about co-op students?");
+    }
+
+    // Always show timing and service tier questions
+    actions.push("Tell me about the timing");
+    actions.push("What does Granted Starter include?");
+
+    if (actions.length === 0) return;
+
+    quickActionsContainer.innerHTML = actions
       .map(action => `<button class="gg-quick-action">${escapeHtml(action)}</button>`)
       .join('');
 
@@ -1230,7 +1292,7 @@
       button.addEventListener('click', () => {
         const message = button.textContent;
         sendMessage(message);
-        quickActionsContainer.remove();
+        // Quick actions will be removed by sendMessage automatically
       });
     });
   }
@@ -1254,9 +1316,18 @@
 
     const trimmedMessage = message.trim();
 
-    // Show user message in UI (skip for hidden init messages)
-    if (!isHidden) {
+    // Show user message in UI (skip for hidden init messages and system messages)
+    const isSystemMessage = trimmedMessage.startsWith('[SYSTEM:');
+    if (!isHidden && !isSystemMessage) {
       addUserMessage(trimmedMessage);
+    }
+
+    // Hide quick actions after any user message (manual or quick action click)
+    if (!isHidden && !isSystemMessage) {
+      const quickActionsContainer = shadowRoot?.querySelector('.gg-quick-actions');
+      if (quickActionsContainer) {
+        quickActionsContainer.remove();
+      }
     }
 
     // Clear input
@@ -1389,6 +1460,14 @@
       if (inputField) {
         inputField.focus();
       }
+
+      // Show quick actions after first agent message (post-estimate)
+      if (!hasReceivedFirstMessage && assistantText) {
+        hasReceivedFirstMessage = true;
+        setTimeout(() => {
+          showQuickActions();
+        }, 500); // Small delay for smoother UX
+      }
     }
   }
 
@@ -1403,7 +1482,6 @@
     const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
     const companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
     const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
-    const province = shadowRoot?.getElementById('gg-province').value;
     const industry = shadowRoot?.getElementById('gg-industry').value;
 
     let isValid = true;
@@ -1423,9 +1501,9 @@
       isValid = false;
     }
 
-    // Website validation OR province/industry validation
+    // Website validation OR industry validation
     if (noWebsite) {
-      if (!province || !industry) {
+      if (!industry) {
         isValid = false;
       }
     } else {
@@ -1438,11 +1516,12 @@
   }
 
   function validatePage2() {
+    const province = shadowRoot?.getElementById('gg-province').value;
     const revenue = shadowRoot?.getElementById('gg-revenue').value;
     const employees = shadowRoot?.getElementById('gg-employees').value;
     const hiring = shadowRoot?.getElementById('gg-hiring').value;
 
-    return revenue && employees && hiring;
+    return province && revenue && employees && hiring;
   }
 
   function updateNextButtonState() {
@@ -1468,7 +1547,6 @@
       const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
       const companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
       const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
-      const province = shadowRoot?.getElementById('gg-province').value;
       const industry = shadowRoot?.getElementById('gg-industry').value;
 
       if (!contactName) {
@@ -1479,9 +1557,6 @@
       }
       if (!companyName) {
         shadowRoot?.getElementById('gg-company-name').classList.add('error');
-      }
-      if (noWebsite && !province) {
-        shadowRoot?.getElementById('gg-province').classList.add('error');
       }
       if (noWebsite && !industry) {
         shadowRoot?.getElementById('gg-industry').classList.add('error');
@@ -1520,10 +1595,14 @@
     // Validate page 2
     if (!validatePage2()) {
       // Show errors
+      const province = shadowRoot?.getElementById('gg-province').value;
       const revenue = shadowRoot?.getElementById('gg-revenue').value;
       const employees = shadowRoot?.getElementById('gg-employees').value;
       const hiring = shadowRoot?.getElementById('gg-hiring').value;
 
+      if (!province) {
+        shadowRoot?.getElementById('gg-province').classList.add('error');
+      }
       if (!revenue) {
         shadowRoot?.getElementById('gg-revenue').classList.add('error');
       }
@@ -1567,8 +1646,8 @@
       if (companyWebsite && !companyWebsite.match(/^https?:\/\//i)) {
         companyWebsite = 'https://' + companyWebsite;
       }
-      // Clear province/industry if website is provided (Haiku will extract)
-      province = null;
+      // Clear industry if website is provided (Haiku will extract)
+      // Province stays - it's always required from form
       industry = null;
     }
 
@@ -1578,8 +1657,8 @@
       email: contactEmail,
       company_name: companyName,
       company_website: companyWebsite,
-      province: province || null,
-      industry: industry || null,
+      province: province, // Always required from form (page 2)
+      industry: industry || null, // Only from form if no website
       revenue_range: revenue,
       employee_count: employees,
       hiring_plans: hiring,
@@ -1618,10 +1697,7 @@
       await sendMessage('Hi', true);
       setInputEnabled(true);
 
-      // Show quick actions for inline mode
-      if (config.mode === 'inline') {
-        showQuickActions();
-      }
+      // Quick actions will be shown after first agent response completes
 
     } catch (error) {
       console.error('Form submission error:', error);
@@ -1660,7 +1736,6 @@
       shadowRoot?.getElementById('gg-contact-email'),
       shadowRoot?.getElementById('gg-company-name'),
       shadowRoot?.getElementById('gg-company-website'),
-      shadowRoot?.getElementById('gg-province'),
       shadowRoot?.getElementById('gg-industry')
     ];
 
@@ -1681,6 +1756,7 @@
 
     // Page 2 field validation listeners
     const page2Fields = [
+      shadowRoot?.getElementById('gg-province'),
       shadowRoot?.getElementById('gg-revenue'),
       shadowRoot?.getElementById('gg-employees'),
       shadowRoot?.getElementById('gg-hiring'),
@@ -1713,18 +1789,13 @@
           websiteInput.classList.remove('error');
         }
 
-        // Toggle conditional fields (province + industry)
+        // Toggle conditional fields (industry only)
         if (isChecked) {
           conditionalFields.classList.add('visible');
         } else {
           conditionalFields.classList.remove('visible');
-          // Clear province/industry when hiding
-          const provinceField = shadowRoot?.getElementById('gg-province');
+          // Clear industry when hiding
           const industryField = shadowRoot?.getElementById('gg-industry');
-          if (provinceField) {
-            provinceField.value = '';
-            provinceField.classList.remove('error');
-          }
           if (industryField) {
             industryField.value = '';
             industryField.classList.remove('error');
@@ -1806,6 +1877,36 @@
       sendButton.addEventListener('click', () => {
         if (inputField && !inputField.disabled) {
           sendMessage(inputField.value);
+        }
+      });
+    }
+
+    // Summary button handler
+    const summaryButton = shadowRoot?.getElementById('gg-summary-button');
+    if (summaryButton) {
+      summaryButton.addEventListener('click', async () => {
+        if (summaryButton.disabled || summaryButton.classList.contains('sent')) {
+          return;
+        }
+
+        // Disable button and show "Sending..." state
+        summaryButton.disabled = true;
+        summaryButton.textContent = '⏳ Sending...';
+
+        try {
+          // Send system message (hidden from UI)
+          await sendMessage('[SYSTEM: User requested email summary]', true);
+
+          // Update button to "sent" state
+          summaryButton.classList.add('sent');
+          summaryButton.textContent = '✓ Summary sent!';
+          summaryButton.disabled = true;
+
+        } catch (error) {
+          console.error('Summary request failed:', error);
+          // Reset button on error
+          summaryButton.disabled = false;
+          summaryButton.textContent = '📧 Send me the funding summary';
         }
       });
     }

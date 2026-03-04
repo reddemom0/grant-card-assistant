@@ -52,6 +52,10 @@ export async function getLeadGenFormContext(conversationId) {
     }
 
     // Add new fields from prospect_data
+    // Province is always required and always from form
+    if (prospectData.province) {
+      context += `Province: ${prospectData.province}\n`;
+    }
     if (prospectData.revenue_range) {
       context += `Revenue: ${prospectData.revenue_range}\n`;
     }
@@ -87,11 +91,9 @@ export async function getLeadGenFormContext(conversationId) {
         context += `Industry: ${prospectData.industry} (form-provided)\n`;
       }
 
-      // Location/Province: prioritize Haiku extraction over form-provided
+      // Location: if Haiku extracted location, include it (form province already in <lead_info>)
       if (bg.location) {
         context += `Location: ${bg.location}\n`;
-      } else if (prospectData.province) {
-        context += `Province: ${prospectData.province} (form-provided)\n`;
       }
 
       if (bg.estimated_team_size) {
@@ -106,24 +108,20 @@ export async function getLeadGenFormContext(conversationId) {
 
       console.log(`✓ Company background extracted from website:\n${context}`);
     } else {
-      // No website extraction - use form-provided province/industry if available
+      // No website extraction - use form-provided industry if available
       context += `<company_background>\n`;
 
       if (prospectData.industry) {
         context += `Industry: ${prospectData.industry} (form-provided)\n`;
       }
 
-      if (prospectData.province) {
-        context += `Province: ${prospectData.province} (form-provided)\n`;
-      }
-
-      if (!prospectData.industry && !prospectData.province) {
+      if (!prospectData.industry) {
         context += `Could not extract company information from website. Proceed with standard discovery.\n`;
       }
 
       context += `</company_background>\n`;
 
-      console.log(`ℹ️  No website extraction - using form-provided province/industry`);
+      console.log(`ℹ️  No website extraction - using form-provided industry`);
     }
 
     return context;

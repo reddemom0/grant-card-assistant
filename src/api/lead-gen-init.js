@@ -282,9 +282,9 @@ export async function handleLeadGenInit(req, res) {
     }
 
     // Validate new required fields from page 2
-    if (!revenue_range || !employee_count || !hiring_plans) {
+    if (!province || !revenue_range || !employee_count || !hiring_plans) {
       return res.status(400).json({
-        error: 'Missing required fields: revenue_range, employee_count, hiring_plans'
+        error: 'Missing required fields: province, revenue_range, employee_count, hiring_plans'
       });
     }
 
