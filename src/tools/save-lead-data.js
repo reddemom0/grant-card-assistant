@@ -352,6 +352,56 @@ export async function saveLeadData(input, conversationId) {
   }
 
   // -------------------------------------------------------------------------
+  // 0. Auto-pull matched_programs and funding fields from memory_store
+  //    (Infrastructure-level override to ensure actual program names are used)
+  // -------------------------------------------------------------------------
+
+  try {
+    const memoryFields = await query(
+      `SELECT key, value FROM conversation_memory
+       WHERE conversation_id = $1
+         AND key IN ('matched_programs', 'programs_matched_count', 'estimated_funding', 'available_now_funding')`,
+      [conversationId]
+    );
+
+    memoryFields.rows.forEach(row => {
+      const { key, value } = row;
+
+      if (key === 'matched_programs' && value) {
+        const agentValue = input.matched_programs;
+        console.log(`✅ matched_programs overridden from memory_store`);
+        console.log(`   Agent sent: ${JSON.stringify(agentValue)?.substring(0, 150)}...`);
+        console.log(`   Using stored: ${value.substring(0, 150)}...`);
+
+        // Parse stored value (could be JSON array or comma-separated string)
+        try {
+          input.matched_programs = JSON.parse(value);
+        } catch {
+          // If not JSON, split comma-separated string
+          input.matched_programs = value.split(',').map(s => s.trim());
+        }
+      } else if (key === 'programs_matched_count' && value) {
+        if (input.programs_matched_count && input.programs_matched_count !== value) {
+          console.log(`✅ programs_matched_count overridden from memory_store (agent: ${input.programs_matched_count}, stored: ${value})`);
+        }
+        input.programs_matched_count = value;
+      } else if (key === 'estimated_funding' && value) {
+        if (input.estimated_funding && input.estimated_funding !== value) {
+          console.log(`✅ estimated_funding overridden from memory_store (agent: ${input.estimated_funding}, stored: ${value})`);
+        }
+        input.estimated_funding = value;
+      } else if (key === 'available_now_funding' && value) {
+        if (input.available_now_funding && input.available_now_funding !== value) {
+          console.log(`✅ available_now_funding overridden from memory_store (agent: ${input.available_now_funding}, stored: ${value})`);
+        }
+        input.available_now_funding = value;
+      }
+    });
+  } catch (err) {
+    console.warn(`⚠️  Failed to load memory_store overrides (will use agent values):`, err.message);
+  }
+
+  // -------------------------------------------------------------------------
   // 1. Update lead_gen_conversations with contact info and all captured data
   // -------------------------------------------------------------------------
   try {
