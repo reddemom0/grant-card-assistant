@@ -11,6 +11,10 @@
 
 import { query } from '../database/connection.js';
 import {
+  determineServiceTier,
+  loadEnrichedSessionData
+} from './lead-gen-helpers.js';
+import {
   createHubSpotCompany,
   createHubSpotContact,
   updateHubSpotCompany,
@@ -154,7 +158,42 @@ async function createHubSpotNote(noteBody, contactId, companyId, hubspotClient) 
 }
 
 /**
+ * Update existing HubSpot Note with new content
+ * @param {string} noteId - HubSpot note ID to update
+ * @param {string} noteBody - New note body content
+ * @param {Object} hubspotClient - Axios instance with HubSpot auth
+ * @returns {string} Note ID
+ */
+async function updateHubSpotNote(noteId, noteBody, hubspotClient) {
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would update HubSpot note:');
+    console.log(JSON.stringify({
+      endpoint: `/crm/v3/objects/notes/${noteId}`,
+      method: 'PATCH',
+      properties: {
+        hs_timestamp: new Date().toISOString(),
+        hs_note_body: noteBody
+      }
+    }, null, 2));
+    console.log('');
+    return noteId;
+  }
+
+  await hubspotClient.patch(`/crm/v3/objects/notes/${noteId}`, {
+    properties: {
+      hs_timestamp: new Date().toISOString(),
+      hs_note_body: noteBody
+    }
+  });
+
+  console.log(`✏️ HubSpot note updated: ${noteId}`);
+  return noteId;
+}
+
+/**
  * Build HubSpot note body for finalized conversation
+ * @deprecated Use buildNoteBodyComprehensive instead
  */
 function buildNoteBody(sessionData, trigger) {
   const { prospect_data, matched_programs, estimated_funding, cta_selected, message_count, contact_name, contact_email } = sessionData;
@@ -262,6 +301,299 @@ function buildNoteBody(sessionData, trigger) {
   // Booking link
   lines.push('---');
   lines.push(`Booking link: ${BOOKING_LINK}`);
+
+  return lines.join('\n');
+}
+
+/**
+ * Build comprehensive HubSpot note body with ALL data sources
+ *
+ * This function assembles a complete prospect profile from multiple data sources:
+ * 1. Pre-chat form (page 1 + page 2)
+ * 2. Haiku company extraction (company_background)
+ * 3. Phase 1 estimate delivery (memory_store)
+ * 4. Phase 2 conversation enrichment (memory_store)
+ * 5. Agent analysis (lead_score, prospect_summary, service tier)
+ *
+ * @param {Object} sessionData - Session record with all data
+ * @param {string} trigger - 'estimate_delivered' | 'contact_captured' | 'inactivity_timeout'
+ * @param {string} serviceTier - 'pro' | 'starter' | 'getgranted' | null
+ * @returns {string} Plain text note body
+ */
+function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
+  const {
+    prospect_data,
+    company_background,
+    matched_programs,
+    estimated_funding,
+    available_now_funding,
+    programs_matched_count,
+    cta_selected,
+    message_count,
+    contact_name,
+    contact_email,
+    company_website
+  } = sessionData;
+
+  const pd = prospect_data || {};
+  const bg = company_background ? (typeof company_background === 'string' ? JSON.parse(company_background) : company_background) : {};
+
+  const lines = ['=== Grant Advisor Chat — Lead Summary ===', ''];
+
+  // =========================================================================
+  // TRIGGER-SPECIFIC HEADER
+  // =========================================================================
+
+  if (trigger === 'inactivity_timeout') {
+    lines.push(`⚠️ No contact info captured — visitor abandoned chat after ${message_count} exchanges`);
+    lines.push('This record was auto-created to preserve conversation data.');
+    lines.push('');
+  } else if (trigger === 'estimate_delivered') {
+    lines.push('📊 INITIAL ESTIMATE — Captured after Phase 1 (estimate delivery)');
+    lines.push('Additional qualification data may be captured in Phase 2.');
+    lines.push('');
+  }
+
+  // =========================================================================
+  // PROSPECT SUMMARY (if agent provided one)
+  // =========================================================================
+
+  if (pd.prospect_summary) {
+    lines.push(pd.prospect_summary);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+
+  // =========================================================================
+  // CONTACT & COMPANY INFO
+  // =========================================================================
+
+  if (contact_name || contact_email) {
+    const contactLine = contact_name && contact_email
+      ? `Contact: ${contact_name} <${contact_email}>`
+      : contact_name
+        ? `Contact: ${contact_name}`
+        : `Email: ${contact_email}`;
+    lines.push(contactLine);
+  }
+
+  if (pd.company_name) {
+    const companyLine = company_website
+      ? `Company: ${pd.company_name} (${company_website})`
+      : `Company: ${pd.company_name}`;
+    lines.push(companyLine);
+  }
+
+  // Province (always from form)
+  if (pd.province) {
+    lines.push(`Province: ${pd.province}`);
+  }
+
+  // Industry (Haiku extraction preferred, form fallback)
+  const industry = bg.industry || pd.industry;
+  if (industry) {
+    const source = bg.industry ? 'extracted from website' : 'form-provided';
+    lines.push(`Industry: ${industry} (${source})`);
+  }
+
+  // Location (from Haiku extraction)
+  if (bg.location) {
+    lines.push(`Location: ${bg.location}`);
+  }
+
+  // Revenue & Employees (from form)
+  if (pd.revenue_range || pd.revenue) {
+    lines.push(`Revenue: ${pd.revenue_range || pd.revenue}`);
+  }
+  if (pd.employee_count) {
+    lines.push(`Employees: ${pd.employee_count}`);
+  }
+
+  // Company description (Haiku extraction preferred, agent fallback)
+  const companyDesc = bg.description || pd.company_description;
+  if (companyDesc) {
+    const source = bg.description ? 'extracted from website' : 'agent-collected';
+    lines.push(`About: ${companyDesc} (${source})`);
+  }
+
+  // Products/Services (from Haiku extraction)
+  if (bg.products_services) {
+    lines.push(`Products/Services: ${bg.products_services}`);
+  }
+
+  // Team size estimate (from Haiku extraction)
+  if (bg.estimated_team_size) {
+    lines.push(`Estimated Team Size: ${bg.estimated_team_size} (from website)`);
+  }
+
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  // =========================================================================
+  // ACTIVITIES & PLANS (from form + conversation)
+  // =========================================================================
+
+  lines.push('Activities & Plans:');
+  lines.push('');
+
+  if (pd.hiring_plans) {
+    lines.push(`Hiring: ${pd.hiring_plans}`);
+  }
+
+  if (pd.training_budget) {
+    lines.push(`Training Budget: ${pd.training_budget}`);
+  }
+
+  if (pd.expansion_budget) {
+    lines.push(`Market Expansion Budget: ${pd.expansion_budget}`);
+  }
+
+  // Activities discussed during conversation (from agent analysis)
+  if (pd.activities_discussed || pd.activities) {
+    const activities = pd.activities_discussed || pd.activities;
+    lines.push(`Activities Discussed: ${activities}`);
+  }
+
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  // =========================================================================
+  // FUNDING ESTIMATE
+  // =========================================================================
+
+  if (estimated_funding || available_now_funding) {
+    lines.push('💰 Funding Estimate:');
+    lines.push('');
+
+    if (available_now_funding && available_now_funding !== estimated_funding) {
+      // Two-tier funding (NOW vs 12 MONTHS)
+      lines.push(`Available NOW: ${available_now_funding}`);
+      lines.push(`12-Month Potential: ${estimated_funding || 'TBD'}`);
+    } else {
+      // Single funding estimate
+      lines.push(`Estimated Potential: ${estimated_funding}`);
+    }
+
+    if (programs_matched_count) {
+      lines.push(`Programs Matched: ${programs_matched_count} programs`);
+    }
+
+    lines.push('');
+  }
+
+  // Programs matched (with actual program names)
+  if (matched_programs && matched_programs.length > 0) {
+    lines.push('Programs Matched:');
+
+    // If it's an array, format one per line
+    if (Array.isArray(matched_programs)) {
+      matched_programs.forEach(program => {
+        lines.push(`  • ${program}`);
+      });
+    } else {
+      // If it's a string (shouldn't be, but handle it)
+      lines.push(matched_programs);
+    }
+
+    lines.push('');
+  }
+
+  // Service tier recommendation
+  if (serviceTier) {
+    const tierLabels = {
+      pro: 'GrantedPro ($30K+)',
+      starter: 'Granted Starter ($15K-$29,999)',
+      getgranted: 'GetGranted (under $15K)'
+    };
+    lines.push(`Service Tier Recommended: ${tierLabels[serviceTier] || serviceTier}`);
+    lines.push('');
+  }
+
+  lines.push('---');
+  lines.push('');
+
+  // =========================================================================
+  // QUALIFICATION SIGNALS
+  // =========================================================================
+
+  lines.push('🎯 Qualification Signals:');
+  lines.push('');
+
+  // Timeline
+  lines.push(`Timeline: ${pd.timeline || 'Not discussed'}`);
+
+  // Budget
+  const budgetValue = pd.budget_committed !== undefined
+    ? (pd.budget_committed === true ? 'Allocated' : pd.budget_committed === false ? 'Exploring' : pd.budget_committed)
+    : 'Not discussed';
+  lines.push(`Budget: ${budgetValue}`);
+
+  // Decision maker
+  const dmValue = pd.is_decision_maker !== undefined
+    ? (pd.is_decision_maker === true ? 'Yes' : pd.is_decision_maker === false ? 'No' : pd.is_decision_maker)
+    : 'Not discussed';
+  lines.push(`Decision Maker: ${dmValue}`);
+
+  // Grant experience
+  lines.push(`Grant Experience: ${pd.prior_grant_experience || 'Not discussed'}`);
+
+  // Existing consultant
+  lines.push(`Existing Consultant: ${pd.existing_consultant || 'Not discussed'}`);
+
+  // Growth plans
+  lines.push(`Growth Plans: ${pd.growth_plans || 'Not discussed'}`);
+
+  lines.push('');
+
+  // Lead score & status
+  if (pd.lead_score) {
+    const scoreLabels = {
+      hot: 'HOT (ready to close)',
+      warm: 'WARM (promising)',
+      cool: 'COOL (early stage)'
+    };
+    const scoreLabel = scoreLabels[pd.lead_score] || pd.lead_score;
+    lines.push(`Lead Score: ${scoreLabel}`);
+  }
+
+  if (pd.hs_lead_status) {
+    lines.push(`Lead Status: ${pd.hs_lead_status}`);
+  }
+
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  // =========================================================================
+  // CONVERSATION METADATA
+  // =========================================================================
+
+  if (cta_selected) {
+    const ctaLabels = {
+      book_call: 'Book a strategy call',
+      email_summary: 'Email summary requested',
+      resources: 'Resources requested',
+      none: 'No CTA taken'
+    };
+    lines.push(`CTA Selected: ${ctaLabels[cta_selected] || cta_selected}`);
+  }
+
+  lines.push(`Conversation Length: ${message_count} messages`);
+  lines.push('');
+
+  // =========================================================================
+  // BOOKING LINK (tier-based)
+  // =========================================================================
+
+  // Only include booking link for Starter ($15K+) and Pro ($30K+) tiers
+  // Exclude for GetGranted (under $15K)
+  if (serviceTier && serviceTier !== 'getgranted') {
+    lines.push('---');
+    lines.push(`📅 Booking Link: https://meetings.hubspot.com/natalie392/15min-intro-to-granted`);
+  }
 
   return lines.join('\n');
 }
@@ -606,48 +938,25 @@ export async function createHubSpotRecordOnEstimate(sessionId) {
   }
 
   // -------------------------------------------------------------------------
-  // 6. Load memory_store data and create Note
+  // 6. Load enriched data and create comprehensive Note
   // -------------------------------------------------------------------------
+
+  let noteId = null;
 
   if (companyId || contactId) {
     try {
-      // Load enriched data from memory_store (conversation_memory table)
-      const memoryResult = await query(
-        `SELECT key, value FROM conversation_memory WHERE conversation_id = $1`,
-        [sessionId]
-      );
+      // Load enriched session data (session + memory_store + company_background)
+      const enrichedSession = await loadEnrichedSessionData(sessionId);
 
-      // Merge memory_store data into session object
-      const enrichedSession = { ...session };
+      // Determine service tier from funding estimate
+      const serviceTier = determineServiceTier(enrichedSession.estimated_funding);
 
-      memoryResult.rows.forEach(row => {
-        const { key, value } = row;
+      // Build comprehensive note with ALL data sources
+      const noteBody = buildNoteBodyComprehensive(enrichedSession, 'estimate_delivered', serviceTier);
 
-        // Top-level fields that buildNoteBody expects
-        if (key === 'matched_programs') {
-          try {
-            enrichedSession.matched_programs = JSON.parse(value);
-          } catch {
-            enrichedSession.matched_programs = value;
-          }
-        } else if (key === 'estimated_funding') {
-          enrichedSession.estimated_funding = value;
-        } else if (key === 'available_now_funding') {
-          enrichedSession.available_now_funding = value;
-        } else if (key === 'programs_matched_count') {
-          enrichedSession.programs_matched_count = value;
-        } else {
-          // All other memory_store fields go into prospect_data
-          enrichedSession.prospect_data = enrichedSession.prospect_data || {};
-          enrichedSession.prospect_data[key] = value;
-        }
-      });
-
-      console.log(`✓ Loaded ${memoryResult.rows.length} memory_store items for note`);
-
-      const noteBody = buildNoteBody(enrichedSession, 'estimate_delivered');
-      const noteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
-      console.log(`✅ Note created (ID: ${noteId})`);
+      // Create HubSpot note
+      noteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
+      console.log(`✅ Stage 1 note created (ID: ${noteId})`);
     } catch (err) {
       console.warn('⚠️  Note creation failed:', err.message);
     }
@@ -666,11 +975,12 @@ export async function createHubSpotRecordOnEstimate(sessionId) {
       [JSON.stringify({
         hubspot_company_id: companyId,
         hubspot_contact_id: contactId,
+        hubspot_note_id: noteId,
         hubspot_created_at: new Date().toISOString()
       }), sessionId]
     );
 
-    console.log(`✅ Stored HubSpot IDs in database`);
+    console.log(`✅ Stored HubSpot IDs in database (Company: ${companyId}, Contact: ${contactId}, Note: ${noteId})`);
   } catch (err) {
     console.warn(`⚠️  Failed to store HubSpot IDs:`, err.message);
   }
@@ -679,6 +989,7 @@ export async function createHubSpotRecordOnEstimate(sessionId) {
     success: true,
     companyId,
     contactId,
+    noteId,
     message: 'HubSpot record created on estimate delivery'
   };
 }
@@ -975,17 +1286,46 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   }
 
   // -------------------------------------------------------------------------
-  // 6. Create Note
+  // 6. Update or Create Comprehensive Note
   // -------------------------------------------------------------------------
 
   if (companyId || contactId) {
     try {
-      const noteBody = buildNoteBody(session, trigger);
-      const noteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
-      results.note = { action: 'created', id: noteId };
-      console.log(`✅ Note created and associated (ID: ${noteId})`);
+      // Load enriched session data (session + memory_store + company_background)
+      const enrichedSession = await loadEnrichedSessionData(sessionId);
+
+      // Determine service tier from funding estimate
+      const serviceTier = determineServiceTier(
+        enrichedSession.estimated_funding || enrichedSession.prospect_data?.estimated_funding
+      );
+
+      // Build comprehensive note with ALL data sources
+      const noteBody = buildNoteBodyComprehensive(enrichedSession, trigger, serviceTier);
+
+      // Check if Stage 1 note already exists
+      const existingNoteId = prospectData.hubspot_note_id;
+
+      if (existingNoteId) {
+        // UPDATE existing note (Stage 1 → Stage 2 enrichment)
+        try {
+          await updateHubSpotNote(existingNoteId, noteBody, hubspotClient);
+          results.note = { action: 'updated', id: existingNoteId };
+          console.log(`✅ Stage 2: Updated existing note (ID: ${existingNoteId}) with enriched data`);
+        } catch (updateErr) {
+          // Fallback: If update fails (note was deleted?), create new note
+          console.warn(`⚠️  Note update failed (${updateErr.message}), creating new note as fallback`);
+          const newNoteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
+          results.note = { action: 'created_fallback', id: newNoteId };
+          console.log(`✅ Stage 2: Created new note as fallback (ID: ${newNoteId})`);
+        }
+      } else {
+        // CREATE new note (Stage 1 didn't happen, or note creation failed)
+        const newNoteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
+        results.note = { action: 'created', id: newNoteId };
+        console.log(`✅ Stage 2: Created comprehensive note (ID: ${newNoteId})`);
+      }
     } catch (err) {
-      console.warn('⚠️  Note creation failed:', err.message);
+      console.warn('⚠️  Note creation/update failed:', err.message);
       results.note = { action: 'failed', error: err.message };
     }
   }
