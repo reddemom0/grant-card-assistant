@@ -180,15 +180,39 @@ async function updateHubSpotNote(noteId, noteBody, hubspotClient) {
     return noteId;
   }
 
-  await hubspotClient.patch(`/crm/v3/objects/notes/${noteId}`, {
+  // 🔍 DEBUG: Log the PATCH request details
+  const endpoint = `/crm/v3/objects/notes/${noteId}`;
+  const payload = {
     properties: {
       hs_timestamp: new Date().toISOString(),
       hs_note_body: noteBody
     }
-  });
+  };
 
-  console.log(`✏️ HubSpot note updated: ${noteId}`);
-  return noteId;
+  console.log(`\n🔍 DEBUG: HubSpot note PATCH request`);
+  console.log(`  Endpoint: ${endpoint}`);
+  console.log(`  Note ID: ${noteId}`);
+  console.log(`  Property name: hs_note_body`);
+  console.log(`  Note body length: ${noteBody.length} chars`);
+  console.log(`  Note body preview (first 200 chars): ${noteBody.substring(0, 200)}...`);
+
+  try {
+    const response = await hubspotClient.patch(endpoint, payload);
+
+    // 🔍 DEBUG: Log the full response
+    console.log(`\n🔍 DEBUG: HubSpot note PATCH response`);
+    console.log(`  Status: ${response.status}`);
+    console.log(`  Response data:`, JSON.stringify(response.data, null, 2));
+
+    console.log(`✏️ HubSpot note updated: ${noteId}`);
+    return noteId;
+  } catch (err) {
+    console.error(`\n❌ HubSpot note PATCH failed:`);
+    console.error(`  Error message: ${err.message}`);
+    console.error(`  Response status: ${err.response?.status}`);
+    console.error(`  Response data:`, JSON.stringify(err.response?.data, null, 2));
+    throw err;
+  }
 }
 
 /**
