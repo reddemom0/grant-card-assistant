@@ -18,6 +18,7 @@ const __dirname = dirname(__filename);
 
 // Cache loaded data files
 let industryGroupsData = null;
+let industryGroupMapping = null;
 let provinceRates = {};
 let federalRates = null;
 let tierRules = null;
@@ -32,6 +33,7 @@ function loadDataFiles() {
     const dataDir = join(__dirname, '../../data/rates');
 
     industryGroupsData = JSON.parse(readFileSync(join(dataDir, 'industry-groups.json'), 'utf8'));
+    industryGroupMapping = JSON.parse(readFileSync(join(dataDir, 'industry-group-mapping.json'), 'utf8'));
     federalRates = JSON.parse(readFileSync(join(dataDir, 'federal-rates.json'), 'utf8'));
     tierRules = JSON.parse(readFileSync(join(dataDir, 'tier-rules.json'), 'utf8'));
     consultantRouting = JSON.parse(readFileSync(join(dataDir, 'consultant-routing.json'), 'utf8'));
@@ -71,6 +73,8 @@ function loadProvinceRates(province) {
 /**
  * Resolve industry string to standardized industry + group
  *
+ * Uses industry-group-mapping.json for comprehensive coverage of all widget dropdown values.
+ *
  * @param {string} industryInput - Raw industry string
  * @returns {object} { matched_industry, group, group_label, confidence }
  */
@@ -82,21 +86,49 @@ export function resolveIndustry(industryInput) {
     return {
       matched_industry: 'Other',
       group: 1,
-      group_label: industryGroupsData.group_labels['1'],
+      group_label: industryGroupMapping.groups['1'],
       confidence: 'default'
     };
   }
 
   const input = industryInput.trim();
 
+  // Try exact match in comprehensive mapping
+  if (industryGroupMapping.mapping[input]) {
+    const group = industryGroupMapping.mapping[input];
+    console.log(`✅ Industry: "${input}" → Group ${group} (${industryGroupMapping.groups[group.toString()]})`);
+    return {
+      matched_industry: input,
+      group,
+      group_label: industryGroupMapping.groups[group.toString()],
+      confidence: 'exact'
+    };
+  }
+
+  // Try case-insensitive match
+  const inputLower = input.toLowerCase();
+  for (const [industry, group] of Object.entries(industryGroupMapping.mapping)) {
+    if (industry.toLowerCase() === inputLower) {
+      console.log(`✅ Industry: "${input}" → Group ${group} (${industryGroupMapping.groups[group.toString()]}) [case-insensitive]`);
+      return {
+        matched_industry: industry,
+        group,
+        group_label: industryGroupMapping.groups[group.toString()],
+        confidence: 'case_insensitive'
+      };
+    }
+  }
+
+  // Fallback to old industry-groups.json for legacy support
   // Try exact match
   if (industryGroupsData.industries[input]) {
     const group = industryGroupsData.industries[input];
+    console.log(`✅ Industry: "${input}" → Group ${group} (${industryGroupsData.group_labels[group.toString()]}) [legacy exact]`);
     return {
       matched_industry: input,
       group,
       group_label: industryGroupsData.group_labels[group.toString()],
-      confidence: 'exact'
+      confidence: 'legacy_exact'
     };
   }
 
@@ -104,6 +136,7 @@ export function resolveIndustry(industryInput) {
   if (industryGroupsData.synonyms[input]) {
     const matched = industryGroupsData.synonyms[input];
     const group = industryGroupsData.industries[matched];
+    console.log(`✅ Industry: "${input}" → "${matched}" → Group ${group} (${industryGroupsData.group_labels[group.toString()]}) [synonym]`);
     return {
       matched_industry: matched,
       group,
@@ -112,41 +145,12 @@ export function resolveIndustry(industryInput) {
     };
   }
 
-  // Try case-insensitive synonym match
-  const inputLower = input.toLowerCase();
-  for (const [synonym, industry] of Object.entries(industryGroupsData.synonyms)) {
-    if (synonym.toLowerCase() === inputLower) {
-      const group = industryGroupsData.industries[industry];
-      return {
-        matched_industry: industry,
-        group,
-        group_label: industryGroupsData.group_labels[group.toString()],
-        confidence: 'synonym'
-      };
-    }
-  }
-
-  // Try fuzzy substring matching
-  const inputWords = inputLower.split(/\s+/);
-  for (const [industry, group] of Object.entries(industryGroupsData.industries)) {
-    const industryLower = industry.toLowerCase();
-    // Check if any significant input word matches the industry
-    if (inputWords.some(word => word.length > 3 && industryLower.includes(word))) {
-      return {
-        matched_industry: industry,
-        group,
-        group_label: industryGroupsData.group_labels[group.toString()],
-        confidence: 'fuzzy'
-      };
-    }
-  }
-
   // Default to Group 1
   console.warn(`⚠️  No match for industry "${input}", defaulting to Group 1`);
   return {
     matched_industry: 'Other',
     group: 1,
-    group_label: industryGroupsData.group_labels['1'],
+    group_label: industryGroupMapping.groups['1'],
     confidence: 'default'
   };
 }
@@ -480,7 +484,14 @@ function buildSearchParameters(industryResolution, province, grantCategories, pr
 
   // Build keywords from industry + categories
   const keywords = new Set();
-  keywords.add(industryResolution.matched_industry);
+
+  // Use group label for keywords if matched_industry is "Other" (more meaningful for search)
+  // Otherwise use the actual industry name (even if not canonical, it might match grants)
+  const industryKeyword = industryResolution.matched_industry === 'Other'
+    ? industryResolution.group_label
+    : industryResolution.matched_industry;
+
+  keywords.add(industryKeyword);
   keywords.add(industryResolution.group_label);
 
   grantCategories.forEach(cat => {
@@ -507,7 +518,7 @@ function buildSearchParameters(industryResolution, province, grantCategories, pr
     province_full_name: provinceFullName,
     purposes: Array.from(purposes),
     keywords: Array.from(keywords),
-    industry_keyword: industryResolution.matched_industry,
+    industry_keyword: industryKeyword,
     company_size: prospectData.num_ftes || null,
     exclude_grant_amounts_above: maxGrantAmount
   };

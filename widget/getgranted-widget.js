@@ -54,118 +54,123 @@
     "Northwest Territories", "Nunavut", "Yukon"
   ];
 
-  // Detailed industry categories matching grant rate groups
+  // Canonical industry list matching rate tables exactly (from data/rates/industry-groups.json)
   const INDUSTRIES = {
     categories: [
       {
         header: "Professional Services & Services",
         industries: [
-          "Accounting / Bookkeeping",
-          "Legal Services",
-          "Management Consulting",
-          "Marketing / Advertising",
+          "Accounting",
+          "Advertising/Marketing",
+          "Alternative Medicine",
+          "Arts & Culture",
+          "Association",
+          "Auto Repairs & Auto Parts",
+          "Automotive Dealers",
+          "Auxiliary Services",
+          "Charity/Non-Profit",
+          "Consulting - Business",
+          "Consumer Services",
+          "Educational Services",
+          "Esthetics & Spas",
+          "Film/Music/Entertainment",
+          "Financial",
+          "Healthcare",
+          "Healthcare - Dental",
+          "Healthcare - Physio",
+          "Hospitality/Lodging/Tourism",
+          "Insurance",
+          "Legal",
+          "Media - Broadcast",
+          "Media - Podcast",
+          "Media - Print/Publishing",
           "Public Relations",
-          "Architecture",
-          "Engineering Services",
-          "Design Services",
-          "Business Services",
-          "Human Resources Consulting",
-          "Financial Services",
-          "Real Estate Services",
-          "Retail Store",
-          "E-Commerce / Online Retail",
-          "Restaurants / Food Service",
-          "Hotel / Accommodation",
-          "Tourism / Travel",
-          "Entertainment / Events",
-          "Arts / Creative Industries",
-          "Healthcare Services",
-          "Education / Training",
-          "Childcare Services",
-          "Fitness / Wellness",
-          "Personal Services"
+          "Real Estate",
+          "Recreation",
+          "Restaurants/Cafes",
+          "Retail",
+          "Social Enterprise",
+          "Travel",
+          "Utilities",
+          "Veterinary",
+          "Warehousing",
+          "Wellness",
+          "Wellness - Counselling/Therapy",
+          "Wellness - Fitness",
+          "Wellness - Registered Practitioner",
+          "Wholesaling"
         ]
       },
       {
         header: "Agriculture",
         industries: [
-          "Agriculture / Farming",
-          "Aquaculture / Fisheries",
-          "Food & Beverage Manufacturing",
-          "Agribusiness",
-          "Greenhouse / Horticulture",
-          "Livestock / Ranching",
-          "Agricultural Equipment",
-          "Food Processing",
-          "Organic Farming",
-          "Vineyard / Winery"
+          "Agriculture - Crop",
+          "Agriculture - Dairy",
+          "Agriculture - Livestock",
+          "Agriculture - Tree Fruit",
+          "Agriculture - Vineyard/Wine"
         ]
       },
       {
         header: "Construction & Supply Chain",
         industries: [
-          "General Construction",
-          "Residential Construction",
-          "Commercial Construction",
-          "Specialty Trades",
-          "Plumbing / HVAC",
-          "Electrical Contracting",
-          "Landscaping",
-          "Transportation / Logistics",
-          "Warehousing / Distribution",
-          "Freight / Shipping",
-          "Supply Chain Management"
+          "Architecture/Design",
+          "Construction",
+          "Construction Supplier",
+          "Engineering",
+          "Logistics/Trucking"
         ]
       },
       {
         header: "Manufacturing",
         industries: [
-          "Industrial Manufacturing",
-          "Textiles / Apparel",
-          "Electronics Manufacturing",
-          "Machinery / Equipment",
-          "Automotive Parts",
-          "Aerospace / Aviation",
-          "Chemicals / Materials",
-          "Plastics / Packaging",
-          "Metal Fabrication",
-          "Furniture Manufacturing",
-          "Medical Devices",
-          "Consumer Products"
+          "Apparel/Textiles (Manufacturing)",
+          "Consumer Goods (Manufacturing)",
+          "Electronic (Manufacturing)",
+          "Food Processing",
+          "Food/Beverage (Manufacturing)",
+          "Healthcare - Manufacturing",
+          "Industrial (Manufacturing)",
+          "Manufacturing",
+          "Metal (Manufacturing)",
+          "Paper/Print (Manufacturing)",
+          "Plastics (Manufacturing)",
+          "Wood Products (Manufacturing)"
         ]
       },
       {
         header: "Natural Resources / CleanTech",
         industries: [
-          "Forestry / Lumber",
-          "Mining / Extraction",
-          "Oil & Gas",
-          "Renewable Energy",
-          "Clean Technology",
-          "Environmental Services",
-          "Waste Management / Recycling",
-          "Biotechnology / Life Sciences",
-          "Cannabis Production",
-          "Solar / Wind Energy",
-          "Green Building Technology"
+          "Environmental - Education",
+          "Environmental - Green Technologies",
+          "Environmental - Waste Management",
+          "Fishery",
+          "Forestry",
+          "Mining/Quarrying",
+          "Oil & Gas Extraction",
+          "Ship Building & Repair/Maritime Operations"
         ]
       },
       {
         header: "Technology",
         industries: [
-          "Software Development / SaaS",
-          "IT Services & Consulting",
-          "Cybersecurity",
-          "AI / Machine Learning",
-          "Cloud Computing",
-          "E-Commerce Platform",
-          "Mobile App Development",
-          "Web Development",
-          "Data Analytics / BI",
-          "Telecommunications",
-          "Gaming / Interactive Media",
-          "Fintech",
-          "Hardware / IoT"
+          "Animation",
+          "Aviation & Aerospace",
+          "Biotechnology",
+          "Computer/Network Security",
+          "E-Commerce",
+          "Healthcare - Technology",
+          "Tech - AI",
+          "Tech - Hardware",
+          "Tech - Software/Web Development",
+          "Technology",
+          "Video Games"
+        ]
+      },
+      {
+        header: "Other",
+        industries: [
+          "Other"
         ]
       }
     ]
