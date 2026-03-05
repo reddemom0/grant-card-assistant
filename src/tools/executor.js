@@ -811,9 +811,9 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                 result = {
                   success: true,
                   grants: searchResults.programs_found.map(p => ({
-                    grant_name: p.name,
+                    grant_name: p.grant_name || p.name,
                     grant_amount: p.max_grant_amount || p.grant_amount || 'amount varies',
-                    currently_accepting: p.status === 'open' || p.accepting_applications,
+                    currently_accepting: p.currently_accepting || p.status === 'open' || p.accepting_applications,
                     intake_cycle: p.intake_cycle || null,
                     description: p.description || null,
                     purposes: p.purposes || [],

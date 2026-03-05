@@ -108,24 +108,35 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
           limit: 15
         });
 
-        if (results && results.programs && results.programs.length > 0) {
-          console.log(`      ✅ Found ${results.programs.length} programs`);
+        // Diagnostic logging to debug response shape
+        console.log(`      📦 Response type: ${typeof results}, keys: ${results ? Object.keys(results).join(', ') : 'null'}`);
+
+        if (results && results.grants && results.grants.length > 0) {
+          console.log(`      ✅ Found ${results.grants.length} grants`);
+          allPrograms.push(...results.grants);
+        } else if (results && results.programs && results.programs.length > 0) {
+          // Fallback: check if response uses 'programs' key instead
+          console.log(`      ✅ Found ${results.programs.length} programs (via programs key)`);
           allPrograms.push(...results.programs);
         } else {
-          console.log(`      ⚠️  No programs found`);
+          console.log(`      ⚠️  No grants found in response`);
+          if (results && results.count !== undefined) {
+            console.log(`      📦 Response claims count=${results.count} but grants array is ${results.grants ? 'empty' : 'missing'}`);
+          }
         }
       } catch (error) {
         console.error(`      ❌ Search failed: ${error.message}`);
       }
     }
 
-    // Deduplicate programs by ID
+    // Deduplicate programs by ID (grants use grant_id field)
     const uniquePrograms = [];
     const seenIds = new Set();
 
     for (const program of allPrograms) {
-      if (!seenIds.has(program.id)) {
-        seenIds.add(program.id);
+      const programId = program.grant_id || program.id;
+      if (!seenIds.has(programId)) {
+        seenIds.add(programId);
         uniquePrograms.push(program);
       }
     }
@@ -136,8 +147,9 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
     const maxGrantAmount = searchParams.exclude_grant_amounts_above;
     const filteredPrograms = uniquePrograms.filter(program => {
       const grantAmount = program.max_grant_amount || program.grant_amount || 0;
+      const programName = program.grant_name || program.name || 'Unknown';
       if (grantAmount > maxGrantAmount) {
-        console.log(`  🚫 Filtered out "${program.name}" (${grantAmount} > ${maxGrantAmount})`);
+        console.log(`  🚫 Filtered out "${programName}" (${grantAmount} > ${maxGrantAmount})`);
         return false;
       }
       return true;
@@ -238,7 +250,7 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
     };
 
     console.log('✅ FOCUSED SEARCH COMPLETE');
-    console.log(`  Top programs: ${top10Programs.map(p => p.name).join(', ')}`);
+    console.log(`  Top programs: ${top10Programs.map(p => p.grant_name || p.name).join(', ')}`);
     console.log(`  By category: Hiring (${byCategory.hiring.length}), Training (${byCategory.training.length}), Market Expansion (${byCategory.market_expansion.length}), R&D (${byCategory.rd.length}), Other (${byCategory.other.length})`);
 
     return {
@@ -251,7 +263,7 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
         other: byCategory.other.filter(p => top10Programs.includes(p))
       },
       totals: totals,
-      all_program_names: top10Programs.map(p => p.name)
+      all_program_names: top10Programs.map(p => p.grant_name || p.name)
     };
 
   } catch (error) {
