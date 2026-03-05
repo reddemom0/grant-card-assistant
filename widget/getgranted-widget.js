@@ -844,7 +844,8 @@
 
         .gg-form-field input[type="text"],
         .gg-form-field input[type="email"],
-        .gg-form-field input[type="url"] {
+        .gg-form-field input[type="url"],
+        .gg-form-field textarea {
           border: 1px solid ${BRAND_COLORS.lightGrey};
           border-radius: 6px;
           padding: 10px 12px;
@@ -854,7 +855,14 @@
           transition: border-color 0.2s ease;
         }
 
-        .gg-form-field input:focus {
+        .gg-form-field textarea {
+          resize: vertical;
+          min-height: 70px;
+          line-height: 1.5;
+        }
+
+        .gg-form-field input:focus,
+        .gg-form-field textarea:focus {
           border-color: ${BRAND_COLORS.primary};
         }
 
@@ -1451,6 +1459,16 @@
             </select>
           </div>
 
+          <div class="gg-form-field">
+            <label for="gg-planned-activities">Any specific projects or activities you're looking to get funded?</label>
+            <textarea
+              id="gg-planned-activities"
+              placeholder="e.g., attending a trade show in Europe, hiring a marketing coordinator, buying new equipment, training our team on AI tools..."
+              rows="3"
+            ></textarea>
+            <div class="gg-form-hint">Optional — helps us tailor your estimate</div>
+          </div>
+
           <div class="gg-form-buttons">
             <button type="button" class="gg-form-back" id="gg-form-back">← Back</button>
             <button type="button" class="gg-form-submit in-page-2" id="gg-form-final-submit" disabled>Get My Free Estimate →</button>
@@ -1921,6 +1939,7 @@
     const hiring = shadowRoot?.getElementById('gg-hiring').value;
     const training = shadowRoot?.getElementById('gg-training').value;
     const expansion = shadowRoot?.getElementById('gg-expansion').value;
+    const plannedActivities = shadowRoot?.getElementById('gg-planned-activities').value.trim();
 
     // If "no website" is checked, set website to null
     if (noWebsite) {
@@ -1944,7 +1963,8 @@
       employee_count: employees,
       hiring_plans: hiring,
       training_budget: training || null,
-      expansion_budget: expansion || null
+      expansion_budget: expansion || null,
+      planned_activities: plannedActivities || null
     };
 
     // Show loading, disable submit
