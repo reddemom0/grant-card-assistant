@@ -25,79 +25,72 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
   const searchCalls = [];
 
   try {
-    // Construct 2-3 targeted search calls based on categories
+    // Construct SHORT, targeted search calls (2-5 word queries work best)
     const categories = categorization.grant_categories_to_search;
+    const provinceFullName = searchParams.province_full_name || searchParams.province;
+    const industryKeyword = searchParams.industry_keyword || categorization.industry_group_label.split(' ')[0];
 
-    // Search 1: Hiring + Training (if applicable)
-    const hiringTrainingCategories = categories.filter(cat =>
-      cat.includes('hiring') || cat.includes('training') || cat.includes('student') || cat.includes('youth')
-    );
+    // Search 1: Hiring programs (if applicable)
+    const hasHiring = categories.some(cat => cat.includes('hiring') || cat.includes('student') || cat.includes('youth'));
 
-    if (hiringTrainingCategories.length > 0) {
-      const keywords = hiringTrainingCategories.map(cat => {
-        if (cat.includes('student')) return 'student co-op intern';
-        if (cat.includes('youth') || cat.includes('grad')) return 'youth recent graduate';
-        if (cat.includes('training')) return 'training upskilling workforce development';
-        if (cat.includes('apprentice')) return 'apprentice skilled trades';
-        return 'hiring wage subsidy employment';
-      }).join(' ');
-
+    if (hasHiring) {
       searchCalls.push({
-        name: 'Hiring & Training',
-        categories: hiringTrainingCategories,
-        query: `${keywords} ${categorization.industry_group_label} ${searchParams.province}`,
-        province: searchParams.province,
-        purposes: ['Hiring', 'Training']
+        name: 'Hiring Programs',
+        categories: categories.filter(cat => cat.includes('hiring') || cat.includes('student') || cat.includes('youth')),
+        query: `hiring ${industryKeyword}`,
+        province: provinceFullName,
+        purposes: ['Hiring']
       });
     }
 
-    // Search 2: Market Expansion + R&D (if applicable)
-    const expansionRdCategories = categories.filter(cat =>
-      cat.includes('export') || cat.includes('international') || cat.includes('market') ||
-      cat.includes('rd') || cat.includes('research') || cat.includes('irap') || cat.includes('sred')
-    );
+    // Search 2: Training programs (if applicable)
+    const hasTraining = categories.some(cat => cat.includes('training'));
 
-    if (expansionRdCategories.length > 0) {
-      const keywords = expansionRdCategories.map(cat => {
-        if (cat.includes('export') || cat.includes('canexport')) return 'export international market expansion';
-        if (cat.includes('irap')) return 'IRAP research development innovation';
-        if (cat.includes('sred')) return 'SR&ED SRED tax credit R&D';
-        return 'research development innovation';
-      }).join(' ');
-
+    if (hasTraining) {
       searchCalls.push({
-        name: 'Market Expansion & R&D',
-        categories: expansionRdCategories,
-        query: `${keywords} ${categorization.industry_group_label}`,
-        province: searchParams.province,
-        purposes: ['Market Expansion', 'Research & Development']
+        name: 'Training Programs',
+        categories: categories.filter(cat => cat.includes('training')),
+        query: `training ${industryKeyword}`,
+        province: provinceFullName,
+        purposes: ['Training']
       });
     }
 
-    // Search 3: Industry-specific (if not covered by above)
-    const industryCategories = categories.filter(cat =>
-      cat.includes('agriculture') || cat.includes('manufacturing') || cat.includes('technology') ||
-      cat.includes('green') || cat.includes('clean') || cat.includes('biotalent') ||
-      cat.includes('trades') || cat.includes('digital')
-    );
+    // Search 3: Market Expansion programs (if applicable)
+    const hasExpansion = categories.some(cat => cat.includes('export') || cat.includes('international') || cat.includes('market'));
 
-    if (industryCategories.length > 0) {
-      const keywords = industryCategories.map(cat => {
-        if (cat.includes('agriculture')) return 'agriculture farming agri';
-        if (cat.includes('manufacturing')) return 'manufacturing production';
-        if (cat.includes('technology') || cat.includes('digital')) return 'technology digital innovation';
-        if (cat.includes('green') || cat.includes('clean')) return 'clean technology renewable environmental';
-        if (cat.includes('biotalent')) return 'bio life sciences';
-        if (cat.includes('trades')) return 'skilled trades construction apprentice';
-        return categorization.industry_group_label;
-      }).join(' ');
-
+    if (hasExpansion) {
       searchCalls.push({
-        name: 'Industry-Specific',
-        categories: industryCategories,
-        query: `${keywords} ${searchParams.province}`,
-        province: searchParams.province,
-        purposes: searchParams.purposes
+        name: 'Market Expansion Programs',
+        categories: categories.filter(cat => cat.includes('export') || cat.includes('international') || cat.includes('market')),
+        query: `export ${industryKeyword}`,
+        province: provinceFullName,
+        purposes: ['Market Expansion']
+      });
+    }
+
+    // Search 4: R&D programs (if applicable)
+    const hasRD = categories.some(cat => cat.includes('rd') || cat.includes('research') || cat.includes('irap') || cat.includes('sred'));
+
+    if (hasRD) {
+      searchCalls.push({
+        name: 'R&D Programs',
+        categories: categories.filter(cat => cat.includes('rd') || cat.includes('research') || cat.includes('irap') || cat.includes('sred')),
+        query: `innovation ${industryKeyword}`,
+        province: provinceFullName,
+        purposes: ['Research & Development']
+      });
+    }
+
+    // Search 5: Broad industry sweep (catch-all for other programs)
+    // Only run if we have fewer than 3 specific searches, or always as a safety net
+    if (searchCalls.length < 3) {
+      searchCalls.push({
+        name: 'General Industry Programs',
+        categories: categories,
+        query: industryKeyword,
+        province: provinceFullName,
+        purposes: [] // Empty = all purposes
       });
     }
 

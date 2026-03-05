@@ -447,6 +447,25 @@ function buildGrantCategories(industryGroup, prospectData) {
 }
 
 /**
+ * Map province code to full name for search API
+ */
+const PROVINCE_FULL_NAMES = {
+  'ON': 'Ontario',
+  'BC': 'British Columbia',
+  'AB': 'Alberta',
+  'QC': 'Quebec',
+  'MB': 'Manitoba',
+  'SK': 'Saskatchewan',
+  'NS': 'Nova Scotia',
+  'NB': 'New Brunswick',
+  'PE': 'Prince Edward Island',
+  'NL': 'Newfoundland and Labrador',
+  'NT': 'Northwest Territories',
+  'YT': 'Yukon',
+  'NU': 'Nunavut'
+};
+
+/**
  * Build search parameters for focused search
  */
 function buildSearchParameters(industryResolution, province, grantCategories, prospectData) {
@@ -480,10 +499,15 @@ function buildSearchParameters(industryResolution, province, grantCategories, pr
   const estimatedRevenue = revenueMap[prospectData.revenue_tier] || 1000000;
   const maxGrantAmount = estimatedRevenue * 10;
 
+  // Get full province name for search API (expects "British Columbia" not "BC")
+  const provinceFullName = PROVINCE_FULL_NAMES[province] || province;
+
   return {
     province: province,
+    province_full_name: provinceFullName,
     purposes: Array.from(purposes),
     keywords: Array.from(keywords),
+    industry_keyword: industryResolution.matched_industry,
     company_size: prospectData.num_ftes || null,
     exclude_grant_amounts_above: maxGrantAmount
   };
