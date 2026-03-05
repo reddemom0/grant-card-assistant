@@ -510,6 +510,65 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
     lines.push('');
   }
 
+  // =========================================================================
+  // CATEGORIZATION (from infrastructure-enhanced search)
+  // =========================================================================
+
+  // Load categorization data from conversation_memory (if available)
+  const categorizationData = pd.categorization
+    ? (typeof pd.categorization === 'string' ? JSON.parse(pd.categorization) : pd.categorization)
+    : null;
+
+  const mergedEstimateData = pd.merged_estimate
+    ? (typeof pd.merged_estimate === 'string' ? JSON.parse(pd.merged_estimate) : pd.merged_estimate)
+    : null;
+
+  if (categorizationData || mergedEstimateData) {
+    lines.push('🏗️ Infrastructure Analysis:');
+    lines.push('');
+
+    if (categorizationData) {
+      // Industry Group
+      if (categorizationData.industry_group_label) {
+        lines.push(`Industry Group: ${categorizationData.industry_group_label} (Group ${categorizationData.industry_group})`);
+      }
+
+      // Baseline Estimate
+      if (categorizationData.baseline_estimate) {
+        const baseline = categorizationData.baseline_estimate;
+        const totalLow = Math.round(baseline.total_low / 1000);
+        const totalHigh = Math.round(baseline.total_high / 1000);
+        lines.push(`Baseline Estimate: $${totalLow}K–$${totalHigh}K (from rate tables)`);
+      }
+
+      // Service Tier
+      if (categorizationData.service_tier) {
+        const tierDisplay = categorizationData.service_tier.toUpperCase().replace('_', ' ');
+        const reasoning = categorizationData.tier_reasoning || '';
+        lines.push(`Service Tier: ${tierDisplay} (${reasoning})`);
+      }
+
+      // Consultant Assignment
+      if (categorizationData.consultant_assignment) {
+        const consultant = categorizationData.consultant_assignment;
+        lines.push(`Assigned Consultant: ${consultant.name}`);
+        if (consultant.booking_link) {
+          lines.push(`Booking Link: ${consultant.booking_link}`);
+        }
+      }
+    }
+
+    // Confidence Level (from merged estimate)
+    if (mergedEstimateData && mergedEstimateData.confidence_level) {
+      const confidence = mergedEstimateData.confidence_level.toUpperCase();
+      lines.push(`Estimate Confidence: ${confidence}`);
+    }
+
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+  }
+
   // Programs matched (with actual program names)
   // Priority chain: auto_matched_grants (from search API) → matched_programs (agent-written) → prospect_data fallback
   const autoMatchedGrants = sessionData.auto_matched_grants || pd.auto_matched_grants;

@@ -16,6 +16,8 @@ import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 import { isServerTool } from './definitions.js';
 import * as getgrantedTools from './getgranted-tools.js';
 import * as programCards from '../utils/program-cards.js';
+import { categorizeProspect } from '../services/grant-categorization.js';
+import { runFocusedSearch, mergeEstimate } from '../services/grant-search-pipeline.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -47,6 +49,145 @@ function parseJSONParameter(value) {
     console.warn(`⚠️  Failed to parse JSON parameter: ${value.substring(0, 100)}...`);
     return value;
   }
+}
+
+/**
+ * Build prospect data from session for categorization
+ * @param {string} conversationId - Lead-gen session ID
+ * @returns {Promise<Object|null>} Prospect data or null if not available
+ */
+async function buildProspectDataFromSession(conversationId) {
+  try {
+    const { query: dbQuery } = await import('../database/connection.js');
+
+    const result = await dbQuery(
+      `SELECT prospect_data, company_background FROM lead_gen_conversations WHERE session_id = $1`,
+      [conversationId]
+    );
+
+    if (result.rows.length === 0) {
+      console.log('  ⚠️  No lead-gen session found');
+      return null;
+    }
+
+    const session = result.rows[0];
+    const prospectData = session.prospect_data || {};
+    const companyBackground = session.company_background || {};
+
+    // Map form data to categorization input format
+    const data = {
+      // Industry (prioritize Haiku extraction over form-provided)
+      industry: companyBackground.industry || prospectData.industry || null,
+
+      // Province (always required from form)
+      province: prospectData.province || 'ON',
+
+      // Revenue tier mapping
+      revenue_tier: mapRevenueTier(prospectData.revenue_range),
+
+      // Employee count (parse from range string)
+      num_ftes: parseEmployeeCount(prospectData.employee_count),
+
+      // Hiring plans (parse from text)
+      ...parseHiringPlans(prospectData.hiring_plans),
+
+      // Training budget (parse from range string)
+      annual_training_spend: parseSpendAmount(prospectData.training_budget),
+
+      // Market expansion (parse from range string)
+      international_market_spend: parseSpendAmount(prospectData.expansion_budget),
+
+      // R&D spend (not collected in form yet, default to 0)
+      rd_spend: 0,
+
+      // Incorporation status (assume yes if they have revenue)
+      is_incorporated_1yr: prospectData.revenue_range !== 'Pre-revenue',
+
+      // Nonprofit status (assume no unless explicitly indicated)
+      is_nonprofit: false,
+
+      // Funds raised (not collected in form, default to 0)
+      funds_raised: 0
+    };
+
+    console.log('  ✅ Built prospect data from session:', JSON.stringify(data, null, 2));
+    return data;
+
+  } catch (error) {
+    console.error('  ❌ Failed to build prospect data:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Map revenue range string to tier
+ */
+function mapRevenueTier(revenueRange) {
+  if (!revenueRange) return 'unknown';
+  if (revenueRange === 'Pre-revenue') return 'pre_revenue';
+  if (revenueRange === 'Under $500K') return 'lt_500k';
+  if (revenueRange === '$500K–$2.5MM') return '500k_2.5mm';
+  if (revenueRange === '$2.5MM–$5MM') return '2.5mm_5mm';
+  if (revenueRange === 'Over $5MM') return '5mm_plus';
+  return 'unknown';
+}
+
+/**
+ * Parse employee count from range string
+ */
+function parseEmployeeCount(employeeCount) {
+  if (!employeeCount) return 0;
+  if (employeeCount === '1–10') return 5;
+  if (employeeCount === '11–50') return 30;
+  if (employeeCount === '51–100') return 75;
+  if (employeeCount === '101–500') return 250;
+  if (employeeCount === '500+') return 750;
+  return 0;
+}
+
+/**
+ * Parse hiring plans text to extract hire counts
+ */
+function parseHiringPlans(hiringPlans) {
+  const result = {
+    num_hires: 0,
+    num_student_hires: 0,
+    num_recent_grad_hires: 0
+  };
+
+  if (!hiringPlans) return result;
+
+  const text = hiringPlans.toLowerCase();
+
+  // Extract numbers from text
+  const match = text.match(/(\d+)/);
+  if (match) {
+    const totalHires = parseInt(match[1]);
+
+    if (text.includes('student') || text.includes('co-op') || text.includes('intern')) {
+      result.num_student_hires = totalHires;
+    } else if (text.includes('recent grad') || text.includes('graduate')) {
+      result.num_recent_grad_hires = totalHires;
+    } else {
+      result.num_hires = totalHires;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Parse spend amount from range string
+ */
+function parseSpendAmount(spendRange) {
+  if (!spendRange) return 0;
+  if (spendRange === 'None') return 0;
+  if (spendRange === 'Under $10K') return 5000;
+  if (spendRange === '$10K–$25K') return 17500;
+  if (spendRange === '$25K–$50K') return 37500;
+  if (spendRange === '$50K–$100K') return 75000;
+  if (spendRange === 'Over $100K') return 150000;
+  return 0;
 }
 
 /**
@@ -517,21 +658,129 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
 
       case 'search_getgranted': {
         const { searchGetGranted } = await import('./getgranted-search.js');
-        result = await searchGetGranted({
-          query: input.query,
-          purposes: parseJSONParameter(input.purposes),
-          regions: parseJSONParameter(input.regions),
-          industries: parseJSONParameter(input.industries),
-          business_type: input.business_type,
-          owner_demographics: parseJSONParameter(input.owner_demographics),
-          company_size_min: input.company_size_min,
-          company_size_max: input.company_size_max,
-          active_only: input.active_only,
-          open_intakes_only: input.open_intakes_only,
-          limit: input.limit,
-          fetch_full_details: input.fetch_full_details,
-          bypass_cache: input.bypass_cache
-        });
+
+        // Infrastructure-enhanced search for lead-gen agent
+        let categorization = null;
+        let mergedEstimate = null;
+        let usedFocusedSearch = false;
+
+        if (agentType === 'lead-gen' && conversationId) {
+          console.log('\n🏗️  INFRASTRUCTURE-ENHANCED SEARCH STARTING...');
+
+          try {
+            // Step 1: Build prospect data from session
+            const prospectData = await buildProspectDataFromSession(conversationId);
+
+            if (prospectData && prospectData.industry) {
+              // Step 2: Categorize prospect
+              console.log('  🏷️  Running categorization...');
+              categorization = categorizeProspect(prospectData);
+
+              if (categorization) {
+                // Step 3: Run focused search using categorization
+                console.log('  🔍 Running focused search...');
+
+                const searchResults = await runFocusedSearch(
+                  categorization,
+                  async (searchParams) => {
+                    return await searchGetGranted({
+                      query: searchParams.query,
+                      purposes: searchParams.purposes,
+                      regions: searchParams.province,
+                      industries: [],
+                      active_only: input.active_only,
+                      open_intakes_only: input.open_intakes_only,
+                      limit: searchParams.limit || 15,
+                      fetch_full_details: input.fetch_full_details,
+                      bypass_cache: input.bypass_cache
+                    });
+                  },
+                  conversationId
+                );
+
+                // Step 4: Merge estimates
+                console.log('  🔀 Merging estimates...');
+                mergedEstimate = mergeEstimate(categorization, searchResults);
+
+                // Step 5: Store in conversation_memory
+                const { query: dbQuery } = await import('../database/connection.js');
+
+                await dbQuery(
+                  `INSERT INTO conversation_memory (conversation_id, key, value)
+                   VALUES ($1, 'categorization', $2)
+                   ON CONFLICT (conversation_id, key)
+                   DO UPDATE SET value = $2`,
+                  [conversationId, JSON.stringify(categorization)]
+                );
+
+                await dbQuery(
+                  `INSERT INTO conversation_memory (conversation_id, key, value)
+                   VALUES ($1, 'merged_estimate', $2)
+                   ON CONFLICT (conversation_id, key)
+                   DO UPDATE SET value = $2`,
+                  [conversationId, JSON.stringify(mergedEstimate)]
+                );
+
+                console.log('  ✅ Stored categorization + merged_estimate in conversation_memory');
+
+                // Step 6: Override auto_matched_grants with filtered programs
+                const grantNames = mergedEstimate.programs_for_hubspot || [];
+                await dbQuery(
+                  `INSERT INTO conversation_memory (conversation_id, key, value)
+                   VALUES ($1, 'auto_matched_grants', $2)
+                   ON CONFLICT (conversation_id, key)
+                   DO UPDATE SET value = $2`,
+                  [conversationId, JSON.stringify(grantNames)]
+                );
+
+                console.log(`  ✅ Auto-captured ${grantNames.length} grant names from focused search`);
+
+                // Step 7: Format result to match expected structure
+                result = {
+                  success: true,
+                  grants: searchResults.programs_found.map(p => ({
+                    grant_name: p.name,
+                    grant_amount: p.max_grant_amount || p.grant_amount || 'amount varies',
+                    currently_accepting: p.status === 'open' || p.accepting_applications,
+                    intake_cycle: p.intake_cycle || null,
+                    description: p.description || null,
+                    purposes: p.purposes || [],
+                    categories: p.categories || []
+                  })),
+                  count: searchResults.programs_found.length,
+                  message: `Found ${searchResults.programs_found.length} programs using infrastructure-enhanced search`
+                };
+
+                usedFocusedSearch = true;
+                console.log('✅ INFRASTRUCTURE-ENHANCED SEARCH COMPLETE\n');
+              }
+            } else {
+              console.log('  ⚠️  No industry data available - falling back to standard search');
+            }
+          } catch (error) {
+            console.error('  ❌ Infrastructure-enhanced search failed:', error.message);
+            console.log('  ⚠️  Falling back to standard search');
+          }
+        }
+
+        // Fallback: Standard search (if not lead-gen, or if categorization failed)
+        if (!usedFocusedSearch) {
+          result = await searchGetGranted({
+            query: input.query,
+            purposes: parseJSONParameter(input.purposes),
+            regions: parseJSONParameter(input.regions),
+            industries: parseJSONParameter(input.industries),
+            business_type: input.business_type,
+            owner_demographics: parseJSONParameter(input.owner_demographics),
+            company_size_min: input.company_size_min,
+            company_size_max: input.company_size_max,
+            active_only: input.active_only,
+            open_intakes_only: input.open_intakes_only,
+            limit: input.limit,
+            fetch_full_details: input.fetch_full_details,
+            bypass_cache: input.bypass_cache
+          });
+        }
 
         // Log search_performed analytics for lead-gen agent
         if (agentType === 'lead-gen' && conversationId) {
@@ -542,15 +791,16 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                VALUES ($1, $2, $3)`,
               [conversationId, 'search_performed', JSON.stringify({
                 query:         input.query || null,
-                results_count: result.results?.length || result.grants?.length || 0
+                results_count: result.results?.length || result.grants?.length || 0,
+                used_infrastructure: usedFocusedSearch
               })]
             );
           } catch (e) {
             console.warn('⚠️  Analytics log failed (search_performed):', e.message);
           }
 
-          // Auto-capture exact grant names from search results (before agent can paraphrase)
-          if (result.success && result.grants && result.grants.length > 0) {
+          // Auto-capture exact grant names from search results (if not already done by focused search)
+          if (!usedFocusedSearch && result.success && result.grants && result.grants.length > 0) {
             try {
               const { query: dbQuery } = await import('../database/connection.js');
 
