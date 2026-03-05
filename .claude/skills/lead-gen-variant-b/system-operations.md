@@ -99,9 +99,11 @@ For service_tier_recommended: Store the tier key you recommended in chat ("start
 </memory_store_instructions>
 
 <save_lead_data_instructions>
-save_lead_data is triggered by the widget's summary button OR at conversation end.
+**CRITICAL: You must call save_lead_data immediately after delivering the funding estimate in your first response.**
 
-The system will call save_lead_data with all collected information. Include these fields:
+Do NOT wait for the summary button, CTA, or conversation end. The HubSpot record must be created at estimate delivery so the sales team has the lead information immediately.
+
+When calling save_lead_data, include these fields:
 - lead_score and hs_lead_status (based on signals collected)
 - name
 - email
