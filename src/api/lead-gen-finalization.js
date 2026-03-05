@@ -482,6 +482,23 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
     lines.push(`Activities Discussed: ${activities}`);
   }
 
+  // Planned activities from form + agent assessment
+  const plannedActivities = sessionData.planned_activities || pd.planned_activities;
+  const activityAssessment = sessionData.activity_assessment || pd.activity_assessment;
+  const activityClarification = sessionData.activity_clarification || pd.activity_clarification;
+
+  if (plannedActivities) {
+    lines.push('');
+    lines.push('📋 Planned Activities (from form):');
+    lines.push(plannedActivities);
+    if (activityAssessment) {
+      lines.push(`Agent Assessment: ${activityAssessment}`);
+    }
+    if (activityClarification) {
+      lines.push(`Clarification Q&A: ${activityClarification}`);
+    }
+  }
+
   lines.push('');
   lines.push('---');
   lines.push('');
