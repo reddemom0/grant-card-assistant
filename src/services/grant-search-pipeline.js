@@ -113,11 +113,28 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
 
         if (results && results.grants && results.grants.length > 0) {
           console.log(`      ✅ Found ${results.grants.length} grants`);
-          allPrograms.push(...results.grants);
+
+          // Tag each program with the purposes from this search query
+          // This ensures proper categorization even if database grant_type field is empty
+          const taggedGrants = results.grants.map(grant => ({
+            ...grant,
+            purposes: searchCall.purposes.length > 0 ? searchCall.purposes : (grant.purposes || []),
+            search_origin: searchCall.name  // Track which search returned this program
+          }));
+
+          allPrograms.push(...taggedGrants);
         } else if (results && results.programs && results.programs.length > 0) {
           // Fallback: check if response uses 'programs' key instead
           console.log(`      ✅ Found ${results.programs.length} programs (via programs key)`);
-          allPrograms.push(...results.programs);
+
+          // Tag each program with the purposes from this search query
+          const taggedPrograms = results.programs.map(program => ({
+            ...program,
+            purposes: searchCall.purposes.length > 0 ? searchCall.purposes : (program.purposes || []),
+            search_origin: searchCall.name
+          }));
+
+          allPrograms.push(...taggedPrograms);
         } else {
           console.log(`      ⚠️  No grants found in response`);
           if (results && results.count !== undefined) {
@@ -129,17 +146,31 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
       }
     }
 
-    // Deduplicate programs by ID (grants use grant_id field)
-    const uniquePrograms = [];
-    const seenIds = new Set();
+    // Deduplicate programs by ID, merging purposes for programs returned by multiple searches
+    const programsById = new Map();
 
     for (const program of allPrograms) {
       const programId = program.grant_id || program.id;
-      if (!seenIds.has(programId)) {
-        seenIds.add(programId);
-        uniquePrograms.push(program);
+
+      if (programsById.has(programId)) {
+        // Program already seen - merge purposes
+        const existing = programsById.get(programId);
+        const existingPurposes = new Set(existing.purposes || []);
+        const newPurposes = program.purposes || [];
+
+        // Add new purposes to the set
+        newPurposes.forEach(p => existingPurposes.add(p));
+
+        // Update the existing program with merged purposes
+        existing.purposes = Array.from(existingPurposes);
+        existing.search_origin = `${existing.search_origin}, ${program.search_origin}`;
+      } else {
+        // First time seeing this program
+        programsById.set(programId, program);
       }
     }
+
+    const uniquePrograms = Array.from(programsById.values());
 
     console.log(`  📊 Total unique programs: ${uniquePrograms.length}`);
 
@@ -252,6 +283,16 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
     console.log('✅ FOCUSED SEARCH COMPLETE');
     console.log(`  Top programs: ${top10Programs.map(p => p.grant_name || p.name).join(', ')}`);
     console.log(`  By category: Hiring (${byCategory.hiring.length}), Training (${byCategory.training.length}), Market Expansion (${byCategory.market_expansion.length}), R&D (${byCategory.rd.length}), Other (${byCategory.other.length})`);
+
+    // Diagnostic: show a few examples of categorization
+    if (byCategory.hiring.length > 0) {
+      const example = byCategory.hiring[0];
+      console.log(`    Example Hiring program: "${example.grant_name || example.name}" (purposes: [${(example.purposes || []).join(', ')}])`);
+    }
+    if (byCategory.training.length > 0) {
+      const example = byCategory.training[0];
+      console.log(`    Example Training program: "${example.grant_name || example.name}" (purposes: [${(example.purposes || []).join(', ')}])`);
+    }
 
     return {
       programs_found: top10Programs,
