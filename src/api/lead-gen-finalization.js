@@ -948,11 +948,24 @@ export async function createHubSpotRecordOnEstimate(sessionId) {
       // Load enriched session data (session + memory_store + company_background)
       const enrichedSession = await loadEnrichedSessionData(sessionId);
 
+      // 🔍 DEBUG: Log Stage 1 data
+      console.log('\n🔍 DEBUG (STAGE 1): EnrichedSession keys:', Object.keys(enrichedSession).join(', '));
+      const pd1 = enrichedSession.prospect_data || {};
+      console.log('🔍 DEBUG (STAGE 1): prospect_data keys:', Object.keys(pd1).join(', '));
+      console.log('🔍 DEBUG (STAGE 1): matched_programs (top-level):', JSON.stringify(enrichedSession.matched_programs)?.substring(0, 100));
+      console.log('🔍 DEBUG (STAGE 1): timeline (prospect_data):', pd1.timeline);
+      console.log('🔍 DEBUG (STAGE 1): prospect_summary (prospect_data):', pd1.prospect_summary);
+
       // Determine service tier from funding estimate
       const serviceTier = determineServiceTier(enrichedSession.estimated_funding);
 
       // Build comprehensive note with ALL data sources
       const noteBody = buildNoteBodyComprehensive(enrichedSession, 'estimate_delivered', serviceTier);
+
+      // 🔍 DEBUG: Log Stage 1 note body preview
+      console.log('\n🔍 DEBUG (STAGE 1): Note body (first 500 chars):');
+      console.log(noteBody.substring(0, 500));
+      console.log('...\n');
 
       // Create HubSpot note
       noteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
@@ -1294,6 +1307,30 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
       // Load enriched session data (session + memory_store + company_background)
       const enrichedSession = await loadEnrichedSessionData(sessionId);
 
+      // 🔍 DEBUG: Log enriched session structure
+      console.log('\n🔍 DEBUG: EnrichedSession keys:', Object.keys(enrichedSession).join(', '));
+      console.log('🔍 DEBUG: prospect_data keys:', Object.keys(enrichedSession.prospect_data || {}).join(', '));
+
+      // 🔍 DEBUG: Log qualification signals
+      const pd = enrichedSession.prospect_data || {};
+      console.log('\n🔍 DEBUG: Qualification signals in enrichedSession:');
+      console.log(`  matched_programs (top-level): ${JSON.stringify(enrichedSession.matched_programs)?.substring(0, 100)}`);
+      console.log(`  matched_programs (prospect_data): ${JSON.stringify(pd.matched_programs)?.substring(0, 100)}`);
+      console.log(`  timeline (top-level): ${enrichedSession.timeline}`);
+      console.log(`  timeline (prospect_data): ${pd.timeline}`);
+      console.log(`  budget_committed (top-level): ${enrichedSession.budget_committed}`);
+      console.log(`  budget_committed (prospect_data): ${pd.budget_committed}`);
+      console.log(`  is_decision_maker (top-level): ${enrichedSession.is_decision_maker}`);
+      console.log(`  is_decision_maker (prospect_data): ${pd.is_decision_maker}`);
+      console.log(`  prior_grant_experience (top-level): ${enrichedSession.prior_grant_experience}`);
+      console.log(`  prior_grant_experience (prospect_data): ${pd.prior_grant_experience}`);
+      console.log(`  existing_consultant (top-level): ${enrichedSession.existing_consultant}`);
+      console.log(`  existing_consultant (prospect_data): ${pd.existing_consultant}`);
+      console.log(`  growth_plans (top-level): ${enrichedSession.growth_plans}`);
+      console.log(`  growth_plans (prospect_data): ${pd.growth_plans}`);
+      console.log(`  prospect_summary (top-level): ${enrichedSession.prospect_summary}`);
+      console.log(`  prospect_summary (prospect_data): ${pd.prospect_summary}`);
+
       // Determine service tier from funding estimate
       const serviceTier = determineServiceTier(
         enrichedSession.estimated_funding || enrichedSession.prospect_data?.estimated_funding
@@ -1301,6 +1338,11 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
 
       // Build comprehensive note with ALL data sources
       const noteBody = buildNoteBodyComprehensive(enrichedSession, trigger, serviceTier);
+
+      // 🔍 DEBUG: Log note body preview
+      console.log('\n🔍 DEBUG: Note body (first 500 chars):');
+      console.log(noteBody.substring(0, 500));
+      console.log('...\n');
 
       // Check if Stage 1 note already exists
       const existingNoteId = prospectData.hubspot_note_id;

@@ -347,6 +347,15 @@ function buildNoteBody(input, multipleCompaniesFlag = null) {
 export async function saveLeadData(input, conversationId) {
   const { name, email } = input;
 
+  // 🔍 DEBUG: Log payload size and email_summary_body presence
+  const payloadStr = JSON.stringify(input);
+  console.log(`\n🔍 DEBUG: save_lead_data payload size: ${payloadStr.length} chars`);
+  console.log(`🔍 DEBUG: email_summary_body present: ${!!input.email_summary_body}`);
+  if (input.email_summary_body) {
+    console.log(`🔍 DEBUG: email_summary_body size: ${input.email_summary_body.length} chars`);
+  }
+  console.log(`🔍 DEBUG: Input keys: ${Object.keys(input).join(', ')}\n`);
+
   if (!name || !email) {
     return { success: false, error: 'name and email are required' };
   }
