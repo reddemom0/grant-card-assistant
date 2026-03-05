@@ -769,6 +769,24 @@ export async function runAgent({
 
         console.log(`✓ Executed ${toolResults.length} tool calls`);
 
+        // CRITICAL: Validate that toolResults is not empty before adding to messages
+        // If stop_reason is tool_use but no tool_use blocks found, this is an error state
+        if (toolResults.length === 0) {
+          console.error('❌ CRITICAL ERROR: stop_reason is tool_use but no tool_use blocks found in response content');
+          console.error('   Response content blocks:', fullResponse.content.map(b => ({ type: b.type, hasText: b.type === 'text' && !!b.text })));
+
+          // Send error to frontend
+          sendSSE(res, {
+            type: 'error',
+            message: 'Agent requested tools but no valid tool calls were found. Please try again.',
+            sessionId
+          });
+
+          closeSSE(res);
+
+          throw new Error('stop_reason is tool_use but no tool_use blocks found in response');
+        }
+
         // Add tool results to messages
         messages.push({
           role: 'user',
