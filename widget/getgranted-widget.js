@@ -2159,6 +2159,14 @@
         filterIndustries(''); // Show all initially
       });
 
+      // Prevent click on input from closing dropdown (stop propagation)
+      industryInput.addEventListener('mousedown', (e) => {
+        // If dropdown is already open, don't let the click close it
+        if (industryDropdown.classList.contains('open')) {
+          e.stopPropagation();
+        }
+      });
+
       // Filter as user types
       industryInput.addEventListener('input', (e) => {
         const query = e.target.value;
@@ -2171,14 +2179,29 @@
         }
       });
 
-      // Close dropdown when clicking outside
-      document.addEventListener('click', (e) => {
+      // Close dropdown when clicking outside (listen within shadow root)
+      // Use mousedown to catch clicks before they can interfere with focus
+      const clickOutsideHandler = (e) => {
+        // Get the composedPath to see the actual click target across shadow boundaries
+        const path = e.composedPath ? e.composedPath() : [e.target];
         const wrapper = shadowRoot?.querySelector('.gg-combobox-wrapper');
-        if (wrapper && !wrapper.contains(e.target)) {
+
+        // Check if click is outside the wrapper using composedPath
+        const clickedOutside = wrapper && !path.includes(wrapper) && !wrapper.contains(e.target);
+
+        if (clickedOutside && industryDropdown.classList.contains('open')) {
           industryInput.setAttribute('aria-expanded', 'false');
           industryDropdown.classList.remove('open');
         }
-      });
+      };
+
+      // Listen on document for clicks outside shadow DOM
+      document.addEventListener('mousedown', clickOutsideHandler);
+
+      // Also listen within shadow root for clicks inside shadow DOM
+      if (shadowRoot) {
+        shadowRoot.addEventListener('mousedown', clickOutsideHandler);
+      }
     }
 
     if (config.mode === 'floating') {
