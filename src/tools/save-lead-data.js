@@ -366,6 +366,28 @@ export async function saveLeadData(input, conversationId) {
   // -------------------------------------------------------------------------
 
   try {
+    // Check for auto_matched_grants first (most reliable — directly from search results)
+    const autoGrantsResult = await query(
+      `SELECT value FROM conversation_memory WHERE conversation_id = $1 AND key = 'auto_matched_grants'`,
+      [conversationId]
+    );
+
+    if (autoGrantsResult.rows.length > 0) {
+      try {
+        const autoGrants = JSON.parse(autoGrantsResult.rows[0].value);
+        if (autoGrants.length > 0) {
+          console.log(`✅ matched_programs overridden from auto_matched_grants (${autoGrants.length} programs from search results)`);
+          console.log(`   Agent sent: ${JSON.stringify(input.matched_programs)?.substring(0, 200)}...`);
+          console.log(`   Using auto-captured: ${autoGrants.slice(0, 3).join(', ')}...`);
+          input.matched_programs = autoGrants;
+        }
+      } catch (e) {
+        console.log(`⚠️  Failed to parse auto_matched_grants, falling back to memory_store override`);
+        // Fall through to existing memory_store override
+      }
+    }
+
+    // Load other memory_store fields (matched_programs fallback, funding fields)
     const memoryFields = await query(
       `SELECT key, value FROM conversation_memory
        WHERE conversation_id = $1
@@ -376,9 +398,10 @@ export async function saveLeadData(input, conversationId) {
     memoryFields.rows.forEach(row => {
       const { key, value } = row;
 
-      if (key === 'matched_programs' && value) {
+      if (key === 'matched_programs' && value && !input.matched_programs) {
+        // Only use matched_programs from memory_store if auto_matched_grants wasn't found
         const agentValue = input.matched_programs;
-        console.log(`✅ matched_programs overridden from memory_store`);
+        console.log(`✅ matched_programs overridden from memory_store (fallback)`);
         console.log(`   Agent sent: ${JSON.stringify(agentValue)?.substring(0, 150)}...`);
         console.log(`   Using stored: ${value.substring(0, 150)}...`);
 

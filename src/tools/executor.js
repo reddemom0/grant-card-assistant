@@ -548,6 +548,58 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           } catch (e) {
             console.warn('⚠️  Analytics log failed (search_performed):', e.message);
           }
+
+          // Auto-capture exact grant names from search results (before agent can paraphrase)
+          if (result.success && result.grants && result.grants.length > 0) {
+            try {
+              const { query: dbQuery } = await import('../database/connection.js');
+
+              // Extract actual grant names with amounts and status
+              const grantNames = result.grants.map(g => {
+                const status = g.currently_accepting ? 'active' : (g.intake_cycle ? `cyclical - ${g.intake_cycle}` : 'inactive');
+                const amount = g.grant_amount || 'amount varies';
+                return `${g.grant_name} (${amount}, ${status})`;
+              });
+
+              // Load existing auto_matched_grants (agent searches twice: active + all)
+              const existingResult = await dbQuery(
+                `SELECT value FROM conversation_memory WHERE conversation_id = $1 AND key = 'auto_matched_grants'`,
+                [conversationId]
+              );
+
+              let allGrants = [];
+              if (existingResult.rows.length > 0) {
+                try {
+                  allGrants = JSON.parse(existingResult.rows[0].value);
+                } catch {
+                  allGrants = [];
+                }
+              }
+
+              // Deduplicate by grant_name (agent searches twice, may get overlaps)
+              const existingNames = new Set(allGrants.map(g => g.split(' (')[0]));
+              for (const grant of grantNames) {
+                const name = grant.split(' (')[0];
+                if (!existingNames.has(name)) {
+                  allGrants.push(grant);
+                  existingNames.add(name);
+                }
+              }
+
+              // Store/update in conversation_memory
+              await dbQuery(
+                `INSERT INTO conversation_memory (conversation_id, key, value)
+                 VALUES ($1, 'auto_matched_grants', $2)
+                 ON CONFLICT (conversation_id, key)
+                 DO UPDATE SET value = $2`,
+                [conversationId, JSON.stringify(allGrants)]
+              );
+
+              console.log(`✅ Auto-captured ${allGrants.length} grant names from search results`);
+            } catch (e) {
+              console.warn('⚠️  Auto-capture of grant names failed:', e.message);
+            }
+          }
         }
         break;
       }

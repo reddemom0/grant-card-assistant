@@ -65,7 +65,14 @@ Required memory_store keys for lead-gen sessions:
 - programs_matched_count
 - service_tier_recommended
 
-For matched_programs: Use ACTUAL program names from search_getgranted results (e.g., "IRAP YEP ($15K per hire, active)", "BC ETG ($10K, fall intake)"), NOT generic descriptions. Store actual program names, amounts, and active/cyclical status from search results.
+For matched_programs: Copy the EXACT grant_name field from each search result. Do not paraphrase, categorize, or summarize.
+
+WRONG: "BC hiring subsidies for trades apprentices ($7K-$12K per hire)"
+WRONG: "Provincial training reimbursement programs"
+RIGHT: "WorkBC Wage Subsidy Program ($12K, active)"
+RIGHT: "Employer Training Grant ($10K, fall intake)"
+
+The grant_name is in every search result. Copy it exactly. The sales team needs specific program names to prepare for the consultation call.
 
 For service_tier_recommended: Store the tier key you recommended in chat ("starter", "pro", or "getgranted"). This ensures your judgment (considering company size, complexity, etc.) is preserved in HubSpot notes, even if the funding amount alone would suggest a different tier.
 </memory_store_instructions>
@@ -90,7 +97,14 @@ The system will call save_lead_data with all collected information. Include thes
 - email_summary_body (personalized HTML email content — REQUIRED)
 - All enrichment data collected during conversation
 
-For matched_programs in save_lead_data: Use ACTUAL program names from search_getgranted results (e.g., "IRAP YEP ($15K per hire, active)", "BC ETG ($10K, fall intake)"), NOT generic descriptions. The HubSpot note is internal — sales team needs exact program names.
+For matched_programs in save_lead_data: Copy the EXACT grant_name field from each search result. Do not paraphrase.
+
+WRONG: "BC hiring subsidies for trades apprentices"
+WRONG: "Provincial training reimbursement programs"
+RIGHT: "WorkBC Wage Subsidy Program ($12K, active)"
+RIGHT: "Employer Training Grant ($10K, fall intake)"
+
+The HubSpot note is internal — the sales team needs specific program names to prepare for the consultation call.
 
 CRITICAL: Once save_lead_data is called, do NOT call any other tools. Write confirmation and end.
 </save_lead_data_instructions>

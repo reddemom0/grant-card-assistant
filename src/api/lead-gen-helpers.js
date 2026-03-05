@@ -72,6 +72,13 @@ export async function loadEnrichedSessionData(sessionId) {
       } catch {
         enrichedSession.matched_programs = value;
       }
+    } else if (key === 'auto_matched_grants') {
+      // Auto-captured grant names from search tool (most reliable - direct from API)
+      try {
+        enrichedSession.auto_matched_grants = JSON.parse(value);
+      } catch {
+        enrichedSession.auto_matched_grants = value;
+      }
     } else if (key === 'estimated_funding') {
       enrichedSession.estimated_funding = value;
     } else if (key === 'available_now_funding') {

@@ -511,8 +511,14 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
   }
 
   // Programs matched (with actual program names)
-  // Check prospect_data first (may have better data from memory_store), then top-level
-  const matchedProgramsData = pd.matched_programs || matched_programs;
+  // Priority chain: auto_matched_grants (from search API) → matched_programs (agent-written) → prospect_data fallback
+  const autoMatchedGrants = sessionData.auto_matched_grants || pd.auto_matched_grants;
+  const matchedProgramsData = autoMatchedGrants || pd.matched_programs || matched_programs;
+
+  if (autoMatchedGrants && autoMatchedGrants.length > 0) {
+    console.log(`✅ Using auto-captured grant names (${autoMatchedGrants.length} programs) instead of agent-written matched_programs`);
+  }
+
   if (matchedProgramsData && matchedProgramsData.length > 0) {
     lines.push('Programs Matched:');
 
