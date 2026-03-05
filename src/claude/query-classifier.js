@@ -13,28 +13,6 @@
  */
 
 /**
- * Check if lead-gen conversation is ready for estimate delivery
- * @param {Object} memories - Conversation memory key-value pairs
- * @returns {boolean} True if ready for estimate (has discovery data but not estimate yet)
- */
-function isLeadGenReadyForEstimate(memories) {
-  if (!memories || typeof memories !== 'object') {
-    return false;
-  }
-
-  // Check if discovery is complete (has key discovery data)
-  const hasActivities = !!memories.activities_summary;
-  const hasProvince = !!memories.province;
-  const hasEmployeeCount = !!memories.employee_count;
-
-  // Check if estimate hasn't been delivered yet
-  const hasEstimate = !!memories.estimated_funding;
-
-  // Ready for estimate = has discovery data AND no estimate yet
-  return hasActivities && hasProvince && hasEmployeeCount && !hasEstimate;
-}
-
-/**
  * Classify query complexity
  * @param {string} message - User's query
  * @param {string} agentType - Type of agent handling the query
@@ -73,24 +51,14 @@ export function classifyQuery(message, agentType, conversationMemories = null) {
   // AGENT-SPECIFIC CLASSIFICATION OVERRIDES
   // ============================================================================
 
-  // Lead-gen agent: Conditional routing based on conversation state
-  // Sonnet for estimate delivery AND post-estimate CTA phase, Haiku for discovery
+  // Lead-gen agent: Haiku with extended thinking for ALL turns.
+  // Extended thinking gives Haiku reasoning room for activity assessment,
+  // estimate synthesis, and pushback handling — without Sonnet's latency.
+  // Sonnet caused 15-24s response times and Railway timeouts.
+  // Haiku + thinking: 5-8s responses, quality reasoning, no timeouts.
   if (agentType === 'lead-gen') {
-    // Check if this is the estimate delivery turn (about to deliver)
-    if (isLeadGenReadyForEstimate(conversationMemories)) {
-      console.log('🎯 Lead-gen routing: SONNET (estimate delivery turn detected)');
-      return 'complex'; // Sonnet + thinking for estimate synthesis
-    }
-
-    // Check if estimate has already been delivered (post-estimate CTA phase)
-    if (conversationMemories && (conversationMemories.estimated_funding || conversationMemories.matched_programs)) {
-      console.log('🎯 Lead-gen routing: SONNET (post-estimate CTA phase — estimated_funding in memory)');
-      return 'complex'; // Sonnet + thinking for CTA phase (better context awareness)
-    }
-
-    // Discovery phase (before estimate): use Haiku for speed
-    console.log('🎯 Lead-gen routing: HAIKU (discovery phase)');
-    return 'simple'; // Haiku for speed
+    console.log('🎯 Lead-gen routing: HAIKU + THINKING (moderate tier)');
+    return 'moderate';
   }
 
   // CanExport Claims agent: ALWAYS use complex (auditing requires maximum precision)
