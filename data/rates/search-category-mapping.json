@@ -1,0 +1,62 @@
+{
+  "group_categories": {
+    "1": ["hiring_general", "hiring_student", "training_employer"],
+    "2": ["hiring_general", "hiring_student", "training_employer", "agriculture"],
+    "3": ["hiring_general", "hiring_student", "hiring_apprentice", "training_employer", "trades"],
+    "4": ["hiring_general", "hiring_student", "training_employer", "manufacturing", "export"],
+    "5": ["hiring_enhanced", "hiring_student", "hiring_youth_grad", "training_employer", "green_clean", "biotalent"],
+    "6": ["hiring_general", "hiring_student", "hiring_youth_grad", "training_employer", "technology_digital", "irap"]
+  },
+  "activity_categories": {
+    "has_hires": ["hiring_general", "hiring_wage_subsidy"],
+    "has_student_hires": ["hiring_student", "student_work_placement"],
+    "has_grad_hires": ["hiring_youth_grad", "youth_employment"],
+    "has_training_spend": ["training_employer", "training_provincial"],
+    "has_international_expansion": ["international_market_expansion", "canexport"],
+    "has_rd_spend": ["research_development", "sred", "irap"]
+  },
+  "category_to_purposes": {
+    "hiring_general": ["Hiring"],
+    "hiring_student": ["Hiring"],
+    "hiring_apprentice": ["Hiring"],
+    "hiring_enhanced": ["Hiring"],
+    "hiring_youth_grad": ["Hiring"],
+    "hiring_wage_subsidy": ["Hiring"],
+    "student_work_placement": ["Hiring"],
+    "youth_employment": ["Hiring"],
+    "training_employer": ["Training"],
+    "training_provincial": ["Training"],
+    "agriculture": ["Market Expansion"],
+    "trades": ["Training"],
+    "manufacturing": ["Market Expansion", "Capital Costs"],
+    "export": ["Market Expansion"],
+    "green_clean": ["Research & Development", "Capital Costs"],
+    "biotalent": ["Hiring"],
+    "technology_digital": ["Research & Development"],
+    "irap": ["Research & Development"],
+    "international_market_expansion": ["Market Expansion"],
+    "canexport": ["Market Expansion"],
+    "research_development": ["Research & Development"],
+    "sred": ["Research & Development"]
+  },
+  "category_keywords": {
+    "hiring_general": ["wage subsidy", "hiring", "employment"],
+    "hiring_student": ["student", "co-op", "intern"],
+    "hiring_apprentice": ["apprentice", "skilled trades"],
+    "hiring_enhanced": ["clean tech", "biotalent", "green jobs"],
+    "hiring_youth_grad": ["youth", "recent grad", "new graduate"],
+    "training_employer": ["training", "upskilling", "workforce development"],
+    "agriculture": ["agriculture", "farming", "agri"],
+    "trades": ["skilled trades", "construction", "apprentice"],
+    "manufacturing": ["manufacturing", "production"],
+    "export": ["export", "international trade"],
+    "green_clean": ["clean technology", "renewable", "environmental"],
+    "biotalent": ["bio", "life sciences"],
+    "technology_digital": ["technology", "digital", "innovation"],
+    "irap": ["IRAP", "research", "development"],
+    "international_market_expansion": ["export", "market expansion", "international"],
+    "canexport": ["CanExport", "export"],
+    "research_development": ["R&D", "research", "development", "innovation"],
+    "sred": ["SR&ED", "SRED", "tax credit"]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "scope": "federal",
+  "label": "Federal Programs",
+  "programs": {
+    "canexport": {
+      "label": "CanExport SME",
+      "category": "international_expansion",
+      "rate": 0.75,
+      "max_per_market": 75000,
+      "max_total": 150000,
+      "applies_to_company_size": "sme"
+    },
+    "irap": {
+      "label": "IRAP (Industrial Research Assistance Program)",
+      "category": "rd",
+      "rate": 0.80,
+      "max": 10000000,
+      "applies_to_company_size": "sme"
+    },
+    "sred": {
+      "label": "SR&ED Tax Credit",
+      "category": "rd",
+      "rate": 0.35,
+      "enhanced_rate_ccpc": 0.35,
+      "federal_rate": 0.15,
+      "provincial_rate_on": 0.035,
+      "applies_to": "all"
+    }
+  },
+  "baseline_rates": {
+    "international_expansion_rate": 0.50,
+    "international_expansion_max": 75000,
+    "rd_rate": 0.50,
+    "rd_max": 500000
+  }
+}

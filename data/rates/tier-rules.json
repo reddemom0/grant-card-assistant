@@ -1,0 +1,66 @@
+{
+  "rules": [
+    {
+      "condition": "is_nonprofit",
+      "tier": "not_a_fit",
+      "reason": "Nonprofit — redirect to Elivated platform"
+    },
+    {
+      "condition": "!is_incorporated_1yr",
+      "tier": "not_a_fit",
+      "reason": "Not incorporated for 1+ year"
+    },
+    {
+      "condition": "revenue_tier == 'pre_revenue'",
+      "tier": "not_a_fit",
+      "reason": "Pre-revenue stage"
+    },
+    {
+      "condition": "revenue_tier == 'lt_500k' && funds_raised < 500000",
+      "tier": "starter",
+      "reason": "Revenue <$500K, limited funds raised"
+    },
+    {
+      "condition": "revenue_tier == 'lt_500k' && funds_raised >= 500000",
+      "tier": "starter_plus",
+      "reason": "Revenue <$500K but significant funds raised"
+    },
+    {
+      "condition": "revenue_tier == '500k_2.5mm'",
+      "tier": "starter",
+      "reason": "Revenue $500K–$2.5MM — Online Platform fit"
+    },
+    {
+      "condition": "revenue_tier in ['2.5mm_5mm', '5mm_plus'] && industry_group == 1",
+      "tier": "waitlist",
+      "reason": "Pro-eligible revenue but services industry — currently waitlisted"
+    },
+    {
+      "condition": "revenue_tier in ['2.5mm_5mm', '5mm_plus']",
+      "tier": "pro",
+      "reason": "Revenue $2.5MM+ — Pro service fit"
+    }
+  ],
+  "tier_metadata": {
+    "not_a_fit": {
+      "email_template": "not_qualified",
+      "booking_link": null
+    },
+    "starter": {
+      "email_template": "starter",
+      "booking_link": "https://meetings.hubspot.com/natalie392/15min-intro-to-granted"
+    },
+    "starter_plus": {
+      "email_template": "starter",
+      "booking_link": "https://meetings.hubspot.com/natalie392/15min-intro-to-granted"
+    },
+    "waitlist": {
+      "email_template": "waitlist",
+      "booking_link": null
+    },
+    "pro": {
+      "email_template": "pro",
+      "booking_link": null
+    }
+  }
+}
