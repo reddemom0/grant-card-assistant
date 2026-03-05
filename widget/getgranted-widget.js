@@ -54,14 +54,122 @@
     "Northwest Territories", "Nunavut", "Yukon"
   ];
 
-  const INDUSTRIES = [
-    "Technology / Software", "Construction / Trades", "Manufacturing",
-    "Food & Beverage", "Healthcare / Biotech", "Professional Services",
-    "Retail / E-Commerce", "Clean Tech / Environmental",
-    "Agriculture", "Arts / Media / Entertainment",
-    "Hospitality / Tourism", "Transportation / Logistics",
-    "Natural Resources / Mining", "Financial Services", "Other"
-  ];
+  // Detailed industry categories matching grant rate groups
+  const INDUSTRIES = {
+    categories: [
+      {
+        header: "Professional Services & Services",
+        industries: [
+          "Accounting / Bookkeeping",
+          "Legal Services",
+          "Management Consulting",
+          "Marketing / Advertising",
+          "Public Relations",
+          "Architecture",
+          "Engineering Services",
+          "Design Services",
+          "Business Services",
+          "Human Resources Consulting",
+          "Financial Services",
+          "Real Estate Services",
+          "Retail Store",
+          "E-Commerce / Online Retail",
+          "Restaurants / Food Service",
+          "Hotel / Accommodation",
+          "Tourism / Travel",
+          "Entertainment / Events",
+          "Arts / Creative Industries",
+          "Healthcare Services",
+          "Education / Training",
+          "Childcare Services",
+          "Fitness / Wellness",
+          "Personal Services"
+        ]
+      },
+      {
+        header: "Agriculture",
+        industries: [
+          "Agriculture / Farming",
+          "Aquaculture / Fisheries",
+          "Food & Beverage Manufacturing",
+          "Agribusiness",
+          "Greenhouse / Horticulture",
+          "Livestock / Ranching",
+          "Agricultural Equipment",
+          "Food Processing",
+          "Organic Farming",
+          "Vineyard / Winery"
+        ]
+      },
+      {
+        header: "Construction & Supply Chain",
+        industries: [
+          "General Construction",
+          "Residential Construction",
+          "Commercial Construction",
+          "Specialty Trades",
+          "Plumbing / HVAC",
+          "Electrical Contracting",
+          "Landscaping",
+          "Transportation / Logistics",
+          "Warehousing / Distribution",
+          "Freight / Shipping",
+          "Supply Chain Management"
+        ]
+      },
+      {
+        header: "Manufacturing",
+        industries: [
+          "Industrial Manufacturing",
+          "Textiles / Apparel",
+          "Electronics Manufacturing",
+          "Machinery / Equipment",
+          "Automotive Parts",
+          "Aerospace / Aviation",
+          "Chemicals / Materials",
+          "Plastics / Packaging",
+          "Metal Fabrication",
+          "Furniture Manufacturing",
+          "Medical Devices",
+          "Consumer Products"
+        ]
+      },
+      {
+        header: "Natural Resources / CleanTech",
+        industries: [
+          "Forestry / Lumber",
+          "Mining / Extraction",
+          "Oil & Gas",
+          "Renewable Energy",
+          "Clean Technology",
+          "Environmental Services",
+          "Waste Management / Recycling",
+          "Biotechnology / Life Sciences",
+          "Cannabis Production",
+          "Solar / Wind Energy",
+          "Green Building Technology"
+        ]
+      },
+      {
+        header: "Technology",
+        industries: [
+          "Software Development / SaaS",
+          "IT Services & Consulting",
+          "Cybersecurity",
+          "AI / Machine Learning",
+          "Cloud Computing",
+          "E-Commerce Platform",
+          "Mobile App Development",
+          "Web Development",
+          "Data Analytics / BI",
+          "Telecommunications",
+          "Gaming / Interactive Media",
+          "Fintech",
+          "Hardware / IoT"
+        ]
+      }
+    ]
+  };
 
   const REVENUE_RANGES = [
     "Pre-revenue",
@@ -884,6 +992,137 @@
           color: ${BRAND_COLORS.grey};
         }
 
+        /* Combobox (searchable dropdown) styles */
+        .gg-combobox-wrapper {
+          position: relative;
+        }
+
+        .gg-combobox-input {
+          width: 100%;
+          border: 1px solid ${BRAND_COLORS.lightGrey};
+          border-radius: 6px;
+          padding: 10px 36px 10px 12px;
+          font-size: 14px;
+          font-family: inherit;
+          outline: none;
+          transition: border-color 0.2s ease;
+          cursor: text;
+          background: white;
+          background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L6 6L11 1' stroke='%236d7881' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 12px center;
+        }
+
+        .gg-combobox-input:focus {
+          border-color: ${BRAND_COLORS.primary};
+        }
+
+        .gg-combobox-input.error {
+          border-color: #dc2626;
+        }
+
+        .gg-combobox-input[aria-expanded="true"] {
+          border-bottom-left-radius: 0;
+          border-bottom-right-radius: 0;
+          border-bottom-color: ${BRAND_COLORS.primary};
+        }
+
+        .gg-combobox-dropdown {
+          position: absolute;
+          top: 100%;
+          left: 0;
+          right: 0;
+          max-height: 320px;
+          overflow-y: auto;
+          background: white;
+          border: 1px solid ${BRAND_COLORS.primary};
+          border-top: none;
+          border-radius: 0 0 6px 6px;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+          z-index: 1000;
+          display: none;
+        }
+
+        .gg-combobox-dropdown.open {
+          display: block;
+        }
+
+        .gg-industry-header {
+          padding: 8px 12px 6px 12px;
+          font-size: 12px;
+          font-weight: 600;
+          color: ${BRAND_COLORS.grey};
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          background: ${BRAND_COLORS.lightBg};
+          border-bottom: 1px solid ${BRAND_COLORS.lightGrey};
+          cursor: default;
+          user-select: none;
+        }
+
+        .gg-industry-header:not(:first-child) {
+          border-top: 1px solid ${BRAND_COLORS.lightGrey};
+        }
+
+        .gg-industry-option {
+          padding: 10px 12px;
+          font-size: 14px;
+          color: ${BRAND_COLORS.dark};
+          cursor: pointer;
+          transition: background 0.15s ease;
+          user-select: none;
+        }
+
+        .gg-industry-option:hover {
+          background: ${BRAND_COLORS.primaryLight};
+          color: ${BRAND_COLORS.primary};
+        }
+
+        .gg-industry-option.selected {
+          background: ${BRAND_COLORS.primaryLight};
+          color: ${BRAND_COLORS.primary};
+          font-weight: 600;
+        }
+
+        .gg-industry-option.hidden {
+          display: none;
+        }
+
+        .gg-combobox-dropdown::-webkit-scrollbar {
+          width: 6px;
+        }
+
+        .gg-combobox-dropdown::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .gg-combobox-dropdown::-webkit-scrollbar-thumb {
+          background: ${BRAND_COLORS.lightGrey};
+          border-radius: 3px;
+        }
+
+        .gg-combobox-dropdown::-webkit-scrollbar-thumb:hover {
+          background: ${BRAND_COLORS.grey};
+        }
+
+        /* Mobile: full-height dropdown on small screens */
+        @media (max-width: 480px) {
+          .gg-combobox-dropdown {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: calc(100vw - 32px);
+            max-height: 70vh;
+            border-radius: 12px;
+            border-top: 1px solid ${BRAND_COLORS.primary};
+          }
+
+          .gg-combobox-input[aria-expanded="true"] {
+            border-radius: 6px;
+          }
+        }
+
         .gg-conditional-fields {
           display: none;
           flex-direction: column;
@@ -981,6 +1220,44 @@
       html += `<option value="${escapeHtml(option)}">${escapeHtml(option)}</option>`;
     });
     return html;
+  }
+
+  function createIndustryCombobox() {
+    // Generate HTML for searchable industry combobox
+    let optionsHtml = '';
+
+    INDUSTRIES.categories.forEach(category => {
+      // Add category header (not selectable)
+      optionsHtml += `<div class="gg-industry-header">${escapeHtml(category.header)}</div>`;
+
+      // Add industries in this category
+      category.industries.forEach(industry => {
+        optionsHtml += `
+          <div class="gg-industry-option" data-value="${escapeHtml(industry)}" data-category="${escapeHtml(category.header)}">
+            ${escapeHtml(industry)}
+          </div>
+        `;
+      });
+    });
+
+    return `
+      <div class="gg-combobox-wrapper">
+        <input
+          type="text"
+          id="gg-industry-input"
+          class="gg-combobox-input"
+          placeholder="Search industries..."
+          autocomplete="off"
+          role="combobox"
+          aria-expanded="false"
+          aria-autocomplete="list"
+        />
+        <input type="hidden" id="gg-industry" />
+        <div class="gg-combobox-dropdown" id="gg-industry-dropdown" role="listbox">
+          ${optionsHtml}
+        </div>
+      </div>
+    `;
   }
 
   function createFloatingWidget() {
@@ -1092,15 +1369,10 @@
             <span class="error-message">Please enter a valid website URL</span>
           </div>
 
-          <!-- Conditional fields shown when "no website" is checked -->
-          <div class="gg-conditional-fields" id="gg-conditional-fields">
-            <div class="gg-form-field">
-              <label for="gg-industry">Industry <span class="required">*</span></label>
-              <select id="gg-industry">
-                ${createDropdownOptions(INDUSTRIES)}
-              </select>
-              <span class="error-message">Please select your industry</span>
-            </div>
+          <div class="gg-form-field">
+            <label for="gg-industry-input">Industry <span class="required">*</span></label>
+            ${createIndustryCombobox()}
+            <span class="error-message">Please select your industry</span>
           </div>
 
           <button type="button" class="gg-form-submit gg-form-next" id="gg-form-next" disabled>Next →</button>
@@ -1503,15 +1775,14 @@
       isValid = false;
     }
 
-    // Website validation OR industry validation
-    if (noWebsite) {
-      if (!industry) {
-        isValid = false;
-      }
-    } else {
-      if (!companyWebsite) {
-        isValid = false;
-      }
+    // Website validation (optional if "no website" is checked)
+    if (!noWebsite && !companyWebsite) {
+      isValid = false;
+    }
+
+    // Industry validation (always required)
+    if (!industry) {
+      isValid = false;
     }
 
     return isValid;
@@ -1560,11 +1831,12 @@
       if (!companyName) {
         shadowRoot?.getElementById('gg-company-name').classList.add('error');
       }
-      if (noWebsite && !industry) {
-        shadowRoot?.getElementById('gg-industry').classList.add('error');
-      }
       if (!noWebsite && !companyWebsite) {
         shadowRoot?.getElementById('gg-company-website').classList.add('error');
+      }
+      if (!industry) {
+        // Show error on visible input, not hidden
+        shadowRoot?.getElementById('gg-industry-input')?.classList.add('error');
       }
 
       return;
@@ -1630,8 +1902,8 @@
     const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
     let companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
     const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
-    let province = shadowRoot?.getElementById('gg-province').value;
-    let industry = shadowRoot?.getElementById('gg-industry').value;
+    const province = shadowRoot?.getElementById('gg-province').value;
+    const industry = shadowRoot?.getElementById('gg-industry').value;
 
     // Page 2 fields
     const revenue = shadowRoot?.getElementById('gg-revenue').value;
@@ -1648,9 +1920,6 @@
       if (companyWebsite && !companyWebsite.match(/^https?:\/\//i)) {
         companyWebsite = 'https://' + companyWebsite;
       }
-      // Clear industry if website is provided (Haiku will extract)
-      // Province stays - it's always required from form
-      industry = null;
     }
 
     // Prepare form data with all fields
@@ -1660,7 +1929,7 @@
       company_name: companyName,
       company_website: companyWebsite,
       province: province, // Always required from form (page 2)
-      industry: industry || null, // Only from form if no website
+      industry: industry, // Always required from form (page 1)
       revenue_range: revenue,
       employee_count: employees,
       hiring_plans: hiring,
@@ -1737,8 +2006,7 @@
       shadowRoot?.getElementById('gg-contact-name'),
       shadowRoot?.getElementById('gg-contact-email'),
       shadowRoot?.getElementById('gg-company-name'),
-      shadowRoot?.getElementById('gg-company-website'),
-      shadowRoot?.getElementById('gg-industry')
+      shadowRoot?.getElementById('gg-company-website')
     ];
 
     page1Fields.forEach(field => {
@@ -1755,6 +2023,8 @@
         }
       }
     });
+
+    // Note: Industry combobox validation handled separately below
 
     // Page 2 field validation listeners
     const page2Fields = [
@@ -1778,9 +2048,8 @@
     // "No website" checkbox handler
     const noWebsiteCheckbox = shadowRoot?.getElementById('gg-no-website');
     const websiteInput = shadowRoot?.getElementById('gg-company-website');
-    const conditionalFields = shadowRoot?.getElementById('gg-conditional-fields');
 
-    if (noWebsiteCheckbox && websiteInput && conditionalFields) {
+    if (noWebsiteCheckbox && websiteInput) {
       noWebsiteCheckbox.addEventListener('change', (e) => {
         const isChecked = e.target.checked;
 
@@ -1791,21 +2060,109 @@
           websiteInput.classList.remove('error');
         }
 
-        // Toggle conditional fields (industry only)
-        if (isChecked) {
-          conditionalFields.classList.add('visible');
-        } else {
-          conditionalFields.classList.remove('visible');
-          // Clear industry when hiding
-          const industryField = shadowRoot?.getElementById('gg-industry');
-          if (industryField) {
-            industryField.value = '';
-            industryField.classList.remove('error');
-          }
-        }
-
         updateNextButtonState();
       });
+    }
+
+    // Industry combobox handlers
+    const industryInput = shadowRoot?.getElementById('gg-industry-input');
+    const industryHidden = shadowRoot?.getElementById('gg-industry');
+    const industryDropdown = shadowRoot?.getElementById('gg-industry-dropdown');
+
+    if (industryInput && industryHidden && industryDropdown) {
+      // Open dropdown on focus
+      industryInput.addEventListener('focus', () => {
+        industryInput.setAttribute('aria-expanded', 'true');
+        industryDropdown.classList.add('open');
+        filterIndustries(''); // Show all initially
+      });
+
+      // Filter as user types
+      industryInput.addEventListener('input', (e) => {
+        const query = e.target.value;
+        filterIndustries(query);
+
+        // Clear selection if user is typing
+        if (industryHidden.value) {
+          industryHidden.value = '';
+          updateNextButtonState();
+        }
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        const wrapper = shadowRoot?.querySelector('.gg-combobox-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+          industryInput.setAttribute('aria-expanded', 'false');
+          industryDropdown.classList.remove('open');
+        }
+      });
+
+      // Select industry on click
+      const industryOptions = industryDropdown.querySelectorAll('.gg-industry-option');
+      industryOptions.forEach(option => {
+        option.addEventListener('click', () => {
+          const value = option.getAttribute('data-value');
+
+          // Update hidden input and display input
+          industryHidden.value = value;
+          industryInput.value = value;
+
+          // Clear error state
+          industryInput.classList.remove('error');
+
+          // Update selected state visually
+          industryOptions.forEach(opt => opt.classList.remove('selected'));
+          option.classList.add('selected');
+
+          // Close dropdown
+          industryInput.setAttribute('aria-expanded', 'false');
+          industryDropdown.classList.remove('open');
+
+          // Update validation
+          updateNextButtonState();
+        });
+      });
+
+      // Helper function to filter industries
+      function filterIndustries(query) {
+        const normalizedQuery = query.toLowerCase().trim();
+        const options = industryDropdown.querySelectorAll('.gg-industry-option');
+        const headers = industryDropdown.querySelectorAll('.gg-industry-header');
+
+        if (!normalizedQuery) {
+          // Show all
+          options.forEach(opt => opt.classList.remove('hidden'));
+          headers.forEach(hdr => hdr.style.display = 'block');
+          return;
+        }
+
+        // Track which categories have visible options
+        const visibleCategories = new Set();
+
+        // Filter options
+        options.forEach(option => {
+          const text = option.textContent.toLowerCase();
+          const category = option.getAttribute('data-category');
+
+          if (text.includes(normalizedQuery)) {
+            option.classList.remove('hidden');
+            visibleCategories.add(category);
+          } else {
+            option.classList.add('hidden');
+          }
+        });
+
+        // Hide category headers with no visible options
+        headers.forEach(header => {
+          const categoryName = header.textContent;
+          if (visibleCategories.has(categoryName)) {
+            header.style.display = 'block';
+          } else {
+            header.style.display = 'none';
+          }
+        });
+      }
     }
 
     if (config.mode === 'floating') {
