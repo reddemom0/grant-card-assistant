@@ -1223,7 +1223,29 @@
   }
 
   function createIndustryCombobox() {
-    // Generate HTML for searchable industry combobox
+    // Return empty dropdown - industries will be lazy-loaded on first interaction
+    return `
+      <div class="gg-combobox-wrapper">
+        <input
+          type="text"
+          id="gg-industry-input"
+          class="gg-combobox-input"
+          placeholder="Search industries..."
+          autocomplete="off"
+          role="combobox"
+          aria-expanded="false"
+          aria-autocomplete="list"
+        />
+        <input type="hidden" id="gg-industry" />
+        <div class="gg-combobox-dropdown" id="gg-industry-dropdown" role="listbox">
+          <!-- Industries loaded on first interaction -->
+        </div>
+      </div>
+    `;
+  }
+
+  function loadIndustryOptions(dropdown) {
+    // Generate HTML for all industries
     let optionsHtml = '';
 
     INDUSTRIES.categories.forEach(category => {
@@ -1240,24 +1262,7 @@
       });
     });
 
-    return `
-      <div class="gg-combobox-wrapper">
-        <input
-          type="text"
-          id="gg-industry-input"
-          class="gg-combobox-input"
-          placeholder="Search industries..."
-          autocomplete="off"
-          role="combobox"
-          aria-expanded="false"
-          aria-autocomplete="list"
-        />
-        <input type="hidden" id="gg-industry" />
-        <div class="gg-combobox-dropdown" id="gg-industry-dropdown" role="listbox">
-          ${optionsHtml}
-        </div>
-      </div>
-    `;
+    dropdown.innerHTML = optionsHtml;
   }
 
   function createFloatingWidget() {
@@ -2064,65 +2069,13 @@
       });
     }
 
-    // Industry combobox handlers
+    // Industry combobox handlers with lazy-loading
     const industryInput = shadowRoot?.getElementById('gg-industry-input');
     const industryHidden = shadowRoot?.getElementById('gg-industry');
     const industryDropdown = shadowRoot?.getElementById('gg-industry-dropdown');
 
     if (industryInput && industryHidden && industryDropdown) {
-      // Open dropdown on focus
-      industryInput.addEventListener('focus', () => {
-        industryInput.setAttribute('aria-expanded', 'true');
-        industryDropdown.classList.add('open');
-        filterIndustries(''); // Show all initially
-      });
-
-      // Filter as user types
-      industryInput.addEventListener('input', (e) => {
-        const query = e.target.value;
-        filterIndustries(query);
-
-        // Clear selection if user is typing
-        if (industryHidden.value) {
-          industryHidden.value = '';
-          updateNextButtonState();
-        }
-      });
-
-      // Close dropdown when clicking outside
-      document.addEventListener('click', (e) => {
-        const wrapper = shadowRoot?.querySelector('.gg-combobox-wrapper');
-        if (wrapper && !wrapper.contains(e.target)) {
-          industryInput.setAttribute('aria-expanded', 'false');
-          industryDropdown.classList.remove('open');
-        }
-      });
-
-      // Select industry on click
-      const industryOptions = industryDropdown.querySelectorAll('.gg-industry-option');
-      industryOptions.forEach(option => {
-        option.addEventListener('click', () => {
-          const value = option.getAttribute('data-value');
-
-          // Update hidden input and display input
-          industryHidden.value = value;
-          industryInput.value = value;
-
-          // Clear error state
-          industryInput.classList.remove('error');
-
-          // Update selected state visually
-          industryOptions.forEach(opt => opt.classList.remove('selected'));
-          option.classList.add('selected');
-
-          // Close dropdown
-          industryInput.setAttribute('aria-expanded', 'false');
-          industryDropdown.classList.remove('open');
-
-          // Update validation
-          updateNextButtonState();
-        });
-      });
+      let industriesLoaded = false;
 
       // Helper function to filter industries
       function filterIndustries(query) {
@@ -2163,6 +2116,69 @@
           }
         });
       }
+
+      // Setup click handlers for industry options (called after lazy-load)
+      function setupIndustryOptionHandlers() {
+        const industryOptions = industryDropdown.querySelectorAll('.gg-industry-option');
+        industryOptions.forEach(option => {
+          option.addEventListener('click', () => {
+            const value = option.getAttribute('data-value');
+
+            // Update hidden input and display input
+            industryHidden.value = value;
+            industryInput.value = value;
+
+            // Clear error state
+            industryInput.classList.remove('error');
+
+            // Update selected state visually
+            industryOptions.forEach(opt => opt.classList.remove('selected'));
+            option.classList.add('selected');
+
+            // Close dropdown
+            industryInput.setAttribute('aria-expanded', 'false');
+            industryDropdown.classList.remove('open');
+
+            // Update validation
+            updateNextButtonState();
+          });
+        });
+      }
+
+      // Open dropdown on focus (lazy-load on first open)
+      industryInput.addEventListener('focus', () => {
+        // Lazy-load industries on first interaction
+        if (!industriesLoaded) {
+          loadIndustryOptions(industryDropdown);
+          setupIndustryOptionHandlers();
+          industriesLoaded = true;
+        }
+
+        industryInput.setAttribute('aria-expanded', 'true');
+        industryDropdown.classList.add('open');
+        filterIndustries(''); // Show all initially
+      });
+
+      // Filter as user types
+      industryInput.addEventListener('input', (e) => {
+        const query = e.target.value;
+        filterIndustries(query);
+
+        // Clear selection if user is typing
+        if (industryHidden.value) {
+          industryHidden.value = '';
+          updateNextButtonState();
+        }
+      });
+
+      // Close dropdown when clicking outside
+      document.addEventListener('click', (e) => {
+        const wrapper = shadowRoot?.querySelector('.gg-combobox-wrapper');
+        if (wrapper && !wrapper.contains(e.target)) {
+          industryInput.setAttribute('aria-expanded', 'false');
+          industryDropdown.classList.remove('open');
+        }
+      });
     }
 
     if (config.mode === 'floating') {
