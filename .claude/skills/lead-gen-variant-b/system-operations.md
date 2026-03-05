@@ -47,6 +47,7 @@ After delivering the estimate, store via memory_store:
 - estimated_funding → full 12-month estimate
 - available_now_funding → immediate estimate
 - programs_matched_count → total count
+- service_tier_recommended → which tier you recommended in chat (e.g., "starter", "pro", "getgranted")
 
 Required memory_store keys for lead-gen sessions:
 - company_name
@@ -62,8 +63,11 @@ Required memory_store keys for lead-gen sessions:
 - estimated_funding
 - available_now_funding
 - programs_matched_count
+- service_tier_recommended
 
 For matched_programs: Use ACTUAL program names from search_getgranted results (e.g., "IRAP YEP ($15K per hire, active)", "BC ETG ($10K, fall intake)"), NOT generic descriptions. Store actual program names, amounts, and active/cyclical status from search results.
+
+For service_tier_recommended: Store the tier key you recommended in chat ("starter", "pro", or "getgranted"). This ensures your judgment (considering company size, complexity, etc.) is preserved in HubSpot notes, even if the funding amount alone would suggest a different tier.
 </memory_store_instructions>
 
 <save_lead_data_instructions>

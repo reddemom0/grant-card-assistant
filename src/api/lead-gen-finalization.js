@@ -358,8 +358,10 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
   // PROSPECT SUMMARY (if agent provided one)
   // =========================================================================
 
-  if (pd.prospect_summary) {
-    lines.push(pd.prospect_summary);
+  // Check both top-level and prospect_data
+  const prospectSummary = sessionData.prospect_summary || pd.prospect_summary;
+  if (prospectSummary) {
+    lines.push(prospectSummary);
     lines.push('');
     lines.push('---');
     lines.push('');
@@ -485,30 +487,40 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
   }
 
   // Programs matched (with actual program names)
-  if (matched_programs && matched_programs.length > 0) {
+  // Check prospect_data first (may have better data from memory_store), then top-level
+  const matchedProgramsData = pd.matched_programs || matched_programs;
+  if (matchedProgramsData && matchedProgramsData.length > 0) {
     lines.push('Programs Matched:');
 
     // If it's an array, format one per line
-    if (Array.isArray(matched_programs)) {
-      matched_programs.forEach(program => {
+    if (Array.isArray(matchedProgramsData)) {
+      matchedProgramsData.forEach(program => {
         lines.push(`  • ${program}`);
       });
     } else {
       // If it's a string (shouldn't be, but handle it)
-      lines.push(matched_programs);
+      lines.push(matchedProgramsData);
     }
 
     lines.push('');
   }
 
   // Service tier recommendation
-  if (serviceTier) {
+  // Check if agent stored a recommended tier (overrides computed value)
+  const agentRecommendedTier = sessionData.service_tier_recommended || pd.service_tier_recommended;
+  const finalServiceTier = agentRecommendedTier || serviceTier;
+
+  if (agentRecommendedTier && serviceTier && agentRecommendedTier !== serviceTier) {
+    console.log(`✅ Using agent-recommended tier: ${agentRecommendedTier} (computed was: ${serviceTier})`);
+  }
+
+  if (finalServiceTier) {
     const tierLabels = {
       pro: 'GrantedPro ($30K+)',
       starter: 'Granted Starter ($15K-$29,999)',
       getgranted: 'GetGranted (under $15K)'
     };
-    lines.push(`Service Tier Recommended: ${tierLabels[serviceTier] || serviceTier}`);
+    lines.push(`Service Tier Recommended: ${tierLabels[finalServiceTier] || finalServiceTier}`);
     lines.push('');
   }
 
@@ -522,45 +534,53 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
   lines.push('🎯 Qualification Signals:');
   lines.push('');
 
-  // Timeline
-  lines.push(`Timeline: ${pd.timeline || 'Not discussed'}`);
+  // Timeline (check top-level first, then prospect_data)
+  const timeline = sessionData.timeline || pd.timeline || 'Not discussed';
+  lines.push(`Timeline: ${timeline}`);
 
-  // Budget
-  const budgetValue = pd.budget_committed !== undefined
-    ? (pd.budget_committed === true ? 'Allocated' : pd.budget_committed === false ? 'Exploring' : pd.budget_committed)
+  // Budget (check both locations, handle boolean values)
+  const budgetCommitted = sessionData.budget_committed !== undefined ? sessionData.budget_committed : pd.budget_committed;
+  const budgetValue = budgetCommitted !== undefined
+    ? (budgetCommitted === true ? 'Allocated' : budgetCommitted === false ? 'Exploring' : budgetCommitted)
     : 'Not discussed';
   lines.push(`Budget: ${budgetValue}`);
 
-  // Decision maker
-  const dmValue = pd.is_decision_maker !== undefined
-    ? (pd.is_decision_maker === true ? 'Yes' : pd.is_decision_maker === false ? 'No' : pd.is_decision_maker)
+  // Decision maker (check both locations, handle boolean values)
+  const isDecisionMaker = sessionData.is_decision_maker !== undefined ? sessionData.is_decision_maker : pd.is_decision_maker;
+  const dmValue = isDecisionMaker !== undefined
+    ? (isDecisionMaker === true ? 'Yes' : isDecisionMaker === false ? 'No' : isDecisionMaker)
     : 'Not discussed';
   lines.push(`Decision Maker: ${dmValue}`);
 
-  // Grant experience
-  lines.push(`Grant Experience: ${pd.prior_grant_experience || 'Not discussed'}`);
+  // Grant experience (check both locations)
+  const priorGrantExperience = sessionData.prior_grant_experience || pd.prior_grant_experience || 'Not discussed';
+  lines.push(`Grant Experience: ${priorGrantExperience}`);
 
-  // Existing consultant
-  lines.push(`Existing Consultant: ${pd.existing_consultant || 'Not discussed'}`);
+  // Existing consultant (check both locations)
+  const existingConsultant = sessionData.existing_consultant || pd.existing_consultant || 'Not discussed';
+  lines.push(`Existing Consultant: ${existingConsultant}`);
 
-  // Growth plans
-  lines.push(`Growth Plans: ${pd.growth_plans || 'Not discussed'}`);
+  // Growth plans (check both locations)
+  const growthPlans = sessionData.growth_plans || pd.growth_plans || 'Not discussed';
+  lines.push(`Growth Plans: ${growthPlans}`);
 
   lines.push('');
 
-  // Lead score & status
-  if (pd.lead_score) {
+  // Lead score & status (check both locations)
+  const leadScore = sessionData.lead_score || pd.lead_score;
+  if (leadScore) {
     const scoreLabels = {
       hot: 'HOT (ready to close)',
       warm: 'WARM (promising)',
       cool: 'COOL (early stage)'
     };
-    const scoreLabel = scoreLabels[pd.lead_score] || pd.lead_score;
+    const scoreLabel = scoreLabels[leadScore] || leadScore;
     lines.push(`Lead Score: ${scoreLabel}`);
   }
 
-  if (pd.hs_lead_status) {
-    lines.push(`Lead Status: ${pd.hs_lead_status}`);
+  const hsLeadStatus = sessionData.hs_lead_status || pd.hs_lead_status;
+  if (hsLeadStatus) {
+    lines.push(`Lead Status: ${hsLeadStatus}`);
   }
 
   lines.push('');
@@ -590,7 +610,9 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
 
   // Only include booking link for Starter ($15K+) and Pro ($30K+) tiers
   // Exclude for GetGranted (under $15K)
-  if (serviceTier && serviceTier !== 'getgranted') {
+  // Use finalServiceTier (agent-recommended if available, otherwise computed)
+  const bookingTier = agentRecommendedTier || serviceTier;
+  if (bookingTier && bookingTier !== 'getgranted') {
     lines.push('---');
     lines.push(`📅 Booking Link: https://meetings.hubspot.com/natalie392/15min-intro-to-granted`);
   }
