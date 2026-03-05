@@ -325,7 +325,7 @@
         .gg-chat-header {
           background: ${BRAND_COLORS.primary};
           color: white;
-          padding: 20px;
+          padding: 12px 20px;
           border-radius: 12px 12px 0 0;
           display: flex;
           align-items: center;
@@ -334,25 +334,25 @@
         }
 
         .gg-chat-header-avatar {
-          width: 40px;
-          height: 40px;
+          width: 32px;
+          height: 32px;
           background: rgba(255, 255, 255, 0.2);
           border-radius: 50%;
           display: flex;
           align-items: center;
           justify-content: center;
           font-weight: bold;
-          font-size: 18px;
+          font-size: 16px;
         }
 
         .gg-chat-header-text h3 {
-          font-size: 16px;
+          font-size: 15px;
           font-weight: 600;
           margin: 0 0 2px 0;
         }
 
         .gg-chat-header-text p {
-          font-size: 13px;
+          font-size: 12px;
           margin: 0;
           opacity: 0.9;
         }
@@ -567,14 +567,16 @@
         }
 
         .gg-summary-bar {
-          padding: 8px 20px;
+          padding: 8px 20px 12px 20px;
           border-top: 1px solid ${BRAND_COLORS.lightGrey};
           flex-shrink: 0;
+          display: flex;
+          justify-content: center;
         }
 
         .gg-summary-button {
-          width: 100%;
-          padding: 10px 16px;
+          max-width: 280px;
+          padding: 8px 14px;
           background: white;
           border: 1.5px solid ${BRAND_COLORS.primary};
           border-radius: 8px;
@@ -1182,11 +1184,6 @@
       <div class="gg-chat-interface hidden">
         <div class="gg-chat-messages"></div>
         ${config.quickActions.length > 0 ? '<div class="gg-quick-actions"></div>' : ''}
-        <div class="gg-summary-bar">
-          <button class="gg-summary-button" id="gg-summary-button" aria-label="Send funding summary to email">
-            📧 Send me the funding summary
-          </button>
-        </div>
         <div class="gg-chat-input-wrapper">
           <textarea
             class="gg-chat-input"
@@ -1198,6 +1195,11 @@
             <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
             </svg>
+          </button>
+        </div>
+        <div class="gg-summary-bar">
+          <button class="gg-summary-button" id="gg-summary-button" aria-label="Send funding summary to email">
+            📧 Send me the funding summary
           </button>
         </div>
       </div>
