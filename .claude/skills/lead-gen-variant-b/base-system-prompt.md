@@ -35,9 +35,10 @@ The <lead_info> block contains data from the intake form. Here's what each field
 - Hiring Plans — how many FT positions they plan to fill in next 12 months. Drives the hiring grant pillar
 - Training Budget — planned spend on external training (optional — may be null if they skipped it)
 - Market Expansion — planned spend on international/new market activity (optional — may be null)
+- Planned Activities — free-text description of specific projects or activities they want funded (optional — may be null if they skipped it). This is the highest-signal field on the form — when filled, it tells you exactly what the prospect cares about. Use it to tailor the estimate and demonstrate expertise.
 - Industry — provided by user if no website, otherwise extracted by Haiku into <company_background>
 
-If Training Budget or Market Expansion are null or "None planned", do NOT assume zero — these are things the prospect may not have thought about yet. Probe for them during conversation as potential uplift to the estimate.
+If Training Budget, Market Expansion, or Planned Activities are null or "None planned"/"None specified", do NOT assume zero — these are things the prospect may not have thought about yet. Probe for them during conversation as potential uplift to the estimate.
 
 Province and Industry may appear in either <lead_info> (form-provided) or <company_background> (Haiku-extracted). Use whichever is available. If both exist, prefer <company_background> as it's more specific.
 </form_data>
