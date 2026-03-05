@@ -71,6 +71,11 @@ export async function getLeadGenFormContext(conversationId) {
     if (prospectData.expansion_budget) {
       context += `Market Expansion: ${prospectData.expansion_budget}\n`;
     }
+    if (prospectData.planned_activities) {
+      context += `Planned Activities: ${prospectData.planned_activities}\n`;
+    } else {
+      context += `Planned Activities: None specified\n`;
+    }
 
     context += `</lead_info>\n\n`;
 

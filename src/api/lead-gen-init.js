@@ -80,7 +80,8 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
     employee_count: formData.employee_count,
     hiring_plans: formData.hiring_plans,
     training_budget: formData.training_budget,
-    expansion_budget: formData.expansion_budget
+    expansion_budget: formData.expansion_budget,
+    planned_activities: formData.planned_activities
   };
 
   // Create the lead-gen-specific metadata row with form data
@@ -113,6 +114,9 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
   console.log(`  Hiring: ${formData.hiring_plans}, Training: ${formData.training_budget || 'none'}, Expansion: ${formData.expansion_budget || 'none'}`);
   if (formData.province && formData.industry) {
     console.log(`  Province: ${formData.province}, Industry: ${formData.industry} (form-provided)`);
+  }
+  if (formData.planned_activities) {
+    console.log(`  📋 Planned Activities: ${formData.planned_activities.substring(0, 100)}${formData.planned_activities.length > 100 ? '...' : ''}`);
   }
 
   return sessionId;
@@ -259,7 +263,8 @@ export async function handleLeadGenInit(req, res) {
       employee_count,
       hiring_plans,
       training_budget,
-      expansion_budget
+      expansion_budget,
+      planned_activities
     } = req.body;
 
     const ipAddress = getClientIp(req);
@@ -315,7 +320,8 @@ export async function handleLeadGenInit(req, res) {
       employee_count,
       hiring_plans,
       training_budget: training_budget || null,
-      expansion_budget: expansion_budget || null
+      expansion_budget: expansion_budget || null,
+      planned_activities: planned_activities || null
     };
 
     const sessionId = await createLeadGenSessionWithFormData(ipAddress, formData);
