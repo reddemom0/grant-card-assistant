@@ -111,7 +111,7 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
         const results = await searchFunction({
           query: searchCall.query,
           province: searchCall.province,
-          purposes: searchCall.purposes.join(','),
+          purposes: searchCall.purposes,
           limit: 15
         });
 
