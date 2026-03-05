@@ -1,0 +1,91 @@
+{
+  "province": "default",
+  "province_label": "Default (based on Ontario federal programs)",
+  "groups": {
+    "1": {
+      "label": "Pro Services & Services",
+      "hiring_base_per_hire": 0,
+      "hiring_student_per_hire": 7000,
+      "hiring_recent_grad_per_hire": 0,
+      "training_rate": 0.66,
+      "training_cap_multiplier": 0.50,
+      "training_small_company_threshold_ftes": 100,
+      "training_small_company_rate": 0.50,
+      "international_expansion_rate": 0.50,
+      "international_expansion_max": 50000,
+      "rd_rate": 0.30,
+      "rd_max": 150000
+    },
+    "2": {
+      "label": "Agriculture",
+      "hiring_base_per_hire": 0,
+      "hiring_student_per_hire": 7000,
+      "hiring_recent_grad_per_hire": 14000,
+      "training_rate": 0.66,
+      "training_cap_multiplier": 0.50,
+      "training_small_company_threshold_ftes": 100,
+      "training_small_company_rate": 0.50,
+      "international_expansion_rate": 0.50,
+      "international_expansion_max": 50000,
+      "rd_rate": 0.30,
+      "rd_max": 150000
+    },
+    "3": {
+      "label": "Construction or Supply Chain",
+      "hiring_base_per_hire": 0,
+      "hiring_student_per_hire": 7000,
+      "hiring_recent_grad_per_hire": 14000,
+      "training_rate": 0.66,
+      "training_cap_multiplier": 0.50,
+      "training_small_company_threshold_ftes": 100,
+      "training_small_company_rate": 0.50,
+      "international_expansion_rate": 0.50,
+      "international_expansion_max": 50000,
+      "rd_rate": 0.30,
+      "rd_max": 150000
+    },
+    "4": {
+      "label": "Manufacturing",
+      "hiring_base_per_hire": 0,
+      "hiring_student_per_hire": 7000,
+      "hiring_recent_grad_per_hire": 14000,
+      "training_rate": 0.66,
+      "training_cap_multiplier": 0.50,
+      "training_small_company_threshold_ftes": 100,
+      "training_small_company_rate": 0.50,
+      "international_expansion_rate": 0.50,
+      "international_expansion_max": 50000,
+      "rd_rate": 0.30,
+      "rd_max": 150000
+    },
+    "5": {
+      "label": "Natural Resources / CleanTech / BioTalent",
+      "hiring_base_per_hire": 50000,
+      "hiring_student_per_hire": 7000,
+      "hiring_recent_grad_per_hire": 30000,
+      "training_rate": 0.66,
+      "training_cap_multiplier": 0.50,
+      "training_small_company_threshold_ftes": 100,
+      "training_small_company_rate": 0.50,
+      "international_expansion_rate": 0.50,
+      "international_expansion_max": 50000,
+      "rd_rate": 0.30,
+      "rd_max": 150000
+    },
+    "6": {
+      "label": "Technology",
+      "hiring_base_per_hire": 0,
+      "hiring_student_per_hire": 7000,
+      "hiring_recent_grad_per_hire": 20000,
+      "training_rate": 0.66,
+      "training_cap_multiplier": 0.50,
+      "training_small_company_threshold_ftes": 100,
+      "training_small_company_rate": 0.50,
+      "international_expansion_rate": 0.50,
+      "international_expansion_max": 50000,
+      "rd_rate": 0.30,
+      "rd_max": 150000
+    }
+  },
+  "modifiers": {}
+}

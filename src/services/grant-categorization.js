@@ -54,9 +54,15 @@ function loadProvinceRates(province) {
       provinceRates[province] = JSON.parse(readFileSync(filePath, 'utf8'));
       console.log(`✅ Loaded ${province} rate table`);
     } catch (err) {
-      console.warn(`⚠️  No rate table for ${province}, using conservative defaults`);
-      // Use ON rates as default
-      provinceRates[province] = JSON.parse(readFileSync(join(dataDir, 'on-rates.json'), 'utf8'));
+      console.warn(`⚠️  No rate table for ${province}, using default rates`);
+      // Try default-rates.json, fall back to ON rates if that doesn't exist
+      try {
+        provinceRates[province] = JSON.parse(readFileSync(join(dataDir, 'default-rates.json'), 'utf8'));
+        console.log(`✅ Using default rate table for ${province}`);
+      } catch (err2) {
+        console.warn(`⚠️  No default-rates.json found, using ON rates as ultimate fallback`);
+        provinceRates[province] = JSON.parse(readFileSync(join(dataDir, 'on-rates.json'), 'utf8'));
+      }
     }
   }
   return provinceRates[province];

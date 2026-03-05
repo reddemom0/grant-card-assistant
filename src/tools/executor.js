@@ -758,7 +758,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                     return await searchGetGranted({
                       query: searchParams.query,
                       purposes: searchParams.purposes,
-                      regions: searchParams.province,
+                      regions: [searchParams.province],
                       industries: [],
                       active_only: input.active_only,
                       open_intakes_only: input.open_intakes_only,
