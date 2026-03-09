@@ -7,6 +7,30 @@
 
 import { categorizeProspect } from './grant-categorization.js';
 
+// Map search categories to expected smart_tags intents and genres
+const CATEGORY_TAG_MAP = {
+  'Hiring Programs': {
+    intents: ['Talent'],
+    genres: ['Wage Subsidy', 'Student/Co-op Hire', 'Youth Hire', 'Apprenticeship', 'Internship', 'General Hiring']
+  },
+  'Training Programs': {
+    intents: ['Talent', 'Operations'],
+    genres: ['Skills Training', 'Technical Training', 'Leadership Development', 'Health & Safety Certification', 'Digital Literacy']
+  },
+  'Market Expansion Programs': {
+    intents: ['Markets', 'Markets_Domestic', 'Growth'],
+    genres: ['Export', 'Trade Show', 'Market Research', 'International Marketing', 'Foreign Certification', 'Commercialization', 'Scale-up']
+  },
+  'R&D Programs': {
+    intents: ['Innovation'],
+    genres: ['R&D', 'Prototype Development', 'Product Testing', 'IP Protection', 'Pilot Projects', 'Feasibility Studies']
+  },
+  'General Industry Programs': {
+    intents: [],  // no intent boost for general
+    genres: []
+  }
+};
+
 /**
  * Run focused search based on categorization
  *
@@ -192,6 +216,8 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
     const scoredPrograms = filteredPrograms.map(program => {
       let score = 0;
 
+      // ── EXISTING SCORING ──────────────────────────────────────────────────────
+
       // +3 if program category matches one of our target categories
       const programCategories = program.categories || [];
       const hasMatchingCategory = categorization.grant_categories_to_search.some(cat =>
@@ -216,6 +242,43 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
       } else {
         // No size restriction, assume it's a fit
         score += 1;
+      }
+
+      // ── SMART TAGS SCORING ────────────────────────────────────────────────────
+
+      const tags = program.smart_tags;
+      const searchOrigin = program.search_origin || 'General Industry Programs';
+      const expectedTags = CATEGORY_TAG_MAP[searchOrigin] || CATEGORY_TAG_MAP['General Industry Programs'];
+      let tagBoost = 0;
+
+      if (tags) {
+        // +5 for primary intent match
+        if (expectedTags.intents.length > 0 && tags.primary_intents) {
+          const intentMatch = tags.primary_intents.some(i => expectedTags.intents.includes(i));
+          if (intentMatch) {
+            tagBoost += 5;
+          }
+        }
+
+        // +2 per genre match, up to +6
+        if (expectedTags.genres.length > 0 && tags.genres) {
+          const genreMatches = tags.genres.filter(g => expectedTags.genres.includes(g)).length;
+          const genreBoost = Math.min(genreMatches * 2, 6);
+          tagBoost += genreBoost;
+        }
+
+        // +2-4 for max_funding_numeric (logarithmic boost — $50K scores higher than $5K)
+        if (tags.max_funding_numeric && tags.max_funding_numeric > 0) {
+          const fundingBoost = Math.min(Math.floor(Math.log10(tags.max_funding_numeric)), 4);
+          tagBoost += fundingBoost;
+        }
+
+        if (tagBoost > 0) {
+          score += tagBoost;
+          const intentMatch = tags.primary_intents && expectedTags.intents.some(i => tags.primary_intents.includes(i));
+          const genreMatches = tags.genres ? tags.genres.filter(g => expectedTags.genres.includes(g)).length : 0;
+          console.log(`      Smart tag boost: +${tagBoost} for "${program.grant_name}" (intents: ${intentMatch}, genres: ${genreMatches})`);
+        }
       }
 
       return { ...program, relevance_score: score };
