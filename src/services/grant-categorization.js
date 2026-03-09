@@ -485,10 +485,11 @@ function buildSearchParameters(industryResolution, province, grantCategories, pr
   // Build keywords from industry + categories
   const keywords = new Set();
 
-  // Use group label for keywords if matched_industry is "Other" (more meaningful for search)
-  // Otherwise use the actual industry name (even if not canonical, it might match grants)
+  // Use original industry string when matched_industry is "Other" to preserve specificity
+  // Original form value (e.g., "Food Service / Hospitality") produces better keyword matches
+  // than generic group label (e.g., "Professional Services & Services")
   const industryKeyword = industryResolution.matched_industry === 'Other'
-    ? industryResolution.group_label
+    ? (prospectData.industry || industryResolution.group_label)
     : industryResolution.matched_industry;
 
   keywords.add(industryKeyword);
