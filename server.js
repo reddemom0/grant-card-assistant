@@ -146,7 +146,15 @@ app.get('/batch-retag-grants', async (req, res) => {
     console.log('   Match:', receivedSecret === expectedSecret);
 
     if (receivedSecret !== expectedSecret) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({
+        error: 'Unauthorized',
+        debug: {
+          receivedPrefix: receivedSecret ? receivedSecret.substring(0, 8) : 'null',
+          expectedPrefix: expectedSecret ? expectedSecret.substring(0, 8) : 'null',
+          receivedLength: receivedSecret ? receivedSecret.length : 0,
+          expectedLength: expectedSecret ? expectedSecret.length : 0
+        }
+      });
     }
 
     const { tagGrant } = await import('./src/services/grant-tagger.js');
