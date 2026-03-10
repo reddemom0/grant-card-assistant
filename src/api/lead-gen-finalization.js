@@ -900,9 +900,19 @@ export async function sendLeadGenEmail(sessionId) {
   // Check conditions
   console.log(`📧 Checking email conditions — cta_selected: "${prospectData.cta_selected}", has_contact_email: ${!!session.contact_email}, has_email_body: ${!!prospectData.email_summary_body}`);
 
-  if (!prospectData.cta_selected || !prospectData.cta_selected.includes('email')) {
-    console.log(`ℹ️  Email summary NOT requested (cta_selected: "${prospectData.cta_selected}") — skipping`);
+  // Send email if EITHER:
+  // 1. Explicit request (cta_selected includes 'email'), OR
+  // 2. Agent prepared email body (indicates intent to send on timeout/finalization)
+  const hasExplicitRequest = prospectData.cta_selected && prospectData.cta_selected.includes('email');
+  const hasEmailBody = !!prospectData.email_summary_body;
+
+  if (!hasExplicitRequest && !hasEmailBody) {
+    console.log(`ℹ️  Email summary NOT requested and no email body prepared — skipping`);
     return { success: false, error: 'Email not requested' };
+  }
+
+  if (hasEmailBody && !hasExplicitRequest) {
+    console.log(`📧 Email body prepared by agent but no explicit button click — sending via timeout/finalization path`);
   }
 
   if (!session.contact_email) {
