@@ -743,8 +743,9 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             // Step 1: Build prospect data from session
             const prospectData = await buildProspectDataFromSession(conversationId);
 
-            if (prospectData && prospectData.industry) {
+            if (prospectData) {
               // Step 2: Categorize prospect
+              // Note: categorizeProspect() handles missing industry by defaulting to Group 1
               console.log('  🏷️  Running categorization...');
               categorization = categorizeProspect(prospectData);
 
@@ -828,7 +829,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                 console.log('✅ INFRASTRUCTURE-ENHANCED SEARCH COMPLETE\n');
               }
             } else {
-              console.log('  ⚠️  No industry data available - falling back to standard search');
+              console.log('  ⚠️  No prospect data available - falling back to standard search');
             }
           } catch (error) {
             console.error('  ❌ Infrastructure-enhanced search failed:', error.message);
