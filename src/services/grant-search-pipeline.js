@@ -653,9 +653,9 @@ export function mergeEstimate(categorization, searchResults) {
       const programs = searchResults.by_category.hiring.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`Hiring: ${Math.round(merged.hiring.low / 1000)}K–${Math.round(merged.hiring.high / 1000)}K across programs like ${programs}`);
     } else if (baseline.hiring.high > 0) {
-      // Only baseline - use it but lower confidence
-      merged.hiring.low = baseline.hiring.low * 0.7;
-      merged.hiring.high = baseline.hiring.high * 0.7;
+      // Only baseline - trust baseline estimate (search coverage incomplete)
+      merged.hiring.low = baseline.hiring.low;
+      merged.hiring.high = baseline.hiring.high;
       confidenceLevel = 'medium';
       talkingPoints.push(`Hiring: ~${Math.round(merged.hiring.high / 1000)}K (based on historical patterns, currently researching active programs)`);
     } else {
@@ -677,8 +677,8 @@ export function mergeEstimate(categorization, searchResults) {
       const programs = searchResults.by_category.training.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`Training: ${Math.round(merged.training.low / 1000)}K–${Math.round(merged.training.high / 1000)}K through programs like ${programs}`);
     } else if (baseline.training.high > 0) {
-      merged.training.low = baseline.training.low * 0.7;
-      merged.training.high = baseline.training.high * 0.7;
+      merged.training.low = baseline.training.low;
+      merged.training.high = baseline.training.high;
       confidenceLevel = 'medium';
       talkingPoints.push(`Training: ~${Math.round(merged.training.high / 1000)}K (historical estimate, validating current options)`);
     } else {
@@ -699,8 +699,8 @@ export function mergeEstimate(categorization, searchResults) {
       const programs = searchResults.by_category.market_expansion.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`Market Expansion: ${Math.round(merged.market_expansion.low / 1000)}K–${Math.round(merged.market_expansion.high / 1000)}K via programs like ${programs}`);
     } else if (baseline.market_expansion.high > 0) {
-      merged.market_expansion.low = baseline.market_expansion.low * 0.7;
-      merged.market_expansion.high = baseline.market_expansion.high * 0.7;
+      merged.market_expansion.low = baseline.market_expansion.low;
+      merged.market_expansion.high = baseline.market_expansion.high;
       confidenceLevel = 'medium';
       talkingPoints.push(`Market Expansion: ~${Math.round(merged.market_expansion.high / 1000)}K (estimate based on typical funding, checking live programs)`);
     } else {
@@ -721,8 +721,8 @@ export function mergeEstimate(categorization, searchResults) {
       const programs = searchResults.by_category.rd.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`R&D: ${Math.round(merged.rd.low / 1000)}K–${Math.round(merged.rd.high / 1000)}K through programs like ${programs}`);
     } else if (baseline.rd.high > 0) {
-      merged.rd.low = baseline.rd.low * 0.7;
-      merged.rd.high = baseline.rd.high * 0.7;
+      merged.rd.low = baseline.rd.low;
+      merged.rd.high = baseline.rd.high;
       confidenceLevel = 'medium';
       talkingPoints.push(`R&D: ~${Math.round(merged.rd.high / 1000)}K (historical funding patterns)`);
     } else {
