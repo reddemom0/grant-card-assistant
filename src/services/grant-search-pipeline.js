@@ -32,6 +32,121 @@ const CATEGORY_TAG_MAP = {
 };
 
 /**
+ * Intent hierarchy for program prioritization
+ * Higher values = rarer, higher ceiling, more valuable programs
+ */
+const INTENT_HIERARCHY = {
+  'Innovation': 6,      // Rare, highest ceiling ($50K-$500K+), hardest to find
+  'Markets': 5,         // Uncommon, high value (CanExport $50K)
+  'Markets_Domestic': 5,
+  'Technology': 4,      // Moderate availability, good value
+  'Sustainability': 4,
+  'Talent': 0,          // Default — will be overridden below for training-specific
+  'Foundational': 2,
+  'Operations': 2,
+  'Growth': 2,
+  'Startups': 1,
+  'Capital': 1
+};
+
+/**
+ * Tokenize activity text into keywords
+ * Remove stopwords, lowercase, deduplicate
+ */
+function tokenizeActivityText(text) {
+  if (!text || typeof text !== 'string') return [];
+
+  const stopwords = new Set([
+    'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+    'of', 'with', 'by', 'from', 'up', 'about', 'into', 'through', 'during',
+    'is', 'am', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
+    'can', 'could', 'may', 'might', 'must', 'shall',
+    'i', 'you', 'he', 'she', 'it', 'we', 'they', 'my', 'your', 'our',
+    'this', 'that', 'these', 'those'
+  ]);
+
+  const tokens = text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ') // Remove punctuation
+    .split(/\s+/)
+    .filter(word => word.length > 2) // Min 3 chars
+    .filter(word => !stopwords.has(word));
+
+  return [...new Set(tokens)]; // Deduplicate
+}
+
+/**
+ * Detect program family from grant name
+ */
+function detectProgramFamily(grantName) {
+  if (!grantName) return null;
+
+  const name = grantName.toLowerCase();
+
+  if (name.includes('swpp') || name.includes('student work placement')) {
+    return 'SWPP';
+  }
+
+  if (name.includes('canexport')) {
+    return 'CanExport';
+  }
+
+  if (name.includes('irap') || name.includes('industrial research assistance')) {
+    return 'IRAP';
+  }
+
+  if (name.includes('mitacs')) {
+    return 'Mitacs';
+  }
+
+  if (name.includes('alberta jobs now')) {
+    return 'Alberta Jobs Now';
+  }
+
+  return null;
+}
+
+/**
+ * Apply diversity cap to prevent program family flooding
+ */
+function applyDiversityCap(scoredPrograms, maxPerFamily = 3, topN = 10) {
+  const familyCounts = {};
+  const diverseTop10 = [];
+  const overflow = [];
+
+  for (const program of scoredPrograms) {
+    const family = detectProgramFamily(program.grant_name || program.name);
+
+    // If no family, always include (until we hit topN)
+    if (!family) {
+      if (diverseTop10.length < topN) {
+        diverseTop10.push(program);
+      } else {
+        overflow.push(program);
+      }
+      continue;
+    }
+
+    // Track family count
+    familyCounts[family] = familyCounts[family] || 0;
+
+    // Include if under cap and still have room in top 10
+    if (familyCounts[family] < maxPerFamily && diverseTop10.length < topN) {
+      diverseTop10.push(program);
+      familyCounts[family]++;
+    } else {
+      overflow.push(program);
+      if (familyCounts[family] >= maxPerFamily) {
+        console.log(`      🚫 Diversity cap: "${program.grant_name}" pushed to #${diverseTop10.length + overflow.length} (${family} family limit reached)`);
+      }
+    }
+  }
+
+  return diverseTop10.concat(overflow);
+}
+
+/**
  * Run focused search based on categorization
  *
  * @param {Object} categorization - Output from categorizeProspect()
@@ -287,6 +402,61 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
         }
       }
 
+      // ── INTENT HIERARCHY BONUS ────────────────────────────────────────────────
+
+      if (tags && tags.primary_intents && Array.isArray(tags.primary_intents)) {
+        let intentBonus = 0;
+        let topIntent = null;
+
+        for (const intent of tags.primary_intents) {
+          let bonus = INTENT_HIERARCHY[intent] || 0;
+
+          // Special case for Talent intent: check genres
+          if (intent === 'Talent' && tags.genres && Array.isArray(tags.genres)) {
+            const trainingGenres = ['Skills Training', 'Technical Training', 'Leadership Development', 'Health & Safety Certification', 'Digital Literacy'];
+            const hasTrainingGenre = tags.genres.some(g => trainingGenres.includes(g));
+
+            if (hasTrainingGenre) {
+              bonus = 3; // Training programs get +3
+            } else {
+              bonus = 0; // Pure hiring programs get +0
+            }
+          }
+
+          if (bonus > intentBonus) {
+            intentBonus = bonus;
+            topIntent = intent;
+          }
+        }
+
+        if (intentBonus > 0) {
+          score += intentBonus;
+          console.log(`      🏆 Intent hierarchy: +${intentBonus} for "${program.grant_name}" (intent: ${topIntent})`);
+        }
+      }
+
+      // ── ACTIVITY TEXT KEYWORD BOOST ───────────────────────────────────────────
+
+      if (prospectData && prospectData.planned_activities) {
+        const activityKeywords = tokenizeActivityText(prospectData.planned_activities);
+
+        if (activityKeywords.length > 0) {
+          const programName = (program.grant_name || program.name || '').toLowerCase();
+          const programCriteria = (program.grant_criteria || '').toLowerCase();
+          const combinedText = `${programName} ${programCriteria}`;
+
+          const matchedKeywords = activityKeywords.filter(keyword =>
+            combinedText.includes(keyword)
+          );
+
+          if (matchedKeywords.length > 0) {
+            const activityBoost = Math.min(matchedKeywords.length * 2, 6);
+            score += activityBoost;
+            console.log(`      💬 Activity boost: +${activityBoost} for "${program.grant_name}" (matched: ${matchedKeywords.join(', ')})`);
+          }
+        }
+      }
+
       // ── ELIGIBILITY PENALTY SCORING ───────────────────────────────────────────
 
       const eligibility = tags?.eligibility;
@@ -354,6 +524,10 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
     // Sort by relevance score (highest first)
     scoredPrograms.sort((a, b) => b.relevance_score - a.relevance_score);
 
+    // Apply diversity cap to prevent program family flooding
+    console.log('\n  🎯 Applying diversity cap (max 3 per family in top 10)...');
+    const diversifiedPrograms = applyDiversityCap(scoredPrograms, 3, 10);
+
     // Organize programs by category
     const byCategory = {
       hiring: [],
@@ -363,7 +537,7 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
       other: []
     };
 
-    for (const program of scoredPrograms) {
+    for (const program of diversifiedPrograms) {
       const purposes = program.purposes || [];
       const categories = program.categories || [];
 
@@ -399,8 +573,8 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
       }
     }
 
-    // Keep top 10 overall (by score)
-    const top10Programs = scoredPrograms.slice(0, 10);
+    // Keep top 10 overall (now diversified)
+    const top10Programs = diversifiedPrograms.slice(0, 10);
 
     // Calculate totals by category (from top 10)
     const totals = {

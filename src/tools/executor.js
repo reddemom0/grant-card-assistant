@@ -107,7 +107,10 @@ async function buildProspectDataFromSession(conversationId) {
       is_nonprofit: false,
 
       // Funds raised (not collected in form, default to 0)
-      funds_raised: 0
+      funds_raised: 0,
+
+      // Activity text for keyword boost
+      planned_activities: prospectData.planned_activities || null
     };
 
     console.log('  ✅ Built prospect data from session:', JSON.stringify(data, null, 2));
