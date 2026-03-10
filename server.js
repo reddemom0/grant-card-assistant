@@ -867,6 +867,22 @@ async function startServer() {
       console.warn('⚠️  Migration 016 failed (non-fatal):', migrationError.message);
     }
 
+    // ── Migration 017: Add smart_tags column ────────────────────────────────
+    console.log('🔧 Running migration 017: Add smart_tags column...');
+    try {
+      await client.query(`
+        ALTER TABLE grants
+        ADD COLUMN IF NOT EXISTS smart_tags JSONB DEFAULT NULL
+      `);
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_grants_smart_tags
+        ON grants USING gin(smart_tags)
+      `);
+      console.log('✅ Migration 017 complete (or already applied)');
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 017 failed (non-fatal):', migrationError.message);
+    }
+
     // Start Express server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n' + '='.repeat(80));
