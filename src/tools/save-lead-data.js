@@ -509,19 +509,39 @@ export async function saveLeadData(input, conversationId) {
 
     if (result.success) {
       console.log(`✅ Session finalized via contact_captured`);
-      return {
-        success: true,
-        message: `Lead data saved and synced to HubSpot.`,
-        ...result
-      };
+    } else if (result.alreadyFinalized) {
+      console.log(`ℹ️  Session already finalized — HubSpot records already exist`);
     } else {
       console.warn(`⚠️  Finalization returned non-success:`, result);
-      return {
-        success: true,
-        message: `Lead data saved to database. HubSpot sync: ${result.error || 'unknown issue'}`,
-        ...result
-      };
     }
+
+    // -------------------------------------------------------------------------
+    // 3. Send Email (Independent of finalization — runs even if already finalized)
+    // -------------------------------------------------------------------------
+    // This is the PRIMARY email sending path. It runs after finalization attempt,
+    // regardless of whether finalization succeeded or returned alreadyFinalized.
+    // This allows email to be sent when summary button is clicked AFTER estimate delivery.
+
+    const { sendLeadGenEmail } = await import('../api/lead-gen-finalization.js');
+    const emailResult = await sendLeadGenEmail(conversationId);
+
+    if (emailResult.success) {
+      console.log(`✅ Email sent successfully via save_lead_data — Message ID: ${emailResult.messageId}`);
+    } else if (emailResult.alreadySent) {
+      console.log(`ℹ️  Email already sent at ${emailResult.sentAt} — skipping duplicate`);
+    } else {
+      console.log(`ℹ️  Email not sent: ${emailResult.error}`);
+    }
+
+    // Return success regardless of email send result (non-blocking)
+    return {
+      success: true,
+      message: result.success
+        ? `Lead data saved and synced to HubSpot.`
+        : `Lead data saved. HubSpot: ${result.error || 'already exists'}`,
+      finalization: result,
+      email: emailResult
+    };
   } catch (err) {
     console.error('❌ Finalization failed:', err.message);
     return {

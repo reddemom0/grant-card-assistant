@@ -860,6 +860,151 @@ function getResourceLink(tier) {
 }
 
 // ============================================================================
+// STANDALONE EMAIL SENDING FUNCTION (Independent of finalization lock)
+// ============================================================================
+
+/**
+ * Send email summary for a lead-gen session
+ *
+ * This function is INDEPENDENT of finalization - it can be called multiple times
+ * and will only send if:
+ * 1. cta_selected includes 'email'
+ * 2. contact_email exists
+ * 3. Email hasn't been sent yet (checks prospect_data.email_sent_at)
+ *
+ * @param {string} sessionId - Session ID
+ * @returns {Object} Email send result
+ */
+export async function sendLeadGenEmail(sessionId) {
+  console.log(`\n📧 sendLeadGenEmail called for session ${sessionId}`);
+
+  // Load session data
+  const sessionResult = await query(
+    `SELECT * FROM lead_gen_conversations WHERE session_id = $1`,
+    [sessionId]
+  );
+
+  if (sessionResult.rows.length === 0) {
+    return { success: false, error: 'Session not found' };
+  }
+
+  const session = sessionResult.rows[0];
+  const prospectData = session.prospect_data || {};
+
+  // Check if email already sent
+  if (prospectData.email_sent_at) {
+    console.log(`ℹ️  Email already sent at ${prospectData.email_sent_at} — skipping duplicate send`);
+    return { success: false, error: 'Email already sent', alreadySent: true, sentAt: prospectData.email_sent_at };
+  }
+
+  // Check conditions
+  console.log(`📧 Checking email conditions — cta_selected: "${prospectData.cta_selected}", has_contact_email: ${!!session.contact_email}, has_email_body: ${!!prospectData.email_summary_body}`);
+
+  if (!prospectData.cta_selected || !prospectData.cta_selected.includes('email')) {
+    console.log(`ℹ️  Email summary NOT requested (cta_selected: "${prospectData.cta_selected}") — skipping`);
+    return { success: false, error: 'Email not requested' };
+  }
+
+  if (!session.contact_email) {
+    console.warn('⚠️  Cannot send email summary — no contact_email captured');
+    return { success: false, error: 'No contact email' };
+  }
+
+  // Prepare email
+  console.log(`📧 Preparing email for ${session.contact_email}...`);
+
+  // Extract first name
+  const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
+  const firstName = nameParts[0] || 'there';
+
+  // Get email body or generate fallback
+  let emailBodyHtml = prospectData.email_summary_body;
+
+  if (!emailBodyHtml) {
+    console.log('⚠️  No email_summary_body from agent — generating fallback email');
+    emailBodyHtml = generateFallbackEmail(
+      prospectData,
+      session.estimated_funding || prospectData.estimated_funding,
+      firstName
+    );
+  } else {
+    console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
+
+    // Strip HTML document tags if present
+    if (emailBodyHtml.includes('<html') || emailBodyHtml.includes('<!DOCTYPE')) {
+      console.warn(`⚠️  email_summary_body contains <html> or <!DOCTYPE> tags — stripping them`);
+      emailBodyHtml = emailBodyHtml
+        .replace(/<!DOCTYPE[^>]*>/gi, '')
+        .replace(/<html[^>]*>/gi, '')
+        .replace(/<\/html>/gi, '')
+        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+        .replace(/<body[^>]*>/gi, '')
+        .replace(/<\/body>/gi, '')
+        .trim();
+      console.log(`✅ Stripped outer tags — new length: ${emailBodyHtml.length} chars`);
+    }
+  }
+
+  // Convert markdown to HTML
+  const originalLength = emailBodyHtml.length;
+  emailBodyHtml = convertMarkdownToHtml(emailBodyHtml);
+  if (emailBodyHtml.length !== originalLength) {
+    console.log(`  🎨 Converted markdown to HTML in email body`);
+  }
+
+  // Fix booking links
+  const wrongBookingLinkRegex = /https:\/\/meetings\.hubspot\.com\/[^\s"'<>]+/g;
+  const matches = emailBodyHtml.match(wrongBookingLinkRegex);
+  if (matches && matches.some(link => link !== BOOKING_LINK)) {
+    console.log(`⚠️  Found incorrect booking link, replacing with ${BOOKING_LINK}`);
+    emailBodyHtml = emailBodyHtml.replace(wrongBookingLinkRegex, BOOKING_LINK);
+  }
+
+  // Wrap in template
+  const brandedEmailHtml = wrapInBrandedTemplate(emailBodyHtml);
+  console.log(`📧 Email template wrapped (total ${brandedEmailHtml.length} chars)`);
+
+  // Send email
+  try {
+    console.log(`📧 Calling sendEmail for ${session.contact_email}...`);
+    const emailResult = await sendEmail({
+      to: session.contact_email,
+      toName: session.contact_name || firstName,
+      subject: `Your funding estimate for ${prospectData.company_name || 'your company'}`,
+      htmlBody: brandedEmailHtml
+    });
+
+    console.log(`✅ Email summary sent to ${session.contact_email} — Message ID: ${emailResult.messageId}`);
+
+    // Mark email as sent in database
+    await query(
+      `UPDATE lead_gen_conversations
+       SET prospect_data = prospect_data || $1::jsonb,
+           updated_at = NOW()
+       WHERE session_id = $2`,
+      [JSON.stringify({ email_sent_at: new Date().toISOString() }), sessionId]
+    );
+
+    console.log(`✅ Marked email as sent in database (email_sent_at stored in prospect_data)`);
+
+    return {
+      success: true,
+      recipient: session.contact_email,
+      messageId: emailResult.messageId,
+      sentAt: new Date().toISOString()
+    };
+  } catch (err) {
+    console.error(`❌ Email send FAILED for ${session.contact_email}:`, err.message);
+    console.error(`❌ Full error:`, err);
+    return {
+      success: false,
+      error: err.message,
+      recipient: session.contact_email
+    };
+  }
+}
+
+// ============================================================================
 // MAIN FINALIZATION FUNCTION
 // ============================================================================
 
@@ -1501,98 +1646,23 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   }
 
   // -------------------------------------------------------------------------
-  // 7. Send Email Summary via Nodemailer (if requested)
+  // 7. Send Email Summary (Legacy - now handled by standalone function)
   // -------------------------------------------------------------------------
+  // NOTE: Email sending is now handled by sendLeadGenEmail() which is called
+  // from save_lead_data. This allows email to be sent even if finalization
+  // has already happened (e.g., second call to save_lead_data with email CTA).
+  //
+  // We still attempt to send here for backwards compatibility with the timeout
+  // trigger (inactivity_timeout), but the main email sending path is now through
+  // save_lead_data → sendLeadGenEmail().
 
-  console.log(`📧 Checking email CTA — cta_selected: "${prospectData.cta_selected}", has_contact_email: ${!!session.contact_email}`);
-
-  if (prospectData.cta_selected && prospectData.cta_selected.includes('email')) {
-    console.log('📧 Email summary requested — preparing to send via Nodemailer...');
-
-    if (!session.contact_email) {
-      console.warn('⚠️  Cannot send email summary — no contact_email captured');
-      results.email = { action: 'skipped', reason: 'no_contact_email' };
-    } else {
-      console.log(`📧 Preparing email for ${session.contact_email}...`);
-
-      // Extract first name from contact_name
-      const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
-      const firstName = nameParts[0] || 'there';
-
-      // Get email summary body from agent or generate fallback
-      let emailBodyHtml = prospectData.email_summary_body;
-
-      if (!emailBodyHtml) {
-        console.log('⚠️  No email_summary_body from agent — generating fallback email');
-        emailBodyHtml = generateFallbackEmail(
-          prospectData,
-          session.estimated_funding || prospectData.estimated_funding,
-          firstName
-        );
-      } else {
-        console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
-
-        // Debug: Check if agent included full HTML document tags (which would break template)
-        if (emailBodyHtml.includes('<html') || emailBodyHtml.includes('<!DOCTYPE')) {
-          console.warn(`⚠️  email_summary_body contains <html> or <!DOCTYPE> tags — stripping them`);
-          console.warn(`⚠️  First 200 chars: ${emailBodyHtml.substring(0, 200)}`);
-
-          // Strip outer HTML document structure, keep only body content
-          emailBodyHtml = emailBodyHtml
-            .replace(/<!DOCTYPE[^>]*>/gi, '')
-            .replace(/<html[^>]*>/gi, '')
-            .replace(/<\/html>/gi, '')
-            .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
-            .replace(/<body[^>]*>/gi, '')
-            .replace(/<\/body>/gi, '')
-            .trim();
-
-          console.log(`✅ Stripped outer tags — new length: ${emailBodyHtml.length} chars`);
-        }
-      }
-
-      // Convert markdown to HTML (safety net for email formatting)
-      const originalLength = emailBodyHtml.length;
-      emailBodyHtml = convertMarkdownToHtml(emailBodyHtml);
-      if (emailBodyHtml.length !== originalLength) {
-        console.log(`  🎨 Converted markdown to HTML in email body (safety net)`);
-      }
-
-      // Validate and fix booking link if agent hallucinated wrong URL
-      const wrongBookingLinkRegex = /https:\/\/meetings\.hubspot\.com\/[^\s"'<>]+/g;
-      const matches = emailBodyHtml.match(wrongBookingLinkRegex);
-      if (matches && matches.some(link => link !== BOOKING_LINK)) {
-        console.log(`⚠️  Found incorrect booking link in email, replacing with correct one: ${BOOKING_LINK}`);
-        emailBodyHtml = emailBodyHtml.replace(wrongBookingLinkRegex, BOOKING_LINK);
-      }
-
-      // Wrap in branded HTML template
-      const brandedEmailHtml = wrapInBrandedTemplate(emailBodyHtml);
-      console.log(`📧 Email template wrapped (total ${brandedEmailHtml.length} chars)`);
-      console.log(`📧 First 300 chars of wrapped email: ${brandedEmailHtml.substring(0, 300)}...`);
-
-      // Send via Nodemailer (blocking with full error capture)
-      // Changed from setImmediate to blocking call to capture errors
-      try {
-        console.log(`📧 Calling sendEmail for ${session.contact_email}...`);
-        const emailResult = await sendEmail({
-          to: session.contact_email,
-          toName: session.contact_name || firstName,
-          subject: `Your funding estimate for ${prospectData.company_name || 'your company'}`,
-          htmlBody: brandedEmailHtml
-        });
-        console.log(`✅ Email summary sent to ${session.contact_email} for session ${sessionId} — Message ID: ${emailResult.messageId}`);
-        results.email = { action: 'sent', recipient: session.contact_email, messageId: emailResult.messageId };
-      } catch (err) {
-        // Don't fail finalization if email send fails, but log the full error
-        console.error(`❌ Email send FAILED for ${session.contact_email}:`, err.message);
-        console.error(`❌ Error code: ${err.code}, command: ${err.command}, response: ${err.response}`);
-        console.error(`❌ Full error object:`, JSON.stringify(err, null, 2));
-        results.email = { action: 'failed', recipient: session.contact_email, error: err.message };
-      }
-    }
+  const emailResult = await sendLeadGenEmail(sessionId);
+  if (emailResult.success) {
+    results.email = { action: 'sent', recipient: emailResult.recipient, messageId: emailResult.messageId };
+  } else if (emailResult.alreadySent) {
+    results.email = { action: 'skipped', reason: 'already_sent', sentAt: emailResult.sentAt };
   } else {
-    console.log(`ℹ️  Email summary NOT requested — skipping email send`);
+    results.email = { action: 'skipped', reason: emailResult.error };
   }
 
   // -------------------------------------------------------------------------
