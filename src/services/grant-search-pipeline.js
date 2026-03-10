@@ -212,6 +212,11 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
 
     console.log(`  ✅ After amount filtering: ${filteredPrograms.length} programs`);
 
+    // DEBUG: Check if smart_tags exist in first program
+    console.log(`🔍 DEBUG: First program smart_tags:`, filteredPrograms[0]?.smart_tags ? 'EXISTS' : 'NULL');
+    console.log(`🔍 DEBUG: First program grant_name:`, filteredPrograms[0]?.grant_name);
+    console.log(`🔍 DEBUG: First program search_origin:`, filteredPrograms[0]?.search_origin);
+
     // Score programs by relevance
     const scoredPrograms = filteredPrograms.map(program => {
       let score = 0;
