@@ -134,6 +134,69 @@ app.get('/import-grants', importGrantsEndpoint);
 import { searchGrantsEndpoint } from './search-grants-endpoint.js';
 app.get('/search-grants', searchGrantsEndpoint);
 
+// Batch retag endpoint — re-tags all grants with updated eligibility fields
+app.get('/batch-retag-grants', async (req, res) => {
+  try {
+    const receivedSecret = req.query.secret?.trim();
+    const expectedSecret = process.env.JWT_SECRET?.trim();
+
+    if (receivedSecret !== expectedSecret) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const { tagGrant } = await import('./src/services/grant-tagger.js');
+    const { query } = await import('./src/database/connection.js');
+
+    console.log('🚀 Starting batch re-tagging process...\n');
+    res.write('🚀 Starting batch re-tagging process...\n\n');
+
+    const result = await query('SELECT * FROM grants ORDER BY grant_id');
+    const grants = result.rows;
+
+    console.log(`📊 Found ${grants.length} grants to tag\n`);
+    res.write(`📊 Found ${grants.length} grants to tag\n\n`);
+
+    let tagged = 0;
+    let failed = 0;
+
+    for (const grant of grants) {
+      try {
+        const tags = await tagGrant(grant);
+
+        if (tags && tags.eligibility) {
+          await query(
+            'UPDATE grants SET smart_tags = $1 WHERE grant_id = $2',
+            [tags, grant.grant_id]
+          );
+          tagged++;
+
+          if (tagged % 50 === 0) {
+            const progress = `   Progress: ${tagged}/${grants.length} (${((tagged / grants.length) * 100).toFixed(1)}%)\n`;
+            console.log(progress);
+            res.write(progress);
+          }
+        } else {
+          failed++;
+          console.warn(`⚠️  Failed to tag: ${grant.grant_name}`);
+        }
+      } catch (error) {
+        failed++;
+        console.error(`❌ Error tagging ${grant.grant_name}:`, error.message);
+      }
+    }
+
+    const summary = `\n✅ Batch re-tagging complete!\n   Tagged: ${tagged}\n   Failed: ${failed}\n   Total: ${grants.length}\n`;
+    console.log(summary);
+    res.write(summary);
+    res.end();
+
+  } catch (error) {
+    console.error('❌ Batch re-tagging failed:', error);
+    res.status(500).write(`❌ Error: ${error.message}\n`);
+    res.end();
+  }
+});
+
 // Generate embeddings endpoint — re-embeds all currently_accepting grants with full text
 app.get('/generate-embeddings', async (req, res) => {
   try {
