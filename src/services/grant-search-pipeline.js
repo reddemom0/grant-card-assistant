@@ -646,9 +646,9 @@ export function mergeEstimate(categorization, searchResults) {
   // Hiring
   if (baseline.hiring.high > 0 || searchTotals.hiring > 0) {
     if (baseline.hiring.high > 0 && searchTotals.hiring > 0) {
-      // Both exist - use baseline range but cap high at search max
+      // Both exist - use baseline range and refine upward if search found more
       merged.hiring.low = baseline.hiring.low;
-      merged.hiring.high = Math.min(baseline.hiring.high, searchTotals.hiring);
+      merged.hiring.high = Math.max(baseline.hiring.high, searchTotals.hiring);
 
       const programs = searchResults.by_category.hiring.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`Hiring: ${Math.round(merged.hiring.low / 1000)}K–${Math.round(merged.hiring.high / 1000)}K across programs like ${programs}`);
@@ -672,7 +672,7 @@ export function mergeEstimate(categorization, searchResults) {
   if (baseline.training.high > 0 || searchTotals.training > 0) {
     if (baseline.training.high > 0 && searchTotals.training > 0) {
       merged.training.low = baseline.training.low;
-      merged.training.high = Math.min(baseline.training.high, searchTotals.training);
+      merged.training.high = Math.max(baseline.training.high, searchTotals.training);
 
       const programs = searchResults.by_category.training.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`Training: ${Math.round(merged.training.low / 1000)}K–${Math.round(merged.training.high / 1000)}K through programs like ${programs}`);
@@ -694,7 +694,7 @@ export function mergeEstimate(categorization, searchResults) {
   if (baseline.market_expansion.high > 0 || searchTotals.market_expansion > 0) {
     if (baseline.market_expansion.high > 0 && searchTotals.market_expansion > 0) {
       merged.market_expansion.low = baseline.market_expansion.low;
-      merged.market_expansion.high = Math.min(baseline.market_expansion.high, searchTotals.market_expansion);
+      merged.market_expansion.high = Math.max(baseline.market_expansion.high, searchTotals.market_expansion);
 
       const programs = searchResults.by_category.market_expansion.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`Market Expansion: ${Math.round(merged.market_expansion.low / 1000)}K–${Math.round(merged.market_expansion.high / 1000)}K via programs like ${programs}`);
@@ -716,7 +716,7 @@ export function mergeEstimate(categorization, searchResults) {
   if (baseline.rd.high > 0 || searchTotals.rd > 0) {
     if (baseline.rd.high > 0 && searchTotals.rd > 0) {
       merged.rd.low = baseline.rd.low;
-      merged.rd.high = Math.min(baseline.rd.high, searchTotals.rd);
+      merged.rd.high = Math.max(baseline.rd.high, searchTotals.rd);
 
       const programs = searchResults.by_category.rd.slice(0, 2).map(p => p.name).join(', ');
       talkingPoints.push(`R&D: ${Math.round(merged.rd.low / 1000)}K–${Math.round(merged.rd.high / 1000)}K through programs like ${programs}`);
