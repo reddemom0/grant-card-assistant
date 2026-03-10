@@ -166,11 +166,17 @@ export async function runAgent({
     // ============================================================================
 
     let leadGenFormContext = null;
+    let strategicContext = null;
+
     if (agentType === 'lead-gen') {
       console.log(`📝 Loading lead-gen form context...`);
       leadGenFormContext = await getLeadGenFormContext(conversationId);
       if (leadGenFormContext) {
         console.log(`✓ Injected lead form data and company background into system prompt`);
+
+        // Load strategic context (one-time, cached)
+        const { getStrategicContext } = await import('../utils/lead-gen-context.js');
+        strategicContext = await getStrategicContext(conversationId);
       } else {
         console.log(`✓ No form context available (may be first message before form submission)`);
       }
@@ -478,6 +484,15 @@ export async function runAgent({
           text: leadGenFormContext  // ❌ NOT CACHED (conversation-specific)
         });
         console.log(`🔍 DEBUG: Lead-gen context injected into system prompt:\n${leadGenFormContext}`);
+      }
+
+      // Add strategic context (if present) - NOT CACHED
+      if (strategicContext) {
+        systemBlocks.push({
+          type: 'text',
+          text: strategicContext  // ❌ NOT CACHED (conversation-specific, one-time lookup)
+        });
+        console.log(`🔍 DEBUG: Strategic context injected into system prompt (${strategicContext.length} chars)`);
       }
 
       // DEBUG: Log full system prompt structure for lead-gen conversations
