@@ -883,6 +883,40 @@ async function startServer() {
       console.warn('⚠️  Migration 017 failed (non-fatal):', migrationError.message);
     }
 
+    // ── Migration 018: Import smart_tags data ────────────────────────────────
+    console.log('🔧 Running migration 018: Import smart_tags data...');
+    try {
+      // Check if tags are already imported
+      const checkResult = await client.query('SELECT COUNT(smart_tags) as tagged FROM grants');
+      const alreadyTagged = parseInt(checkResult.rows[0].tagged);
+
+      if (alreadyTagged > 0) {
+        console.log(`✅ Migration 018 already applied (${alreadyTagged} grants already tagged)`);
+      } else {
+        // Import tags from JSON export
+        const { readFileSync } = await import('fs');
+        const tagsData = JSON.parse(readFileSync('./smart-tags-export.json', 'utf8'));
+
+        console.log(`📥 Importing ${tagsData.total_count} smart_tags...`);
+
+        let imported = 0;
+        for (const row of tagsData.tags) {
+          await client.query(
+            'UPDATE grants SET smart_tags = $1 WHERE grant_id = $2',
+            [row.smart_tags, row.grant_id]
+          );
+          imported++;
+          if (imported % 100 === 0) {
+            console.log(`   Progress: ${imported}/${tagsData.total_count}`);
+          }
+        }
+
+        console.log(`✅ Migration 018 complete (imported ${imported} tags)`);
+      }
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 018 failed (non-fatal):', migrationError.message);
+    }
+
     // Start Express server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n' + '='.repeat(80));
