@@ -361,6 +361,17 @@ export async function saveLeadData(input, conversationId) {
   }
 
   // -------------------------------------------------------------------------
+  // 0a. Server-side override: Force cta_selected='email_summary' if email body provided
+  //     (Safety net for cases where agent provides email body but forgets to set CTA)
+  // -------------------------------------------------------------------------
+
+  if ((!input.cta_selected || input.cta_selected === 'none') && input.email_summary_body) {
+    console.log(`⚠️  OVERRIDE: cta_selected is "${input.cta_selected}" but email_summary_body is present (${input.email_summary_body.length} chars)`);
+    console.log(`✅ OVERRIDE: Forcing cta_selected='email_summary' to ensure email is sent`);
+    input.cta_selected = 'email_summary';
+  }
+
+  // -------------------------------------------------------------------------
   // 0. Auto-pull matched_programs and funding fields from memory_store
   //    (Infrastructure-level override to ensure actual program names are used)
   // -------------------------------------------------------------------------
