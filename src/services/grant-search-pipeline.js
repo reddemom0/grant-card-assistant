@@ -423,6 +423,17 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
             }
           }
 
+          // Special case for Innovation intent: check R&D activities
+          // Only apply Innovation bonus if prospect has R&D spend/activities
+          if (intent === 'Innovation' && prospectData) {
+            const hasRDActivity = (prospectData.rd_spend || 0) > 0;
+
+            if (!hasRDActivity) {
+              bonus = 0; // No R&D activities - don't prioritize Innovation programs
+              console.log(`      ⚠️  Innovation bonus suppressed for "${program.grant_name}" (no R&D activities in prospect profile)`);
+            }
+          }
+
           if (bonus > intentBonus) {
             intentBonus = bonus;
             topIntent = intent;

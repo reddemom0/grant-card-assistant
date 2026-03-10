@@ -254,7 +254,7 @@ export async function getStrategicContext(conversationId) {
       return null;
     }
 
-    const contextText = strategyResult.content || strategyResult.answer || '';
+    const contextText = strategyResult.results?.map(r => r.knowledge).join('\n\n') || '';
     const charCount = contextText.length;
 
     console.log(`🧠 Strategic context loaded: "${strategyQuery}" → ${charCount} chars`);
