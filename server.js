@@ -870,11 +870,12 @@ async function startServer() {
     // ── Migration 017: Add smart_tags column ────────────────────────────────
     console.log('🔧 Running migration 017: Add smart_tags column...');
     try {
-      await client.query(`
+      const { query } = await import('./src/database/connection.js');
+      await query(`
         ALTER TABLE grants
         ADD COLUMN IF NOT EXISTS smart_tags JSONB DEFAULT NULL
       `);
-      await client.query(`
+      await query(`
         CREATE INDEX IF NOT EXISTS idx_grants_smart_tags
         ON grants USING gin(smart_tags)
       `);
@@ -886,8 +887,10 @@ async function startServer() {
     // ── Migration 018: Import smart_tags data ────────────────────────────────
     console.log('🔧 Running migration 018: Import smart_tags data...');
     try {
+      const { query } = await import('./src/database/connection.js');
+
       // Check if tags are already imported
-      const checkResult = await client.query('SELECT COUNT(smart_tags) as tagged FROM grants');
+      const checkResult = await query('SELECT COUNT(smart_tags) as tagged FROM grants');
       const alreadyTagged = parseInt(checkResult.rows[0].tagged);
 
       if (alreadyTagged > 0) {
@@ -901,7 +904,7 @@ async function startServer() {
 
         let imported = 0;
         for (const row of tagsData.tags) {
-          await client.query(
+          await query(
             'UPDATE grants SET smart_tags = $1 WHERE grant_id = $2',
             [row.smart_tags, row.grant_id]
           );
