@@ -140,6 +140,11 @@ app.get('/batch-retag-grants', async (req, res) => {
     const receivedSecret = req.query.secret?.trim();
     const expectedSecret = process.env.JWT_SECRET?.trim();
 
+    console.log('🔐 Auth debug:');
+    console.log('   Received:', receivedSecret ? `${receivedSecret.substring(0, 8)}...` : 'null');
+    console.log('   Expected:', expectedSecret ? `${expectedSecret.substring(0, 8)}...` : 'null');
+    console.log('   Match:', receivedSecret === expectedSecret);
+
     if (receivedSecret !== expectedSecret) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
