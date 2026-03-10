@@ -767,7 +767,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                       bypass_cache: input.bypass_cache
                     });
                   },
-                  conversationId
+                  conversationId,
+                  prospectData  // Pass prospect data for eligibility scoring
                 );
 
                 // Step 4: Merge estimates

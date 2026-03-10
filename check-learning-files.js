@@ -5,7 +5,7 @@
 import pg from 'pg';
 const { Pool } = pg;
 
-const DATABASE_URL = 'postgresql://postgres:tRutpbSXaKwzTsZxMBmMeOKSGdscsWIY@shinkansen.proxy.rlwy.net:19092/railway';
+const DATABASE_URL = 'postgresql://postgres:bDLYkwkUCxbuOHawZJMNxUQOroBzeJGN@nozomi.proxy.rlwy.net:16552/railway';
 
 const pool = new Pool({
   connectionString: DATABASE_URL,

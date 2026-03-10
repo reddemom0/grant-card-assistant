@@ -37,9 +37,10 @@ const CATEGORY_TAG_MAP = {
  * @param {Object} categorization - Output from categorizeProspect()
  * @param {Function} searchFunction - Callback that calls search_getgranted tool
  * @param {string} conversationId - For logging context
+ * @param {Object} prospectData - Prospect profile data for eligibility scoring
  * @returns {Object} Structured search results with programs organized by category
  */
-export async function runFocusedSearch(categorization, searchFunction, conversationId) {
+export async function runFocusedSearch(categorization, searchFunction, conversationId, prospectData = null) {
   console.log('\n🔍 RUNNING FOCUSED SEARCH');
   console.log(`  Conversation: ${conversationId}`);
   console.log(`  Categories to search: ${categorization.grant_categories_to_search.join(', ')}`);
@@ -283,6 +284,67 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
           const intentMatch = tags.primary_intents && expectedTags.intents.some(i => tags.primary_intents.includes(i));
           const genreMatches = tags.genres ? tags.genres.filter(g => expectedTags.genres.includes(g)).length : 0;
           console.log(`      Smart tag boost: +${tagBoost} for "${program.grant_name}" (intents: ${intentMatch}, genres: ${genreMatches})`);
+        }
+      }
+
+      // ── ELIGIBILITY PENALTY SCORING ───────────────────────────────────────────
+
+      const eligibility = tags?.eligibility;
+      let eligibilityPenalty = 0;
+
+      if (eligibility && prospectData) {
+        // Extract prospect profile from prospectData
+        const revenue_tier = prospectData.revenue_tier || 'unknown';
+        const num_ftes = prospectData.num_ftes || 0;
+        const is_incorporated = prospectData.is_incorporated_1yr === true || prospectData.is_incorporated_1yr === 'true';
+        const annual_training_spend = prospectData.annual_training_spend || 0;
+        const international_market_spend = prospectData.international_market_spend || 0;
+
+        // Penalty 1: Pre-revenue company + program requires revenue
+        if (revenue_tier === 'pre_revenue' && eligibility.requires_revenue === true) {
+          eligibilityPenalty += 10;
+          console.log(`      ❌ Eligibility penalty: -10 for "${program.grant_name}" (pre-revenue + requires_revenue)`);
+        }
+
+        // Penalty 2: Not incorporated + program requires incorporation
+        if (!is_incorporated && eligibility.requires_incorporation === true) {
+          eligibilityPenalty += 10;
+          console.log(`      ❌ Eligibility penalty: -10 for "${program.grant_name}" (not incorporated + requires_incorporation)`);
+        }
+
+        // Penalty 3: Zero employees + program requires employer status
+        if (num_ftes === 0 && eligibility.requires_employer_status === true) {
+          eligibilityPenalty += 8;
+          console.log(`      ❌ Eligibility penalty: -8 for "${program.grant_name}" (0 employees + requires_employer_status)`);
+        }
+
+        // Penalty 4: Below minimum employees
+        if (eligibility.min_employees && num_ftes < eligibility.min_employees) {
+          eligibilityPenalty += 5;
+          console.log(`      ❌ Eligibility penalty: -5 for "${program.grant_name}" (${num_ftes} < min ${eligibility.min_employees} employees)`);
+        }
+
+        // Penalty 5: Training program + zero training budget
+        const isTrainingProgram = tags.genres && tags.genres.some(g =>
+          ['Skills Training', 'Technical Training', 'Leadership Development', 'Health & Safety Certification', 'Digital Literacy'].includes(g)
+        );
+        if (isTrainingProgram && annual_training_spend === 0) {
+          eligibilityPenalty += 3;
+          console.log(`      ❌ Eligibility penalty: -3 for "${program.grant_name}" (training program + $0 training budget)`);
+        }
+
+        // Penalty 6: Export/market expansion program + zero international spend
+        const isExportProgram = tags.genres && tags.genres.some(g =>
+          ['Export', 'Trade Show', 'Market Research', 'International Marketing', 'Foreign Certification'].includes(g)
+        );
+        if (isExportProgram && international_market_spend === 0) {
+          eligibilityPenalty += 3;
+          console.log(`      ❌ Eligibility penalty: -3 for "${program.grant_name}" (export program + $0 international spend)`);
+        }
+
+        // Apply penalty to score
+        if (eligibilityPenalty > 0) {
+          score -= eligibilityPenalty;
         }
       }
 

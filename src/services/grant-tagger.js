@@ -197,7 +197,15 @@ Return a JSON object with these fields:
 
   "target_populations": [array of strings - ONLY from this exact list: "Youth", "Students", "Indigenous", "Women", "Newcomers", "Persons with Disabilities", "Francophone", "Veterans", "Rural", "Black-owned". Use empty array [] if the program is open to all businesses without specific priority populations. Note: "SMEs" is NOT a population - it's a business size, do not include it. Copy the EXACT string as shown.],
 
-  "funding_model": string (ONLY one of: "reimbursement", "wage_subsidy", "grant", "tax_credit", "loan", "mixed")
+  "funding_model": string (ONLY one of: "reimbursement", "wage_subsidy", "grant", "tax_credit", "loan", "mixed"),
+
+  "eligibility": {
+    "requires_incorporation": boolean (true if program explicitly requires incorporated business, nonprofit, or charity structure),
+    "requires_revenue": boolean (true if program requires the business to have existing revenue/sales),
+    "requires_employer_status": boolean (true if program requires having employees - e.g., wage subsidy programs),
+    "min_employees": number or null (minimum number of employees required, null if no minimum),
+    "requires_matching_funds": boolean (true if program requires business to contribute matching funds)
+  }
 }
 
 Example output:
@@ -208,7 +216,14 @@ Example output:
   "specificity": "broad",
   "complexity": "moderate",
   "target_populations": ["Youth"],
-  "funding_model": "wage_subsidy"
+  "funding_model": "wage_subsidy",
+  "eligibility": {
+    "requires_incorporation": true,
+    "requires_revenue": false,
+    "requires_employer_status": true,
+    "min_employees": 1,
+    "requires_matching_funds": false
+  }
 }
 
 Return ONLY the JSON object. No explanation, no markdown code blocks.`;
@@ -282,6 +297,7 @@ Return ONLY the JSON object. No explanation, no markdown code blocks.`;
       'complexity',
       'target_populations',
       'funding_model',
+      'eligibility',
     ];
 
     for (const field of requiredFields) {
