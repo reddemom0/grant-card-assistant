@@ -889,13 +889,15 @@ async function startServer() {
     try {
       const { query } = await import('./src/database/connection.js');
 
-      // Check if tags are already imported
-      const checkResult = await query('SELECT COUNT(smart_tags) as tagged FROM grants');
+      // Check if tags are already imported (need at least 590 of 598)
+      const checkResult = await query('SELECT COUNT(smart_tags) as tagged, COUNT(*) as total FROM grants');
       const alreadyTagged = parseInt(checkResult.rows[0].tagged);
+      const totalGrants = parseInt(checkResult.rows[0].total);
 
-      if (alreadyTagged > 0) {
-        console.log(`✅ Migration 018 already applied (${alreadyTagged} grants already tagged)`);
+      if (alreadyTagged >= 590) {
+        console.log(`✅ Migration 018 already applied (${alreadyTagged}/${totalGrants} grants tagged)`);
       } else {
+        console.log(`📊 Found ${alreadyTagged}/${totalGrants} grants already tagged - importing remaining...`);
         // Import tags from JSON export
         const { readFileSync } = await import('fs');
         const tagsData = JSON.parse(readFileSync('./smart-tags-export.json', 'utf8'));
