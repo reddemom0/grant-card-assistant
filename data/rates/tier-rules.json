@@ -31,14 +31,14 @@
       "reason": "Revenue $500K–$2.5MM — Online Platform fit"
     },
     {
-      "condition": "revenue_tier in ['2.5mm_5mm', '5mm_plus'] && industry_group == 1",
+      "condition": "revenue_tier == '5mm_plus' && industry_group == 1",
       "tier": "waitlist",
       "reason": "Pro-eligible revenue but services industry — currently waitlisted"
     },
     {
-      "condition": "revenue_tier in ['2.5mm_5mm', '5mm_plus']",
+      "condition": "revenue_tier == '5mm_plus'",
       "tier": "pro",
-      "reason": "Revenue $2.5MM+ — Pro service fit"
+      "reason": "Revenue $5MM+ — Pro service fit"
     }
   ],
   "tier_metadata": {
