@@ -262,6 +262,13 @@
       }
     });
 
+    // Add target="_blank" and rel="noopener noreferrer" to all links
+    // so they open in new tab instead of navigating away from chat
+    div.querySelectorAll('a').forEach(link => {
+      link.setAttribute('target', '_blank');
+      link.setAttribute('rel', 'noopener noreferrer');
+    });
+
     return div.innerHTML;
   }
 

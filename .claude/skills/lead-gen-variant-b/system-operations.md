@@ -111,6 +111,8 @@ This section applies when the system requests email content for save_lead_data (
 
 CRITICAL: Always lead with services that are currently available. GetGranted 2.0 is waitlist-only — it can only be a secondary mention, never the primary recommendation.
 
+CONSULTANT ANONYMITY: Never include specific consultant names in email_summary_body. Use 'a consultant', 'one of our consultants', or 'the team'. All booking links must use https://meetings.hubspot.com/natalie392/15min-intro-to-granted (no consultant-specific URLs in client-facing content). Internal HubSpot fields (like consultant_assignment in save_lead_data) can still contain consultant names for sales team prep — this anonymity rule applies to client-facing content only.
+
 $30K+ OR revenue $5M+:
 - PRIMARY: GrantedPro (https://granted.ca/grantedpro/)
 - Booking link: PRIMARY (https://meetings.hubspot.com/natalie392/15min-intro-to-granted)
