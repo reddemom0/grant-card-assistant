@@ -76,7 +76,7 @@
     "topic": "pricing_cost",
     "question": "How much does it cost to work with Granted?",
     "keywords": ["cost", "price", "pricing", "fee", "how much", "expensive", "afford", "free", "ROI", "worth"],
-    "knowledge": "Granted has three main service levels: Granted Starter (self-serve), GrantedPro (full-service), and Granted Export (CanExport-specific). **Granted Starter** is self-serve with guided support — you handle applications with streamlined tools, claims assistance, and submission reminders. $166.67/month or $1,700/year plus 25% success fee on approved grants. Up to 3 grant applications per year (hiring and training only, no market expansion). Best for 1-3 grant needs per year. 12-month minimum. **GrantedPro** is full done-for-you service — includes a dedicated Grant Strategist, proactive searching, unlimited applications, quarterly strategy sessions, and complete claims management. Best for revenue $2M+, multiple grant needs, complex applications. 12-month minimum, success-based fees plus writing fees for larger applications. **Granted Export** is a one-time service for CanExport applications. The ROI framing: hiring 2-3 students can return $10K-$21K, more than covering Starter costs. Full-service clients often see tens of thousands in approved funding annually. Don't lead with price — lead with the funding estimate.",
+    "knowledge": "Granted has three main service levels: Granted Starter (self-serve), GrantedPro (full-service), and Granted Export (CanExport-specific). **Granted Starter** is self-serve with guided support — you handle applications with streamlined tools, claims assistance, and submission reminders. $166.67/month or $1,700/year plus 25% success fee on approved grants. Up to 3 grant applications per year (hiring and training only, no market expansion). Best for 1-3 grant needs per year. 12-month minimum. **GrantedPro** is full done-for-you service — includes a dedicated Grant Strategist, proactive searching, unlimited applications, quarterly strategy sessions, and complete claims management. Best for established companies with revenue $5M+, 25+ employees, 5+ years operating. 12-month minimum, success-based fees. **Granted Export** is a one-time service for CanExport applications. The ROI framing: hiring 2-3 students can return $10K-$21K, more than covering Starter costs. Full-service clients often see tens of thousands in approved funding annually. Don't lead with price — lead with the funding estimate.",
     "database_hook": "Tie cost to estimated return: 'Based on what you've told me, you're looking at potentially $X-$Y in grant funding. Our consultants can walk you through the service options and which level makes sense for your situation.'",
     "cta_bridge": "The best way to figure out which service fits is to talk to a consultant — they can look at your full picture and recommend the right approach. Want to book a quick call?"
   },
@@ -102,7 +102,7 @@
     "topic": "getgranted_platform",
     "question": "What is GetGranted?",
     "keywords": ["getgranted", "database", "self-serve", "grant database", "platform", "subscription", "lite", "standard", "plus"],
-    "knowledge": "GetGranted is a paid self-serve grant management platform (NOT free) — currently waitlist-only for the new 2026 launch. Three pricing tiers: **Lite** ($55/mo or $499/yr): 1 user, 3 watchlists, 3 smart filters, chatbot, notifications. Best for solo/micro businesses exploring grants. **GetGranted Standard** ($99/mo or $899/yr): 2 users, 10 watchlists, 10 smart filters, quarterly office hours. Annual unlocks analytics, Grant Navigator, and strategy consulting session. Best for growing businesses with a small team. **Plus** ($149/mo or $1,499/yr): 3 users, unlimited watchlists/filters, monthly office hours. Annual unlocks unlimited Grant Navigator, strategy consulting session, pay-per-use consulting calls. Best for businesses wanting guided strategic support. Annual plans save up to 25% and unlock extra features. When recommending GetGranted, suggest the right tier based on company size. Waitlist: https://getgranted.ca/waitlist/",
+    "knowledge": "GetGranted is a paid self-serve grant management platform (NOT free) — currently waitlist-only for the new 2026 launch. Three pricing tiers: **Lite** ($55/mo or $499/yr): 1 user, 3 watchlists, 3 smart filters, chatbot, notifications. Best for solo/micro businesses exploring grants. **GetGranted** ($99/mo or $899/yr): 2 users, 10 watchlists, 10 smart filters, quarterly office hours. Annual unlocks analytics, Grant Navigator, and strategy consulting session. Best for growing businesses with a small team. **Plus** ($149/mo or $1,499/yr): 3 users, unlimited watchlists/filters, monthly office hours. Annual unlocks unlimited Grant Navigator, strategy consulting session, pay-per-use consulting calls. Best for businesses wanting guided strategic support. Annual plans save up to 25% and unlock extra features. When recommending GetGranted, suggest the right tier based on company size. Waitlist: https://getgranted.ca/waitlist/",
     "cta_bridge": "If you want more hands-on support beyond the platform, we have Granted Starter and GrantedPro. Want me to walk you through those options?"
   },
   {
@@ -238,7 +238,7 @@
     "topic": "which_service_right_for_me",
     "question": "Which service is right for me?",
     "keywords": ["which service", "right fit", "best option", "recommend", "choose", "decide"],
-    "knowledge": "Depends on your business size, revenue, and grant needs. If you just want to explore what's available: Join the GetGranted waitlist at https://getgranted.ca/waitlist/ — paid platform with three tiers ($55-$149/mo) for grant discovery and tracking. If you have 1–3 hiring or training grant needs and want guided self-serve support: Granted Starter ($166.67/mo or $1,700/yr + 25% success fee) at https://granted.ca/granted-starter/. If you have revenue $2M+, multiple growth initiatives, and want full done-for-you service: GrantedPro with dedicated Grant Strategist at https://granted.ca/grantedpro/. If you're planning international expansion: Granted Export for CanExport at https://granted.ca/granted-export/. The best way to figure out which fits is to book a free consultation so a grant strategist can assess your situation.",
+    "knowledge": "Depends on your business size, revenue, and grant needs. If you just want to explore what's available: Join the GetGranted waitlist at https://getgranted.ca/waitlist/ — paid platform with three tiers ($55-$149/mo) for grant discovery and tracking. If you have 1–3 hiring or training grant needs and want guided self-serve support: Granted Starter ($166.67/mo or $1,700/yr + 25% success fee) at https://granted.ca/granted-starter/. If you have revenue $5M+, 25+ employees, 5+ years, multiple growth initiatives, and want full done-for-you service: GrantedPro with dedicated Grant Strategist at https://granted.ca/grantedpro/. If you're planning international expansion: Granted Export for CanExport at https://granted.ca/granted-export/. The best way to figure out which fits is to book a 15-minute intro call to check if our services are a fit.",
     "cta_bridge": "I can give you a quick funding estimate based on your business profile, and that'll help narrow down which service tier makes sense. Want to run through that?"
   },
   {
@@ -256,5 +256,21 @@
     "keywords": ["transition", "merger", "combining", "getgranted 2.0 launch", "when", "2026", "new platform", "upgrade"],
     "knowledge": "Starting in 2026, Granted Starter and GetGranted are evolving into one newly enhanced, all-in-one grant management platform called GetGranted 2.0. Your account and data will be securely transferred. The new platform features smarter tools (including Grant Navigator for guided applications), faster performance, and a more intuitive interface. GetGranted 2.0 is currently waitlist-only at https://getgranted.ca/waitlist/. In the meantime, both current GetGranted and Starter services remain fully operational and accepting new subscribers.",
     "cta_bridge": "You can join the waitlist now for early access, or start with our current services and transition automatically when the new platform launches."
+  },
+  {
+    "id": "faq_32",
+    "topic": "intro_call_15min",
+    "question": "What happens on the 15-minute intro call?",
+    "keywords": ["call", "15 minutes", "intro", "consultation", "book", "meeting", "what happens"],
+    "knowledge": "The 15-minute intro call is a quick fit check to see if Granted's services match your needs. It is NOT a strategy session and NOT a grant consultation — the consultant will not identify specific grants or build a funding plan on this call. Available for Starter-eligible prospects and above.",
+    "cta_bridge": "Ready to book? I can share the link based on your profile."
+  },
+  {
+    "id": "faq_33",
+    "topic": "getgranted_2_mention_rule",
+    "question": "Should I mention GetGranted 2.0?",
+    "keywords": ["getgranted 2.0", "waitlist", "new platform", "mention"],
+    "knowledge": "For all prospects recommended GetGranted or Starter (below GrantedPro), always mention GetGranted 2.0 as a secondary note after the primary current-tier recommendation. Example: We're also launching GetGranted 2.0 with three tiers starting at $55/month — join the waitlist at getgranted.ca/waitlist. Always lead with the current available service first.",
+    "cta_bridge": "Would you like to hear more about the current services or the upcoming platform?"
   }
 ]
