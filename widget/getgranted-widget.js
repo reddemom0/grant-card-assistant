@@ -1554,6 +1554,17 @@
     return typingDiv;
   }
 
+  function createEstimateLoadingMessage() {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'gg-message gg-message-bot';
+    loadingDiv.id = 'gg-estimate-loading';
+    loadingDiv.innerHTML = `
+      <div class="gg-message-avatar">G</div>
+      <div class="gg-message-content">Crunching your numbers — one moment...</div>
+    `;
+    return loadingDiv;
+  }
+
   function addErrorMessage(text) {
     if (!messagesContainer) return;
 
@@ -1649,8 +1660,10 @@
     isWaitingForResponse = true;
     setInputEnabled(false);
 
-    // Show typing indicator
-    const typingIndicator = createTypingIndicator();
+    // Show typing indicator or estimate loading message
+    // For the first hidden "Hi" message, show custom loading text
+    const isFirstMessage = (trimmedMessage === 'Hi' && isHidden === true);
+    const typingIndicator = isFirstMessage ? createEstimateLoadingMessage() : createTypingIndicator();
     messagesContainer.appendChild(typingIndicator);
     scrollToBottom();
 
