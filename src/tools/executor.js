@@ -17,7 +17,7 @@ import { isServerTool } from './definitions.js';
 import * as getgrantedTools from './getgranted-tools.js';
 import * as programCards from '../utils/program-cards.js';
 import { categorizeProspect } from '../services/grant-categorization.js';
-import { runFocusedSearch, mergeEstimate } from '../services/grant-search-pipeline.js';
+import { runFocusedSearch } from '../services/grant-search-pipeline.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -775,9 +775,19 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                   prospectData  // Pass prospect data for eligibility scoring
                 );
 
-                // Step 4: Merge estimates
-                console.log('  🔀 Merging estimates...');
-                mergedEstimate = mergeEstimate(categorization, searchResults);
+                // Step 4: Use baseline estimate (merge removed - was pulling estimates down)
+                console.log('  ✅ Using baseline estimate (merge disabled)');
+                mergedEstimate = {
+                  estimate: categorization.baseline_estimate,
+                  confidence_level: searchResults.programs_found.length >= 8 ? 'high' : searchResults.programs_found.length >= 3 ? 'medium' : 'low',
+                  service_tier: categorization.service_tier,
+                  tier_reasoning: categorization.tier_reasoning,
+                  consultant_assignment: categorization.consultant_assignment,
+                  booking_link: categorization.booking_link,
+                  agent_talking_points: [],  // Agent generates these from baseline + programs
+                  programs_for_hubspot: searchResults.all_program_names,
+                  matched_programs_detail: searchResults.programs_found
+                };
 
                 // Step 5: Store in conversation_memory
                 const { query: dbQuery } = await import('../database/connection.js');
