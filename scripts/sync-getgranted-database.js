@@ -12,6 +12,7 @@ import path from 'path';
 import pg from 'pg';
 import { config } from 'dotenv';
 import { applyCurrentlyAcceptingHeuristics } from './apply-currently-accepting-heuristics.js';
+import { reimportSmartTags } from './reimport-smart-tags.js';
 
 config();
 
@@ -135,6 +136,11 @@ async function syncDatabase() {
       const heuristicsResult = await applyCurrentlyAcceptingHeuristics(client);
       console.log(`   ✅ Heuristics complete\n`);
 
+      // Re-import smart_tags from export file (migration 017)
+      console.log('6️⃣ Re-importing smart_tags...');
+      const tagsResult = await reimportSmartTags(client);
+      console.log(`   ✅ Smart tags complete\n`);
+
       // Create sync log
       const syncSummary = {
         synced_at: new Date().toISOString(),
@@ -145,6 +151,9 @@ async function syncDatabase() {
         currently_accepting: heuristicsResult.accepting,
         excluded: heuristicsResult.excluded,
         false_positives_caught: heuristicsResult.falsepositives,
+        smart_tags_imported: tagsResult.imported,
+        smart_tags_untagged: tagsResult.untagged,
+        smart_tags_skipped: tagsResult.skipped || false,
         failed: failed,
         success: true
       };
