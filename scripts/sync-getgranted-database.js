@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import pg from 'pg';
 import { config } from 'dotenv';
+import { applyCurrentlyAcceptingHeuristics } from './apply-currently-accepting-heuristics.js';
 
 config();
 
@@ -129,6 +130,11 @@ async function syncDatabase() {
       console.log(`   ✅ Active: ${activeResult.rows[0].count}`);
       console.log(`   ✅ Inactive: ${inactiveResult.rows[0].count}\n`);
 
+      // Apply currently_accepting heuristics (migration 004)
+      console.log('5️⃣ Applying currently_accepting heuristics...');
+      const heuristicsResult = await applyCurrentlyAcceptingHeuristics(client);
+      console.log(`   ✅ Heuristics complete\n`);
+
       // Create sync log
       const syncSummary = {
         synced_at: new Date().toISOString(),
@@ -136,6 +142,9 @@ async function syncDatabase() {
         total_grants: imported,
         active_grants: parseInt(activeResult.rows[0].count),
         inactive_grants: parseInt(inactiveResult.rows[0].count),
+        currently_accepting: heuristicsResult.accepting,
+        excluded: heuristicsResult.excluded,
+        false_positives_caught: heuristicsResult.falsepositives,
         failed: failed,
         success: true
       };
