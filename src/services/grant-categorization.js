@@ -199,10 +199,9 @@ function calculateBaselineEstimate(groupRates, prospectData) {
     const rate = numFtes < groupRates.training_small_company_threshold_ftes
       ? groupRates.training_small_company_rate
       : groupRates.training_rate;
-    const cappedSpend = Math.min(trainingSpend, trainingSpend * groupRates.training_cap_multiplier);
 
-    estimate.training.low = cappedSpend * rate * 0.5;
-    estimate.training.high = cappedSpend * rate;
+    estimate.training.low = trainingSpend * rate * 0.5;
+    estimate.training.high = trainingSpend * rate;
   }
 
   // Market expansion estimates
@@ -227,9 +226,13 @@ function calculateBaselineEstimate(groupRates, prospectData) {
     estimate.rd.high = estimatedFunding;
   }
 
-  // Calculate totals
-  estimate.total_low = estimate.hiring.low + estimate.training.low + estimate.market_expansion.low + estimate.rd.low;
-  estimate.total_high = estimate.hiring.high + estimate.training.high + estimate.market_expansion.high + estimate.rd.high;
+  // Calculate base totals
+  const baseTotalLow = estimate.hiring.low + estimate.training.low + estimate.market_expansion.low + estimate.rd.low;
+  const baseTotalHigh = estimate.hiring.high + estimate.training.high + estimate.market_expansion.high + estimate.rd.high;
+
+  // Apply 25% cyclical programs multiplier (accounts for programs that run multiple cycles per year)
+  estimate.total_low = Math.round(baseTotalLow * 1.25);
+  estimate.total_high = Math.round(baseTotalHigh * 1.25);
 
   return estimate;
 }
