@@ -5,7 +5,7 @@
  * Should be run weekly via cron job or Railway scheduled task.
  */
 
-import { exec } from 'child_process';
+import { exec, execSync } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
@@ -22,6 +22,15 @@ const { Pool } = pg;
 async function syncDatabase() {
   console.log('🔄 Starting GetGranted database sync...\n');
   console.log(`⏰ Started at: ${new Date().toISOString()}\n`);
+
+  // Step 0: Ensure Playwright is installed (required for scraper)
+  console.log('0️⃣ Checking Playwright installation...');
+  try {
+    execSync('npx playwright install chromium --with-deps', { stdio: 'inherit' });
+    console.log('   ✅ Playwright ready\n');
+  } catch (e) {
+    console.log('   ⚠️  Playwright install failed or already installed, continuing...\n');
+  }
 
   try {
     // Step 1: Export all grants from GetGranted
