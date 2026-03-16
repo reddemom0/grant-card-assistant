@@ -12,18 +12,16 @@
 // If RUN_MODE=sync, run the sync script instead of starting the server
 // This allows Railway cron service to use the same codebase but run sync
 if (process.env.RUN_MODE === 'sync') {
-  console.log('🔄 RUN_MODE=sync detected - running database sync instead of server');
-  import('./scripts/sync-getgranted-database.js')
-    .then(() => {
-      console.log('✅ Sync completed successfully');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('❌ Sync failed:', error);
-      process.exit(1);
-    });
-  // Exit early - don't load the rest of the server code
-  // This throws to prevent module loading from continuing
+  (async () => {
+    console.log('🔄 RUN_MODE=sync detected - running database sync instead of server');
+    const { execSync } = await import('child_process');
+    execSync('node scripts/sync-getgranted-database.js', { stdio: 'inherit' });
+    process.exit(0);
+  })().catch((error) => {
+    console.error('❌ Sync failed:', error);
+    process.exit(1);
+  });
+  // Throw to prevent rest of module from loading while sync runs
   throw new Error('SYNC_MODE');
 }
 
