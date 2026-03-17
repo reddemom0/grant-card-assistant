@@ -12,9 +12,30 @@
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import Anthropic from '@anthropic-ai/sdk';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+// Initialize Anthropic client
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY
+});
+
+// Smart filter definitions for AI mapping
+const SMART_FILTER_DEFINITIONS = {
+  "Building Bench of Talent": "Hiring and training programs. Wage subsidies, student placements, apprenticeships, skills training, upskilling employees.",
+  "Adopt Software or AI": "Digital transformation. Software/hardware purchases, cloud migration, AI/ML integration, digital marketing tools, technology training.",
+  "Buy Equipment or Upgrade Facilities": "Capital investments. Equipment purchases, facility retrofits/expansion, automation hardware, production upgrades.",
+  "Build Something New": "R&D and innovation. Prototype development, product development, pilot testing, IP protection, tech development, feasibility studies.",
+  "International Growth": "Export and international expansion. Export development, trade shows, market research, foreign certification, international business development.",
+  "Domestic Growth": "Canadian market expansion. Domestic trade shows, marketing campaigns, sales growth, expanding to new provinces.",
+  "Improve Sustainability": "Environmental initiatives. Decarbonization, electrification, emissions reduction, clean tech, waste reduction, green jobs.",
+  "Improve Productivity": "Operations improvement. Process optimization, lean manufacturing, productivity gains, automation for efficiency, advanced manufacturing.",
+  "Commercialize or Scale": "Bringing products to market. Commercialization support, scaling production, go-to-market strategy, product validation, demonstration projects.",
+  "Planning or Readiness Support": "Advisory and planning. Feasibility studies, readiness assessments, market research, business planning, consulting services, audits.",
+  "Grants for Startups": "Early-stage company support. Startup-specific hiring, training, R&D, expansion, advisory, and loan programs for pre-revenue or newly incorporated companies."
+};
 
 // Cache loaded data files
 let industryGroupsData = null;
@@ -347,12 +368,145 @@ function assignConsultant(industry) {
 }
 
 /**
+ * Map prospect to relevant smart filters using AI
+ *
+ * @param {object} prospectData - Prospect information
+ * @param {string} industry - Resolved industry
+ * @returns {Promise<object>} Weighted smart filter mapping
+ */
+async function mapProspectToSmartFilters(prospectData, industry) {
+  try {
+    console.log('\n🤖 Mapping prospect to smart filters using Haiku...');
+
+    // Build context from prospect data
+    const context = {
+      industry: industry || prospectData.industry || 'Unknown',
+      company_description: prospectData.company_background?.ai_extracted_description || prospectData.company_description || 'Not provided',
+      planned_activities: prospectData.planned_activities || 'Not provided',
+      hiring_plans: prospectData.num_hires || 0,
+      student_hires: prospectData.num_student_hires || 0,
+      training_budget: prospectData.annual_training_spend || 0,
+      rd_spend: prospectData.rd_spend || 0,
+      international_expansion: prospectData.international_market_spend || 0,
+      capital_investment: prospectData.capital_investment || 0,
+      revenue_tier: prospectData.revenue_tier || 'unknown',
+      num_employees: prospectData.num_ftes || 0
+    };
+
+    const prompt = `You are analyzing a Canadian business to determine which grant categories are most relevant.
+
+BUSINESS CONTEXT:
+- Industry: ${context.industry}
+- Company description: ${context.company_description}
+- Planned activities: ${context.planned_activities}
+- Hiring plans: ${context.hiring_plans} new hires, ${context.student_hires} student/co-op placements
+- Training budget: $${context.training_budget}
+- R&D spend: $${context.rd_spend}
+- International expansion budget: $${context.international_expansion}
+- Capital investment planned: $${context.capital_investment}
+- Revenue tier: ${context.revenue_tier}
+- Employees: ${context.num_employees}
+
+SMART FILTER DEFINITIONS:
+${Object.entries(SMART_FILTER_DEFINITIONS).map(([name, desc]) => `- "${name}": ${desc}`).join('\n')}
+
+TASK:
+Determine which of the 11 smart filters are relevant for this business. Assign weights:
+- 2 = PRIMARY relevance (this is a core need/activity for the business)
+- 1 = SECONDARY relevance (this is a potential or minor need)
+- 0 = NOT relevant (do not include in output)
+
+Return ONLY a JSON object with this structure:
+{
+  "smart_filters": {
+    "Filter Name": weight,
+    "Another Filter": weight
+  }
+}
+
+Only include filters with weight 1 or 2. Be selective - most businesses should have 2-4 filters, not all 11.`;
+
+    const response = await anthropic.messages.create({
+      model: 'claude-haiku-4-20250514',
+      max_tokens: 500,
+      temperature: 0,
+      messages: [{
+        role: 'user',
+        content: prompt
+      }]
+    });
+
+    const responseText = response.content[0].text.trim();
+
+    // Extract JSON from response (handles cases where model adds explanation)
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.warn('⚠️  Haiku response did not contain JSON, using fallback mapping');
+      return getFallbackSmartFilterMapping(prospectData);
+    }
+
+    const result = JSON.parse(jsonMatch[0]);
+
+    console.log('✅ Smart filter mapping:', JSON.stringify(result.smart_filters, null, 2));
+    console.log(`   Cost: ~$${((response.usage.input_tokens / 1000000) * 1.0 + (response.usage.output_tokens / 1000000) * 5.0).toFixed(4)}`);
+
+    return result.smart_filters;
+
+  } catch (error) {
+    console.error('❌ Smart filter mapping failed:', error.message);
+    console.warn('⚠️  Using fallback smart filter mapping');
+    return getFallbackSmartFilterMapping(prospectData);
+  }
+}
+
+/**
+ * Fallback smart filter mapping (deterministic rules)
+ */
+function getFallbackSmartFilterMapping(prospectData) {
+  const filters = {};
+
+  // Hiring/Training
+  if ((prospectData.num_hires || 0) > 0 || (prospectData.num_student_hires || 0) > 0 || (prospectData.annual_training_spend || 0) > 0) {
+    filters['Building Bench of Talent'] = 2;
+  }
+
+  // International expansion
+  if ((prospectData.international_market_spend || 0) > 0) {
+    filters['International Growth'] = 2;
+  }
+
+  // R&D
+  if ((prospectData.rd_spend || 0) > 0) {
+    filters['Build Something New'] = 2;
+  }
+
+  // Capital investment
+  if ((prospectData.capital_investment || 0) > 0) {
+    filters['Buy Equipment or Upgrade Facilities'] = 2;
+  }
+
+  // Startups (pre-revenue or <2 years incorporated)
+  if (prospectData.revenue_tier === 'pre_revenue') {
+    filters['Grants for Startups'] = 2;
+  }
+
+  // If nothing else, add general categories
+  if (Object.keys(filters).length === 0) {
+    filters['Improve Productivity'] = 1;
+    filters['Planning or Readiness Support'] = 1;
+  }
+
+  console.log('✅ Fallback smart filter mapping:', filters);
+  return filters;
+}
+
+/**
  * Main categorization function
  *
  * @param {object} prospectData - Webform + agent-collected data
- * @returns {object} Categorization result
+ * @returns {Promise<object>} Categorization result
  */
-export function categorizeProspect(prospectData) {
+export async function categorizeProspect(prospectData) {
   loadDataFiles();
 
   console.log('\n🏷️  CATEGORIZING PROSPECT');
@@ -400,6 +554,10 @@ export function categorizeProspect(prospectData) {
     prospectData
   );
 
+  // Step 8: Map prospect to smart filters using AI
+  const smartFilterWeights = await mapProspectToSmartFilters(prospectData, industryResolution.matched_industry);
+  console.log(`✅ Smart filters: ${Object.entries(smartFilterWeights).map(([f, w]) => `${f} (${w})`).join(', ')}`);
+
   console.log('✅ CATEGORIZATION COMPLETE\n');
 
   return {
@@ -414,6 +572,7 @@ export function categorizeProspect(prospectData) {
     baseline_estimate: baselineEstimate,
     grant_categories_to_search: grantCategories,
     search_parameters: searchParameters,
+    smart_filter_weights: smartFilterWeights,
     province: province
   };
 }

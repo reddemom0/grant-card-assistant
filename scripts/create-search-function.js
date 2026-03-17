@@ -206,6 +206,97 @@ async function searchGrants({
 }
 
 /**
+ * Search grants by genre scores (AI-powered relevance ranking)
+ *
+ * @param {string} province - Province/territory filter
+ * @param {Object} smartFilterWeights - Weights for each smart filter (0, 1, or 2)
+ * @param {number} maxResults - Max results (default 15)
+ * @returns {Promise<{total: number, rankMethod: string, grants: Array}>}
+ */
+async function searchByGenreScores(province, smartFilterWeights = {}, maxResults = 15) {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  try {
+    const client = await pool.connect();
+
+    // Build weighted score expression using smart filter weights
+    const weights = {
+      'Building Bench of Talent': smartFilterWeights['Building Bench of Talent'] || 0,
+      'Adopt Software or AI': smartFilterWeights['Adopt Software or AI'] || 0,
+      'Buy Equipment or Upgrade Facilities': smartFilterWeights['Buy Equipment or Upgrade Facilities'] || 0,
+      'Build Something New': smartFilterWeights['Build Something New'] || 0,
+      'International Growth': smartFilterWeights['International Growth'] || 0,
+      'Domestic Growth': smartFilterWeights['Domestic Growth'] || 0,
+      'Improve Sustainability': smartFilterWeights['Improve Sustainability'] || 0,
+      'Improve Productivity': smartFilterWeights['Improve Productivity'] || 0,
+      'Commercialize or Scale': smartFilterWeights['Commercialize or Scale'] || 0,
+      'Planning or Readiness Support': smartFilterWeights['Planning or Readiness Support'] || 0,
+      'Grants for Startups': smartFilterWeights['Grants for Startups'] || 0
+    };
+
+    const sql = `
+      SELECT
+        grant_id, grant_name, grant_type, grant_amount, url, regions, industries,
+        program_provider, deadline, contribution_percentage, grant_criteria,
+        currently_accepting, intake_cycle, smart_tags, genre_scores,
+        (
+          COALESCE((genre_scores->'association_scores'->'Building Bench of Talent'->>'association_pct')::int, 0) * $2 +
+          COALESCE((genre_scores->'association_scores'->'Adopt Software or AI'->>'association_pct')::int, 0) * $3 +
+          COALESCE((genre_scores->'association_scores'->'Buy Equipment or Upgrade Facilities'->>'association_pct')::int, 0) * $4 +
+          COALESCE((genre_scores->'association_scores'->'Build Something New'->>'association_pct')::int, 0) * $5 +
+          COALESCE((genre_scores->'association_scores'->'International Growth'->>'association_pct')::int, 0) * $6 +
+          COALESCE((genre_scores->'association_scores'->'Domestic Growth'->>'association_pct')::int, 0) * $7 +
+          COALESCE((genre_scores->'association_scores'->'Improve Sustainability'->>'association_pct')::int, 0) * $8 +
+          COALESCE((genre_scores->'association_scores'->'Improve Productivity'->>'association_pct')::int, 0) * $9 +
+          COALESCE((genre_scores->'association_scores'->'Commercialize or Scale'->>'association_pct')::int, 0) * $10 +
+          COALESCE((genre_scores->'association_scores'->'Planning or Readiness Support'->>'association_pct')::int, 0) * $11 +
+          COALESCE((genre_scores->'association_scores'->'Grants for Startups'->>'association_pct')::int, 0) * $12
+        ) AS relevance_score
+      FROM grants
+      WHERE currently_accepting = true
+        AND genre_scores IS NOT NULL
+        AND (regions ILIKE '%' || $1 || '%' OR regions ILIKE '%National%' OR regions ILIKE '%Canada%')
+      ORDER BY relevance_score DESC
+      LIMIT $13
+    `;
+
+    const params = [
+      province,
+      weights['Building Bench of Talent'],
+      weights['Adopt Software or AI'],
+      weights['Buy Equipment or Upgrade Facilities'],
+      weights['Build Something New'],
+      weights['International Growth'],
+      weights['Domestic Growth'],
+      weights['Improve Sustainability'],
+      weights['Improve Productivity'],
+      weights['Commercialize or Scale'],
+      weights['Planning or Readiness Support'],
+      weights['Grants for Startups'],
+      maxResults
+    ];
+
+    const result = await client.query(sql, params);
+    client.release();
+
+    console.log(`✅ searchByGenreScores: ${result.rows.length} results (province: ${province}, filters: ${Object.keys(smartFilterWeights).length})`);
+    console.log(`   Top 3 relevance scores: ${result.rows.slice(0, 3).map(r => `${r.grant_name}: ${r.relevance_score}`).join(', ')}`);
+
+    return {
+      total: result.rows.length,
+      rankMethod: 'genre-scores-weighted',
+      grants: result.rows
+    };
+
+  } catch (error) {
+    console.error('❌ searchByGenreScores error:', error);
+    throw error;
+  } finally {
+    await pool.end();
+  }
+}
+
+/**
  * Get a single grant by ID
  */
 async function getGrantById(grantId) {
@@ -277,7 +368,7 @@ async function getGrantStats() {
 }
 
 // Export functions
-export { searchGrants, getGrantById, getGrantStats };
+export { searchGrants, searchByGenreScores, getGrantById, getGrantStats };
 
 // ── Self-test when run directly ───────────────────────────────────────────────
 if (import.meta.url === `file://${process.argv[1]}`) {

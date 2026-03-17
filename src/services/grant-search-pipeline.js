@@ -190,6 +190,7 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
   console.log('\n🔍 RUNNING FOCUSED SEARCH');
   console.log(`  Conversation: ${conversationId}`);
   console.log(`  Categories to search: ${categorization.grant_categories_to_search.join(', ')}`);
+  console.log(`  Smart filter weights: ${categorization.smart_filter_weights ? JSON.stringify(categorization.smart_filter_weights) : 'Not available (using legacy mapping)'}`);
 
   const searchParams = categorization.search_parameters;
   const allPrograms = [];
@@ -265,19 +266,67 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
       });
     }
 
-    // Execute all search calls
-    console.log(`  Executing ${searchCalls.length} targeted searches...`);
-
-    for (const searchCall of searchCalls) {
-      console.log(`    → ${searchCall.name}: "${searchCall.query}"`);
+    // ── GENRE-SCORE SEARCH (PRIMARY) ─────────────────────────────────────────
+    // Use AI-powered genre-score ranking if smart filter weights are available
+    if (categorization.smart_filter_weights && Object.keys(categorization.smart_filter_weights).length > 0) {
+      console.log(`  🎯 Using genre-score search with AI-mapped weights`);
 
       try {
-        const results = await searchFunction({
-          query: searchCall.query,
-          province: searchCall.province,
-          purposes: searchCall.purposes,
-          limit: 15
+        const { searchByGenreScores } = await import('../../scripts/create-search-function.js');
+        const genreResults = await searchByGenreScores(
+          provinceFullName,
+          categorization.smart_filter_weights,
+          15
+        );
+
+        console.log(`    ✅ Genre-score search: ${genreResults.grants.length} grants found`);
+
+        // Tag grants with search origin
+        genreResults.grants.forEach(grant => {
+          grant.search_origin = 'Genre Score Match';
+          grant.purposes = []; // Will be inferred from smart tags/genres
         });
+
+        allPrograms.push(...genreResults.grants);
+
+        // If we got enough results (>=5), we can skip keyword searches
+        if (genreResults.grants.length >= 5) {
+          console.log(`  ✅ Sufficient results from genre-score search (${genreResults.grants.length}), skipping keyword searches`);
+        }
+
+      } catch (error) {
+        console.error(`    ❌ Genre-score search failed: ${error.message}, falling back to keyword search`);
+      }
+    }
+
+    // ── KEYWORD SEARCH (FALLBACK OR SUPPLEMENT) ─────────────────────────────
+    // Run keyword searches if:
+    // 1. No genre-score search was performed (no smart_filter_weights), OR
+    // 2. Genre-score search returned < 5 results
+    const shouldRunKeywordSearch = !categorization.smart_filter_weights ||
+                                     Object.keys(categorization.smart_filter_weights).length === 0 ||
+                                     allPrograms.length < 5;
+
+    if (shouldRunKeywordSearch) {
+      console.log(`  🔤 Running keyword searches (${allPrograms.length < 5 ? 'supplement' : 'primary'} mode)`);
+    } else {
+      console.log(`  ⏭️  Skipping keyword searches (sufficient genre-score results)`);
+    }
+
+    // Execute all search calls
+    if (shouldRunKeywordSearch) {
+      console.log(`  Executing ${searchCalls.length} targeted searches...`);
+
+      for (const searchCall of searchCalls) {
+        console.log(`    → ${searchCall.name}: "${searchCall.query}"`);
+
+        try {
+          const results = await searchFunction({
+            query: searchCall.query,
+            province: searchCall.province,
+            purposes: searchCall.purposes,
+            limit: 15
+          });
 
         // Diagnostic logging to debug response shape
         console.log(`      📦 Response type: ${typeof results}, keys: ${results ? Object.keys(results).join(', ') : 'null'}`);
@@ -316,6 +365,7 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
         console.error(`      ❌ Search failed: ${error.message}`);
       }
     }
+    } // End if (shouldRunKeywordSearch)
 
     // Deduplicate programs by ID, merging purposes for programs returned by multiple searches
     const programsById = new Map();

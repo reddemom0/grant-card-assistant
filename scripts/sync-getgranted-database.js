@@ -13,6 +13,7 @@ import pg from 'pg';
 import { config } from 'dotenv';
 import { applyCurrentlyAcceptingHeuristics } from './apply-currently-accepting-heuristics.js';
 import { reimportSmartTags } from './reimport-smart-tags.js';
+import { reimportGenreScores } from './reimport-genre-scores.js';
 
 config();
 
@@ -150,6 +151,11 @@ async function syncDatabase() {
       const tagsResult = await reimportSmartTags(client);
       console.log(`   ✅ Smart tags complete\n`);
 
+      // Re-import genre_scores from export file (migration 020)
+      console.log('7️⃣ Re-importing genre_scores...');
+      const genreScoresResult = await reimportGenreScores(client);
+      console.log(`   ✅ Genre scores complete\n`);
+
       // Create sync log
       const syncSummary = {
         synced_at: new Date().toISOString(),
@@ -163,6 +169,9 @@ async function syncDatabase() {
         smart_tags_imported: tagsResult.imported,
         smart_tags_untagged: tagsResult.untagged,
         smart_tags_skipped: tagsResult.skipped || false,
+        genre_scores_imported: genreScoresResult.imported,
+        genre_scores_unscored: genreScoresResult.unscored,
+        genre_scores_skipped: genreScoresResult.skipped || false,
         failed: failed,
         success: true
       };
