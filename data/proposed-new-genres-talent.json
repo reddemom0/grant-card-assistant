@@ -1,0 +1,330 @@
+{
+  "exported_at": "2026-03-16T16:00:52.223Z",
+  "total_proposals": 23,
+  "unique_genres": 21,
+  "proposals": [
+    {
+      "name": "Disability Employment Support",
+      "definition": "Funding supports hiring and wage subsidies specifically for individuals with disabilities to facilitate employment placement and retention.",
+      "when_to_use": "Use when the program explicitly targets or prioritizes individuals with disabilities as participants and provides employment support services.",
+      "why_existing_dont_fit": "While 'Barriered Youth' captures some aspects of targeting disadvantaged groups, this program is specifically disability-focused (not age-restricted to youth) and combines wage subsidy with participant-centered support services including mentorship and accommodations that go beyond standard hiring/wage subsidy programs. The disability focus and accommodation-based funding model are distinct enough to warrant a separate genre.",
+      "grant_id": "370",
+      "grant_name": "Creative Employment Options",
+      "count": 2,
+      "example_grants": [
+        {
+          "grant_id": "370",
+          "grant_name": "Creative Employment Options"
+        },
+        {
+          "grant_id": "836",
+          "grant_name": "Opportunities Fund Program - BC Centre for Ability [WAITLIST]"
+        }
+      ]
+    },
+    {
+      "name": "Business Consulting & Capacity Building",
+      "definition": "Funding supports access to professional business consulting services and capacity building activities to develop business management skills and organizational capability.",
+      "when_to_use": "Use when the program provides funding for consulting services, business planning, feasibility assessments, or skills development in business management rather than direct hiring or employment placement.",
+      "why_existing_dont_fit": "This program is fundamentally about providing access to professional consulting services and business planning support, not about hiring employees, creating positions, or placing workers. While it includes some skills training and capacity building (scoring 2 on training), the primary focus is on business consulting and organizational development services delivered by pre-approved consultants, which doesn't align with the core intent of the 'Building Bench of Talent' filter that targets workforce hiring and employment placement.",
+      "grant_id": "428",
+      "grant_name": "B.C. Indigenous Agriculture Development Program: Stream 1 - Indigenous Governments, Communities and Organizations",
+      "count": 2,
+      "example_grants": [
+        {
+          "grant_id": "428",
+          "grant_name": "B.C. Indigenous Agriculture Development Program: Stream 1 - Indigenous Governments, Communities and Organizations"
+        },
+        {
+          "grant_id": "430",
+          "grant_name": "B.C. Indigenous Agriculture Development Program: Stream 2 - Indigenous Entrepreneurs"
+        }
+      ]
+    },
+    {
+      "name": "Business Owner Development/Acceleration",
+      "definition": "Funding supports growth and development of existing businesses through grants, mentorship, or accelerator programs.",
+      "when_to_use": "Use when the program provides capital or structured development support to business owners rather than hiring employees or training individual workers.",
+      "why_existing_dont_fit": "This grant funds business acceleration and owner development (via the Ella Ascend program), not employee hiring, wage subsidies, or individual worker training. The Ella Ascend component has a minor training/development element (score 2), but the primary focus is business growth funding for established women entrepreneurs, which doesn't align with the 'Building Bench of Talent' focus on hiring and workforce development.",
+      "grant_id": "352",
+      "grant_name": "Visa Canada Grant Program in Partnership with IFundWomen",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "352",
+          "grant_name": "Visa Canada Grant Program in Partnership with IFundWomen"
+        }
+      ]
+    },
+    {
+      "name": "Entrepreneurship/Commercialization Training",
+      "definition": "Funding supports graduate students and postdoctoral fellows in developing research-based business ventures through structured training, mentorship, and customer discovery activities.",
+      "when_to_use": "Use when the program provides stipends and training to help early-career researchers commercialize their research or test business hypotheses, rather than traditional employment or skills training.",
+      "why_existing_dont_fit": "This program is fundamentally about entrepreneurship development and commercialization of research, not traditional hiring, wage subsidies for employment, or general workforce training. While it involves stipends to students and training components, the core purpose is to build an entrepreneurial pipeline and foster research-based ventures, which is distinct from the existing 'Building Bench of Talent' genres that focus on employment placement, skills development, or apprenticeships.",
+      "grant_id": "365",
+      "grant_name": "Lab2Market",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "365",
+          "grant_name": "Lab2Market"
+        }
+      ]
+    },
+    {
+      "name": "Artist Development & Talent Support",
+      "definition": "Funding supports the development, production, marketing, and promotion of emerging artists and creative talent through recording, touring, and industry exposure activities.",
+      "when_to_use": "Use when the program provides grants to support artist career development, talent production, or creative output rather than direct employment or workforce training.",
+      "why_existing_dont_fit": "This program is fundamentally about supporting emerging artists and creative talent development through production and promotion activities, not about hiring employees, training workers, or creating employment positions. While it includes labour costs and staff salaries as eligible expenses, these are secondary to the primary purpose of artist development and talent support. The program doesn't fit traditional workforce development genres.",
+      "grant_id": "409",
+      "grant_name": "Music Creation",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "409",
+          "grant_name": "Music Creation"
+        }
+      ]
+    },
+    {
+      "name": "Immigrant/Newcomer Hire",
+      "definition": "Program targets hiring of recent immigrants, refugees, or internationally educated professionals to fill employment gaps.",
+      "when_to_use": "Use when the program explicitly prioritizes or requires candidates to be newcomers to the country, recent immigrants, or internationally educated professionals.",
+      "why_existing_dont_fit": "While 'Barriered Youth' captures some disadvantage, this program's core focus is on newcomer/immigrant status as the primary eligibility criterion, not youth age or traditional barriers. The program is specifically designed to connect employers with talented IEPs and recent immigrants (5 years or less in Canada) seeking first work experience, which is a distinct talent pool and barrier category that deserves its own genre.",
+      "grant_id": "492",
+      "grant_name": "Skilled Newcomer Internships for the Bio-Economy",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "492",
+          "grant_name": "Skilled Newcomer Internships for the Bio-Economy"
+        }
+      ]
+    },
+    {
+      "name": "Executive/Leadership Recruitment",
+      "definition": "Funding supports recruitment and advancement of senior technical employees, executives, and management-level talent into permanent roles.",
+      "when_to_use": "Use when the program specifically targets hiring or transitioning experienced professionals into senior technical, executive, or leadership positions rather than entry-level or junior roles.",
+      "why_existing_dont_fit": "The program's core focus is attracting 'senior technical employees,' 'senior executives,' and supporting 'transition to senior leadership positions' — a talent acquisition strategy distinct from entry-level hiring, apprenticeships, or student placements. While 'Hiring' applies broadly, this program's emphasis on seniority level and leadership advancement warrants a more specific classification.",
+      "grant_id": "511",
+      "grant_name": "Ocean Leaders Impact Program (OLIP) Call for Proposals",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "511",
+          "grant_name": "Ocean Leaders Impact Program (OLIP) Call for Proposals"
+        }
+      ]
+    },
+    {
+      "name": "Artist/Professional Development Support",
+      "definition": "Funding supports individual artists or cultural professionals in acquiring materials, skills, and career development opportunities rather than creating employment positions.",
+      "when_to_use": "Use when the program provides grants to self-employed professionals or artists for skill-building, materials, and career advancement rather than hiring employees or creating wage-subsidized positions.",
+      "why_existing_dont_fit": "This program does not involve hiring employees, wage subsidies, or creating positions. While it includes training components (workshops, mentorship, conferences), the primary focus is on supporting individual artists' creative and professional development through material acquisition and learning opportunities. The 'Training' genre (scored 2) captures the secondary training/learning aspect, but the core activity—providing direct support to artists for their own practice—doesn't fit the employment-focused 'Building Bench of Talent' genres which assume organizational hiring or workforce placement.",
+      "grant_id": "520",
+      "grant_name": "Creating, Knowing, Sharing: Small Scale Activities",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "520",
+          "grant_name": "Creating, Knowing, Sharing: Small Scale Activities"
+        }
+      ]
+    },
+    {
+      "name": "Professional Development & Mentorship",
+      "definition": "Funding supports professional development, mentorship programs, and capacity building for established or emerging professionals in a field.",
+      "when_to_use": "Use when the program provides funding for mentorship, professional development, skill-building, or capacity development activities that are not formal apprenticeships or structured training programs, and are not tied to hiring new employees.",
+      "why_existing_dont_fit": "This grant primarily funds professional development, mentorship, and capacity building for Indigenous arts professionals and organizations, but does not involve hiring new employees, wage subsidies, or formal apprenticeships. While 'training' scored a 2 (mentorship and training are mentioned as possible components), the program's core focus is on funding creative projects and professional development for established practitioners, not workforce training or skills certification. The program is too broad and artist-focused to fit neatly into existing 'Building Bench of Talent' genres which emphasize hiring and employment placement.",
+      "grant_id": "528",
+      "grant_name": "Creating, Knowing, Sharing: Long-term Projects",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "528",
+          "grant_name": "Creating, Knowing, Sharing: Long-term Projects"
+        }
+      ]
+    },
+    {
+      "name": "Indigenous-focused workforce development",
+      "definition": "Program prioritizes training and employment support specifically for Indigenous people, with emphasis on building inclusive workplaces and cultural competency.",
+      "when_to_use": "Use when the program explicitly targets Indigenous populations for workforce development, includes cultural competency components, or requires Indigenous-led governance.",
+      "why_existing_dont_fit": "While the program includes training (3), apprenticeship (2), and wage subsidy (2) components, its defining characteristic is the Indigenous-specific focus combined with cultural competency and workplace inclusion requirements. The barriered_youth score (3) captures disadvantaged populations, but this program's primary distinction is Indigenous identity and cultural integration, not just age or barrier status. A dedicated genre would better capture the program's emphasis on Indigenous representation, cultural respect, and inclusive workplace creation.",
+      "grant_id": "530",
+      "grant_name": "Skills and Partnership Fund (SPF)",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "530",
+          "grant_name": "Skills and Partnership Fund (SPF)"
+        }
+      ]
+    },
+    {
+      "name": "Business Mentorship & Coaching",
+      "definition": "Funding supports mentorship, coaching, and expert guidance to help business owners develop skills and execute growth strategies.",
+      "when_to_use": "Use when the program provides access to mentors, coaches, or industry specialists to advise on business development, strategy, or skill-building rather than direct hiring or employee training.",
+      "why_existing_dont_fit": "This program is fundamentally about business owner/entrepreneur development and mentorship rather than hiring employees, training employees, or supporting apprenticeships. While it includes some skill-development elements (training score: 1), the primary focus is on providing expert guidance and mentorship to help existing business leaders scale their companies, which doesn't align with the 'Building Bench of Talent' smart filter that targets workforce hiring and employee development.",
+      "grant_id": "623",
+      "grant_name": "Rhyze Up!",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "623",
+          "grant_name": "Rhyze Up!"
+        }
+      ]
+    },
+    {
+      "name": "Immigrant Work Experience",
+      "definition": "Funding supports internship or employment placements specifically designed to help internationally educated immigrants gain Canadian work experience and credential recognition.",
+      "when_to_use": "Use when the program targets recent immigrants or internationally educated professionals seeking to establish Canadian work history or bridge credentials to the local job market.",
+      "why_existing_dont_fit": "While this program involves hiring and internships, its core purpose is not general talent development but rather addressing a specific barrier faced by recent immigrants (lack of Canadian work experience and credential recognition). The program explicitly targets individuals who immigrated within 5 years and are underemployed due to their international credentials not being recognized. This is distinct from youth hiring, barriered youth (which typically refers to domestic disadvantaged groups), or general internship programs, as it addresses a specific immigration-related employment barrier.",
+      "grant_id": "627",
+      "grant_name": "WorkXP Internship Program",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "627",
+          "grant_name": "WorkXP Internship Program"
+        }
+      ]
+    },
+    {
+      "name": "Newcomer/Immigration Employment",
+      "definition": "Program targets immigrants, refugees, or newcomers to a country and provides hiring support or wage subsidies to facilitate their labor market integration.",
+      "when_to_use": "Use when the program explicitly requires or prioritizes hiring newcomers, immigrants, refugees, or individuals with recent immigration status as a core eligibility criterion.",
+      "why_existing_dont_fit": "While this program involves hiring and wage subsidies, its primary distinguishing feature is that it specifically targets newcomers to Canada (permanent residents and refugees within 5 years of arrival) as a barrier-removal initiative. The 'barriered_youth' tag doesn't capture this, as the program isn't age-restricted and the barrier is immigration status, not age or traditional disadvantage categories. This is a distinct talent pipeline that warrants its own classification.",
+      "grant_id": "665",
+      "grant_name": "Environmental Foreign Talent Development Program (EFTD)",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "665",
+          "grant_name": "Environmental Foreign Talent Development Program (EFTD)"
+        }
+      ]
+    },
+    {
+      "name": "Workplace Accessibility & Accommodation",
+      "definition": "Funding supports modifications to workplace environments, policies, technologies, and practices to remove barriers and accommodate employees with disabilities.",
+      "when_to_use": "Use when the program provides funding for accessibility improvements, accommodations, or barrier removal that enable persons with disabilities to work effectively.",
+      "why_existing_dont_fit": "This grant is fundamentally about workplace accessibility and accommodation infrastructure rather than hiring, training, or talent development. While it includes some training components (anti-bias training, interview process training), these are secondary to the primary purpose of removing environmental, technological, and systemic barriers. It does not focus on hiring new talent, wage subsidies, or targeting specific demographic groups for employment.",
+      "grant_id": "685",
+      "grant_name": "Workplace Accessibility Grant ",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "685",
+          "grant_name": "Workplace Accessibility Grant "
+        }
+      ]
+    },
+    {
+      "name": "Gender Equity Leadership Development",
+      "definition": "Funding supports training, education, or policy development to advance underrepresented groups (particularly women) into leadership positions within organizations.",
+      "when_to_use": "Use when the program explicitly targets removing barriers to leadership advancement for a specific demographic group and funds capacity-building activities rather than direct hiring or wage subsidies.",
+      "why_existing_dont_fit": "This grant focuses on organizational capacity building and leadership development for women in sport leadership roles, not on hiring new employees, wage subsidies, or youth-specific hiring. While 'Training' applies (score 3), the core purpose is addressing gender equity in leadership advancement, which is distinct from general workforce training and represents a specific equity-focused talent development approach.",
+      "grant_id": "693",
+      "grant_name": "LeadForward ",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "693",
+          "grant_name": "LeadForward "
+        }
+      ]
+    },
+    {
+      "name": "Equity-Deserving Group Hiring",
+      "definition": "Program provides enhanced funding or prioritized support for hiring candidates from equity-deserving groups including women, persons with disabilities, Indigenous peoples, racialized communities, newcomers, and 2SLGBTQIA communities.",
+      "when_to_use": "Use when the program explicitly targets or provides higher funding levels for hiring from underrepresented or equity-deserving populations.",
+      "why_existing_dont_fit": "While 'barriered_youth' captures some disadvantaged groups, this program explicitly names and prioritizes specific equity-deserving communities (women, Indigenous peoples, racialized communities, newcomers, 2SLGBTQIA) with enhanced funding ($15,000 vs $10,000), which is a distinct program design feature beyond general youth barriers. The program is not youth-specific and applies to all ages.",
+      "grant_id": "787",
+      "grant_name": "Canadian Mining Work Placement Program (CMWP)",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "787",
+          "grant_name": "Canadian Mining Work Placement Program (CMWP)"
+        }
+      ]
+    },
+    {
+      "name": "Language/Cultural Skills Development",
+      "definition": "Funding supports language revitalization, cultural education, and skills development programs delivered to community members.",
+      "when_to_use": "Use when the program funds language instruction, cultural training, or community-based skills development activities rather than individual employee hiring or wage subsidies.",
+      "why_existing_dont_fit": "This grant is primarily about delivering language revitalization services and cultural education to First Nations communities. While it includes eligible expenses for salaries and professional development, these are secondary to the core purpose of supporting language reclamation and community cultural programming. The 'Training' genre (score 2) partially applies to professional development components, but the program's primary focus is on delivering language services and cultural revitalization activities to beneficiaries, not on hiring employees or subsidizing wages for individual placements.",
+      "grant_id": "849",
+      "grant_name": "Interim Applications for time-limited funding under Sections 8 & 9 of the Indigenous Languages Act",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "849",
+          "grant_name": "Interim Applications for time-limited funding under Sections 8 & 9 of the Indigenous Languages Act"
+        }
+      ]
+    },
+    {
+      "name": "Cultural Knowledge Transfer",
+      "definition": "Funding supports the revitalization and transmission of traditional cultural practices, knowledge systems, and skills within Indigenous communities.",
+      "when_to_use": "Use when the program prioritizes preserving, documenting, or teaching traditional Indigenous practices, cultural methods, or knowledge systems as part of workforce development.",
+      "why_existing_dont_fit": "While 'Training' captures the skills development component, the program's primary focus is on revitalizing cultural and traditional food production practices and knowledge transfer within Indigenous communities—this goes beyond generic skills training to emphasize cultural preservation and intergenerational knowledge transmission as core outcomes.",
+      "grant_id": "873",
+      "grant_name": "Indigenous Food Systems & Agriculture Skills & Training",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "873",
+          "grant_name": "Indigenous Food Systems & Agriculture Skills & Training"
+        }
+      ]
+    },
+    {
+      "name": "Workplace Innovation & Productivity",
+      "definition": "Funding supports organizational innovation projects that improve workplace practices, technology adoption, and operational efficiency to address labour market challenges.",
+      "when_to_use": "Use when the program funds technology implementation, process improvement, workplace culture initiatives, or systemic changes to address labour demand and productivity rather than direct hiring or individual training.",
+      "why_existing_dont_fit": "This program is fundamentally about organizational innovation and sector-wide solutions to labour challenges, not about hiring individuals, subsidizing wages, or training specific workers. While training is an eligible cost, it is secondary to the primary focus on technology adoption and workplace innovation. The program funds capital projects and systemic improvements, which doesn't align with the individual talent placement focus of the existing 'Building Bench of Talent' genres.",
+      "grant_id": "880",
+      "grant_name": "B.C. Workplace Innovation Fund",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "880",
+          "grant_name": "B.C. Workplace Innovation Fund"
+        }
+      ]
+    },
+    {
+      "name": "Job Creation Impact",
+      "definition": "Program explicitly targets projects that generate significant job creation and economic growth as a measurable outcome.",
+      "when_to_use": "Use when the program prioritizes or requires job creation as a stated objective or success metric, but does not directly fund hiring or wage subsidies.",
+      "why_existing_dont_fit": "The Sector Adoption Program lists 'Generate significant job creation and economic growth' as a core program objective and expected outcome, but funding is directed at technology development, R&D, equipment, and materials—not direct hiring or wage subsidies. The job creation is an anticipated result of sector adoption and commercialization, not a direct funding mechanism. This represents a distinct talent-building outcome that differs from the direct hiring/wage subsidy genres.",
+      "grant_id": "923",
+      "grant_name": "Sector Adoption Program",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "923",
+          "grant_name": "Sector Adoption Program"
+        }
+      ]
+    },
+    {
+      "name": "Mentorship & Business Development",
+      "definition": "Funding supports structured mentoring programs and business development guidance for entrepreneurs or business owners.",
+      "when_to_use": "Use when the program provides mentorship, coaching, or business advisory services as a core component alongside financial support.",
+      "why_existing_dont_fit": "This grant is primarily about mentorship and business development for established entrepreneurs, not about hiring employees, training workers, or targeting youth. The 'training' tag (score 2) captures the skill-building aspect of mentorship, but the program's core focus is on providing structured mentoring relationships and business guidance to help entrepreneurs grow their ventures, which is distinct from workforce training or hiring activities.",
+      "grant_id": "937",
+      "grant_name": "Visa She's Next Grant Program",
+      "count": 1,
+      "example_grants": [
+        {
+          "grant_id": "937",
+          "grant_name": "Visa She's Next Grant Program"
+        }
+      ]
+    }
+  ]
+}

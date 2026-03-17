@@ -1283,3 +1283,6 @@ Then provide the full LinkedIn post following the recommended version's template
 - Each field must be scannable in under 10-15 seconds
 - When in doubt about detail level, err on the side of completeness for complex grants
 </critical_reminders>
+
+## Genre Tagging
+After completing a grant card, apply the genre tagging skill from `.claude/skills/genre-tagging/SKILL.md`. Score the program against all available smart filters and include the genre scores in the output. This replaces manual tagging.

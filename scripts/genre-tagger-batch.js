@@ -121,7 +121,7 @@ Return ONLY valid JSON in this exact format:
 
 async function scoreGrantGenres(grantCriteria, grantName) {
   const response = await anthropic.messages.create({
-    model: 'claude-3-5-haiku-20250122',
+    model: 'claude-haiku-4-5-20251001',
     max_tokens: 1024,
     temperature: 0,
     system: SYSTEM_PROMPT,
@@ -131,15 +131,51 @@ async function scoreGrantGenres(grantCriteria, grantName) {
     }]
   });
 
-  const jsonText = response.content[0].text.trim();
-  const result = JSON.parse(jsonText);
+  let text = response.content[0].text.trim();
 
-  return {
-    scores: result.scores,
-    proposed_genre: result.proposed_genre,
-    input_tokens: response.usage.input_tokens,
-    output_tokens: response.usage.output_tokens
-  };
+  // Strip markdown code fences if present (be flexible with whitespace)
+  if (text.startsWith('```')) {
+    // Remove opening fence: ```json or ``` with optional whitespace/newlines
+    text = text.replace(/^```[a-z]*\s*/, '');
+    // Remove closing fence: ``` with optional whitespace/newlines at end
+    text = text.replace(/\s*```\s*$/, '');
+    text = text.trim();
+  }
+
+  // Extract JSON object - find first { and matching }
+  const startIndex = text.indexOf('{');
+  if (startIndex === -1) {
+    throw new Error('No JSON object found in response');
+  }
+
+  let braceCount = 0;
+  let endIndex = -1;
+  for (let i = startIndex; i < text.length; i++) {
+    if (text[i] === '{') braceCount++;
+    if (text[i] === '}') braceCount--;
+    if (braceCount === 0) {
+      endIndex = i + 1;
+      break;
+    }
+  }
+
+  const jsonText = text.substring(startIndex, endIndex);
+
+  try {
+    const result = JSON.parse(jsonText);
+
+    return {
+      scores: result.scores,
+      proposed_genre: result.proposed_genre,
+      input_tokens: response.usage.input_tokens,
+      output_tokens: response.usage.output_tokens
+    };
+  } catch (parseError) {
+    console.error('\n❌ JSON Parse Error:');
+    console.error('Raw response:', text);
+    console.error('Extracted JSON:', jsonText);
+    throw parseError;
+  }
 }
 
 function calculateAssociationScore(scores) {

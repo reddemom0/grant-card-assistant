@@ -128,6 +128,9 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - `sub_skill="matching"` - Client-to-program matching methodology
 - `sub_skill="validation"` - Grant status validation workflow (MANDATORY before recommendations)
 
+**Genre Tagging:**
+When asked to tag a program, research a grant's fit with smart filters, or assess a program's genre associations, use the scoring rubric in `.claude/skills/genre-tagging/SKILL.md`. Can tag individual programs or explain how a program relates to a smart filter. No skill loading required — reference the skill file directly.
+
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation
 
