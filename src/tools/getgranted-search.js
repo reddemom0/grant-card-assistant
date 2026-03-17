@@ -183,7 +183,8 @@ export async function searchGetGranted(input) {
       exclusion_reason: grant.exclusion_reason,
       keyword_score: grant.keyword_score,
       intake_cycle: grant.intake_cycle,
-      smart_tags: grant.smart_tags
+      smart_tags: grant.smart_tags,
+      genre_scores: grant.genre_scores
     }));
 
     // Build result
@@ -255,7 +256,8 @@ export async function searchGetGranted(input) {
           exclusion_reason: grant.exclusion_reason,
           keyword_score: grant.keyword_score,
           intake_cycle: grant.intake_cycle,
-          smart_tags: grant.smart_tags
+          smart_tags: grant.smart_tags,
+          genre_scores: grant.genre_scores
         }));
 
         result = {

@@ -175,7 +175,7 @@ async function searchGrants({
         max_spend, contribution_percentage, difficulty,
         grant_criteria, best_practices, recently_changed,
         last_updated, is_active, currently_accepting, exclusion_reason,
-        smart_tags,
+        smart_tags, genre_scores,
         ${keywordScoreExpr} AS keyword_score
       FROM grants
       ${whereClause}

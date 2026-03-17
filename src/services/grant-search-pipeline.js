@@ -7,23 +7,54 @@
 
 import { categorizeProspect } from './grant-categorization.js';
 
-// Map search categories to expected smart_tags intents and genres
+// Map search categories to relevant smart filters (for genre_scores ranking)
+const CATEGORY_TO_SMART_FILTER_MAP = {
+  'Hiring Programs': ['Building Bench of Talent'],
+  'Training Programs': ['Building Bench of Talent', 'Improve Productivity'],
+  'Market Expansion Programs': ['International Growth', 'Domestic Growth'],
+  'R&D Programs': ['Build Something New', 'Adopt Software or AI'],
+  'General Industry Programs': [] // Use industry-based mapping for general searches
+};
+
+// DEPRECATED: Legacy smart_tags mapping (kept for fallback only)
+// This is now only used when genre_scores is not available
 const CATEGORY_TAG_MAP = {
   'Hiring Programs': {
-    intents: ['Talent'],
-    genres: ['Wage Subsidy', 'Student/Co-op Hire', 'Youth Hire', 'Apprenticeship', 'Internship', 'General Hiring']
+    intents: ['Talent', 'Growth'],
+    genres: [
+      'Wage Subsidy',           // 167 programs
+      'Youth Hire',             // 70 programs
+      'Internship',             // 67 programs
+      'Student/Co-op Hire',     // 40 programs
+      'General Hiring',         // 31 programs
+      'Apprenticeship',         // 14 programs
+      'Skills Training',        // 99 programs (overlap with training)
+      'Technical Training',     // 33 programs (overlap with training)
+      'Leadership Development', // 11 programs
+      'Digital Literacy'        // 9 programs
+    ]
   },
   'Training Programs': {
     intents: ['Talent', 'Operations'],
-    genres: ['Skills Training', 'Technical Training', 'Leadership Development', 'Health & Safety Certification', 'Digital Literacy']
+    genres: [
+      'Skills Training',        // 109 programs
+      'Technical Training',     // 43 programs
+      'Leadership Development', // 10 programs
+      'Digital Literacy',       // 11 programs
+      'Health & Safety Certification', // 3 programs
+      'Apprenticeship',         // 8 programs
+      'Wage Subsidy',           // 61 programs (overlap with hiring)
+      'Youth Hire',             // 34 programs (overlap with hiring)
+      'Internship'              // 29 programs (overlap with hiring)
+    ]
   },
   'Market Expansion Programs': {
     intents: ['Markets', 'Markets_Domestic', 'Growth'],
-    genres: ['Export', 'Trade Show', 'Market Research', 'International Marketing', 'Foreign Certification', 'Commercialization', 'Scale-up']
+    genres: ['Export', 'Trade Show', 'Market Research', 'International Marketing', 'Foreign Certification', 'Commercialization', 'Scale-up', 'Market Analysis']
   },
   'R&D Programs': {
-    intents: ['Innovation'],
-    genres: ['R&D', 'Prototype Development', 'Product Testing', 'IP Protection', 'Pilot Projects', 'Feasibility Studies']
+    intents: ['Innovation', 'Technology'],
+    genres: ['R&D', 'Prototype Development', 'Product Testing', 'IP Protection', 'Pilot Projects', 'Feasibility Studies', 'AI/ML Integration', 'Automation', 'Cloud Migration']
   },
   'General Industry Programs': {
     intents: [],  // no intent boost for general
@@ -328,7 +359,8 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
 
     console.log(`  ✅ After amount filtering: ${filteredPrograms.length} programs`);
 
-    // DEBUG: Check if smart_tags exist in first program
+    // DEBUG: Check if genre_scores and smart_tags exist in first program
+    console.log(`🔍 DEBUG: First program genre_scores:`, filteredPrograms[0]?.genre_scores ? 'EXISTS' : 'NULL');
     console.log(`🔍 DEBUG: First program smart_tags:`, filteredPrograms[0]?.smart_tags ? 'EXISTS' : 'NULL');
     console.log(`🔍 DEBUG: First program grant_name:`, filteredPrograms[0]?.grant_name);
     console.log(`🔍 DEBUG: First program search_origin:`, filteredPrograms[0]?.search_origin);
@@ -365,45 +397,82 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
         score += 1;
       }
 
-      // ── SMART TAGS SCORING ────────────────────────────────────────────────────
+      // ── GENRE SCORES RANKING ──────────────────────────────────────────────────
+      // Use AI-scored genre associations from genre_scores column
+      // Falls back to legacy smart_tags if genre_scores is unavailable
 
-      const tags = program.smart_tags;
+      const genreScores = program.genre_scores;
       const searchOrigin = program.search_origin || 'General Industry Programs';
-      const expectedTags = CATEGORY_TAG_MAP[searchOrigin] || CATEGORY_TAG_MAP['General Industry Programs'];
-      let tagBoost = 0;
+      let genreBoostApplied = 0;
 
-      if (tags) {
-        // +5 for primary intent match
-        if (expectedTags.intents.length > 0 && tags.primary_intents) {
-          const intentMatch = tags.primary_intents.some(i => expectedTags.intents.includes(i));
-          if (intentMatch) {
-            tagBoost += 5;
+      if (genreScores && genreScores.association_scores) {
+        // Get relevant smart filters for this search category
+        const relevantFilters = CATEGORY_TO_SMART_FILTER_MAP[searchOrigin] || [];
+
+        if (relevantFilters.length > 0) {
+          // Calculate average association percentage across relevant filters
+          const associations = relevantFilters
+            .map(filter => genreScores.association_scores[filter]?.association_pct || 0);
+
+          const avgAssociation = associations.reduce((sum, pct) => sum + pct, 0) / associations.length;
+
+          // Convert percentage to boost: 70% → +7, 30% → +3, 0% → +0
+          genreBoostApplied = Math.round(avgAssociation / 10);
+          score += genreBoostApplied;
+
+          if (genreBoostApplied > 0) {
+            const filterDetails = relevantFilters
+              .map(filter => `${filter}: ${genreScores.association_scores[filter]?.association_pct || 0}%`)
+              .join(', ');
+            console.log(`      Genre score boost: +${genreBoostApplied} for "${program.grant_name}" (avg ${Math.round(avgAssociation)}% across ${filterDetails})`);
           }
         }
+      } else {
+        // FALLBACK: Use legacy smart_tags scoring if genre_scores not available
+        const tags = program.smart_tags;
+        const expectedTags = CATEGORY_TAG_MAP[searchOrigin] || CATEGORY_TAG_MAP['General Industry Programs'];
 
-        // +2 per genre match, up to +6
-        if (expectedTags.genres.length > 0 && tags.genres) {
-          const genreMatches = tags.genres.filter(g => expectedTags.genres.includes(g)).length;
-          const genreBoost = Math.min(genreMatches * 2, 6);
-          tagBoost += genreBoost;
-        }
+        let intentBoostApplied = 0;
+        let fundingBoostApplied = 0;
 
-        // +2-4 for max_funding_numeric (logarithmic boost — $50K scores higher than $5K)
-        if (tags.max_funding_numeric && tags.max_funding_numeric > 0) {
-          const fundingBoost = Math.min(Math.floor(Math.log10(tags.max_funding_numeric)), 4);
-          tagBoost += fundingBoost;
-        }
+        if (tags) {
+          // +5 for primary intent match (INDEPENDENT)
+          if (expectedTags.intents.length > 0 && tags.primary_intents) {
+            const intentMatch = tags.primary_intents.some(i => expectedTags.intents.includes(i));
+            if (intentMatch) {
+              intentBoostApplied = 5;
+              score += intentBoostApplied;
+            }
+          }
 
-        if (tagBoost > 0) {
-          score += tagBoost;
-          const intentMatch = tags.primary_intents && expectedTags.intents.some(i => tags.primary_intents.includes(i));
-          const genreMatches = tags.genres ? tags.genres.filter(g => expectedTags.genres.includes(g)).length : 0;
-          console.log(`      Smart tag boost: +${tagBoost} for "${program.grant_name}" (intents: ${intentMatch}, genres: ${genreMatches})`);
+          // +2 per genre match, up to +6 (INDEPENDENT - applies even without intent match)
+          if (expectedTags.genres.length > 0 && tags.genres) {
+            const genreMatches = tags.genres.filter(g => expectedTags.genres.includes(g)).length;
+            if (genreMatches > 0) {
+              genreBoostApplied = Math.min(genreMatches * 2, 6);
+              score += genreBoostApplied;
+            }
+          }
+
+          // +2-4 for max_funding_numeric (INDEPENDENT - logarithmic boost)
+          if (tags.max_funding_numeric && tags.max_funding_numeric > 0) {
+            fundingBoostApplied = Math.min(Math.floor(Math.log10(tags.max_funding_numeric)), 4);
+            score += fundingBoostApplied;
+          }
+
+          // Log all boosts (even if some are 0)
+          const totalTagBoost = intentBoostApplied + genreBoostApplied + fundingBoostApplied;
+          if (totalTagBoost > 0) {
+            const genreMatches = tags.genres ? tags.genres.filter(g => expectedTags.genres.includes(g)).length : 0;
+            const matchedGenres = tags.genres ? tags.genres.filter(g => expectedTags.genres.includes(g)) : [];
+            console.log(`      [FALLBACK] Smart tag boost: +${totalTagBoost} for "${program.grant_name}" (intent: +${intentBoostApplied}, genre: +${genreBoostApplied} [${genreMatches} matches: ${matchedGenres.join(', ') || 'none'}], funding: +${fundingBoostApplied})`);
+          }
         }
       }
 
       // ── INTENT HIERARCHY BONUS ────────────────────────────────────────────────
 
+      const tags = program.smart_tags;
       if (tags && tags.primary_intents && Array.isArray(tags.primary_intents)) {
         let intentBonus = 0;
         let topIntent = null;
