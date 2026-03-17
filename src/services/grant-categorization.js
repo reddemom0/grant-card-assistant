@@ -427,7 +427,7 @@ Return ONLY a JSON object with this structure:
 Only include filters with weight 1 or 2. Be selective - most businesses should have 2-4 filters, not all 11.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-20250514',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       temperature: 0,
       messages: [{

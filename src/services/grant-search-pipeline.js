@@ -189,7 +189,7 @@ function applyDiversityCap(scoredPrograms, maxPerFamily = 3, topN = 10) {
 export async function runFocusedSearch(categorization, searchFunction, conversationId, prospectData = null) {
   console.log('\n🔍 RUNNING FOCUSED SEARCH');
   console.log(`  Conversation: ${conversationId}`);
-  console.log(`  Categories to search: ${categorization.grant_categories_to_search.join(', ')}`);
+  console.log(`  Categories to search: ${categorization.grant_categories_to_search ? categorization.grant_categories_to_search.join(', ') : 'None'}`);
   console.log(`  Smart filter weights: ${categorization.smart_filter_weights ? JSON.stringify(categorization.smart_filter_weights) : 'Not available (using legacy mapping)'}`);
 
   const searchParams = categorization.search_parameters;

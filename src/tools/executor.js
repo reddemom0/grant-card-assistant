@@ -747,10 +747,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             const prospectData = await buildProspectDataFromSession(conversationId);
 
             if (prospectData) {
-              // Step 2: Categorize prospect
+              // Step 2: Categorize prospect (async - includes AI smart filter mapping)
               // Note: categorizeProspect() handles missing industry by defaulting to Group 1
               console.log('  🏷️  Running categorization...');
-              categorization = categorizeProspect(prospectData);
+              categorization = await categorizeProspect(prospectData);
 
               if (categorization) {
                 // Step 3: Run focused search using categorization
