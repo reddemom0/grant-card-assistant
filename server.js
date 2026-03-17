@@ -1016,6 +1016,68 @@ async function startServer() {
       console.warn('⚠️  Migration 018 failed (non-fatal):', migrationError.message);
     }
 
+    // ── Migration 019: Add genre_scores column ───────────────────────────────
+    console.log('🔧 Running migration 019: Add genre_scores column...');
+    try {
+      const { query } = await import('./src/database/connection.js');
+      await query(`
+        ALTER TABLE grants
+        ADD COLUMN IF NOT EXISTS genre_scores JSONB DEFAULT NULL
+      `);
+      await query(`
+        CREATE INDEX IF NOT EXISTS idx_grants_genre_scores
+        ON grants USING gin(genre_scores)
+      `);
+      console.log('✅ Migration 019 complete (or already applied)');
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 019 failed (non-fatal):', migrationError.message);
+    }
+
+    // ── Migration 020: Import genre_scores data ──────────────────────────────
+    console.log('🔧 Running migration 020: Import genre_scores data...');
+    try {
+      const { query } = await import('./src/database/connection.js');
+
+      // Check if genre scores are already imported (need at least 440 of ~445)
+      const checkResult = await query('SELECT COUNT(genre_scores) as scored, COUNT(*) as total FROM grants');
+      const alreadyScored = parseInt(checkResult.rows[0].scored);
+      const totalGrants = parseInt(checkResult.rows[0].total);
+
+      if (alreadyScored >= 440) {
+        console.log(`✅ Migration 020 already applied (${alreadyScored}/${totalGrants} grants scored)`);
+      } else {
+        console.log(`📊 Found ${alreadyScored}/${totalGrants} grants already scored - importing remaining...`);
+        // Import genre scores from JSON export
+        const { readFileSync } = await import('fs');
+        const genreData = JSON.parse(readFileSync('./data/genre-scores-all.json', 'utf8'));
+
+        console.log(`📥 Importing ${genreData.total_scored} genre_scores...`);
+
+        let imported = 0;
+        for (const result of genreData.results) {
+          // Store both detailed scores and association_scores in the genre_scores column
+          const genreScoresData = {
+            scores: result.scores,
+            association_scores: result.association_scores,
+            scored_at: result.scored_at
+          };
+
+          await query(
+            'UPDATE grants SET genre_scores = $1 WHERE grant_id = $2',
+            [genreScoresData, result.grant_id]
+          );
+          imported++;
+          if (imported % 100 === 0) {
+            console.log(`   Progress: ${imported}/${genreData.total_scored}`);
+          }
+        }
+
+        console.log(`✅ Migration 020 complete (imported ${imported} genre scores)`);
+      }
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 020 failed (non-fatal):', migrationError.message);
+    }
+
     // Start Express server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n' + '='.repeat(80));
