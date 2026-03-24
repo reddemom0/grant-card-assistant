@@ -1730,7 +1730,7 @@ export async function finalizeInactiveSessions(inactivityMinutes = 5, batchSize 
        WHERE finalized = FALSE
          AND last_activity_at < NOW() - INTERVAL '${inactivityMinutes} minutes'
          AND prospect_data->>'company_name' IS NOT NULL
-         AND message_count >= 3
+         AND message_count >= 1
        ORDER BY last_activity_at ASC
        LIMIT $1`,
       [batchSize]
