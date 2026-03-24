@@ -274,9 +274,9 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
       try {
         const { searchByGenreScores } = await import('../../scripts/create-search-function.js');
 
-        // Use raw Haiku-extracted industry (e.g., "Cosmetics / Retail / Beauty")
-        // instead of matched_industry (which could be "Other")
-        // This preserves tokens like "Tech / SaaS / EdTech" for partial matching
+        // Use form dropdown industry selection (e.g., "Tech - Software/Web Development", "Retail")
+        // Form vocabulary matches grant database vocabulary exactly
+        // Falls back to matched_industry if form value not available
         const rawIndustry = categorization.raw_industry || prospectData?.industry || categorization.matched_industry;
 
         const genreResults = await searchByGenreScores(

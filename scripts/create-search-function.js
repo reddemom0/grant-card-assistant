@@ -248,30 +248,20 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
 
     // Build industry filter clause
     let industryClause = '';
-    let industryTokens = [];
 
     if (industry && industry.trim() !== '') {
-      // Split industry on common delimiters: /, comma, &
-      const rawTokens = industry.split(/[\/,&]/).map(t => t.trim()).filter(t => t.length > 0);
-      industryTokens = [...new Set(rawTokens)]; // Deduplicate
+      console.log(`  🏭 Industry filter: "${industry}"`);
 
-      if (industryTokens.length > 0) {
-        console.log(`  🏭 Industry filter: [${industryTokens.join(', ')}]`);
+      // Use exact form dropdown value (e.g., "Tech - Software/Web Development", "Retail")
+      // Form vocabulary matches grant database vocabulary exactly
+      const industryParamIdx = provinces.length + 12;
 
-        // Build OR conditions for industry matching
-        // Start index after provinces (1..provinces.length) and weights (provinces.length+1..provinces.length+11)
-        const industryStartIdx = provinces.length + 12;
-        const industryConditions = industryTokens.map((_, idx) =>
-          `industries ILIKE $${industryStartIdx + idx}`
-        ).join(' OR ');
-
-        industryClause = `AND (
-          industries ILIKE '%All Industries%'
-          OR industries IS NULL
-          OR industries = ''
-          OR ${industryConditions}
-        )`;
-      }
+      industryClause = `AND (
+        industries ILIKE '%All Industries%'
+        OR industries IS NULL
+        OR industries = ''
+        OR industries ILIKE $${industryParamIdx}
+      )`;
     }
 
     const sql = `
@@ -298,7 +288,7 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
         AND ${provinceClause}
         ${industryClause}
       ORDER BY relevance_score DESC
-      LIMIT $${provinces.length + 12 + industryTokens.length}
+      LIMIT $${provinces.length + 12 + (industry && industry.trim() !== '' ? 1 : 0)}
     `;
 
     const params = [
@@ -313,10 +303,15 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
       weights['Improve Productivity'],
       weights['Commercialize or Scale'],
       weights['Planning or Readiness Support'],
-      weights['Grants for Startups'],
-      ...industryTokens.map(token => `%${token}%`), // Industry tokens with wildcards
-      maxResults
+      weights['Grants for Startups']
     ];
+
+    // Add industry parameter if filter is active
+    if (industry && industry.trim() !== '') {
+      params.push(`%${industry}%`); // Exact form value with wildcards for ILIKE matching
+    }
+
+    params.push(maxResults);
 
     const result = await client.query(sql, params);
     client.release();

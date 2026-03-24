@@ -76,8 +76,9 @@ async function buildProspectDataFromSession(conversationId) {
 
     // Map form data to categorization input format
     const data = {
-      // Industry (prioritize Haiku extraction over form-provided)
-      industry: companyBackground.industry || prospectData.industry || null,
+      // Industry (prioritize form dropdown selection over Haiku extraction)
+      // Form uses exact grant vocabulary like "Tech - Software/Web Development", "Retail"
+      industry: prospectData.industry || companyBackground.industry || null,
 
       // Province (normalize to code: "British Columbia" → "BC")
       province: normalizeProvince(prospectData.province) || 'ON',
