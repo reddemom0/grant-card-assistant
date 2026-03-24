@@ -224,6 +224,7 @@
   let showingForm = false; // Track if form is currently displayed
   let currentPage = 1; // Form page state (1 or 2)
   let hasReceivedFirstMessage = false; // Track first agent message for quick actions
+  let lastSuggestions = []; // Store parsed suggestions from agent's last response
 
   // ============================================================================
   // UTILITY FUNCTIONS
@@ -277,9 +278,33 @@
     return escapeHtml(text).replace(/\n/g, '<br>');
   }
 
+  function parseSuggestions(html) {
+    // Parse and extract suggestions metadata from agent response
+    // Format: <!--suggestions:["q1","q2","q3"]-->
+    const suggestionRegex = /<!--suggestions:\s*(\[.*?\])\s*-->/;
+    const match = html.match(suggestionRegex);
+
+    if (match && match[1]) {
+      try {
+        const suggestions = JSON.parse(match[1]);
+        if (Array.isArray(suggestions)) {
+          lastSuggestions = suggestions;
+          // Remove the suggestions metadata from the text
+          return html.replace(suggestionRegex, '');
+        }
+      } catch (e) {
+        console.error('Failed to parse suggestions:', e);
+      }
+    }
+
+    return html;
+  }
+
   function formatAssistantMessage(html) {
     // Assistant messages may contain safe HTML like <strong>, <br>, <a>
-    // Sanitize but don't escape - allow whitelisted tags to render
+    // First parse and remove suggestions metadata
+    html = parseSuggestions(html);
+    // Then sanitize but don't escape - allow whitelisted tags to render
     return sanitizeHtml(html).replace(/\n/g, '<br>');
   }
 
@@ -588,6 +613,36 @@
           }
           40% {
             transform: scale(1);
+          }
+        }
+
+        .gg-loading-dots {
+          display: inline-block;
+        }
+
+        .gg-loading-dots span {
+          animation: loadingFade 1.4s infinite;
+          opacity: 0;
+        }
+
+        .gg-loading-dots span:nth-child(1) {
+          animation-delay: 0s;
+        }
+
+        .gg-loading-dots span:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+
+        .gg-loading-dots span:nth-child(3) {
+          animation-delay: 0.4s;
+        }
+
+        @keyframes loadingFade {
+          0%, 100% {
+            opacity: 0;
+          }
+          50% {
+            opacity: 1;
           }
         }
 
@@ -1578,7 +1633,9 @@
     loadingDiv.id = 'gg-estimate-loading';
     loadingDiv.innerHTML = `
       <div class="gg-message-avatar">G</div>
-      <div class="gg-message-content">Crunching your numbers — one moment...</div>
+      <div class="gg-message-content">
+        Crunching your numbers<span class="gg-loading-dots"><span>.</span><span>.</span><span>.</span></span>
+      </div>
     `;
     return loadingDiv;
   }
@@ -1605,23 +1662,14 @@
     const quickActionsContainer = shadowRoot?.querySelector('.gg-quick-actions');
     if (!quickActionsContainer) return;
 
-    // Generate post-estimate conversation starters based on form data
-    const actions = [];
-    const hiringPlans = formData?.hiring_plans;
-
-    // Only show hiring-related quick actions if actively hiring
-    if (hiringPlans && hiringPlans !== "Not hiring right now") {
-      actions.push("How do the hiring subsidies work?");
-      actions.push("What about co-op students?");
+    // Use dynamically parsed suggestions from agent's response
+    // If no suggestions were parsed, don't show any quick actions
+    if (!lastSuggestions || lastSuggestions.length === 0) {
+      quickActionsContainer.innerHTML = '';
+      return;
     }
 
-    // Always show timing and service tier questions
-    actions.push("Tell me about the timing");
-    actions.push("What does Granted Starter include?");
-
-    if (actions.length === 0) return;
-
-    quickActionsContainer.innerHTML = actions
+    quickActionsContainer.innerHTML = lastSuggestions
       .map(action => `<button class="gg-quick-action">${escapeHtml(action)}</button>`)
       .join('');
 
@@ -1801,9 +1849,8 @@
         inputField.focus();
       }
 
-      // Show quick actions after first agent message (post-estimate)
-      if (!hasReceivedFirstMessage && assistantText) {
-        hasReceivedFirstMessage = true;
+      // Show quick actions after every agent message (using parsed suggestions)
+      if (assistantText) {
         setTimeout(() => {
           showQuickActions();
         }, 500); // Small delay for smoother UX
