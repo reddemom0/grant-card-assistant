@@ -206,6 +206,50 @@ async function searchGrants({
 }
 
 /**
+ * Form dropdown values to database industry string mapping
+ * Only includes values that don't match - matching values pass through as-is
+ *
+ * Based on comprehensive comparison between widget dropdown (81 values) and
+ * database industries (78 values):
+ * - 54 exact matches (pass through)
+ * - 8 non-matches with minor formatting differences
+ * - 19 form values not in DB (suffix → prefix format for Manufacturing/Tech)
+ * - 16 DB values not in form (orphaned values like "All Industries")
+ */
+const INDUSTRY_FORM_TO_DB = {
+  // Minor formatting differences (/ vs &, capitalization)
+  'Charity/Non-Profit': 'Charity/Non-profit',
+  'Restaurants/Cafes': 'Restaurants & Cafes',
+  'Construction Supplier': 'Construction - Supplier',
+  'Logistics/Trucking': 'Logistics & Trucking',
+  'Mining/Quarrying': 'Mining & Quarrying',
+  'Ship Building & Repair/Maritime Operations': 'Ship Building/Repair & Maritime Operations',
+  'E-Commerce': 'E-commerce',
+
+  // Tech industries: form suffix format → DB prefix format
+  'Tech - Software/Web Development': 'Tech - Software & Web Development',
+  'Video Games': 'Tech - Video Game',
+  'Computer/Network Security': 'Tech - Computer Network Security',
+  'Tech - Hardware': 'Tech - Technology Hardware',
+  'Biotechnology': 'Tech - Biotechnology',
+  'Animation': 'Tech - Animation',
+
+  // Manufacturing industries: form suffix format → DB prefix format
+  'Apparel/Textiles (Manufacturing)': 'Manufacturing - Apparel/Textiles',
+  'Food/Beverage (Manufacturing)': 'Manufacturing - Food & Beverage',
+  'Consumer Goods (Manufacturing)': 'Manufacturing - Consumer Goods',
+  'Electronic (Manufacturing)': 'Manufacturing - Electronic',
+  'Industrial (Manufacturing)': 'Manufacturing - Industrial',
+  'Metal (Manufacturing)': 'Manufacturing - Metal',
+  'Paper/Print (Manufacturing)': 'Manufacturing - Paper/Print',
+  'Plastics (Manufacturing)': 'Manufacturing - Plastics',
+  'Wood Products (Manufacturing)': 'Manufacturing - Wood Products',
+
+  // Wellness
+  'Wellness - Fitness': 'Wellness - Fitness/Yoga/Pilates'
+};
+
+/**
  * Search grants by genre scores (AI-powered relevance ranking)
  *
  * @param {string} province - Province/territory filter
@@ -250,17 +294,20 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
     let industryClause = '';
 
     if (industry && industry.trim() !== '') {
-      console.log(`  🏭 Industry filter: "${industry}"`);
+      // Translate form dropdown value to database format
+      const dbIndustry = INDUSTRY_FORM_TO_DB[industry] || industry;
 
-      // Use exact form dropdown value (e.g., "Tech - Software/Web Development", "Retail")
-      // Form vocabulary matches grant database vocabulary exactly
+      console.log(`  🏭 Industry filter: "${industry}" → "${dbIndustry}"`);
+
       const industryParamIdx = provinces.length + 12;
 
+      // Check both raw industries field AND cleaned version (strips "Industries\n      " prefix)
       industryClause = `AND (
         industries ILIKE '%All Industries%'
         OR industries IS NULL
         OR industries = ''
         OR industries ILIKE $${industryParamIdx}
+        OR REPLACE(industries, E'Industries\\n      ', '') ILIKE $${industryParamIdx}
       )`;
     }
 
