@@ -529,32 +529,29 @@ export async function categorizeProspect(prospectData) {
   const tierResult = determineTier(prospectData, industryResolution.group);
   console.log(`✅ Service tier: ${tierResult.tier} (${tierResult.reasoning})`);
 
-  // DEBUG: Check what values we're receiving for flag checks
-  console.log('🔍 DEBUG FLAGS: employee_count =', JSON.stringify(prospectData.employee_count), '| training_budget =', JSON.stringify(prospectData.training_budget), '| expansion_budget =', JSON.stringify(prospectData.expansion_budget));
-
   // Step 4.5: Check for high-volume flag (high employee count + significant training budget)
-  const highEmployeeCounts = ['50 – 99', '100 – 499', '500+'];
-  const significantTrainingBudgets = ['$10K – $25K', '$25K – $50K', '$50K – $100K', '$100K+'];
+  // Note: prospectData uses transformed field names from buildProspectDataFromSession:
+  // - num_ftes (number) instead of employee_count (string)
+  // - annual_training_spend (number) instead of training_budget (string)
+  // - international_market_spend (number) instead of expansion_budget (string)
 
   const highVolumeFlag =
-    highEmployeeCounts.includes(prospectData.employee_count) &&
-    significantTrainingBudgets.includes(prospectData.training_budget);
+    (prospectData.num_ftes >= 50) &&
+    (prospectData.annual_training_spend >= 10000);
 
   let highVolumeFlagNote = null;
   if (highVolumeFlag) {
     highVolumeFlagNote = "High employee count with significant training budget — verify if 3 Starter tokens are sufficient before confirming tier.";
-    console.log(`⚠️  High-volume flag: ${highVolumeFlagNote}`);
+    console.log(`⚠️  High-volume flag: ${highVolumeFlagNote} (${prospectData.num_ftes} FTEs, $${prospectData.annual_training_spend} training)`);
   }
 
   // Step 4.6: Check for high market expansion budget flag
-  const highExpansionBudgets = ['$25K – $50K', '$50K – $100K', '$100K+'];
-
-  const highMeBudgetFlag = highExpansionBudgets.includes(prospectData.expansion_budget);
+  const highMeBudgetFlag = (prospectData.international_market_spend >= 25000);
 
   let highMeBudgetFlagNote = null;
   if (highMeBudgetFlag) {
     highMeBudgetFlagNote = "High market expansion budget — suggest booking a call for market expansion planning. Could lead to CanExport engagement or Granted Export service.";
-    console.log(`⚠️  High ME budget flag: ${highMeBudgetFlagNote}`);
+    console.log(`⚠️  High ME budget flag: ${highMeBudgetFlagNote} ($${prospectData.international_market_spend} expansion budget)`);
   }
 
   // Step 5: Assign consultant (if Pro tier)
