@@ -137,50 +137,49 @@ export async function handleListLeadGenConversations(req, res) {
  */
 export async function handleLeadGenStats(req, res) {
   try {
-    // Total sessions today
-    const todayResult = await query(`
-      SELECT COUNT(*) as count
-      FROM lead_gen_conversations
-      WHERE created_at >= CURRENT_DATE
-    `);
-
-    // Total sessions this week (last 7 days)
-    const weekResult = await query(`
-      SELECT COUNT(*) as count
-      FROM lead_gen_conversations
-      WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
-    `);
-
-    // Average messages per session
-    const avgMessagesResult = await query(`
-      SELECT ROUND(AVG(message_count), 1) as avg_messages
-      FROM lead_gen_conversations
-      WHERE message_count > 0
-    `);
-
-    // Conversion rate (sessions with CTA / total sessions)
-    const conversionResult = await query(`
+    // Funnel metrics - all from single query for consistency
+    const funnelResult = await query(`
       SELECT
         COUNT(*) as total_sessions,
-        COUNT(CASE WHEN cta_selected IS NOT NULL AND cta_selected != 'none' THEN 1 END) as with_cta
+        COUNT(CASE WHEN estimated_funding IS NOT NULL THEN 1 END) as estimates_delivered,
+        COUNT(CASE WHEN cta_selected IS NOT NULL AND cta_selected != 'none' THEN 1 END) as cta_taken,
+        COUNT(CASE WHEN cta_selected = 'book_call' THEN 1 END) as calls_booked,
+        COUNT(CASE WHEN cta_selected = 'email_summary' THEN 1 END) as emails_sent
       FROM lead_gen_conversations
     `);
 
-    const totalSessions = parseInt(conversionResult.rows[0].total_sessions, 10);
-    const withCta = parseInt(conversionResult.rows[0].with_cta, 10);
-    const conversionRate = totalSessions > 0
-      ? Math.round((withCta / totalSessions) * 100)
+    const totalSessions = parseInt(funnelResult.rows[0].total_sessions, 10);
+    const estimatesDelivered = parseInt(funnelResult.rows[0].estimates_delivered, 10);
+    const ctaTaken = parseInt(funnelResult.rows[0].cta_taken, 10);
+    const callsBooked = parseInt(funnelResult.rows[0].calls_booked, 10);
+    const emailsSent = parseInt(funnelResult.rows[0].emails_sent, 10);
+
+    // Calculate percentages (% of previous step)
+    const estimateRate = totalSessions > 0
+      ? Math.round((estimatesDelivered / totalSessions) * 100)
+      : 0;
+    const ctaRate = estimatesDelivered > 0
+      ? Math.round((ctaTaken / estimatesDelivered) * 100)
+      : 0;
+    const callRate = ctaTaken > 0
+      ? Math.round((callsBooked / ctaTaken) * 100)
+      : 0;
+    const emailRate = ctaTaken > 0
+      ? Math.round((emailsSent / ctaTaken) * 100)
       : 0;
 
     return res.json({
       success: true,
       stats: {
-        total_today: parseInt(todayResult.rows[0].count, 10),
-        total_week: parseInt(weekResult.rows[0].count, 10),
-        avg_messages: parseFloat(avgMessagesResult.rows[0].avg_messages) || 0,
-        conversion_rate: conversionRate,
         total_sessions: totalSessions,
-        with_cta: withCta
+        estimates_delivered: estimatesDelivered,
+        estimate_rate: estimateRate,
+        cta_taken: ctaTaken,
+        cta_rate: ctaRate,
+        calls_booked: callsBooked,
+        call_rate: callRate,
+        emails_sent: emailsSent,
+        email_rate: emailRate
       }
     });
   } catch (err) {

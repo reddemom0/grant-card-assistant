@@ -72,6 +72,12 @@
       color: #1a2332;
     }
 
+    .stat-subtitle {
+      font-size: 13px;
+      color: #6d7881;
+      margin-top: 4px;
+    }
+
     /* Filters */
     .filters {
       background: #fff;
@@ -300,23 +306,31 @@
       <p class="subtitle">Monitor and analyze lead generation chatbot conversations</p>
     </header>
 
-    <!-- Stats Bar -->
+    <!-- Stats Bar - Funnel -->
     <div class="stats-bar">
       <div class="stat-card">
-        <div class="stat-label">Today</div>
-        <div class="stat-value" id="stat-today">-</div>
+        <div class="stat-label">Sessions</div>
+        <div class="stat-value" id="stat-sessions">-</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">This Week</div>
-        <div class="stat-value" id="stat-week">-</div>
+        <div class="stat-label">Estimates Delivered</div>
+        <div class="stat-value" id="stat-estimates">-</div>
+        <div class="stat-subtitle" id="stat-estimates-pct">-</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Avg Messages</div>
-        <div class="stat-value" id="stat-avg">-</div>
+        <div class="stat-label">CTA Taken</div>
+        <div class="stat-value" id="stat-cta">-</div>
+        <div class="stat-subtitle" id="stat-cta-pct">-</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Conversion Rate</div>
-        <div class="stat-value" id="stat-conversion">-</div>
+        <div class="stat-label">Calls Booked</div>
+        <div class="stat-value" id="stat-calls">-</div>
+        <div class="stat-subtitle" id="stat-calls-pct">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Emails Sent</div>
+        <div class="stat-value" id="stat-emails">-</div>
+        <div class="stat-subtitle" id="stat-emails-pct">-</div>
       </div>
     </div>
 
@@ -373,7 +387,9 @@
           <tr>
             <th>Date</th>
             <th>Company</th>
+            <th>Industry</th>
             <th>Province</th>
+            <th>Revenue</th>
             <th>Employees</th>
             <th>Estimate</th>
             <th>Tier</th>
@@ -384,7 +400,7 @@
         </thead>
         <tbody id="conversations-table">
           <tr>
-            <td colspan="9" class="loading">Loading conversations...</td>
+            <td colspan="11" class="loading">Loading conversations...</td>
           </tr>
         </tbody>
       </table>
@@ -401,10 +417,16 @@
         const data = await response.json();
 
         if (data.success) {
-          document.getElementById('stat-today').textContent = data.stats.total_today;
-          document.getElementById('stat-week').textContent = data.stats.total_week;
-          document.getElementById('stat-avg').textContent = data.stats.avg_messages.toFixed(1);
-          document.getElementById('stat-conversion').textContent = data.stats.conversion_rate + '%';
+          const s = data.stats;
+          document.getElementById('stat-sessions').textContent = s.total_sessions;
+          document.getElementById('stat-estimates').textContent = s.estimates_delivered;
+          document.getElementById('stat-estimates-pct').textContent = s.estimate_rate + '% of sessions';
+          document.getElementById('stat-cta').textContent = s.cta_taken;
+          document.getElementById('stat-cta-pct').textContent = s.cta_rate + '% of estimates';
+          document.getElementById('stat-calls').textContent = s.calls_booked;
+          document.getElementById('stat-calls-pct').textContent = s.call_rate + '% of CTAs';
+          document.getElementById('stat-emails').textContent = s.emails_sent;
+          document.getElementById('stat-emails-pct').textContent = s.email_rate + '% of CTAs';
         }
       } catch (error) {
         console.error('Failed to load stats:', error);
@@ -438,7 +460,7 @@
       } catch (error) {
         console.error('Failed to load conversations:', error);
         document.getElementById('conversations-table').innerHTML = `
-          <tr><td colspan="9" class="empty">
+          <tr><td colspan="11" class="empty">
             <div class="empty-icon">⚠️</div>
             <div>Failed to load conversations</div>
           </td></tr>
@@ -451,7 +473,7 @@
 
       if (conversations.length === 0) {
         tbody.innerHTML = `
-          <tr><td colspan="9" class="empty">
+          <tr><td colspan="11" class="empty">
             <div class="empty-icon">📭</div>
             <div>No conversations found</div>
           </td></tr>
@@ -467,10 +489,15 @@
         });
 
         const companyName = conv.prospect_data?.company_name || 'N/A';
+        const industry = conv.prospect_data?.industry || 'N/A';
         const province = conv.prospect_data?.province || 'N/A';
+        const revenue = conv.prospect_data?.revenue_range || 'N/A';
         const employees = conv.prospect_data?.employee_count || 'N/A';
         const estimate = conv.estimated_funding || 'N/A';
-        const tier = conv.prospect_data?.service_tier_recommended || 'N/A';
+        // Try multiple paths for tier - service_tier_recommended or categorization.service_tier
+        const tier = conv.prospect_data?.service_tier_recommended
+                  || conv.prospect_data?.categorization?.service_tier
+                  || 'N/A';
         const messages = conv.message_count || 0;
         const finalized = conv.finalized ? 'Yes' : 'No';
         const cta = conv.cta_selected || 'none';
@@ -488,7 +515,9 @@
           <tr onclick="toggleTranscript(${index})" class="${isExpanded ? 'expanded' : ''}">
             <td>${date}</td>
             <td><strong>${companyName}</strong></td>
+            <td>${industry}</td>
             <td>${province}</td>
+            <td>${revenue}</td>
             <td>${employees}</td>
             <td>${estimate}</td>
             <td>${tier}</td>
@@ -497,7 +526,7 @@
             <td><span class="badge ${ctaClass}">${ctaDisplay}</span></td>
           </tr>
           <tr class="transcript-row">
-            <td colspan="9">
+            <td colspan="11">
               <div id="transcript-${index}" class="transcript ${isExpanded ? 'visible' : ''}">
                 ${isExpanded ? renderTranscript(conv.messages || []) : ''}
               </div>
