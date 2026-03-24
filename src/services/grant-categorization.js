@@ -529,6 +529,9 @@ export async function categorizeProspect(prospectData) {
   const tierResult = determineTier(prospectData, industryResolution.group);
   console.log(`✅ Service tier: ${tierResult.tier} (${tierResult.reasoning})`);
 
+  // DEBUG: Check what values we're receiving for flag checks
+  console.log('🔍 DEBUG FLAGS: employee_count =', JSON.stringify(prospectData.employee_count), '| training_budget =', JSON.stringify(prospectData.training_budget), '| expansion_budget =', JSON.stringify(prospectData.expansion_budget));
+
   // Step 4.5: Check for high-volume flag (high employee count + significant training budget)
   const highEmployeeCounts = ['50 – 99', '100 – 499', '500+'];
   const significantTrainingBudgets = ['$10K – $25K', '$25K – $50K', '$50K – $100K', '$100K+'];
