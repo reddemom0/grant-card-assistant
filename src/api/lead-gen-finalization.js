@@ -1756,6 +1756,35 @@ export async function finalizeInactiveSessions(inactivityMinutes = 5, batchSize 
         if (result.success) {
           results.finalized++;
           console.log(`✅ [${results.processed}/${sessions.length}] Finalized: ${session.prospect_data?.company_name || session.session_id}`);
+
+          // Auto-send funding summary email if conditions are met
+          const prospectData = session.prospect_data || {};
+          const hasEmail = !!session.contact_email;
+          const hasEmailBody = !!prospectData.email_summary_body;
+
+          if (hasEmail && hasEmailBody) {
+            try {
+              console.log(`📧 Auto-sending funding summary email to ${session.contact_email} (inactivity timeout)...`);
+              const emailResult = await sendLeadGenEmail(session.session_id);
+
+              if (emailResult.success) {
+                console.log(`📧 Auto-sent funding summary email to ${session.contact_email} (inactivity timeout)`);
+              } else if (emailResult.alreadySent) {
+                console.log(`ℹ️  Email already sent at ${emailResult.sentAt} — skipping duplicate`);
+              } else {
+                console.warn(`⚠️  Email send failed: ${emailResult.error}`);
+              }
+            } catch (emailErr) {
+              console.error(`⚠️  Error auto-sending email: ${emailErr.message}`);
+              // Don't fail finalization if email fails
+            }
+          } else {
+            if (!hasEmailBody) {
+              console.log(`⚠️  No email_summary_body — skipping auto-send`);
+            } else if (!hasEmail) {
+              console.log(`⚠️  No contact_email — skipping auto-send`);
+            }
+          }
         } else if (result.alreadyFinalized) {
           // Skip — was finalized by another process
           console.log(`⚠️  [${results.processed}/${sessions.length}] Already finalized: ${session.session_id}`);
