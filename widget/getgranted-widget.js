@@ -1600,7 +1600,7 @@
       <!-- Chat Interface (hidden until form submitted) -->
       <div class="gg-chat-interface hidden">
         <div class="gg-chat-messages"></div>
-        ${config.quickActions.length > 0 ? '<div class="gg-quick-actions"></div>' : ''}
+        <div class="gg-quick-actions"></div>
         <div class="gg-chat-input-wrapper">
           <textarea
             class="gg-chat-input"
@@ -1749,7 +1749,7 @@
     if (!isHidden && !isSystemMessage) {
       const quickActionsContainer = shadowRoot?.querySelector('.gg-quick-actions');
       if (quickActionsContainer) {
-        quickActionsContainer.remove();
+        quickActionsContainer.innerHTML = '';
       }
     }
 
