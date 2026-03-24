@@ -211,9 +211,10 @@ async function searchGrants({
  * @param {string} province - Province/territory filter
  * @param {Object} smartFilterWeights - Weights for each smart filter (0, 1, or 2)
  * @param {number} maxResults - Max results (default 15)
+ * @param {string|null} industry - Industry string for filtering (optional)
  * @returns {Promise<{total: number, rankMethod: string, grants: Array}>}
  */
-async function searchByGenreScores(province, smartFilterWeights = {}, maxResults = 15) {
+async function searchByGenreScores(province, smartFilterWeights = {}, maxResults = 15, industry = null) {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   try {
@@ -245,6 +246,34 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
       ? `(${provinceConditions} OR regions ILIKE '%National%' OR regions ILIKE '%Canada%')`
       : `(regions ILIKE '%National%' OR regions ILIKE '%Canada%')`;
 
+    // Build industry filter clause
+    let industryClause = '';
+    let industryTokens = [];
+
+    if (industry && industry.trim() !== '') {
+      // Split industry on common delimiters: /, comma, &
+      const rawTokens = industry.split(/[\/,&]/).map(t => t.trim()).filter(t => t.length > 0);
+      industryTokens = [...new Set(rawTokens)]; // Deduplicate
+
+      if (industryTokens.length > 0) {
+        console.log(`  🏭 Industry filter: [${industryTokens.join(', ')}]`);
+
+        // Build OR conditions for industry matching
+        // Start index after provinces (1..provinces.length) and weights (provinces.length+1..provinces.length+11)
+        const industryStartIdx = provinces.length + 12;
+        const industryConditions = industryTokens.map((_, idx) =>
+          `industries ILIKE $${industryStartIdx + idx}`
+        ).join(' OR ');
+
+        industryClause = `AND (
+          industries ILIKE '%All Industries%'
+          OR industries IS NULL
+          OR industries = ''
+          OR ${industryConditions}
+        )`;
+      }
+    }
+
     const sql = `
       SELECT
         grant_id, grant_name, grant_type, grant_amount, url, regions, industries,
@@ -267,8 +296,9 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
       WHERE currently_accepting = true
         AND genre_scores IS NOT NULL
         AND ${provinceClause}
+        ${industryClause}
       ORDER BY relevance_score DESC
-      LIMIT $${provinces.length + 12}
+      LIMIT $${provinces.length + 12 + industryTokens.length}
     `;
 
     const params = [
@@ -284,6 +314,7 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
       weights['Commercialize or Scale'],
       weights['Planning or Readiness Support'],
       weights['Grants for Startups'],
+      ...industryTokens.map(token => `%${token}%`), // Industry tokens with wildcards
       maxResults
     ];
 

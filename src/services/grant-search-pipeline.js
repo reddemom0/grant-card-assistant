@@ -276,7 +276,8 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
         const genreResults = await searchByGenreScores(
           provinceFullName,
           categorization.smart_filter_weights,
-          15
+          15,
+          categorization.matched_industry
         );
 
         console.log(`    ✅ Genre-score search: ${genreResults.grants.length} grants found`);
