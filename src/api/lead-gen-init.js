@@ -59,6 +59,34 @@ async function countRecentSessionsForIp(ipAddress) {
 }
 
 /**
+ * Count new sessions created by this IP in the last 24 hours.
+ */
+async function countDailySessionsForIp(ipAddress) {
+  const result = await query(
+    `SELECT COUNT(DISTINCT session_id) AS cnt
+     FROM lead_gen_conversations
+     WHERE ip_address = $1
+       AND created_at >= NOW() - INTERVAL '24 hours'`,
+    [ipAddress]
+  );
+  return parseInt(result.rows[0]?.cnt || 0, 10);
+}
+
+/**
+ * Sum total API costs for this IP in the last 24 hours.
+ */
+async function getDailyCostForIp(ipAddress) {
+  const result = await query(
+    `SELECT COALESCE(SUM(api_cost_total), 0) AS total_cost
+     FROM lead_gen_conversations
+     WHERE ip_address = $1
+       AND created_at >= NOW() - INTERVAL '24 hours'`,
+    [ipAddress]
+  );
+  return parseFloat(result.rows[0]?.total_cost || 0);
+}
+
+/**
  * Create a new lead-gen session row with form data.
  * Returns the session_id UUID.
  */
@@ -257,6 +285,7 @@ export async function handleLeadGenInit(req, res) {
       email,
       company_name,
       company_website,
+      _honeypot,
       province,
       industry,
       revenue_range,
@@ -268,6 +297,19 @@ export async function handleLeadGenInit(req, res) {
     } = req.body;
 
     const ipAddress = getClientIp(req);
+
+    // -------------------------------------------------------------------------
+    // 0. Honeypot check (bot detection)
+    // -------------------------------------------------------------------------
+
+    if (_honeypot && _honeypot.trim() !== '') {
+      console.log(`🤖 Bot detected (honeypot triggered) from IP ${ipAddress}`);
+      // Silently return 200 to not alert the bot
+      return res.status(200).json({
+        success: true,
+        session_id: 'bot-detected-' + Date.now()
+      });
+    }
 
     // -------------------------------------------------------------------------
     // 1. Validate input
@@ -298,10 +340,26 @@ export async function handleLeadGenInit(req, res) {
     // -------------------------------------------------------------------------
 
     const recentCount = await countRecentSessionsForIp(ipAddress);
-    if (recentCount >= 50) {
-      console.warn(`⚠️  Rate limit hit for IP ${ipAddress}: ${recentCount} sessions in last hour`);
+    if (recentCount >= 10) {
+      console.warn(`⚠️  Hourly rate limit hit for IP ${ipAddress}: ${recentCount} sessions in last hour`);
       return res.status(429).json({
         error: "You've started several chats recently. Please wait a bit before starting a new one."
+      });
+    }
+
+    const dailyCount = await countDailySessionsForIp(ipAddress);
+    if (dailyCount >= 20) {
+      console.warn(`⚠️  Daily rate limit hit for IP ${ipAddress}: ${dailyCount} sessions in last 24 hours`);
+      return res.status(429).json({
+        error: "You've reached the daily limit for new conversations. Please try again tomorrow or contact us directly."
+      });
+    }
+
+    const dailyCost = await getDailyCostForIp(ipAddress);
+    if (dailyCost >= 50.00) {
+      console.warn(`🚫 IP daily cost cap reached: $${dailyCost.toFixed(2)} for IP ${ipAddress}`);
+      return res.status(429).json({
+        error: "We're experiencing high demand. Please try again later or contact us directly."
       });
     }
 

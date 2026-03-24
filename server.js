@@ -1116,6 +1116,23 @@ async function startServer() {
       console.error('⚠️  Full migration 021 error:', migrationError);
     }
 
+    // ── Migration 022: Add api_cost_total column for cost tracking ──────────
+    console.log('🔧 Running migration 022: Add api_cost_total column...');
+    try {
+      const { query } = await import('./src/database/connection.js');
+      await query(`
+        ALTER TABLE lead_gen_conversations
+        ADD COLUMN IF NOT EXISTS api_cost_total NUMERIC(10,4) DEFAULT 0;
+
+        CREATE INDEX IF NOT EXISTS idx_lead_gen_cost
+          ON lead_gen_conversations(api_cost_total);
+      `);
+      console.log('✅ Migration 022 complete (api_cost_total column added)');
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 022 failed (non-fatal):', migrationError.message);
+      console.error('⚠️  Full migration 022 error:', migrationError);
+    }
+
     // Start Express server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n' + '='.repeat(80));

@@ -931,6 +931,15 @@
           gap: 6px;
         }
 
+        /* Honeypot field - hidden from real users, visible to bots */
+        .gg-honeypot-field {
+          position: absolute;
+          left: -9999px;
+          width: 1px;
+          height: 1px;
+          overflow: hidden;
+        }
+
         .gg-form-field label {
           font-size: 13px;
           font-weight: 600;
@@ -1531,6 +1540,12 @@
             <label for="gg-contact-email">Email <span class="required">*</span></label>
             <input type="email" id="gg-contact-email" required />
             <span class="error-message">Please enter a valid email address</span>
+          </div>
+
+          <!-- Honeypot field (hidden from real users, visible to bots) -->
+          <div class="gg-honeypot-field">
+            <label for="gg-phone-number">Phone Number</label>
+            <input type="text" id="gg-phone-number" name="phone_number" tabindex="-1" autocomplete="off" />
           </div>
 
           <div class="gg-form-field">
@@ -2142,6 +2157,9 @@
       }
     }
 
+    // Get honeypot value (should be empty for real users)
+    const honeypot = shadowRoot?.getElementById('gg-phone-number').value;
+
     // Prepare form data with all fields
     formData = {
       contact_name: contactName,
@@ -2155,7 +2173,8 @@
       hiring_plans: hiring,
       training_budget: training || null,
       expansion_budget: expansion || null,
-      planned_activities: plannedActivities || null
+      planned_activities: plannedActivities || null,
+      _honeypot: honeypot // Hidden field for bot detection
     };
 
     // Show loading, disable submit

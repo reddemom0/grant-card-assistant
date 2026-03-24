@@ -19,8 +19,9 @@ import { createConversation } from '../database/messages.js';
 // CONSTANTS
 // ============================================================================
 
-const MAX_SESSIONS_PER_IP_PER_HOUR = 50;
-const MAX_MESSAGES_PER_SESSION = 20;
+const MAX_SESSIONS_PER_IP_PER_HOUR = 10;
+const MAX_SESSIONS_PER_IP_PER_DAY = 20;
+const MAX_MESSAGES_PER_SESSION = 12;
 const MAX_MESSAGE_LENGTH = 500;
 
 // ============================================================================
@@ -51,6 +52,73 @@ async function countRecentSessionsForIp(ipAddress) {
     [ipAddress]
   );
   return parseInt(result.rows[0]?.cnt || 0, 10);
+}
+
+/**
+ * Count new sessions created by this IP in the last 24 hours.
+ */
+async function countDailySessionsForIp(ipAddress) {
+  const result = await query(
+    `SELECT COUNT(DISTINCT session_id) AS cnt
+     FROM lead_gen_conversations
+     WHERE ip_address = $1
+       AND created_at >= NOW() - INTERVAL '24 hours'`,
+    [ipAddress]
+  );
+  return parseInt(result.rows[0]?.cnt || 0, 10);
+}
+
+/**
+ * Sum total API costs for this IP in the last 24 hours.
+ */
+async function getDailyCostForIp(ipAddress) {
+  const result = await query(
+    `SELECT COALESCE(SUM(api_cost_total), 0) AS total_cost
+     FROM lead_gen_conversations
+     WHERE ip_address = $1
+       AND created_at >= NOW() - INTERVAL '24 hours'`,
+    [ipAddress]
+  );
+  return parseFloat(result.rows[0]?.total_cost || 0);
+}
+
+/**
+ * Get current API cost total for a session.
+ */
+async function getSessionCost(sessionId) {
+  const result = await query(
+    `SELECT api_cost_total FROM lead_gen_conversations WHERE session_id = $1`,
+    [sessionId]
+  );
+  return parseFloat(result.rows[0]?.api_cost_total || 0);
+}
+
+/**
+ * Add cost to session's running total.
+ */
+async function addSessionCost(sessionId, cost) {
+  await query(
+    `UPDATE lead_gen_conversations
+     SET api_cost_total = COALESCE(api_cost_total, 0) + $1
+     WHERE session_id = $2`,
+    [cost, sessionId]
+  );
+
+  const newTotal = await getSessionCost(sessionId);
+  console.log(`💰 Session cost updated: +$${cost.toFixed(4)} → Total: $${newTotal.toFixed(4)} (session ${sessionId})`);
+  return newTotal;
+}
+
+/**
+ * Check if session has exceeded cost cap.
+ */
+async function checkSessionCostCap(sessionId, cap = 5.00) {
+  const currentCost = await getSessionCost(sessionId);
+  if (currentCost >= cap) {
+    console.warn(`🚫 Session cost cap reached: $${currentCost.toFixed(2)} for session ${sessionId}`);
+    return { exceeded: true, currentCost };
+  }
+  return { exceeded: false, currentCost };
 }
 
 /**
@@ -323,9 +391,27 @@ export async function handleLeadGenChat(req, res) {
       // Rate limit: max 10 new sessions per IP per hour
       const recentCount = await countRecentSessionsForIp(ipAddress);
       if (recentCount >= MAX_SESSIONS_PER_IP_PER_HOUR) {
-        console.warn(`⚠️  Rate limit hit for IP ${ipAddress}: ${recentCount} sessions in last hour`);
+        console.warn(`⚠️  Hourly rate limit hit for IP ${ipAddress}: ${recentCount} sessions in last hour`);
         return res.status(429).json({
           error: "You've started several chats recently. Please wait a bit before starting a new one, or continue your existing conversation."
+        });
+      }
+
+      // Rate limit: max 20 new sessions per IP per day
+      const dailyCount = await countDailySessionsForIp(ipAddress);
+      if (dailyCount >= MAX_SESSIONS_PER_IP_PER_DAY) {
+        console.warn(`⚠️  Daily rate limit hit for IP ${ipAddress}: ${dailyCount} sessions in last 24 hours`);
+        return res.status(429).json({
+          error: "You've reached the daily limit for new conversations. Please try again tomorrow or contact us directly."
+        });
+      }
+
+      // Cost cap: max $50 API spend per IP per day
+      const dailyCost = await getDailyCostForIp(ipAddress);
+      if (dailyCost >= 50.00) {
+        console.warn(`🚫 IP daily cost cap reached: $${dailyCost.toFixed(2)} for IP ${ipAddress}`);
+        return res.status(429).json({
+          error: "We're experiencing high demand. Please try again later or contact us directly."
         });
       }
 
@@ -404,6 +490,20 @@ export async function handleLeadGenChat(req, res) {
     await incrementMessageCount(sessionId);
 
     // -------------------------------------------------------------------------
+    // 4. Check session cost cap before making API call
+    // -------------------------------------------------------------------------
+
+    const costCheck = await checkSessionCostCap(sessionId, 5.00);
+    if (costCheck.exceeded) {
+      console.log(`🚫 Session cost cap reached ($${costCheck.currentCost.toFixed(2)}) — blocking API call`);
+      return res.status(429).json({
+        error: "We've reached the limit for this session. Hit the summary button to get your funding estimate by email, or book a 15-minute call to continue the conversation.",
+        cost_cap_reached: true,
+        current_cost: costCheck.currentCost
+      });
+    }
+
+    // -------------------------------------------------------------------------
     // 5. Run the lead-gen agent (SSE streaming)
     //    session_id == conversationId in the conversations/messages tables
     // -------------------------------------------------------------------------
@@ -420,7 +520,11 @@ export async function handleLeadGenChat(req, res) {
       userId: null,                 // public endpoint — no authenticated user
       sessionId: uuidv4(),         // per-request session ID for SSE connection tracking
       attachments: [],
-      res
+      res,
+      onCostCalculated: async (cost) => {
+        // Update session cost after API call completes
+        await addSessionCost(sessionId, cost);
+      }
     });
 
     // runAgent handles SSE streaming and closes the connection.

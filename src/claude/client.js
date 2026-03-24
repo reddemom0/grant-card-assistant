@@ -105,7 +105,8 @@ export async function runAgent({
   attachments = [],
   res,
   forceModel = null,
-  modelConfig = {}
+  modelConfig = {},
+  onCostCalculated = null
 }) {
   console.log('\n' + '='.repeat(80));
   console.log(`🤖 Running agent: ${agentType}`);
@@ -618,6 +619,15 @@ export async function runAgent({
         if (shouldWarnAboutCost(cost)) {
           console.warn(`⚠️  HIGH COST ALERT: Request cost ($${cost.toFixed(2)}) exceeds threshold ($${COST_SETTINGS.monitoring.warnThreshold})`);
           console.warn(`   Agent: ${agentType}, Model: ${MODEL}, Conversation: ${conversationId}`);
+        }
+
+        // Call cost callback if provided (for cost tracking in lead-gen)
+        if (onCostCalculated && typeof onCostCalculated === 'function') {
+          try {
+            await onCostCalculated(cost);
+          } catch (callbackError) {
+            console.error('⚠️  Cost callback error:', callbackError.message);
+          }
         }
 
         // Calculate cache hit rate for this request
