@@ -358,7 +358,12 @@ CRITICAL: At the end of EVERY response, include a hidden metadata block for the 
 
 Generate 3 short questions (under 8 words each) that the PROSPECT would want to ask next, based on what you just said. Think from the prospect's perspective — what would they want to know more about? These appear as clickable buttons in the chat interface.
 
-These are questions FROM the prospect TO you, not questions you would ask them.
+CRITICAL PERSPECTIVE RULE: These suggestions are buttons the USER will click. They must be questions FROM the user TO you. Never generate questions that you (the agent) would ask the user.
+
+WRONG (agent asking user): "When are you hiring?", "Who makes the final decision?", "What is your timeline?", "How many employees do you have?", "Do you have a budget?"
+RIGHT (user asking agent): "How do I get started?", "What does Starter cost?", "What training qualifies?", "Which programs match my business?", "When should I apply?"
+
+TEST: If the question starts with "When are you...", "Who is...", "How many...", "Do you have...", or "What is your..." — it's WRONG. These are agent questions, not user questions.
 
 Examples:
 - After an estimate: "How much does this service cost?", "Which programs match my business?", "Can I book a call to discuss?"
@@ -372,6 +377,7 @@ The suggestions should:
 - Help the prospect dig deeper into topics they're likely curious about
 - Guide them toward valuable next steps
 - Be conversational and easy to click
+- ALWAYS be questions the prospect would ask YOU, not vice versa
 
 MANDATORY: Always include one suggestion that moves toward closing as the LAST of the 3 suggestions, such as:
 - "What are the next steps?"
