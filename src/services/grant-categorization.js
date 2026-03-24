@@ -543,6 +543,17 @@ export async function categorizeProspect(prospectData) {
     console.log(`⚠️  High-volume flag: ${highVolumeFlagNote}`);
   }
 
+  // Step 4.6: Check for high market expansion budget flag
+  const highExpansionBudgets = ['$25K – $50K', '$50K – $100K', '$100K+'];
+
+  const highMeBudgetFlag = highExpansionBudgets.includes(prospectData.expansion_budget);
+
+  let highMeBudgetFlagNote = null;
+  if (highMeBudgetFlag) {
+    highMeBudgetFlagNote = "High market expansion budget — suggest booking a call for market expansion planning. Could lead to CanExport engagement or Granted Export service.";
+    console.log(`⚠️  High ME budget flag: ${highMeBudgetFlagNote}`);
+  }
+
   // Step 5: Assign consultant (if Pro tier)
   let consultantAssignment = null;
   let bookingLink = null;
@@ -589,7 +600,9 @@ export async function categorizeProspect(prospectData) {
     smart_filter_weights: smartFilterWeights,
     province: province,
     high_volume_flag: highVolumeFlag,
-    high_volume_flag_note: highVolumeFlagNote
+    high_volume_flag_note: highVolumeFlagNote,
+    high_me_budget_flag: highMeBudgetFlag,
+    high_me_budget_flag_note: highMeBudgetFlagNote
   };
 }
 
