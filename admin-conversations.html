@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lead-Gen Conversations | Granted</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f5f7fa;
+      color: #1a2332;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      background: #fff;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      color: #6d7881;
+      font-size: 14px;
+    }
+
+    /* Stats Bar */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .stat-card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .stat-label {
+      font-size: 13px;
+      color: #6d7881;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stat-value {
+      font-size: 28px;
+      font-weight: 600;
+      color: #1a2332;
+    }
+
+    /* Filters */
+    .filters {
+      background: #fff;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .filters-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .filter-group label {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 5px;
+      color: #1a2332;
+    }
+
+    .filter-group input,
+    .filter-group select {
+      padding: 8px 12px;
+      border: 1px solid #dde1e3;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+
+    .filter-group input:focus,
+    .filter-group select:focus {
+      outline: none;
+      border-color: #008abf;
+    }
+
+    .filter-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #008abf;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #006d99;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: #1a2332;
+      border: 1px solid #dde1e3;
+    }
+
+    button.secondary:hover {
+      background: #f5f7fa;
+    }
+
+    /* Table */
+    .table-container {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      overflow: hidden;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #f8fafb;
+      border-bottom: 2px solid #dde1e3;
+    }
+
+    th {
+      text-align: left;
+      padding: 12px 15px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #6d7881;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid #f0f2f4;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    tbody tr:hover {
+      background: #f8fafb;
+    }
+
+    tbody tr.expanded {
+      background: #f8fafb;
+    }
+
+    td {
+      padding: 12px 15px;
+      font-size: 14px;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .badge.finalized-yes {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge.finalized-no {
+      background: #f8d7da;
+      color: #721c24;
+    }
+
+    .badge.cta-email {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .badge.cta-call {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge.cta-none {
+      background: #e2e3e5;
+      color: #383d41;
+    }
+
+    /* Transcript */
+    .transcript {
+      display: none;
+      background: #f8fafb;
+      padding: 20px;
+      border-top: 1px solid #dde1e3;
+    }
+
+    .transcript.visible {
+      display: block;
+    }
+
+    .transcript-header {
+      font-weight: 600;
+      margin-bottom: 15px;
+      color: #1a2332;
+    }
+
+    .message {
+      margin-bottom: 15px;
+      padding: 12px;
+      border-radius: 6px;
+      max-width: 80%;
+    }
+
+    .message.user {
+      background: #e5f4fa;
+      margin-left: auto;
+      text-align: right;
+    }
+
+    .message.assistant {
+      background: #fff;
+      border: 1px solid #dde1e3;
+    }
+
+    .message .role {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      color: #6d7881;
+      margin-bottom: 5px;
+    }
+
+    .message .content {
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #6d7881;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 60px 20px;
+      color: #6d7881;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      margin-bottom: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Lead-Gen Conversations</h1>
+      <p class="subtitle">Monitor and analyze lead generation chatbot conversations</p>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="stats-bar">
+      <div class="stat-card">
+        <div class="stat-label">Today</div>
+        <div class="stat-value" id="stat-today">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">This Week</div>
+        <div class="stat-value" id="stat-week">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Avg Messages</div>
+        <div class="stat-value" id="stat-avg">-</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Conversion Rate</div>
+        <div class="stat-value" id="stat-conversion">-</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+      <div class="filters-grid">
+        <div class="filter-group">
+          <label for="filter-start">Start Date</label>
+          <input type="date" id="filter-start">
+        </div>
+        <div class="filter-group">
+          <label for="filter-end">End Date</label>
+          <input type="date" id="filter-end">
+        </div>
+        <div class="filter-group">
+          <label for="filter-province">Province</label>
+          <select id="filter-province">
+            <option value="all">All Provinces</option>
+            <option value="Alberta">Alberta</option>
+            <option value="British Columbia">British Columbia</option>
+            <option value="Manitoba">Manitoba</option>
+            <option value="New Brunswick">New Brunswick</option>
+            <option value="Newfoundland & Labrador">Newfoundland & Labrador</option>
+            <option value="Nova Scotia">Nova Scotia</option>
+            <option value="Ontario">Ontario</option>
+            <option value="Prince Edward Island">Prince Edward Island</option>
+            <option value="Quebec">Quebec</option>
+            <option value="Saskatchewan">Saskatchewan</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-finalized">Finalized</label>
+          <select id="filter-finalized">
+            <option value="all">All</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="filter-min-messages">Min Messages</label>
+          <input type="number" id="filter-min-messages" min="0" placeholder="0">
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button onclick="applyFilters()">Apply Filters</button>
+        <button class="secondary" onclick="resetFilters()">Reset</button>
+      </div>
+    </div>
+
+    <!-- Conversations Table -->
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Company</th>
+            <th>Province</th>
+            <th>Employees</th>
+            <th>Estimate</th>
+            <th>Tier</th>
+            <th>Messages</th>
+            <th>Finalized</th>
+            <th>CTA</th>
+          </tr>
+        </thead>
+        <tbody id="conversations-table">
+          <tr>
+            <td colspan="9" class="loading">Loading conversations...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    let conversations = [];
+    let expandedRows = new Set();
+
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/admin/lead-gen-stats');
+        const data = await response.json();
+
+        if (data.success) {
+          document.getElementById('stat-today').textContent = data.stats.total_today;
+          document.getElementById('stat-week').textContent = data.stats.total_week;
+          document.getElementById('stat-avg').textContent = data.stats.avg_messages.toFixed(1);
+          document.getElementById('stat-conversion').textContent = data.stats.conversion_rate + '%';
+        }
+      } catch (error) {
+        console.error('Failed to load stats:', error);
+      }
+    }
+
+    async function loadConversations() {
+      const params = new URLSearchParams();
+
+      const startDate = document.getElementById('filter-start').value;
+      const endDate = document.getElementById('filter-end').value;
+      const province = document.getElementById('filter-province').value;
+      const finalized = document.getElementById('filter-finalized').value;
+      const minMessages = document.getElementById('filter-min-messages').value;
+
+      if (startDate) params.set('start_date', startDate);
+      if (endDate) params.set('end_date', endDate);
+      if (province && province !== 'all') params.set('province', province);
+      if (finalized && finalized !== 'all') params.set('finalized', finalized);
+      if (minMessages) params.set('min_messages', minMessages);
+      params.set('limit', '100');
+
+      try {
+        const response = await fetch(`/api/admin/lead-gen-conversations?${params}`);
+        const data = await response.json();
+
+        if (data.success) {
+          conversations = data.conversations;
+          renderTable();
+        }
+      } catch (error) {
+        console.error('Failed to load conversations:', error);
+        document.getElementById('conversations-table').innerHTML = `
+          <tr><td colspan="9" class="empty">
+            <div class="empty-icon">⚠️</div>
+            <div>Failed to load conversations</div>
+          </td></tr>
+        `;
+      }
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('conversations-table');
+
+      if (conversations.length === 0) {
+        tbody.innerHTML = `
+          <tr><td colspan="9" class="empty">
+            <div class="empty-icon">📭</div>
+            <div>No conversations found</div>
+          </td></tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = conversations.map((conv, index) => {
+        const date = new Date(conv.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        const companyName = conv.prospect_data?.company_name || 'N/A';
+        const province = conv.prospect_data?.province || 'N/A';
+        const employees = conv.prospect_data?.employee_count || 'N/A';
+        const estimate = conv.estimated_funding || 'N/A';
+        const tier = conv.prospect_data?.service_tier_recommended || 'N/A';
+        const messages = conv.message_count || 0;
+        const finalized = conv.finalized ? 'Yes' : 'No';
+        const cta = conv.cta_selected || 'none';
+
+        const finalizedClass = conv.finalized ? 'finalized-yes' : 'finalized-no';
+        const ctaClass = cta === 'email_summary' ? 'cta-email' :
+                         cta === 'book_call' ? 'cta-call' : 'cta-none';
+        const ctaDisplay = cta === 'email_summary' ? 'Email' :
+                          cta === 'book_call' ? 'Call' :
+                          cta === 'none' ? 'None' : cta;
+
+        const isExpanded = expandedRows.has(index);
+
+        return `
+          <tr onclick="toggleTranscript(${index})" class="${isExpanded ? 'expanded' : ''}">
+            <td>${date}</td>
+            <td><strong>${companyName}</strong></td>
+            <td>${province}</td>
+            <td>${employees}</td>
+            <td>${estimate}</td>
+            <td>${tier}</td>
+            <td>${messages}</td>
+            <td><span class="badge ${finalizedClass}">${finalized}</span></td>
+            <td><span class="badge ${ctaClass}">${ctaDisplay}</span></td>
+          </tr>
+          <tr class="transcript-row">
+            <td colspan="9">
+              <div id="transcript-${index}" class="transcript ${isExpanded ? 'visible' : ''}">
+                ${isExpanded ? renderTranscript(conv.messages || []) : ''}
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function renderTranscript(messages) {
+      if (!messages || messages.length === 0) {
+        return '<div class="empty">No messages in this conversation</div>';
+      }
+
+      return `
+        <div class="transcript-header">Conversation Transcript</div>
+        ${messages.map(msg => `
+          <div class="message ${msg.role}">
+            <div class="role">${msg.role === 'user' ? 'User' : 'Assistant'}</div>
+            <div class="content">${escapeHtml(msg.content)}</div>
+          </div>
+        `).join('')}
+      `;
+    }
+
+    function toggleTranscript(index) {
+      if (expandedRows.has(index)) {
+        expandedRows.delete(index);
+      } else {
+        expandedRows.add(index);
+      }
+      renderTable();
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function applyFilters() {
+      loadConversations();
+    }
+
+    function resetFilters() {
+      document.getElementById('filter-start').value = '';
+      document.getElementById('filter-end').value = '';
+      document.getElementById('filter-province').value = 'all';
+      document.getElementById('filter-finalized').value = 'all';
+      document.getElementById('filter-min-messages').value = '';
+      loadConversations();
+    }
+
+    // Load on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      loadStats();
+      loadConversations();
+    });
+  </script>
+</body>
+</html>
