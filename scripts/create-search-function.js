@@ -234,34 +234,45 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
       'Grants for Startups': smartFilterWeights['Grants for Startups'] || 0
     };
 
+    // Handle multiple provinces (comma-separated)
+    const provinces = province.includes(',')
+      ? province.split(',').map(p => p.trim())
+      : [province];
+
+    // Build province OR conditions dynamically
+    const provinceConditions = provinces.map((_, idx) => `regions ILIKE $${idx + 1}`).join(' OR ');
+    const provinceClause = provinces.length > 0
+      ? `(${provinceConditions} OR regions ILIKE '%National%' OR regions ILIKE '%Canada%')`
+      : `(regions ILIKE '%National%' OR regions ILIKE '%Canada%')`;
+
     const sql = `
       SELECT
         grant_id, grant_name, grant_type, grant_amount, url, regions, industries,
         program_provider, deadline, contribution_percentage, grant_criteria,
         currently_accepting, intake_cycle, smart_tags, genre_scores,
         (
-          COALESCE((genre_scores->'association_scores'->'Building Bench of Talent'->>'association_pct')::int, 0) * $2 +
-          COALESCE((genre_scores->'association_scores'->'Adopt Software or AI'->>'association_pct')::int, 0) * $3 +
-          COALESCE((genre_scores->'association_scores'->'Buy Equipment or Upgrade Facilities'->>'association_pct')::int, 0) * $4 +
-          COALESCE((genre_scores->'association_scores'->'Build Something New'->>'association_pct')::int, 0) * $5 +
-          COALESCE((genre_scores->'association_scores'->'International Growth'->>'association_pct')::int, 0) * $6 +
-          COALESCE((genre_scores->'association_scores'->'Domestic Growth'->>'association_pct')::int, 0) * $7 +
-          COALESCE((genre_scores->'association_scores'->'Improve Sustainability'->>'association_pct')::int, 0) * $8 +
-          COALESCE((genre_scores->'association_scores'->'Improve Productivity'->>'association_pct')::int, 0) * $9 +
-          COALESCE((genre_scores->'association_scores'->'Commercialize or Scale'->>'association_pct')::int, 0) * $10 +
-          COALESCE((genre_scores->'association_scores'->'Planning or Readiness Support'->>'association_pct')::int, 0) * $11 +
-          COALESCE((genre_scores->'association_scores'->'Grants for Startups'->>'association_pct')::int, 0) * $12
+          COALESCE((genre_scores->'association_scores'->'Building Bench of Talent'->>'association_pct')::int, 0) * $${provinces.length + 1} +
+          COALESCE((genre_scores->'association_scores'->'Adopt Software or AI'->>'association_pct')::int, 0) * $${provinces.length + 2} +
+          COALESCE((genre_scores->'association_scores'->'Buy Equipment or Upgrade Facilities'->>'association_pct')::int, 0) * $${provinces.length + 3} +
+          COALESCE((genre_scores->'association_scores'->'Build Something New'->>'association_pct')::int, 0) * $${provinces.length + 4} +
+          COALESCE((genre_scores->'association_scores'->'International Growth'->>'association_pct')::int, 0) * $${provinces.length + 5} +
+          COALESCE((genre_scores->'association_scores'->'Domestic Growth'->>'association_pct')::int, 0) * $${provinces.length + 6} +
+          COALESCE((genre_scores->'association_scores'->'Improve Sustainability'->>'association_pct')::int, 0) * $${provinces.length + 7} +
+          COALESCE((genre_scores->'association_scores'->'Improve Productivity'->>'association_pct')::int, 0) * $${provinces.length + 8} +
+          COALESCE((genre_scores->'association_scores'->'Commercialize or Scale'->>'association_pct')::int, 0) * $${provinces.length + 9} +
+          COALESCE((genre_scores->'association_scores'->'Planning or Readiness Support'->>'association_pct')::int, 0) * $${provinces.length + 10} +
+          COALESCE((genre_scores->'association_scores'->'Grants for Startups'->>'association_pct')::int, 0) * $${provinces.length + 11}
         ) AS relevance_score
       FROM grants
       WHERE currently_accepting = true
         AND genre_scores IS NOT NULL
-        AND (regions ILIKE '%' || $1 || '%' OR regions ILIKE '%National%' OR regions ILIKE '%Canada%')
+        AND ${provinceClause}
       ORDER BY relevance_score DESC
-      LIMIT $13
+      LIMIT $${provinces.length + 12}
     `;
 
     const params = [
-      province,
+      ...provinces.map(p => `%${p}%`), // Province parameters with wildcards
       weights['Building Bench of Talent'],
       weights['Adopt Software or AI'],
       weights['Buy Equipment or Upgrade Facilities'],

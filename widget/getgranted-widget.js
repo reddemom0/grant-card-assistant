@@ -1012,6 +1012,23 @@
           color: ${BRAND_COLORS.grey};
         }
 
+        .gg-form-field select[multiple] {
+          min-height: 120px;
+          padding: 8px;
+        }
+
+        .gg-form-field select[multiple] option {
+          padding: 6px 8px;
+          border-radius: 4px;
+          margin-bottom: 2px;
+        }
+
+        .gg-form-field select[multiple] option:checked {
+          background: ${BRAND_COLORS.primaryLight};
+          color: ${BRAND_COLORS.primary};
+          font-weight: 600;
+        }
+
         /* Combobox (searchable dropdown) styles */
         .gg-combobox-wrapper {
           position: relative;
@@ -1410,11 +1427,12 @@
           <div class="gg-form-section-label">Your Business</div>
 
           <div class="gg-form-field">
-            <label for="gg-province">Province <span class="required">*</span></label>
-            <select id="gg-province">
-              ${createDropdownOptions(PROVINCES)}
+            <label for="gg-province">Province(s) <span class="required">*</span></label>
+            <div class="gg-form-hint">Select all provinces where your company operates</div>
+            <select id="gg-province" multiple>
+              ${createDropdownOptions(PROVINCES, "Select provinces...")}
             </select>
-            <span class="error-message">Please select your province</span>
+            <span class="error-message">Please select at least one province</span>
           </div>
 
           <div class="gg-form-field">
@@ -1837,12 +1855,13 @@
   }
 
   function validatePage2() {
-    const province = shadowRoot?.getElementById('gg-province').value;
+    const provinceSelect = shadowRoot?.getElementById('gg-province');
+    const selectedProvinces = provinceSelect ? Array.from(provinceSelect.selectedOptions).map(opt => opt.value) : [];
     const revenue = shadowRoot?.getElementById('gg-revenue').value;
     const employees = shadowRoot?.getElementById('gg-employees').value;
     const hiring = shadowRoot?.getElementById('gg-hiring').value;
 
-    return province && revenue && employees && hiring;
+    return selectedProvinces.length > 0 && revenue && employees && hiring;
   }
 
   function updateNextButtonState() {
@@ -1917,12 +1936,13 @@
     // Validate page 2
     if (!validatePage2()) {
       // Show errors
-      const province = shadowRoot?.getElementById('gg-province').value;
+      const provinceSelect = shadowRoot?.getElementById('gg-province');
+      const selectedProvinces = provinceSelect ? Array.from(provinceSelect.selectedOptions).map(opt => opt.value) : [];
       const revenue = shadowRoot?.getElementById('gg-revenue').value;
       const employees = shadowRoot?.getElementById('gg-employees').value;
       const hiring = shadowRoot?.getElementById('gg-hiring').value;
 
-      if (!province) {
+      if (selectedProvinces.length === 0) {
         shadowRoot?.getElementById('gg-province').classList.add('error');
       }
       if (!revenue) {
@@ -1950,7 +1970,9 @@
     const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
     let companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
     const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
-    const province = shadowRoot?.getElementById('gg-province').value;
+    const provinceSelect = shadowRoot?.getElementById('gg-province');
+    const selectedProvinces = provinceSelect ? Array.from(provinceSelect.selectedOptions).map(opt => opt.value) : [];
+    const province = selectedProvinces.join(', '); // Join multiple provinces with comma separator
     const industry = shadowRoot?.getElementById('gg-industry').value;
 
     // Page 2 fields
