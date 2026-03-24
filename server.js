@@ -1087,6 +1087,32 @@ async function startServer() {
       console.warn('⚠️  Migration 020 failed (non-fatal):', migrationError.message);
     }
 
+    // ── Migration 021: Create lead_gen_events table ──────────────────────────
+    console.log('🔧 Running migration 021: Create lead_gen_events table...');
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS lead_gen_events (
+          id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+          session_id TEXT,
+          event_type TEXT NOT NULL,
+          event_data JSONB DEFAULT '{}',
+          created_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_lead_gen_events_type
+          ON lead_gen_events(event_type);
+
+        CREATE INDEX IF NOT EXISTS idx_lead_gen_events_session
+          ON lead_gen_events(session_id);
+
+        CREATE INDEX IF NOT EXISTS idx_lead_gen_events_created
+          ON lead_gen_events(created_at);
+      `);
+      console.log('✅ Migration 021 complete (lead_gen_events table created)');
+    } catch (migrationError) {
+      console.warn('⚠️  Migration 021 failed (non-fatal):', migrationError.message);
+    }
+
     // Start Express server
     const server = app.listen(PORT, '0.0.0.0', () => {
       console.log('\n' + '='.repeat(80));
