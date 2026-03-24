@@ -994,6 +994,56 @@
           cursor: pointer;
         }
 
+        /* Province checkbox list */
+        .gg-province-checkboxes {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+          max-height: 240px;
+          overflow-y: auto;
+          padding: 12px;
+          border: 1px solid ${BRAND_COLORS.lightGrey};
+          border-radius: 6px;
+          background: white;
+        }
+
+        .gg-province-checkboxes.error {
+          border-color: #dc2626;
+        }
+
+        .gg-province-checkbox {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background 0.15s ease;
+          user-select: none;
+        }
+
+        .gg-province-checkbox:hover {
+          background: ${BRAND_COLORS.lightBg};
+        }
+
+        .gg-province-checkbox input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          cursor: pointer;
+          accent-color: ${BRAND_COLORS.primary};
+        }
+
+        .gg-province-checkbox span {
+          font-size: 14px;
+          color: ${BRAND_COLORS.dark};
+        }
+
+        @media (max-width: 480px) {
+          .gg-province-checkboxes {
+            grid-template-columns: 1fr;
+          }
+        }
+
         .gg-form-submit {
           margin-top: 8px;
           background: ${BRAND_COLORS.primary};
@@ -1424,10 +1474,6 @@
       ${createChatUI()}
       <div class="gg-trust-badges">
         <div class="gg-trust-badge">
-          <span>🔒</span>
-          <span>No data stored</span>
-        </div>
-        <div class="gg-trust-badge">
           <span>⚡</span>
           <span>Instant estimate</span>
         </div>
@@ -1521,9 +1567,15 @@
           <div class="gg-form-field">
             <label for="gg-province">Province(s) <span class="required">*</span></label>
             <div class="gg-form-hint">Select all provinces where your company operates</div>
-            <select id="gg-province" multiple>
-              ${createDropdownOptions(PROVINCES, "Select provinces...")}
-            </select>
+            <div class="gg-province-checkboxes" id="gg-province-checkboxes">
+              ${PROVINCES.map((prov, idx) => `
+                <label class="gg-province-checkbox">
+                  <input type="checkbox" name="province" value="${escapeHtml(prov)}" data-province-checkbox />
+                  <span>${escapeHtml(prov)}</span>
+                </label>
+              `).join('')}
+            </div>
+            <input type="hidden" id="gg-province" />
             <span class="error-message">Please select at least one province</span>
           </div>
 
@@ -1952,8 +2004,8 @@
   }
 
   function validatePage2() {
-    const provinceSelect = shadowRoot?.getElementById('gg-province');
-    const selectedProvinces = provinceSelect ? Array.from(provinceSelect.selectedOptions).map(opt => opt.value) : [];
+    const provinceCheckboxes = shadowRoot?.querySelectorAll('[data-province-checkbox]:checked');
+    const selectedProvinces = provinceCheckboxes ? Array.from(provinceCheckboxes).map(cb => cb.value) : [];
     const revenue = shadowRoot?.getElementById('gg-revenue').value;
     const employees = shadowRoot?.getElementById('gg-employees').value;
     const hiring = shadowRoot?.getElementById('gg-hiring').value;
@@ -2033,14 +2085,14 @@
     // Validate page 2
     if (!validatePage2()) {
       // Show errors
-      const provinceSelect = shadowRoot?.getElementById('gg-province');
-      const selectedProvinces = provinceSelect ? Array.from(provinceSelect.selectedOptions).map(opt => opt.value) : [];
+      const provinceCheckboxes = shadowRoot?.querySelectorAll('[data-province-checkbox]:checked');
+      const selectedProvinces = provinceCheckboxes ? Array.from(provinceCheckboxes).map(cb => cb.value) : [];
       const revenue = shadowRoot?.getElementById('gg-revenue').value;
       const employees = shadowRoot?.getElementById('gg-employees').value;
       const hiring = shadowRoot?.getElementById('gg-hiring').value;
 
       if (selectedProvinces.length === 0) {
-        shadowRoot?.getElementById('gg-province').classList.add('error');
+        shadowRoot?.getElementById('gg-province-checkboxes').classList.add('error');
       }
       if (!revenue) {
         shadowRoot?.getElementById('gg-revenue').classList.add('error');
@@ -2067,8 +2119,8 @@
     const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
     let companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
     const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
-    const provinceSelect = shadowRoot?.getElementById('gg-province');
-    const selectedProvinces = provinceSelect ? Array.from(provinceSelect.selectedOptions).map(opt => opt.value) : [];
+    const provinceCheckboxes = shadowRoot?.querySelectorAll('[data-province-checkbox]:checked');
+    const selectedProvinces = provinceCheckboxes ? Array.from(provinceCheckboxes).map(cb => cb.value) : [];
     const province = selectedProvinces.join(', '); // Join multiple provinces with comma separator
     const industry = shadowRoot?.getElementById('gg-industry').value;
 
@@ -2206,9 +2258,30 @@
 
     // Note: Industry combobox validation handled separately below
 
-    // Page 2 field validation listeners
+    // Province checkbox event listeners
+    const provinceCheckboxes = shadowRoot?.querySelectorAll('[data-province-checkbox]');
+    const provinceContainer = shadowRoot?.getElementById('gg-province-checkboxes');
+    const provinceHiddenInput = shadowRoot?.getElementById('gg-province');
+
+    if (provinceCheckboxes && provinceContainer && provinceHiddenInput) {
+      provinceCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', () => {
+          // Clear error state
+          provinceContainer.classList.remove('error');
+
+          // Update hidden input with comma-separated values
+          const checked = shadowRoot?.querySelectorAll('[data-province-checkbox]:checked');
+          const values = checked ? Array.from(checked).map(cb => cb.value) : [];
+          provinceHiddenInput.value = values.join(', ');
+
+          // Update button state
+          updateFinalSubmitButtonState();
+        });
+      });
+    }
+
+    // Page 2 field validation listeners (other than province)
     const page2Fields = [
-      shadowRoot?.getElementById('gg-province'),
       shadowRoot?.getElementById('gg-revenue'),
       shadowRoot?.getElementById('gg-employees'),
       shadowRoot?.getElementById('gg-hiring'),
