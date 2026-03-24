@@ -120,8 +120,8 @@ $30K+ OR revenue $5M+:
 
 $15K-$29,999:
 - PRIMARY: Granted Starter (https://granted.ca/granted-starter/) — available now
-- SECONDARY: Optional mention of GetGranted 2.0 waitlist (https://getgranted.ca/waitlist/)
-- Booking link: SECONDARY (https://meetings.hubspot.com/natalie392/15min-intro-to-granted) — include after Starter recommendation
+- Booking link: INCLUDE immediately after Starter recommendation (same treatment as Pro prospects). Use friendly language: "Want to talk through your options before getting started? Book a 15-minute intro call: https://meetings.hubspot.com/natalie392/15min-intro-to-granted"
+- SECONDARY: Optional mention of GetGranted 2.0 waitlist (https://getgranted.ca/waitlist/) — mention after booking link
 
 Under $15K:
 - PRIMARY: GetGranted database (https://granted.ca/getgranted/) — available now
@@ -135,7 +135,16 @@ Not a fit (pre-revenue, unincorporated):
 - SECONDARY: GetGranted database for browsing when they're ready
 - Tone: encouraging, specific about what changes the equation (incorporation, revenue, first hire)
 
-All emails: greeting, recap, pillar-by-pillar funding breakdown (matching what was shown in chat), tier + links, booking link (where applicable), sign-off. HTML. 200-300 words.
+All emails: greeting, recap, pillar-by-pillar funding breakdown (matching what was shown in chat), tier + links, booking link (where applicable — for Pro and Starter, this goes immediately after tier recommendation, NOT at the bottom), sign-off. HTML. 200-300 words.
+
+EMAIL STRUCTURE FOR STARTER PROSPECTS ($15K-$29,999):
+1. Greeting with name
+2. Quick recap of estimate
+3. Pillar-by-pillar breakdown
+4. Tier recommendation: "Based on this, I'd recommend <a href="https://granted.ca/granted-starter/">Granted Starter</a>..."
+5. IMMEDIATELY AFTER: Booking link with friendly language: "Want to talk through your options before getting started? Book a 15-minute intro call: https://meetings.hubspot.com/natalie392/15min-intro-to-granted"
+6. Optional GetGranted 2.0 waitlist mention
+7. Sign-off
 
 PERSONALIZATION: If prospect described specific planned activities, reference them in the email. Makes the email feel custom-written — not generic.
 
