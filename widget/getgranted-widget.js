@@ -225,6 +225,7 @@
   let currentPage = 1; // Form page state (1 or 2)
   let hasReceivedFirstMessage = false; // Track first agent message for quick actions
   let lastSuggestions = []; // Store parsed suggestions from agent's last response
+  let formStarted = false; // Track if user has interacted with form
 
   // ============================================================================
   // UTILITY FUNCTIONS
@@ -306,6 +307,42 @@
     html = parseSuggestions(html);
     // Then sanitize but don't escape - allow whitelisted tags to render
     return sanitizeHtml(html).replace(/\n/g, '<br>');
+  }
+
+  // ============================================================================
+  // ANALYTICS TRACKING
+  // ============================================================================
+
+  function trackEvent(eventType, eventData = {}) {
+    // Fire-and-forget event tracking - don't block UI
+    try {
+      const payload = {
+        session_id: sessionId || null,
+        event_type: eventType,
+        event_data: {
+          widget_mode: config.mode,
+          page_url: window.location.href,
+          referrer: document.referrer || null,
+          ...eventData
+        }
+      };
+
+      // Use sendBeacon if available (better for session_ended events)
+      if (navigator.sendBeacon) {
+        const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+        navigator.sendBeacon(`${config.apiUrl}/api/lead-gen/event`, blob);
+      } else {
+        // Fallback to fetch with keepalive
+        fetch(`${config.apiUrl}/api/lead-gen/event`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          keepalive: true
+        }).catch(() => {}); // Ignore errors - fire and forget
+      }
+    } catch (e) {
+      // Silent fail - don't break widget functionality
+    }
   }
 
   // ============================================================================
@@ -1742,6 +1779,11 @@
 
       console.log('[Widget] Sending message. session_id:', sessionId || '(none — new session)');
 
+      // Track message sent (skip hidden/system messages)
+      if (!isHidden && !isSystemMessage) {
+        trackEvent('message_sent', { message_length: trimmedMessage.length });
+      }
+
       const response = await fetch(`${config.apiUrl}/api/lead-gen/chat`, {
         method: 'POST',
         headers: {
@@ -1804,6 +1846,14 @@
           if (parsed.type === 'done') {
             if (!assistantWrapper && assistantText === '') {
               typingIndicator.remove();
+            }
+            // Track message received
+            trackEvent('message_received', { response_length: assistantText.length });
+
+            // Check if this message contains an estimate (dollar amounts with K+ suffix)
+            const hasEstimate = /\$\d+[KMk]?[\s-]*[\$\d+KMk]*/.test(assistantText);
+            if (hasEstimate && sessionId) {
+              trackEvent('estimate_delivered');
             }
           }
 
@@ -2078,6 +2128,9 @@
 
       console.log('[Widget] Form submitted, session created:', sessionId);
 
+      // Track form completion
+      trackEvent('form_completed');
+
       // Transition: hide form, show chat
       if (formContainer) formContainer.classList.add('hidden');
       if (chatInterface) chatInterface.classList.remove('hidden');
@@ -2130,6 +2183,14 @@
 
     page1Fields.forEach(field => {
       if (field) {
+        // Track form started on first interaction
+        field.addEventListener('focus', () => {
+          if (!formStarted) {
+            formStarted = true;
+            trackEvent('form_started');
+          }
+        }, { once: true });
+
         field.addEventListener('input', () => {
           field.classList.remove('error');
           updateNextButtonState();
@@ -2405,6 +2466,9 @@
         summaryButton.disabled = true;
         summaryButton.textContent = '⏳ Sending...';
 
+        // Track CTA click
+        trackEvent('cta_clicked', { cta_type: 'email_summary' });
+
         try {
           // Send system message (hidden from UI)
           await sendMessage('[SYSTEM: User requested email summary]', true);
@@ -2422,6 +2486,34 @@
         }
       });
     }
+
+    // Track link clicks in messages (delegated event listener)
+    if (messagesContainer) {
+      messagesContainer.addEventListener('click', (e) => {
+        const link = e.target.closest('a');
+        if (link && link.href) {
+          const url = link.href;
+          let ctaType = 'other_link';
+
+          if (url.includes('meetings.hubspot.com') || url.includes('15min-intro')) {
+            ctaType = 'book_call';
+          } else if (url.includes('granted.ca/grantedpro') || url.includes('granted-starter')) {
+            ctaType = 'service_page';
+          } else if (url.includes('getgranted.ca')) {
+            ctaType = 'getgranted_page';
+          }
+
+          trackEvent('cta_clicked', { cta_type: ctaType, url: url });
+        }
+      });
+    }
+
+    // Track session ended on page unload
+    window.addEventListener('beforeunload', () => {
+      if (sessionId) {
+        trackEvent('session_ended');
+      }
+    });
   }
 
   // ============================================================================
@@ -2498,6 +2590,9 @@
     setupEventHandlers();
 
     console.log('GetGranted Widget initialized:', config.mode);
+
+    // Track widget opened
+    trackEvent('widget_opened');
   }
 
   // ============================================================================

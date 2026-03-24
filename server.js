@@ -55,6 +55,7 @@ import {
 // Lead-gen chatbot (public — no auth)
 import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js';
 import { handleLeadGenInit } from './src/api/lead-gen-init.js';
+import { handleLeadGenEvent } from './src/api/lead-gen-event.js';
 import { handleListLeadGenConversations, handleGetLeadGenMessages } from './src/api/admin-lead-gen.js';
 
 // Test endpoint (temporary for email debugging)
@@ -377,6 +378,9 @@ app.post('/api/lead-gen/init', handleLeadGenInit);
 
 // Chat endpoint — no authenticateUser middleware (public-facing)
 app.post('/api/lead-gen/chat', handleLeadGenChat);
+
+// Event tracking endpoint — fire-and-forget analytics (public, rate-limited by IP)
+app.post('/api/lead-gen/event', handleLeadGenEvent);
 
 // Analytics endpoint — authenticated team members only
 app.get('/api/lead-gen/analytics', authenticateUser, handleLeadGenAnalytics);
