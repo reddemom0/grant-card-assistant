@@ -116,8 +116,8 @@ CONSULTANT ANONYMITY: Never include specific consultant names in email_summary_b
 BOOKING LINK LANGUAGE: The email must NOT assume the prospect has booked a call. Instead of 'You've got a call booked' or 'We'll talk soon', use language that offers the option: 'If you'd like to talk through your options, you can book a 15-minute intro call here: [booking link]'. The email should present booking as an available next step, not confirm something that may not have happened.
 
 $30K+ OR revenue $5M+:
-- PRIMARY: GrantedPro (https://granted.ca/grantedpro/)
-- Booking link: PRIMARY (https://meetings.hubspot.com/natalie392/15min-intro-to-granted)
+- PRIMARY CTA: Booking link (https://meetings.hubspot.com/natalie392/15min-intro-to-granted) — this is how Pro starts
+- SECONDARY: GrantedPro service page (https://granted.ca/grantedpro/) — for information only, not as "get started"
 - GetGranted 2.0: Do NOT mention (these prospects need consultant, not self-serve)
 
 $15K-$29,999:

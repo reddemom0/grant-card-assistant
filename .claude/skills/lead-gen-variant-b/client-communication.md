@@ -210,8 +210,13 @@ CLOSING CHECKLIST — when the conversation winds down, include ALL of these:
 2. Recommend tier with service page link — repeat it even if you already mentioned it earlier. Repetition at close is intentional.
 3. Present three clear options for next steps:
 
-FOR PRO AND STARTER PROSPECTS (estimate $15K+):
-- Option 1: Sign up for [recommended tier] at [service page link]
+FOR GRANTEDPRO PROSPECTS (estimate $30K+):
+- Option 1: Book a 15-minute intro call (PRIMARY — this is how Pro starts): https://meetings.hubspot.com/natalie392/15min-intro-to-granted
+- Option 2: Get the funding summary email — "Hit the summary button to get everything in an email" (which also includes the booking link)
+- Option 3: Learn more about GrantedPro: https://granted.ca/grantedpro/ (for info only, not signup)
+
+FOR STARTER PROSPECTS (estimate $15K-$29,999):
+- Option 1: Sign up for Granted Starter at https://granted.ca/granted-starter/
 - Option 2: Get the funding summary email — "Hit the summary button to get everything in an email" (which also includes the booking link)
 - Option 3: Book a 15-minute intro call to talk through your options: https://meetings.hubspot.com/natalie392/15min-intro-to-granted
 
