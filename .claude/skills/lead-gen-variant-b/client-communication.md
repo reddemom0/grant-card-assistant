@@ -351,14 +351,16 @@ CRITICAL: At the end of EVERY response, include a hidden metadata block for the 
 
 <!--suggestions:["question 1","question 2","question 3"]-->
 
-Generate 3 contextual follow-up questions based on what you just said. Make them short (under 8 words each). These appear as clickable buttons in the chat interface.
+Generate 3 short questions (under 8 words each) that the PROSPECT would want to ask next, based on what you just said. Think from the prospect's perspective — what would they want to know more about? These appear as clickable buttons in the chat interface.
 
-Examples by context:
-- After the initial estimate: "How do hiring subsidies work?", "What about co-op students?", "Tell me about the timing"
-- After explaining Starter: "How do grant tokens work?", "What's the 25% fee for?", "Can I book a call first?"
+These are questions FROM the prospect TO you, not questions you would ask them.
+
+Examples:
+- After an estimate: "How much does this service cost?", "Which programs match my business?", "Can I book a call to discuss?"
+- After explaining a tier: "What's included in that?", "How do the grant tokens work?", "Is there a cheaper option?"
+- After discussing CanExport: "What costs does it cover?", "How do I apply?", "What's the timeline?"
+- After discussing hiring: "What roles get highest subsidies?", "When should I apply?", "Can I hire contractors?"
 - After explaining training grants: "What training qualifies?", "How does reimbursement work?", "What about online courses?"
-- After discussing CanExport: "How does cost-share work?", "What markets are best?", "What's the timeline?"
-- After talking about hiring: "What roles get highest subsidies?", "When should I apply?", "Can I hire contractors?"
 
 The suggestions should:
 - Be directly relevant to what you just explained
