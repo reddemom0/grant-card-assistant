@@ -529,6 +529,20 @@ export async function categorizeProspect(prospectData) {
   const tierResult = determineTier(prospectData, industryResolution.group);
   console.log(`✅ Service tier: ${tierResult.tier} (${tierResult.reasoning})`);
 
+  // Step 4.5: Check for high-volume flag (high employee count + significant training budget)
+  const highEmployeeCounts = ['50 – 99', '100 – 499', '500+'];
+  const significantTrainingBudgets = ['$10K – $25K', '$25K – $50K', '$50K – $100K', '$100K+'];
+
+  const highVolumeFlag =
+    highEmployeeCounts.includes(prospectData.employee_count) &&
+    significantTrainingBudgets.includes(prospectData.training_budget);
+
+  let highVolumeFlagNote = null;
+  if (highVolumeFlag) {
+    highVolumeFlagNote = "High employee count with significant training budget — verify if 3 Starter tokens are sufficient before confirming tier.";
+    console.log(`⚠️  High-volume flag: ${highVolumeFlagNote}`);
+  }
+
   // Step 5: Assign consultant (if Pro tier)
   let consultantAssignment = null;
   let bookingLink = null;
@@ -573,7 +587,9 @@ export async function categorizeProspect(prospectData) {
     grant_categories_to_search: grantCategories,
     search_parameters: searchParameters,
     smart_filter_weights: smartFilterWeights,
-    province: province
+    province: province,
+    high_volume_flag: highVolumeFlag,
+    high_volume_flag_note: highVolumeFlagNote
   };
 }
 
