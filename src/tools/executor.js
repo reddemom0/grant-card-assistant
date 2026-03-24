@@ -822,6 +822,22 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
 
                 console.log(`  ✅ Auto-captured ${grantNames.length} grant names from focused search`);
 
+                // Step 6.5: Add tier-specific reminder for Starter/GetGranted prospects
+                const tier = categorization.service_tier?.toLowerCase();
+                if (tier === 'starter' || tier === 'getgranted') {
+                  const tierReminder = "CRITICAL REMINDER: This is a Starter/GetGranted prospect. You MUST mention GetGranted 2.0 in your opening message. Include this exact line somewhere in your response: 'We're also launching GetGranted 2.0 — an all-in-one grant platform starting at $55/month. You can join the waitlist at <a href=\"https://getgranted.ca/waitlist/\">getgranted.ca/waitlist</a>.'";
+
+                  await dbQuery(
+                    `INSERT INTO conversation_memory (conversation_id, key, value)
+                     VALUES ($1, 'tier_specific_reminder', $2)
+                     ON CONFLICT (conversation_id, key)
+                     DO UPDATE SET value = $2`,
+                    [conversationId, JSON.stringify(tierReminder)]
+                  );
+
+                  console.log(`  ✅ Added tier-specific reminder for ${tier} prospect`);
+                }
+
                 // Step 7: Format result to match expected structure
                 result = {
                   success: true,
