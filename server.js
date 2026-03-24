@@ -1088,9 +1088,11 @@ async function startServer() {
     }
 
     // ── Migration 021: Create lead_gen_events table ──────────────────────────
+    console.log('🔧 ABOUT TO RUN migration 021...');
     console.log('🔧 Running migration 021: Create lead_gen_events table...');
     try {
-      await pool.query(`
+      const { query } = await import('./src/database/connection.js');
+      await query(`
         CREATE TABLE IF NOT EXISTS lead_gen_events (
           id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
           session_id TEXT,
@@ -1111,6 +1113,7 @@ async function startServer() {
       console.log('✅ Migration 021 complete (lead_gen_events table created)');
     } catch (migrationError) {
       console.warn('⚠️  Migration 021 failed (non-fatal):', migrationError.message);
+      console.error('⚠️  Full migration 021 error:', migrationError);
     }
 
     // Start Express server
