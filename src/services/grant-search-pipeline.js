@@ -273,11 +273,17 @@ export async function runFocusedSearch(categorization, searchFunction, conversat
 
       try {
         const { searchByGenreScores } = await import('../../scripts/create-search-function.js');
+
+        // Use raw Haiku-extracted industry (e.g., "Cosmetics / Retail / Beauty")
+        // instead of matched_industry (which could be "Other")
+        // This preserves tokens like "Tech / SaaS / EdTech" for partial matching
+        const rawIndustry = categorization.raw_industry || prospectData?.industry || categorization.matched_industry;
+
         const genreResults = await searchByGenreScores(
           provinceFullName,
           categorization.smart_filter_weights,
           15,
-          categorization.matched_industry
+          rawIndustry
         );
 
         console.log(`    ✅ Genre-score search: ${genreResults.grants.length} grants found`);

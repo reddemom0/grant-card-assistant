@@ -592,6 +592,7 @@ export async function categorizeProspect(prospectData) {
     industry_group: industryResolution.group,
     industry_group_label: industryResolution.group_label,
     matched_industry: industryResolution.matched_industry,
+    raw_industry: prospectData.industry,  // Haiku-extracted industry before resolution
     industry_confidence: industryResolution.confidence,
     service_tier: tierResult.tier,
     tier_reasoning: tierResult.reasoning,
