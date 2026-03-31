@@ -457,7 +457,8 @@
           bottom: 80px;
           right: 0;
           width: 440px;
-          height: 560px;
+          height: 680px;
+          max-height: calc(100vh - 120px);
           background: white;
           border-radius: 12px;
           box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
