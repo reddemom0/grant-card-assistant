@@ -758,7 +758,7 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
   if (tier === 'high') {
     // $30K+ → GrantedPro
     tierContent = `
-<p>With this level of funding potential across multiple programs, having a dedicated grant team handle the applications, timing, and claims makes a real difference. Our GrantedPro service includes a dedicated Grant Strategist, unlimited applications, complete claims management, and a 93% approval rate.</p>
+<p>With this level of funding potential across multiple programs, a dedicated grant strategist makes sure nothing falls through the cracks — coordinating timing, stacking programs, and managing claims to maximize your return. Our GrantedPro service includes a dedicated Grant Strategist, unlimited applications, complete claims management, and a 93% approval rate.</p>
 
 <p><a href="https://granted.ca/grantedpro/" style="color: #0066cc; font-weight: bold;">Learn more about GrantedPro</a></p>
     `;
