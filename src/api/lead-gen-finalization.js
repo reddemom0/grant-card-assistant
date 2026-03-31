@@ -733,22 +733,80 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
  * @param {string} firstName - Recipient's first name
  * @returns {string} HTML email content
  */
-function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there') {
+function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null) {
   const pd = prospectData || {};
   const companyName = pd.company_name || 'your company';
   const activities = pd.activities || pd.activities_discussed || 'your growth plans';
-  const tier = determineFundingTier(estimatedFunding);
 
-  // Parse funding estimate for "now" vs "12 months" if available
-  const fundingNow = pd.available_now_funding || null;
-  const funding12Mo = estimatedFunding || pd.estimated_funding || '$10-30K';
+  // Determine tier: use provided serviceTier if available, otherwise derive from funding amount
+  let tier;
+  if (serviceTier) {
+    // Map service_tier values to tier codes
+    const tierMap = {
+      'pro': 'high',
+      'grantedpro': 'high',
+      'starter': 'medium',
+      'getgranted': 'low'
+    };
+    tier = tierMap[serviceTier.toLowerCase()] || 'medium';
+  } else {
+    tier = determineFundingTier(estimatedFunding);
+  }
 
   // Build funding summary
   let fundingSummary = '';
-  if (fundingNow && fundingNow !== funding12Mo) {
-    fundingSummary = `Right now, you're looking at an estimated <strong>${fundingNow}</strong> across programs currently accepting applications. Over the next 12 months, as more programs open seasonal intakes, that grows to an estimated <strong>${funding12Mo}</strong>.`;
-  } else {
+  let pillarBreakdown = '';
+
+  if (mergedEstimate) {
+    // Use merged_estimate for accurate pillar-by-pillar breakdown
+    const totalLow = Math.round(mergedEstimate.total_low / 1000);
+    const totalHigh = Math.round(mergedEstimate.total_high / 1000);
+    const funding12Mo = `$${totalLow}K–$${totalHigh}K`;
+
     fundingSummary = `Based on what you shared, you're looking at an estimated <strong>${funding12Mo}</strong> over the next 12 months across multiple programs.`;
+
+    // Build pillar breakdown
+    const pillars = [];
+    if (mergedEstimate.hiring?.high > 0) {
+      const low = Math.round(mergedEstimate.hiring.low / 1000);
+      const high = Math.round(mergedEstimate.hiring.high / 1000);
+      pillars.push(`<strong>Hiring:</strong> $${low}K–$${high}K`);
+    }
+    if (mergedEstimate.training?.high > 0) {
+      const low = Math.round(mergedEstimate.training.low / 1000);
+      const high = Math.round(mergedEstimate.training.high / 1000);
+      pillars.push(`<strong>Training:</strong> $${low}K–$${high}K`);
+    }
+    if (mergedEstimate.market_expansion?.high > 0) {
+      const low = Math.round(mergedEstimate.market_expansion.low / 1000);
+      const high = Math.round(mergedEstimate.market_expansion.high / 1000);
+      pillars.push(`<strong>Market Expansion:</strong> $${low}K–$${high}K`);
+    }
+    if (mergedEstimate.rd?.high > 0) {
+      const low = Math.round(mergedEstimate.rd.low / 1000);
+      const high = Math.round(mergedEstimate.rd.high / 1000);
+      pillars.push(`<strong>R&D / Innovation:</strong> $${low}K–$${high}K`);
+    }
+
+    if (pillars.length > 0) {
+      pillarBreakdown = `<p>Here's the breakdown by activity:</p>
+
+<ul>
+  <li>${pillars.join('</li>\n  <li>')}</li>
+</ul>`;
+    }
+  } else {
+    // Fallback to generic estimate if merged_estimate not available
+    const fundingNow = pd.available_now_funding || null;
+    const funding12Mo = estimatedFunding || pd.estimated_funding || '$10-30K';
+
+    if (fundingNow && fundingNow !== funding12Mo) {
+      fundingSummary = `Right now, you're looking at an estimated <strong>${fundingNow}</strong> across programs currently accepting applications. Over the next 12 months, as more programs open seasonal intakes, that grows to an estimated <strong>${funding12Mo}</strong>.`;
+    } else {
+      fundingSummary = `Based on what you shared, you're looking at an estimated <strong>${funding12Mo}</strong> over the next 12 months across multiple programs.`;
+    }
+
+    pillarBreakdown = `<p>This includes hiring support, training reimbursements, and market expansion funding — the exact mix depends on timing, your province, and which intakes are open.</p>`;
   }
 
   // Build tier-specific email content
@@ -810,7 +868,7 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 
 <p>${fundingSummary}</p>
 
-<p>This includes hiring support, training reimbursements, and market expansion funding — the exact mix depends on timing, your province, and which intakes are open.</p>
+${pillarBreakdown}
 
 ${tierContent}
 
@@ -932,10 +990,38 @@ export async function sendLeadGenEmail(sessionId) {
 
   if (!emailBodyHtml) {
     console.log('⚠️  No email_summary_body from agent — generating fallback email');
+
+    // Load enriched session data for accurate estimate
+    console.log(`📊 Loading enriched session data from conversation_memory...`);
+    const enrichedSession = await loadEnrichedSessionData(sessionId);
+
+    // Extract merged estimate and tier data
+    let mergedEstimate = null;
+    let serviceTier = null;
+
+    if (enrichedSession?.prospect_data?.merged_estimate) {
+      const rawEstimate = typeof enrichedSession.prospect_data.merged_estimate === 'string'
+        ? JSON.parse(enrichedSession.prospect_data.merged_estimate)
+        : enrichedSession.prospect_data.merged_estimate;
+      mergedEstimate = rawEstimate.estimate || null;
+      serviceTier = rawEstimate.service_tier || null;
+      console.log(`✅ Using merged_estimate for fallback email`);
+    }
+
+    // Fallback to categorization if merged_estimate not available
+    if (!serviceTier && enrichedSession?.prospect_data?.categorization) {
+      const categorization = typeof enrichedSession.prospect_data.categorization === 'string'
+        ? JSON.parse(enrichedSession.prospect_data.categorization)
+        : enrichedSession.prospect_data.categorization;
+      serviceTier = categorization.service_tier || null;
+    }
+
     emailBodyHtml = generateFallbackEmail(
       prospectData,
       session.estimated_funding || prospectData.estimated_funding,
-      firstName
+      firstName,
+      mergedEstimate,
+      serviceTier
     );
   } else {
     console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
@@ -1770,15 +1856,43 @@ export async function finalizeInactiveSessions(inactivityMinutes = 5, batchSize 
               console.log(`⚠️  No email_summary_body from agent — generating fallback for auto-send`);
 
               try {
+                // Load enriched session data (includes conversation_memory)
+                console.log(`📊 Loading enriched session data from conversation_memory...`);
+                const enrichedSession = await loadEnrichedSessionData(session.session_id);
+
+                // Extract merged estimate and tier data
+                let mergedEstimate = null;
+                let serviceTier = null;
+
+                if (enrichedSession?.prospect_data?.merged_estimate) {
+                  const rawEstimate = typeof enrichedSession.prospect_data.merged_estimate === 'string'
+                    ? JSON.parse(enrichedSession.prospect_data.merged_estimate)
+                    : enrichedSession.prospect_data.merged_estimate;
+                  mergedEstimate = rawEstimate.estimate || null;
+                  serviceTier = rawEstimate.service_tier || null;
+                  console.log(`✅ Loaded merged_estimate: total $${Math.round(mergedEstimate?.total_low / 1000)}K–$${Math.round(mergedEstimate?.total_high / 1000)}K, tier: ${serviceTier}`);
+                }
+
+                // Fallback to categorization if merged_estimate not available
+                if (!serviceTier && enrichedSession?.prospect_data?.categorization) {
+                  const categorization = typeof enrichedSession.prospect_data.categorization === 'string'
+                    ? JSON.parse(enrichedSession.prospect_data.categorization)
+                    : enrichedSession.prospect_data.categorization;
+                  serviceTier = categorization.service_tier || null;
+                  console.log(`✅ Loaded service_tier from categorization: ${serviceTier}`);
+                }
+
                 // Extract first name for personalization
                 const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
                 const firstName = nameParts[0] || 'there';
 
-                // Generate fallback email
+                // Generate fallback email with enriched data
                 const fallbackBody = generateFallbackEmail(
                   prospectData,
                   session.estimated_funding || prospectData.estimated_funding,
-                  firstName
+                  firstName,
+                  mergedEstimate,
+                  serviceTier
                 );
 
                 if (fallbackBody) {
