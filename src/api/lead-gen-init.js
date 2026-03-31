@@ -285,7 +285,7 @@ export async function handleLeadGenInit(req, res) {
       email,
       company_name,
       company_website,
-      _honeypot,
+      _fax,
       province,
       industry,
       revenue_range,
@@ -301,8 +301,10 @@ export async function handleLeadGenInit(req, res) {
     // -------------------------------------------------------------------------
     // 0. Honeypot check (bot detection)
     // -------------------------------------------------------------------------
+    // Field renamed from _honeypot to _fax to avoid browser autofill
+    // Only flag as bot if field exists and has non-empty value
 
-    if (_honeypot && _honeypot.trim() !== '') {
+    if (typeof _fax === 'string' && _fax.trim() !== '') {
       console.log(`🤖 Bot detected (honeypot triggered) from IP ${ipAddress}`);
       // Silently return 200 to not alert the bot
       return res.status(200).json({

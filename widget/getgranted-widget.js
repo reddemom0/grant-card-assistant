@@ -1544,8 +1544,8 @@
 
           <!-- Honeypot field (hidden from real users, visible to bots) -->
           <div class="gg-honeypot-field">
-            <label for="gg-phone-number">Phone Number</label>
-            <input type="text" id="gg-phone-number" name="phone_number" tabindex="-1" autocomplete="off" />
+            <label for="gg-company-fax">Company Fax</label>
+            <input type="text" id="gg-company-fax" name="fax_number_confirm" tabindex="-1" autocomplete="new-password" aria-hidden="true" />
           </div>
 
           <div class="gg-form-field">
@@ -2158,7 +2158,7 @@
     }
 
     // Get honeypot value (should be empty for real users)
-    const honeypot = shadowRoot?.getElementById('gg-phone-number').value;
+    const honeypot = shadowRoot?.getElementById('gg-company-fax')?.value || '';
 
     // Prepare form data with all fields
     formData = {
@@ -2174,7 +2174,7 @@
       training_budget: training || null,
       expansion_budget: expansion || null,
       planned_activities: plannedActivities || null,
-      _honeypot: honeypot // Hidden field for bot detection
+      _fax: honeypot // Hidden field for bot detection (fax field to avoid autofill)
     };
 
     // Show loading, disable submit
