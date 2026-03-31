@@ -1760,29 +1760,68 @@ export async function finalizeInactiveSessions(inactivityMinutes = 5, batchSize 
           // Auto-send funding summary email if conditions are met
           const prospectData = session.prospect_data || {};
           const hasEmail = !!session.contact_email;
-          const hasEmailBody = !!prospectData.email_summary_body;
+          let hasEmailBody = !!prospectData.email_summary_body;
 
-          if (hasEmail && hasEmailBody) {
-            try {
-              console.log(`📧 Auto-sending funding summary email to ${session.contact_email} (inactivity timeout)...`);
-              const emailResult = await sendLeadGenEmail(session.session_id);
-
-              if (emailResult.success) {
-                console.log(`📧 Auto-sent funding summary email to ${session.contact_email} (inactivity timeout)`);
-              } else if (emailResult.alreadySent) {
-                console.log(`ℹ️  Email already sent at ${emailResult.sentAt} — skipping duplicate`);
-              } else {
-                console.warn(`⚠️  Email send failed: ${emailResult.error}`);
-              }
-            } catch (emailErr) {
-              console.error(`⚠️  Error auto-sending email: ${emailErr.message}`);
-              // Don't fail finalization if email fails
-            }
+          if (!hasEmail) {
+            console.log(`⚠️  No contact_email — skipping auto-send`);
           } else {
+            // Generate fallback email if agent didn't provide one
             if (!hasEmailBody) {
-              console.log(`⚠️  No email_summary_body — skipping auto-send`);
-            } else if (!hasEmail) {
-              console.log(`⚠️  No contact_email — skipping auto-send`);
+              console.log(`⚠️  No email_summary_body from agent — generating fallback for auto-send`);
+
+              try {
+                // Extract first name for personalization
+                const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
+                const firstName = nameParts[0] || 'there';
+
+                // Generate fallback email
+                const fallbackBody = generateFallbackEmail(
+                  prospectData,
+                  session.estimated_funding || prospectData.estimated_funding,
+                  firstName
+                );
+
+                if (fallbackBody) {
+                  console.log(`✅ Generated fallback email (${fallbackBody.length} chars)`);
+
+                  // Update session with generated email body
+                  prospectData.email_summary_body = fallbackBody;
+                  await query(
+                    `UPDATE lead_gen_conversations
+                     SET prospect_data = $1
+                     WHERE session_id = $2`,
+                    [JSON.stringify(prospectData), session.session_id]
+                  );
+
+                  console.log(`✅ Updated session with fallback email body`);
+                  hasEmailBody = true;
+                } else {
+                  console.warn(`⚠️  Fallback email generation returned empty — skipping auto-send`);
+                }
+              } catch (fallbackErr) {
+                console.error(`❌ Fallback email generation failed: ${fallbackErr.message}`);
+              }
+            }
+
+            // Send email if we have a body (agent-generated or fallback)
+            if (hasEmailBody) {
+              try {
+                console.log(`📧 Auto-sending funding summary email to ${session.contact_email} (inactivity timeout)...`);
+                const emailResult = await sendLeadGenEmail(session.session_id);
+
+                if (emailResult.success) {
+                  console.log(`📧 Auto-sent funding summary email to ${session.contact_email} (inactivity timeout)`);
+                } else if (emailResult.alreadySent) {
+                  console.log(`ℹ️  Email already sent at ${emailResult.sentAt} — skipping duplicate`);
+                } else {
+                  console.warn(`⚠️  Email send failed: ${emailResult.error}`);
+                }
+              } catch (emailErr) {
+                console.error(`⚠️  Error auto-sending email: ${emailErr.message}`);
+                // Don't fail finalization if email fails
+              }
+            } else {
+              console.log(`⚠️  No email body available — skipping auto-send`);
             }
           }
         } else if (result.alreadyFinalized) {

@@ -71,7 +71,9 @@ save_lead_data is called at TWO points:
 
 CALL 1 — Immediately after delivering the estimate (first response):
 - Include: lead_score, hs_lead_status, name, email, company_name, province, revenue, employee_count, company_description, planned_activities, activity_assessment, prospect_summary
-- Include email_summary_body — generate it now even though it won't send yet. It's stored for the timeout trigger.
+
+CRITICAL — email_summary_body is REQUIRED in this call. Generate the complete HTML email now, even though it won't send yet. If the prospect walks away, this is the ONLY email they'll receive. Follow <email_generation> rules for tier-appropriate content. Omitting this field means the prospect gets no funding summary — treat it as mandatory as the estimate itself.
+
 - Set cta_selected to "none" (no CTA has happened yet)
 - After this call, continue the conversation normally
 
