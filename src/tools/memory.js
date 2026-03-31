@@ -195,7 +195,11 @@ export async function loadConversationMemories(conversationId) {
 
     console.log(`✓ Loaded ${result.rows.length} memories into context for conversation ${conversationId}`);
 
-    return `\n\n## Previously Stored Information\n${memoryList}\n`;
+    return `\n\n## Previously Stored Information
+
+INTERNAL REFERENCE DATA — The following contains exact program names for internal record-keeping (HubSpot, memory_store). These names must NEVER appear in client-facing chat or email. Use category-level descriptions only when speaking to the prospect.
+
+${memoryList}\n`;
   } catch (error) {
     console.error('Error loading conversation memories:', error);
     return '';

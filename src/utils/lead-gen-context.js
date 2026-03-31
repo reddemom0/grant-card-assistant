@@ -260,8 +260,12 @@ export async function getStrategicContext(conversationId) {
     console.log(`🧠 Strategic context loaded: "${strategyQuery}" → ${charCount} chars`);
     console.log(`🧠 Strategy lookup: ${elapsed}ms`);
 
-    // Format as XML block
-    const formattedContext = `<strategic_context>\n${contextText}\n</strategic_context>\n`;
+    // Format as XML block with internal reference warning
+    const formattedContext = `<strategic_context>
+INTERNAL STRATEGIC CONTEXT — Contains program-level intelligence for estimation accuracy. Program names below are for internal reference only and must not be shared with the prospect.
+
+${contextText}
+</strategic_context>\n`;
 
     // Store in conversation_memory
     await query(

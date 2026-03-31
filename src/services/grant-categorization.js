@@ -550,7 +550,7 @@ export async function categorizeProspect(prospectData) {
 
   let highMeBudgetFlagNote = null;
   if (highMeBudgetFlag) {
-    highMeBudgetFlagNote = "High market expansion budget — suggest booking a call for market expansion planning. Could lead to CanExport engagement or Granted Export service.";
+    highMeBudgetFlagNote = "High market expansion budget — suggest booking a call for market expansion planning. Strong fit for export-focused grant programs and Granted Export service.";
     console.log(`⚠️  High ME budget flag: ${highMeBudgetFlagNote} ($${prospectData.international_market_spend} expansion budget)`);
   }
 
