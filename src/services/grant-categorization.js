@@ -618,25 +618,47 @@ function buildGrantCategories(industryGroup, prospectData) {
   // Add base categories for the industry group
   const groupCategories = searchCategoryMapping.group_categories[industryGroup.toString()] || [];
   groupCategories.forEach(cat => categories.add(cat));
+  console.log(`  📦 Base categories from group ${industryGroup}: ${groupCategories.join(', ') || 'none'}`);
+
+  // DIAGNOSTIC: Log activity detection
+  console.log(`  🔍 Activity detection (values from prospectData):`);
+  console.log(`     num_hires: ${prospectData.num_hires || 0} ${(prospectData.num_hires || 0) > 0 ? '✓ WILL ADD HIRING CATEGORIES' : '✗ no hiring categories'}`);
+  console.log(`     num_student_hires: ${prospectData.num_student_hires || 0} ${(prospectData.num_student_hires || 0) > 0 ? '✓ WILL ADD STUDENT HIRING' : '✗ no student hiring'}`);
+  console.log(`     num_recent_grad_hires: ${prospectData.num_recent_grad_hires || 0} ${(prospectData.num_recent_grad_hires || 0) > 0 ? '✓ WILL ADD GRAD HIRING' : '✗ no grad hiring'}`);
+  console.log(`     annual_training_spend: $${prospectData.annual_training_spend || 0} ${(prospectData.annual_training_spend || 0) > 0 ? '✓ WILL ADD TRAINING CATEGORIES' : '✗ no training categories'}`);
+  console.log(`     international_market_spend: $${prospectData.international_market_spend || 0} ${(prospectData.international_market_spend || 0) > 0 ? '✓ WILL ADD EXPANSION CATEGORIES' : '✗ no expansion categories'}`);
+  console.log(`     rd_spend: $${prospectData.rd_spend || 0} ${(prospectData.rd_spend || 0) > 0 ? '✓ WILL ADD R&D CATEGORIES' : '✗ no R&D categories'}`);
 
   // Add activity-based categories
   if ((prospectData.num_hires || 0) > 0) {
-    searchCategoryMapping.activity_categories.has_hires.forEach(cat => categories.add(cat));
+    const addedCats = searchCategoryMapping.activity_categories.has_hires || [];
+    addedCats.forEach(cat => categories.add(cat));
+    console.log(`     → Added hiring categories: ${addedCats.join(', ')}`);
   }
   if ((prospectData.num_student_hires || 0) > 0) {
-    searchCategoryMapping.activity_categories.has_student_hires.forEach(cat => categories.add(cat));
+    const addedCats = searchCategoryMapping.activity_categories.has_student_hires || [];
+    addedCats.forEach(cat => categories.add(cat));
+    console.log(`     → Added student hire categories: ${addedCats.join(', ')}`);
   }
   if ((prospectData.num_recent_grad_hires || 0) > 0) {
-    searchCategoryMapping.activity_categories.has_grad_hires.forEach(cat => categories.add(cat));
+    const addedCats = searchCategoryMapping.activity_categories.has_grad_hires || [];
+    addedCats.forEach(cat => categories.add(cat));
+    console.log(`     → Added grad hire categories: ${addedCats.join(', ')}`);
   }
   if ((prospectData.annual_training_spend || 0) > 0) {
-    searchCategoryMapping.activity_categories.has_training_spend.forEach(cat => categories.add(cat));
+    const addedCats = searchCategoryMapping.activity_categories.has_training_spend || [];
+    addedCats.forEach(cat => categories.add(cat));
+    console.log(`     → Added training categories: ${addedCats.join(', ')}`);
   }
   if ((prospectData.international_market_spend || 0) > 0) {
-    searchCategoryMapping.activity_categories.has_international_expansion.forEach(cat => categories.add(cat));
+    const addedCats = searchCategoryMapping.activity_categories.has_international_expansion || [];
+    addedCats.forEach(cat => categories.add(cat));
+    console.log(`     → Added market expansion categories: ${addedCats.join(', ')}`);
   }
   if ((prospectData.rd_spend || 0) > 0) {
-    searchCategoryMapping.activity_categories.has_rd_spend.forEach(cat => categories.add(cat));
+    const addedCats = searchCategoryMapping.activity_categories.has_rd_spend || [];
+    addedCats.forEach(cat => categories.add(cat));
+    console.log(`     → Added R&D categories: ${addedCats.join(', ')}`);
   }
 
   return Array.from(categories);

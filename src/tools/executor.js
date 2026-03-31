@@ -75,6 +75,22 @@ async function buildProspectDataFromSession(conversationId) {
     const companyBackground = session.company_background || {};
 
     // Map form data to categorization input format
+    // DIAGNOSTIC: Log raw form values before parsing
+    console.log('  📋 Raw form values from prospect_data:');
+    console.log(`     hiring_plans: "${prospectData.hiring_plans}"`);
+    console.log(`     training_budget: "${prospectData.training_budget}"`);
+    console.log(`     expansion_budget: "${prospectData.expansion_budget}"`);
+    console.log(`     planned_activities: "${prospectData.planned_activities}"`);
+
+    const hiringParsed = parseHiringPlans(prospectData.hiring_plans);
+    const trainingParsed = parseSpendAmount(prospectData.training_budget);
+    const expansionParsed = parseSpendAmount(prospectData.expansion_budget);
+
+    console.log('  🔢 Parsed numeric values:');
+    console.log(`     num_hires: ${hiringParsed.num_hires}, num_student_hires: ${hiringParsed.num_student_hires}`);
+    console.log(`     annual_training_spend: $${trainingParsed}`);
+    console.log(`     international_market_spend: $${expansionParsed}`);
+
     const data = {
       // Industry (prioritize form dropdown selection over Haiku extraction)
       // Form uses exact grant vocabulary like "Tech - Software/Web Development", "Retail"
@@ -89,14 +105,14 @@ async function buildProspectDataFromSession(conversationId) {
       // Employee count (parse from range string)
       num_ftes: parseEmployeeCount(prospectData.employee_count),
 
-      // Hiring plans (parse from text)
-      ...parseHiringPlans(prospectData.hiring_plans),
+      // Hiring plans (parsed values)
+      ...hiringParsed,
 
-      // Training budget (parse from range string)
-      annual_training_spend: parseSpendAmount(prospectData.training_budget),
+      // Training budget (parsed value)
+      annual_training_spend: trainingParsed,
 
-      // Market expansion (parse from range string)
-      international_market_spend: parseSpendAmount(prospectData.expansion_budget),
+      // Market expansion (parsed value)
+      international_market_spend: expansionParsed,
 
       // R&D spend (not collected in form yet, default to 0)
       rd_spend: 0,

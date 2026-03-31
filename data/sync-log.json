@@ -1,5 +1,14 @@
 [
   {
+    "synced_at": "2026-03-12T12:31:29.792Z",
+    "duration_minutes": 21,
+    "total_grants": 590,
+    "active_grants": 527,
+    "inactive_grants": 63,
+    "failed": 8,
+    "success": true
+  },
+  {
     "synced_at": "2026-02-12T10:12:38.454Z",
     "error": "getaddrinfo ENOTFOUND postgres.railway.internal",
     "success": false
