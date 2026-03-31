@@ -456,7 +456,7 @@
           position: absolute;
           bottom: 80px;
           right: 0;
-          width: 440px;
+          width: 500px;
           height: 680px;
           max-height: calc(100vh - 120px);
           background: white;
@@ -697,9 +697,11 @@
         .gg-quick-actions {
           padding: 0 20px 12px;
           display: flex;
-          flex-wrap: wrap;
+          flex-wrap: nowrap;
           gap: 8px;
           flex-shrink: 0;
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
         }
 
         .gg-quick-action {
@@ -711,6 +713,8 @@
           font-size: 14px;
           cursor: pointer;
           transition: all 0.2s ease;
+          white-space: nowrap;
+          flex-shrink: 0;
         }
 
         .gg-quick-action:hover {
