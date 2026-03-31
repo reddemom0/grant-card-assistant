@@ -772,7 +772,7 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
   } else if (tier === 'medium') {
     // $10-29K → Granted Starter (PRIMARY), GetGranted 2.0 (SECONDARY)
     tierContent = `
-<p>For your situation, Granted Starter is a great fit — you get expert guidance on your applications without full-service overhead. Our team reviews your applications, provides feedback, and helps you maximize your approval chances.</p>
+<p>For your profile, Granted Starter is a great fit — you get expert guidance on your applications without full-service overhead. Our team reviews your applications, provides feedback, and helps you maximize your approval chances.</p>
 
 <p><a href="https://granted.ca/granted-starter/" style="color: #0066cc; font-weight: bold;">Learn more about Granted Starter</a></p>
 
