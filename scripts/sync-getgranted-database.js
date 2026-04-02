@@ -156,6 +156,20 @@ async function syncDatabase() {
       const genreScoresResult = await reimportGenreScores(client);
       console.log(`   ✅ Genre scores complete\n`);
 
+      // Run incremental genre tagger for any unscored grants
+      console.log('8️⃣ Scoring new grants (genre tagger)...');
+      let genreTaggerResult = { scored: 0, skipped: true };
+      try {
+        const taggerStart = Date.now();
+        await execAsync('node scripts/genre-tagger-incremental.js');
+        const taggerDuration = Math.round((Date.now() - taggerStart) / 1000);
+        console.log(`   ✅ Genre tagger complete (${taggerDuration}s)\n`);
+        genreTaggerResult.skipped = false;
+      } catch (taggerError) {
+        console.log(`   ⚠️  Genre tagger failed: ${taggerError.message}`);
+        console.log(`   Continuing with sync...\n`);
+      }
+
       // Create sync log
       const syncSummary = {
         synced_at: new Date().toISOString(),
@@ -172,6 +186,7 @@ async function syncDatabase() {
         genre_scores_imported: genreScoresResult.imported,
         genre_scores_unscored: genreScoresResult.unscored,
         genre_scores_skipped: genreScoresResult.skipped || false,
+        genre_tagger_skipped: genreTaggerResult.skipped,
         failed: failed,
         success: true
       };
