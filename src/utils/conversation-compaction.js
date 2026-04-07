@@ -34,7 +34,7 @@ const COMPACTION_SETTINGS = {
   keepRecentTurns: 10,
 
   // Use Haiku for summarization (fast and cheap)
-  summaryModel: 'claude-haiku-4-5-20250929',
+  summaryModel: 'claude-haiku-4-5-20251001',
 
   // Target summary length
   targetSummaryTokens: 2000

@@ -139,7 +139,7 @@ export function getModelForQuery(complexity) {
   }
 
   // Both moderate and simple use Haiku
-  return 'claude-haiku-4-5-20250929';
+  return 'claude-haiku-4-5-20251001';
 }
 ```
 
