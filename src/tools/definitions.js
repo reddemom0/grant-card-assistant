@@ -578,6 +578,70 @@ export const HUBSPOT_TOOLS = [
     }
   },
   {
+    name: 'create_hubspot_deal',
+    description: 'Create a new deal in HubSpot with the specified properties and optional company/contact associations. Use this when a team member asks to create a new grant application deal, either from a conversation or from a spreadsheet. The deal will be created in the pipeline and stage you specify. You MUST provide at minimum: dealname, pipeline (as the pipeline ID), and dealstage (as the pipeline-specific stage ID). Other properties depend on which pipeline and stage you\'re creating into — consult the HubSpot Deal Creation skill for the full required-field matrix per pipeline. Associations (company + contact) should be included in the same call when possible; if either fails after the deal is created, the function will still return success with warnings. Returns the new deal ID and a direct HubSpot URL.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        properties: {
+          type: 'object',
+          description: 'HubSpot deal properties. Keys must be HubSpot API names (e.g., "dealname", "pipeline", "dealstage", "grant_type", "dealtype"). At minimum must include dealname, pipeline, and dealstage. Use HubSpot API names, not display labels.',
+          additionalProperties: true,
+          properties: {
+            dealname: {
+              type: 'string',
+              description: 'Deal name (REQUIRED) - e.g., "Acme Corp - ETG - Q2 2026"'
+            },
+            pipeline: {
+              type: 'string',
+              description: 'Pipeline ID (REQUIRED) - e.g., "2662913" for Hiring Grants. Use the numeric pipeline ID, not the label.'
+            },
+            dealstage: {
+              type: 'string',
+              description: 'Stage ID (REQUIRED) - e.g., "9371216" for Hiring Pending Submission. Use the pipeline-specific numeric stage ID, not the label.'
+            }
+          },
+          required: ['dealname', 'pipeline', 'dealstage']
+        },
+        associations: {
+          type: 'object',
+          description: 'Optional associations to create alongside the deal.',
+          properties: {
+            companyId: {
+              type: 'string',
+              description: 'HubSpot company ID to associate as primary company on the deal'
+            },
+            contactIds: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Array of HubSpot contact IDs to associate with the deal'
+            }
+          }
+        }
+      },
+      required: ['properties']
+    }
+  },
+  {
+    name: 'update_hubspot_deal',
+    description: 'Update properties on an existing HubSpot deal. Use this to change property values on a deal that already exists — for example, moving it to a new stage, updating a reimbursement amount, or filling in fields after the fact. Requires the deal ID and an object of properties to update (only include the properties you want to change, not all of them). Does not touch associations. For creating a new deal, use create_hubspot_deal instead.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        deal_id: {
+          type: 'string',
+          description: 'HubSpot deal ID to update (from create_hubspot_deal or search results)'
+        },
+        properties: {
+          type: 'object',
+          description: 'Properties to update. Keys are HubSpot API names (e.g., "dealstage", "grant_type", "amount"), values are the new values. Only include properties you want to change.',
+          additionalProperties: true
+        }
+      },
+      required: ['deal_id', 'properties']
+    }
+  },
+  {
     name: 'verify_company_website',
     description: 'Verify if a company\'s website is still active and accessible. Checks HTTP status, handles redirects, and identifies if the business appears to still be operating. Use this for lead verification to identify inactive/defunct companies. Returns status (active/inactive/unknown), HTTP status code, and detailed message about accessibility.',
     input_schema: {
@@ -2003,7 +2067,8 @@ export function getToolsForAgent(agentType) {
      'get_hubspot_contact', 'get_hubspot_company',
      'get_grant_application',  // Get deal by ID (actual name, not get_hubspot_deal)
      'create_hubspot_contact', 'create_hubspot_company',
-     'update_hubspot_contact', 'update_hubspot_company', 'update_hubspot_deal',
+     'update_hubspot_contact', 'update_hubspot_company',
+     'create_hubspot_deal', 'update_hubspot_deal',
      'associate_contact_with_company', 'search_getgranted',
      'generate_hubspot_embed_link'].includes(tool.name)
   );

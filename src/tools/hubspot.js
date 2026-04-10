@@ -1415,6 +1415,188 @@ export async function associateContactWithCompany(contactId, companyId) {
 }
 
 // ============================================================================
+// DEAL WRITE OPERATIONS
+// ============================================================================
+
+/**
+ * Create a new deal in HubSpot, optionally with company and contact associations.
+ *
+ * @param {Object} params
+ * @param {Object} params.properties - HubSpot deal property payload. Keys must be HubSpot API names
+ *   (e.g., 'dealname', 'pipeline', 'dealstage', 'grant_type', 'participant_name', etc.).
+ *   At minimum must include 'dealname', 'pipeline', and 'dealstage'.
+ * @param {Object} [params.associations] - Optional object describing records to associate with the new deal.
+ * @param {string} [params.associations.companyId] - HubSpot company ID to associate as Primary.
+ * @param {string[]} [params.associations.contactIds] - Array of HubSpot contact IDs to associate.
+ * @returns {Promise<Object>} { success, deal: { id, properties }, associations_created, warnings, hubspotUrl }
+ */
+export async function createHubSpotDeal({ properties, associations = {} }) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  // Validate required fields
+  for (const field of ['dealname', 'pipeline', 'dealstage']) {
+    if (!properties[field]) {
+      return {
+        success: false,
+        error: `Missing required property: ${field}`
+      };
+    }
+  }
+
+  // Filter out undefined/null values
+  const cleanedProperties = {};
+  Object.keys(properties).forEach(key => {
+    if (properties[key] !== undefined && properties[key] !== null) {
+      cleanedProperties[key] = properties[key];
+    }
+  });
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`📋 Creating deal: ${properties.dealname}`);
+
+    const response = await client.post('/crm/v3/objects/deals', {
+      properties: cleanedProperties
+    });
+
+    const dealId = response.data.id;
+    console.log(`✅ Deal created with ID: ${dealId}`);
+
+    const warnings = [];
+    const associations_created = {};
+
+    // Associate company if provided
+    if (associations.companyId) {
+      try {
+        console.log(`🔗 Associating deal ${dealId} with company ${associations.companyId}`);
+        await client.put(
+          `/crm/v4/objects/deals/${dealId}/associations/default/companies/${associations.companyId}`,
+          []
+        );
+        console.log(`✅ Company association created`);
+        associations_created.companyId = associations.companyId;
+      } catch (assocError) {
+        const msg = `Failed to associate company ${associations.companyId}: ${assocError.response?.data?.message || assocError.message}`;
+        console.error(`⚠️  ${msg}`);
+        warnings.push(msg);
+      }
+    }
+
+    // Associate contacts if provided
+    if (associations.contactIds && associations.contactIds.length > 0) {
+      associations_created.contactIds = [];
+      for (const contactId of associations.contactIds) {
+        try {
+          console.log(`🔗 Associating deal ${dealId} with contact ${contactId}`);
+          await client.put(
+            `/crm/v4/objects/deals/${dealId}/associations/default/contacts/${contactId}`,
+            []
+          );
+          console.log(`✅ Contact association created: ${contactId}`);
+          associations_created.contactIds.push(contactId);
+        } catch (assocError) {
+          const msg = `Failed to associate contact ${contactId}: ${assocError.response?.data?.message || assocError.message}`;
+          console.error(`⚠️  ${msg}`);
+          warnings.push(msg);
+        }
+      }
+    }
+
+    const hubspotUrl = `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/deal/${dealId}`;
+
+    return {
+      success: true,
+      deal: {
+        id: dealId,
+        ...response.data.properties
+      },
+      associations_created,
+      warnings,
+      hubspotUrl
+    };
+  } catch (error) {
+    console.error('Create HubSpot deal error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+/**
+ * Update properties on an existing HubSpot deal.
+ *
+ * @param {string} dealId - The HubSpot deal ID to update.
+ * @param {Object} properties - Properties to update (keys are HubSpot API names, values are the new values).
+ *   Only include properties you want to change.
+ * @returns {Promise<Object>} { success, deal: { id, properties } } on success, { success: false, error } on failure.
+ */
+export async function updateHubSpotDeal(dealId, properties) {
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
+  if (!dealId) {
+    return {
+      success: false,
+      error: 'Deal ID is required'
+    };
+  }
+
+  if (!properties || Object.keys(properties).length === 0) {
+    return {
+      success: false,
+      error: 'At least one property to update is required'
+    };
+  }
+
+  // Filter out undefined/null values
+  const cleanedProperties = {};
+  Object.keys(properties).forEach(key => {
+    if (properties[key] !== undefined && properties[key] !== null) {
+      cleanedProperties[key] = properties[key];
+    }
+  });
+
+  try {
+    const client = createHubSpotClient();
+
+    console.log(`🔄 Updating deal ID: ${dealId}`);
+
+    const response = await client.patch(`/crm/v3/objects/deals/${dealId}`, {
+      properties: cleanedProperties
+    });
+
+    console.log(`✅ Deal updated: ${dealId}`);
+
+    return {
+      success: true,
+      deal: {
+        id: response.data.id,
+        ...response.data.properties
+      }
+    };
+  } catch (error) {
+    console.error('Update HubSpot deal error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.response?.data?.message || error.message,
+      details: error.response?.data
+    };
+  }
+}
+
+// ============================================================================
 // LEAD VERIFICATION & MANAGEMENT
 // ============================================================================
 

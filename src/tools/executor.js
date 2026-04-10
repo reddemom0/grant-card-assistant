@@ -537,6 +537,17 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.updateHubSpotContact(input.contact_id, parseJSONParameter(input.properties));
         break;
 
+      case 'create_hubspot_deal':
+        result = await hubspot.createHubSpotDeal({
+          properties: parseJSONParameter(input.properties),
+          associations: parseJSONParameter(input.associations) || {}
+        });
+        break;
+
+      case 'update_hubspot_deal':
+        result = await hubspot.updateHubSpotDeal(input.deal_id, parseJSONParameter(input.properties));
+        break;
+
       case 'associate_contact_with_company':
         result = await hubspot.associateContactWithCompany(input.contact_id, input.company_id);
         break;
