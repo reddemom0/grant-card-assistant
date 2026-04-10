@@ -91,8 +91,8 @@ async function syncDatabase() {
               max_spend, contribution_percentage, difficulty,
               grant_criteria, best_practices, recently_changed, full_page_text,
               last_updated, extracted_at, is_active,
-              intake_cycle
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+              intake_cycle, last_edited_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
           `, [
             grant.grant_id,
             grant.grant_name,
@@ -113,7 +113,8 @@ async function syncDatabase() {
             grant.last_updated,
             grant.extracted_at,
             grant.is_active,
-            grant.intake_cycle
+            grant.intake_cycle,
+            grant.last_edited_at || null
           ]);
 
           imported++;

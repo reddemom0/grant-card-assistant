@@ -64,7 +64,7 @@ async function searchGrants({
 
     const params = [];
     let paramIndex = 1;
-    const whereConditions = ['1=1'];
+    const whereConditions = ['1=1', "last_updated >= '2025/01/01'"];
 
     // ── Status filter ─────────────────────────────────────────────────────────
     // Use currently_accepting when populated (migration 004+), fall back to is_active.
@@ -331,6 +331,7 @@ async function searchByGenreScores(province, smartFilterWeights = {}, maxResults
         ) AS relevance_score
       FROM grants
       WHERE currently_accepting = true
+        AND last_updated >= '2025/01/01'
         AND genre_scores IS NOT NULL
         AND ${provinceClause}
         ${industryClause}

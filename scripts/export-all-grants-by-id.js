@@ -188,6 +188,31 @@ async function extractGrantDetails(page, grantId) {
       console.warn(`      ⚠️  Some fields failed for grant ${grantId}: ${error.message}`);
     }
 
+    // Extract last_edited_at from admin edit history page
+    try {
+      await page.goto(`${GETGRANTED_URL}/admin/grants/${grantId}/edit_history`, { timeout: 10000, waitUntil: 'domcontentloaded' });
+      await page.waitForTimeout(1000);
+
+      const dateText = await page.locator('.edit-history__table-row td:nth-child(3) p').first().textContent({ timeout: 3000 });
+
+      if (dateText && dateText.trim()) {
+        const raw = dateText.trim();
+        const parsed = new Date(raw);
+        if (!isNaN(parsed.getTime())) {
+          details.last_edited_at = parsed.toISOString();
+        } else {
+          console.warn(`      ⚠️  Grant ${grantId}: could not parse edit history date: "${raw}"`);
+          details.last_edited_at = null;
+        }
+      } else {
+        console.warn(`      ⚠️  Grant ${grantId}: no edit history rows found`);
+        details.last_edited_at = null;
+      }
+    } catch (error) {
+      console.warn(`      ⚠️  Grant ${grantId}: edit history failed: ${error.message}`);
+      details.last_edited_at = null;
+    }
+
     return details;
 
   } catch (error) {
