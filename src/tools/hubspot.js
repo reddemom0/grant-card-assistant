@@ -1468,6 +1468,21 @@ export async function createHubSpotDeal({ properties, associations = {} }) {
     const dealId = response.data.id;
     console.log(`✅ Deal created with ID: ${dealId}`);
 
+    // Verify the deal actually exists in HubSpot before proceeding
+    console.log(`🔍 Verifying deal exists in HubSpot...`);
+    try {
+      await client.get(`/crm/v3/objects/deals/${dealId}`);
+      console.log(`✅ Deal verified`);
+    } catch (verifyError) {
+      console.error('Deal verification failed:', verifyError.response?.data || verifyError.message);
+      return {
+        success: false,
+        error: 'Verification failed: deal was not found in HubSpot after creation. The POST returned ID ' + dealId + ' but a follow-up GET could not retrieve it. The deal likely was not actually created.',
+        attempted_deal_id: dealId,
+        verification_error: verifyError.response?.data?.message || verifyError.message
+      };
+    }
+
     const warnings = [];
     const associations_created = {};
 

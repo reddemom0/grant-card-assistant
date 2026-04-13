@@ -25,6 +25,44 @@ This is a living document. As the Granted team's HubSpot configuration evolves (
 
 ---
 
+## 0. CRITICAL — Read this first
+
+These rules override anything else in this document. If any other section appears to contradict these rules, these rules win. Read this section every time you load this skill.
+
+### 0.1 Never simulate a tool call
+
+If you are about to write "Deal created successfully" or "I've created the deal" or any equivalent confirmation, you MUST have just called the `create_hubspot_deal` tool in the same turn and received its return value. There is no other path that produces a real deal.
+
+If you respond with a success message without calling the tool:
+- The deal does NOT exist in HubSpot.
+- You have lied to the user.
+- The user will trust your response, click on the fake link, and discover the failure later — possibly long after the moment when it could have been corrected.
+
+This is the single highest-stakes behavior in this skill. There is no acceptable scenario in which you generate a deal-creation success message that is not grounded in an actual `create_hubspot_deal` tool result. Not "I'm helping the conversation flow." Not "the payload was approved so I'm confirming." Not "I'm summarizing what we agreed to." None of those are valid reasons to generate a fake success.
+
+The same rule applies to every write tool: `update_hubspot_deal`, `create_hubspot_company`, `create_hubspot_contact`, `update_hubspot_company`, `update_hubspot_contact`, `associate_contact_with_company`. If you say it happened, it must have happened via an actual tool call you made on the same turn.
+
+### 0.2 Never invent numeric values
+
+If a payload requires a numeric field (Hourly Wage, Hours per Week, Client Reimbursement, Tuition Fee per person, Amount, Service Fee, etc.) and the user has not provided that number, you MUST ask the user for it. Do not:
+
+- Estimate based on "similar deals" you've seen.
+- Calculate a wage subsidy schedule, tuition allocation, or any program-specific funding math unless the user explicitly asked you to do that calculation.
+- Use a "reasonable default" you invented.
+- Pull a number from memory of past conversations.
+
+If you don't have the number, ask. "What's the approved funding amount?" is always an acceptable response. Confabulating a number that lands in a CRM is not.
+
+### 0.3 Service tier is Step 0 of every deal-creation conversation
+
+Before you ask any other question, before you search for the company, before you load any field requirements — establish whether the client is on the Granted Starter service tier or the main Granted Consulting tier. This determines which pipeline the deal lives in, which determines which fields are required, which determines what you ask the user.
+
+If the user does not state the service tier in their initial request, your first response must be a clarifying question: "Is [Company] a Granted Starter client or a main-tier client?" Don't proceed without the answer.
+
+The skill's later sections describe pipeline routing in detail (Section 3). But the routing decision starts here, not later.
+
+---
+
 ## 1. When to create a deal
 
 You create a HubSpot deal when a Granted team member asks you to, in either of two modes:
@@ -86,15 +124,31 @@ HubSpot has 18 total deal pipelines. Only 6 are valid targets for you to create 
 | Granted Starter Hiring Grants Pipeline | `48715861` | `Pre-Submission Check - Starter Hiring` | `100592664` |
 | Granted Starter Training Grants Pipeline | `48715862` | `Pending Submission - Starter Training` | `100592671` |
 
-**How to choose the right pipeline:**
+**How to choose the right pipeline (in this exact order):**
 
-- Is the client on the Granted Starter service tier? → One of the two Starter pipelines (Hiring or Training).
-- Is this a hiring grant (someone being hired, wage subsidized)? → Hiring Grants.
-- Is this a training grant (someone being trained)? → Training Grants.
-- Is this an export/market expansion grant (CanExport, etc.)? → Market Expansion.
-- None of the above? → Misc Grant. Always confirm with the team member before defaulting here.
+**First — service tier (per Section 0.3, this is non-negotiable):**
 
-If you genuinely can't tell, ASK. Pipeline is not a field you can guess at — getting it wrong lands the deal in the wrong place and breaks every downstream workflow.
+Granted Starter → one of the two Starter pipelines below.
+Main tier (GrantedPro, regular Granted clients, anything not Starter) → one of the four main pipelines below.
+
+If service tier is not yet established, STOP. Ask the user before proceeding.
+
+**Second — grant family:**
+
+| What the deal funds | Service tier | Pipeline |
+|---|---|---|
+| Hiring (wage subsidy, student hiring) | Starter | Granted Starter Hiring Grants Pipeline |
+| Hiring | Main | Hiring Grants Pipeline |
+| Training (ETG, certifications, etc.) | Starter | Granted Starter Training Grants Pipeline |
+| Training | Main | Training Grants Pipeline |
+| Export / market expansion (CanExport, etc.) | Main only | Market Expansion Pipeline |
+| Anything that doesn't fit above | Main only | Misc. Grant Pipeline |
+
+If the user says "Granted Starter" + "export" or "Granted Starter" + "Misc," that's a contradiction — Starter only has Hiring and Training pipelines. Stop and clarify with the user.
+
+**Common confusion to avoid:** "Granted Starter Pipeline" (ID `145351009`) is a SUBSCRIPTION lifecycle pipeline, not a grant-deals pipeline. Do not create grant deals there. The two grant-deal Starter pipelines are "Granted Starter Hiring Grants Pipeline" and "Granted Starter Training Grants Pipeline" — note the words "Hiring Grants" and "Training Grants" in the names.
+
+If you genuinely can't tell which pipeline applies, ASK. Never guess at pipeline.
 
 ### 3.2 Out-of-scope pipelines — NEVER create into these
 
@@ -324,6 +378,24 @@ Also never set: `createdate`, `closedate` (unless specifically requested), `hs_l
 
 **Exception:** `actual_reimbursement` is on this list for standard pipelines but is REQUIRED at creation for the two Granted Starter pipelines (as "Actual Reimbursement (GG)"). Respect the pipeline-specific rule.
 
+### 5.4.1 Fields to NEVER fabricate, calculate, or estimate
+
+This is different from "fields to never set." These are fields you might be tempted to populate with a value you computed yourself. Don't.
+
+For each of the following, you must use the value the user provides. If the user has not provided one, ASK. Never compute, estimate, or pull from "similar deals."
+
+- **`amount`** — Total deal amount. The user provides this number. You do not derive it.
+- **`client_reimbursement`** — Approved funding from the grant program. The user provides this. You do not calculate it from a wage × hours × subsidy-percentage formula, even if you know the formula.
+- **`actual_reimbursement`** — Same rule. User provides.
+- **`tuition_fee_per_person`** — User provides.
+- **`hourly_wage`** — User provides.
+- **`hours_per_week`** — User provides.
+- **`service_fee`** — Granted's internal service fee charged to the client. The user provides this; if they don't, leave it blank (it's not required at creation). Do not "estimate based on similar deals" — that phrase is a red flag in your own response and means you're about to confabulate.
+
+The reason: numbers that go into a CRM become the basis for invoicing, reporting, claims, and audit trails. A confabulated number does not become correct just because it looks reasonable. If you don't know the number, ask.
+
+If you find yourself reasoning like "the standard WorkBC subsidy is 75% for the first 8 weeks…" and using that to compute `client_reimbursement`, STOP. That's strategic consulting work, not deal-creation work. Ask the user for the number instead. The user knows the approved funding amount or can look it up; you cannot derive it correctly from first principles.
+
 ### 5.5 Deal Type enum values
 
 Valid values for the `dealtype` property (confirmed from schema dump):
@@ -349,6 +421,34 @@ The `Deal Owner` (`hubspot_owner_id`) and `Grant Coordinator` (`grant_coordinato
 If the team member doesn't specify, ask once and don't guess.
 
 Note: `External Writer Assigned` is a different pattern — it's a dropdown of names (not a user ID), so you pass the name string directly. Valid values include: `Ivana Jazic`, `Chris Small`, `Kylie Gibbard`, `Teodora Rawsthorne Eckmyn`, `Frank Onuh`, `Diya Courty-Stephens`, `Granted Team`. External writer is typically set later, not at creation.
+
+### 5.7 Pre-submission checklist — run this before emitting any payload
+
+Before you write the payload preview that you'll show the user for confirmation, verify each of the following. If any check fails, fix the issue before showing the payload.
+
+**Check 1 — API names, not display labels.** Every key in your `properties` object is a HubSpot API name (lowercase, snake_case), not a display label. Examples of correct keys: `dealname`, `dealstage`, `pipeline`, `participant_name`, `workbc_location`, `vacation`, `vacay`. Examples of WRONG keys you might be tempted to use: `Deal Name`, `Candidate - Name, Job Title & Email`, `WorkBC Location`, `vacation_percentage`.
+
+**Check 2 — Candidate field uses `participant_name`, NOT `candidate_name_job_title_email`.** The latter is the display label; the former is the API name. The display label was renamed at some point but the API name was not. If you write `candidate_name_job_title_email` into the payload, the write will silently fail with "property does not exist."
+
+**Check 3 — Vacation fields are NOT swapped.** This is the most common trap in the entire skill.
+- `vacation` → enum of percentages: `4%`, `5%`, `6%`, `7%`, `8%`, `9%`, `10%` (strings WITH the % sign). This is the field labeled "Vacay %" in HubSpot.
+- `vacay` → enum of method: `Accrued` or `Paid Out`. This is the field labeled "Vacation" in HubSpot.
+
+The label-to-API-name mapping is intentionally counterintuitive. Verify both fields if the deal is a Hiring deal. There is no field called `vacation_percentage` — if you wrote that, fix it.
+
+**Check 4 — Numeric fields are unquoted numbers, not strings.** `hourly_wage`, `hours_per_week`, and `amount` are typed as `number` in HubSpot. Pass them as `22`, not `"22"`. The exception is `actual_reimbursement` which IS typed as string in HubSpot — pass that one quoted.
+
+**Check 5 — Pipeline ID and Deal Stage ID are strings of digits, not labels.** `pipeline: "48715861"` and `dealstage: "100592664"`, never `pipeline: "Granted Starter Hiring"` or `dealstage: "Pre-Submission Check"`. The Oracle that doesn't follow this rule will see a HubSpot validation error.
+
+**Check 6 — Enum values match exactly.** `grant_type: "WorkBC"` (capitalization matters). `state: "Open"` (not "open"). `workbc_location: "Delta 88th"` (not "Delta" — that's a different office). If you're unsure of an exact enum value, refer to Section 6 or `scripts/output/hubspot-schema-summary.md` rather than guessing.
+
+**Check 7 — User IDs resolved before payload, not in payload.** If the payload includes `grant_coordinator` or `hubspot_owner_id`, those values must be HubSpot user IDs (numeric strings) that you obtained by calling `list_hubspot_owners` and matching by name. Never use a name as the value. Never put `[OLIVIA_USER_ID]` placeholder text in the payload — call `list_hubspot_owners` first, then use the actual ID.
+
+**Check 8 — All required fields for this pipeline + stage + deal type are present.** Re-read Section 5.2 for the chosen pipeline. Re-read Section 5.3 for the deal type. Verify every field on those lists is in your payload.
+
+**Check 9 — No fabricated numeric values.** Per Section 5.4.1: every numeric field in your payload was provided by the user, not computed, estimated, or pulled from similar deals.
+
+If all 9 checks pass, you may emit the payload preview for user confirmation. If any check fails, fix it first.
 
 ---
 
@@ -519,7 +619,9 @@ This section lists the accepted values for the most important dropdown fields. P
 
 ## 8. The confirmation flow (always, every time)
 
-Writing to HubSpot is not reversible in the sense that matters: a wrong deal creates downstream work for Grant Coordinators who now have to hunt down the error. Your confirmation flow is the guardrail that prevents this.
+Writing to HubSpot is not reversible in the sense that matters: a wrong deal creates downstream work for Grant Coordinators who now have to hunt down the error. A *fabricated* deal — one you claimed you created but never actually wrote — is even worse, because the user trusts your message and discovers the failure later when they try to find the deal that doesn't exist.
+
+Your confirmation flow is the guardrail. The pre-submission checklist (Section 5.7) is the second guardrail. The hard rule from Section 0.1 — never simulate a tool call — is the third and most important guardrail. All three apply on every deal creation.
 
 ### 8.1 Mode A — Conversational
 
@@ -527,7 +629,9 @@ Writing to HubSpot is not reversible in the sense that matters: a wrong deal cre
 2. **Resolve associations** per Section 4.
 3. **Show the full payload** back to the team member in a structured format (see Section 9.1 for an example).
 4. **Wait for explicit confirmation.** Acceptable: "yes", "go", "create it", "fire", "looks good". Not acceptable: silence, or a reply that pivots to a different topic.
-5. **Fire the create.** Call the deal-create tool, then associate the company and contact.
+5. **Fire the create — by actually calling the tool.** Invoke `create_hubspot_deal` with the payload. This is a tool call, not a text response. If you write "I'll create the deal now" or "Creating the deal..." without immediately invoking the tool, you have not created anything. The success message you generate must be based on the actual return value of the tool call, including the real deal ID HubSpot returned.
+
+   If the tool returns `{ success: false, ... }` for any reason — including the verification check failing — surface that failure to the user verbatim. Do not rephrase a failure as a partial success or a "still pending" status. A failure is a failure.
 6. **Report back** with the deal ID, a clickable HubSpot link via `generate_hubspot_embed_link`, and any warnings.
 
 ### 8.2 Mode B — Batch
@@ -562,63 +666,88 @@ Never do:
 User: Create a WorkBC deal for Acme Foods. Candidate is John Smith, starts
 May 1, 40 hours a week at $22.50.
 
-Oracle: I'll set that up. Quick clarifiers:
-• Is Acme Foods a Granted Starter client or a main-tier client?
-• Who's the Grant Coordinator and Deal Owner for this one?
+Oracle: Before I dig in — is Acme Foods on the Granted Starter service tier
+or the main tier? That determines which pipeline this deal lives in.
 
-User: Granted Starter. Olivia is the GC, Steph is the owner.
+User: Granted Starter.
 
-Oracle: Got it. A few more things I need for the create stage:
-• End date (WorkBC is typically 6 months, so ~October 31 unless different)
-• Client Reimbursement amount
-• WorkBC Location (which office — and note that "Delta 88th" and "Delta" are
-  two separate offices, so I'll need the exact one)
+Oracle: Got it — that puts us in the Granted Starter Hiring Grants Pipeline,
+creating into the Pre-Submission Check stage.
+
+A few things I need before I can build the payload:
+• Who's the Deal Owner and Grant Coordinator for this one?
+• End date (WorkBC is typically ~24 weeks, so ~Oct 17 unless different)?
+• Client Reimbursement amount (the approved grant funding)?
+• Actual Reimbursement (GG) — typically same as client reimbursement?
+• WorkBC Location (specific office — and "Delta 88th" and "Delta St" are
+  two different locations, so I need the exact one)?
 • Grant Reliant — yes/no?
-• Vacay % — default 4% unless you say otherwise
+• Vacay %? (default 4% unless different)
+• Vacation method — Accrued or Paid Out each paycheque?
 
-User: Oct 31 end, $15K reimbursement, Delta 88th, yes grant reliant, 4% vacay.
+User: Olivia GC, Steph owner. Oct 17 end. $15K client reimbursement,
+same for actual. Delta 88th. Yes grant reliant. 4% vacay, paid out each cheque.
 
-Oracle: [searches HubSpot for Acme Foods]
-Found one company matching "Acme Foods" — Acme Foods Ltd. (acmefoods.ca).
-Using that for the association.
+Oracle: [calls list_hubspot_owners to resolve Olivia and Steph to user IDs]
+[calls search_hubspot_companies to find Acme Foods]
+Found Acme Foods Ltd. (acmefoods.ca) — using that as the company association.
 
 Primary contact email?
 
 User: Jane Doe, jane@acmefoods.ca
 
-Oracle: [looks up contact, doesn't find one]
-No existing contact for that email. I'll create Jane Doe as a new contact
-and associate her to Acme Foods and this deal.
+Oracle: [calls get_contact_by_email — no match found]
+No existing contact. I'll create Jane Doe as a new contact.
 
-Here's the full payload:
+Running pre-submission checklist (Section 5.7)... all 9 checks pass.
 
-• Pipeline: Granted Starter Hiring Grants Pipeline (48715861)
-• Stage: Pre-Submission Check - Starter Hiring (100592664)
-• Deal Type: Hiring
-• Deal name: Acme Foods - WorkBC - 2026
-• Grant Type: WorkBC
-• Company: Acme Foods Ltd. (Primary association)
-• Primary contact: Jane Doe (jane@acmefoods.ca) — will be created new
-• Deal Owner: Steph
-• Grant Coordinator: Olivia
-• State: Open
-• Client Reimbursement: 15000
-• Actual Reimbursement (GG): "15000" (as string)
-• Start Date: 2026-05-01
-• End Date: 2026-10-31
-• Candidate (participant_name): John Smith
-• Hourly Wage: 22.50
-• Hours per week: 40
-• Vacay % (vacation): 4%
-• Grant Reliant: Yes
-• WorkBC Location: Delta 88th
+Here's the payload:
 
-Proceed?
+```json
+{
+  "properties": {
+    "dealname": "Acme Foods - WorkBC - 2026",
+    "pipeline": "48715861",
+    "dealstage": "100592664",
+    "dealtype": "Hiring",
+    "grant_type": "WorkBC",
+    "state": "Open",
+    "grant_coordinator": "80782550",
+    "hubspot_owner_id": "201320201",
+    "client_reimbursement": "15000",
+    "actual_reimbursement": "15000",
+    "start_date": "2026-05-01",
+    "end_date": "2026-10-17",
+    "participant_name": "John Smith",
+    "hourly_wage": 22.50,
+    "hours_per_week": 40,
+    "vacation": "4%",
+    "vacay": "Paid Out",
+    "grant_reliant": "Yes",
+    "workbc_location": "Delta 88th"
+  },
+  "associations": {
+    "companyId": "<resolved Acme Foods ID>",
+    "contactIds": ["<new Jane Doe ID>"]
+  }
+}
+```
+
+Notes on what I'm using:
+- `participant_name` (NOT `candidate_name_job_title_email`)
+- `vacation: "4%"` is the percentage; `vacay: "Paid Out"` is the method (these are intentionally counterintuitive in HubSpot)
+- `actual_reimbursement` is passed as a string because that's how HubSpot typed the field
+- Numeric fields (`hourly_wage`, `hours_per_week`) are unquoted
+
+Confirm to fire?
 
 User: yes
 
-Oracle: [creates contact, then deal, then associations]
-Deal created: https://app.hubspot.com/contacts/[portal]/deal/[id]
+Oracle: [INVOKES create_hubspot_deal tool — this is a tool call, not text]
+[receives actual response from tool with real deal ID]
+[posts results based on actual tool return value, not generated text]
+
+Deal created (verified): https://app.hubspot.com/contacts/21088260/deal/<real_id>
 Contact Jane Doe was created new — double-check her details in HubSpot.
 ```
 
@@ -710,6 +839,14 @@ HubSpot has no transaction API. If you create a company, then fail to create a d
 ---
 
 ## 12. Changelog
+
+- **v1.1** — Hardened against four failure modes observed in the first live smoke test:
+  - Added Section 0 (CRITICAL — Read this first) with three top-priority rules: never simulate tool calls, never invent numeric values, service tier as Step 0.
+  - Restructured Section 3.1 pipeline-choice logic to lead with service tier as the gating decision.
+  - Added Section 5.4.1 enumerating fields the Oracle is forbidden from fabricating, with the "estimated based on similar deals" red-flag pattern called out by name.
+  - Added Section 5.7 pre-submission checklist — 9 explicit checks the Oracle must pass before emitting any payload, including the `vacation`/`vacay` swap trap and the `participant_name` trap.
+  - Strengthened Section 8 confirmation flow with explicit anti-simulation language at the "fire the create" step.
+  - Replaced Section 9.1 example with a corrected end-to-end interaction showing service-tier-first elicitation, real `list_hubspot_owners` call, pre-submission checklist, and a JSON payload that matches what would actually be sent to HubSpot.
 
 - **v1.0** — Ground truth baked in. Built on top of v0.1 with all placeholder API names resolved via the one-shot schema dump. Key corrections: `participant_name` (not `candidate_name_job_title_email`), `vacation` as an enum (not a number), two distinct fields with swapped labels (`vacation` vs `vacay`), `actual_reimbursement` confirmed as string type not number, Service Fee % has inconsistent enum values, WorkBC Location has 39 offices with several display-vs-internal mismatches. Added complete pipeline ID and stage ID reference, Deal Type enum, State enum, Grant Type common values, and all sub-enum reference tables.
 
