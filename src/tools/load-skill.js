@@ -47,6 +47,9 @@ const SKILL_PATHS = {
   },
   'bcafe-writer': {
     FINAL_REPORT: '.claude/skills/bcafe-writer/FINAL_REPORT.md'
+  },
+  hubspot: {
+    DEAL_CREATION: '.claude/skills/hubspot/DEAL_CREATION.md'
   }
   // Add more skills as they're created: writing, etc.
 };

@@ -1289,6 +1289,9 @@ Use when simple information retrieval is insufficient and you need specialized e
 **BCAFE Writer Skill:**
 - \`FINAL_REPORT\` - Final Progress Report writing guide (template-aligned, section-by-section guidance)
 
+**HubSpot Skill:**
+- \`DEAL_CREATION\` - Full deal creation workflow: pipeline selection, required-field matrix, enum references, confirmation flow, batch mode, error handling. MANDATORY before any deal write.
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1308,13 +1311,14 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "Assess client readiness for CanExport" → load_skill(canexport-writer, STAGE_1_READINESS)
 - "Draft Section 2 of the application" → load_skill(canexport-writer, STAGE_2_DRAFTING)
 - "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)
-- "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)`,
+- "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)
+- "Create a WorkBC deal for TechCo" → load_skill(hubspot, DEAL_CREATION)`,
   input_schema: {
     type: 'object',
     properties: {
       skill_name: {
         type: 'string',
-        enum: ['sales', 'research', 'grants', 'writing', 'canexport-writer', 'bcafe-writer'],
+        enum: ['sales', 'research', 'grants', 'writing', 'canexport-writer', 'bcafe-writer', 'hubspot'],
         description: 'The skill domain to load'
       },
       sub_skill: {
@@ -1324,9 +1328,9 @@ Use when simple information retrieval is insufficient and you need specialized e
           'overview', 'eligibility', 'matching', 'validation', 'company_intelligence',
           'PROGRAM_DETAILS', 'APPLICATION_STRUCTURE', 'KNOWLEDGE_BASE_INDEX',
           'STAGE_1_READINESS', 'STAGE_1_BUDGET_GUIDE', 'STAGE_1_INTERVIEW_QUESTIONS',
-          'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT'
+          'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT', 'DEAL_CREATION'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide).'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write).'
       }
     },
     required: ['skill_name', 'sub_skill']
@@ -1575,6 +1579,9 @@ Use when simple information retrieval is insufficient and you need specialized e
 **BCAFE Writer Skill:**
 - \`FINAL_REPORT\` - Final Progress Report writing guide (template-aligned, section-by-section guidance)
 
+**HubSpot Skill:**
+- \`DEAL_CREATION\` - Full deal creation workflow: pipeline selection, required-field matrix, enum references, confirmation flow, batch mode, error handling. MANDATORY before any deal write.
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1594,7 +1601,8 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "Assess client readiness for CanExport" → load_skill(canexport-writer, STAGE_1_READINESS)
 - "Draft Section 2 of the application" → load_skill(canexport-writer, STAGE_2_DRAFTING)
 - "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)
-- "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)`,
+- "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)
+- "Create a WorkBC deal for TechCo" → load_skill(hubspot, DEAL_CREATION)`,
     input_schema: {
       type: 'object',
       properties: {
@@ -2105,8 +2113,8 @@ export function getToolsForAgent(agentType) {
       // EXCLUDE filesystem-based ANTHROPIC_MEMORY_TOOL (.memories/) - wastes iteration checking empty directory
       // KEEP Postgres-based MEMORY_TOOLS (conversation key-value store) and SERVER_TOOLS
       const oracleBaseTools = [...SERVER_TOOLS, ...MEMORY_TOOLS]; // No ANTHROPIC_MEMORY_TOOL
-      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length} tools, filesystem memory excluded)`);
-      return [...oracleBaseTools, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + 1 + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length} tools, filesystem memory excluded)`);
+      return [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools];
 
     case 'getgranted-ai':
       // GetGrantedAI needs: base tools + GetGrantedAI-specific tools (no HubSpot, no Google Drive)

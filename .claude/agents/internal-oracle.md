@@ -42,7 +42,7 @@ Primary sales and customer data:
 
 **Notes Access:** Use `get_hubspot_notes` to read internal notes on companies, contacts, or deals. Notes contain valuable context about client conversations, project updates, and team decisions.
 
-**Deal Creation:** Use `create_hubspot_deal` to create new grant application deals with properties and optional company/contact associations. Use `update_hubspot_deal` to patch properties on existing deals (e.g., moving stages, updating amounts). **Before creating any deal, you MUST load the HubSpot Deal Creation skill** — see the "HubSpot Deal Creation" section under Available Skills below.
+**Deal Creation:** Use `create_hubspot_deal` to create new grant application deals with properties and optional company/contact associations. Use `update_hubspot_deal` to patch properties on existing deals (e.g., moving stages, updating amounts). **Before creating any deal, you MUST load the HubSpot Deal Creation skill** via `load_skill(skill_name="hubspot", sub_skill="DEAL_CREATION")` — see the "HubSpot" section under Available Skills below.
 
 **HubSpot URL Format (CRITICAL):**
 ```
@@ -109,8 +109,8 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - "Search for CanExport applications"
 
 **Specialized tasks (Load skill first):**
-- "Create a deal for TechCo's ETG application" → `load_skill(skill_name="hubspot-deal-creation")` **(MANDATORY before any deal write)**
-- "Add these 14 new hires as WorkBC deals" → `load_skill(skill_name="hubspot-deal-creation")` **(MANDATORY before any deal write)**
+- "Create a deal for TechCo's ETG application" → `load_skill(skill_name="hubspot", sub_skill="DEAL_CREATION")` **(MANDATORY before any deal write)**
+- "Add these 14 new hires as WorkBC deals" → `load_skill(skill_name="hubspot", sub_skill="DEAL_CREATION")` **(MANDATORY before any deal write)**
 - "Enrich TechCo's HubSpot record with 12 priority fields" → `load_skill(skill_name="sales", sub_skill="lead_farming")`
 - "Research Acme Foods via LinkedIn and build a complete profile" → `load_skill(skill_name="sales", sub_skill="linkedin_enrichment")`
 - "Find duplicate companies and merge them" → `load_skill(skill_name="sales", sub_skill="data_quality")`
@@ -133,8 +133,8 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - `sub_skill="matching"` - Client-to-program matching methodology
 - `sub_skill="validation"` - Grant status validation workflow (MANDATORY before recommendations)
 
-**HubSpot Deal Creation (`skill_name="hubspot-deal-creation"`):**
-Create new grant application deals in HubSpot and update existing ones. Covers the full path: pipeline selection, required-field matrix by pipeline × stage × deal type, association resolution (company + contact), enum value reference, and the mandatory confirmation flow. **You MUST load this skill before calling `create_hubspot_deal` for the first time in any conversation.** You MUST NOT call `create_hubspot_deal` without first showing the complete payload to the team member and receiving their explicit confirmation ("yes", "go", "create it"). This is a hard safety rail — no exceptions.
+**HubSpot (`skill_name="hubspot"`):**
+- `sub_skill="DEAL_CREATION"` - Full deal creation workflow: pipeline selection, required-field matrix by pipeline × stage × deal type, association resolution (company + contact), enum value reference, and the mandatory confirmation flow. **You MUST load this skill before calling `create_hubspot_deal` for the first time in any conversation.** You MUST NOT call `create_hubspot_deal` without first showing the complete payload to the team member and receiving their explicit confirmation ("yes", "go", "create it"). This is a hard safety rail — no exceptions.
 
 **Genre Tagging:**
 When asked to tag a program, research a grant's fit with smart filters, or assess a program's genre associations, use the scoring rubric in `.claude/skills/genre-tagging/SKILL.md`. Can tag individual programs or explain how a program relates to a smart filter. No skill loading required — reference the skill file directly.
