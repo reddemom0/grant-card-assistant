@@ -159,8 +159,10 @@ export async function streamToSSE(stream, res, sessionId, agentType = null) {
           try {
             currentContent.input = JSON.parse(currentContent.input);
           } catch (error) {
-            console.error('Failed to parse tool input JSON:', error);
-            currentContent.input = {};
+            // Incomplete JSON — drop the block entirely (no SSE event, no fullResponse entry)
+            console.error('Failed to parse tool input JSON (block dropped):', error);
+            currentContent = null;
+            continue;
           }
 
           // Notify frontend of complete tool use
@@ -179,8 +181,10 @@ export async function streamToSSE(stream, res, sessionId, agentType = null) {
           try {
             currentContent.input = JSON.parse(currentContent.input);
           } catch (error) {
-            console.error('Failed to parse server tool input JSON:', error);
-            currentContent.input = {};
+            // Incomplete JSON — drop the block entirely (no SSE event, no fullResponse entry)
+            console.error('Failed to parse server tool input JSON (block dropped):', error);
+            currentContent = null;
+            continue;
           }
 
           if (res) {

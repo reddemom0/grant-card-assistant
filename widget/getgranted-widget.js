@@ -1844,6 +1844,7 @@
 
     let assistantWrapper = null;
     let assistantText = '';
+    let pendingText = '';  // Buffer for text suppression between tool calls
 
     try {
       const body = { message: trimmedMessage };
@@ -1901,24 +1902,33 @@
             console.log('[Widget] session_id received from connected event:', sessionId);
           }
 
-          // Streaming text
+          // Buffer text deltas — don't render yet (suppress intermediate narration)
           if (parsed.type === 'text_delta' && parsed.text) {
-            if (!assistantWrapper) {
+            pendingText += parsed.text;
+          }
+
+          // Tool use complete — discard buffered narration
+          if (parsed.type === 'tool_use_complete' || parsed.type === 'server_tool_use_complete') {
+            pendingText = '';
+          }
+
+          // Done event — flush pending text as the final message
+          if (parsed.type === 'done') {
+            if (pendingText) {
+              assistantText += pendingText;
+              pendingText = '';
+            }
+
+            if (assistantText) {
               typingIndicator.remove();
               assistantWrapper = createAssistantMessage('');
               messagesContainer.appendChild(assistantWrapper);
-            }
-            assistantText += parsed.text;
-            // Use innerHTML with sanitization to allow safe HTML tags like <strong>, <br>
-            assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
-            scrollToBottom();
-          }
-
-          // Done event
-          if (parsed.type === 'done') {
-            if (!assistantWrapper && assistantText === '') {
+              assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
+              scrollToBottom();
+            } else {
               typingIndicator.remove();
             }
+
             // Track message received
             trackEvent('message_received', { response_length: assistantText.length });
 
@@ -1937,22 +1947,28 @@
         }
       }
 
-      // Flush remaining buffer
+      // Flush remaining buffer (edge case: stream ends with partial data)
       if (buffer.startsWith('data: ')) {
         const raw = buffer.slice(6).trim();
         try {
           const parsed = JSON.parse(raw);
           if (parsed.type === 'text_delta' && parsed.text) {
-            if (!assistantWrapper) {
-              typingIndicator.remove();
-              assistantWrapper = createAssistantMessage('');
-              messagesContainer.appendChild(assistantWrapper);
-            }
-            assistantText += parsed.text;
-            // Use innerHTML with sanitization to allow safe HTML tags like <strong>, <br>
-            assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
+            pendingText += parsed.text;
           }
         } catch { /* ignore */ }
+      }
+
+      // If stream ended without done event, flush any remaining pending text
+      if (pendingText) {
+        assistantText += pendingText;
+        pendingText = '';
+      }
+      if (assistantText && !assistantWrapper) {
+        typingIndicator.remove();
+        assistantWrapper = createAssistantMessage('');
+        messagesContainer.appendChild(assistantWrapper);
+        assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
+        scrollToBottom();
       }
 
       // If typing indicator is still there (no response came back), remove it

@@ -1313,72 +1313,55 @@
                     throw new Error('Failed to send message');
                 }
 
-                // Read streaming response
+                // Read streaming response with text suppression
+                // Buffer text_delta events; discard on tool_use_complete; flush on done (end_turn)
                 console.log('[DEBUG] Starting to read stream...');
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let assistantMessage = '';
+                let pendingText = '';       // Buffered text — only flushed on final response
+                let finalMessage = '';      // Accumulated final message text (flushed segments)
                 let messageElement = null;
                 let chunkCount = 0;
 
                 while (true) {
                     const { done, value } = await reader.read();
                     chunkCount++;
-                    console.log(`[DEBUG] Chunk ${chunkCount}: done=${done}, bytes=${value?.length || 0}`);
 
                     if (done) {
-                        console.log('[DEBUG] Stream ended, total message length:', assistantMessage.length);
+                        console.log('[DEBUG] Stream ended, final message length:', finalMessage.length, 'pending:', pendingText.length);
                         break;
                     }
 
                     const chunk = decoder.decode(value);
-                    console.log(`[DEBUG] Chunk text:`, chunk.substring(0, 100));
                     const lines = chunk.split('\n');
 
                     for (const line of lines) {
                         if (line.startsWith('data: ')) {
                             const data = line.slice(6);
-                            if (data === '[DONE]') {
-                                console.log('[DEBUG] Received [DONE] signal');
-                                continue;
-                            }
+                            if (data === '[DONE]') continue;
 
                             try {
                                 const parsed = JSON.parse(data);
-                                console.log('[DEBUG] Parsed SSE event:', parsed.type);
 
-                                // Handle text delta events (actual response content)
+                                // Buffer text deltas — don't render yet
                                 if (parsed.type === 'text_delta' && parsed.text) {
-                                    console.log('[SSE] ✅ text_delta received:', parsed.text.substring(0, 50));
-                                    assistantMessage += parsed.text;
-                                    console.log('[SSE] 📊 Total message length:', assistantMessage.length);
+                                    pendingText += parsed.text;
+                                }
 
-                                    // Create or update message element
-                                    if (!messageElement) {
-                                        console.log('[SSE] 🆕 Creating assistant message element');
-                                        // Remove thinking indicator when first response arrives
-                                        if (thinkingIndicator && thinkingIndicator.parentNode) {
-                                            console.log('[SSE] 🗑️  Removing thinking indicator');
-                                            thinkingIndicator.remove();
-                                        }
-                                        messageElement = await addMessageToUI('assistant', '');
-                                        console.log('[SSE] ✅ Message element created:', messageElement);
+                                // Tool use complete — discard buffered narration
+                                if (parsed.type === 'tool_use_complete' || parsed.type === 'server_tool_use_complete') {
+                                    if (pendingText) {
+                                        console.log('[SSE] Discarding intermediate text:', pendingText.length, 'chars');
+                                        pendingText = '';
                                     }
+                                }
 
-                                    // Render markdown in real-time
-                                    const contentElement = messageElement.querySelector('.message-content');
-                                    console.log('[SSE] 📝 Rendering to content element:', contentElement);
-                                    if (typeof marked !== 'undefined') {
-                                        contentElement.innerHTML = marked.parse(assistantMessage);
-                                        console.log('[SSE] ✅ Markdown rendered, HTML length:', contentElement.innerHTML.length);
-                                    } else {
-                                        contentElement.textContent = assistantMessage;
-                                        console.log('[SSE] ✅ Text rendered (no markdown)');
+                                // Stream done — flush pending text as the final message
+                                if (parsed.type === 'done') {
+                                    if (pendingText) {
+                                        finalMessage += pendingText;
+                                        pendingText = '';
                                     }
-
-                                    // Auto-scroll
-                                    const chatMessages = document.getElementById('chat-messages');
-                                    chatMessages.scrollTop = chatMessages.scrollHeight;
                                 }
                             } catch (e) {
                                 console.error('[DEBUG] Parse error:', e, 'for line:', line);
@@ -1387,15 +1370,28 @@
                     }
                 }
 
-                // If no message element was created, show the collected message (defensive programming)
-                if (!messageElement && assistantMessage) {
-                    console.log('[DEBUG] Creating message element after stream ended');
+                // Safety net: if stream ended without done event, flush remaining text
+                if (pendingText) {
+                    finalMessage += pendingText;
+                    pendingText = '';
+                }
+
+                // Render the final message
+                if (finalMessage) {
                     if (thinkingIndicator && thinkingIndicator.parentNode) {
                         thinkingIndicator.remove();
                     }
-                    addMessageToUI('assistant', assistantMessage);
-                } else if (!messageElement && !assistantMessage) {
-                    console.error('[DEBUG] No assistant message received!');
+                    messageElement = await addMessageToUI('assistant', '');
+                    const contentElement = messageElement.querySelector('.message-content');
+                    if (typeof marked !== 'undefined') {
+                        contentElement.innerHTML = marked.parse(finalMessage);
+                    } else {
+                        contentElement.textContent = finalMessage;
+                    }
+                    const chatMessages = document.getElementById('chat-messages');
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                } else {
+                    // No final message — show fallback
                     if (thinkingIndicator && thinkingIndicator.parentNode) {
                         thinkingIndicator.remove();
                     }
