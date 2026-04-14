@@ -1033,7 +1033,7 @@
             load_skill: 'Loading skill'
         };
 
-        function createToolPill(toolName) {
+        function createToolPill(toolName, onFadeComplete) {
             const category = TOOL_CATEGORIES[toolName] || 'other';
             const icon = CATEGORY_ICONS[category];
             const label = TOOL_LABELS[toolName] || 'Working';
@@ -1054,6 +1054,7 @@
                 pill.classList.add('fading');
                 setTimeout(() => {
                     if (pill.parentNode) pill.remove();
+                    if (onFadeComplete) onFadeComplete();
                 }, 250);
             }, 700);
 
@@ -1507,6 +1508,7 @@
                 let messageElement = null;   // The assistant chat bubble DOM element
                 let pillContainer = null;    // Container for tool pills
                 let hasSeenToolUse = false;  // Tracks whether we've entered tool-use phase
+                let thinkingDoneForTurn = false; // Once true, thinking indicator never comes back
 
                 while (true) {
                     const { done, value } = await reader.read();
@@ -1537,11 +1539,15 @@
 
                                 // Phase 2: after tool calls, stream text live
                                 if (hasSeenToolUse) {
-                                    // Ensure bubble exists
-                                    if (!messageElement) {
+                                    // Final response text — permanently retire thinking indicator
+                                    if (!thinkingDoneForTurn) {
+                                        thinkingDoneForTurn = true;
                                         if (thinkingIndicator && thinkingIndicator.parentNode) {
                                             thinkingIndicator.remove();
                                         }
+                                    }
+                                    // Ensure bubble exists
+                                    if (!messageElement) {
                                         messageElement = await addMessageToUI('assistant', '');
                                         // Move pill container into the bubble if it exists
                                         if (pillContainer) {
@@ -1604,9 +1610,17 @@
                                     }
                                 }
 
-                                // Add pill
+                                // Add pill (with callback to restore indicator when pill fades)
                                 const toolName = parsed.toolName || 'unknown';
-                                const pill = createToolPill(toolName);
+                                const pill = createToolPill(toolName, () => {
+                                    if (!thinkingDoneForTurn && pillContainer && pillContainer.children.length === 0) {
+                                        const chatMsgs = document.getElementById('chat-messages');
+                                        if (thinkingIndicator && chatMsgs) {
+                                            chatMsgs.appendChild(thinkingIndicator);
+                                            autoScroll();
+                                        }
+                                    }
+                                });
                                 pillContainer.appendChild(pill);
 
                                 autoScroll();
