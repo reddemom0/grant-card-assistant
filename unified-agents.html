@@ -1462,6 +1462,7 @@
                 // On tool_use_complete: discard any text, show pill, return to pill state
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
+                let sseBuffer = '';          // Accumulates incomplete lines across chunks
                 let assistantMessage = '';   // Currently-visible or buffered text
                 let messageElement = null;   // The assistant chat bubble DOM element
                 let pillContainer = null;    // Container for tool pills
@@ -1469,106 +1470,129 @@
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    if (done) break;
 
-                    const chunk = decoder.decode(value);
-                    const lines = chunk.split('\n');
+                    if (done) {
+                        // Flush decoder for any trailing multibyte sequence
+                        sseBuffer += decoder.decode();
+                        break;
+                    }
 
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = line.slice(6);
-                            if (data === '[DONE]') continue;
+                    sseBuffer += decoder.decode(value, { stream: true });
 
-                            try {
-                                const parsed = JSON.parse(data);
+                    // Process only complete lines (terminated by \n)
+                    const parts = sseBuffer.split('\n');
+                    sseBuffer = parts.pop(); // Retain the incomplete trailing fragment
 
-                                // Text delta handling — behavior depends on phase
-                                if (parsed.type === 'text_delta' && parsed.text) {
-                                    assistantMessage += parsed.text;
+                    for (const line of parts) {
+                        if (!line.startsWith('data: ')) continue;
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
 
-                                    // Phase 2: after tool calls, stream text live
-                                    if (hasSeenToolUse) {
-                                        // Ensure bubble exists
-                                        if (!messageElement) {
-                                            if (thinkingIndicator && thinkingIndicator.parentNode) {
-                                                thinkingIndicator.remove();
-                                            }
-                                            messageElement = await addMessageToUI('assistant', '');
-                                            // Move pill container into the bubble if it exists
-                                            if (pillContainer) {
-                                                const content = messageElement.querySelector('.message-content');
-                                                content.prepend(pillContainer);
-                                            }
+                        try {
+                            const parsed = JSON.parse(data);
+
+                            // Text delta handling — behavior depends on phase
+                            if (parsed.type === 'text_delta' && parsed.text) {
+                                assistantMessage += parsed.text;
+
+                                // Phase 2: after tool calls, stream text live
+                                if (hasSeenToolUse) {
+                                    // Ensure bubble exists
+                                    if (!messageElement) {
+                                        if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                            thinkingIndicator.remove();
                                         }
-
-                                        // Render live
-                                        const content = messageElement.querySelector('.message-content');
-                                        // Preserve pill container, render text after it
-                                        let textTarget = content.querySelector('.tool-response-text');
-                                        if (!textTarget) {
-                                            textTarget = document.createElement('div');
-                                            textTarget.className = 'tool-response-text';
-                                            content.appendChild(textTarget);
-                                        }
-                                        if (typeof marked !== 'undefined') {
-                                            textTarget.innerHTML = marked.parse(assistantMessage);
-                                        } else {
-                                            textTarget.textContent = assistantMessage;
-                                        }
-                                        const chatMessages = document.getElementById('chat-messages');
-                                        chatMessages.scrollTop = chatMessages.scrollHeight;
-                                    }
-                                    // Phase 1: before any tool calls, text stays buffered (not rendered)
-                                }
-
-                                // Tool use complete — discard text, show pill
-                                if (parsed.type === 'tool_use_complete' || parsed.type === 'server_tool_use_complete') {
-                                    hasSeenToolUse = true;
-
-                                    // Discard any buffered/rendered text (it was narration)
-                                    if (assistantMessage) {
-                                        console.log('[SSE] Discarding narration:', assistantMessage.length, 'chars');
-                                        assistantMessage = '';
-                                    }
-
-                                    // Clear rendered text from bubble if it exists
-                                    if (messageElement) {
-                                        const textTarget = messageElement.querySelector('.tool-response-text');
-                                        if (textTarget) textTarget.remove();
-                                    }
-
-                                    // Remove thinking indicator — pills replace it
-                                    if (thinkingIndicator && thinkingIndicator.parentNode) {
-                                        thinkingIndicator.remove();
-                                    }
-
-                                    // Ensure pill container exists in the chat area
-                                    if (!pillContainer) {
-                                        pillContainer = document.createElement('div');
-                                        pillContainer.className = 'tool-pill-container';
-                                        if (messageElement) {
-                                            messageElement.querySelector('.message-content').prepend(pillContainer);
-                                        } else {
-                                            // Create the bubble to host pills
-                                            messageElement = await addMessageToUI('assistant', '');
-                                            messageElement.querySelector('.message-content').innerHTML = '';
-                                            messageElement.querySelector('.message-content').appendChild(pillContainer);
+                                        messageElement = await addMessageToUI('assistant', '');
+                                        // Move pill container into the bubble if it exists
+                                        if (pillContainer) {
+                                            const content = messageElement.querySelector('.message-content');
+                                            content.prepend(pillContainer);
                                         }
                                     }
 
-                                    // Add pill
-                                    const toolName = parsed.toolName || 'unknown';
-                                    const pill = createToolPill(toolName);
-                                    pillContainer.appendChild(pill);
-
+                                    // Render live
+                                    const content = messageElement.querySelector('.message-content');
+                                    // Preserve pill container, render text after it
+                                    let textTarget = content.querySelector('.tool-response-text');
+                                    if (!textTarget) {
+                                        textTarget = document.createElement('div');
+                                        textTarget.className = 'tool-response-text';
+                                        content.appendChild(textTarget);
+                                    }
+                                    if (typeof marked !== 'undefined') {
+                                        textTarget.innerHTML = marked.parse(assistantMessage);
+                                    } else {
+                                        textTarget.textContent = assistantMessage;
+                                    }
                                     const chatMessages = document.getElementById('chat-messages');
                                     chatMessages.scrollTop = chatMessages.scrollHeight;
                                 }
-
-                            } catch (e) {
-                                console.error('[DEBUG] Parse error:', e, 'for line:', line);
+                                // Phase 1: before any tool calls, text stays buffered (not rendered)
                             }
+
+                            // Tool use complete — discard text, show pill
+                            if (parsed.type === 'tool_use_complete' || parsed.type === 'server_tool_use_complete') {
+                                hasSeenToolUse = true;
+
+                                // Discard any buffered/rendered text (it was narration)
+                                if (assistantMessage) {
+                                    console.log('[SSE] Discarding narration:', assistantMessage.length, 'chars');
+                                    assistantMessage = '';
+                                }
+
+                                // Clear rendered text from bubble if it exists
+                                if (messageElement) {
+                                    const textTarget = messageElement.querySelector('.tool-response-text');
+                                    if (textTarget) textTarget.remove();
+                                }
+
+                                // Remove thinking indicator — pills replace it
+                                if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                    thinkingIndicator.remove();
+                                }
+
+                                // Ensure pill container exists in the chat area
+                                if (!pillContainer) {
+                                    pillContainer = document.createElement('div');
+                                    pillContainer.className = 'tool-pill-container';
+                                    if (messageElement) {
+                                        messageElement.querySelector('.message-content').prepend(pillContainer);
+                                    } else {
+                                        // Create the bubble to host pills
+                                        messageElement = await addMessageToUI('assistant', '');
+                                        messageElement.querySelector('.message-content').innerHTML = '';
+                                        messageElement.querySelector('.message-content').appendChild(pillContainer);
+                                    }
+                                }
+
+                                // Add pill
+                                const toolName = parsed.toolName || 'unknown';
+                                const pill = createToolPill(toolName);
+                                pillContainer.appendChild(pill);
+
+                                const chatMessages = document.getElementById('chat-messages');
+                                chatMessages.scrollTop = chatMessages.scrollHeight;
+                            }
+
+                        } catch (e) {
+                            console.error('[DEBUG] Parse error:', e, 'for line:', line);
                         }
+                    }
+                }
+
+                // Process any remaining complete lines left in the buffer after stream ends
+                if (sseBuffer.trim()) {
+                    const remainingLines = sseBuffer.split('\n');
+                    for (const line of remainingLines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const data = line.slice(6);
+                        if (data === '[DONE]') continue;
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.type === 'text_delta' && parsed.text) {
+                                assistantMessage += parsed.text;
+                            }
+                        } catch { /* discard incomplete trailing data */ }
                     }
                 }
 
