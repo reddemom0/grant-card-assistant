@@ -691,6 +691,66 @@
                 padding: 0.75rem;
             }
         }
+
+        /* Tool-call pill indicators */
+        .tool-pill-container {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0.75rem;
+        }
+
+        .tool-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 0.85rem;
+            margin-bottom: 0.5rem;
+            max-height: 2rem;
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.08) 0%, rgba(38, 196, 182, 0.04) 100%);
+            border: 1px solid rgba(54, 202, 250, 0.2);
+            border-radius: 20px;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.775rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            width: fit-content;
+            overflow: hidden;
+            transition: opacity 250ms ease-out,
+                        max-height 250ms ease-out,
+                        padding 250ms ease-out,
+                        margin 250ms ease-out,
+                        border-width 250ms ease-out;
+            animation: pillSlideIn 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes pillSlideIn {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tool-pill-icon {
+            font-size: 0.85rem;
+            line-height: 1;
+        }
+
+        .tool-pill-label {
+            white-space: nowrap;
+        }
+
+        .tool-pill-check {
+            font-size: 0.75rem;
+            line-height: 1;
+            color: rgba(74, 222, 128, 0.9);
+        }
+
+        .tool-pill.fading {
+            opacity: 0;
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin: 0;
+            border-width: 0;
+        }
     </style>
 </head>
 <body>
@@ -888,6 +948,89 @@
         let selectedFiles = [];
         let currentAbortController = null;
         let inlineFeedback = null;  // Inline feedback system instance
+
+        // Tool-call pill mappings
+        const TOOL_CATEGORIES = {
+            search_hubspot_companies: 'search',
+            search_hubspot_contacts: 'search',
+            search_grant_applications: 'search',
+            search_oracle_kb: 'knowledge',
+            search_getgranted: 'knowledge',
+            search_google_drive: 'knowledge',
+            get_hubspot_company: 'search',
+            get_hubspot_contact: 'search',
+            get_grant_application: 'search',
+            list_hubspot_owners: 'user_lookup',
+            create_hubspot_company: 'create',
+            create_hubspot_contact: 'create',
+            create_hubspot_deal: 'create',
+            update_hubspot_company: 'update',
+            update_hubspot_contact: 'update',
+            update_hubspot_deal: 'update',
+            associate_contact_with_company: 'associate',
+            generate_hubspot_embed_link: 'other',
+            load_skill: 'skill'
+        };
+
+        const CATEGORY_ICONS = {
+            search: '\u{1F50D}',
+            create: '\u{270F}\u{FE0F}',
+            update: '\u{1F4DD}',
+            associate: '\u{1F517}',
+            knowledge: '\u{1F4DA}',
+            user_lookup: '\u{1F464}',
+            skill: '\u{1F9E0}',
+            other: '\u{26A1}'
+        };
+
+        const TOOL_LABELS = {
+            search_hubspot_companies: 'Searching companies',
+            search_hubspot_contacts: 'Searching contacts',
+            search_grant_applications: 'Searching grant applications',
+            search_oracle_kb: 'Searching knowledge base',
+            search_getgranted: 'Searching grant database',
+            search_google_drive: 'Searching Google Drive',
+            get_hubspot_company: 'Looking up company',
+            get_hubspot_contact: 'Looking up contact',
+            get_grant_application: 'Looking up application',
+            list_hubspot_owners: 'Looking up team members',
+            create_hubspot_company: 'Creating company',
+            create_hubspot_contact: 'Creating contact',
+            create_hubspot_deal: 'Creating deal',
+            update_hubspot_company: 'Updating company',
+            update_hubspot_contact: 'Updating contact',
+            update_hubspot_deal: 'Updating deal',
+            associate_contact_with_company: 'Linking contact',
+            generate_hubspot_embed_link: 'Generating link',
+            load_skill: 'Loading skill'
+        };
+
+        function createToolPill(toolName) {
+            const category = TOOL_CATEGORIES[toolName] || 'other';
+            const icon = CATEGORY_ICONS[category];
+            const label = TOOL_LABELS[toolName] || 'Working';
+
+            const pill = document.createElement('div');
+            pill.className = 'tool-pill';
+            if (!TOOL_LABELS[toolName]) {
+                pill.title = toolName;
+            }
+            pill.innerHTML = `
+                <span class="tool-pill-icon">${icon}</span>
+                <span class="tool-pill-label">${label}</span>
+                <span class="tool-pill-check">\u2713</span>
+            `;
+
+            // After 700ms visible, fade + collapse over 250ms, then remove from DOM
+            setTimeout(() => {
+                pill.classList.add('fading');
+                setTimeout(() => {
+                    if (pill.parentNode) pill.remove();
+                }, 250);
+            }, 700);
+
+            return pill;
+        }
 
         // Initialize
         function init() {
@@ -1313,24 +1456,20 @@
                     throw new Error('Failed to send message');
                 }
 
-                // Read streaming response with text suppression
-                // Buffer text_delta events; discard on tool_use_complete; flush on done (end_turn)
-                console.log('[DEBUG] Starting to read stream...');
+                // Read streaming response with tool-call pills + text suppression
+                // Phase 1 (before any tool calls): buffer text silently
+                // Phase 2 (after first tool call): stream text live (it's the final response)
+                // On tool_use_complete: discard any text, show pill, return to pill state
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
-                let pendingText = '';       // Buffered text — only flushed on final response
-                let finalMessage = '';      // Accumulated final message text (flushed segments)
-                let messageElement = null;
-                let chunkCount = 0;
+                let assistantMessage = '';   // Currently-visible or buffered text
+                let messageElement = null;   // The assistant chat bubble DOM element
+                let pillContainer = null;    // Container for tool pills
+                let hasSeenToolUse = false;  // Tracks whether we've entered tool-use phase
 
                 while (true) {
                     const { done, value } = await reader.read();
-                    chunkCount++;
-
-                    if (done) {
-                        console.log('[DEBUG] Stream ended, final message length:', finalMessage.length, 'pending:', pendingText.length);
-                        break;
-                    }
+                    if (done) break;
 
                     const chunk = decoder.decode(value);
                     const lines = chunk.split('\n');
@@ -1343,26 +1482,89 @@
                             try {
                                 const parsed = JSON.parse(data);
 
-                                // Buffer text deltas — don't render yet
+                                // Text delta handling — behavior depends on phase
                                 if (parsed.type === 'text_delta' && parsed.text) {
-                                    pendingText += parsed.text;
+                                    assistantMessage += parsed.text;
+
+                                    // Phase 2: after tool calls, stream text live
+                                    if (hasSeenToolUse) {
+                                        // Ensure bubble exists
+                                        if (!messageElement) {
+                                            if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                                thinkingIndicator.remove();
+                                            }
+                                            messageElement = await addMessageToUI('assistant', '');
+                                            // Move pill container into the bubble if it exists
+                                            if (pillContainer) {
+                                                const content = messageElement.querySelector('.message-content');
+                                                content.prepend(pillContainer);
+                                            }
+                                        }
+
+                                        // Render live
+                                        const content = messageElement.querySelector('.message-content');
+                                        // Preserve pill container, render text after it
+                                        let textTarget = content.querySelector('.tool-response-text');
+                                        if (!textTarget) {
+                                            textTarget = document.createElement('div');
+                                            textTarget.className = 'tool-response-text';
+                                            content.appendChild(textTarget);
+                                        }
+                                        if (typeof marked !== 'undefined') {
+                                            textTarget.innerHTML = marked.parse(assistantMessage);
+                                        } else {
+                                            textTarget.textContent = assistantMessage;
+                                        }
+                                        const chatMessages = document.getElementById('chat-messages');
+                                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                                    }
+                                    // Phase 1: before any tool calls, text stays buffered (not rendered)
                                 }
 
-                                // Tool use complete — discard buffered narration
+                                // Tool use complete — discard text, show pill
                                 if (parsed.type === 'tool_use_complete' || parsed.type === 'server_tool_use_complete') {
-                                    if (pendingText) {
-                                        console.log('[SSE] Discarding intermediate text:', pendingText.length, 'chars');
-                                        pendingText = '';
+                                    hasSeenToolUse = true;
+
+                                    // Discard any buffered/rendered text (it was narration)
+                                    if (assistantMessage) {
+                                        console.log('[SSE] Discarding narration:', assistantMessage.length, 'chars');
+                                        assistantMessage = '';
                                     }
+
+                                    // Clear rendered text from bubble if it exists
+                                    if (messageElement) {
+                                        const textTarget = messageElement.querySelector('.tool-response-text');
+                                        if (textTarget) textTarget.remove();
+                                    }
+
+                                    // Remove thinking indicator — pills replace it
+                                    if (thinkingIndicator && thinkingIndicator.parentNode) {
+                                        thinkingIndicator.remove();
+                                    }
+
+                                    // Ensure pill container exists in the chat area
+                                    if (!pillContainer) {
+                                        pillContainer = document.createElement('div');
+                                        pillContainer.className = 'tool-pill-container';
+                                        if (messageElement) {
+                                            messageElement.querySelector('.message-content').prepend(pillContainer);
+                                        } else {
+                                            // Create the bubble to host pills
+                                            messageElement = await addMessageToUI('assistant', '');
+                                            messageElement.querySelector('.message-content').innerHTML = '';
+                                            messageElement.querySelector('.message-content').appendChild(pillContainer);
+                                        }
+                                    }
+
+                                    // Add pill
+                                    const toolName = parsed.toolName || 'unknown';
+                                    const pill = createToolPill(toolName);
+                                    pillContainer.appendChild(pill);
+
+                                    const chatMessages = document.getElementById('chat-messages');
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
                                 }
 
-                                // Stream done — flush pending text as the final message
-                                if (parsed.type === 'done') {
-                                    if (pendingText) {
-                                        finalMessage += pendingText;
-                                        pendingText = '';
-                                    }
-                                }
                             } catch (e) {
                                 console.error('[DEBUG] Parse error:', e, 'for line:', line);
                             }
@@ -1370,31 +1572,25 @@
                     }
                 }
 
-                // Safety net: if stream ended without done event, flush remaining text
-                if (pendingText) {
-                    finalMessage += pendingText;
-                    pendingText = '';
+                // Stream ended — clean up
+                if (thinkingIndicator && thinkingIndicator.parentNode) {
+                    thinkingIndicator.remove();
                 }
 
-                // Render the final message
-                if (finalMessage) {
-                    if (thinkingIndicator && thinkingIndicator.parentNode) {
-                        thinkingIndicator.remove();
-                    }
+                // Safety net: if we have buffered text that was never rendered
+                if (assistantMessage && !hasSeenToolUse) {
+                    // No tools were called — render the buffered text as the response
                     messageElement = await addMessageToUI('assistant', '');
-                    const contentElement = messageElement.querySelector('.message-content');
+                    const content = messageElement.querySelector('.message-content');
                     if (typeof marked !== 'undefined') {
-                        contentElement.innerHTML = marked.parse(finalMessage);
+                        content.innerHTML = marked.parse(assistantMessage);
                     } else {
-                        contentElement.textContent = finalMessage;
+                        content.textContent = assistantMessage;
                     }
                     const chatMessages = document.getElementById('chat-messages');
                     chatMessages.scrollTop = chatMessages.scrollHeight;
-                } else {
-                    // No final message — show fallback
-                    if (thinkingIndicator && thinkingIndicator.parentNode) {
-                        thinkingIndicator.remove();
-                    }
+                } else if (!messageElement && !assistantMessage) {
+                    // Nothing received at all
                     addMessageToUI('assistant', 'No response received from the assistant.');
                 }
             } catch (error) {
