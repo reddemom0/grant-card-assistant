@@ -828,6 +828,15 @@
                 headerIds: false,
                 mangle: false
             });
+
+            // Open all rendered links in new tabs to preserve chat session
+            const renderer = new marked.Renderer();
+            const originalLink = renderer.link.bind(renderer);
+            renderer.link = (href, title, text) => {
+                const html = originalLink(href, title, text);
+                return html.replace(/^<a /, '<a target="_blank" rel="noopener noreferrer" ');
+            };
+            marked.use({ renderer });
         }
 
         // Map URL-friendly agent names to backend agent types
