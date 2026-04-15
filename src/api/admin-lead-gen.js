@@ -8,7 +8,7 @@
 import { query } from '../database/connection.js';
 
 // Exclude test data created before this date from all queries
-const DATA_FLOOR = '2025-04-01';
+const DATA_FLOOR = '2026-04-01';
 
 /**
  * GET /api/admin/lead-gen-conversations
