@@ -393,6 +393,131 @@ export async function getMessageCount(conversationId) {
 }
 
 // ============================================================================
+// TOOL TRACE — post-hoc debugging of agent tool calls
+// ============================================================================
+
+/**
+ * Get the full chronological tool trace for a conversation.
+ *
+ * Returns every content block from every message in order: tool_use calls
+ * (with parameters), tool_result responses (with full content), text blocks,
+ * and thinking blocks. This is the canonical way to inspect what an agent
+ * did in a past conversation.
+ *
+ * Each entry includes the tool_use_id so callers can correlate a tool_use
+ * with its corresponding tool_result.
+ *
+ * @param {string} conversationId - UUID of the conversation
+ * @returns {Promise<Array>} Ordered array of typed entries:
+ *   { type: 'tool_use', tool_name, tool_use_id, input, timestamp }
+ *   { type: 'tool_result', tool_use_id, content, is_error, timestamp }
+ *   { type: 'text', content, timestamp }
+ *   { type: 'thinking', content, timestamp }
+ */
+export async function getConversationToolTrace(conversationId) {
+  const result = await query(
+    `SELECT role, content, created_at
+     FROM messages
+     WHERE conversation_id = $1
+     ORDER BY created_at ASC, id ASC`,
+    [conversationId]
+  );
+
+  const trace = [];
+
+  for (const row of result.rows) {
+    const timestamp = row.created_at;
+
+    let blocks;
+    try {
+      blocks = JSON.parse(row.content);
+    } catch {
+      // Plain-text content (legacy or user text)
+      if (row.content && row.content.trim()) {
+        trace.push({ type: 'text', content: row.content, timestamp });
+      }
+      continue;
+    }
+
+    if (!Array.isArray(blocks)) {
+      // Single object or primitive — wrap
+      blocks = [blocks];
+    }
+
+    for (const block of blocks) {
+      if (!block || !block.type) continue;
+
+      switch (block.type) {
+        case 'tool_use':
+          trace.push({
+            type: 'tool_use',
+            tool_name: block.name,
+            tool_use_id: block.id,
+            input: block.input,
+            timestamp
+          });
+          break;
+
+        case 'tool_result':
+          trace.push({
+            type: 'tool_result',
+            tool_use_id: block.tool_use_id,
+            content: block.content,
+            is_error: block.is_error || false,
+            timestamp
+          });
+          break;
+
+        case 'text':
+          if (block.text && block.text.trim()) {
+            trace.push({ type: 'text', content: block.text, timestamp });
+          }
+          break;
+
+        case 'thinking':
+          if (block.thinking && block.thinking.trim()) {
+            trace.push({ type: 'thinking', content: block.thinking, timestamp });
+          }
+          break;
+
+        case 'redacted_thinking':
+          trace.push({ type: 'thinking', content: '[redacted]', timestamp });
+          break;
+
+        // Server-side tool blocks (web_search, web_fetch) — also useful for debugging
+        case 'server_tool_use':
+          trace.push({
+            type: 'tool_use',
+            tool_name: block.name,
+            tool_use_id: block.id,
+            input: block.input,
+            timestamp
+          });
+          break;
+
+        case 'web_search_tool_result':
+        case 'web_fetch_tool_result':
+          trace.push({
+            type: 'tool_result',
+            tool_use_id: block.tool_use_id,
+            content: block.content,
+            is_error: false,
+            timestamp
+          });
+          break;
+
+        default:
+          // Unknown block type — preserve it as-is for forward compatibility
+          trace.push({ type: block.type, content: block, timestamp });
+          break;
+      }
+    }
+  }
+
+  return trace;
+}
+
+// ============================================================================
 // CONVERSATION COMPACTION FUNCTIONS
 // ============================================================================
 

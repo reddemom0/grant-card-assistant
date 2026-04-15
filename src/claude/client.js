@@ -421,6 +421,7 @@ export async function runAgent({
     let loopCount = 0;
     let accumulatedText = ''; // Track text across ALL iterations (fixes greeting loss bug)
     let hasUnstreamedText = false; // Track if accumulated text from tool_use needs to be streamed
+    let userMessageSaved = false; // Track whether the initial user message has been persisted
 
     while (loopCount < MAX_AGENT_LOOPS) {
       loopCount++;
@@ -690,8 +691,13 @@ export async function runAgent({
           console.log(`✓ Messages saved to database (${assistantText.length} chars from ${loopCount} iterations)`);
         } else {
           // Standard agents: save to messages table
+          // User message may already have been saved during a tool-use iteration;
+          // only save it here if no tool loop ran (direct end_turn on first iteration).
           const { saveMessage } = await import('../database/messages.js');
-          await saveMessage(conversationId, 'user', userContent);
+          if (!userMessageSaved) {
+            await saveMessage(conversationId, 'user', userContent);
+            userMessageSaved = true;
+          }
           await saveMessage(conversationId, 'assistant', contentToSave);
           console.log('✓ Messages saved to database');
         }
@@ -818,6 +824,45 @@ export async function runAgent({
           content: toolResults
         });
 
+        // Persist tool-loop messages to database in real time so post-hoc
+        // debugging can reconstruct the full tool trace. Two writes per
+        // iteration: the assistant message (tool_use + any text blocks)
+        // and the user message (tool_result blocks).
+        if (agentType !== 'lead-gen') {
+          try {
+            const { saveMessage } = await import('../database/messages.js');
+
+            // Save user's initial message on first tool iteration (only once)
+            if (!userMessageSaved) {
+              await saveMessage(conversationId, 'user', userContent);
+              userMessageSaved = true;
+            }
+
+            // Save the full assistant response for this iteration, including
+            // thinking blocks and tool_use blocks — everything except empty text
+            const toolTurnContent = fullResponse.content
+              .filter(block => {
+                if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
+                  return false;
+                }
+                return true;
+              })
+              .map(block => {
+                const { index, ...cleanBlock } = block;
+                return cleanBlock;
+              });
+            await saveMessage(conversationId, 'assistant', toolTurnContent);
+
+            // Save the tool results
+            await saveMessage(conversationId, 'user', toolResults);
+
+            console.log(`✓ Tool-loop messages persisted to database`);
+          } catch (dbError) {
+            // Non-fatal: log but don't break the agent loop
+            console.error('⚠️  Failed to persist tool-loop messages:', dbError.message);
+          }
+        }
+
         // Continue to next loop iteration
         continue;
       }
@@ -867,7 +912,10 @@ export async function runAgent({
           await appendLeadGenMessages(conversationId, userText, assistantText);
         } else {
           const { saveMessage } = await import('../database/messages.js');
-          await saveMessage(conversationId, 'user', userContent);
+          if (!userMessageSaved) {
+            await saveMessage(conversationId, 'user', userContent);
+            userMessageSaved = true;
+          }
           await saveMessage(conversationId, 'assistant', contentToSave);
         }
 
@@ -926,7 +974,10 @@ export async function runAgent({
           await appendLeadGenMessages(conversationId, userText, assistantText);
         } else {
           const { saveMessage } = await import('../database/messages.js');
-          await saveMessage(conversationId, 'user', userContent);
+          if (!userMessageSaved) {
+            await saveMessage(conversationId, 'user', userContent);
+            userMessageSaved = true;
+          }
           await saveMessage(conversationId, 'assistant', contentToSave);
         }
 
@@ -957,6 +1008,20 @@ export async function runAgent({
 
     if (loopCount >= MAX_AGENT_LOOPS) {
       console.error(`❌ Agent exceeded maximum loop limit (${MAX_AGENT_LOOPS})`);
+
+      // Save user message if it hasn't been saved yet (e.g., loop exhausted
+      // on the very first iteration before any tool_use path ran).
+      // Tool-loop iterations are already saved in real time by CASE 2.
+      if (agentType !== 'lead-gen' && !userMessageSaved) {
+        try {
+          const { saveMessage } = await import('../database/messages.js');
+          await saveMessage(conversationId, 'user', userContent);
+          userMessageSaved = true;
+          console.log('✓ User message saved before loop-exhaustion exit');
+        } catch (dbError) {
+          console.error('⚠️  Failed to save user message on loop exhaustion:', dbError.message);
+        }
+      }
 
       sendSSE(res, {
         type: 'error',
