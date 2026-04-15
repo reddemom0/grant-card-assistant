@@ -18,10 +18,13 @@ import { query } from '../database/connection.js';
  *   - start_date: filter from date (YYYY-MM-DD) (optional)
  *   - end_date: filter to date (YYYY-MM-DD) (optional)
  *   - province: filter by province (optional)
+ *   - industry: filter by industry (optional, ILIKE match)
  *   - finalized: filter by finalized status (true/false/all) (optional)
  *   - min_messages: filter by minimum message count (optional)
  *   - score: filter by lead score (hot/warm/cool) (optional)
  *   - has_email: filter by contact capture status (true/false) (optional)
+ *   - sort_by: column to sort by (default: created_at)
+ *   - sort_dir: sort direction asc/desc (default: desc)
  *   - limit: max results (default: 100)
  */
 export async function handleListLeadGenConversations(req, res) {
@@ -31,10 +34,13 @@ export async function handleListLeadGenConversations(req, res) {
       start_date,
       end_date,
       province,
+      industry,
       finalized,
       min_messages,
       score,
       has_email,
+      sort_by = 'created_at',
+      sort_dir = 'desc',
       limit = '100'
     } = req.query;
 
@@ -62,8 +68,8 @@ export async function handleListLeadGenConversations(req, res) {
 
     // Date filter - days takes precedence
     if (days) {
-      params.push(days);
-      queryText += ` AND created_at >= NOW() - INTERVAL '${days} days'`;
+      params.push(parseInt(days, 10));
+      queryText += ` AND created_at >= NOW() - MAKE_INTERVAL(days => $${params.length})`;
     } else {
       // Date range filter
       if (start_date) {
@@ -80,6 +86,12 @@ export async function handleListLeadGenConversations(req, res) {
     if (province && province !== 'all') {
       params.push(`%${province}%`);
       queryText += ` AND prospect_data->>'province' ILIKE $${params.length}`;
+    }
+
+    // Industry filter
+    if (industry && industry !== 'all') {
+      params.push(`%${industry}%`);
+      queryText += ` AND prospect_data->>'industry' ILIKE $${params.length}`;
     }
 
     // Finalized filter
@@ -110,7 +122,17 @@ export async function handleListLeadGenConversations(req, res) {
     }
 
     // Order and limit
-    queryText += ` ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+    const SORT_WHITELIST = {
+      created_at: 'created_at',
+      estimated_funding: 'estimated_funding',
+      message_count: 'message_count',
+      company_name: "prospect_data->>'company_name'",
+      industry: "prospect_data->>'industry'",
+      province: "prospect_data->>'province'",
+    };
+    const sortColumn = SORT_WHITELIST[sort_by] || 'created_at';
+    const sortDirection = sort_dir === 'asc' ? 'ASC' : 'DESC';
+    queryText += ` ORDER BY ${sortColumn} ${sortDirection} NULLS LAST LIMIT $${params.length + 1}`;
     params.push(parseInt(limit, 10));
 
     const result = await query(queryText, params);
@@ -133,53 +155,38 @@ export async function handleListLeadGenConversations(req, res) {
  * GET /api/admin/lead-gen-stats
  *
  * Get summary statistics for lead-gen dashboard.
- * Returns: total sessions today, total this week, average messages, conversion rate
+ * Uses lead_gen_events table for accurate user-behavior metrics
+ * (not lead_gen_conversations, which tracks agent-side state and inflates numbers).
  */
 export async function handleLeadGenStats(req, res) {
   try {
-    // Funnel metrics - all from single query for consistency
     const funnelResult = await query(`
       SELECT
-        COUNT(*) as total_sessions,
-        COUNT(CASE WHEN estimated_funding IS NOT NULL THEN 1 END) as estimates_delivered,
-        COUNT(CASE WHEN cta_selected IS NOT NULL AND cta_selected != 'none' THEN 1 END) as cta_taken,
-        COUNT(CASE WHEN cta_selected = 'book_call' THEN 1 END) as calls_booked,
-        COUNT(CASE WHEN cta_selected = 'email_summary' THEN 1 END) as emails_sent
-      FROM lead_gen_conversations
+        COUNT(CASE WHEN event_type = 'widget_opened' THEN 1 END) as widget_opens,
+        COUNT(CASE WHEN event_type = 'estimate_delivered' THEN 1 END) as estimates_delivered,
+        COUNT(CASE WHEN event_type = 'cta_clicked' AND event_data->>'cta_type' = 'email_summary' THEN 1 END) as email_summaries
+      FROM lead_gen_events
     `);
 
-    const totalSessions = parseInt(funnelResult.rows[0].total_sessions, 10);
+    const widgetOpens = parseInt(funnelResult.rows[0].widget_opens, 10);
     const estimatesDelivered = parseInt(funnelResult.rows[0].estimates_delivered, 10);
-    const ctaTaken = parseInt(funnelResult.rows[0].cta_taken, 10);
-    const callsBooked = parseInt(funnelResult.rows[0].calls_booked, 10);
-    const emailsSent = parseInt(funnelResult.rows[0].emails_sent, 10);
+    const emailSummaries = parseInt(funnelResult.rows[0].email_summaries, 10);
 
-    // Calculate percentages (% of previous step)
-    const estimateRate = totalSessions > 0
-      ? Math.round((estimatesDelivered / totalSessions) * 100)
+    const estimateRate = widgetOpens > 0
+      ? Math.round((estimatesDelivered / widgetOpens) * 100)
       : 0;
-    const ctaRate = estimatesDelivered > 0
-      ? Math.round((ctaTaken / estimatesDelivered) * 100)
-      : 0;
-    const callRate = ctaTaken > 0
-      ? Math.round((callsBooked / ctaTaken) * 100)
-      : 0;
-    const emailRate = ctaTaken > 0
-      ? Math.round((emailsSent / ctaTaken) * 100)
+    const emailRate = estimatesDelivered > 0
+      ? Math.round((emailSummaries / estimatesDelivered) * 100)
       : 0;
 
     return res.json({
       success: true,
       stats: {
-        total_sessions: totalSessions,
+        widget_opens: widgetOpens,
         estimates_delivered: estimatesDelivered,
         estimate_rate: estimateRate,
-        cta_taken: ctaTaken,
-        cta_rate: ctaRate,
-        calls_booked: callsBooked,
-        call_rate: callRate,
-        emails_sent: emailsSent,
-        email_rate: emailRate
+        email_summaries: emailSummaries,
+        email_rate: emailRate,
       }
     });
   } catch (err) {

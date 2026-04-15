@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lead-Gen Conversations | Granted</title>
+  <title>Lead-Gen Dashboard | Granted</title>
   <style>
     * {
       box-sizing: border-box;
@@ -89,7 +89,7 @@
 
     .filters-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       gap: 15px;
       margin-bottom: 15px;
     }
@@ -180,6 +180,39 @@
       letter-spacing: 0.5px;
     }
 
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+      position: relative;
+      padding-right: 24px;
+    }
+
+    th.sortable:hover {
+      color: #1a2332;
+    }
+
+    th.sortable::after {
+      content: '\2195';
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 12px;
+      opacity: 0.4;
+    }
+
+    th.sortable.sort-asc::after {
+      content: '\2191';
+      opacity: 1;
+      color: #008abf;
+    }
+
+    th.sortable.sort-desc::after {
+      content: '\2193';
+      opacity: 1;
+      color: #008abf;
+    }
+
     tbody tr {
       border-bottom: 1px solid #f0f2f4;
       cursor: pointer;
@@ -192,6 +225,14 @@
 
     tbody tr.expanded {
       background: #f8fafb;
+    }
+
+    tbody tr.transcript-row {
+      cursor: default;
+    }
+
+    tbody tr.transcript-row:hover {
+      background: transparent;
     }
 
     td {
@@ -217,37 +258,117 @@
       color: #721c24;
     }
 
-    .badge.cta-email {
-      background: #d1ecf1;
-      color: #0c5460;
-    }
-
-    .badge.cta-call {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .badge.cta-none {
-      background: #e2e3e5;
-      color: #383d41;
-    }
-
-    /* Transcript */
-    .transcript {
+    /* Detail panel */
+    .detail-panel {
       display: none;
       background: #f8fafb;
       padding: 20px;
       border-top: 1px solid #dde1e3;
     }
 
-    .transcript.visible {
+    .detail-panel.visible {
       display: block;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    .detail-section h4 {
+      font-size: 12px;
+      color: #6d7881;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .detail-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .detail-label {
+      color: #6d7881;
+      min-width: 80px;
+    }
+
+    .detail-value {
+      color: #1a2332;
+    }
+
+    .detail-value a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+
+    .detail-value a:hover {
+      text-decoration: underline;
+    }
+
+    .detail-links {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .detail-links a {
+      display: inline-block;
+      padding: 6px 14px;
+      border-radius: 5px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      color: #fff;
+    }
+
+    .detail-links a.hubspot-link {
+      background: #ff5c35;
+    }
+
+    .programs-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .programs-list li {
+      padding: 3px 0;
+      font-size: 13px;
+      color: #374151;
+    }
+
+    .programs-list li::before {
+      content: '\2022';
+      color: #008abf;
+      margin-right: 8px;
+    }
+
+    .prospect-summary {
+      font-style: italic;
+      color: #374151;
+      font-size: 14px;
+      margin-top: 8px;
+      padding: 10px 14px;
+      background: #fff;
+      border-radius: 6px;
+      border-left: 3px solid #008abf;
+    }
+
+    /* Transcript */
+    .transcript {
+      border-top: 1px solid #dde1e3;
+      padding-top: 16px;
     }
 
     .transcript-header {
       font-weight: 600;
       margin-bottom: 15px;
       color: #1a2332;
+      font-size: 14px;
     }
 
     .message {
@@ -279,6 +400,8 @@
     .message .content {
       font-size: 14px;
       line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
 
     .loading {
@@ -302,15 +425,15 @@
 <body>
   <div class="container">
     <header>
-      <h1>Lead-Gen Conversations</h1>
+      <h1>Lead-Gen Dashboard</h1>
       <p class="subtitle">Monitor and analyze lead generation chatbot conversations</p>
     </header>
 
-    <!-- Stats Bar - Funnel -->
+    <!-- Stats Bar - Funnel (sourced from lead_gen_events) -->
     <div class="stats-bar">
       <div class="stat-card">
-        <div class="stat-label">Sessions</div>
-        <div class="stat-value" id="stat-sessions">-</div>
+        <div class="stat-label">Widget Opens</div>
+        <div class="stat-value" id="stat-opens">-</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Estimates Delivered</div>
@@ -318,17 +441,7 @@
         <div class="stat-subtitle" id="stat-estimates-pct">-</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">CTA Taken</div>
-        <div class="stat-value" id="stat-cta">-</div>
-        <div class="stat-subtitle" id="stat-cta-pct">-</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Calls Booked</div>
-        <div class="stat-value" id="stat-calls">-</div>
-        <div class="stat-subtitle" id="stat-calls-pct">-</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Emails Sent</div>
+        <div class="stat-label">Email Summaries Sent</div>
         <div class="stat-value" id="stat-emails">-</div>
         <div class="stat-subtitle" id="stat-emails-pct">-</div>
       </div>
@@ -362,6 +475,10 @@
           </select>
         </div>
         <div class="filter-group">
+          <label for="filter-industry">Industry</label>
+          <input type="text" id="filter-industry" placeholder="e.g. Technology">
+        </div>
+        <div class="filter-group">
           <label for="filter-finalized">Finalized</label>
           <select id="filter-finalized">
             <option value="all">All</option>
@@ -385,22 +502,20 @@
       <table>
         <thead>
           <tr>
-            <th>Date</th>
-            <th>Company</th>
-            <th>Industry</th>
-            <th>Province</th>
+            <th class="sortable sort-desc" data-sort="created_at" onclick="toggleSort('created_at', this)">Date</th>
+            <th class="sortable" data-sort="company_name" onclick="toggleSort('company_name', this)">Company</th>
+            <th class="sortable" data-sort="industry" onclick="toggleSort('industry', this)">Industry</th>
+            <th class="sortable" data-sort="province" onclick="toggleSort('province', this)">Province</th>
             <th>Revenue</th>
             <th>Employees</th>
-            <th>Estimate</th>
-            <th>Tier</th>
-            <th>Messages</th>
+            <th class="sortable" data-sort="estimated_funding" onclick="toggleSort('estimated_funding', this)">Estimate</th>
+            <th class="sortable" data-sort="message_count" onclick="toggleSort('message_count', this)">Messages</th>
             <th>Finalized</th>
-            <th>CTA</th>
           </tr>
         </thead>
         <tbody id="conversations-table">
           <tr>
-            <td colspan="11" class="loading">Loading conversations...</td>
+            <td colspan="9" class="loading">Loading conversations...</td>
           </tr>
         </tbody>
       </table>
@@ -408,8 +523,10 @@
   </div>
 
   <script>
+    const HUBSPOT_PORTAL_ID = '21088260';
     let conversations = [];
     let expandedRows = new Set();
+    let currentSort = { column: 'created_at', direction: 'desc' };
 
     async function loadStats() {
       try {
@@ -418,15 +535,11 @@
 
         if (data.success) {
           const s = data.stats;
-          document.getElementById('stat-sessions').textContent = s.total_sessions;
+          document.getElementById('stat-opens').textContent = s.widget_opens;
           document.getElementById('stat-estimates').textContent = s.estimates_delivered;
-          document.getElementById('stat-estimates-pct').textContent = s.estimate_rate + '% of sessions';
-          document.getElementById('stat-cta').textContent = s.cta_taken;
-          document.getElementById('stat-cta-pct').textContent = s.cta_rate + '% of estimates';
-          document.getElementById('stat-calls').textContent = s.calls_booked;
-          document.getElementById('stat-calls-pct').textContent = s.call_rate + '% of CTAs';
-          document.getElementById('stat-emails').textContent = s.emails_sent;
-          document.getElementById('stat-emails-pct').textContent = s.email_rate + '% of CTAs';
+          document.getElementById('stat-estimates-pct').textContent = s.estimate_rate + '% of opens';
+          document.getElementById('stat-emails').textContent = s.email_summaries;
+          document.getElementById('stat-emails-pct').textContent = s.email_rate + '% of estimates';
         }
       } catch (error) {
         console.error('Failed to load stats:', error);
@@ -439,14 +552,18 @@
       const startDate = document.getElementById('filter-start').value;
       const endDate = document.getElementById('filter-end').value;
       const province = document.getElementById('filter-province').value;
+      const industry = document.getElementById('filter-industry').value;
       const finalized = document.getElementById('filter-finalized').value;
       const minMessages = document.getElementById('filter-min-messages').value;
 
       if (startDate) params.set('start_date', startDate);
       if (endDate) params.set('end_date', endDate);
       if (province && province !== 'all') params.set('province', province);
+      if (industry) params.set('industry', industry);
       if (finalized && finalized !== 'all') params.set('finalized', finalized);
       if (minMessages) params.set('min_messages', minMessages);
+      params.set('sort_by', currentSort.column);
+      params.set('sort_dir', currentSort.direction);
       params.set('limit', '100');
 
       try {
@@ -456,16 +573,34 @@
         if (data.success) {
           conversations = data.conversations;
           renderTable();
+          handleDeepLink();
         }
       } catch (error) {
         console.error('Failed to load conversations:', error);
         document.getElementById('conversations-table').innerHTML = `
-          <tr><td colspan="11" class="empty">
-            <div class="empty-icon">⚠️</div>
+          <tr><td colspan="9" class="empty">
+            <div class="empty-icon">Warning</div>
             <div>Failed to load conversations</div>
           </td></tr>
         `;
       }
+    }
+
+    function toggleSort(column, thElement) {
+      if (currentSort.column === column) {
+        currentSort.direction = currentSort.direction === 'desc' ? 'asc' : 'desc';
+      } else {
+        currentSort.column = column;
+        currentSort.direction = 'desc';
+      }
+
+      // Update header classes
+      document.querySelectorAll('th.sortable').forEach(th => {
+        th.classList.remove('sort-asc', 'sort-desc');
+      });
+      thElement.classList.add(currentSort.direction === 'asc' ? 'sort-asc' : 'sort-desc');
+
+      loadConversations();
     }
 
     function renderTable() {
@@ -473,8 +608,8 @@
 
       if (conversations.length === 0) {
         tbody.innerHTML = `
-          <tr><td colspan="11" class="empty">
-            <div class="empty-icon">📭</div>
+          <tr><td colspan="9" class="empty">
+            <div class="empty-icon">No results</div>
             <div>No conversations found</div>
           </td></tr>
         `;
@@ -488,47 +623,35 @@
           year: 'numeric'
         });
 
-        const companyName = conv.prospect_data?.company_name || 'N/A';
-        const industry = conv.prospect_data?.industry || 'N/A';
-        const province = conv.prospect_data?.province || 'N/A';
-        const revenue = conv.prospect_data?.revenue_range || 'N/A';
-        const employees = conv.prospect_data?.employee_count || 'N/A';
+        const pd = conv.prospect_data || {};
+        const companyName = pd.company_name || 'N/A';
+        const industry = pd.industry || 'N/A';
+        const province = pd.province || 'N/A';
+        const revenue = pd.revenue_range || 'N/A';
+        const employees = pd.employee_count || 'N/A';
         const estimate = conv.estimated_funding || 'N/A';
-        // Try multiple paths for tier - service_tier_recommended or categorization.service_tier
-        const tier = conv.prospect_data?.service_tier_recommended
-                  || conv.prospect_data?.categorization?.service_tier
-                  || 'N/A';
         const messages = conv.message_count || 0;
         const finalized = conv.finalized ? 'Yes' : 'No';
-        const cta = conv.cta_selected || 'none';
-
         const finalizedClass = conv.finalized ? 'finalized-yes' : 'finalized-no';
-        const ctaClass = cta === 'email_summary' ? 'cta-email' :
-                         cta === 'book_call' ? 'cta-call' : 'cta-none';
-        const ctaDisplay = cta === 'email_summary' ? 'Email' :
-                          cta === 'book_call' ? 'Call' :
-                          cta === 'none' ? 'None' : cta;
 
         const isExpanded = expandedRows.has(index);
 
         return `
-          <tr onclick="toggleTranscript(${index})" class="${isExpanded ? 'expanded' : ''}">
+          <tr onclick="toggleDetail(${index})" class="${isExpanded ? 'expanded' : ''}" data-session="${conv.session_id}">
             <td>${date}</td>
-            <td><strong>${companyName}</strong></td>
-            <td>${industry}</td>
-            <td>${province}</td>
-            <td>${revenue}</td>
-            <td>${employees}</td>
-            <td>${estimate}</td>
-            <td>${tier}</td>
+            <td><strong>${escapeHtml(companyName)}</strong></td>
+            <td>${escapeHtml(industry)}</td>
+            <td>${escapeHtml(province)}</td>
+            <td>${escapeHtml(revenue)}</td>
+            <td>${escapeHtml(String(employees))}</td>
+            <td>${escapeHtml(estimate)}</td>
             <td>${messages}</td>
             <td><span class="badge ${finalizedClass}">${finalized}</span></td>
-            <td><span class="badge ${ctaClass}">${ctaDisplay}</span></td>
           </tr>
           <tr class="transcript-row">
-            <td colspan="11">
-              <div id="transcript-${index}" class="transcript ${isExpanded ? 'visible' : ''}">
-                ${isExpanded ? renderTranscript(conv.messages || []) : ''}
+            <td colspan="9" style="padding:0;">
+              <div id="detail-${index}" class="detail-panel ${isExpanded ? 'visible' : ''}">
+                ${isExpanded ? renderDetailPanel(conv) : ''}
               </div>
             </td>
           </tr>
@@ -536,29 +659,121 @@
       }).join('');
     }
 
-    function renderTranscript(messages) {
-      if (!messages || messages.length === 0) {
-        return '<div class="empty">No messages in this conversation</div>';
+    function renderDetailPanel(conv) {
+      const pd = conv.prospect_data || {};
+      const messages = conv.messages || [];
+
+      // Contact info
+      const name = conv.contact_name || pd.contact_name || null;
+      const email = conv.contact_email || pd.contact_email || pd.email || null;
+      const phone = pd.phone || null;
+      const website = pd.company_website || null;
+
+      // HubSpot links
+      const companyId = pd.hubspot_company_id || null;
+      const contactId = conv.hubspot_contact_id || pd.hubspot_contact_id || null;
+
+      // Programs
+      const programs = conv.matched_programs || pd.matched_programs || [];
+
+      // Summary
+      const summary = pd.prospect_summary || null;
+
+      let html = '<div class="detail-grid">';
+
+      // Left column: Contact & Company
+      html += '<div class="detail-section">';
+      html += '<h4>Contact Details</h4>';
+      if (name) html += `<div class="detail-row"><span class="detail-label">Name</span><span class="detail-value">${escapeHtml(name)}</span></div>`;
+      if (email) html += `<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value"><a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></span></div>`;
+      if (phone) html += `<div class="detail-row"><span class="detail-label">Phone</span><span class="detail-value">${escapeHtml(phone)}</span></div>`;
+      if (website) html += `<div class="detail-row"><span class="detail-label">Website</span><span class="detail-value"><a href="${escapeHtml(website)}" target="_blank" rel="noopener">${escapeHtml(website)}</a></span></div>`;
+      if (!name && !email && !phone && !website) html += '<div class="detail-row"><span class="detail-value" style="color:#6d7881;">No contact details captured</span></div>';
+
+      // HubSpot links
+      if (companyId || contactId) {
+        html += '<div class="detail-links">';
+        if (companyId) html += `<a class="hubspot-link" href="https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/company/${companyId}" target="_blank" rel="noopener">HubSpot Company</a>`;
+        if (contactId) html += `<a class="hubspot-link" href="https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/contact/${contactId}" target="_blank" rel="noopener">HubSpot Contact</a>`;
+        html += '</div>';
+      }
+      html += '</div>';
+
+      // Right column: Programs
+      html += '<div class="detail-section">';
+      html += '<h4>Matched Programs</h4>';
+      if (programs.length > 0) {
+        html += '<ul class="programs-list">';
+        programs.slice(0, 8).forEach(prog => {
+          const progName = typeof prog === 'string' ? prog : (prog.name || JSON.stringify(prog));
+          html += `<li>${escapeHtml(progName)}</li>`;
+        });
+        html += '</ul>';
+        if (programs.length > 8) html += `<div style="color:#6d7881;font-size:13px;margin-top:4px;">+ ${programs.length - 8} more</div>`;
+      } else {
+        html += '<div style="color:#6d7881;">No programs matched</div>';
+      }
+      html += '</div>';
+
+      html += '</div>'; // close detail-grid
+
+      // Prospect summary
+      if (summary) {
+        html += `<div class="prospect-summary">${escapeHtml(summary)}</div>`;
       }
 
-      return `
-        <div class="transcript-header">Conversation Transcript</div>
-        ${messages.map(msg => `
-          <div class="message ${msg.role}">
-            <div class="role">${msg.role === 'user' ? 'User' : 'Assistant'}</div>
-            <div class="content">${escapeHtml(msg.content)}</div>
-          </div>
-        `).join('')}
-      `;
+      // Transcript
+      if (messages.length > 0) {
+        html += '<div class="transcript">';
+        html += `<div class="transcript-header">Conversation Transcript (${messages.length} messages)</div>`;
+        messages.forEach(msg => {
+          const isUser = msg.role === 'user';
+          const roleClass = isUser ? 'user' : 'assistant';
+          const roleLabel = isUser ? 'User' : 'Assistant';
+          let content = msg.content || '';
+          if (content.length > 2000) content = content.substring(0, 2000) + '... [truncated]';
+          html += `
+            <div class="message ${roleClass}">
+              <div class="role">${roleLabel}</div>
+              <div class="content">${escapeHtml(content)}</div>
+            </div>`;
+        });
+        html += '</div>';
+      }
+
+      return html;
     }
 
-    function toggleTranscript(index) {
+    function toggleDetail(index) {
       if (expandedRows.has(index)) {
         expandedRows.delete(index);
       } else {
         expandedRows.add(index);
       }
       renderTable();
+    }
+
+    // Deep-link support: ?session=<session_id>
+    let deepLinkHandled = false;
+
+    function handleDeepLink() {
+      if (deepLinkHandled) return;
+      const params = new URLSearchParams(window.location.search);
+      const targetSession = params.get('session');
+      if (!targetSession) return;
+
+      const index = conversations.findIndex(c => c.session_id === targetSession);
+      if (index === -1) return;
+
+      deepLinkHandled = true;
+      expandedRows.add(index);
+      renderTable();
+
+      // Scroll to the row after render
+      requestAnimationFrame(() => {
+        const row = document.querySelector(`tr[data-session="${targetSession}"]`);
+        if (row) row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
     }
 
     function escapeHtml(text) {
@@ -568,6 +783,7 @@
     }
 
     function applyFilters() {
+      expandedRows.clear();
       loadConversations();
     }
 
@@ -575,8 +791,10 @@
       document.getElementById('filter-start').value = '';
       document.getElementById('filter-end').value = '';
       document.getElementById('filter-province').value = 'all';
+      document.getElementById('filter-industry').value = '';
       document.getElementById('filter-finalized').value = 'all';
       document.getElementById('filter-min-messages').value = '';
+      expandedRows.clear();
       loadConversations();
     }
 

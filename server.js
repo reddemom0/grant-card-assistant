@@ -820,8 +820,9 @@ app.get('/agent-quality', (req, res) => {
   res.sendFile('agent-quality.html', { root: '.' });
 });
 
+// Deprecated — redirect to the unified lead-gen dashboard
 app.get('/admin-lead-gen', authenticateUser, (req, res) => {
-  res.sendFile('admin-lead-gen.html', { root: '.' });
+  res.redirect(301, '/admin/conversations');
 });
 
 app.get('/admin/conversations', authenticateUser, (req, res) => {
