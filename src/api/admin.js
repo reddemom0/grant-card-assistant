@@ -9,6 +9,9 @@ import { requireAdmin, logAdminAction } from '../middleware/admin.js';
 import * as adminQueries from '../database/admin-queries.js';
 import * as analytics from '../services/analytics.js';
 import * as feedbackRetrieval from '../feedback-learning/retrieval.js';
+import { query } from '../database/connection.js';
+import { loadEnrichedSessionData } from './lead-gen-helpers.js';
+import { notifyTeamOfLead } from '../services/lead-notification.js';
 
 const router = express.Router();
 
@@ -907,6 +910,90 @@ router.get('/fix-user-tracking', async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Failed to check/fix user tracking',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * POST /api/admin/test-lead-notification
+ *
+ * Fire a test lead notification for a real session.
+ * Loads the session from the database and sends the notification
+ * to the current NOTIFY_EMAIL recipients.
+ *
+ * Body: { sessionId: string }
+ */
+router.post('/test-lead-notification', async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+
+    if (!sessionId) {
+      return res.status(400).json({
+        success: false,
+        error: 'sessionId is required in request body'
+      });
+    }
+
+    // Load the session
+    const sessionResult = await query(
+      `SELECT * FROM lead_gen_conversations WHERE session_id = $1`,
+      [sessionId]
+    );
+
+    if (sessionResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: `Session ${sessionId} not found`
+      });
+    }
+
+    const session = sessionResult.rows[0];
+    const prospectData = session.prospect_data || {};
+
+    // Load enriched session data
+    let enrichedSession = null;
+    try {
+      enrichedSession = await loadEnrichedSessionData(sessionId);
+    } catch (err) {
+      console.warn(`⚠️  Could not load enriched session data: ${err.message}`);
+    }
+
+    // Fire the notification
+    await notifyTeamOfLead({
+      sessionId,
+      trigger: session.finalization_trigger || 'test_manual',
+      session,
+      prospectData,
+      enrichedSession,
+      companyId: prospectData.hubspot_company_id || null,
+      contactId: prospectData.hubspot_contact_id || null,
+      results: { company: null, contact: null, note: null }
+    });
+
+    const recipients = (process.env.NOTIFY_EMAIL || 'writers@granted.ca')
+      .split(',').map(s => s.trim()).filter(Boolean);
+
+    console.log(`✅ Test lead notification sent for session ${sessionId} to ${recipients.join(', ')}`);
+
+    return res.json({
+      success: true,
+      message: `Test notification sent for session ${sessionId}`,
+      recipients,
+      channels: (process.env.NOTIFY_CHANNELS || 'email').split(',').map(s => s.trim()),
+      session: {
+        company: prospectData.company_name || session.company_name,
+        contact: session.contact_name,
+        email: session.contact_email,
+        leadScore: prospectData.lead_score,
+        trigger: session.finalization_trigger
+      }
+    });
+  } catch (error) {
+    console.error('❌ Test lead notification error:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to send test notification',
       message: error.message
     });
   }

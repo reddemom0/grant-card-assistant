@@ -23,6 +23,7 @@ import {
   getContactByEmail
 } from '../tools/hubspot.js';
 import { sendEmail, wrapInBrandedTemplate } from '../email/sendEmail.js';
+import { notifyTeamOfLead } from '../services/lead-notification.js';
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 const BOOKING_LINK = 'https://meetings.hubspot.com/natalie392/15min-intro-to-granted';
@@ -1671,10 +1672,12 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
   // 6. Update or Create Comprehensive Note
   // -------------------------------------------------------------------------
 
+  let enrichedSession = null;
+
   if (companyId || contactId) {
     try {
       // Load enriched session data (session + memory_store + company_background)
-      const enrichedSession = await loadEnrichedSessionData(sessionId);
+      enrichedSession = await loadEnrichedSessionData(sessionId);
 
       // 🔍 DEBUG: Log enriched session structure
       console.log('\n🔍 DEBUG: EnrichedSession keys:', Object.keys(enrichedSession).join(', '));
@@ -1738,6 +1741,21 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
     } catch (err) {
       console.warn('⚠️  Note creation/update failed:', err.message);
       results.note = { action: 'failed', error: err.message };
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 6b. Notify internal team
+  // -------------------------------------------------------------------------
+
+  if (companyId || contactId) {
+    try {
+      await notifyTeamOfLead({
+        sessionId, trigger, session, prospectData,
+        enrichedSession, companyId, contactId, results
+      });
+    } catch (err) {
+      console.warn('⚠️  Internal notification failed (non-blocking):', err.message);
     }
   }
 
