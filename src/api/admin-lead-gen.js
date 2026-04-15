@@ -7,6 +7,9 @@
 
 import { query } from '../database/connection.js';
 
+// Exclude test data created before this date from all queries
+const DATA_FLOOR = '2025-04-01';
+
 /**
  * GET /api/admin/lead-gen-conversations
  *
@@ -61,7 +64,7 @@ export async function handleListLeadGenConversations(req, res) {
         finalization_trigger,
         messages
       FROM lead_gen_conversations
-      WHERE 1=1
+      WHERE created_at >= '${DATA_FLOOR}'
     `;
 
     const params = [];
@@ -166,6 +169,7 @@ export async function handleLeadGenStats(req, res) {
         COUNT(CASE WHEN event_type = 'estimate_delivered' THEN 1 END) as estimates_delivered,
         COUNT(CASE WHEN event_type = 'cta_clicked' AND event_data->>'cta_type' = 'email_summary' THEN 1 END) as email_summaries
       FROM lead_gen_events
+      WHERE created_at >= '${DATA_FLOOR}'
     `);
 
     const widgetOpens = parseInt(funnelResult.rows[0].widget_opens, 10);
