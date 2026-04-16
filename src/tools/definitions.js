@@ -1990,12 +1990,17 @@ export function getToolsForAgent(agentType) {
   // All agents get server tools and memory (file-based + database)
   const baseTools = [...SERVER_TOOLS, ANTHROPIC_MEMORY_TOOL, ...MEMORY_TOOLS];
 
-  // Core HubSpot tools needed for most agents (enrichment, search, CRUD operations)
+  // Core HubSpot tools needed for most agents (enrichment, search, CRUD operations).
+  // This whitelist feeds the Oracle and other curated agents. Tools referenced by
+  // skills (e.g., DEAL_CREATION references list_hubspot_owners in Section 5.6) must
+  // be listed here — otherwise the agent will see the skill instruction but lack
+  // the tool to follow it.
   const coreHubSpotTools = HUBSPOT_TOOLS.filter(tool =>
     ['search_hubspot_contacts', 'search_hubspot_companies',
      'search_grant_applications',  // Deal search (actual name, not search_hubspot_deals)
      'get_hubspot_contact', 'get_hubspot_company',
      'get_grant_application',  // Get deal by ID (actual name, not get_hubspot_deal)
+     'list_hubspot_owners',  // Resolve owner names → user IDs (required by DEAL_CREATION skill)
      'create_hubspot_contact', 'create_hubspot_company',
      'update_hubspot_contact', 'update_hubspot_company',
      'create_hubspot_deal', 'update_hubspot_deal',
