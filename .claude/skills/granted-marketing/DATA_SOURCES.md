@@ -26,15 +26,26 @@ Marketing content is public. A fabricated 78% success rate in a Grant Blast goes
 
 **Even though marketing drafts are reviewed before publishing,** the Oracle should never fabricate. Review catches mistakes; it doesn't correct sloppiness. A draft littered with fake numbers forces a reviewer to re-research everything, which makes the Oracle worse than useless.
 
+### The tool-call rule (transferred from DEAL_CREATION)
+
+**If the Oracle cites "per HubSpot" or "HubSpot shows," it must have called `get_program_stats` or `get_deal_count` in the same conversation and received a result.** There is no other path that produces a real HubSpot stat.
+
+If the Oracle writes "per HubSpot" without having called a HubSpot tool:
+- The stat does NOT come from HubSpot
+- The Oracle has fabricated both the number and the source
+- This is a critical failure, not a minor drafting issue
+
+This directly mirrors the HubSpot deal-creation rule: *"If you are about to write 'Deal created successfully,' you MUST have just called the tool and received its return value."* The marketing equivalent: *"If you are about to write 'Per HubSpot,' you MUST have called a HubSpot read tool and received its return value."*
+
 ---
 
 ## 2. Available data sources (Level 1 and Level 2)
 
-### Level 1 — what the Oracle has today
+### Live data sources
 
-**User-provided facts.** The human feeds the Oracle the information needed to draft. The Oracle asks for anything missing.
+**User-provided facts.** The human feeds the Oracle information. The Oracle asks for anything missing.
 
-**`COMPANY_CONTEXT` reference material.** Public proof points, product names, named case studies, testimonial quotes. All already loaded in that sub-skill.
+**`COMPANY_CONTEXT` reference material.** Public proof points, product names, named case studies, testimonial quotes. Already loaded in that sub-skill.
 
 **Web fetch (on demand).** When prompted to check a specific URL or public source, the Oracle can fetch it.
 
@@ -42,30 +53,76 @@ Marketing content is public. A fabricated 78% success rate in a Grant Blast goes
 - Granted's aggregate: 92% approval rate, 18,000+ applications, 1,400+ businesses, 10+ years
 - Well-documented program success rates (e.g., CanExport 36–40% per Global Affairs Canada, RTRI 6% per public reporting)
 
-**What Level 1 does not have:**
-- HubSpot access (per-program stats, deal counts, turnaround times)
-- Grants database integration
-- Current program open/close dates without explicit fetching
+**HubSpot — `get_program_stats` tool (LIVE)**
 
-### Level 2 — planned infrastructure
+Returns Granted's track record on a specific grant program. Call with the exact `grant_type` enum value (180 programs — e.g., "ETG - BC", "CanExport", "WorkBC", "CSJ").
 
-These capabilities are being built. When they come online, they plug into this sub-skill without needing a rewrite of the content playbooks.
+Returns:
+- `success_rate` — decimal (0.0–1.0), or null if confidence is "insufficient_data"
+- `sample_size` — total deals (won + lost + pending)
+- `won_count`, `lost_count`, `pending_count` — breakdown
+- `avg_deal_days` — average days from deal creation to close (not submission-to-approval — see §2a)
+- `date_range_start`, `date_range_end` — date range of the dataset
+- `confidence` — "high" (50+), "medium" (15–49), "low" (5–14), "insufficient_data" (<5)
+- `include_starter` — whether Granted Starter pipelines were included (default true)
 
-**HubSpot integration**
-- Per-program success rate, turnaround time, deal counts
-- Existing case study metadata (which clients have consent)
-- Segment and list data for campaign targeting
+Optional parameters:
+- `lookback_months` — filter to recent deals only (default: all-time)
+- `include_starter` — boolean, default true. Set false to isolate Pro-tier performance.
+
+**HubSpot — `get_deal_count` tool (LIVE)**
+
+Returns the number of deals on a program within a time window.
+
+Call with program name and optional `date_range_months` (default 12).
+
+Returns: `count`, `date_range_months`, `as_of` timestamp.
+
+### §2a. What `avg_deal_days` actually measures
+
+`avg_deal_days` is calculated from HubSpot system fields: `closedate - createdate`. This measures the deal's total lifetime in HubSpot — from when the deal record was created to when it was closed. It is **not** submission-to-approval turnaround.
+
+When citing this number in marketing content, frame it honestly:
+- ✅ *"Our CanExport deals average 124 days from start to close"*
+- ❌ *"Applications are approved in 124 days"*
+
+### §2b. The zero-losses rule
+
+When `lost_count === 0` and `pending_count > 0`, the success rate may reflect incomplete outcome tracking rather than a perfect record. Deals that should be "Lost" may be sitting in Abandoned or Suspended states (which the tool counts as pending, not as losses).
+
+**When the Oracle encounters a 100% success rate with zero losses and pending deals > 0:**
+
+Do not cite "100% success rate." Instead:
+1. Flag the anomaly to the user: *"HubSpot shows [won_count] approved and 0 rejected [program] applications — but [pending_count] are still in pending states. The 100% rate may reflect incomplete outcome tracking."*
+2. Offer alternatives: *"Want me to use '[won_count] of [won_count] decided applications approved' as the framing, or fall back to the aggregate 92%?"*
+3. Let the user decide which framing to publish.
+
+### §2c. The confidence rule
+
+The Oracle may only cite a program-specific success rate if:
+- The tool returned a non-null `success_rate` (confidence is NOT "insufficient_data")
+- The confidence level is at least "medium" (15+ decided deals)
+
+If confidence is "low" (5–14 deals), the Oracle may cite the stat but must include a caveat: *"based on a small sample of [N] applications"*
+
+If confidence is "insufficient_data" (<5 deals), the Oracle must NOT cite the program-specific rate. Fall back to the aggregate 92% or flag `[TBD — not enough data for a program-specific stat]`.
+
+### Planned infrastructure (not yet live)
 
 **Government grants database scraper**
-- Publicly disclosed funding recipients (the database Stephanie referenced in the April 14 meeting)
+- Publicly disclosed funding recipients (the government database Stephanie referenced in the April 14 meeting)
 - Program funding totals by year and region
 - Named companies that received specific grants (useful for lead gen and blog research)
 - Monthly refresh cadence
 
 **granted.ca blog scraper**
 - Existing blog content for refresh identification
-- Traffic / performance signals (Level 2+)
+- Traffic / performance signals
 - Internal linking opportunities
+
+**Case study consent tracking**
+- Not yet a HubSpot property. Consent currently tracked informally.
+- Until formalized, use the public case study list in `COMPANY_CONTEXT` §9 as the authoritative source.
 
 **Public program pages (on-demand fetch)**
 - Current program details from grantor websites
@@ -77,32 +134,46 @@ These capabilities are being built. When they come online, they plug into this s
 
 ### Granted's own stats
 
-**What:** Success rates on specific programs, turnaround times, deal counts, case study metadata.
+**What:** Success rates on specific programs, deal volume, deal days.
 
-**Level 1:** User provides the specific stat (e.g., *"Our CanExport success rate is 78% across 40+ applications"*). The Oracle cites the user-provided number.
+**How:** Call `get_program_stats(program_name)` before drafting. The tool returns the stat or null. The Oracle cites what the tool returns — nothing else.
 
-**Level 2:** Oracle pulls from HubSpot. Always cites source in the draft: *"Per HubSpot, our CanExport success rate is 78% across 42 applications since 2021."*
+**Mandatory citation format in drafts:**
+- ✅ *"Per HubSpot (April 2026): 100% approval rate across 56 decided ETG-BC applications"*
+- ✅ *"We've supported 77 ETG-BC applications in the last 12 months (per HubSpot)"*
+- ❌ *"We have a strong track record on ETG"* (vague — cite the actual number or don't claim it)
 
-**Never:**
-- Use aggregate 92% as if it were program-specific
-- Round or smooth numbers (if it's 77.3%, it's 77.3% or "roughly 77%" — not "nearly 80%")
-- Reference stats from memory without sourcing
+**Rules:**
+- Never use aggregate 92% as if it were program-specific
+- Never round or smooth (if it's 77.3%, say "roughly 77%" — not "nearly 80%")
+- If the tool returns null or "insufficient_data" → fall back to aggregate 92% or flag TBD
+- If the tool returns 100% with zero losses → apply the zero-losses rule in §2b
+- If the tool returns confidence "low" → include a "small sample" caveat
+
+**If the tool is unavailable or errors:** ask the user for the stat. Do not fall back to memory.
+
+### Granted's deal volume
+
+**How:** Call `get_deal_count(program_name, date_range_months)` for "how many applications have we done" type questions.
+
+**Useful for:**
+- Grant Blast body: *"We've supported 40+ CanExport applications in the past year"*
+- Blog research: identifying which programs have recent activity
+- Content calendar: what programs are trending (more deals opening)
 
 ### Public stats (program success rates, industry data)
 
 **What:** Externally reported statistics — CanExport published success rates, government budget data, StatCan figures.
 
-**Level 1:** Oracle may reference commonly-cited public stats it knows, but must cite the source. Example:
+**How:** Oracle may reference commonly-cited public stats, but must cite the source:
 - ✅ *"CanExport's published success rate is 36–40% (Global Affairs Canada)"*
 - ❌ *"CanExport has a 78% approval rate"* (conflating Granted's rate with the program's)
 
-**Level 2 (web fetch enabled):** Oracle fetches the current source URL before citing. Always includes the citation.
+For current figures, fetch the source URL before citing. Always include the citation.
 
 ### Program specifics (amounts, deadlines, eligibility)
 
-**Level 1:** User provides these. If the user says *"up to $50K, closes Feb 28,"* the Oracle uses those exact numbers. If the user doesn't provide them, the Oracle asks.
-
-**Level 2:** Oracle fetches from the grantor's current program page when prompted. Always cites the source URL.
+**How:** User provides OR Oracle fetches from the grantor's current program page. Always cite the source.
 
 **Never:**
 - Invent amounts ("probably around $50K")
@@ -213,7 +284,7 @@ When facts are placeholders, the Oracle uses specific bracketed placeholders tha
 If the Oracle has multiple sources for the same fact, preference order:
 
 1. **User-provided, same conversation** — highest weight. The user knows their context.
-2. **HubSpot** (Level 2) — authoritative for Granted's own operations
+2. **HubSpot tools** (`get_program_stats`, `get_deal_count`) — authoritative for Granted's own operations
 3. **Grantor's current program page** — authoritative for current program details
 4. **`COMPANY_CONTEXT`** — authoritative for Granted's positioning and public facts
 5. **Well-known public stats** — useful for context but subordinate to the above
@@ -249,15 +320,16 @@ If two sources conflict, the Oracle surfaces the conflict to the user rather tha
 | Funding amount | User | ✅ "up to $50K" |
 | Deadline | User | ✅ "Feb 28" |
 | Open date | User | ✅ "Feb 1" |
-| Eligibility essentials | Missing | ❌ need to ask or fetch |
-| Granted's success rate on CanExport | Missing (Level 1) | ❌ need to ask, or use aggregate |
-| Public success rate | Known (Level 1) | ✅ "CanExport ~36–40% per Global Affairs Canada" |
+| Eligibility essentials | Missing | ❌ ask user or fetch from program page |
+| Granted's success rate on CanExport | `get_program_stats("CanExport")` | ✅ tool returns result (check confidence) |
+| Deal volume | `get_deal_count("CanExport", 12)` | ✅ tool returns count |
 
 ### Oracle's response before drafting
 
-> *"I have the basics — $50K, Feb 1 reopen, Feb 28 close. Before I draft:*
-> *1. Who qualifies — any industry restrictions, business size limits, or export market specifics we should spell out?*
-> *2. Do we have a Granted-specific success rate on CanExport, or should I reference the public 36–40% from Global Affairs Canada?"*
+> *"I pulled our CanExport stats from HubSpot — [success_rate]% across [sample_size] applications, confidence [confidence]. [Deal count] applications in the last 12 months.*
+>
+> *Before I draft, one thing I still need:*
+> *1. Who qualifies — any industry restrictions, business size limits, or export market specifics we should spell out?"*
 
 ### After the user answers
 
@@ -265,16 +337,24 @@ Oracle drafts. Every stat in the output is either user-provided, from `COMPANY_C
 
 ---
 
-## 10. Upgrading to Level 2 — what changes
+## 10. Current status and what's next
 
-When HubSpot and grants DB integrations come online, this sub-skill gets updated in two places:
+### What's live now
+- **HubSpot `get_program_stats`** — per-program success rate, deal volume, deal days, confidence scoring
+- **HubSpot `get_deal_count`** — program deal volume over configurable time windows
+- **Anti-fabrication discipline** — confidence thresholds, zero-losses rule, citation conventions
 
-1. **Section 2 (available sources)** — HubSpot and grants DB move from "planned" to "live"
-2. **Section 3 (stat sourcing rules)** — Level 1 / Level 2 distinction collapses for stat types that now have live pulls
+### What's still planned
+- **Government grants database scraper** — the biggest remaining unlock. Once live, the Oracle can pull publicly disclosed funding recipients, program totals, and use them for blog research and Grant Blast content.
+- **granted.ca blog scraper** — enables the blog refresh workflow to identify stale content automatically
+- **Case study consent tracking** — needs an operational decision on where consent is tracked before a tool can read it
 
-Content sub-skills (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) don't change. They already cite this sub-skill for stat sourcing; the rules here get richer, and the content sub-skills inherit the upgrade for free.
+### What changed vs. previous versions
+HubSpot read tools went live April 2026. The Level 1 / Level 2 distinction has collapsed for Granted's own stats — the Oracle now calls a real tool rather than asking the user for numbers. The user still provides program specifics (amounts, deadlines, eligibility) and the Oracle still fetches public stats from the web on demand.
 
-**This is why `DATA_SOURCES` is a separate sub-skill.** Isolating data discipline from content craft means the skill can grow new capabilities without rewriting how it writes.
+Content sub-skills (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) didn't change. They cite this sub-skill for stat sourcing; the tools here got richer, and the content sub-skills inherited the upgrade for free.
+
+**This is why `DATA_SOURCES` is a separate sub-skill.** Isolating data discipline from content craft means the skill grows new capabilities without rewriting how it writes.
 
 ---
 

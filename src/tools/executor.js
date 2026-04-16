@@ -667,6 +667,23 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         );
         break;
 
+      case 'get_program_stats':
+        result = await hubspot.getProgramStats(
+          input.program_name,
+          { include_starter: input.include_starter !== false }
+        );
+        break;
+
+      case 'get_deal_count':
+        result = await hubspot.getDealCount(
+          input.program_name,
+          {
+            date_range_months: input.date_range_months ?? 12,
+            include_starter: input.include_starter !== false
+          }
+        );
+        break;
+
       // ============================================================================
       // GOOGLE DRIVE TOOLS
       // ============================================================================

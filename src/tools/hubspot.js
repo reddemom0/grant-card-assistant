@@ -4627,3 +4627,277 @@ export async function getHubSpotNotes(objectType, recordId, limit = 20) {
     };
   }
 }
+
+// ============================================================================
+// PROGRAM STATS & DEAL COUNT
+// Aggregate-level reporting tools used by the marketing skill for traceable
+// stat citations. Both tools validate program names against the live
+// grant_type enum and return structured errors (not silent 0%) on mismatch.
+// ============================================================================
+
+const GRANT_PIPELINES = {
+  hiring: '2662913',
+  training: '2662912',
+  market_expansion: '10188292',
+  misc: '26501516',
+  starter_hiring: '48715861',
+  starter_training: '48715862'
+};
+
+const ALL_GRANT_PIPELINE_IDS = Object.values(GRANT_PIPELINES);
+const STARTER_PIPELINE_IDS = [GRANT_PIPELINES.starter_hiring, GRANT_PIPELINES.starter_training];
+const MAIN_PIPELINE_IDS = ALL_GRANT_PIPELINE_IDS.filter(id => !STARTER_PIPELINE_IDS.includes(id));
+
+// Include both canonical internal value (`Won`) per DEAL_CREATION skill and the
+// legacy display-prefixed value (`Invoice Sent (Won)`) used elsewhere in this
+// file, so aggregation is resilient to whichever the portal actually stores.
+const SUCCESS_STATES = ['Won', 'Invoice Sent (Won)', 'Invoice Paid', 'Invoice Cleared', 'Retainer Sent', 'Retainer Paid'];
+const FAILURE_STATES = ['Lost'];
+const PENDING_STATES = ['Open', 'Abandoned', 'Suspended'];
+
+let GRANT_TYPE_ENUM_CACHE = null;
+let GRANT_TYPE_ENUM_FETCHED_AT = 0;
+const GRANT_TYPE_ENUM_TTL_MS = 60 * 60 * 1000;
+
+async function fetchGrantTypeEnum(client) {
+  const now = Date.now();
+  if (GRANT_TYPE_ENUM_CACHE && (now - GRANT_TYPE_ENUM_FETCHED_AT) < GRANT_TYPE_ENUM_TTL_MS) {
+    return GRANT_TYPE_ENUM_CACHE;
+  }
+  const response = await client.get('/crm/v3/properties/deals/grant_type');
+  const options = response.data?.options || [];
+  GRANT_TYPE_ENUM_CACHE = options.map(opt => opt.value);
+  GRANT_TYPE_ENUM_FETCHED_AT = now;
+  console.log(`  Cached grant_type enum: ${GRANT_TYPE_ENUM_CACHE.length} values`);
+  return GRANT_TYPE_ENUM_CACHE;
+}
+
+async function fetchAllMatchingDeals(client, { grantType, pipelineIds, extraFilters = [], properties, maxResults = 5000 }) {
+  const allDeals = [];
+  let after;
+  const limit = 100;
+  const maxPages = Math.ceil(maxResults / limit);
+  let pageCount = 0;
+
+  while (pageCount < maxPages) {
+    const body = {
+      filterGroups: [{
+        filters: [
+          { propertyName: 'grant_type', operator: 'EQ', value: grantType },
+          { propertyName: 'pipeline', operator: 'IN', values: pipelineIds },
+          ...extraFilters
+        ]
+      }],
+      properties,
+      limit,
+      ...(after ? { after } : {})
+    };
+
+    const response = await client.post('/crm/v3/objects/deals/search', body);
+    const results = response.data?.results || [];
+    allDeals.push(...results);
+
+    after = response.data?.paging?.next?.after;
+    pageCount++;
+    if (!after) break;
+  }
+
+  return allDeals;
+}
+
+/**
+ * Get aggregate stats for a grant program based on HubSpot deal history.
+ * Counts Won + downstream states (Invoice Paid/Cleared, Retainer Sent/Paid) as successes.
+ * success_rate denominator = won + lost (pending deals excluded from rate).
+ *
+ * @param {string} programName - exact grant_type enum value (e.g., "ETG - BC", "CanExport")
+ * @param {Object} options
+ * @param {boolean} options.include_starter - include Granted Starter pipelines (default true)
+ * @returns {Object} stats with confidence band, or structured error on invalid program
+ */
+export async function getProgramStats(programName, { include_starter = true } = {}) {
+  if (!HUBSPOT_TOKEN) {
+    return { success: false, error: 'HubSpot access token not configured' };
+  }
+
+  if (!programName || typeof programName !== 'string') {
+    return { success: false, error: 'program_name is required and must be a string' };
+  }
+
+  try {
+    const client = createHubSpotClient();
+    console.log(`📊 get_program_stats: program="${programName}", include_starter=${include_starter}`);
+
+    const enumValues = await fetchGrantTypeEnum(client);
+    if (!enumValues.includes(programName)) {
+      console.warn(`⚠️  Unknown program name: "${programName}" — not in grant_type enum`);
+      return {
+        success: false,
+        error: `Unknown program name: "${programName}". Not a valid grant_type enum value.`,
+        program: programName,
+        valid_examples: enumValues.slice(0, 10)
+      };
+    }
+
+    const pipelineIds = include_starter ? ALL_GRANT_PIPELINE_IDS : MAIN_PIPELINE_IDS;
+    const deals = await fetchAllMatchingDeals(client, {
+      grantType: programName,
+      pipelineIds,
+      properties: ['dealname', 'state', 'createdate', 'closedate', 'grant_type', 'pipeline']
+    });
+
+    console.log(`  Found ${deals.length} deal(s) for "${programName}"`);
+
+    let wonCount = 0;
+    let lostCount = 0;
+    let pendingCount = 0;
+    const dealDurations = [];
+    let minCreate = null;
+    let maxCreate = null;
+
+    for (const deal of deals) {
+      const state = deal.properties.state;
+      const createdate = deal.properties.createdate;
+      const closedate = deal.properties.closedate;
+
+      if (SUCCESS_STATES.includes(state)) wonCount++;
+      else if (FAILURE_STATES.includes(state)) lostCount++;
+      else pendingCount++;
+
+      if (createdate) {
+        const d = new Date(createdate);
+        if (!minCreate || d < minCreate) minCreate = d;
+        if (!maxCreate || d > maxCreate) maxCreate = d;
+      }
+
+      if (createdate && closedate &&
+          (SUCCESS_STATES.includes(state) || FAILURE_STATES.includes(state))) {
+        const days = (new Date(closedate) - new Date(createdate)) / (1000 * 60 * 60 * 24);
+        if (days >= 0) dealDurations.push(days);
+      }
+    }
+
+    const sampleSize = deals.length;
+
+    let confidence;
+    if (sampleSize < 5) confidence = 'insufficient_data';
+    else if (sampleSize < 15) confidence = 'low';
+    else if (sampleSize < 50) confidence = 'medium';
+    else confidence = 'high';
+
+    let successRate = null;
+    if (confidence !== 'insufficient_data' && (wonCount + lostCount) > 0) {
+      successRate = Math.round((wonCount / (wonCount + lostCount)) * 1000) / 1000;
+    }
+
+    const avgDealDays = dealDurations.length > 0
+      ? Math.round((dealDurations.reduce((a, b) => a + b, 0) / dealDurations.length) * 10) / 10
+      : null;
+
+    const result = {
+      success: true,
+      program: programName,
+      success_rate: successRate,
+      sample_size: sampleSize,
+      won_count: wonCount,
+      lost_count: lostCount,
+      pending_count: pendingCount,
+      avg_deal_days: avgDealDays,
+      date_range_start: minCreate ? minCreate.toISOString().split('T')[0] : null,
+      date_range_end: maxCreate ? maxCreate.toISOString().split('T')[0] : null,
+      last_updated: new Date().toISOString(),
+      confidence,
+      include_starter,
+      source: 'HubSpot'
+    };
+
+    console.log(`✓ get_program_stats: won=${wonCount} lost=${lostCount} pending=${pendingCount} confidence=${confidence}`);
+    return result;
+
+  } catch (error) {
+    console.error('get_program_stats error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message,
+      program: programName
+    };
+  }
+}
+
+/**
+ * Count deals on a grant program within a time window.
+ *
+ * @param {string} programName - exact grant_type enum value
+ * @param {Object} options
+ * @param {number} options.date_range_months - lookback window in months (default 12)
+ * @param {boolean} options.include_starter - include Granted Starter pipelines (default true)
+ * @returns {Object} count and metadata, or structured error on invalid program
+ */
+export async function getDealCount(programName, { date_range_months = 12, include_starter = true } = {}) {
+  if (!HUBSPOT_TOKEN) {
+    return { success: false, error: 'HubSpot access token not configured' };
+  }
+
+  if (!programName || typeof programName !== 'string') {
+    return { success: false, error: 'program_name is required and must be a string' };
+  }
+
+  if (!Number.isFinite(date_range_months) || date_range_months <= 0) {
+    return { success: false, error: 'date_range_months must be a positive number' };
+  }
+
+  try {
+    const client = createHubSpotClient();
+    console.log(`📊 get_deal_count: program="${programName}", months=${date_range_months}, include_starter=${include_starter}`);
+
+    const enumValues = await fetchGrantTypeEnum(client);
+    if (!enumValues.includes(programName)) {
+      console.warn(`⚠️  Unknown program name: "${programName}"`);
+      return {
+        success: false,
+        error: `Unknown program name: "${programName}". Not a valid grant_type enum value.`,
+        program: programName,
+        valid_examples: enumValues.slice(0, 10)
+      };
+    }
+
+    const pipelineIds = include_starter ? ALL_GRANT_PIPELINE_IDS : MAIN_PIPELINE_IDS;
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - date_range_months);
+
+    const body = {
+      filterGroups: [{
+        filters: [
+          { propertyName: 'grant_type', operator: 'EQ', value: programName },
+          { propertyName: 'pipeline', operator: 'IN', values: pipelineIds },
+          { propertyName: 'createdate', operator: 'GTE', value: String(cutoff.getTime()) }
+        ]
+      }],
+      limit: 1,
+      properties: ['dealname']
+    };
+
+    const response = await client.post('/crm/v3/objects/deals/search', body);
+    const count = response.data?.total ?? 0;
+
+    console.log(`✓ get_deal_count: ${count} deal(s) in last ${date_range_months} month(s)`);
+
+    return {
+      success: true,
+      program: programName,
+      count,
+      date_range_months,
+      include_starter,
+      as_of: new Date().toISOString(),
+      source: 'HubSpot'
+    };
+
+  } catch (error) {
+    console.error('get_deal_count error:', error.response?.data || error.message);
+    return {
+      success: false,
+      error: error.message,
+      program: programName
+    };
+  }
+}

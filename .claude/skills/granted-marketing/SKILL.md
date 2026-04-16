@@ -26,15 +26,15 @@ The Oracle's marketing brain. This file is the router. Sub-skills hold the playb
 
 ## 0. Maturity model — what this skill can do right now
 
-This skill supports three progressive levels. Level 2 is the target. Starting at Level 1.
+This skill supports three progressive levels. HubSpot read tools are now live, putting the skill partially at Level 2.
 
 | Level | Oracle behavior | Human role | Status |
 |---|---|---|---|
-| **1. Assistant** | Drafts in brand voice. Knows content rules. Prompted for every input. | Provides facts, stats, program details. Reviews + edits. | **Live** |
-| **2. Data-aware assistant** | Pulls stats from HubSpot, program details from grants DB, calendar context — then drafts. | Confirms intent, reviews, edits. | **Target — infra in build** |
+| **1. Assistant** | Drafts in brand voice. Knows content rules. Prompted for every input. | Provides facts, stats, program details. Reviews + edits. | **Foundation — always active** |
+| **2. Data-aware assistant** | Pulls stats from HubSpot, program details from grants DB, calendar context — then drafts. | Confirms intent, reviews, edits. | **Partially live — HubSpot read tools active. Grants DB and blog scraper planned.** |
 | **3. Scheduled + autonomous** | Runs on cadence. Picks the grant. Drafts all versions. Sends to human for approval before posting. | Approves or edits. | **Future** |
 
-**Operating principle at Level 1:** The human feeds the facts. The Oracle handles the craft.
+**What's live now:** The Oracle can call `get_program_stats` and `get_deal_count` to pull real HubSpot data into drafts. Program specifics (amounts, deadlines, eligibility) still come from the user or web fetch.
 
 ---
 

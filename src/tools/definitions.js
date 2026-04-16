@@ -1177,6 +1177,49 @@ export const HUBSPOT_TOOLS = [
       },
       required: ['object_type', 'record_id']
     }
+  },
+  {
+    name: 'get_program_stats',
+    description: 'Returns Granted\'s aggregate track record on a specific grant program: success rate, sample size, deal duration, and confidence band. Queries HubSpot deals across all 6 grant pipelines. Success = Won + downstream states (Invoice Paid/Cleared, Retainer Sent/Paid). success_rate denominator is won+lost (pending deals excluded from rate). Use this when the marketing skill or any other skill needs a traceable, auditable stat to cite about Granted\'s performance on a program. Returns structured error if program_name is not a valid grant_type enum value — never returns silent 0%.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        program_name: {
+          type: 'string',
+          description: 'Exact grant_type enum value (e.g., "ETG - BC", "CanExport", "BC MDP", "CSJ"). Must match HubSpot grant_type enum exactly.'
+        },
+        include_starter: {
+          type: 'boolean',
+          description: 'Include Granted Starter pipelines in the stats (default true). Set false to isolate the Pro-tier track record.',
+          default: true
+        }
+      },
+      required: ['program_name']
+    }
+  },
+  {
+    name: 'get_deal_count',
+    description: 'Returns the count of HubSpot deals on a grant program within a lookback window. Used to identify programs with recent activity. Queries all 6 grant pipelines by default. Returns structured error if program_name is not a valid grant_type enum value.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        program_name: {
+          type: 'string',
+          description: 'Exact grant_type enum value (e.g., "ETG - BC", "CanExport").'
+        },
+        date_range_months: {
+          type: 'number',
+          description: 'Lookback window in months (default 12). Counts deals with createdate >= now - N months.',
+          default: 12
+        },
+        include_starter: {
+          type: 'boolean',
+          description: 'Include Granted Starter pipelines in the count (default true).',
+          default: true
+        }
+      },
+      required: ['program_name']
+    }
   }
 ];
 
@@ -2005,7 +2048,8 @@ export function getToolsForAgent(agentType) {
      'update_hubspot_contact', 'update_hubspot_company',
      'create_hubspot_deal', 'update_hubspot_deal',
      'associate_contact_with_company', 'search_getgranted',
-     'generate_hubspot_embed_link'].includes(tool.name)
+     'generate_hubspot_embed_link',
+     'get_program_stats', 'get_deal_count'].includes(tool.name)
   );
 
   // Curated tool sets per agent - only include what each agent actually uses
