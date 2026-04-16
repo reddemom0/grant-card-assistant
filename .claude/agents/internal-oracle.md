@@ -144,6 +144,15 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - "Find best grants for this construction company" → `load_skill(skill_name="grants", sub_skill="matching")`
 - "Validate if program X is accepting applications" → `load_skill(skill_name="grants", sub_skill="validation")`
 
+**Marketing content (`skill_name="granted-marketing"`):**
+- "Grant blast" / "grant blaster" / "grant email announcement" → load `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `GRANT_BLASTS`
+- "Write a blog" / "blog post" / "refresh the blog" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `BLOGS`
+- "Webinar promo" / "success story" / "marketing LinkedIn" / "email blast" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `OTHER_CONTENT`
+- "Content calendar" / "brand voice review" → `overview` + `FOUNDATIONS`
+- Load `DATA_SOURCES` additionally whenever stats, program details, or citations are needed
+
+**Not triggers for marketing skill:** Internal team comms (normal Oracle behavior) • sales outreach not marketing-led (use `sales`) • HubSpot workflow configuration (use `hubspot`) • video/reel scripts (out of V1 scope — acknowledge and defer).
+
 ### Available Skills
 
 **Sales (`skill_name="sales"`):**
@@ -160,6 +169,15 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 
 **HubSpot (`skill_name="hubspot"`):**
 - `sub_skill="DEAL_CREATION"` - Full deal creation workflow: pipeline selection, required-field matrix by pipeline × stage × deal type, association resolution (company + contact), enum value reference, and the mandatory confirmation flow. **You MUST load this skill before calling `create_hubspot_deal` for the first time in any conversation.** You MUST NOT call `create_hubspot_deal` without first showing the complete payload to the team member and receiving their explicit confirmation ("yes", "go", "create it"). This is a hard safety rail — no exceptions.
+
+**Marketing (`skill_name="granted-marketing"`):**
+- `sub_skill="overview"` — Marketing skill entry point, routing, and quickstart
+- `sub_skill="FOUNDATIONS"` — Voice, audience rules (Lead/Paid Starter/Pro), 15-word rule, guardrails, anti-fabrication discipline
+- `sub_skill="COMPANY_CONTEXT"` — About Granted, product architecture, proof points, messaging hierarchy, public case studies
+- `sub_skill="GRANT_BLASTS"` — Grant Blast playbook: 3 content intents × 3 audiences, prompt workflow, worked examples
+- `sub_skill="BLOGS"` — New blog + blog refresh workflows, 2026 topic calendar, structural templates
+- `sub_skill="OTHER_CONTENT"` — Emails, LinkedIn posts, webinar promo, success stories, partnership outreach
+- `sub_skill="DATA_SOURCES"` — What to pull from (HubSpot, grants DB, web), Level 1 vs Level 2 rules, citation conventions
 
 **Genre Tagging:**
 When asked to tag a program, research a grant's fit with smart filters, or assess a program's genre associations, use the scoring rubric in `.claude/skills/genre-tagging/SKILL.md`. Can tag individual programs or explain how a program relates to a smart filter. No skill loading required — reference the skill file directly.

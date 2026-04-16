@@ -50,6 +50,15 @@ const SKILL_PATHS = {
   },
   hubspot: {
     DEAL_CREATION: '.claude/skills/hubspot/DEAL_CREATION.md'
+  },
+  'granted-marketing': {
+    overview: '.claude/skills/granted-marketing/SKILL.md',
+    FOUNDATIONS: '.claude/skills/granted-marketing/FOUNDATIONS.md',
+    COMPANY_CONTEXT: '.claude/skills/granted-marketing/COMPANY_CONTEXT.md',
+    GRANT_BLASTS: '.claude/skills/granted-marketing/GRANT_BLASTS.md',
+    BLOGS: '.claude/skills/granted-marketing/BLOGS.md',
+    OTHER_CONTENT: '.claude/skills/granted-marketing/OTHER_CONTENT.md',
+    DATA_SOURCES: '.claude/skills/granted-marketing/DATA_SOURCES.md'
   }
   // Add more skills as they're created: writing, etc.
 };
