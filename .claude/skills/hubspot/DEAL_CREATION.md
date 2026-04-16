@@ -392,7 +392,9 @@ This is different from "fields to never set." These are fields you might be temp
 
 For each of the following, you must use the value the user provides. If the user has not provided one, ASK. Never compute, estimate, or pull from "similar deals."
 
-- **`amount`** — Total deal amount. The user provides this number. You do not derive it.
+- **`amount`** — Total deal amount. The user provides this number. **One narrow exception for batch mode:** if `hourly_wage`, `hours_per_week`, `start_date`, and `end_date` are all present in the batch input, Oracle may propose a derived amount (`hourly_wage × hours_per_week × weeks-between-dates`) in the dry-run preview, clearly labeled as a derivation with the formula visible, for the team member to confirm or override. This proposal-with-confirmation pattern is allowed because the preview IS the ask — the team member sees the number and the formula before anything commits. Silent derivation — inserting a computed value into the payload without surfacing the formula in the preview — remains forbidden under Section 0.2.
+
+  This exception does NOT extend to `client_reimbursement`, `actual_reimbursement`, or `tuition_fee_per_person`. Those remain user-provided, no derivation proposal. The reason: `amount` can be reconstructed from payroll math, but `client_reimbursement` is set by grant program policy that Oracle cannot reason about from first principles.
 - **`client_reimbursement`** — Approved funding from the grant program. The user provides this. You do not calculate it from a wage × hours × subsidy-percentage formula, even if you know the formula.
 - **`actual_reimbursement`** — Same rule. User provides.
 - **`tuition_fee_per_person`** — User provides.
@@ -466,35 +468,228 @@ This section lists the accepted values for the most important dropdown fields. P
 
 ### 6.1 Grant Type (`grant_type`)
 
-HubSpot has 180 Grant Type values. The ones most commonly used for create operations include (display label → internal value):
+HubSpot has **180 valid `grant_type` values**. The complete enum is below, sorted alphabetically by display label. Pass the **Internal Value** column exactly — capitalization, punctuation, and whitespace are all significant.
+
+⚠️ **23 values have display labels that differ from their internal values.** If the team member gives you a label from this subset, you MUST map to the internal value before writing the payload. Sending the display label where the internal value differs will cause a 400 "Invalid value for property" error. The differing values are called out in Section 6.1.A below.
+
+⚠️ **3 values carry trailing whitespace in the HubSpot label.** Preserve it exactly. `"Accelerating Digital Career for Youth "` (with trailing space) is a different string to HubSpot than the trimmed version — Oracle's enum match is strict. The three affected labels: `"Accelerating Digital Career for Youth "`, `"Eco-Canada - Science/Tech "`, `"Trucking HR SWSP "`.
+
+⚠️ **Similar-sounding names are frequently distinct programs.** `"Science Horizons BioTalent"` and `"Bio Talent SWPP"` are separate grants with separate internal values (`Science Horizons BioTalent` vs `Bio Talent`). `"Career Launcher"`, `"Career Launcher - CL"`, `"Career Launcher - CT"`, `"Career Launcher - Impact"`, `"Career Launcher - NR"` are five separate programs, not variants of one. Never group by surface similarity — look each one up independently.
+
+**Full enum:**
 
 | Display Label | Internal Value |
 |---|---|
-| CanExport - SME | `CanExport` |
-| CanExport - Innovation | `CanEx Innovate` |
-| ETG - BC | `ETG - BC` |
-| WorkBC | `WorkBC` |
-| BCAFE | `BC MDP` |
-| Buy BC Partnership Program | `BC Buy Local` |
-| DS4Y - Innovate BC | `DS4Y - Innovate BC` |
-| DS4Y - BioTalent | `DS4Y - BioTalent` |
-| WIL Digital | `WIL Digital` |
-| Magnet | `Magnet` |
-| Career Launcher | `Career Launcher` |
-| PLTC Green Jobs | `PLTC Green Jobs` |
-| BCCAF | `BCCAF` |
-| IRP | `IRP` |
-| IRAP (various) | see Career Launcher variants |
-| Canada Summer Jobs (CSJ) | `CSJ` |
-| Manufacturing Jobs Fund | `Manufacturing Jobs Fund` |
+| `Accelerating Digital Career for Youth ` | `Accelerating Digital Career for Youth` |
+| `Accelerating Manufacturing Scale Up` | `Accelerating Manufacturing Scale Up` |
+| `Access to Talent` | `Access to Talent` |
+| `Agriassurance` | `Agriassurance` |
+| `AgriAssurance: SME Component` | `AgriAssurance: SME Component` |
+| `AgriMarketing Program` | `AgriMarketing Program` |
+| `AgriTalent SWPP` | `AgriTalent SWPP` |
+| `AI Compute Access Fund` | `AI Compute Access Fund` |
+| `Alberta Export Expansion Program` | `Alberta Export Expansion Program` |
+| `Alberta Innovates Voucher` | `Alberta Innovates Voucher` |
+| `Alberta Jobs Now` | `Alberta Jobs Now` |
+| `Amber` | `Amber` |
+| `Annual Fee` | `Annual Fee` |
+| `Apprenticeship Service Program` | `Apprenticeship Service Program` |
+| `BC Basin` | `BC Basin` |
+| `BC Lean` | `BC Lean` |
+| `BC Maritime` | `BC Maritime` |
+| `BC SMB Recovery` | `BC SMB Recovery` |
+| `BCAFE` | `BC MDP` |
+| `BCCAF` | `BCCAF` |
+| `BCMDP` | `BCMDP` |
+| `Bio Talent SWPP` | `Bio Talent` |
+| `Building Green Program` | `Building Green Program` |
+| `Business Scale-Up and Productivity - PacifiCan` | `Business Scale-Up and Productivity - PacifiCan` |
+| `Buy BC Partnership Program` | `BC Buy Local` |
+| `CAJG` | `CAJG` |
+| `Canada Summer Jobs (CSJ)` | `CSJ` |
+| `Canada-Saskatchewan Job Grant (CSJG)` | `CSJG` |
+| `Canadian Mining Work Placement Program` | `Canadian Mining Work Placement Program` |
+| `Canadian periodical fund` | `CPF` |
+| `Canadian Supply Chain Program` | `Canadian Supply Chain Program` |
+| `CanExport - Innovation` | `CanEx Innovate` |
+| `CanExport - SME` | `CanExport` |
+| `CAP Value-Added` | `CAP Value-Added` |
+| `CAPG` | `CAPG` |
+| `Career Launcher` | `Career Launcher` |
+| `Career Launcher - CL` | `Career Launcher - CL` |
+| `Career Launcher - CT` | `Career Launcher - CT` |
+| `Career Launcher - Impact` | `Career Launcher - Impact` |
+| `Career Launcher - NR` | `Career Launcher - NR` |
+| `Career Ready SWPP` | `Career Ready Internship` |
+| `Career Ready with CTMA Expanding Opportunities` | `Career Ready with CTMA Expanding Opportunities` |
+| `Career Starter` | `Career Starter` |
+| `CareerLaunch: Workplace Training` | `CareerLaunch: Workplace Training` |
+| `CF - Food` | `CF - Food` |
+| `CJG - AB` | `CJG - AB` |
+| `CLAC` | `CLAC` |
+| `CleanBC Innovation Accelerator` | `CleanBC Innovation Accelerator` |
+| `CMJG` | `CMJG` |
+| `COIL` | `COIL` |
+| `COJG` | `COJG` |
+| `Communautique - DS4Y` | `Communautique - DS4Y` |
+| `Competitiveness Consulting Rebate` | `Competitiveness Consulting Rebate` |
+| `Creative Employment Options` | `Creative Employment Options` |
+| `Creative Export Canada` | `Creative Export Canada` |
+| `Culture Works Canada SWPP` | `Culture Works Canada SWPP` |
+| `CVP` | `CVP` |
+| `DELIA` | `DELIA` |
+| `Deposit` | `Deposit` |
+| `Destination Trade` | `Destination Trade` |
+| `Digital Lift` | `Digital Lift` |
+| `Digital Lift Tech Internship` | `Digital Lift Tech Internship` |
+| `Digital Marketing Skills Experience (DMSE)` | `Digital Marketing Skills Experience (DMSE)` |
+| `Digital Modernization and Adoption Program - DCC` | `Digital Modernization and Adoption Program - DCC` |
+| `Digital Traction` | `Digital Traction` |
+| `Digital Works - Pinnguaq` | `Pinnguaq Supercluster` |
+| `Discovering Potential` | `Discovering Potential` |
+| `Driver Training Grant For All Age Groups` | `Driver Training Grant For All Age Groups` |
+| `DS4Y - BioTalent` | `DS4Y - BioTalent` |
+| `DS4Y - Eco Canada` | `DS4Y - Eco Canada` |
+| `DS4Y - ICNJ` | `DS4Y - ICNJ` |
+| `DS4Y - IMAA` | `DS4Y - IMAA` |
+| `DS4Y - Innovate BC` | `DS4Y - Innovate BC` |
+| `DS4Y - Lighthouse Labs` | `DS4Y - Lighthouse Labs` |
+| `DS4Y - PCPI` | `DS4Y - PCPI` |
+| `DS4Y - Pinnguaq` | `DS4Y - Pinnguaq` |
+| `DS4Y VCN` | `DS4Y VCN` |
+| `DSYIP` | `DSYIP` |
+| `Eco Canada` | `Eco Canada` |
+| `Eco Canada - Science Horizons` | `Eco Canada - SH` |
+| `Eco-Canada - Science/Tech ` | `Eco-Canada - Science/Tech` |
+| `Eco-Canada Co-op` | `Eco-Canada Co-op` |
+| `Eco-Canada YNR` | `Eco-Canada YNR` |
+| `Employability Pathways Program` | `Employability Pathways Program` |
+| `Employment Services` | `Employment Services` |
+| `Empowering Futures` | `Empowering Futures` |
+| `Enabling Accessibility Fund (EAF)` | `Enabling Accessibility Fund (EAF)` |
+| `EnMax Amplifier` | `EnMax Amplifier` |
+| `Environmental Employability Pathways` | `Environmental Employability Pathways` |
+| `Environmental Foreign Talent Development` | `Environmental Foreign Talent Development` |
+| `Environmental Jobs Growth` | `Eco Canada - SWSP` |
+| `EPF` | `EPF` |
+| `ETG - BC` | `ETG - BC` |
+| `EWSY - Trucking` | `EWSY - Trucking` |
+| `Experience Matters` | `Experience Matters` |
+| `First Nations and Inuit Summer Work Experience Program` | `first Nations and Inuit Summer Work Experience Program` |
+| `Food Processing` | `Food Processing` |
+| `Food Processing Growth Fund` | `FPGF` |
+| `Food Safety Program` | `Food Safety Program` |
+| `FSDRP` | `FSDRP` |
+| `Gearing Up SWPP` | `Gearing Up SWPP` |
+| `Get BC working` | `Get BC working` |
+| `GoodSpark` | `GoodSpark` |
+| `Green Jobs - Clean Foundations` | `Green Jobs - Clean Foundations` |
+| `Green Jobs - MiHR` | `Green Jobs` |
+| `Green Shipping Corridor Program` | `Green Shipping Corridor Program` |
+| `Greenworks` | `Greenworks` |
+| `GYW` | `GYW` |
+| `HDYIP` | `HDYIP` |
+| `Housing Supply Challenge` | `Housing Supply Challenge` |
+| `iAdvance Pathways` | `iAdvance Pathways` |
+| `ICTC` | `ICTC` |
+| `IDEA Fund` | `IDEA Fund` |
+| `Indigenous Tech Circle` | `Indigenous Tech Circle` |
+| `Industry Commercialization Associates` | `Industry R&D Commercialization` |
+| `Industry R&D Associates` | `Industry R&D Associates` |
+| `Infuse Student Work Placement Program (SWPP)` | `Infuse Student Work Placement Program (SWPP)` |
+| `Innovate BC` | `Innovate BC` |
+| `Innovate ISI` | `Innovate ISI` |
+| `Innovation Booster` | `Innovation Booster` |
+| `Intrapreneurship Program` | `Intrapreneurship Program` |
+| `Invest North - Grow Stream` | `Invest North - Grow Stream` |
+| `IRP` | `IRP` |
+| `ISI-UBC` | `ISI` |
+| `IT Immigrant` | `IT Immigrant` |
+| `ITAC (Technation)` | `ITAC (Technation)` |
+| `KPU Mitacs` | `KPU Mitacs` |
+| `LNG Canada Trades Training Fund (TTF)` | `LNG` |
+| `Magnet` | `Magnet` |
+| `Manufacturing Jobs Fund` | `Manufacturing Jobs Fund` |
+| `Market Diversification` | `Market Diversification` |
+| `MITACS` | `MITACS` |
+| `Mitacs Accelerate Entrepreneur` | `Mitacs Accelerate Entrepreneur` |
+| `Mon Avenir` | `Mon Avenir` |
+| `New Category` | `New Category` |
+| `Opportunities Fund Program` | `Opportunities Fund Program` |
+| `PICS` | `PICS` |
+| `PLTC Green Jobs` | `PLTC Green Jobs` |
+| `Product Demonstration Program` | `Product Demonstration Program` |
+| `Propel SWPP` | `Propel SWPP` |
+| `PSYIP` | `PSYIP` |
+| `Regional Defence Investment Initiative` | `RDII` |
+| `Regional Tariff Response Initiative` | `Regional Tariff Response Initiative` |
+| `RELAY-Green Careers` | `RELAY-Green Careers` |
+| `Renewal` | `Renewal` |
+| `Scale AI` | `Scale AI` |
+| `Scale AI Training Program` | `Scale AI Training Program` |
+| `Scale up and Productivity` | `Scale up and Productivity` |
+| `Science Horizons BioTalent` | `Science Horizons BioTalent` |
+| `Science Horizons-Clean Foundation` | `Science Horizons-Clean Foundation` |
+| `Securing Small Business Rebate Program` | `Securing Small Business Rebate Program` |
+| `Skilled Newcomer Bio-Economy` | `Skilled Newcomer Bio-Economy` |
+| `Start up and Scale up` | `Start up and Scale up` |
+| `Supply Management Processing Investment Fund` | `Supply Management Processing Investment Fund` |
+| `Talent Opportunities` | `Talent Opportunities` |
+| `Time-limited funding under Sections 8 and 9 of the Indigenous Languages Act` | `Time-limited funding under Sections 8 and 9 of the Indigenous Languages Act` |
+| `Traceability Adoption (TA) Program` | `Traceability Adoption (TA) Program` |
+| `Trade Pathways` | `Trade Pathways` |
+| `Trucking HR SWPP` | `Trucking HR SWPP` |
+| `Trucking HR SWSP ` | `Trucking HR` |
+| `TSSP` | `TSSP` |
+| `UNAC-Green Corps-STIP` | `UNAC-Green Corps-STIP` |
+| `Venture For Canada` | `Venture For Canada` |
+| `WAGE` | `WAGE` |
+| `Wage Financial Incentive` | `Wage Financial Incentive` |
+| `Wage Subsidy - Lighthouse Labs` | `Wage Subsidy - Lighthouse Labs` |
+| `WEF` | `WEF` |
+| `Welcoming Newcomers` | `Welcoming Newcomers` |
+| `WEOC National Loan Program` | `WEOC National Loan Program` |
+| `WIL Digital` | `WIL Digital` |
+| `WilWorks` | `WilWorks` |
+| `Work to Grow` | `Work to Grow` |
+| `Work XP` | `Work XP` |
+| `WorkBC` | `WorkBC` |
+| `Workers in Transition` | `Workers in Transition` |
+| `Workplace Accessibility` | `Workplace Accessibility` |
+| `YBBE` | `YBBE` |
+| `YESP (Youth Employment and Skills Program)` | `YESP (Youth Employment and Skills Program)` |
+| `Youth Job Connection` | `Youth Job Connection` |
+| `Youth Job Match` | `YJM` |
 
-⚠️ **Important mismatches** (label ≠ internal value):
-- "BCAFE" label → internal `BC MDP`
-- "Buy BC Partnership Program" label → internal `BC Buy Local`
-- "Canadian periodical fund" label → internal `CPF`
-- "LNG Canada Trades Training Fund (TTF)" label → internal `LNG`
-- "Regional Defence Investment Initiative" label → internal `RDII`
-- "Bio Talent SWPP" label → internal `Bio Talent`
+#### 6.1.A Labels that differ from their internal values
+
+These 23 values require label → internal-value translation before writing the payload. If the team member supplies a label from the left column (which is what they see in HubSpot's UI), convert to the right column before sending.
+
+**Labels that differ from their internal values** (verify carefully):
+
+- `Accelerating Digital Career for Youth ` → `Accelerating Digital Career for Youth`
+- `BCAFE` → `BC MDP`
+- `Bio Talent SWPP` → `Bio Talent`
+- `Buy BC Partnership Program` → `BC Buy Local`
+- `Canada Summer Jobs (CSJ)` → `CSJ`
+- `Canada-Saskatchewan Job Grant (CSJG)` → `CSJG`
+- `Canadian periodical fund` → `CPF`
+- `CanExport - Innovation` → `CanEx Innovate`
+- `CanExport - SME` → `CanExport`
+- `Career Ready SWPP` → `Career Ready Internship`
+- `Digital Works - Pinnguaq` → `Pinnguaq Supercluster`
+- `Eco Canada - Science Horizons` → `Eco Canada - SH`
+- `Eco-Canada - Science/Tech ` → `Eco-Canada - Science/Tech`
+- `Environmental Jobs Growth` → `Eco Canada - SWSP`
+- `First Nations and Inuit Summer Work Experience Program` → `first Nations and Inuit Summer Work Experience Program`
+- `Food Processing Growth Fund` → `FPGF`
+- `Green Jobs - MiHR` → `Green Jobs`
+- `Industry Commercialization Associates` → `Industry R&D Commercialization`
+- `ISI-UBC` → `ISI`
+- `LNG Canada Trades Training Fund (TTF)` → `LNG`
+- `Regional Defence Investment Initiative` → `RDII`
+- `Trucking HR SWSP ` → `Trucking HR`
+- `Youth Job Match` → `YJM`
 
 ### 6.1.1 Resolution procedure — do this every time you encounter a `grant_type` value
 
@@ -659,7 +854,7 @@ Every HubSpot deal field falls into one of three buckets. Knowing which bucket a
 | State | `state` | `Open` | Only differs for specific recovery workflows |
 | Pipeline | `pipeline` | Derived from service tier + deal type (see Section 3.1) | N/A — this is derived, not defaulted |
 | Deal stage | `dealstage` | The create stage of the chosen pipeline | N/A — always the create stage for new deals |
-| Deal name | `dealname` | Auto-constructed from the team's convention — ask the team member at session start if you don't know their format, then apply it to every row. Common formats: `{Company} - {Grant Type Label} - {Year}` or `{Grant Type Label} - {Month Year} - {Company} - {Candidate}` | Team member gives an explicit name in the sheet or conversation |
+| Deal name | `dealname` | **Mode A:** ask the team member at session start if you don't know their convention. **Mode B with the LVS template:** auto-construct as `{Candidate Name} - {Grant Type label} - {Start Date YYYY-MM}` (e.g., `"Samuel Vincent - Science Horizons BioTalent - 2026-01"`). Use the Grant Type **label** (not internal value) so names stay human-readable. | Team member gives an explicit name in the sheet or conversation, or specifies a different convention at session start |
 | TP Paying (Training only) | `tp_paying` | `false` | Team member indicates a third party is paying |
 | RA Complete (Market Expansion only) | `ra_complete` | `false` | Team member confirms the readiness assessment is done |
 
@@ -667,7 +862,7 @@ Every HubSpot deal field falls into one of three buckets. Knowing which bucket a
 
 **Bucket 2 — Always ask.** These fields have no safe default. If they're missing from the spreadsheet, ask.
 
-- Amount
+- Amount *(In batch mode: if `hourly_wage`, `hours_per_week`, `start_date`, and `end_date` are all present, propose a derivation in the preview rather than asking up-front — see Section 5.4.1 and Patch 2. The preview IS the ask; this satisfies always-ask without adding a clarifier round.)*
 - Client Reimbursement
 - Actual Reimbursement (GG) — Granted Starter pipelines only
 - Start Date
@@ -699,11 +894,56 @@ Every HubSpot deal field falls into one of three buckets. Knowing which bucket a
 
 ### 8.2 Mode B — Batch
 
+### 8.2.1 The Large Vetting Sheet (LVS) template — column parsing reference
+
+The batch template the Granted team currently uses is the Large Vetting Sheet (LVS), a 16-column `.xlsx` typically named `Template_-_Large_Vetting_Sheet.xlsx` or a close variant. Every batch submitted via this template follows the structure below; deviations signal either a corrupted file, a pre-release version of the template, or a different template entirely — stop and confirm with the team member before parsing.
+
+**File-level parsing rules:**
+
+- **Headers live in row 2, not row 1.** Row 1 is intentionally blank (reserved for future title/instruction text). Do not treat row 1 as the header row; do not treat row 2 as data.
+- **Data starts at row 3** and continues to the first fully-empty row. Empty rows below real data are padding — stop parsing at the first fully-empty row.
+- **Date columns routinely arrive in mixed formats within the same file** — Excel serial numbers (e.g., `46027.0`), `DD/MM/YYYY` strings (e.g., `"31/07/2026"`), and occasionally `YYYY-MM-DD` strings. Accept all three, normalize every parsed date to ISO 8601 (`YYYY-MM-DD`) before payload assembly. If a cell value matches none of the three formats, mark the row blocked and surface in the preview — do not guess.
+- **The literal string `"Granted"` appearing in the Associate Company column is a sentinel** carried over from template testing. It does NOT mean "associate to the Granted consulting firm" — Granted is the consulting firm doing the work, not the client. When you encounter `"Granted"` in Associate Company, treat it as equivalent to blank.
+- **Test/sample rows.** If a row's values match the template's sample rows verbatim (notably `"Granted"` in Associate Company or known test contact names like `"Natalie Valenzuela"` in Associate Contact), treat the company/contact as sentinel-blank rather than a real association. Ask the team member in the preview whether these are intentional rows or leftover samples.
+
+**Column → HubSpot property mapping:**
+
+| LVS Column | HubSpot API Name | Type | Parsing / translation notes |
+|---|---|---|---|
+| Grant Coordinator | `grant_coordinator` | user ID | Name → user ID via `list_hubspot_owners`. If blank, apply session default (Section 5.6). |
+| Candidate Name | `participant_name` | string | Name alone. Do NOT compose Job Title into this field — they are separate HubSpot properties. |
+| Job Title | `job_title` | string | Separate property from `participant_name`. Populate directly from this column. |
+| Student | `application___confirm_candidate_is_student` | enum | Template values are `Yes`/`No`. Pass through as-is. |
+| Citizen | `candidate___citizenship_status` | enum | Template has `Yes`/`No`; HubSpot enum expects `Citizen by birth` / `Naturalized Citizen` / `Work Permit`. **Inference rule:** `Yes` → `Citizen by birth`; `No` → `Work Permit`. Surface the inference in the preview (e.g., *"Interpreted Citizen=Yes as 'Citizen by birth' — confirm or correct for naturalized citizens"*) so the team member can override before confirmation. Never silently commit the inference without the preview callout. |
+| Deal Type | `dealtype` | enum | Template restricts to `Hiring` / `Training`. Pass through. |
+| **Grant Type | `grant_type` | enum (180 vals) | Full enum in Section 6.1. Apply the resolution procedure in Section 6.1.1. The `**` prefix on the header matches HubSpot's double-asterisk label convention and is not a typo — do NOT strip it when comparing to schema labels. |
+| Hourly Wage | `hourly_wage` | number | Numeric. Strip any `$` or `,` if present. |
+| Hours Per Week | `hours_per_week` | number | Numeric. |
+| Start Date | `start_date` | date | Normalize per the file-level date rules above. |
+| End Date | `end_date` | date | Same. |
+| Client Reimbursement | `client_reimbursement` | number | Numeric. Strip `$` and `,`. |
+| Service Fee | `service_fee` | enum (%) | ⚠️ Inconsistent enum — see Section 6.11. Template values like `20.0` (float) must normalize to the enum value `20` (no decimal). Template values like `17.5` stay as `17.5`. Match exactly against the Section 6.11 table. |
+| Associate Contact | contact association | — | Resolve via `search_hubspot_contacts` by name. Exactly one match → associate. Zero or multiple matches → associate with company only and flag the row in the preview as *"contact not uniquely resolvable by name — create deal with company association only, or provide email to create the contact."* Do NOT ask mid-parse for emails; flag and continue. |
+| Associate Company | company association | — | Resolve via `search_hubspot_companies` by name. Same pattern as contact. Treat literal `"Granted"` as sentinel-blank per the file-level rule. |
+| Notes | `description` | string (textarea) | Pass through verbatim. |
+
+**Columns the LVS template does NOT capture** (apply Section 8.0 defaults or Bucket 2 ask rules):
+
+- `dealname` — apply batch-mode default: `{Candidate Name} - {Grant Type label} - {Start Date YYYY-MM}` (e.g., `"Samuel Vincent - Science Horizons BioTalent - 2026-01"`). See Section 8.0.
+- `amount` — always-ask (Bucket 2). In batch mode, if `hourly_wage`, `hours_per_week`, `start_date`, and `end_date` are all present, Oracle MAY propose a derived value (`hourly_wage × hours_per_week × weeks_between_dates`) in the dry-run preview for the team member to confirm or override. This proposal-with-preview pattern is explicitly allowed by Section 5.4.1; silent derivation without the preview callout is not.
+- `grant_reliant` — apply default `Yes` (Section 8.0 Bucket 1).
+- `vacation` (Vacay %) — apply default `4%` (Section 8.0 Bucket 1).
+- `vacay` (Vacation type) — apply default `Accrued` (Section 8.0 Bucket 1).
+- `hubspot_owner_id` (Deal Owner) — ask once at session start per Section 5.6. **Never default to a specific person (not Steph, not the Grant Coordinator, not anyone).** Deal Owner and Grant Coordinator are independent fields — they often differ.
+- Pipeline-specific fields not in the template (`state`, `actual_reimbursement`, `workbc_location`, `training_course_name`, `tp_company`, `tuition_fee_per_person`, etc.) — apply Section 5.2 rules for the chosen pipeline. If required for the chosen pipeline and absent from the template, include them in the single Step 5 clarifier round — do NOT ask per-row.
+
+### 8.2.2 Batch workflow steps
+
 Batch mode has one cardinal rule: **do all the work you can do yourself before you ask the user anything**. The worst batch experience is three rounds of clarifier questions as you slowly discover what's missing. The best is one round, or zero.
 
 Follow this sequence. Do not reorder it. Do not merge steps. Do not ask clarifier questions before step 5.
 
-**Step 1 — Parse all rows.** Read the entire spreadsheet into a working structure. Extract every field from every row. Identify which columns the team's template uses and map them to API names via Section 7. Normalize data formats at this stage: convert dates to ISO 8601, strip `$` and `,` from numbers, normalize `Yes`/`No` to match the exact enum values (e.g., `student` wants `true`/`false` as strings, `grant_reliant` wants `Yes`/`No`). Do not ask the team member for any of this — the spreadsheet is the source of truth.
+**Step 1 — Parse all rows.** Read the entire spreadsheet into a working structure. Extract every field from every row. Identify which columns the team's template uses and map them to API names via Section 7. Normalize data formats at this stage: convert dates to ISO 8601, strip `$` and `,` from numbers, normalize `Yes`/`No` to match the exact enum values (e.g., `student` wants `true`/`false` as strings, `grant_reliant` wants `Yes`/`No`). Do not ask the team member for any of this — the spreadsheet is the source of truth. If the input file is the Large Vetting Sheet, follow the parsing rules and column mapping in Section 8.2.1 rather than inferring columns fresh. Deviations from the 8.2.1 structure mean you're looking at a different template — stop and confirm with the team member before parsing.
 
 **Step 2 — Determine pipeline, stage, and deal type for the batch.** Based on the service tier (if provided in the sheet or the initial message) and the Deal Type column, pick:
 - The pipeline from Section 3.1
@@ -945,6 +1185,14 @@ HubSpot has no transaction API. If you create a company, then fail to create a d
 ---
 
 ## 12. Changelog
+
+- **v1.2** — Sprint B: adapted the skill to parse the Large Vetting Sheet (LVS) batch template rather than requiring the template to be rebuilt.
+  - Added Section 8.2.1 with the complete LVS column → property mapping, file-level parsing rules (row 2 headers, mixed date formats, `"Granted"` sentinel in Associate Company), and inference rules for the Citizen `Yes`/`No` → `candidate___citizenship_status` enum translation.
+  - Reorganized current 8.2 body as 8.2.2 and added Step 1 cross-reference to 8.2.1.
+  - Patched Section 5.4.1 Amount entry to permit proposal-with-preview derivation in batch mode (visible formula required); silent derivation still forbidden.
+  - Updated Section 8.0 Bucket 1 Deal Name default to the LVS-specific batch convention (`{Candidate Name} - {Grant Type label} - {Start Date YYYY-MM}`); Mode A convention-ask pattern preserved.
+  - Section 8.0 Bucket 2 Amount entry clarified: batch derivation proposal is allowed; preview IS the ask.
+  - Replaced Section 6.1 with the full 180-value `grant_type` enum inlined, including callouts for the 23 label≠value mismatches and the 3 trailing-whitespace cases. Closes the Sprint C dependency on runtime file reads for `grant_type` lookups (Oracle can now resolve any grant type without consulting `scripts/output/hubspot-schema-summary.md`).
 
 - **v1.1** — Hardened against four failure modes observed in the first live smoke test:
   - Added Section 0 (CRITICAL — Read this first) with three top-priority rules: never simulate tool calls, never invent numeric values, service tier as Step 0.
