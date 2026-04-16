@@ -163,11 +163,15 @@ export async function handleListLeadGenConversations(req, res) {
  */
 export async function handleLeadGenStats(req, res) {
   try {
+    // Widget opens have no session_id (event fires before session exists), so
+    // this is a raw view count, not unique users. Estimates and CTA clicks
+    // are deduped by session_id since the widget can re-fire these events
+    // on navigation/refresh within a single session.
     const funnelResult = await query(`
       SELECT
         COUNT(CASE WHEN event_type = 'widget_opened' THEN 1 END) as widget_opens,
-        COUNT(CASE WHEN event_type = 'estimate_delivered' THEN 1 END) as estimates_delivered,
-        COUNT(CASE WHEN event_type = 'cta_clicked' AND event_data->>'cta_type' = 'email_summary' THEN 1 END) as email_summaries
+        COUNT(DISTINCT CASE WHEN event_type = 'estimate_delivered' THEN session_id END) as estimates_delivered,
+        COUNT(DISTINCT CASE WHEN event_type = 'cta_clicked' AND event_data->>'cta_type' = 'email_summary' THEN session_id END) as email_summaries
       FROM lead_gen_events
       WHERE created_at >= '${DATA_FLOOR}'
     `);

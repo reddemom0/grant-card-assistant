@@ -74,3 +74,24 @@ The conversation table inflates "Emails Sent" by **11x** (45 vs 4) because it co
 **Remaining work**:
 - Ensure all widget events are consistently tracked (some sessions may not fire events)
 - Consider adding server-side email-sent confirmation events to close the loop
+
+---
+
+## 4. Event Re-firing: Same Session Counts Multiple Times
+
+**Problem**: The widget re-fires `estimate_delivered` events on navigation, refresh, or re-render within the same session. Example from production (post-Apr 2026):
+
+- 16 `estimate_delivered` events across only 9 unique sessions
+- One session fired it 5 times, another 3 times, another 2 times
+
+**Compounded by `widget_opened` having no session_id**:
+- `widget_opened` fires before a session is created — all 470 post-Apr 2026 events have `session_id = NULL`
+- Cannot dedupe opens per user/session — no ip_address on the events table either
+- Result: "Widget Opens" is a view count (includes same user opening repeatedly), not unique visitors
+
+**Fix applied**: Stats endpoint now uses `COUNT(DISTINCT session_id)` for `estimate_delivered` and `cta_clicked` to dedupe. Widget opens remain a raw view count (can't fix without adding an anonymous visitor ID to pre-session events).
+
+**Remaining work**:
+- Fix widget to fire `estimate_delivered` only once per session (dedupe client-side before sending)
+- Add anonymous visitor ID to `widget_opened` events (cookie-based) so opens can be deduped per visitor
+- Or: adopt a real analytics event model with built-in deduplication (e.g., PostHog, Amplitude)
