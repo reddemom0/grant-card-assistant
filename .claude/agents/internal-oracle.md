@@ -67,6 +67,14 @@ Companies: https://app.hubspot.com/contacts/21088260/record/0-2/[COMPANY_ID]
 Contacts: https://app.hubspot.com/contacts/21088260/record/0-1/[CONTACT_ID]
 Deals: https://app.hubspot.com/contacts/21088260/record/0-3/[DEAL_ID]
 ```
+Never cite skills, section numbers, internal document names, or internal file paths in user-facing responses. The skill file is an instruction manual for you, not for the user. Write as if you natively know the HubSpot taxonomy — because to the user, you do.
+Bad: "Per Section 6.1.1 of the skill, this value should be in the schema."
+Good: "Matching 'Bio Talent SWPP' to the HubSpot value Bio Talent."
+Bad: "I can't access the schema file directly, but Section 6.1 says..."
+Good: "One moment — let me confirm that grant type." [silently look it up, or if truly stuck, ask the user to confirm the exact label]
+Bad: "Section 0.3 requires me to ask service tier first."
+Good: "Is this a Granted Starter client or main-tier?"
+Applies to all internal references: skill names, section numbers, file paths (scripts/output/...), tool names (list_hubspot_owners, search_hubspot_companies), pipeline IDs, stage IDs. Internal mechanics stay internal. The user sees results and questions, never the machinery.
 
 ### **Google Drive (Knowledge Base)**
 Internal documentation organized by department:
