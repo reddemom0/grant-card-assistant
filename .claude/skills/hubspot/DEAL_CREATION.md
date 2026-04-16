@@ -636,16 +636,59 @@ Your confirmation flow is the guardrail. The pre-submission checklist (Section 5
 
 ### 8.2 Mode B — Batch
 
-1. **Parse** the uploaded spreadsheet. Map columns to HubSpot property API names using Section 7.
-2. **Validate every row** against Section 5's requirements for the target pipeline/stage/deal type.
-3. **Resolve associations for every row** — look up the Company (and Contact if provided).
-4. **Present a dry-run preview** with three buckets:
-   - ✅ **Ready to create** — rows that validate cleanly. Show count + a sample row.
-   - ⚠️ **Needs attention** — rows with resolvable issues. Show count + specifics.
-   - ❌ **Blocked** — rows that can't be created as-is. Show count + specifics per row.
-5. **Wait for explicit confirmation** on what to do with each bucket.
-6. **Execute the batch sequentially**, not in parallel. Sequential means a failure partway through doesn't create half a batch of mystery state.
-7. **Report results**: total created, total skipped, total failed, and for each failure, the row and the reason.
+Batch mode has one cardinal rule: **do all the work you can do yourself before you ask the user anything**. The worst batch experience is three rounds of clarifier questions as you slowly discover what's missing. The best is one round, or zero.
+
+Follow this sequence. Do not reorder it. Do not merge steps. Do not ask clarifier questions before step 5.
+
+**Step 1 — Parse all rows.** Read the entire spreadsheet into a working structure. Extract every field from every row. Identify which columns the team's template uses and map them to API names via Section 7. Normalize data formats at this stage: convert dates to ISO 8601, strip `$` and `,` from numbers, normalize `Yes`/`No` to match the exact enum values (e.g., `student` wants `true`/`false` as strings, `grant_reliant` wants `Yes`/`No`). Do not ask the team member for any of this — the spreadsheet is the source of truth.
+
+**Step 2 — Determine pipeline, stage, and deal type for the batch.** Based on the service tier (if provided in the sheet or the initial message) and the Deal Type column, pick:
+- The pipeline from Section 3.1
+- The create stage for that pipeline (also Section 3.1)
+- The deal type from Section 5.5
+
+If the service tier is genuinely missing from both the sheet and the initial message, this is the one thing you must ask up front — without it you can't know which pipeline to target. Ask only this one question, then stop and wait.
+
+**Step 3 — Resolve everything looksupable.** Before asking the team member any questions about missing fields, do all of these lookups:
+- For each unique company name in the sheet: `search_hubspot_companies`. Track the resolved ID per row.
+- For each unique contact email: `search_hubspot_contacts` or `get_contact_by_email`. Track resolved IDs.
+- For each unique `grant_type` value: first check Section 6.1's common-values table. If the value is a label that maps to a different internal value (e.g., "Bio Talent SWPP" → `Bio Talent`), use the internal value. If it's not in the common-values table, search `scripts/output/hubspot-schema-summary.md` for the full 180-value enum before concluding it's unknown.
+- For each unique Deal Owner / Grant Coordinator name: `list_hubspot_owners`. Track resolved user IDs.
+
+Do not ask the team member to resolve values that are resolvable from the schema. The schema is on disk; use it.
+
+**Step 4 — Apply defaults.** For every row, apply the defaults from Section 8.0 (the new defaulting behavior section). Defaults go into the proposed payload — they are not open questions. They will be shown to the team member in the preview, and the team member can override any of them.
+
+**Step 5 — Build the single clarifier round.** Now — and only now — assemble the list of things you genuinely cannot resolve. A field goes on this list only if all three are true:
+1. It's required for this pipeline + stage + deal type per Section 5
+2. It's not in the spreadsheet
+3. It's not resolvable via lookup (Step 3) and has no documented default (Step 4)
+
+Combine every unresolvable field across every row into a single message. If three rows all need Vacation %, ask once, not three times. If one row needs a contact and another needs a company, ask for both in the same message. The team member should be able to answer everything in one reply.
+
+If Step 5's list is empty, skip directly to Step 6.
+
+**Step 6 — Dry-run preview.** Present the full payload for every row with three buckets:
+- ✅ **Ready to create** — rows that fully validate. Show count and a sample row.
+- ⚠️ **Needs attention** — rows with resolvable issues that the team member's clarifier-round answer fixed or should fix. Show count and specifics.
+- ❌ **Blocked** — rows that still can't be created. Show count and specifics per row.
+
+Also show any defaults you applied explicitly. Example: "Vacay % defaulted to 4%, Vacation type defaulted to Accrued, Grant Reliant defaulted to Yes — tell me if any of these should be different."
+
+**Step 7 — Wait for explicit confirmation** on what to do with each bucket. Acceptable: "yes", "go", "create it", "fire the ready ones and skip the blocked", "looks good, proceed". Not acceptable: silence, pivoting to a different topic, or any response that doesn't clearly authorize the creates.
+
+**Step 8 — Execute sequentially, not in parallel.** Sequential means a failure partway through doesn't leave half a batch in a mystery state.
+
+**Step 9 — Report results**: total created, total skipped, total failed. For each failure, the row and the specific error. Provide HubSpot links for every created deal.
+
+**Batch mode anti-patterns — do not do these:**
+
+- Asking clarifier questions before completing Steps 1–4
+- Asking about fields that are present in the spreadsheet (even if values look unusual, trust the sheet unless HubSpot rejects it)
+- Asking the team member to resolve a `grant_type` enum value that's in `hubspot-schema-summary.md` — you have the mapping, use it
+- Asking about fields that have documented defaults (Section 8.0) without first proposing the default
+- Surfacing missing fields across multiple rounds as you rediscover them — the checklist in Step 5 must be comprehensive the first time
+- Applying requirements from the wrong pipeline (e.g., asking about WorkBC Location for a main-tier Hiring deal — that's only required for Granted Starter Hiring)
 
 ### 8.3 Confirmation anti-patterns
 
