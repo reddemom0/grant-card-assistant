@@ -251,6 +251,8 @@ Gather these in addition to the Section 5.1 fields. This is the minimum set to g
 
 #### Hiring Grants Pipeline → `Hiring Pending Submission`
 
+⚠️ **Differences from Granted Starter Hiring:** This is the **main-tier** Hiring pipeline. WorkBC Location, State, and Actual Reimbursement (GG) are NOT required here — those are Starter-only fields. If you find yourself asking about WorkBC Location for a main-tier Hiring deal, stop — you have the wrong pipeline's checklist in mind.
+
 | Display Label | API Name | Type |
 |---|---|---|
 | Grant Coordinator | `grant_coordinator` | user ID (resolve via `list_hubspot_owners`) |
@@ -265,6 +267,8 @@ Gather these in addition to the Section 5.1 fields. This is the minimum set to g
 ⚠️ **The API name for Candidate is `participant_name`, not `candidate_name_job_title_email`.** This is a legacy naming inconsistency — the HubSpot label was changed at some point but the internal name wasn't. Getting this wrong silently fails every Hiring and Training deal.
 
 #### Training Grants Pipeline → `Training Pending Submission`
+
+⚠️ **Differences from Granted Starter Training:** This is the **main-tier** Training pipeline. State, Actual Reimbursement (GG), TP Address, and TP Paying are NOT required here — those are Starter-only fields.
 
 | Display Label | API Name | Type |
 |---|---|---|
@@ -304,6 +308,8 @@ Note: `Create date` is auto-set by HubSpot. Don't try to populate it.
 
 #### Granted Starter Hiring → `Pre-Submission Check - Starter Hiring`
 
+⚠️ **Differences from main-tier Hiring:** Starter deals add three fields the main-tier pipeline doesn't require: State, Actual Reimbursement (GG), and WorkBC Location. WorkBC Location is required only if the grant program is actually WorkBC — for a Starter Hiring deal using a different program (e.g., ETG), leave it blank.
+
 | Display Label | API Name | Type |
 |---|---|---|
 | Grant Type | `grant_type` | enum |
@@ -320,6 +326,8 @@ Note: `Create date` is auto-set by HubSpot. Don't try to populate it.
 ⚠️ **`actual_reimbursement` is type `string`, not number.** Known HubSpot data quality quirk — this field was configured as text, not currency. Pass the value as a string (e.g., `"15000"` not `15000`). The field label is `Actual Reimbursement (GG)` but the API name is just `actual_reimbursement` — same field as the existing read configs.
 
 #### Granted Starter Training → `Pending Submission - Starter Training`
+
+⚠️ **Differences from main-tier Training:** Starter Training adds State, Actual Reimbursement (GG), TP Address, and TP Paying as required fields. The `actual_reimbursement` field is still a string, not a number.
 
 | Display Label | API Name | Type |
 |---|---|---|
@@ -444,7 +452,7 @@ The label-to-API-name mapping is intentionally counterintuitive. Verify both fie
 
 **Check 7 — User IDs resolved before payload, not in payload.** If the payload includes `grant_coordinator` or `hubspot_owner_id`, those values must be HubSpot user IDs (numeric strings) that you obtained by calling `list_hubspot_owners` and matching by name. Never use a name as the value. Never put `[OLIVIA_USER_ID]` placeholder text in the payload — call `list_hubspot_owners` first, then use the actual ID.
 
-**Check 8 — All required fields for this pipeline + stage + deal type are present.** Re-read Section 5.2 for the chosen pipeline. Re-read Section 5.3 for the deal type. Verify every field on those lists is in your payload.
+**Check 8 — All required fields for this pipeline + stage + deal type are present.** Re-read Section 5.2 for the chosen pipeline — and specifically the subsection for the chosen pipeline, not an adjacent one. The main-tier Hiring subsection and the Granted Starter Hiring subsection are different; applying the wrong one is a known failure mode. Re-read Section 5.3 for the deal type. Verify every field on those lists is in your payload — no more, no less. If your payload contains fields from a different pipeline's subsection, remove them.
 
 **Check 9 — No fabricated numeric values.** Per Section 5.4.1: every numeric field in your payload was provided by the user, not computed, estimated, or pulled from similar deals.
 
@@ -488,7 +496,21 @@ HubSpot has 180 Grant Type values. The ones most commonly used for create operat
 - "Regional Defence Investment Initiative" label → internal `RDII`
 - "Bio Talent SWPP" label → internal `Bio Talent`
 
-If the team member names a program whose internal value you're not 100% sure about, confirm exact spelling by checking the schema dump or by asking the team member to confirm the label they see in HubSpot.
+### 6.1.1 Resolution procedure — do this every time you encounter a `grant_type` value
+
+When the user gives you a grant type — in a spreadsheet cell, in a chat message, or anywhere else — follow this procedure. Do not ask the user to resolve an enum value before you have tried each of these steps in order.
+
+**Step 1 — Exact match in this skill file (Section 6.1 table above).** If the user's value is a label in the table, use the mapped internal value. Examples: "BCAFE" → `BC MDP`, "Bio Talent SWPP" → `Bio Talent`, "CanExport - SME" → `CanExport`.
+
+**Step 2 — Full schema lookup.** If the value is not in the Section 6.1 table, read `scripts/output/hubspot-schema-summary.md` (or `hubspot-schema-raw.json` if more detail is needed). Grep for the label. There are 180 valid `grant_type` values and Section 6.1 only lists the most common 17 — the vast majority of grant type values live in the full schema file, not here. Most user inputs that look unfamiliar to you are actually exact matches once you look. "Building Green Program" is a real, exact-match value in the schema. "Science Horizons BioTalent" is a real, exact-match value in the schema. So is "DS4Y - Eco Canada", "Eco-Canada Co-op", "Career Ready SWPP", "Manufacturing Jobs Fund", and 170+ others.
+
+**Step 3 — Fuzzy match with caution.** If the exact label isn't in the schema but something close is, propose the close match to the user and confirm before using it. Example: the user types "WorkBC Wage Subsidy" and the schema has "WorkBC". Propose the match, get confirmation, don't assume.
+
+**Step 4 — Only then ask the user.** If Steps 1–3 all come up empty, ask the user for the exact label they see in HubSpot when they create this type of deal manually. This is the last resort, not the first.
+
+⚠️ **Critical: different labels map to different internal values.** Do not group labels together that look similar. "Science Horizons BioTalent" and "Bio Talent SWPP" are separate grant programs with separate internal values (`Science Horizons BioTalent` and `Bio Talent` respectively) — they are NOT the same program despite both referencing BioTalent. Treating them as the same produces wrong data for at least one of the deals. When in doubt, look each label up independently in the full schema file.
+
+⚠️ **Do not ask the user to do your lookup work.** If you write the message "These don't match the standard HubSpot grant type enum values I have" or "I don't see X in my enum list" to a user without first having read `scripts/output/hubspot-schema-summary.md`, you are asking the user to do research you could have done yourself. The schema file is on disk and always available — use it.
 
 ### 6.2 Deal Type (`dealtype`)
 
@@ -621,7 +643,48 @@ This section lists the accepted values for the most important dropdown fields. P
 
 Writing to HubSpot is not reversible in the sense that matters: a wrong deal creates downstream work for Grant Coordinators who now have to hunt down the error. A *fabricated* deal — one you claimed you created but never actually wrote — is even worse, because the user trusts your message and discovers the failure later when they try to find the deal that doesn't exist.
 
-Your confirmation flow is the guardrail. The pre-submission checklist (Section 5.7) is the second guardrail. The hard rule from Section 0.1 — never simulate a tool call — is the third and most important guardrail. All three apply on every deal creation.
+Writing to HubSpot is not reversible in the sense that matters: a wrong deal creates downstream work for Grant Coordinators who now have to hunt down the error. Your confirmation flow is the guardrail that prevents this.
+
+### 8.0 Defaulting behavior — three buckets
+
+Every HubSpot deal field falls into one of three buckets. Knowing which bucket a field belongs to is what separates a competent batch-mode run from an annoying one.
+
+**Bucket 1 — Auto-default with visible preview.** These fields have sensible defaults that are correct for the vast majority of grant deals. Apply the default in the proposed payload, show it explicitly in the preview, and tell the team member they can override. Do not ask about these fields unless the team member's input indicates an override is needed.
+
+| Field | API Name | Default | Override trigger |
+|---|---|---|---|
+| Vacay % | `vacation` | `4%` | Team member explicitly says a different percentage, or client's payroll setup is known to differ |
+| Vacation type | `vacay` | `Accrued` | Team member says "paid out" or specifies differently |
+| Grant Reliant | `grant_reliant` | `Yes` for Hiring deals | Team member says the hire would happen regardless of funding |
+| State | `state` | `Open` | Only differs for specific recovery workflows |
+| Pipeline | `pipeline` | Derived from service tier + deal type (see Section 3.1) | N/A — this is derived, not defaulted |
+| Deal stage | `dealstage` | The create stage of the chosen pipeline | N/A — always the create stage for new deals |
+| Deal name | `dealname` | Auto-constructed from the team's convention — ask the team member at session start if you don't know their format, then apply it to every row. Common formats: `{Company} - {Grant Type Label} - {Year}` or `{Grant Type Label} - {Month Year} - {Company} - {Candidate}` | Team member gives an explicit name in the sheet or conversation |
+| TP Paying (Training only) | `tp_paying` | `false` | Team member indicates a third party is paying |
+| RA Complete (Market Expansion only) | `ra_complete` | `false` | Team member confirms the readiness assessment is done |
+
+**How to present defaults in the preview:** List them explicitly in a "Defaults applied" block near the top of the preview. Example: "Applied defaults: Vacay % = 4%, Vacation type = Accrued, Grant Reliant = Yes, State = Open, Deal names built as `{Grant Type} - {Month Year} - {Company} - {Candidate}`. Tell me if any of these should be different."
+
+**Bucket 2 — Always ask.** These fields have no safe default. If they're missing from the spreadsheet, ask.
+
+- Amount
+- Client Reimbursement
+- Actual Reimbursement (GG) — Granted Starter pipelines only
+- Start Date
+- End Date
+- Candidate name (`participant_name`)
+- Hourly Wage (Hiring only)
+- Hours per week (Hiring only)
+- Training course name (Training only)
+- Tuition Fee per person (Training only)
+- TP Company (Training only)
+- Deal Owner (`hubspot_owner_id`) — ask once at session start, apply to whole batch
+- Grant Coordinator (`grant_coordinator`) — ask once at session start, apply to whole batch
+- WorkBC Location (`workbc_location`) — Granted Starter Hiring only, and only if the grant program is WorkBC
+
+**Bucket 3 — Never set at creation.** See Section 5.4 for the full list. These are workflow-populated fields that should always be blank on a new deal.
+
+**One nuance on WorkBC Location:** it's in Bucket 2 (always ask if missing) BUT only applies to Granted Starter Hiring deals targeting WorkBC. For a main-tier Hiring deal, or a Granted Starter Hiring deal for a non-WorkBC program, do NOT ask for a WorkBC Location. Asking about WorkBC Location for a main-tier Hiring deal is a common failure mode — WorkBC Location is required only by the `Pre-Submission Check - Starter Hiring` stage, not by `Hiring Pending Submission`.
 
 ### 8.1 Mode A — Conversational
 
