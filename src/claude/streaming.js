@@ -156,13 +156,20 @@ export async function streamToSSE(stream, res, sessionId, agentType = null) {
       if (event.type === 'content_block_stop') {
         // Finalize content block
         if (currentContent.type === 'tool_use') {
-          try {
-            currentContent.input = JSON.parse(currentContent.input);
-          } catch (error) {
-            // Incomplete JSON — drop the block entirely (no SSE event, no fullResponse entry)
-            console.error('Failed to parse tool input JSON (block dropped):', error);
-            currentContent = null;
-            continue;
+          // Zero-arg tools (e.g. list_hubspot_owners with empty input_schema.properties)
+          // emit no input_json_delta events, leaving the accumulator as ''. JSON.parse('')
+          // throws, so coerce empty input to {} before parsing. Dropping the block here
+          // causes stop_reason='tool_use' with no tool_use content, which the caller
+          // treats as a fatal protocol error.
+          if (currentContent.input === '') {
+            currentContent.input = {};
+          } else {
+            try {
+              currentContent.input = JSON.parse(currentContent.input);
+            } catch (error) {
+              console.error('Failed to parse tool input JSON; using {} as fallback:', error);
+              currentContent.input = {};
+            }
           }
 
           // Notify frontend of complete tool use
@@ -176,15 +183,16 @@ export async function streamToSSE(stream, res, sessionId, agentType = null) {
             })}\n\n`);
           }
         } else if (currentContent.type === 'server_tool_use') {
-          // Server tool complete (web_search, web_fetch)
-          // Parse accumulated JSON input
-          try {
-            currentContent.input = JSON.parse(currentContent.input);
-          } catch (error) {
-            // Incomplete JSON — drop the block entirely (no SSE event, no fullResponse entry)
-            console.error('Failed to parse server tool input JSON (block dropped):', error);
-            currentContent = null;
-            continue;
+          // Server tool complete (web_search, web_fetch). Same empty-input guard as tool_use above.
+          if (currentContent.input === '') {
+            currentContent.input = {};
+          } else {
+            try {
+              currentContent.input = JSON.parse(currentContent.input);
+            } catch (error) {
+              console.error('Failed to parse server tool input JSON; using {} as fallback:', error);
+              currentContent.input = {};
+            }
           }
 
           if (res) {

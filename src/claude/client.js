@@ -1044,13 +1044,18 @@ export async function runAgent({
     console.error(error);
     console.error('='.repeat(80) + '\n');
 
-    sendSSE(res, {
-      type: 'error',
-      error: error.message,
-      sessionId
-    });
+    // Inner error paths (e.g. the stop_reason='tool_use' protocol guard) may have
+    // already closed the SSE stream before throwing. Writing after end() crashes
+    // the Node process with ERR_STREAM_WRITE_AFTER_END, so only emit if still open.
+    if (res && !res.writableEnded) {
+      sendSSE(res, {
+        type: 'error',
+        error: error.message,
+        sessionId
+      });
 
-    closeSSE(res);
+      closeSSE(res);
+    }
 
     return {
       success: false,
