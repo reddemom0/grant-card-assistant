@@ -11,3 +11,5 @@ dist
 mcp-servers/gdrive/credentials/
 mcp-servers/gdrive/node_modules/
 *.backup
+.DS_Store
+.claude/worktrees/

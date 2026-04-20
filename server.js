@@ -30,7 +30,6 @@ import { config } from 'dotenv';
 import cron from 'node-cron';
 
 // Legacy handlers (for backwards compatibility)
-import agentHandler from './api/agent-sdk-handler.js';
 import filesHandler from './api/files-handler.js';
 import pdfHandler from './api/pdf-handler.js';
 
@@ -740,12 +739,6 @@ app.get('/api/visualping/stats', authenticateUser, async (req, res) => {
 });
 
 // ============================================================================
-// LEGACY AGENT SDK ENDPOINT (for backwards compatibility)
-// ============================================================================
-
-app.post('/api/agent', agentHandler);
-
-// ============================================================================
 // FILES API ENDPOINTS
 // ============================================================================
 
@@ -1144,7 +1137,6 @@ async function startServer() {
       console.log('\nEndpoints:');
       console.log(`  💬 Direct API Chat: POST /api/chat`);
       console.log(`  📝 Conversations: GET /api/conversations`);
-      console.log(`  🤖 Legacy Agent SDK: POST /api/agent`);
       console.log(`  📁 Files API: /api/files`);
       console.log(`  📄 PDF Processing: /api/pdf`);
       console.log('\n' + '='.repeat(80) + '\n');
