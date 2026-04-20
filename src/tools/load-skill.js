@@ -59,8 +59,10 @@ const SKILL_PATHS = {
     BLOGS: '.claude/skills/granted-marketing/BLOGS.md',
     OTHER_CONTENT: '.claude/skills/granted-marketing/OTHER_CONTENT.md',
     DATA_SOURCES: '.claude/skills/granted-marketing/DATA_SOURCES.md'
+  },
+  'genre-tagging': {
+    overview: '.claude/skills/genre-tagging/SKILL.md'
   }
-  // Add more skills as they're created: writing, etc.
 };
 
 /**

@@ -1338,6 +1338,18 @@ Use when simple information retrieval is insufficient and you need specialized e
 **HubSpot Skill:**
 - \`DEAL_CREATION\` - Full deal creation workflow: pipeline selection, required-field matrix, enum references, confirmation flow, batch mode, error handling. MANDATORY before any deal write.
 
+**Granted Marketing Skill:**
+- \`overview\` - Marketing strategy and content production overview
+- \`FOUNDATIONS\` - Brand voice, audience, and positioning fundamentals
+- \`COMPANY_CONTEXT\` - Granted Consulting product lines and positioning
+- \`GRANT_BLASTS\` - Grant Blasts content methodology
+- \`BLOGS\` - Blog post creation methodology
+- \`OTHER_CONTENT\` - Other content formats (newsletters, case studies, etc.)
+- \`DATA_SOURCES\` - Content sourcing and data references
+
+**Genre Tagging Skill:**
+- \`overview\` - Score grant programs against Granted smart filter genres (v1: Building Bench of Talent)
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1358,13 +1370,15 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "Draft Section 2 of the application" → load_skill(canexport-writer, STAGE_2_DRAFTING)
 - "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)
 - "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)
-- "Create a WorkBC deal for TechCo" → load_skill(hubspot, DEAL_CREATION)`,
+- "Create a WorkBC deal for TechCo" → load_skill(hubspot, DEAL_CREATION)
+- "Draft a Grant Blast for GetGranted" → load_skill(granted-marketing, GRANT_BLASTS)
+- "Score this program against smart filter genres" → load_skill(genre-tagging, overview)`,
   input_schema: {
     type: 'object',
     properties: {
       skill_name: {
         type: 'string',
-        enum: ['sales', 'research', 'grants', 'writing', 'canexport-writer', 'bcafe-writer', 'hubspot'],
+        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'genre-tagging'],
         description: 'The skill domain to load'
       },
       sub_skill: {
@@ -1374,9 +1388,10 @@ Use when simple information retrieval is insufficient and you need specialized e
           'overview', 'eligibility', 'matching', 'validation', 'company_intelligence',
           'PROGRAM_DETAILS', 'APPLICATION_STRUCTURE', 'KNOWLEDGE_BASE_INDEX',
           'STAGE_1_READINESS', 'STAGE_1_BUDGET_GUIDE', 'STAGE_1_INTERVIEW_QUESTIONS',
-          'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT', 'DEAL_CREATION'
+          'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT', 'DEAL_CREATION',
+          'FOUNDATIONS', 'COMPANY_CONTEXT', 'GRANT_BLASTS', 'BLOGS', 'OTHER_CONTENT', 'DATA_SOURCES'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write).'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), OTHER_CONTENT (newsletters/case studies), DATA_SOURCES (content sourcing). For genre-tagging: overview (score programs against smart filter genres).'
       }
     },
     required: ['skill_name', 'sub_skill']
