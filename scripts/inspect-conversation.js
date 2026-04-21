@@ -92,8 +92,8 @@ async function findConversationIds(args) {
   const where = [];
   const params = [];
   if (args.agent)  { params.push(args.agent);  where.push(`c.agent_type = $${params.length}`); }
-  if (args.after)  { params.push(args.after);  where.push(`c.created_at >= $${params.length}`); }
-  if (args.before) { params.push(args.before); where.push(`c.created_at <= $${params.length}`); }
+  if (args.after)  { params.push(args.after);  where.push(`c.created_at >= $${params.length}::timestamptz`); }
+  if (args.before) { params.push(args.before); where.push(`c.created_at <= $${params.length}::timestamptz`); }
   if (args.user) {
     if (/^\d+$/.test(args.user)) {
       params.push(parseInt(args.user, 10));
