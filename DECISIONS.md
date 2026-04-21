@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-04-21 — Authoring-copy drift — project knowledge can lag live repo
+**What:** v1.4 authoring started from a stale `/mnt/project/hubspot-deal-creation-skill-v1_0.md` while the live file was already at v1.3; Claude Code caught the old_str mismatch at install time and aborted before applying bad edits.
+**Why:** Authoring copies in the claude.ai project aren't auto-refreshed when the live file is edited elsewhere — five versions (v1.1, v1.2, v1.2.1, v1.3) shipped without the authoring copy being re-uploaded.
+**Impact:** Convention — for any skill editable outside this project (GitHub web edits, other Claude Code sessions, other authors), Step 1 of an authoring session is to pull the current live file via Claude Code, or re-upload after significant revisions. No code changes.
+
 ## 2026-04-21 — Inspector timestamp fix — no storage skew, only client-side cast bug
 **What:** scripts/inspect-conversation.js:95-96 was silently dropping rows from --after/--before windows; fixed by casting bounds as ::timestamptz (mirrors find-oracle-conv.js:25-26).
 **Why:** Apparent +2h skew on `conversations.created_at` was a node-pg read-side display artifact on non-UTC hosts (Europe/Madrid). Storage is correct UTC — column populated by `DEFAULT CURRENT_TIMESTAMP` on a UTC server, cross-checked against HubSpot `createdate` in tool_result payloads; zero future-dated rows across 19 audited naked-TS columns.
