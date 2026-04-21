@@ -191,20 +191,23 @@ function renderSummary(meta, trace, user, sidecar) {
       case 'text':
         line = `text: "${truncate(entry.content || '', 80)}"`;
         break;
-      case 'tool_use': {
+      case 'tool_use':
+      case 'server_tool_use': {
         toolUseCount++;
         const pair = firstInputPair(entry.input);
         line = `tool_use: ${entry.tool_name}(${pair})`;
         break;
       }
-      case 'tool_result': {
+      case 'tool_result':
+      case 'web_search_tool_result': {
         if (entry.is_error) errorCount++;
         const idShort = (entry.tool_use_id || '').slice(0, 8);
         const status = entry.is_error ? 'error' : 'ok';
         const contentStr = typeof entry.content === 'string'
           ? entry.content
           : JSON.stringify(entry.content);
-        line = `tool_result: ${idShort}.. [${status}] "${truncate(contentStr, 60)}"`;
+        const idDisplay = entry.tool_use_id ? `${idShort}..` : '—';
+        line = `tool_result: ${idDisplay} [${status}] "${truncate(contentStr, 60)}"`;
         break;
       }
       case 'thinking': {
@@ -219,7 +222,7 @@ function renderSummary(meta, trace, user, sidecar) {
   }
 
   lines.push('');
-  lines.push(`  Totals: ${toolUseCount} tool_use calls, ${errorCount} errors`);
+  lines.push(`  Totals: ${toolUseCount} tool calls, ${errorCount} errors`);
   return lines.join('\n');
 }
 
@@ -238,11 +241,11 @@ function renderTrace(meta, trace, user, sidecar) {
         break;
       case 'tool_use':
         lines.push(`  tool_name:   ${entry.tool_name}`);
-        lines.push(`  tool_use_id: ${entry.tool_use_id}`);
+        if (entry.tool_use_id) lines.push(`  tool_use_id: ${entry.tool_use_id}`);
         lines.push(`  input: ${truncateWithNote(JSON.stringify(entry.input, null, 2), 500)}`);
         break;
       case 'tool_result': {
-        lines.push(`  tool_use_id: ${entry.tool_use_id}`);
+        if (entry.tool_use_id) lines.push(`  tool_use_id: ${entry.tool_use_id}`);
         lines.push(`  is_error:    ${entry.is_error}`);
         const contentStr = typeof entry.content === 'string'
           ? entry.content
