@@ -36,7 +36,7 @@ Standard agent prompt file:
 ---
 name: agent-name
 description: one-line purpose
-model: claude-sonnet-4-5
+model: claude-sonnet-4-6
 temperature: 0.7
 tools:                           # YAML list — advertises intended tools to Claude Code
   - Read

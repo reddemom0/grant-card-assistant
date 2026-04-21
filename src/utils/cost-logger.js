@@ -11,7 +11,7 @@ import { calculateRequestCost } from '../config/cost-settings.js';
  * Log an API request cost with full context
  * @param {Object} params - Logging parameters
  * @param {Object} params.usage - Token usage from Claude response
- * @param {string} params.model - Model used (e.g., 'claude-sonnet-4-5-20250929')
+ * @param {string} params.model - Model used (e.g., 'claude-sonnet-4-6')
  * @param {string} params.source - Source of the call (e.g., 'agent', 'title-generation', 'webhook')
  * @param {string} [params.agentType] - Agent type if applicable
  * @param {string} [params.conversationId] - Conversation ID if applicable

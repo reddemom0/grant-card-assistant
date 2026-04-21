@@ -81,7 +81,7 @@ export async function processPDF(req, res) {
       base64Data,
       prompt,
       config: {
-        model: model || 'claude-sonnet-4-5-20250929',
+        model: model || 'claude-sonnet-4-6',
         maxTokens: maxTokens || 4096,
         systemPrompt,
         enableCaching: enableCaching || false,

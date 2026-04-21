@@ -397,7 +397,7 @@ export const pdfAPI = {
     // Make API call
     try {
       const message = await anthropic.messages.create({
-        model: config.model || 'claude-sonnet-4-5-20250929',
+        model: config.model || 'claude-sonnet-4-6',
         max_tokens: config.maxTokens || 4096,
         messages: [{
           role: 'user',
@@ -406,7 +406,7 @@ export const pdfAPI = {
         ...(config.systemPrompt && { system: config.systemPrompt })
       });
 
-      const model = config.model || 'claude-sonnet-4-5-20250929';
+      const model = config.model || 'claude-sonnet-4-6';
       console.log(`✅ [PDF Processing] PDF processed: ${message.usage.input_tokens} input, ${message.usage.output_tokens} output tokens`);
 
       // Log cost with full context
@@ -482,7 +482,7 @@ export const pdfAPI = {
         return {
           custom_id: req.customId || `pdf-${index}`,
           params: {
-            model: req.model || 'claude-sonnet-4-5-20250929',
+            model: req.model || 'claude-sonnet-4-6',
             max_tokens: req.maxTokens || 4096,
             messages: [{
               role: 'user',

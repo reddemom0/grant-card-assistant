@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-04-21 — Oracle model upgraded to Sonnet 4.6 alias (dated-snapshot convention broken)
+**What:** Repo-wide swap of `claude-sonnet-4-5-20250929` (dated snapshot) to `claude-sonnet-4-6` (alias) across 14 files; added `sonnet-4-6` branch to `calculateRequestCost` with identical $3/$15 pricing to 4.5.
+**Why:** Anthropic hasn't published a dated snapshot for Sonnet 4.6 as of 2026-04-21. Alias is the only available form.
+**Impact:** Breaks the repo's dated-snapshot pinning convention. When Anthropic publishes a dated snapshot (e.g., `claude-sonnet-4-6-20260217` or similar), do a follow-up repo-wide swap to restore the convention. Meanwhile the alias floats to whatever Anthropic's latest 4.6 snapshot is.
+
 ## 2026-04-21 — Authoring-copy drift — project knowledge can lag live repo
 **What:** v1.4 authoring started from a stale `/mnt/project/hubspot-deal-creation-skill-v1_0.md` while the live file was already at v1.3; Claude Code caught the old_str mismatch at install time and aborted before applying bad edits.
 **Why:** Authoring copies in the claude.ai project aren't auto-refreshed when the live file is edited elsewhere — five versions (v1.1, v1.2, v1.2.1, v1.3) shipped without the authoring copy being re-uploaded.

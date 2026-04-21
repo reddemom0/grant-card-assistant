@@ -676,7 +676,7 @@ POST /api/refresh-knowledge-base
 
 ### Claude API Costs
 
-**Current Model:** Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+**Current Model:** Claude Sonnet 4.6 (`claude-sonnet-4-6`)
 
 **Average Request:**
 - Input tokens: 15,000 - 30,000 (includes knowledge base context)

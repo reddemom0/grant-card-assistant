@@ -158,7 +158,7 @@ Return your analysis as valid JSON only, no other text:
 }`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1000,
       messages: [{
         role: 'user',
@@ -170,7 +170,7 @@ Return your analysis as valid JSON only, no other text:
     if (response.usage) {
       logAPICost({
         usage: response.usage,
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-6',
         source: 'visualping-webhook',
         metadata: {
           url: alert.url,

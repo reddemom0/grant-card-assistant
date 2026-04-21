@@ -59,7 +59,7 @@ Guidelines:
 - summary: Brief summary of what the user is saying`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       max_tokens: 1024,
       messages: [{
         role: 'user',
@@ -71,7 +71,7 @@ Guidelines:
     if (response.usage) {
       logAPICost({
         usage: response.usage,
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-6',
         source: 'sentiment-analysis',
         agentType: agentType || 'unknown',
         metadata: {
@@ -282,7 +282,7 @@ Guidelines:
 - Base insights ONLY on the data provided`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       max_tokens: 4096,
       messages: [{
         role: 'user',
@@ -294,7 +294,7 @@ Guidelines:
     if (response.usage) {
       logAPICost({
         usage: response.usage,
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-6',
         source: 'insight-generation',
         agentType,
         metadata: {

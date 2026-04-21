@@ -13,7 +13,7 @@
 - **Hosting:** Vercel (serverless, ephemeral file system)
 - **Knowledge Base:** Google Drive folders accessed via API at runtime
 - **Architecture:** Custom Node.js → Google Drive API → Claude API
-- **Model:** Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+- **Model:** Claude Sonnet 4.6 (`claude-sonnet-4-6`)
 - **Code:** ~300+ lines in `api/server.js`
 - **Agents:** 4 active (Grant Card, ETG, BCAFE, CanExport Claims)
 

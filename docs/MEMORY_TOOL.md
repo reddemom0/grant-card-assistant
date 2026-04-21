@@ -226,7 +226,7 @@ Track multi-step workflow progress even when context is cleared.
 ## Supported Models
 
 The memory tool is available on:
-- Claude Sonnet 4.5 (`claude-sonnet-4-5-20250929`)
+- Claude Sonnet 4.6 (`claude-sonnet-4-6`)
 - Claude Sonnet 4 (`claude-sonnet-4-20250514`)
 - Claude Haiku 4.5 (`claude-haiku-4-5-20251001`)
 - Claude Opus 4.1 (`claude-opus-4-1-20250805`)

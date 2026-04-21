@@ -65,7 +65,7 @@ Rules:
 - Keep task descriptions clear and actionable`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 2000,
     messages: [{
       role: 'user',
@@ -85,7 +85,7 @@ Rules:
  * Uses Haiku for cost efficiency (or Sonnet if complex)
  */
 async function executeTask(task, toolResults = {}) {
-  const model = task.complexity === 'complex' ? 'claude-sonnet-4-5' : 'claude-haiku-4-5';
+  const model = task.complexity === 'complex' ? 'claude-sonnet-4-6' : 'claude-haiku-4-5';
   console.log(`🔨 Worker (${model}): Executing ${task.id}...`);
 
   // Build context from dependency results
@@ -188,7 +188,7 @@ Present the information clearly with appropriate formatting (bullet points, head
 Focus on actionable insights.`;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-5',
+    model: 'claude-sonnet-4-6',
     max_tokens: 8000,
     messages: [{
       role: 'user',

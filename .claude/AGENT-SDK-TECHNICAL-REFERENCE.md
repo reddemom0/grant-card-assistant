@@ -233,7 +233,7 @@ app.post('/api/chat', async (req, res) => {
       options: {
         agents: AGENTS,                          // All agent definitions
         settingSources: ['project'],             // REQUIRED: Load CLAUDE.md + agent .md files
-        model: 'claude-sonnet-4-5-20250929',    // Default model (Sonnet 4.5)
+        model: 'claude-sonnet-4-6',    // Default model (Sonnet 4.6)
         allowedTools: ['Read', 'Write', 'Edit', 'Grep', 'Glob'],  // Global tool allowlist
         resume: sessionId,                       // Continue existing session (if provided)
         permissionMode: 'acceptEdits',          // Auto-accept file edits (for web app)

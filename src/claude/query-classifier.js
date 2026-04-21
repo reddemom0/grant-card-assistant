@@ -213,7 +213,7 @@ export function classifyQuery(message, agentType, conversationMemories = null) {
  */
 export function getModelForQuery(queryComplexity) {
   if (queryComplexity === 'complex') {
-    return 'claude-sonnet-4-5-20250929'; // Full power - Sonnet 4.5
+    return 'claude-sonnet-4-6'; // Full power - Sonnet 4.6
   }
 
   // Both simple and moderate use Haiku (moderate adds extended thinking)

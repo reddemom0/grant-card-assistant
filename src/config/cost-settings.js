@@ -79,6 +79,11 @@ export function calculateRequestCost(usage, model) {
     cacheWritePrice = 3.75;
     cacheReadPrice = 0.30;
     outputPrice = 15.00;
+  } else if (model.includes('sonnet-4-6')) {
+    inputPrice = 3.00;
+    cacheWritePrice = 3.75;
+    cacheReadPrice = 0.30;
+    outputPrice = 15.00;
   } else if (model.includes('haiku-4-5')) {
     inputPrice = 1.00;
     cacheWritePrice = 1.25;

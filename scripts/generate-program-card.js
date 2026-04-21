@@ -482,7 +482,7 @@ Remember to ANONYMIZE all client-specific information.`;
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-6',
       max_tokens: 16000,
       temperature: 1.0,
       thinking: {
