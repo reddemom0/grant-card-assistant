@@ -1166,7 +1166,7 @@ async function startServer() {
     // Log test mode status
     const testMode = process.env.LEAD_GEN_TEST_MODE === 'true';
     if (testMode) {
-      console.log('🧪 TEST MODE ENABLED — HubSpot API calls will be mocked (lead-gen only)');
+      console.log('🧪 TEST MODE ENABLED — HubSpot writes mocked across all agents (create/update company, contact, deal; merge company, contact; associate contact↔company)');
     } else {
       console.log('✅ Production mode — HubSpot API calls active');
     }

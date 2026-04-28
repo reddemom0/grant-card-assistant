@@ -1,0 +1,75 @@
+{
+  "scenario": {
+    "slug": "04-parental-leave-eligibility",
+    "title": "Eligibility question on a less-covered case (parental leave)",
+    "watch": "Does the agent attempt source loading? Does it correctly identify \"employed\" status applies during parental leave, or fabricate a rule?",
+    "turns": [
+      "Can my employee who's currently on parental leave participate in ETG-funded training?"
+    ]
+  },
+  "run": {
+    "conversationId": "13b7b2a5-1df8-4852-b50f-5d5c83947372",
+    "turnsCompleted": 1,
+    "turnErrors": [],
+    "totalCostUSD": 0.009263799999999999,
+    "runtimeMs": 7261,
+    "capturedAt": "2026-04-28T13:17:09.359Z"
+  },
+  "conversation": {
+    "id": "13b7b2a5-1df8-4852-b50f-5d5c83947372",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Eligibility question on a less-covered case (parental leave)",
+    "created_at": "2026-04-28T11:17:02.100Z",
+    "updated_at": "2026-04-28T11:17:02.100Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "4",
+    "last_message_at": "2026-04-28T11:17:09.314Z"
+  },
+  "trace": [
+    {
+      "type": "text",
+      "role": "user",
+      "content": "Can my employee who's currently on parental leave participate in ETG-funded training?",
+      "timestamp": "2026-04-28T11:17:04.889Z"
+    },
+    {
+      "type": "thinking",
+      "role": "assistant",
+      "content": "The user is asking about participant eligibility for ETG when the prospective trainee is on parental leave. This is an eligibility question.\n\nPer my instructions, when a user asks any eligibility question, I MUST follow the `<eligibility_verification_protocol>` — which means I need to attempt to load the BC ETG Eligibility Criteria document from the knowledge base BEFORE giving an answer.\n\nLet me search for and load the BC ETG Eligibility Criteria document.",
+      "timestamp": "2026-04-28T11:17:04.942Z"
+    },
+    {
+      "type": "text",
+      "role": "assistant",
+      "content": "I'll check the BC ETG Eligibility Criteria to give you a definitive answer.",
+      "timestamp": "2026-04-28T11:17:04.942Z"
+    },
+    {
+      "type": "tool_use",
+      "role": "assistant",
+      "tool_name": "search_google_drive",
+      "tool_use_id": "toolu_01DV6u9BKVKXgfY7UdzChYhw",
+      "input": {
+        "query": "BC ETG Eligibility Criteria",
+        "file_type": "pdf"
+      },
+      "timestamp": "2026-04-28T11:17:04.942Z"
+    },
+    {
+      "type": "tool_result",
+      "role": "user",
+      "tool_use_id": "toolu_01DV6u9BKVKXgfY7UdzChYhw",
+      "content": "{\"success\":false,\"error\":\"Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_KEY or (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN).\",\"files\":[]}",
+      "is_error": false,
+      "timestamp": "2026-04-28T11:17:04.992Z"
+    },
+    {
+      "type": "text",
+      "role": "assistant",
+      "content": "I cannot verify this against the source document right now — answering from prompt knowledge only. Treat this answer as provisional and confirm against the official BC ETG Eligibility Criteria before relying on it.\n\nBased on the eligibility rules I have, **parental leave is not explicitly listed as a disqualifying status**. The BC ETG Eligibility Criteria requires participants to have one of these employment statuses:\n\n- Employed\n- Unemployed\n- Self-employed\n- Employed by a company directly or indirectly impacted by local economic disruptions and at risk of losing their job\n\nAn employee on parental leave is typically still considered **employed** by the company (the employment relationship is maintained during leave). However, **parental leave creates a practical question**: the participant must receive training that is \"relevant to their current employment or employment goals.\" \n\n**You should confirm with the BC ETG program directly** at **etg@gov.bc.ca** before proceeding, to clarify:\n1. Whether parental leave status affects eligibility\n2. Whether the training can be delivered during leave (or must wait until return to work)\n\nThis will ensure there are no surprises at application submission.",
+      "timestamp": "2026-04-28T11:17:09.314Z"
+    }
+  ]
+}

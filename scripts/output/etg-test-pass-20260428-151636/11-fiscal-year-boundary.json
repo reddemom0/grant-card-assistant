@@ -1,0 +1,108 @@
+{
+  "scenario": {
+    "slug": "11-fiscal-year-boundary",
+    "title": "Training spans fiscal year boundary",
+    "watch": "Does the agent flag the boundary and route to etg@gov.bc.ca, or invent a rule?",
+    "turns": [
+      "I need ETG funding for a course running March 15, 2026 to June 30, 2026. Company is Delta Manufacturing in Surrey BC. Trainee is Alex Kim, alex@delta.com, Production Supervisor. Course is advanced lean manufacturing at Langara College, $2,800."
+    ]
+  },
+  "run": {
+    "conversationId": "dc7680d3-c97b-464d-83e1-5f7c111a4e30",
+    "turnsCompleted": 1,
+    "turnErrors": [],
+    "totalCostUSD": 0.0123608,
+    "runtimeMs": 11410,
+    "capturedAt": "2026-04-28T13:18:52.190Z"
+  },
+  "conversation": {
+    "id": "dc7680d3-c97b-464d-83e1-5f7c111a4e30",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Training spans fiscal year boundary",
+    "created_at": "2026-04-28T11:18:40.787Z",
+    "updated_at": "2026-04-28T11:18:40.787Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "4",
+    "last_message_at": "2026-04-28T11:18:52.128Z"
+  },
+  "trace": [
+    {
+      "type": "text",
+      "role": "user",
+      "content": "I need ETG funding for a course running March 15, 2026 to June 30, 2026. Company is Delta Manufacturing in Surrey BC. Trainee is Alex Kim, alex@delta.com, Production Supervisor. Course is advanced lean manufacturing at Langara College, $2,800.",
+      "timestamp": "2026-04-28T11:18:47.189Z"
+    },
+    {
+      "type": "thinking",
+      "role": "assistant",
+      "content": "Let me work through the state check first:\n\n1. **Eligibility verified?** No - I need to verify this training against the BC ETG Eligibility Criteria\n2. **Company/participant info gathered?** Yes - provided: Delta Manufacturing (Surrey BC), Alex Kim (Production Supervisor, alex@delta.com), course details\n3. **Questions 1-3 drafted?** No\n4. **BC alternatives researched?** No\n5. **Questions 4-7 drafted?** No\n\nThe user has provided:\n- Company: Delta Manufacturing, Surrey BC\n- Participant: Alex Kim, Production Supervisor, alex@delta.com\n- Training: Advanced lean manufacturing at Langara College\n- Duration: March 15, 2026 to June 30, 2026 (~16 weeks)\n- Cost: $2,800\n\nPer the <state_check> protocol, I should:\n1. Check memory first\n2. Jump to the next incomplete step\n\nSince this is the first mention of Delta Manufacturing and we have no existing project loaded, I need to:\n1. Check if they have an existing ETG deal in HubSpot\n2. If not, proceed with eligibility verification\n\nBut first, let me follow the eligibility_verification_protocol: I need to load the BC ETG Eligibility Criteria document before answering any eligibility questions.\n\nThe training appears to be:\n- Skills-based (lean manufacturing)\n- Job-related (participant is Production Supervisor)\n- 16 weeks duration (eligible - under 52 weeks)\n- B.C. provider (Langara College is a public post-secondary institution in BC)\n\nLet me load the BC ETG Eligibility Criteria first, then verify this training and company against it.",
+      "timestamp": "2026-04-28T11:18:47.252Z"
+    },
+    {
+      "type": "tool_use",
+      "role": "assistant",
+      "tool_name": "memory",
+      "tool_use_id": "toolu_01UNthLMkm5rcq2ztZobFAqr",
+      "input": {
+        "command": "view",
+        "path": "/memories"
+      },
+      "timestamp": "2026-04-28T11:18:47.252Z"
+    },
+    {
+      "type": "tool_use",
+      "role": "assistant",
+      "tool_name": "search_grant_applications",
+      "tool_use_id": "toolu_01AM2anbVGya7cj1nAZhVaqg",
+      "input": {
+        "company_name": "Delta Manufacturing",
+        "grant_program": "ETG"
+      },
+      "timestamp": "2026-04-28T11:18:47.252Z"
+    },
+    {
+      "type": "tool_use",
+      "role": "assistant",
+      "tool_name": "search_google_drive",
+      "tool_use_id": "toolu_01MTby5AbcNsugQh43vskCc9",
+      "input": {
+        "query": "BC ETG Eligibility Criteria",
+        "file_type": "pdf",
+        "limit": 1
+      },
+      "timestamp": "2026-04-28T11:18:47.252Z"
+    },
+    {
+      "type": "tool_result",
+      "role": "user",
+      "tool_use_id": "toolu_01UNthLMkm5rcq2ztZobFAqr",
+      "content": "{\"success\":true,\"type\":\"directory\",\"path\":\"/memories\",\"files\":[{\"name\":\"agents\",\"type\":\"directory\",\"size\":224,\"modified\":\"2025-11-12T22:22:48.745Z\"},{\"name\":\"knowledge_base\",\"type\":\"directory\",\"size\":160,\"modified\":\"2025-10-15T14:17:31.548Z\"},{\"name\":\"projects\",\"type\":\"directory\",\"size\":128,\"modified\":\"2025-10-15T14:17:31.548Z\"},{\"name\":\"sessions\",\"type\":\"directory\",\"size\":64,\"modified\":\"2025-10-15T14:18:04.548Z\"},{\"name\":\"user_feedback\",\"type\":\"directory\",\"size\":64,\"modified\":\"2025-10-15T14:18:04.547Z\"}],\"message\":\"Directory contains 5 items. To view a file, use the full path like /memories/agents\"}",
+      "is_error": false,
+      "timestamp": "2026-04-28T11:18:47.423Z"
+    },
+    {
+      "type": "tool_result",
+      "role": "user",
+      "tool_use_id": "toolu_01AM2anbVGya7cj1nAZhVaqg",
+      "content": "{\"success\":false,\"error\":\"HubSpot access token not configured\",\"applications\":[]}",
+      "is_error": false,
+      "timestamp": "2026-04-28T11:18:47.423Z"
+    },
+    {
+      "type": "tool_result",
+      "role": "user",
+      "tool_use_id": "toolu_01MTby5AbcNsugQh43vskCc9",
+      "content": "{\"success\":false,\"error\":\"Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_KEY or (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN).\",\"files\":[]}",
+      "is_error": false,
+      "timestamp": "2026-04-28T11:18:47.423Z"
+    },
+    {
+      "type": "text",
+      "role": "assistant",
+      "content": "I can help you build the ETG business case for Delta Manufacturing. I don't have immediate access to your HubSpot data or the official eligibility criteria document right now, so I'll work from what you've provided and flag what needs confirmation.\n\n**Here's what I have:**\n- **Company:** Delta Manufacturing, Surrey BC\n- **Trainee:** Alex Kim, Production Supervisor (alex@delta.com)\n- **Training:** Advanced Lean Manufacturing at Langara College\n- **Duration:** March 15 – June 30, 2026 (~3.5 months / 15 weeks)\n- **Cost:** $2,800\n\n**Quick eligibility check (from program knowledge):**\n- ✅ Langara College is a B.C. public post-secondary institution (eligible provider)\n- ✅ Training duration under 52 weeks (eligible)\n- ✅ Lean manufacturing is skills-based (eligible method)\n- ⚠️ Need to confirm: What is Alex's \"better job\" outcome after this training? (promotion, wage increase, expanded duties, etc.)\n\n**Before I draft the business case, I need to confirm:**\n\n1. **Better job outcome:** What will change for Alex after completing this training? (e.g., promotion to Senior Supervisor, wage increase, lead Lean initiatives across the plant)\n\n2. **Business BCeID:** Does Delta Manufacturing have an active Business BCeID registered with the Province? (Required to submit the ETG application)\n\n3. **Delta's history:** Has Delta Manufacturing received ETG funding before, or is this the first application?\n\nOnce I have these, I can verify full eligibility and draft Questions 1–3.",
+      "timestamp": "2026-04-28T11:18:52.128Z"
+    }
+  ]
+}

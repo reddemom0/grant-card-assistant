@@ -1,0 +1,70 @@
+{
+  "scenario": {
+    "slug": "10-self-employed-overlap",
+    "title": "Self-employed-as-both-employer-and-participant",
+    "watch": "Does Step 2 catch the overlap and surface the conflict-of-interest / routing-to-program flag?",
+    "turns": [
+      "I'm a sole proprietor running a consulting business. I want to apply for ETG to fund training for myself. The course is a Project Management Professional certification through PMI at $4,200. Training February 1 to April 30, 2026."
+    ]
+  },
+  "run": {
+    "conversationId": "ef4195d1-30a8-40f3-84aa-5718e74b3b79",
+    "turnsCompleted": 1,
+    "turnErrors": [],
+    "totalCostUSD": 0.0112148,
+    "runtimeMs": 12827,
+    "capturedAt": "2026-04-28T13:18:40.696Z"
+  },
+  "conversation": {
+    "id": "ef4195d1-30a8-40f3-84aa-5718e74b3b79",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Self-employed-as-both-employer-and-participant",
+    "created_at": "2026-04-28T11:18:27.873Z",
+    "updated_at": "2026-04-28T11:18:27.873Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "4",
+    "last_message_at": "2026-04-28T11:18:40.630Z"
+  },
+  "trace": [
+    {
+      "type": "text",
+      "role": "user",
+      "content": "I'm a sole proprietor running a consulting business. I want to apply for ETG to fund training for myself. The course is a Project Management Professional certification through PMI at $4,200. Training February 1 to April 30, 2026.",
+      "timestamp": "2026-04-28T11:18:34.607Z"
+    },
+    {
+      "type": "thinking",
+      "role": "assistant",
+      "content": "The user is asking about applying for ETG funding for themselves - they're a sole proprietor (self-employed, single owner) who wants to fund their own training.\n\nLet me start with the state check:\n1. First message of the conversation\n2. No prior context loaded\n3. No eligibility verification done yet\n4. No business case sections drafted\n\nKey issues I need to address:\n1. **Self-employed-as-both employer and participant**: This is a flagged scenario per my instructions. The user is both the employer (sole proprietor) and the participant (the trainee). The BC ETG Eligibility Criteria doesn't explicitly address this case, so I need to flag it and recommend they confirm with the program.\n\n2. **Training eligibility check needed**: I need to verify if a \"Project Management Professional certification through PMI\" is eligible under ETG. This might be a diploma/degree program or it might be a professional certification - I need to check.\n\nPer my protocol, I should follow `<eligibility_verification_protocol>` - load the BC ETG Eligibility Criteria from the knowledge base FIRST before stating eligibility rules.\n\nLet me load the eligibility criteria document so I can verify:\n- Whether the PMP certification is eligible (is it considered a \"diploma or degree program\"?)\n- Whether self-employed-as-both-employer-and-participant has special rules\n- General eligibility for the participant (self-employed is listed as eligible)\n- The funding limits and structure\n\nI should search for and load the BC ETG Eligibility Criteria document.",
+      "timestamp": "2026-04-28T11:18:34.664Z"
+    },
+    {
+      "type": "tool_use",
+      "role": "assistant",
+      "tool_name": "search_google_drive",
+      "tool_use_id": "toolu_011aqEfK9wbjkYAAqxZHfGyt",
+      "input": {
+        "query": "BC ETG Eligibility Criteria",
+        "file_type": "pdf",
+        "limit": 3
+      },
+      "timestamp": "2026-04-28T11:18:34.664Z"
+    },
+    {
+      "type": "tool_result",
+      "role": "user",
+      "tool_use_id": "toolu_011aqEfK9wbjkYAAqxZHfGyt",
+      "content": "{\"success\":false,\"error\":\"Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_KEY or (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN).\",\"files\":[]}",
+      "is_error": false,
+      "timestamp": "2026-04-28T11:18:34.729Z"
+    },
+    {
+      "type": "text",
+      "role": "assistant",
+      "content": "I cannot verify this against the source document right now — answering from prompt knowledge only. Treat this answer as provisional and confirm against the official BC ETG Eligibility Criteria before relying on it.\n\nThat said, I've identified **two issues** that need clarification before we proceed:\n\n---\n\n**1. Self-employed-as-both-employer-and-participant**\n\nYou're applying as both the employer (sole proprietor) and the participant (trainee). The BC ETG Eligibility Criteria doesn't explicitly address this overlap. It's possible a conflict-of-interest disclosure or special documentation may be required. **Before drafting your business case, contact the program at etg@gov.bc.ca to confirm whether COI rules apply and what documentation you'll need.**\n\n---\n\n**2. PMI certification eligibility**\n\nThe BC ETG program does not fund diploma or degree programs in full or in part. The **PMP certification is typically a credential program (not a degree)**, so it may be eligible — but I cannot confirm this without loading the source document.\n\nMore importantly: **Is the PMI training delivered by a B.C.-based provider, or is it delivered by PMI (a U.S.-based organization)?** ETG requires training providers to be B.C.-based. If PMI is delivering the training outside B.C., it may not be eligible without exceptional circumstances approval from the program.\n\n---\n\n**To move forward, please clarify:**\n\n1. Will you contact ETG at **etg@gov.bc.ca** to confirm the self-employed overlap is acceptable?\n2. Is the PMP training being delivered by a B.C.-based training provider, or directly by PMI (U.S.)?\n\nOnce you've confirmed both, I can assess your eligibility and draft your business case.",
+      "timestamp": "2026-04-28T11:18:40.630Z"
+    }
+  ]
+}

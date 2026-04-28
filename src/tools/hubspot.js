@@ -1045,13 +1045,6 @@ export async function searchHubSpotCompanies(query, minRevenue = null, maxRevenu
  * @returns {Object} Created company with id and properties
  */
 export async function createHubSpotCompany(companyData) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!companyData.name) {
     return {
       success: false,
@@ -1098,6 +1091,13 @@ export async function createHubSpotCompany(companyData) {
     };
   }
 
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
   try {
     const client = createHubSpotClient();
 
@@ -1133,17 +1133,32 @@ export async function createHubSpotCompany(companyData) {
  * @returns {Object} Updated company
  */
 export async function updateHubSpotCompany(companyId, properties) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!companyId) {
     return {
       success: false,
       error: 'Company ID is required'
+    };
+  }
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would update HubSpot company:');
+    console.log(JSON.stringify({ endpoint: `/crm/v3/objects/companies/${companyId}`, method: 'PATCH', properties }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      company: {
+        id: companyId,
+        ...properties
+      },
+      testMode: true
+    };
+  }
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
     };
   }
 
@@ -1200,13 +1215,6 @@ export async function updateHubSpotCompany(companyId, properties) {
  * @returns {Object} Created contact with id and properties
  */
 export async function createHubSpotContact(contactData) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!contactData.email) {
     return {
       success: false,
@@ -1248,6 +1256,13 @@ export async function createHubSpotContact(contactData) {
     };
   }
 
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
+
   try {
     const client = createHubSpotClient();
 
@@ -1283,13 +1298,6 @@ export async function createHubSpotContact(contactData) {
  * @returns {Object} Updated contact
  */
 export async function updateHubSpotContact(contactId, properties) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!contactId) {
     return {
       success: false,
@@ -1317,6 +1325,13 @@ export async function updateHubSpotContact(contactId, properties) {
         ...cleanedProperties
       },
       testMode: true
+    };
+  }
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
     };
   }
 
@@ -1355,13 +1370,6 @@ export async function updateHubSpotContact(contactId, properties) {
  * @returns {Object} Association result
  */
 export async function associateContactWithCompany(contactId, companyId) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!contactId || !companyId) {
     return {
       success: false,
@@ -1383,6 +1391,13 @@ export async function associateContactWithCompany(contactId, companyId) {
       success: true,
       message: `Contact ${contactId} associated with company ${companyId}`,
       testMode: true
+    };
+  }
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
     };
   }
 
@@ -1431,13 +1446,6 @@ export async function associateContactWithCompany(contactId, companyId) {
  * @returns {Promise<Object>} { success, deal: { id, properties }, associations_created, warnings, hubspotUrl }
  */
 export async function createHubSpotDeal({ properties, associations = {} }) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   // Validate required fields
   for (const field of ['dealname', 'pipeline', 'dealstage']) {
     if (!properties[field]) {
@@ -1455,6 +1463,35 @@ export async function createHubSpotDeal({ properties, associations = {} }) {
       cleanedProperties[key] = properties[key];
     }
   });
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    const fakeDealId = 'TEST_DEAL_' + Date.now();
+    console.log('\n🧪 TEST MODE — Would create HubSpot deal:');
+    console.log(JSON.stringify({ endpoint: '/crm/v3/objects/deals', method: 'POST', properties: cleanedProperties, associations }, null, 2));
+    console.log('');
+    const associations_created = {};
+    if (associations.companyId) associations_created.companyId = associations.companyId;
+    if (associations.contactIds && associations.contactIds.length > 0) associations_created.contactIds = [...associations.contactIds];
+    return {
+      success: true,
+      deal: {
+        id: fakeDealId,
+        ...cleanedProperties
+      },
+      associations_created,
+      warnings: [],
+      hubspotUrl: `https://app.hubspot.com/contacts/${HUBSPOT_PORTAL_ID}/deal/${fakeDealId}`,
+      testMode: true
+    };
+  }
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
 
   try {
     const client = createHubSpotClient();
@@ -1554,13 +1591,6 @@ export async function createHubSpotDeal({ properties, associations = {} }) {
  * @returns {Promise<Object>} { success, deal: { id, properties } } on success, { success: false, error } on failure.
  */
 export async function updateHubSpotDeal(dealId, properties) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!dealId) {
     return {
       success: false,
@@ -1582,6 +1612,28 @@ export async function updateHubSpotDeal(dealId, properties) {
       cleanedProperties[key] = properties[key];
     }
   });
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would update HubSpot deal:');
+    console.log(JSON.stringify({ endpoint: `/crm/v3/objects/deals/${dealId}`, method: 'PATCH', properties: cleanedProperties }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      deal: {
+        id: dealId,
+        ...cleanedProperties
+      },
+      testMode: true
+    };
+  }
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
+    };
+  }
 
   try {
     const client = createHubSpotClient();
@@ -1912,13 +1964,6 @@ export async function findDuplicateContacts(email) {
  * @returns {Object} Merge result
  */
 export async function mergeDuplicateCompanies(primaryCompanyId, secondaryCompanyId) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!primaryCompanyId || !secondaryCompanyId) {
     return {
       success: false,
@@ -1930,6 +1975,27 @@ export async function mergeDuplicateCompanies(primaryCompanyId, secondaryCompany
     return {
       success: false,
       error: 'Cannot merge a company with itself'
+    };
+  }
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would merge HubSpot companies:');
+    console.log(JSON.stringify({ endpoint: '/crm/v3/objects/companies/merge', method: 'POST', primaryObjectId: primaryCompanyId, objectIdToMerge: secondaryCompanyId }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      primaryCompanyId,
+      mergedCompanyId: secondaryCompanyId,
+      message: `[TEST MODE] Would merge company ${secondaryCompanyId} into ${primaryCompanyId}. No live merge performed.`,
+      testMode: true
+    };
+  }
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
     };
   }
 
@@ -1972,13 +2038,6 @@ export async function mergeDuplicateCompanies(primaryCompanyId, secondaryCompany
  * @returns {Object} Merge result
  */
 export async function mergeDuplicateContacts(primaryContactId, secondaryContactId) {
-  if (!HUBSPOT_TOKEN) {
-    return {
-      success: false,
-      error: 'HubSpot access token not configured'
-    };
-  }
-
   if (!primaryContactId || !secondaryContactId) {
     return {
       success: false,
@@ -1990,6 +2049,27 @@ export async function mergeDuplicateContacts(primaryContactId, secondaryContactI
     return {
       success: false,
       error: 'Cannot merge a contact with itself'
+    };
+  }
+
+  // TEST MODE: Skip HubSpot API call and log payload
+  if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+    console.log('\n🧪 TEST MODE — Would merge HubSpot contacts:');
+    console.log(JSON.stringify({ endpoint: '/crm/v3/objects/contacts/merge', method: 'POST', primaryObjectId: primaryContactId, objectIdToMerge: secondaryContactId }, null, 2));
+    console.log('');
+    return {
+      success: true,
+      primaryContactId,
+      mergedContactId: secondaryContactId,
+      message: `[TEST MODE] Would merge contact ${secondaryContactId} into ${primaryContactId}. No live merge performed.`,
+      testMode: true
+    };
+  }
+
+  if (!HUBSPOT_TOKEN) {
+    return {
+      success: false,
+      error: 'HubSpot access token not configured'
     };
   }
 

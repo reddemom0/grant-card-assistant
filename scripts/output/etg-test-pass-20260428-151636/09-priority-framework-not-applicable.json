@@ -1,0 +1,70 @@
+{
+  "scenario": {
+    "slug": "09-priority-framework-not-applicable",
+    "title": "BC priority framework — none apply (and ineligibility issues)",
+    "watch": "Does the agent force-fit factors? Does it flag the >$10K cost framing, retreat-style format, and non-BC provider as eligibility issues?",
+    "turns": [
+      "I need to write an ETG business case. Company is MegaCorp Holdings, a 2,000-person financial services firm headquartered in Vancouver. They've previously received ETG funding twice. Trainee is Thomas Wright, thomas@megacorp.com, Senior Vice President. Course is an executive leadership retreat-style program at a private US-based provider. Tuition $12,500. Training May 1 to May 5, 2026."
+    ]
+  },
+  "run": {
+    "conversationId": "95eb1a8e-d0b1-4dbf-a439-610a6f991749",
+    "turnsCompleted": 1,
+    "turnErrors": [],
+    "totalCostUSD": 0.0109318,
+    "runtimeMs": 11094,
+    "capturedAt": "2026-04-28T13:18:27.784Z"
+  },
+  "conversation": {
+    "id": "95eb1a8e-d0b1-4dbf-a439-610a6f991749",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] BC priority framework — none apply (and ineligibility issues)",
+    "created_at": "2026-04-28T11:18:16.699Z",
+    "updated_at": "2026-04-28T11:18:16.699Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "4",
+    "last_message_at": "2026-04-28T11:18:27.711Z"
+  },
+  "trace": [
+    {
+      "type": "text",
+      "role": "user",
+      "content": "I need to write an ETG business case. Company is MegaCorp Holdings, a 2,000-person financial services firm headquartered in Vancouver. They've previously received ETG funding twice. Trainee is Thomas Wright, thomas@megacorp.com, Senior Vice President. Course is an executive leadership retreat-style program at a private US-based provider. Tuition $12,500. Training May 1 to May 5, 2026.",
+      "timestamp": "2026-04-28T11:18:22.393Z"
+    },
+    {
+      "type": "thinking",
+      "role": "assistant",
+      "content": "Let me check my memory first and run through the state check.\n\nState check:\n- This is the first message about MegaCorp Holdings\n- No prior context has been loaded\n- The user is providing specific training information upfront\n- I need to verify eligibility before proceeding\n\nLooking at the information provided:\n1. Company: MegaCorp Holdings (2,000 employees, financial services, Vancouver, previously funded twice under ETG)\n2. Trainee: Thomas Wright, SVP\n3. Training: Executive leadership retreat-style program\n4. Provider: Private US-based provider\n5. Cost: $12,500\n6. Dates: May 1-5, 2026 (5 days)\n\nRED FLAGS I'm seeing:\n1. **\"Retreat-style program\"** - This is explicitly listed in the ineligible training methods (retreats are not funded)\n2. **US-based provider** - Training must be delivered by BC-based providers (non-BC providers require exceptional circumstances approval)\n3. **5 days only** - This is very short training\n\nPer my instructions:\n- For eligibility questions, I must follow `<eligibility_verification_protocol>` - load BC ETG Eligibility Criteria first\n- When training falls into ineligible methods, I must stop the process and explain why\n- For non-BC providers, I must route to etg@gov.bc.ca\n\nI should NOT create a HubSpot project or start drafting a business case. I need to verify eligibility against the source document first.\n\nLet me load the BC ETG Eligibility Criteria.",
+      "timestamp": "2026-04-28T11:18:22.444Z"
+    },
+    {
+      "type": "tool_use",
+      "role": "assistant",
+      "tool_name": "search_google_drive",
+      "tool_use_id": "toolu_01KjSR855ZMWJF83v6BtosXs",
+      "input": {
+        "query": "BC ETG Eligibility Criteria",
+        "file_type": "pdf",
+        "limit": 5
+      },
+      "timestamp": "2026-04-28T11:18:22.444Z"
+    },
+    {
+      "type": "tool_result",
+      "role": "user",
+      "tool_use_id": "toolu_01KjSR855ZMWJF83v6BtosXs",
+      "content": "{\"success\":false,\"error\":\"Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_KEY or (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN).\",\"files\":[]}",
+      "is_error": false,
+      "timestamp": "2026-04-28T11:18:22.513Z"
+    },
+    {
+      "type": "text",
+      "role": "assistant",
+      "content": "I cannot verify this against the source document right now — answering from prompt knowledge only. Treat this answer as provisional and confirm against the official BC ETG Eligibility Criteria before proceeding.\n\n---\n\n**This application has two critical ineligibility issues:**\n\n1. **Training method: Retreats are not eligible.** The BC ETG program explicitly does not fund \"retreats.\" An executive leadership retreat—even if styled as professional development—falls into this ineligible category. There is no carve-out exception for executive retreats.\n\n2. **Training provider: US-based provider requires program approval.** BC ETG training must be delivered by a B.C.-based provider. A US-based provider may be considered under exceptional circumstances, but only with prior confirmation from the program.\n\n**Recommendation:** Before proceeding further, contact the BC ETG program at **etg@gov.bc.ca** to ask:\n- Whether this retreat-format executive leadership training can be approved as an exception.\n- Whether the US-based provider can be approved for delivery.\n\nIf the program declines both, consider alternative BC-based training options for Thomas Wright that focus on executive or leadership skills (e.g., a certificate program, structured workshop series, or professional development program delivered in-person by a B.C. institution) that would meet ETG eligibility.\n\nDo you want to explore eligible alternatives, or will you confirm with the program first?",
+      "timestamp": "2026-04-28T11:18:27.711Z"
+    }
+  ]
+}

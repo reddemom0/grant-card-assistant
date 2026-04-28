@@ -1,0 +1,69 @@
+{
+  "scenario": {
+    "slug": "01-coop-eligibility",
+    "title": "Co-op eligibility question",
+    "watch": "Does the agent attempt source loading? Does it correctly state co-op students are not excluded per se?",
+    "turns": [
+      "Can co-op students apply for ETG funding?"
+    ]
+  },
+  "run": {
+    "conversationId": "5f65d949-54bd-4211-8fc5-c71de0d264d1",
+    "turnsCompleted": 1,
+    "turnErrors": [],
+    "totalCostUSD": 0.033906149999999996,
+    "runtimeMs": 8887,
+    "capturedAt": "2026-04-28T13:16:45.473Z"
+  },
+  "conversation": {
+    "id": "5f65d949-54bd-4211-8fc5-c71de0d264d1",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Co-op eligibility question",
+    "created_at": "2026-04-28T11:16:36.753Z",
+    "updated_at": "2026-04-28T11:16:36.753Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "4",
+    "last_message_at": "2026-04-28T11:16:45.405Z"
+  },
+  "trace": [
+    {
+      "type": "text",
+      "role": "user",
+      "content": "Can co-op students apply for ETG funding?",
+      "timestamp": "2026-04-28T11:16:41.251Z"
+    },
+    {
+      "type": "thinking",
+      "role": "assistant",
+      "content": "The user is asking about co-op student eligibility for ETG funding. This is an eligibility question, so according to my instructions, I need to follow the `<eligibility_verification_protocol>`:\n\n1. I must attempt to load the BC ETG Eligibility Criteria document BEFORE giving an answer\n2. If the load succeeds, answer using the document content with a citation\n3. If the load fails, state explicitly that I cannot verify against the source document and treat the answer as provisional\n\nLet me search for and load the BC ETG Eligibility Criteria document.",
+      "timestamp": "2026-04-28T11:16:41.341Z"
+    },
+    {
+      "type": "tool_use",
+      "role": "assistant",
+      "tool_name": "search_google_drive",
+      "tool_use_id": "toolu_012CdrvjcNu9tCZ66Ezfhx2m",
+      "input": {
+        "query": "BC ETG Eligibility Criteria",
+        "file_type": "pdf"
+      },
+      "timestamp": "2026-04-28T11:16:41.341Z"
+    },
+    {
+      "type": "tool_result",
+      "role": "user",
+      "tool_use_id": "toolu_012CdrvjcNu9tCZ66Ezfhx2m",
+      "content": "{\"success\":false,\"error\":\"Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_KEY or (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN).\",\"files\":[]}",
+      "is_error": false,
+      "timestamp": "2026-04-28T11:16:41.405Z"
+    },
+    {
+      "type": "text",
+      "role": "assistant",
+      "content": "I cannot verify this against the source document right now — answering from prompt knowledge only. Treat this answer as provisional and confirm against the official BC ETG Eligibility Criteria before relying on it.\n\n**Yes, co-op students can be eligible for ETG funding** if they meet the program's general participant requirements:\n\n- They must be **16 or older**\n- They must be a **Canadian citizen, permanent resident, or protected person**\n- They must be **employed** (which a co-op student typically is, through their co-op employer)\n- The training must be **relevant to their current employment**\n\nThere is no specific exclusion for co-op students in the eligibility rules. A co-op student who is actively employed (including by their co-op employer) and receives training that relates to that employment can qualify.\n\n**To confirm this applies to your specific situation**, I recommend reaching out to the BC ETG program at **etg@gov.bc.ca** with details about the co-op arrangement and training.\n\nAre you preparing an ETG application for a co-op student?",
+      "timestamp": "2026-04-28T11:16:45.405Z"
+    }
+  ]
+}
