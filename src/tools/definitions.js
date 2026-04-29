@@ -1621,8 +1621,8 @@ export const CANEXPORT_WRITER_TOOLS = [
       properties: {
         section_number: {
           type: 'number',
-          description: 'Section number (1-8). Each section has a specific character limit: Section 1 (2000), Section 2 (4000), Section 3 (3000), Section 4 (3000), Section 5 (3000), Section 6 (3000), Section 7 (2000), Section 8 (see budget line limits)',
-          enum: [1, 2, 3, 4, 5, 6, 7, 8]
+          description: 'Section number (1-7). Limits: Section 1 Products/Services (2000), Section 2 Project Summary (4000), Section 3 Capacity (4000), Section 4 IP Strategy (2000), Section 5 Market Potential / Opportunities / Competitive Advantages (1800 per target market — call once per target market), Section 6 Benefits to Canada (4000 per benefit field — call once per field, 7 fields total), Section 7 Budget Activity Descriptions (4000 per activity row — call once per row).',
+          enum: [1, 2, 3, 4, 5, 6, 7]
         },
         section_name: {
           type: 'string',
@@ -1630,7 +1630,7 @@ export const CANEXPORT_WRITER_TOOLS = [
         },
         text: {
           type: 'string',
-          description: 'The drafted text to check character count for'
+          description: 'The drafted text to check character count for. For Sections 5, 6, and 7, pass the text of one target market / benefit field / activity row at a time.'
         }
       },
       required: ['section_number', 'section_name', 'text']

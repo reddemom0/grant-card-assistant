@@ -52,7 +52,9 @@ The CanExport application has **7 sections** that grant writers will need suppor
 ---
 
 ## SECTION 5: Market Potential, Opportunities, and Competitive Advantages
-**Character Limit**: 4,000 characters
+**Character Limit**: 1,800 characters **PER TARGET MARKET**
+
+**⚠️ CRITICAL**: This question must be answered SEPARATELY for EACH target market in the project. If the project covers 2 markets, write 2 distinct 1,800-char answers — each tailored to that specific market.
 
 **Official Question**: Please provide an overview of the potential within the selected target market, including any relevant opportunities, strategic partnerships, or any competitive advantages your company may have, if applicable.
 
@@ -132,7 +134,7 @@ Each benefit type has its own text field (4,000 char limit per field):
 | 2 - Project Summary | 4,000 | Single field |
 | 3 - Capacity | 4,000 | Single field |
 | 4 - IP Strategy | 2,000 | Single field |
-| 5 - Market Potential & Competitive Advantages | 4,000 | Single field |
+| 5 - Market Potential & Competitive Advantages | 1,800 EACH | One per target market |
 | 6 - Benefits to Canada | 4,000 EACH | 7 separate fields |
 | 7 - Budget Activities | 4,000 EACH | One per activity row |
 

@@ -1196,51 +1196,54 @@ export function validateToolInput(toolName, input, schema) {
 }
 
 /**
- * Check character count for CanExport application sections
- * @param {number} sectionNumber - Section number (1-8)
+ * Check character count for CanExport application sections.
+ * Limits sourced from .claude/skills/canexport-writer/APPLICATION_STRUCTURE.md.
+ * Sections 6 and 7 are repeating fields — the limit applies per benefit field
+ * (Section 6) or per activity row (Section 7); the caller passes one field/row's
+ * text at a time.
+ * @param {number} sectionNumber - Section number (1-7)
  * @param {string} sectionName - Name of the section
  * @param {string} text - The drafted text to check
  * @returns {Object} Character count validation result
  */
 function checkCharacterCount(sectionNumber, sectionName, text) {
-  // CanExport application section character limits
   const CHARACTER_LIMITS = {
-    1: 2000,  // Products/Services
-    2: 4000,  // Project Summary
-    3: 3000,  // Capacity
-    4: 3000,  // IP Strategy
-    5: 3000,  // Market Potential
-    6: 3000,  // Differentiation
-    7: 2000,  // Benefits to Canada
-    8: null   // Budget Activities (per-line limits, handled separately)
+    1: { limit: 2000, note: null },                                    // Products/Services
+    2: { limit: 4000, note: null },                                    // Project Summary
+    3: { limit: 4000, note: null },                                    // Capacity
+    4: { limit: 2000, note: null },                                    // IP Strategy
+    5: { limit: 1800, note: 'per target market' },                     // Market Potential, Opportunities & Competitive Advantages
+    6: { limit: 4000, note: 'per benefit field (7 fields total)' },    // Benefits to Canada
+    7: { limit: 4000, note: 'per activity row' }                       // Budget Activity Descriptions
   };
 
-  const limit = CHARACTER_LIMITS[sectionNumber];
+  const entry = CHARACTER_LIMITS[sectionNumber];
+  if (!entry) {
+    return {
+      success: false,
+      error: `Invalid section_number ${sectionNumber}. CanExport application has 7 sections (1-7).`
+    };
+  }
+
+  const { limit, note } = entry;
   const actualCount = text.length;
-
-  // Calculate metrics
-  const isWithinLimit = limit ? actualCount <= limit : true;
-  const difference = limit ? actualCount - limit : 0;
-  const percentageUsed = limit ? Math.round((actualCount / limit) * 100) : 0;
+  const isWithinLimit = actualCount <= limit;
+  const difference = actualCount - limit;
+  const percentageUsed = Math.round((actualCount / limit) * 100);
   const percentageOver = difference > 0 ? Math.round((difference / limit) * 100) : 0;
+  const noteSuffix = note ? ` (${note})` : '';
 
-  // Generate guidance message
-  let guidance = '';
-  if (limit) {
-    if (isWithinLimit) {
-      if (percentageUsed >= 90) {
-        guidance = `✓ Within limit but tight (${percentageUsed}% used). Good use of space.`;
-      } else if (percentageUsed >= 75) {
-        guidance = `✓ Within limit (${percentageUsed}% used). Room for ${limit - actualCount} more characters if needed.`;
-      } else {
-        guidance = `✓ Within limit (${percentageUsed}% used). Consider adding more detail if relevant - ${limit - actualCount} characters available.`;
-      }
+  let guidance;
+  if (isWithinLimit) {
+    if (percentageUsed >= 90) {
+      guidance = `✓ Within limit${noteSuffix} but tight (${percentageUsed}% used). Good use of space.`;
+    } else if (percentageUsed >= 75) {
+      guidance = `✓ Within limit${noteSuffix} (${percentageUsed}% used). Room for ${limit - actualCount} more characters if needed.`;
     } else {
-      // Over limit - provide specific cut guidance
-      guidance = `✗ OVER LIMIT by ${difference} characters (${percentageOver}% over). Must cut ${difference} characters. Revision needed.`;
+      guidance = `✓ Within limit${noteSuffix} (${percentageUsed}% used). Consider adding more detail if relevant - ${limit - actualCount} characters available.`;
     }
   } else {
-    guidance = 'Section 8 uses per-activity character limits (see budget template). Check each activity individually.';
+    guidance = `✗ OVER LIMIT${noteSuffix} by ${difference} characters (${percentageOver}% over). Must cut ${difference} characters. Revision needed.`;
   }
 
   return {

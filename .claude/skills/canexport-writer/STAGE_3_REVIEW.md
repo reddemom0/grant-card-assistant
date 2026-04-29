@@ -9,15 +9,15 @@
 **Criterion 1: Incrementality** (/4 points)
 - Is this a NEW market entry? No prior sales/presence in target market?
 - Would activities happen without CanExport funding, or is funding catalytic?
-- Check: Section 2 (Project Summary) emphasizes "first-time entry," Section 8 (Activities) uses "first-time" language, no mention of existing customers in target market
+- Check: Section 2 (Project Summary) emphasizes "first-time entry," Section 7 (Activities) uses "first-time" language, no mention of existing customers in target market
 
 **Criterion 2: Export Business Case** (/4 points)
 - Is export strategy sound? Does company have capacity to execute and sustain?
-- Check: Section 3 (Capacity) proves financial/human/material resources, Section 5 (Market Potential) shows research-backed strategy, Section 7 (Benefits - Increased Sales) has realistic projections with justification
+- Check: Section 3 (Capacity) proves financial/human/material resources, Section 5 (Market Potential & Competitive Advantages) shows research-backed strategy per market, Section 6 (Benefits - Increased Sales) has realistic projections with justification
 
 **Criterion 3: Market Potential** (/4 points)
 - Is this an attractive market with real demand? Is timing right?
-- Check: Section 5 (Market Potential) cites market size/growth with sources, Section 5 (Opportunities) shows buyer interest validation, Section 6 (Differentiation) proves competitive advantages
+- Check: Section 5 cites market size/growth with sources per target market, shows buyer interest validation, and proves competitive advantages — all woven into one ≤1,800-char answer per market
 
 **Criterion 4: Exporting Readiness** (/4 points)
 - Is company truly export-ready? Can they fulfill orders and sustain operations?
@@ -69,7 +69,7 @@ Based on evaluation scoring, provide:
 
 **Example Optimization**:
 ```
-**Priority 1: Enhance Criterion 2 (Export Business Case) - Section 7 (Benefits - Increased Sales)**
+**Priority 1: Enhance Criterion 2 (Export Business Case) - Section 6 (Benefits - Increased Sales)**
 
 Current score: 3/4 (Strong but not Exceptional)
 Gap: Sales projections stated but conversion assumptions not detailed enough
@@ -78,7 +78,7 @@ Current text (excerpt from Increased Sales): "We project $500K export sales in Y
 
 Recommended replacement: "We project $500K export sales in Y1 based on the following funnel: Trade show generates 50 booth visits → 40% schedule follow-up meetings (20 meetings) → 40% qualify for distributor proposals (8 proposals) → 3 advance to negotiation → 67% close rate yields 2 signed distributors → each distributor commits $250K Y1 purchases = $500K total. Y2 growth to $1.2M driven by: existing 2 distributors increase orders 40% ($700K) + 1 new distributor added via referrals ($500K) = $1.2M. Y3 growth to $2M driven by: 3 distributors increase orders 30% ($1.56M) + 1 additional distributor ($440K) = $2M."
 
-Character count: Current ~95 chars, New ~550 chars, Net +455 chars (within Section 7 4000-char limit)
+Character count: Current ~95 chars, New ~550 chars, Net +455 chars (within Section 6 4000-char limit)
 Impact: Moves Criterion 2 from 3/4 to 4/4 = +1 point total score
 Implementation: Replace paragraph 2 in "Increased Sales" section
 
@@ -94,14 +94,13 @@ Estimated new overall score: 17/20 (up from 16/20)
 - Section 2: ___/4000 ✅❌
 - Section 3: ___/4000 ✅❌
 - Section 4: ___/2000 ✅❌
-- Section 5: ___/4000 ✅❌
-- Section 6: ___/4000 ✅❌
-- Section 7 (each benefit): ___/4000 ✅❌
-- Section 8 (each activity): ___/4000 ✅❌
+- Section 5 (each target market): ___/1800 ✅❌
+- Section 6 (each benefit): ___/4000 ✅❌
+- Section 7 (each activity): ___/4000 ✅❌
 
 **Budget Alignment**:
-- Section 8 activities match budget template categories ✅❌
-- Section 8 cost figures match budget template amounts ✅❌
+- Section 7 activities match budget template categories ✅❌
+- Section 7 cost figures match budget template amounts ✅❌
 - All budgeted categories (A-H) have activity descriptions ✅❌
 
 **Compliance**:
@@ -115,7 +114,7 @@ Estimated new overall score: 17/20 (up from 16/20)
 **Quality**:
 - No typos, grammar errors ✅❌
 - Consistent terminology throughout ✅❌
-- Sources cited in Section 5 (Market Potential) ✅❌
+- Sources cited in Section 5 (Market Potential & Competitive Advantages) for each target market ✅❌
 - Specific names, numbers, dates (not vague language) ✅❌
 </compliance_check>
 
@@ -131,10 +130,9 @@ APPLICATION SECTIONS:
 ☐ Section 2: Project Summary (≤4000 chars)
 ☐ Section 3: Capacity (≤4000 chars)
 ☐ Section 4: IP Strategy (≤2000 chars)
-☐ Section 5: Market Potential & Strategy (≤4000 chars)
-☐ Section 6: Competitive Differentiation (≤4000 chars)
-☐ Section 7: Benefits to Canada (≤4000 chars each benefit type)
-☐ Section 8: Budget Activity Descriptions (≤4000 chars per activity)
+☐ Section 5: Market Potential, Opportunities & Competitive Advantages (≤1800 chars per target market)
+☐ Section 6: Benefits to Canada (≤4000 chars each benefit type)
+☐ Section 7: Budget Activity Descriptions (≤4000 chars per activity)
 ☐ Overall evaluation score ≥14 (competitive threshold)
 
 SUPPORTING DOCUMENTS (team to gather from client):

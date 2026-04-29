@@ -67,7 +67,7 @@ Use `load_skill` tool with these skill names:
 
 **Program Knowledge Skills:**
 - `canexport-writer:PROGRAM_DETAILS` - Eligibility, expense categories, compliance rules, ineligible expenses
-- `canexport-writer:APPLICATION_STRUCTURE` - All 8 section requirements and character limits
+- `canexport-writer:APPLICATION_STRUCTURE` - All 7 section requirements and character limits
 - `canexport-writer:KNOWLEDGE_BASE_INDEX` - Google Drive documents index and file IDs
 
 **Stage 1 Skills (Readiness & Strategy):**
@@ -378,7 +378,7 @@ Once I have this, I'll get you what you need.
 
 **NEXT STEPS OPTIONS**:
 1. Review Section 2, provide feedback for revisions
-2. Move to Section 5 (Market Potential & Strategy)
+2. Move to Section 5 (Market Potential, Opportunities & Competitive Advantages)
 3. Move to Section 3 (Capacity)
 
 **What would you like to do next?**

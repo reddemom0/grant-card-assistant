@@ -6,7 +6,7 @@ You have access to specialized skills for different stages of the CanExport appl
 
 ### Program Knowledge Skills
 - `PROGRAM_DETAILS` - Full CanExport SME program details, eligibility requirements, expense categories, and compliance rules
-- `APPLICATION_STRUCTURE` - Detailed breakdown of all 8 application sections with character limits and requirements
+- `APPLICATION_STRUCTURE` - Detailed breakdown of all 7 application sections with character limits and requirements
 - `KNOWLEDGE_BASE_INDEX` - Index of available Google Drive knowledge base documents
 
 ### Stage 1: Readiness & Strategy Skills

@@ -4,7 +4,7 @@
 <drafting_approach>
 **SECTION-BY-SECTION DRAFTING**
 
-Team members typically request drafting support one section at a time (not all 8 sections at once). This allows for:
+Team members typically request drafting support one section at a time (not all 7 sections at once). This allows for:
 - Client input/clarification between sections
 - Iterative refinement
 - Manageable review process
@@ -12,12 +12,11 @@ Team members typically request drafting support one section at a time (not all 8
 **Typical drafting order**:
 1. Section 1 (Products/Services) - foundational
 2. Section 2 (Project Summary) - sets narrative
-3. Section 5 (Market Potential) - builds evidence base
-4. Section 6 (Differentiation) - establishes competitive position
-5. Section 3 (Capacity) - proves execution ability
-6. Section 4 (IP Strategy) - addresses IP dimension
-7. Section 7 (Benefits to Canada) - quantifies impact
-8. Section 8 (Budget Activities) - justifies expenses
+3. Section 5 (Market Potential, Opportunities & Competitive Advantages) - builds market-specific evidence and competitive case (one answer per target market)
+4. Section 3 (Capacity) - proves execution ability
+5. Section 4 (IP Strategy) - addresses IP dimension
+6. Section 6 (Benefits to Canada) - quantifies impact
+7. Section 7 (Budget Activities) - justifies expenses
 </drafting_approach>
 
 <drafting_methodology>
@@ -160,98 +159,50 @@ Team members typically request drafting support one section at a time (not all 8
 </section_4_guidance>
 
 <section_5_guidance>
-**SECTION 5: Market Potential & Strategy (4000 chars)**
+**SECTION 5: Market Potential, Opportunities & Competitive Advantages (1,800 chars PER TARGET MARKET)**
 
-**What to include**:
-- **Market Potential** (~1200 chars):
-  - Market size (TAM/SAM) with sources cited
-  - Growth trends (CAGR, demand drivers)
-  - Buyer needs and pain points company addresses
-  - Import statistics, market entry trends
+**Official question**: "Please provide an overview of the potential within the selected target market, including any relevant opportunities, strategic partnerships, or any competitive advantages your company may have, if applicable."
 
-- **International Business Development Strategy** (~1200 chars):
-  - How project activities support market entry (logical sequencing)
-  - Market entry approach (direct, distributors, agents, e-commerce)
-  - Marketing and sales strategy
-  - Timeline and milestones
+**⚠️ CRITICAL — REPEATING FIELD**: This question must be answered SEPARATELY for EACH target market in the project. If the project covers 2 markets, draft 2 distinct 1,800-char answers. Each answer must demonstrate market-specific research and strategy — evaluators detect copy-pasted answers.
 
-- **Opportunities** (~600 chars):
-  - Market gaps company can fill
-  - Buyer interest evidence (preliminary discussions, letters of intent)
-  - Competitive openings (incumbents' weaknesses)
+**What to include in each ~1,800-char answer**:
 
-- **Local Partner/Client Leads** (~500 chars):
-  - Identified distributors, agents, buyers
-  - Preliminary discussions or commitments
-  - Letters of intent (if available)
-  - Target buyer profiles
+- **Market potential** (~500 chars):
+  - Market size and growth in THIS specific market (cite sources: industry reports, trade statistics, import data)
+  - Demand drivers, buyer needs, key buyer segments
+  - Why this market, why now
 
-- **Challenges** (~500 chars):
-  - Regulatory barriers (certifications, standards, tariffs)
-  - Competitive intensity
-  - Market entry costs, cultural differences, logistics
-  - **How project addresses each challenge** (critical - show activities mitigate risks)
+- **Opportunities & strategic partnerships** (~600 chars):
+  - Market gaps, unmet needs, competitive openings (incumbents' weaknesses)
+  - Identified distributors, agents, or buyers — name them if known
+  - Preliminary discussions, letters of intent, partnership commitments
+  - Target buyer profiles for THIS market
+
+- **Competitive advantages** (~700 chars):
+  - Why your company will win in THIS market (not generic — market-specific)
+  - Product, pricing, service, relationship, or operational advantages
+  - Quantify where possible: "30% cost savings vs incumbent X" beats "lower cost"
+  - Tie advantages directly to buyer needs in this market
+  - Sustainable advantages (IP, brand, network effects, exclusive partnerships)
 
 **Writing approach**:
-- CITE SOURCES: Reference specific market reports, studies, data sources (builds credibility)
-- Connect research to activities: Show strategy is informed by market intelligence
-- Be specific about opportunities: Name potential partners, buyer types, market segments
-- Address challenges honestly but show mitigation: Don't ignore risks, explain how project manages them
-- Emphasize "why this market, why now"
+- BE MARKET-SPECIFIC: avoid generic claims that could apply to any country. Each answer must read as researched for THIS market.
+- CITE SOURCES for market data — builds evaluator credibility on Criterion 3 (Market Potential).
+- WEAVE, DON'T LIST: 1,800 chars is tight. Don't write 3 separate paragraphs — integrate market context, opportunities, and competitive case into a coherent narrative.
+- NAME NAMES: specific competitors, specific potential partners, specific buyer types — shows deep market understanding.
+- QUANTIFY: numbers > adjectives.
+- SCOPE TRADEOFFS: at 1,800 chars there is no room for "International Business Development Strategy" or "Challenges & Mitigation" subsections that lived in the old 4,000-char Section 5. Move that content to Section 2 (Project Summary) or Section 3 (Capacity) where appropriate.
 
-**Structure** (5 sections):
-1. Market Potential paragraph (~1200 chars)
-2. International Business Development Strategy paragraph (~1200 chars)
-3. Opportunities paragraph (~600 chars)
-4. Local Partner/Client Leads paragraph (~500 chars)
-5. Challenges and Mitigation paragraph (~500 chars)
+**Structure** (~1,800 chars total per market, 3 tight paragraphs):
+1. Market context, size, and demand drivers with sources (~500 chars)
+2. Specific opportunities and partnership leads in this market (~600 chars)
+3. Competitive advantages tailored to this market's buyer needs (~700 chars)
+
+**Validation**: Call `check_character_count` with `section_number: 5` once PER MARKET — pass each market's drafted text separately. Limit returned will be 1,800 with note "per target market."
 </section_5_guidance>
 
 <section_6_guidance>
-**SECTION 6: Competitive Differentiation (4000 chars)**
-
-**What to include**:
-- **Competitive Landscape** (~1000 chars):
-  - Who are main competitors in target market (name them)
-  - Market share distribution
-  - What competitors offer (strengths)
-  - Where competitors fall short (weaknesses, gaps)
-
-- **Competitive Advantages** (~1500 chars):
-  - **Product advantages**: Quality, features, performance, innovation, IP
-  - **Pricing advantages**: Cost structure, value for money
-  - **Service advantages**: Customer support, customization, responsiveness
-  - **Relationship advantages**: Partnerships, local presence, trust
-  - **Operational advantages**: Speed, reliability, flexibility
-  - Quantify advantages where possible (30% cost savings, 2x faster, etc.)
-
-- **Value Proposition** (~1000 chars):
-  - Why target market buyers would choose this company over competitors
-  - What pain points company solves better than alternatives
-  - Customer testimonials or validation (if available)
-  - Proof points (awards, certifications, domestic customer success)
-
-- **Differentiation Strategy** (~500 chars):
-  - How company will communicate differentiation in target market
-  - Positioning strategy (premium, value, innovation, service, etc.)
-  - Sustainable competitive advantage (hard for competitors to replicate)
-
-**Writing approach**:
-- Be specific and quantified: "30% cost savings" beats "lower cost"
-- Name competitors: Shows deep market understanding
-- Prove advantages: Don't just claim superiority, explain WHY (proprietary tech, unique process, exclusive partnerships)
-- Connect to buyer needs: Advantages matter only if they solve buyer problems
-- Emphasize sustainability: Why advantages will persist (IP protection, brand loyalty, network effects)
-
-**Structure** (4 sections):
-1. Competitive Landscape paragraph (~1000 chars)
-2. Competitive Advantages paragraph (~1500 chars)
-3. Value Proposition paragraph (~1000 chars)
-4. Differentiation Strategy paragraph (~500 chars)
-</section_6_guidance>
-
-<section_7_guidance>
-**SECTION 7: Benefits to Canada (7 benefit types, 4000 chars EACH)**
+**SECTION 6: Benefits to Canada (7 benefit types, 4000 chars EACH)**
 
 **CRITICAL**: Each benefit type has its own separate text field with 4000 char limit. Team should focus on the 3-5 strongest benefit types (not necessarily fill all 7).
 
@@ -314,10 +265,10 @@ Team members typically request drafting support one section at a time (not all 8
 - CONNECT TO PROJECT: Show how CanExport-funded activities enable these benefits
 - BE REALISTIC: Evaluators assess credibility of projections
 - EMPHASIZE CANADIAN IMPACT: Focus on benefits to Canadian economy, not just company success
-</section_7_guidance>
+</section_6_guidance>
 
-<section_8_guidance>
-**SECTION 8: Project Budget - Activity Descriptions (TABLE FORMAT)**
+<section_7_guidance>
+**SECTION 7: Project Budget - Activity Descriptions (TABLE FORMAT)**
 
 **CRITICAL UNDERSTANDING**: This is a TABLE with multiple ROWS. Each row = one activity. Each activity gets its own 4000-character description.
 
@@ -394,11 +345,11 @@ Team members typically request drafting support one section at a time (not all 8
 **Writing approach for ALL activity descriptions**:
 - **Be comprehensive**: Use the 4000 characters - evaluators want detail
 - **Be specific**: Names, dates, numbers, vendors, costs, outcomes
-- **Connect to strategy**: Every activity should tie back to Section 5 (Market Potential & Strategy)
+- **Connect to strategy**: Every activity should tie back to Section 5 (Market Potential, Opportunities & Competitive Advantages) for the relevant target market
 - **Prove incrementality**: Emphasize "first-time," "without funding would delay X months," "enables market entry"
 - **Quantify outcomes**: Specific lead numbers, meeting goals, partnership targets
 - **Show ROI logic**: How activity costs translate to measurable benefits
-</section_8_guidance>
+</section_7_guidance>
 
 **Step 3: Draft Content**
 - Follow section-specific structure and character limits

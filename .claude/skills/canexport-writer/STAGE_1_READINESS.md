@@ -139,10 +139,9 @@ After preparedness assessment, provide strategic guidance for drafting.
 - **Section 2** (Project Summary): Lead messages, what to emphasize
 - **Section 3** (Capacity): How to prove readiness, address potential concerns
 - **Section 4** (IP Strategy): Angle if strong IP vs weak/no IP
-- **Section 5** (Market Potential): Research to highlight, opportunity framing
-- **Section 6** (Differentiation): Competitive advantages to feature
-- **Section 7** (Benefits): Which benefit categories will be strongest
-- **Section 8** (Budget Activities): How to justify each activity strategically
+- **Section 5** (Market Potential, Opportunities & Competitive Advantages): Research to highlight, opportunity framing, competitive advantages to feature — answered per target market (1,800 chars each)
+- **Section 6** (Benefits to Canada): Which benefit categories will be strongest
+- **Section 7** (Budget Activities): How to justify each activity strategically
 
 ### Risk Mitigation
 
