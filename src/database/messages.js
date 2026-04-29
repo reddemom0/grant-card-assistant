@@ -98,6 +98,26 @@ export async function getLeadGenMessages(sessionId, maxMessages = 60) {
   }
 }
 
+function pruneLeadingOrphans(messages) {
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    if (msg.role !== 'user') continue;
+
+    const hasToolResult = Array.isArray(msg.content) &&
+      msg.content.some(b => b && b.type === 'tool_result');
+
+    if (!hasToolResult) {
+      if (i > 0) {
+        console.log(`⚠️  Dropping ${i} leading message(s) to avoid orphan tool_result at head of window`);
+      }
+      return messages.slice(i);
+    }
+  }
+
+  console.warn('⚠️  No clean user message found in window — returning empty history');
+  return [];
+}
+
 export async function getConversationMessages(conversationId, maxMessages = 60) {
   try {
     // Retrieve the most recent N messages
@@ -175,6 +195,14 @@ export async function getConversationMessages(conversationId, maxMessages = 60) 
         return true;
       });
 
+    // Drop leading messages that would orphan a tool_result.
+    // The Claude API requires messages[0].role === 'user' AND every tool_result
+    // to have its matching tool_use in the immediately preceding message. When
+    // the LIMIT slices through a tool_use/tool_result pair, the surviving
+    // tool_result at the head has no preceding tool_use and the request 400s.
+    // Safe re-entry point: the first user message with no tool_result blocks.
+    const prunedMessages = pruneLeadingOrphans(messages);
+
     const totalMessagesQuery = await query(
       `SELECT COUNT(*) as total FROM messages WHERE conversation_id = $1`,
       [conversationId]
@@ -182,12 +210,12 @@ export async function getConversationMessages(conversationId, maxMessages = 60) 
     const totalMessages = parseInt(totalMessagesQuery.rows[0]?.total || 0);
 
     if (totalMessages > maxMessages) {
-      console.log(`✓ Retrieved ${messages.length} messages (limited from ${totalMessages} total) for conversation ${conversationId}`);
+      console.log(`✓ Retrieved ${prunedMessages.length} messages (limited from ${totalMessages} total) for conversation ${conversationId}`);
     } else {
-      console.log(`✓ Retrieved ${messages.length} messages for conversation ${conversationId}`);
+      console.log(`✓ Retrieved ${prunedMessages.length} messages for conversation ${conversationId}`);
     }
 
-    return messages;
+    return prunedMessages;
   } catch (error) {
     console.error('Error retrieving messages:', error);
     throw error;
@@ -427,6 +455,7 @@ export async function getConversationToolTrace(conversationId) {
 
   for (const row of result.rows) {
     const timestamp = row.created_at;
+    const role = row.role;
 
     let blocks;
     try {
@@ -434,7 +463,7 @@ export async function getConversationToolTrace(conversationId) {
     } catch {
       // Plain-text content (legacy or user text)
       if (row.content && row.content.trim()) {
-        trace.push({ type: 'text', content: row.content, timestamp });
+        trace.push({ type: 'text', role, content: row.content, timestamp });
       }
       continue;
     }
@@ -451,6 +480,7 @@ export async function getConversationToolTrace(conversationId) {
         case 'tool_use':
           trace.push({
             type: 'tool_use',
+            role,
             tool_name: block.name,
             tool_use_id: block.id,
             input: block.input,
@@ -461,6 +491,7 @@ export async function getConversationToolTrace(conversationId) {
         case 'tool_result':
           trace.push({
             type: 'tool_result',
+            role,
             tool_use_id: block.tool_use_id,
             content: block.content,
             is_error: block.is_error || false,
@@ -470,24 +501,25 @@ export async function getConversationToolTrace(conversationId) {
 
         case 'text':
           if (block.text && block.text.trim()) {
-            trace.push({ type: 'text', content: block.text, timestamp });
+            trace.push({ type: 'text', role, content: block.text, timestamp });
           }
           break;
 
         case 'thinking':
           if (block.thinking && block.thinking.trim()) {
-            trace.push({ type: 'thinking', content: block.thinking, timestamp });
+            trace.push({ type: 'thinking', role, content: block.thinking, timestamp });
           }
           break;
 
         case 'redacted_thinking':
-          trace.push({ type: 'thinking', content: '[redacted]', timestamp });
+          trace.push({ type: 'thinking', role, content: '[redacted]', timestamp });
           break;
 
         // Server-side tool blocks (web_search, web_fetch) — also useful for debugging
         case 'server_tool_use':
           trace.push({
             type: 'tool_use',
+            role,
             tool_name: block.name,
             tool_use_id: block.id,
             input: block.input,
@@ -499,6 +531,7 @@ export async function getConversationToolTrace(conversationId) {
         case 'web_fetch_tool_result':
           trace.push({
             type: 'tool_result',
+            role,
             tool_use_id: block.tool_use_id,
             content: block.content,
             is_error: false,
@@ -508,7 +541,7 @@ export async function getConversationToolTrace(conversationId) {
 
         default:
           // Unknown block type — preserve it as-is for forward compatibility
-          trace.push({ type: block.type, content: block, timestamp });
+          trace.push({ type: block.type, role, content: block, timestamp });
           break;
       }
     }
