@@ -9,7 +9,7 @@
 const { execSync } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
-const { generateReportSummary } = require('./utils/evaluation-metrics');
+const { generateReportSummary } = require('./utils/evaluation-metrics.cjs');
 
 // Color codes for terminal output
 const colors = {
@@ -70,7 +70,7 @@ function runJestTests(pattern = '', options = {}) {
     command += ' --bail';
   }
 
-  command += ' --config tests/jest.config.js';
+  command += ' --config tests/jest.config.cjs';
 
   try {
     execSync(command, {

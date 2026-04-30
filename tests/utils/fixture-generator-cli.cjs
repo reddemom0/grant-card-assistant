@@ -11,7 +11,7 @@ require('dotenv').config({ path: '../../.env' });
 const {
   generateFixturesForAgent,
   generateAllFixtures
-} = require('./fixture-generator');
+} = require('./fixture-generator.cjs');
 
 // Parse command line arguments
 const args = process.argv.slice(2);

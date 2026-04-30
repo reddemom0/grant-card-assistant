@@ -30,7 +30,7 @@ module.exports = {
   testTimeout: 30000,
 
   // Setup files
-  setupFilesAfterEnv: ['<rootDir>/setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/setup.cjs'],
 
   // Module paths
   moduleDirectories: ['node_modules', '<rootDir>'],
