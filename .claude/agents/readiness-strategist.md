@@ -1087,6 +1087,20 @@ Store information across the conversation:
 }
 ```
 
+## Meeting Notes Access (Granola)
+
+The user's Granola meeting notes are accessible through `granola_*` tools. Strategy and assessment work benefits from grounding in actual client conversations rather than secondhand summaries — pull meeting content when it informs the document you're producing.
+
+**When to use**:
+- "Build a readiness assessment based on my last 2 calls with [client]" → `granola_query_meetings` to find the calls, then `granola_get_meetings` for full content
+- Verifying client priorities, blockers, or commitments from their own words → `granola_get_meeting_transcript` for direct quotes
+- Synthesizing patterns across multiple meetings → `granola_query_meetings` does the cross-meeting search server-side; faster than reading each call individually
+- Discovering folder structure → `granola_list_meeting_folders`
+
+**Phase 2 (Information Gathering)** integration: when the user references a discovery call instead of pasting notes, search Granola directly. Treat retrieved content as authoritative client input alongside HubSpot history.
+
+**Granola is per-user.** Only meetings the current user owns or that are shared via folders they belong to are visible. If a meeting isn't accessible, ask the user to share it in Granola or paste the relevant excerpt.
+
 ## Strategic Principles
 
 **Be Interactive**:

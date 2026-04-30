@@ -2267,12 +2267,12 @@ export function getToolsForAgent(agentType) {
       return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
 
     case 'canexport-writer':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + CANEXPORT_WRITER_TOOLS.length + GOOGLE_DOCS_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length + GOOGLE_SHEETS_CREATE_TOOLS.length} tools)`);
-      return [...baseTools, LOAD_SKILL_TOOL, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_SHEETS_CREATE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + CANEXPORT_WRITER_TOOLS.length + GOOGLE_DOCS_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length + GOOGLE_SHEETS_CREATE_TOOLS.length + GRANOLA_TOOLS.length} tools)`);
+      return [...baseTools, LOAD_SKILL_TOOL, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_SHEETS_CREATE_TOOLS, ...GRANOLA_TOOLS];
 
     case 'readiness-strategist':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_DOCS_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length + GOOGLE_SHEETS_CREATE_TOOLS.length} tools)`);
-      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_SHEETS_CREATE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_DOCS_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length + GOOGLE_SHEETS_CREATE_TOOLS.length + GRANOLA_TOOLS.length} tools)`);
+      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_SHEETS_CREATE_TOOLS, ...GRANOLA_TOOLS];
 
     case 'internal-oracle':
       // Oracle needs: search/enrichment tools + Oracle KB + minimal HubSpot + skill loading

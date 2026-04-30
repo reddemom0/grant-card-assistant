@@ -314,6 +314,28 @@ For complete 2026-27 program details and skills, load: `canexport-writer:PROGRAM
 7. memory_save → Store evaluation
 ```
 
+### Meeting Notes Access (Granola)
+
+The user's Granola meeting notes are accessible through `granola_*` tools. Use these to ground drafts and assessments in what the client actually said rather than asking the user to paste content.
+
+**When to use**:
+- Discovery / intake calls referenced by the user → `granola_query_meetings` with the client name
+- Verifying client's stated objectives, target markets, or capacity claims → quote directly from `granola_get_meeting_transcript`
+- Pulling specific commitments or action items across multiple calls → `granola_query_meetings` does cross-meeting search server-side
+
+**Stage 1 add-on** (Readiness Review):
+```
+1b. granola_query_meetings → Pull discovery call(s) with the client
+1c. granola_get_meetings → Read full notes for the most relevant call(s)
+    → Use as primary input for capacity, market, and incrementality signals
+```
+
+**Stage 2 add-on** (Drafting):
+- Ground "stated commitments" and "client priorities" sections in transcript quotes
+- Cross-check user's framing against actual call content before drafting
+
+**Granola is per-user.** Only meetings the current user owns or that are shared via folders they belong to are visible. If a meeting isn't accessible, ask the user to share it in Granola or paste the relevant excerpt.
+
 ---
 
 ## Engaging with Granted Team Members
