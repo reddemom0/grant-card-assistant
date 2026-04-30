@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-04-30 — Plaintext OAuth tokens for `user_oauth_tokens` table
+**What:** New generic per-user OAuth token table (migration 019) stores access/refresh tokens as plaintext `TEXT`, mirroring the existing Google convention on the `users` table (migration 004).
+**Why:** No application-layer encryption infrastructure exists in the repo today. Introducing it (key management, rotation, BYTEA + IV/tag columns) is a larger lift than this scaffolding warrants and was not requested. Deferred until a concrete trigger appears (compliance, audit, partner contract).
+**Impact:** `migrations/019_create_user_oauth_tokens.sql`, `src/database/user-oauth-tokens.js`. Generic table shape allows encryption columns to be added later without breaking changes — refresh_token / access_token columns can be replaced with encrypted variants behind the same CRUD API.
+
 ## 2026-04-21 — Oracle model upgraded to Sonnet 4.6 alias (dated-snapshot convention broken)
 **What:** Repo-wide swap of `claude-sonnet-4-5-20250929` (dated snapshot) to `claude-sonnet-4-6` (alias) across 14 files; added `sonnet-4-6` branch to `calculateRequestCost` with identical $3/$15 pricing to 4.5.
 **Why:** Anthropic hasn't published a dated snapshot for Sonnet 4.6 as of 2026-04-21. Alias is the only available form.

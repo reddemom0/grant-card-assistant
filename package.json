@@ -15,6 +15,7 @@
     "test:report": "node tests/run-tests.cjs report",
     "test:file-reading": "node test-file-reading.js",
     "test:mcp-remote": "node scripts/test-mcp-remote-client.js",
+    "test:oauth-tokens": "node scripts/test-user-oauth-tokens.js",
     "fixtures:generate": "node tests/utils/fixture-generator-cli.cjs",
     "db:setup": "node setup-database.js",
     "oracle:explore": "node scripts/oracle-explore-kb.js",
