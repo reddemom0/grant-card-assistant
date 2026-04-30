@@ -57,7 +57,7 @@ async function saveUserOAuthTokens(userId, tokens) {
  * @param {number} userId - User ID
  * @returns {Promise<Object>} Authenticated OAuth2 client
  */
-async function getUserOAuth2Client(userId) {
+export async function getUserOAuth2Client(userId) {
   const tokens = await getUserOAuthTokens(userId);
 
   const oauth2Client = new google.auth.OAuth2(

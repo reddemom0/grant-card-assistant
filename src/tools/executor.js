@@ -1038,6 +1038,22 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      // ============================================================================
+      // GOOGLE SHEETS — read/write
+      // ============================================================================
+      case 'read_sheet_range':
+        result = await googleSheets.readSheetRange(userId, input);
+        break;
+      case 'read_sheet_metadata':
+        result = await googleSheets.readSheetMetadata(userId, input);
+        break;
+      case 'update_sheet_range':
+        result = await googleSheets.updateSheetRange(userId, input);
+        break;
+      case 'append_sheet_row':
+        result = await googleSheets.appendSheetRow(userId, input);
+        break;
+
       case 'create_advanced_document':
         result = await createAdvancedDocumentTool(input, {
           conversationId,

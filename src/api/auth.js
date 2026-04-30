@@ -63,12 +63,16 @@ router.get('/auth-google', (req, res) => {
   console.log('🔵 Detected host:', host);
   console.log('🔵 Protocol:', protocol);
 
-  // Include Google Drive and Docs scopes for document creation
+  // Include Google Drive, Docs, and Sheets scopes for document/spreadsheet creation.
+  // NOTE: when this list changes, existing connected users must log out and log
+  // back in to refresh their granted scopes. prompt=consent (set below) makes
+  // that a single round-trip — Google will re-show the consent screen.
   const scopes = [
     'profile',
     'email',
     'https://www.googleapis.com/auth/drive.file',
-    'https://www.googleapis.com/auth/documents'
+    'https://www.googleapis.com/auth/documents',
+    'https://www.googleapis.com/auth/spreadsheets'
   ].join(' ');
 
   console.log('🔵 OAuth Parameters:');

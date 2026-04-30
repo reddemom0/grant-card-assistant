@@ -1748,32 +1748,6 @@ export const GOOGLE_DOCS_TOOLS = [
     }
   },
   {
-    name: 'create_advanced_budget',
-    description: 'Create a comprehensive budget spreadsheet using Google Sheets API with program-specific templates. Generates multi-sheet workbooks with branded formatting, formulas, validation rules, and dynamic budget tables tailored to specific grant programs (e.g., ETG, BCIC Ignite, CanExport). Supports custom budget data injection for automated budget generation.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        title: {
-          type: 'string',
-          description: 'Spreadsheet title (e.g., "ETG Budget - Q1 2024 Training Program")'
-        },
-        grantProgram: {
-          type: 'string',
-          description: 'Grant program name to determine template structure and categories (e.g., "ETG", "BCIC Ignite", "CanExport SMEs"). Each program has a specific template with appropriate expense categories, formulas, and validation rules.'
-        },
-        budgetData: {
-          type: 'object',
-          description: 'Optional: Structured budget data to populate the spreadsheet dynamically. If provided, the tool will generate budget rows from this data instead of using a blank template. Format depends on grant program requirements.'
-        },
-        parentFolderId: {
-          type: 'string',
-          description: 'Optional: Google Drive folder ID to create the spreadsheet in (from create_google_drive_folder). If not provided, creates in user\'s root Drive.'
-        }
-      },
-      required: ['title', 'grantProgram']
-    }
-  },
-  {
     name: 'create_advanced_document',
     description: 'Create a properly formatted Google Doc from template configuration using Google Docs API v1 (NOT markdown). Supports Readiness Assessments, Interview Questions, and Evaluation Rubrics for hiring, market-expansion, training, rd, loan, and investment grant types. Documents include branded formatting, structured tables, callouts, and placeholders for client data. For interview questions, can dynamically generate questions based on grant criteria instead of using static templates.',
     input_schema: {
@@ -1833,6 +1807,143 @@ export const GOOGLE_DOCS_TOOLS = [
         }
       },
       required: ['title', 'content']
+    }
+  }
+];
+
+// ============================================================================
+// GOOGLE SHEETS — read/write surface for any Google-connected agent.
+// Implementations live in src/tools/google-sheets.js.
+// ============================================================================
+
+export const GOOGLE_SHEETS_READWRITE_TOOLS = [
+  {
+    name: 'read_sheet_range',
+    description: 'Read cell values from a Google Sheets A1 range (e.g. "Sheet1!A1:D10"). Use when the user asks to inspect specific cells, rows, columns, or named ranges. Defaults to formatted display values; pass value_render_option=UNFORMATTED_VALUE for raw numbers or =FORMULA for cell formulas.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        spreadsheet_id: {
+          type: 'string',
+          description: 'Google Sheets spreadsheet ID (the long string in the spreadsheet URL between /d/ and /edit).'
+        },
+        range: {
+          type: 'string',
+          description: 'A1-notation range, e.g. "Sheet1!A1:D10" or "April 22nd 2026!A:E". Tab name is required when the spreadsheet has multiple tabs.'
+        },
+        value_render_option: {
+          type: 'string',
+          enum: ['FORMATTED_VALUE', 'UNFORMATTED_VALUE', 'FORMULA'],
+          description: 'Optional. Default FORMATTED_VALUE returns display text. UNFORMATTED_VALUE returns raw numbers. FORMULA returns the cell formula source.'
+        }
+      },
+      required: ['spreadsheet_id', 'range']
+    }
+  },
+  {
+    name: 'read_sheet_metadata',
+    description: 'Get spreadsheet title and the list of tabs (id, title, index, row/column counts) without reading cell data. Use first when you need to discover what tabs exist before calling read_sheet_range, or to confirm a spreadsheet is structured the way you expect.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        spreadsheet_id: {
+          type: 'string',
+          description: 'Google Sheets spreadsheet ID.'
+        }
+      },
+      required: ['spreadsheet_id']
+    }
+  },
+  {
+    name: 'update_sheet_range',
+    description: 'Write a 2D array of values to a Google Sheets A1 range, overwriting existing content in that range. Use when the user asks to fill specific cells or replace content in a known location. For appending new rows to a table, prefer append_sheet_row.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        spreadsheet_id: {
+          type: 'string',
+          description: 'Google Sheets spreadsheet ID.'
+        },
+        range: {
+          type: 'string',
+          description: 'A1-notation target range. The values array must fit within this range (excess cells are ignored, missing cells are left untouched).'
+        },
+        values: {
+          type: 'array',
+          description: '2D array of cell values: outer array = rows, inner array = cells in that row. Strings starting with "=" are interpreted as formulas when value_input_option=USER_ENTERED.',
+          items: { type: 'array' }
+        },
+        value_input_option: {
+          type: 'string',
+          enum: ['USER_ENTERED', 'RAW'],
+          description: 'Optional. Default USER_ENTERED parses input like a typing user (numbers, dates, formulas). RAW writes verbatim strings.'
+        }
+      },
+      required: ['spreadsheet_id', 'range', 'values']
+    }
+  },
+  {
+    name: 'append_sheet_row',
+    description: 'Append one or more rows at the bottom of a Google Sheets table. Pass the table\'s range to identify which table to append to (Google scans within that range for the data\'s last row and inserts after it). Use for adding new entries to logs, action-item lists, or running ledgers.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        spreadsheet_id: {
+          type: 'string',
+          description: 'Google Sheets spreadsheet ID.'
+        },
+        range: {
+          type: 'string',
+          description: 'A1-notation range covering the table to append to (e.g. "Sheet1!A:E"). Google finds the last row of data within this range and inserts new rows after it.'
+        },
+        values: {
+          type: 'array',
+          description: '2D array of new rows: outer array = rows, inner array = cells. Each inner array becomes one new appended row.',
+          items: { type: 'array' }
+        },
+        value_input_option: {
+          type: 'string',
+          enum: ['USER_ENTERED', 'RAW'],
+          description: 'Optional. Default USER_ENTERED parses input like a typing user. RAW writes verbatim strings.'
+        }
+      },
+      required: ['spreadsheet_id', 'range', 'values']
+    }
+  }
+];
+
+// ============================================================================
+// GOOGLE SHEETS — heavyweight creation tool.
+// Restricted to canexport-writer + readiness-strategist (matches the prior
+// GOOGLE_DOCS_TOOLS distribution where create_advanced_budget previously lived).
+// Implementation in src/tools/google-sheets-advanced.js.
+// ============================================================================
+
+export const GOOGLE_SHEETS_CREATE_TOOLS = [
+  {
+    name: 'create_advanced_budget',
+    description: 'Create a comprehensive budget spreadsheet using Google Sheets API with program-specific templates. Generates multi-sheet workbooks with branded formatting, formulas, validation rules, and dynamic budget tables tailored to specific grant programs (e.g., ETG, BCIC Ignite, CanExport). Supports custom budget data injection for automated budget generation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Spreadsheet title (e.g., "ETG Budget - Q1 2024 Training Program")'
+        },
+        grantProgram: {
+          type: 'string',
+          description: 'Grant program name to determine template structure and categories (e.g., "ETG", "BCIC Ignite", "CanExport SMEs"). Each program has a specific template with appropriate expense categories, formulas, and validation rules.'
+        },
+        budgetData: {
+          type: 'object',
+          description: 'Optional: Structured budget data to populate the spreadsheet dynamically. If provided, the tool will generate budget rows from this data instead of using a blank template. Format depends on grant program requirements.'
+        },
+        parentFolderId: {
+          type: 'string',
+          description: 'Optional: Google Drive folder ID to create the spreadsheet in (from create_google_drive_folder). If not provided, creates in user\'s root Drive.'
+        }
+      },
+      required: ['title', 'grantProgram']
     }
   }
 ];
@@ -2102,6 +2213,8 @@ export const ALL_TOOLS = [
   ...ORACLE_TOOLS,
   ...CANEXPORT_WRITER_TOOLS,
   ...GOOGLE_DOCS_TOOLS,
+  ...GOOGLE_SHEETS_READWRITE_TOOLS,
+  ...GOOGLE_SHEETS_CREATE_TOOLS,
   ...GETGRANTED_AI_TOOLS
 ];
 
@@ -2137,29 +2250,29 @@ export function getToolsForAgent(agentType) {
   // Curated tool sets per agent - only include what each agent actually uses
   switch (agentType) {
     case 'grant-card-generator':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
-      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools)`);
+      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
 
     case 'etg-writer':
     case 'buybc-writer':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
-      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools)`);
+      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
 
     case 'bcafe-writer':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
-      return [...baseTools, LOAD_SKILL_TOOL, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools)`);
+      return [...baseTools, LOAD_SKILL_TOOL, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
 
     case 'canexport-claims':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length} tools)`);
-      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools)`);
+      return [...baseTools, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
 
     case 'canexport-writer':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + CANEXPORT_WRITER_TOOLS.length + GOOGLE_DOCS_TOOLS.length} tools)`);
-      return [...baseTools, LOAD_SKILL_TOOL, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + HUBSPOT_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + CANEXPORT_WRITER_TOOLS.length + GOOGLE_DOCS_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length + GOOGLE_SHEETS_CREATE_TOOLS.length} tools)`);
+      return [...baseTools, LOAD_SKILL_TOOL, ...HUBSPOT_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...CANEXPORT_WRITER_TOOLS, ...GOOGLE_DOCS_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_SHEETS_CREATE_TOOLS];
 
     case 'readiness-strategist':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_DOCS_TOOLS.length} tools)`);
-      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_DOCS_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length + GOOGLE_SHEETS_CREATE_TOOLS.length} tools)`);
+      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_DOCS_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_SHEETS_CREATE_TOOLS];
 
     case 'internal-oracle':
       // Oracle needs: search/enrichment tools + Oracle KB + minimal HubSpot + skill loading
@@ -2168,8 +2281,8 @@ export function getToolsForAgent(agentType) {
       // LOAD_SKILL_TOOL: uses the shared definition (not a per-agent copy) so Oracle can load
       // hubspot/DEAL_CREATION and any future skills without enum drift.
       const oracleBaseTools = [...SERVER_TOOLS, ...MEMORY_TOOLS]; // No ANTHROPIC_MEMORY_TOOL
-      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + 1 + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length + GRANOLA_TOOLS.length} tools, filesystem memory excluded)`);
-      return [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + 1 + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length + GRANOLA_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools, filesystem memory excluded)`);
+      return [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
 
     case 'getgranted-ai':
       // GetGrantedAI needs: base tools + GetGrantedAI-specific tools (no HubSpot, no Google Drive)
