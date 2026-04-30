@@ -1090,6 +1090,35 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
 
       // ============================================================================
+      // GRANOLA (remote MCP server, per-user OAuth)
+      // ============================================================================
+      case 'granola_query_meetings': {
+        const { granolaQueryMeetings } = await import('./granola.js');
+        result = await granolaQueryMeetings(input, { conversationId, userId, agentType });
+        break;
+      }
+      case 'granola_list_meetings': {
+        const { granolaListMeetings } = await import('./granola.js');
+        result = await granolaListMeetings(input, { conversationId, userId, agentType });
+        break;
+      }
+      case 'granola_get_meetings': {
+        const { granolaGetMeetings } = await import('./granola.js');
+        result = await granolaGetMeetings(input, { conversationId, userId, agentType });
+        break;
+      }
+      case 'granola_get_meeting_transcript': {
+        const { granolaGetMeetingTranscript } = await import('./granola.js');
+        result = await granolaGetMeetingTranscript(input, { conversationId, userId, agentType });
+        break;
+      }
+      case 'granola_list_meeting_folders': {
+        const { granolaListMeetingFolders } = await import('./granola.js');
+        result = await granolaListMeetingFolders(input, { conversationId, userId, agentType });
+        break;
+      }
+
+      // ============================================================================
       // UNKNOWN TOOL
       // ============================================================================
 

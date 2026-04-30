@@ -1293,6 +1293,73 @@ export const DROPBOX_TOOLS = [
 ];
 
 // ============================================================================
+// GRANOLA TOOLS
+// Wrap the Granola MCP server's tools (per-user OAuth via remote MCP client).
+// User connects via /api/auth/granola; tokens stored in user_oauth_tokens.
+// ============================================================================
+
+export const GRANOLA_TOOLS = [
+  {
+    name: 'granola_query_meetings',
+    description: 'Search and chat with the user\'s Granola meeting notes. Use when the user asks a natural-language question about their meetings (e.g., "what did we decide about pricing last week?").',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Natural-language search query.' }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'granola_list_meetings',
+    description: 'List the user\'s Granola meetings with metadata (id, title, date, attendees). Use to find meeting IDs before fetching content. Optional folder/date filters.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        folder_id:  { type: 'string', description: 'Optional Granola folder ID to filter by.' },
+        start_date: { type: 'string', description: 'Optional ISO date (YYYY-MM-DD); only meetings on or after this date.' },
+        end_date:   { type: 'string', description: 'Optional ISO date (YYYY-MM-DD); only meetings on or before this date.' },
+        limit:      { type: 'number', description: 'Optional max number of meetings to return.' }
+      }
+    }
+  },
+  {
+    name: 'granola_get_meetings',
+    description: 'Get full meeting content (private and enhanced notes) for one or more Granola meetings by ID. Use after granola_list_meetings or granola_query_meetings has identified candidates.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        meeting_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Granola meeting IDs.'
+        }
+      },
+      required: ['meeting_ids']
+    }
+  },
+  {
+    name: 'granola_get_meeting_transcript',
+    description: 'Get the raw transcript for a specific Granola meeting by ID. Use when the user asks for verbatim quotes or detailed conversation flow.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        meeting_id: { type: 'string', description: 'Granola meeting ID.' }
+      },
+      required: ['meeting_id']
+    }
+  },
+  {
+    name: 'granola_list_meeting_folders',
+    description: 'List the Granola meeting folders the user is a member of. Use to discover folder IDs for filtering granola_list_meetings.',
+    input_schema: {
+      type: 'object',
+      properties: {}
+    }
+  }
+];
+
+// ============================================================================
 // LOAD SKILL TOOL
 // Single source of truth for skill loading across all agents.
 // DO NOT create per-agent copies of this tool definition. If a new skill domain
@@ -2101,8 +2168,8 @@ export function getToolsForAgent(agentType) {
       // LOAD_SKILL_TOOL: uses the shared definition (not a per-agent copy) so Oracle can load
       // hubspot/DEAL_CREATION and any future skills without enum drift.
       const oracleBaseTools = [...SERVER_TOOLS, ...MEMORY_TOOLS]; // No ANTHROPIC_MEMORY_TOOL
-      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + 1 + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length} tools, filesystem memory excluded)`);
-      return [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + 1 + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length + GRANOLA_TOOLS.length} tools, filesystem memory excluded)`);
+      return [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS];
 
     case 'getgranted-ai':
       // GetGrantedAI needs: base tools + GetGrantedAI-specific tools (no HubSpot, no Google Drive)
