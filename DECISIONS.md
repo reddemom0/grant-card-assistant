@@ -12,6 +12,18 @@ Format:
 
 ---
 
+## 2026-04-30 — Granola MCP integration: 4-task architectural arc
+**What:** First remote-MCP-as-tool-source integration in the hub, shipped across Tasks 1 (streamable-HTTP client foundation), 2 (per-user OAuth token storage), 3A-C (DCR client storage, OAuth flow, tool wiring), and 4 (connection UI). Seven decisions worth preserving:
+1. **SDK-managed OAuth ceremony** — implement only `OAuthClientProvider` storage adapters; the SDK handles DCR, PKCE, and refresh. Avoided ~200 lines of hand-rolled crypto.
+2. **Plaintext tokens** — re-affirmed for `user_oauth_tokens` (see separate entry below). Same deferral applies to all per-user OAuth tokens going forward.
+3. **Deployment-scoped DCR** — `mcp_dcr_clients` is one row per provider per deployment, not per user. First user's DCR registration is reused for all subsequent users.
+4. **Unconditional tool advertisement** — Oracle sees Granola tools regardless of user connection state; unconnected users get a "please connect" error from the first tool call. Avoids per-message DB lookup to filter tools.
+5. **Redis for ephemeral OAuth state** — state + PKCE verifier in Redis with 10-min TTL (separate from long-lived tokens in Postgres). Mirrors existing per-module ioredis pattern.
+6. **Generic remote-MCP wrapper** — `createRemoteMCPClient` accepts either `bearerToken` or `authProvider` (XOR). Future remote MCP servers inherit the wrapper without modification.
+7. **Fail-quiet status UI** — Granola card on Oracle welcome screen renders nothing when `/api/auth/granola/status` errors, rather than showing a broken card.
+**Why:** This arc established patterns the next remote MCP integration will inherit. Capturing rationale here lets future contributors and Claude sessions distinguish principled choices from expedient ones.
+**Impact:** `src/mcp/remote-client.js`, `src/database/user-oauth-tokens.js`, `src/database/mcp-dcr-clients.js`, `src/api/granola-oauth-provider.js`, `src/api/granola-auth.js`, `src/utils/granola-oauth-state.js`, `src/tools/granola.js`, `src/tools/definitions.js`, `src/tools/executor.js`, `unified-agents.html`, migrations 019 + 020. Known follow-ups: (a) `src/database/redis.js` shared connection helper is a hygiene refactor target; (b) encryption-at-rest revisit triggered by compliance/audit/partner-contract pressure; (c) generic Connections UI when a second connector ships.
+
 ## 2026-04-30 — Plaintext OAuth tokens for `user_oauth_tokens` table
 **What:** New generic per-user OAuth token table (migration 019) stores access/refresh tokens as plaintext `TEXT`, mirroring the existing Google convention on the `users` table (migration 004).
 **Why:** No application-layer encryption infrastructure exists in the repo today. Introducing it (key management, rotation, BYTEA + IV/tag columns) is a larger lift than this scaffolding warrants and was not requested. Deferred until a concrete trigger appears (compliance, audit, partner contract).
