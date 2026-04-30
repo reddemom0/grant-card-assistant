@@ -20,9 +20,6 @@ CREATE TABLE IF NOT EXISTS mcp_dcr_clients (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS idx_mcp_dcr_clients_provider
-  ON mcp_dcr_clients(provider);
-
 -- Reuse update_user_timestamp() defined in migration 001_users_table.sql
 CREATE TRIGGER trigger_update_mcp_dcr_clients_timestamp
 BEFORE UPDATE ON mcp_dcr_clients
