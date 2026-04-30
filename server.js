@@ -62,6 +62,7 @@ import testEmailHandler from './api/test-email.js';
 
 // Authentication
 import authRouter from './src/api/auth.js';
+import granolaAuthRouter from './src/api/granola-auth.js';
 import { authenticateUser } from './src/middleware/auth.js';
 
 // Admin
@@ -429,6 +430,7 @@ app.post('/api/feedback-tagging', authenticateUser, feedbackTaggingHandler);
 
 // Authentication endpoints
 app.use('/api', authRouter);
+app.use('/api/auth/granola', granolaAuthRouter);
 
 // Admin endpoints (requires authentication + admin role)
 app.use('/api/admin', authenticateUser, adminRouter);
