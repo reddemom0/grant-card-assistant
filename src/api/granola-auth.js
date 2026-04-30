@@ -3,9 +3,14 @@
  *
  *   GET  /api/auth/granola            — start the flow (or short-circuit if already authorized)
  *   GET  /api/auth/granola/callback   — finish the flow after the user returns from the AS
+ *   GET  /api/auth/granola/status     — { connected: bool, email?: string } for the UI
  *   POST /api/auth/granola/disconnect — drop the user's stored tokens
  *
- * All three require an authenticated hub user (granted_session JWT).
+ * All four require an authenticated hub user (granted_session JWT).
+ *
+ * /status reports presence of a token row, NOT live validity against Granola's
+ * server. Invalid/expired-and-unrefreshable tokens surface during actual tool
+ * calls; the user reconnects from there.
  *
  * The MCP SDK's auth() helper does the heavy lifting: discovery of the AS
  * metadata at the .well-known endpoints, Dynamic Client Registration, PKCE
@@ -20,6 +25,7 @@ import { auth } from '@modelcontextprotocol/sdk/client/auth.js';
 import { authenticateUser } from '../middleware/auth.js';
 import { GranolaOAuthClientProvider } from './granola-oauth-provider.js';
 import { verifyAndConsumeState, clearOAuthState } from '../utils/granola-oauth-state.js';
+import { getUserOAuthTokens } from '../database/user-oauth-tokens.js';
 
 const router = Router();
 const SERVER_URL = 'https://mcp.granola.ai/mcp';
@@ -47,6 +53,17 @@ router.get('/', authenticateUser, async (req, res) => {
   } catch (err) {
     console.error('[granola-auth] init failed:', err);
     return res.status(500).send('Granola OAuth init failed');
+  }
+});
+
+router.get('/status', authenticateUser, async (req, res) => {
+  try {
+    const tokens = await getUserOAuthTokens(req.user.id, 'granola');
+    if (!tokens) return res.json({ connected: false });
+    return res.json({ connected: true, email: req.user.email });
+  } catch (err) {
+    console.error('[granola-auth] status failed:', err);
+    return res.status(500).json({ connected: false, error: 'Status check failed' });
   }
 });
 

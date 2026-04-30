@@ -749,6 +749,99 @@
             border-color: var(--primary-cyan);
             color: var(--primary-cyan);
         }
+
+        /* Granola connection toast (post-OAuth confirmation) */
+        .granola-connect-toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem 1.25rem;
+            background: var(--surface);
+            border: 1px solid var(--teal);
+            border-radius: 20px;
+            color: var(--teal);
+            font-size: 0.875rem;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 200ms ease;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+        }
+        .granola-connect-toast.visible { opacity: 1; }
+        .granola-connect-toast.error {
+            border-color: var(--coral-red);
+            color: var(--coral-red);
+        }
+
+        /* Granola connect card on Oracle welcome screen */
+        .granola-card-slot { display: contents; }
+        .granola-card {
+            margin: 2rem auto 0;
+            max-width: 520px;
+            padding: 1.25rem 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            text-align: left;
+            font-size: 0.9375rem;
+            color: var(--text-primary);
+        }
+        .granola-card.unconnected {
+            border-color: rgba(54, 202, 250, 0.25);
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.04) 0%, rgba(38, 196, 182, 0.02) 100%);
+        }
+        .granola-card-title {
+            font-weight: 600;
+            font-size: 1rem;
+            margin: 0 0 0.5rem;
+            color: var(--primary-navy);
+        }
+        body:not(.light-mode) .granola-card-title { color: var(--text-primary); }
+        .granola-card-body {
+            color: var(--text-secondary);
+            margin: 0 0 1rem;
+            line-height: 1.5;
+        }
+        .granola-card-cta {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--primary-cyan);
+            color: var(--primary-navy);
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            text-decoration: none;
+            transition: opacity 150ms ease;
+        }
+        .granola-card-cta:hover { opacity: 0.85; }
+        .granola-card.connected {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+        .granola-card-connected-text { color: var(--teal); font-weight: 600; }
+        .granola-card-connected-text small {
+            color: var(--text-secondary);
+            font-weight: 400;
+            margin-left: 0.5rem;
+        }
+        .granola-card-disconnect {
+            background: none;
+            border: none;
+            padding: 0.25rem 0.5rem;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 1rem;
+            border-radius: 6px;
+            transition: all 150ms ease;
+        }
+        .granola-card-disconnect:hover {
+            background: var(--bg);
+            color: var(--coral-red);
+        }
     </style>
 </head>
 <body>
@@ -766,6 +859,9 @@
 
     <!-- New messages indicator (for smart autoscroll) -->
     <div id="new-messages-indicator" class="new-messages-indicator" onclick="jumpToBottom()">&#8595; New messages</div>
+
+    <!-- Granola connection toast (shown briefly after OAuth callback) -->
+    <div id="granola-connect-toast" class="granola-connect-toast">&#10003; Granola connected</div>
 
     <!-- Chat Input (always visible) -->
     <div class="chat-input-container">
@@ -1006,7 +1102,12 @@
             update_hubspot_deal: 'update',
             associate_contact_with_company: 'associate',
             generate_hubspot_embed_link: 'other',
-            load_skill: 'skill'
+            load_skill: 'skill',
+            granola_query_meetings: 'meetings',
+            granola_list_meetings: 'meetings',
+            granola_get_meetings: 'meetings',
+            granola_get_meeting_transcript: 'meetings',
+            granola_list_meeting_folders: 'meetings'
         };
 
         const CATEGORY_ICONS = {
@@ -1017,6 +1118,7 @@
             knowledge: '\u{1F4DA}',
             user_lookup: '\u{1F464}',
             skill: '\u{1F9E0}',
+            meetings: '\u{1F4D3}',
             other: '\u{26A1}'
         };
 
@@ -1039,7 +1141,12 @@
             update_hubspot_deal: 'Updating deal',
             associate_contact_with_company: 'Linking contact',
             generate_hubspot_embed_link: 'Generating link',
-            load_skill: 'Loading skill'
+            load_skill: 'Loading skill',
+            granola_query_meetings: 'Searching meetings',
+            granola_list_meetings: 'Listing meetings',
+            granola_get_meetings: 'Reading meeting',
+            granola_get_meeting_transcript: 'Reading transcript',
+            granola_list_meeting_folders: 'Listing folders'
         };
 
         function createToolPill(toolName, onFadeComplete) {
@@ -1105,9 +1212,105 @@
                 renderWelcomeScreen();
             }
 
+            // Granola toast on OAuth callback redirect (?granola=connected | ?granola=error)
+            // The error variant is defensive — the current callback handler returns 500
+            // rather than redirecting with an error param. If that ever changes, the toast
+            // is ready.
+            const qs = new URLSearchParams(window.location.search);
+            const granolaParam = qs.get('granola');
+            if (granolaParam === 'connected' || granolaParam === 'error') {
+                showGranolaToast(granolaParam === 'connected'
+                    ? { message: '✓ Granola connected', error: false }
+                    : { message: '✗ Granola connection failed', error: true });
+                qs.delete('granola');
+                const newUrl = window.location.pathname + (qs.toString() ? '?' + qs.toString() : '');
+                history.replaceState({}, '', newUrl);
+            }
+
+            // For Oracle, fetch connection status and update card (fire-and-forget).
+            if (currentAgent === 'oracle') {
+                fetchGranolaStatus();
+            }
+
             setupEventListeners();
             console.log('[INIT] Initialization complete');
         }
+
+        // ===== Granola UI helpers =====
+
+        let granolaConnectionState = null; // { connected: bool, email?: string } | null = unknown/failed
+
+        function escapeHtmlSimple(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        function showGranolaToast({ message, error }) {
+            const toast = document.getElementById('granola-connect-toast');
+            if (!toast) return;
+            toast.textContent = message;
+            toast.classList.toggle('error', !!error);
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 4000);
+        }
+
+        async function fetchGranolaStatus() {
+            try {
+                const r = await fetch('/api/auth/granola/status', { credentials: 'include' });
+                if (!r.ok) throw new Error('status: ' + r.status);
+                granolaConnectionState = await r.json();
+            } catch (err) {
+                console.error('[granola] status fetch failed:', err);
+                granolaConnectionState = null;
+            }
+            updateGranolaCard();
+        }
+
+        function updateGranolaCard() {
+            const slot = document.getElementById('granola-card-slot');
+            if (!slot) return;
+            if (currentAgent !== 'oracle' || !granolaConnectionState) {
+                slot.innerHTML = '';
+                return;
+            }
+            slot.innerHTML = granolaConnectionState.connected
+                ? renderGranolaConnected(granolaConnectionState)
+                : renderGranolaUnconnected();
+        }
+
+        function renderGranolaUnconnected() {
+            return `
+                <div class="granola-card unconnected">
+                    <p class="granola-card-title">\u{1F4D3} Connect Granola</p>
+                    <p class="granola-card-body">Give Oracle access to your meeting notes so it can answer questions about your calls and pull action items.</p>
+                    <a class="granola-card-cta" href="/api/auth/granola">Connect Granola</a>
+                </div>
+            `;
+        }
+
+        function renderGranolaConnected(state) {
+            const email = state.email ? `<small>${escapeHtmlSimple(state.email)}</small>` : '';
+            return `
+                <div class="granola-card connected">
+                    <span class="granola-card-connected-text">✓ Granola connected ${email}</span>
+                    <button class="granola-card-disconnect" onclick="disconnectGranola()" title="Disconnect Granola">✕</button>
+                </div>
+            `;
+        }
+
+        window.disconnectGranola = async function() {
+            if (!window.confirm('Disconnect Granola from Oracle?')) return;
+            try {
+                const r = await fetch('/api/auth/granola/disconnect', {
+                    method: 'POST', credentials: 'include'
+                });
+                if (!r.ok) throw new Error('disconnect: ' + r.status);
+            } catch (err) {
+                console.error('[granola] disconnect failed:', err);
+            }
+            await fetchGranolaStatus();
+        };
 
         // Render welcome screen for current agent
         function renderWelcomeScreen() {
@@ -1130,10 +1333,14 @@
                         </div>
                     `).join('')}
                 </div>
+                <div id="granola-card-slot"></div>
             `;
 
             // Update page title
             document.getElementById('page-title').textContent = `${agent.name} - Granted AI`;
+
+            // Re-populate Granola card from cached state (no fetch on re-render)
+            updateGranolaCard();
         }
 
         // Switch agent
