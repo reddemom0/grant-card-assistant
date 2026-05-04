@@ -369,26 +369,13 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             }
           }
 
-          // STAGE 1 HUBSPOT CREATION: When estimated_funding is stored, create HubSpot record
-          if (input.key === 'estimated_funding' && input.value) {
-            try {
-              console.log(`📊 Estimate delivered — creating HubSpot record (Stage 1)`);
-              const { createHubSpotRecordOnEstimate } = await import('../api/lead-gen-finalization.js');
-
-              const hubspotResult = await createHubSpotRecordOnEstimate(conversationId);
-
-              if (hubspotResult.success) {
-                console.log(`✅ HubSpot record created on estimate delivery (Company ID: ${hubspotResult.companyId})`);
-              } else if (hubspotResult.alreadyExists) {
-                console.log(`ℹ️  HubSpot record already exists — skipping creation`);
-              } else {
-                console.warn(`⚠️  HubSpot creation failed: ${hubspotResult.error}`);
-              }
-            } catch (err) {
-              console.warn(`⚠️  Failed to create HubSpot record on estimate:`, err.message);
-              // Don't fail the memory_store operation if HubSpot creation fails
-            }
-          }
+          // Stage 1 HubSpot creation removed (Phase 2 / 2026-05-04). All HubSpot
+          // writes now happen in the Stage 2 path (`finalizeLeadGenConversation`,
+          // called from save_lead_data) using the Forms API. Variant B's prompt
+          // calls save_lead_data immediately after delivering the estimate, so
+          // there's no meaningful gap between memory_store('estimated_funding')
+          // and the consolidated form submission. The 5-minute inactivity-timeout
+          // cron is the safety net for sessions that error before save_lead_data.
 
           // Also store matched_programs in top-level field for finalization
           if (input.key === 'matched_programs' && input.value) {

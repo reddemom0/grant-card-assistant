@@ -1,27 +1,28 @@
 /**
  * Lead-Gen Conversation Finalization
  *
- * Two-trigger HubSpot sync:
- * - Trigger A: Contact info captured in Phase 5 (save_lead_data tool)
- * - Trigger B: Inactivity timeout (5 min, no messages) + has company_name
+ * Single trigger paths into HubSpot (since Phase 2 / 2026-05-04):
+ * - Trigger A: Contact info captured (save_lead_data tool) — primary path
+ * - Trigger B: Inactivity timeout (5 min, no messages) + has company_name — safety net
  *
- * Both triggers create Company + optional Contact + Note in HubSpot.
- * If Company already exists (from Trigger B), Trigger A updates instead of creating.
+ * Both triggers submit to HubSpot's Forms API (so submissions land in the same
+ * "Grant Calculator Oct 2025" reporting bucket as legacy form submissions),
+ * then PATCH AI-specific Contact properties, then create a Note. Direct CRM v3
+ * Contact + Company creation is NO LONGER used — HubSpot creates those records
+ * itself in response to the form submission.
  */
 
 import { query } from '../database/connection.js';
 import {
   determineServiceTier,
-  loadEnrichedSessionData
+  loadEnrichedSessionData,
+  computeBestFitProduct
 } from './lead-gen-helpers.js';
 import {
-  createHubSpotCompany,
-  createHubSpotContact,
-  updateHubSpotCompany,
-  updateHubSpotContact,
-  associateContactWithCompany,
-  getContactByEmail
-} from '../tools/hubspot.js';
+  submitLeadGenForm,
+  findContactByEmailWithRetry,
+  patchAIContactProperties
+} from './hubspot-form-submission.js';
 import { sendEmail, wrapInBrandedTemplate } from '../email/sendEmail.js';
 import { notifyTeamOfLead } from '../services/lead-notification.js';
 
@@ -44,67 +45,6 @@ function convertMarkdownToHtml(text) {
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     // Links: [text](url) → <a href="url">text</a>
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
-}
-
-/**
- * Parse revenue string to number
- * "$800K" → 800000, "$1.5M" → 1500000, "$500K-$1M" → 500000 (lower bound)
- */
-function parseRevenue(revenueStr) {
-  if (!revenueStr) return null;
-
-  let s = String(revenueStr).replace(/[$,\s]/g, '').toUpperCase();
-
-  // Handle ranges — take lower bound
-  const rangeParts = s.split(/[-–]/);
-  s = rangeParts[0].trim();
-
-  const multipliers = { K: 1_000, M: 1_000_000, B: 1_000_000_000 };
-  for (const [suffix, mult] of Object.entries(multipliers)) {
-    if (s.endsWith(suffix)) {
-      const num = parseFloat(s.slice(0, -1));
-      return isNaN(num) ? null : Math.round(num * mult);
-    }
-  }
-
-  const num = parseFloat(s);
-  return isNaN(num) ? null : Math.round(num);
-}
-
-/**
- * Parse employee count from string
- * "15-20 employees" → 15, "about 30" → 30
- */
-function parseEmployeeCount(str) {
-  if (!str) return null;
-  const match = String(str).match(/[\d,]+/);
-  if (!match) return null;
-  const num = parseInt(match[0].replace(/,/g, ''), 10);
-  return isNaN(num) ? null : num;
-}
-
-/**
- * Search for existing HubSpot company by name
- */
-async function findCompanyByName(name, hubspotClient) {
-  try {
-    const response = await hubspotClient.post('/crm/v3/objects/companies/search', {
-      filterGroups: [{
-        filters: [{
-          propertyName: 'name',
-          operator: 'EQ',
-          value: name
-        }]
-      }],
-      properties: ['name', 'id'],
-      limit: 1
-    });
-    const results = response.data.results || [];
-    return results.length > 0 ? results[0] : null;
-  } catch (err) {
-    console.warn('⚠️  HubSpot company search failed:', err.response?.data?.message || err.message);
-    return null;
-  }
 }
 
 /**
@@ -1105,286 +1045,35 @@ export async function sendLeadGenEmail(sessionId) {
 // MAIN FINALIZATION FUNCTION
 // ============================================================================
 
+// REMOVED Stage 1 entry — `createHubSpotRecordOnEstimate(sessionId)`.
+// Phase 2 / 2026-05-04: All HubSpot writes consolidated into the Stage 2 path
+// (`finalizeLeadGenConversation`). Stage 1 used to fire from
+// `src/tools/executor.js` when the agent called memory_store('estimated_funding'),
+// creating a Contact + Company via direct CRM v3 calls. With the Forms API
+// rewrite, doing the same submission twice would produce duplicate
+// form-submission events in HubSpot reporting (defeating the consolidation
+// goal). Variant B's prompt calls save_lead_data immediately after estimate
+// delivery, so the early-record signal Stage 1 used to provide is preserved by
+// Stage 2 firing within the same agent turn. The 5-minute inactivity-timeout
+// cron (server.js) is the safety net for any session that never reaches
+// save_lead_data — it calls finalizeLeadGenConversation('inactivity_timeout')
+// with whatever data is in `prospect_data` at that point.
+//
 /**
- * STAGE 1: Create HubSpot record when estimate is delivered
- *
- * Called when agent stores estimated_funding in memory_store.
- * Creates Company + Note with all available data at that point.
- *
- * @param {string} sessionId - Session ID
- * @returns {Object} Creation result { success, companyId, contactId, alreadyExists }
- */
-export async function createHubSpotRecordOnEstimate(sessionId) {
-  console.log(`\n📊 STAGE 1: Creating HubSpot record on estimate delivery for ${sessionId}`);
-
-  // -------------------------------------------------------------------------
-  // 1. Load session data
-  // -------------------------------------------------------------------------
-
-  const sessionResult = await query(
-    `SELECT *, prospect_data->>'hubspot_company_id' as hubspot_company_id
-     FROM lead_gen_conversations
-     WHERE session_id = $1`,
-    [sessionId]
-  );
-
-  if (sessionResult.rows.length === 0) {
-    return { success: false, error: 'Session not found' };
-  }
-
-  const session = sessionResult.rows[0];
-  const prospectData = session.prospect_data || {};
-
-  // Check if HubSpot record already exists
-  if (prospectData.hubspot_company_id) {
-    console.log(`ℹ️  HubSpot record already exists (Company ID: ${prospectData.hubspot_company_id})`);
-    return { success: false, alreadyExists: true, companyId: prospectData.hubspot_company_id };
-  }
-
-  // Require company_name for creation
-  if (!prospectData.company_name && !session.company_name) {
-    console.log(`⚠️  No company_name available — skipping HubSpot creation`);
-    return { success: false, error: 'No company_name captured' };
-  }
-
-  const companyName = prospectData.company_name || session.company_name;
-
-  // -------------------------------------------------------------------------
-  // 2. Check HubSpot token
-  // -------------------------------------------------------------------------
-
-  if (!HUBSPOT_TOKEN) {
-    console.warn('⚠️  HUBSPOT_ACCESS_TOKEN not set — skipping HubSpot creation');
-    return { success: false, error: 'No HubSpot token' };
-  }
-
-  // -------------------------------------------------------------------------
-  // 3. Create HubSpot client
-  // -------------------------------------------------------------------------
-
-  const axios = (await import('axios')).default;
-  const axiosRetry = (await import('axios-retry')).default;
-
-  const hubspotClient = axios.create({
-    baseURL: 'https://api.hubapi.com',
-    headers: {
-      Authorization: `Bearer ${HUBSPOT_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    timeout: 10000
-  });
-
-  axiosRetry(hubspotClient, {
-    retries: 3,
-    retryDelay: axiosRetry.exponentialDelay,
-    retryCondition: (err) =>
-      axiosRetry.isNetworkOrIdempotentRequestError(err) ||
-      err.response?.status === 429
-  });
-
-  let companyId = null;
-  let contactId = null;
-
-  // -------------------------------------------------------------------------
-  // 4. Find or create Company
-  // -------------------------------------------------------------------------
-
-  try {
-    const existing = await findCompanyByName(companyName, hubspotClient);
-
-    if (existing) {
-      companyId = existing.id;
-      console.log(`✓ Found existing company: ${companyName} (ID: ${companyId})`);
-
-      // Update company fields
-      const updates = {};
-      const rev = parseRevenue(prospectData.revenue);
-      if (rev !== null) updates.annualrevenue = rev;
-
-      const emp = parseEmployeeCount(prospectData.employee_count);
-      if (emp !== null) updates.numberofemployees = emp;
-
-      if (prospectData.province) updates.state = prospectData.province;
-      if (prospectData.company_description) updates.description = prospectData.company_description;
-      updates.country = 'Canada';
-
-      if (Object.keys(updates).length > 0) {
-        await updateHubSpotCompany(companyId, updates);
-        console.log(`✅ Updated company ${companyId}:`, Object.keys(updates).join(', '));
-      }
-    } else {
-      // Create new company
-      const companyData = {
-        name: companyName,
-        lifecyclestage: 'lead',
-        country: 'Canada',
-        website: session.company_website || prospectData.company_website || null
-      };
-
-      if (prospectData.province) companyData.state = prospectData.province;
-
-      const rev = parseRevenue(prospectData.revenue);
-      if (rev !== null) companyData.annualrevenue = rev;
-
-      const emp = parseEmployeeCount(prospectData.employee_count);
-      if (emp !== null) companyData.numberofemployees = emp;
-
-      if (prospectData.company_description) companyData.description = prospectData.company_description;
-
-      const created = await createHubSpotCompany(companyData);
-
-      if (created.success) {
-        companyId = created.company.id;
-        console.log(`✅ Company created: ${companyName} (ID: ${companyId})`);
-      } else {
-        console.warn('⚠️  Company creation failed:', created.error);
-        return { success: false, error: created.error };
-      }
-    }
-  } catch (err) {
-    console.warn('⚠️  Company step failed:', err.message);
-    return { success: false, error: err.message };
-  }
-
-  // -------------------------------------------------------------------------
-  // 5. Create Contact (if email available)
-  // -------------------------------------------------------------------------
-
-  if (session.contact_email) {
-    try {
-      const existingContact = await getContactByEmail(session.contact_email);
-
-      if (existingContact.success && existingContact.contact) {
-        contactId = existingContact.contact.id;
-        console.log(`✓ Found existing contact: ${session.contact_email} (ID: ${contactId})`);
-
-        // Update hs_lead_status if we have a lead score
-        if (prospectData.lead_score) {
-          const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
-          const hsLeadStatus = leadStatusMap[prospectData.lead_score];
-          if (hsLeadStatus) {
-            await updateHubSpotContact(contactId, { hs_lead_status: hsLeadStatus });
-            console.log(`✅ Updated hs_lead_status → ${hsLeadStatus}`);
-          }
-        }
-      } else {
-        // Create new contact
-        const nameParts = (session.contact_name || '').trim().split(/\s+/);
-        const firstname = nameParts[0] || 'Unknown';
-        const lastname = nameParts.slice(1).join(' ') || undefined;
-
-        const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
-        const hsLeadStatus = leadStatusMap[prospectData.lead_score] || 'NEW';
-
-        const created = await createHubSpotContact({
-          email: session.contact_email,
-          firstname,
-          lastname,
-          state: prospectData.province || undefined,
-          lifecyclestage: 'lead',
-          hs_lead_status: hsLeadStatus
-        });
-
-        if (created.success) {
-          contactId = created.contact.id;
-          console.log(`✅ Contact created: ${session.contact_email} (ID: ${contactId})`);
-        } else {
-          console.warn('⚠️  Contact creation failed:', created.error);
-        }
-      }
-
-      // Associate contact with company
-      if (contactId && companyId) {
-        try {
-          await associateContactWithCompany(contactId, companyId);
-          console.log(`🔗 Contact ${contactId} associated with company ${companyId}`);
-        } catch (err) {
-          console.warn('⚠️  Association failed:', err.message);
-        }
-      }
-    } catch (err) {
-      console.warn('⚠️  Contact step failed:', err.message);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // 6. Load enriched data and create comprehensive Note
-  // -------------------------------------------------------------------------
-
-  let noteId = null;
-
-  if (companyId || contactId) {
-    try {
-      // Load enriched session data (session + memory_store + company_background)
-      const enrichedSession = await loadEnrichedSessionData(sessionId);
-
-      // 🔍 DEBUG: Log Stage 1 data
-      console.log('\n🔍 DEBUG (STAGE 1): EnrichedSession keys:', Object.keys(enrichedSession).join(', '));
-      const pd1 = enrichedSession.prospect_data || {};
-      console.log('🔍 DEBUG (STAGE 1): prospect_data keys:', Object.keys(pd1).join(', '));
-      console.log('🔍 DEBUG (STAGE 1): matched_programs (top-level):', JSON.stringify(enrichedSession.matched_programs)?.substring(0, 100));
-      console.log('🔍 DEBUG (STAGE 1): timeline (prospect_data):', pd1.timeline);
-      console.log('🔍 DEBUG (STAGE 1): prospect_summary (prospect_data):', pd1.prospect_summary);
-
-      // Determine service tier from funding estimate
-      const serviceTier = determineServiceTier(enrichedSession.estimated_funding);
-
-      // Build comprehensive note with ALL data sources
-      const noteBody = buildNoteBodyComprehensive(enrichedSession, 'estimate_delivered', serviceTier);
-
-      // 🔍 DEBUG: Log Stage 1 note body preview
-      console.log('\n🔍 DEBUG (STAGE 1): Note body (first 500 chars):');
-      console.log(noteBody.substring(0, 500));
-      console.log('...\n');
-
-      // Create HubSpot note
-      noteId = await createHubSpotNote(noteBody, contactId, companyId, hubspotClient);
-      console.log(`✅ Stage 1 note created (ID: ${noteId})`);
-    } catch (err) {
-      console.warn('⚠️  Note creation failed:', err.message);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // 7. Store HubSpot IDs in database
-  // -------------------------------------------------------------------------
-
-  try {
-    await query(
-      `UPDATE lead_gen_conversations
-       SET prospect_data = prospect_data || $1::jsonb,
-           updated_at = NOW()
-       WHERE session_id = $2`,
-      [JSON.stringify({
-        hubspot_company_id: companyId,
-        hubspot_contact_id: contactId,
-        hubspot_note_id: noteId,
-        hubspot_created_at: new Date().toISOString()
-      }), sessionId]
-    );
-
-    console.log(`✅ Stored HubSpot IDs in database (Company: ${companyId}, Contact: ${contactId}, Note: ${noteId})`);
-  } catch (err) {
-    console.warn(`⚠️  Failed to store HubSpot IDs:`, err.message);
-  }
-
-  return {
-    success: true,
-    companyId,
-    contactId,
-    noteId,
-    message: 'HubSpot record created on estimate delivery'
-  };
-}
-
-/**
- * Finalize a lead-gen conversation by creating HubSpot records
+ * Finalize a lead-gen conversation by submitting to HubSpot Forms API and
+ * creating an associated Note. Replaces the older direct-CRM Contact + Company
+ * creation path so AI submissions land in the same reporting bucket as legacy
+ * "Grant Calculator Oct 2025" form submissions.
  *
  * @param {string} sessionId - Session ID to finalize
  * @param {string} trigger - 'contact_captured' or 'inactivity_timeout'
+ * @param {Object} [agentInput] - Optional: full input object the agent passed to
+ *   save_lead_data. Carries lead_score, prior_grant_experience, prospect_summary,
+ *   email_summary_body, etc. When called from the inactivity-timeout cron, this
+ *   is null and we fall back to session-only data.
  * @returns {Object} Finalization result
  */
-export async function finalizeLeadGenConversation(sessionId, trigger) {
+export async function finalizeLeadGenConversation(sessionId, trigger, agentInput = null) {
   console.log(`🎯 Finalizing lead-gen session ${sessionId} (trigger: ${trigger})`);
 
   // -------------------------------------------------------------------------
@@ -1492,193 +1181,121 @@ export async function finalizeLeadGenConversation(sessionId, trigger) {
       err.response?.status === 429
   });
 
-  const results = { company: null, contact: null, note: null };
+  const results = { form: null, contact: null, company: null, note: null };
 
   // -------------------------------------------------------------------------
-  // 4. Check if HubSpot record was already created (Stage 1)
+  // 4. Submit to HubSpot Forms API
+  //    Replaces direct CRM Contact + Company creation. The form submission
+  //    causes HubSpot to create/upsert the Contact (matched by email) and the
+  //    associated Company (matched by email domain), AND records a form-
+  //    submission event so the lead lands in the "Grant Calculator Oct 2025"
+  //    reporting bucket alongside legacy form submissions.
   // -------------------------------------------------------------------------
 
-  let companyId = prospectData.hubspot_company_id || null;
-  let contactId = prospectData.hubspot_contact_id || null;
-
-  if (companyId) {
-    console.log(`✓ STAGE 2: HubSpot record already exists (Company ID: ${companyId}) — will update note only`);
-    results.company = { action: 'already_exists', id: companyId };
-
-    // Verify company still exists in HubSpot
-    try {
-      const existing = await findCompanyByName(prospectData.company_name, hubspotClient);
-      if (existing && existing.id === companyId) {
-        console.log(`✓ Confirmed company ${companyId} exists in HubSpot`);
-
-        // Update company with any new information from save_lead_data
-        const updates = {};
-        const rev = parseRevenue(prospectData.revenue);
-        if (rev !== null) updates.annualrevenue = rev;
-
-        const emp = parseEmployeeCount(prospectData.employee_count);
-        if (emp !== null) updates.numberofemployees = emp;
-
-        if (prospectData.province) updates.state = prospectData.province;
-        if (prospectData.company_description) updates.description = prospectData.company_description;
-
-        if (Object.keys(updates).length > 0) {
-          await updateHubSpotCompany(companyId, updates);
-          console.log(`✅ Updated company ${companyId} with new information`);
-        }
-      } else {
-        console.warn(`⚠️  Company ${companyId} not found in HubSpot — will create new record`);
-        companyId = null; // Force re-creation
-      }
-    } catch (err) {
-      console.warn(`⚠️  Error verifying company:`, err.message);
-    }
+  // Load enriched session BEFORE the form submit so the field-builder has
+  // memory_store data (industry, revenue_range, etc. — they live in
+  // prospect_data after lead-gen-init.js stores them).
+  let enrichedSession;
+  try {
+    enrichedSession = await loadEnrichedSessionData(sessionId);
+  } catch (err) {
+    console.warn(`⚠️  Could not load enriched session, falling back to base session: ${err.message}`);
+    enrichedSession = { ...session, prospect_data: prospectData };
   }
 
+  const formResult = await submitLeadGenForm(enrichedSession, agentInput);
+  results.form = formResult.success
+    ? { action: 'submitted', fieldCount: formResult.fieldCount }
+    : { action: 'failed', error: formResult.error };
+
   // -------------------------------------------------------------------------
-  // 5. Find or create Company (if not already created in Stage 1)
+  // 5. Find Contact ID (search by email + retry for eventual-consistency window)
+  //    Needed for the AI-property PATCH and the Note association.
   // -------------------------------------------------------------------------
 
-  if (!companyId) {
-    try {
-      // Check if company already exists
-      const existing = await findCompanyByName(prospectData.company_name, hubspotClient);
+  let contactId = null;
 
-    if (existing) {
-      companyId = existing.id;
-      console.log(`✓ Found existing company: ${prospectData.company_name} (ID: ${companyId})`);
-
-      // Update company fields
-      const updates = {};
-      const rev = parseRevenue(prospectData.revenue);
-      if (rev !== null) updates.annualrevenue = rev;
-
-      const emp = parseEmployeeCount(prospectData.employee_count);
-      if (emp !== null) updates.numberofemployees = emp;
-
-      if (prospectData.province) updates.state = prospectData.province;
-      if (prospectData.company_description) updates.description = prospectData.company_description;
-      updates.country = 'Canada';
-
-      if (Object.keys(updates).length > 0) {
-        await updateHubSpotCompany(companyId, updates);
-        console.log(`✅ Updated company ${companyId}:`, Object.keys(updates).join(', '));
-      }
-
-      results.company = { action: 'updated', id: companyId };
+  if (session.contact_email) {
+    const findResult = await findContactByEmailWithRetry(session.contact_email, hubspotClient);
+    if (findResult.success) {
+      contactId = findResult.contact.id;
+      results.contact = { action: 'found', id: contactId };
+      console.log(`✓ Resolved contact ID ${contactId} for ${session.contact_email}`);
     } else {
-      // Create new company
-      const companyData = {
-        name: prospectData.company_name,
-        lifecyclestage: 'lead',
-        country: 'Canada',
-        website: session.company_website || prospectData.company_website || null
-      };
-
-      if (prospectData.province) companyData.state = prospectData.province;
-
-      const rev = parseRevenue(prospectData.revenue);
-      if (rev !== null) companyData.annualrevenue = rev;
-
-      const emp = parseEmployeeCount(prospectData.employee_count);
-      if (emp !== null) companyData.numberofemployees = emp;
-
-      if (prospectData.company_description) companyData.description = prospectData.company_description;
-
-      const created = await createHubSpotCompany(companyData);
-
-      if (created.success) {
-        companyId = created.company.id;
-        console.log(`✅ Company created: ${prospectData.company_name} (ID: ${companyId})`);
-        results.company = { action: 'created', id: companyId };
-      } else {
-        console.warn('⚠️  Company creation failed:', created.error);
-        results.company = { action: 'failed', error: created.error };
-      }
-      }
-    } catch (err) {
-      console.warn('⚠️  Company step failed:', err.message);
-      results.company = { action: 'error', error: err.message };
+      results.contact = { action: 'failed', error: findResult.error };
+      console.warn(`⚠️  Could not resolve contact ID by email after retries: ${findResult.error}`);
     }
   }
 
   // -------------------------------------------------------------------------
-  // 6. Create or update Contact (if email available)
+  // 6. PATCH AI-specific Contact properties
+  //    submission_source and email_summary_body aren't part of the form's
+  //    field schema; best_fit_product is also re-written defensively.
   // -------------------------------------------------------------------------
 
-  if (session.contact_email && !contactId) {
-    try {
-      const existingContact = await getContactByEmail(session.contact_email);
+  if (contactId) {
+    const bestFitProduct  = computeBestFitProduct(enrichedSession, agentInput);
+    const emailSummaryBody = (agentInput && agentInput.email_summary_body) ||
+                             enrichedSession.prospect_data?.email_summary_body ||
+                             null;
 
-      if (existingContact.success && existingContact.contact) {
-        contactId = existingContact.contact.id;
-        console.log(`✓ Found existing contact: ${session.contact_email} (ID: ${contactId})`);
+    const patchResult = await patchAIContactProperties(
+      contactId,
+      { bestFitProduct, emailSummaryBody },
+      hubspotClient
+    );
 
-        // Update hs_lead_status
-        if (prospectData.lead_score) {
-          const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
-          const hsLeadStatus = leadStatusMap[prospectData.lead_score];
-          if (hsLeadStatus) {
-            await updateHubSpotContact(contactId, { hs_lead_status: hsLeadStatus });
-            console.log(`✅ Updated hs_lead_status → ${hsLeadStatus} for contact ${contactId}`);
-          }
-        }
+    if (patchResult.success) {
+      results.contact.aiPropertiesPatched = true;
+      results.contact.bestFitProduct      = bestFitProduct;
+    } else {
+      results.contact.aiPropertyPatchError = patchResult.error;
+      console.warn(`⚠️  AI-property PATCH failed (non-blocking): ${patchResult.error}`);
+    }
+  }
 
-        results.contact = { action: 'found', id: contactId };
-      } else {
-        // Create new contact
-        const nameParts = (session.contact_name || '').trim().split(/\s+/);
-        const firstname = nameParts[0] || 'Unknown';
-        const lastname = nameParts.slice(1).join(' ') || undefined;
+  // -------------------------------------------------------------------------
+  // 7. Resolve Company ID (for Note association)
+  //    HubSpot auto-associates a Company on form submission via the email
+  //    domain. We look up the contact's first associated company to attach
+  //    the Note to both records, matching the legacy behavior.
+  // -------------------------------------------------------------------------
 
-        const leadStatusMap = { hot: 'NEW', warm: 'OPEN', cool: 'UNQUALIFIED' };
-        const hsLeadStatus = leadStatusMap[prospectData.lead_score] || 'NEW';
+  let companyId = null;
 
-        const created = await createHubSpotContact({
-          email: session.contact_email,
-          firstname,
-          lastname,
-          state: prospectData.province || undefined,
-          lifecyclestage: 'lead',
-          hs_lead_status: hsLeadStatus
+  if (contactId) {
+    if (process.env.LEAD_GEN_TEST_MODE === 'true') {
+      // Match the test-mode pattern used elsewhere
+      companyId = 'TEST_COMPANY_' + Date.now();
+      results.company = { action: 'test_mode_stub', id: companyId };
+    } else {
+      try {
+        const assocRes = await hubspotClient.get(`/crm/v3/objects/contacts/${contactId}`, {
+          params: { associations: 'companies' }
         });
-
-        if (created.success) {
-          contactId = created.contact.id;
-          console.log(`✅ Contact created: ${session.contact_email} (ID: ${contactId})`);
-          results.contact = { action: 'created', id: contactId };
+        const companies = assocRes.data?.associations?.companies?.results || [];
+        if (companies.length > 0) {
+          companyId = companies[0].id;
+          results.company = { action: 'auto_associated', id: companyId };
+          console.log(`✓ Found auto-associated company ${companyId} for contact ${contactId}`);
         } else {
-          console.warn('⚠️  Contact creation failed:', created.error);
-          results.contact = { action: 'failed', error: created.error };
+          results.company = { action: 'none' };
+          console.log(`ℹ️  Contact ${contactId} has no associated company yet — note will attach to contact only`);
         }
+      } catch (err) {
+        console.warn(`⚠️  Could not fetch contact's associated company: ${err.message}`);
+        results.company = { action: 'lookup_failed', error: err.message };
       }
-
-      // Associate contact with company
-      if (contactId && companyId) {
-        try {
-          await associateContactWithCompany(contactId, companyId);
-          console.log(`🔗 Contact ${contactId} associated with company ${companyId}`);
-        } catch (err) {
-          console.warn('⚠️  Association failed:', err.message);
-        }
-      }
-    } catch (err) {
-      console.warn('⚠️  Contact step failed:', err.message);
-      results.contact = { action: 'error', error: err.message };
     }
   }
 
   // -------------------------------------------------------------------------
-  // 6. Update or Create Comprehensive Note
+  // 8. Update or Create Comprehensive Note
+  //    Reuses the enrichedSession already loaded for the form-submit step.
   // -------------------------------------------------------------------------
-
-  let enrichedSession = null;
 
   if (companyId || contactId) {
     try {
-      // Load enriched session data (session + memory_store + company_background)
-      enrichedSession = await loadEnrichedSessionData(sessionId);
-
       // 🔍 DEBUG: Log enriched session structure
       console.log('\n🔍 DEBUG: EnrichedSession keys:', Object.keys(enrichedSession).join(', '));
       console.log('🔍 DEBUG: prospect_data keys:', Object.keys(enrichedSession.prospect_data || {}).join(', '));

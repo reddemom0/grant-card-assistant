@@ -112,3 +112,53 @@ export function parseFundingEstimate(fundingStr) {
 
   return parseInt(match[1].replace(/,/g, ''), 10);
 }
+
+/**
+ * Compute best_fit_product (the AI's product recommendation) from session +
+ * agent input. Used by the HubSpot form submission and post-submission PATCH.
+ *
+ * Order of precedence:
+ *   1. industry === "Charity/Non-Profit" → "Nonprofit" (overrides everything)
+ *   2. service_tier === "not_a_fit" OR $0/null estimate → "Not a Fit"
+ *   3. revenue $5M+ AND estimate ≥ $25K → "Granted Pro"
+ *   4. tier ladder by 12-month estimate:
+ *        ≥ $30K → "Granted Pro"
+ *        $15K-$29K → "Granted Starter"
+ *        < $15K → "Get Granted"
+ *
+ * "Waitlist" is intentionally NOT a possible output — AI never writes it.
+ *
+ * @param {Object} sessionData - Enriched session (from loadEnrichedSessionData)
+ * @param {Object} [agentInput] - The full input object passed to save_lead_data
+ * @returns {'Granted Pro'|'Granted Starter'|'Get Granted'|'Nonprofit'|'Not a Fit'}
+ */
+export function computeBestFitProduct(sessionData, agentInput = null) {
+  const pd = sessionData?.prospect_data || {};
+  const input = agentInput || {};
+
+  // 1. Non-profit override — wins over funding-tier logic
+  const industry = pd.industry || input.industry || null;
+  if (industry === 'Charity/Non-Profit') return 'Nonprofit';
+
+  // 2. Not a Fit signals
+  const serviceTier = pd.service_tier || sessionData?.service_tier || null;
+  if (serviceTier === 'not_a_fit') return 'Not a Fit';
+
+  const estimate = sessionData?.estimated_funding || input.estimated_funding || null;
+  if (!estimate) return 'Not a Fit';
+  if (/\$?0K[\s\-–]+\$?0K/.test(estimate)) return 'Not a Fit';
+
+  const fundingNum = parseFundingEstimate(estimate);
+  if (fundingNum === 0) return 'Not a Fit';
+
+  // 3. Pro override — $5M+ revenue cohort with non-trivial estimate
+  const revenueRange = pd.revenue_range || pd.revenue || input.revenue || null;
+  if (revenueRange === '$5M+' && fundingNum !== null && fundingNum >= 25) {
+    return 'Granted Pro';
+  }
+
+  // 4. Tier ladder
+  if (fundingNum !== null && fundingNum >= 30) return 'Granted Pro';
+  if (fundingNum !== null && fundingNum >= 15) return 'Granted Starter';
+  return 'Get Granted';
+}
