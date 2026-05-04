@@ -6,6 +6,29 @@
 (function() {
     'use strict';
 
+    // Single source of truth for agents shown in the hub UI.
+    // Used to render history filter buttons, map URL slug ↔ backend agent_type,
+    // and look up display names. When adding a new agent, only add it here.
+    // `inHistoryFilter: false` keeps an agent out of the filter bar but still
+    // resolves its display name when its conversations show up under "All".
+    const AGENTS_REGISTRY = [
+        { urlSlug: 'oracle',               backendType: 'internal-oracle',       displayName: 'Team Oracle',           filterLabel: 'Oracle',     inHistoryFilter: true  },
+        { urlSlug: 'grant-cards',          backendType: 'grant-card-generator',  displayName: 'Grant Cards',           filterLabel: 'Grant Cards', inHistoryFilter: true  },
+        { urlSlug: 'canexport-claims',     backendType: 'canexport-claims',      displayName: 'Claims Auditor',        filterLabel: 'Claims',     inHistoryFilter: true  },
+        { urlSlug: 'etg-writer',           backendType: 'etg-writer',            displayName: 'ETG Business Case',     filterLabel: 'ETG',        inHistoryFilter: true  },
+        { urlSlug: 'bcafe-writer',         backendType: 'bcafe-writer',          displayName: 'BCAFE Applications',    filterLabel: 'BCAFE',      inHistoryFilter: true  },
+        { urlSlug: 'buybc-writer',         backendType: 'buybc-writer',          displayName: 'Buy BC Partnership',    filterLabel: 'Buy BC',     inHistoryFilter: true  },
+        { urlSlug: 'canexport-writer',     backendType: 'canexport-writer',      displayName: 'CanExport Applications', filterLabel: 'CanExport', inHistoryFilter: true  },
+        { urlSlug: 'readiness-strategist', backendType: 'readiness-strategist',  displayName: 'Grant Readiness',       filterLabel: 'Readiness',  inHistoryFilter: true  },
+        { urlSlug: 'getgranted-ai',        backendType: 'getgranted-ai',         displayName: 'GetGrantedAI',          filterLabel: 'GetGrantedAI', inHistoryFilter: true  },
+    ];
+    const REGISTRY_BY_BACKEND = Object.fromEntries(AGENTS_REGISTRY.map(a => [a.backendType, a]));
+    const REGISTRY_BY_SLUG = Object.fromEntries(AGENTS_REGISTRY.map(a => [a.urlSlug, a]));
+    // Expose for unified-agents.html and other pages so they can stay in sync.
+    window.AGENTS_REGISTRY = AGENTS_REGISTRY;
+    window.getAgentByBackendType = (t) => REGISTRY_BY_BACKEND[t] || null;
+    window.getAgentByUrlSlug = (s) => REGISTRY_BY_SLUG[s] || null;
+
     // Sidebar HTML Template
     const sidebarHTML = `
         <aside class="sidebar">
@@ -116,11 +139,24 @@
             </nav>
 
             <div class="sidebar-footer">
-                <div class="user-profile" onclick="toggleUserMenu()">
-                    <img class="user-avatar" id="shared-user-avatar" src="" alt="">
-                    <div class="user-info">
-                        <div class="user-name" id="shared-user-name">Loading...</div>
-                        <div class="user-role">Pro</div>
+                <div class="user-profile-wrapper" style="position: relative;">
+                    <div class="user-profile" onclick="toggleUserMenu(event)">
+                        <img class="user-avatar" id="shared-user-avatar" src="" alt="">
+                        <div class="user-info">
+                            <div class="user-name" id="shared-user-name">Loading...</div>
+                            <div class="user-role">Pro</div>
+                        </div>
+                        <svg class="user-menu-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width: 14px; height: 14px; color: var(--text-tertiary); flex-shrink: 0;">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                        </svg>
+                    </div>
+                    <div id="user-menu-dropdown" class="user-menu-dropdown" style="display: none; position: absolute; bottom: calc(100% + 4px); left: 0.75rem; right: 0.75rem; background: var(--surface, #fff); border: 1px solid var(--border, #e5e5e5); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); padding: 0.25rem; z-index: 1000;">
+                        <button type="button" class="user-menu-item" onclick="logout()" style="display: flex; align-items: center; gap: 0.625rem; width: 100%; padding: 0.625rem 0.75rem; background: none; border: none; border-radius: 6px; color: var(--text-primary, #111); font-size: 0.875rem; text-align: left; cursor: pointer;">
+                            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
+                            </svg>
+                            <span>Sign out</span>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -165,12 +201,10 @@
                     </button>
                 </div>
                 <div class="history-modal-filters">
-                    <button class="history-filter-btn active" onclick="filterHistory('all')">All</button>
-                    <button class="history-filter-btn" onclick="filterHistory('internal-oracle')">Oracle</button>
-                    <button class="history-filter-btn" onclick="filterHistory('grant-card-generator')">Grant Cards</button>
-                    <button class="history-filter-btn" onclick="filterHistory('canexport-claims')">Claims</button>
-                    <button class="history-filter-btn" onclick="filterHistory('etg-writer')">ETG</button>
-                    <button class="history-filter-btn" onclick="filterHistory('bcafe-writer')">BCAFE</button>
+                    <button class="history-filter-btn active" onclick="filterHistory('all', event)">All</button>
+                    ${AGENTS_REGISTRY.filter(a => a.inHistoryFilter).map(a =>
+                        `<button class="history-filter-btn" onclick="filterHistory('${a.backendType}', event)">${a.filterLabel}</button>`
+                    ).join('')}
                 </div>
                 <div id="history-conversations" class="history-conversations">
                     <div class="history-loading">
@@ -348,14 +382,15 @@
         }
     }
 
-    window.filterHistory = function(agentType) {
+    window.filterHistory = function(agentType, evt) {
         currentFilter = agentType;
 
         // Update active filter button
         document.querySelectorAll('.history-filter-btn').forEach(btn => {
             btn.classList.remove('active');
         });
-        event.target.classList.add('active');
+        const target = (evt && evt.target) || (typeof event !== 'undefined' && event.target);
+        if (target) target.classList.add('active');
 
         renderConversations();
     };
@@ -415,37 +450,19 @@
     }
 
     window.loadHistoryConversation = function(conversationId, agentType) {
-        // Map backend agent type to URL-friendly name
-        const urlAgentMap = {
-            'internal-oracle': 'oracle',
-            'grant-card-generator': 'grant-cards',
-            'canexport-claims': 'canexport-claims',
-            'etg-writer': 'etg-writer',
-            'bcafe-writer': 'bcafe-writer',
-            'buybc-writer': 'buybc-writer',
-            'canexport-writer': 'canexport-writer',
-            'readiness-strategist': 'readiness-strategist'
-        };
-
-        const urlAgent = urlAgentMap[agentType] || agentType;
-
-        // Close modal and navigate
+        const entry = REGISTRY_BY_BACKEND[agentType];
+        if (!entry) {
+            console.warn('[HISTORY] Unknown agent type, cannot resume conversation:', agentType);
+            alert(`Cannot open this conversation — unknown agent type "${agentType}". This usually means the agent has been renamed or removed.`);
+            return;
+        }
         closeHistory();
-        window.location.href = `/${urlAgent}/chat/${conversationId}`;
+        window.location.href = `/${entry.urlSlug}/chat/${conversationId}`;
     };
 
     function getAgentDisplayName(agentType) {
-        const names = {
-            'internal-oracle': 'Team Oracle',
-            'grant-card-generator': 'Grant Cards',
-            'canexport-claims': 'Claims Auditor',
-            'etg-writer': 'ETG Business Case',
-            'bcafe-writer': 'BCAFE Applications',
-            'buybc-writer': 'Buy BC Partnership',
-            'canexport-writer': 'CanExport Applications',
-            'readiness-strategist': 'Grant Readiness'
-        };
-        return names[agentType] || agentType;
+        const entry = REGISTRY_BY_BACKEND[agentType];
+        return entry ? entry.displayName : agentType;
     }
 
     function formatTimeAgo(timestamp) {
@@ -461,8 +478,37 @@
         return date.toLocaleDateString();
     }
 
-    window.toggleUserMenu = function() {
-        console.log('User menu clicked');
+    window.toggleUserMenu = function(evt) {
+        if (evt) evt.stopPropagation();
+        const dropdown = document.getElementById('user-menu-dropdown');
+        if (!dropdown) return;
+        const isOpen = dropdown.style.display !== 'none';
+        dropdown.style.display = isOpen ? 'none' : 'block';
+        if (!isOpen) {
+            // Close on outside click — registered after this tick so the opening click doesn't immediately close it.
+            setTimeout(() => {
+                document.addEventListener('click', closeUserMenuOnce, { once: true });
+            }, 0);
+        }
+    };
+
+    function closeUserMenuOnce(evt) {
+        const dropdown = document.getElementById('user-menu-dropdown');
+        const wrapper = dropdown && dropdown.closest('.user-profile-wrapper');
+        if (dropdown && wrapper && !wrapper.contains(evt.target)) {
+            dropdown.style.display = 'none';
+        }
+    }
+
+    window.logout = async function() {
+        try {
+            await fetch('/api/logout', { method: 'POST', credentials: 'include' });
+        } catch (e) {
+            console.error('[LOGOUT] Request failed:', e);
+        }
+        // Best-effort client-side cookie clear in case the server response was lost.
+        document.cookie = 'granted_session=; Path=/; Max-Age=0; SameSite=Lax';
+        window.location.href = '/login';
     };
 
     // Run init when DOM is ready

@@ -1953,6 +1953,35 @@
                 console.log('[LOAD_CONV] Received data:', data);
                 console.log('[LOAD_CONV] Messages count:', data.messages?.length || 0);
 
+                // Reconcile currentAgent with the conversation's actual agent_type.
+                // If the URL slug doesn't resolve to the same agent the conversation belongs to
+                // (renamed agent, manually-typed URL, stale link), fix currentAgent and the URL
+                // before any further messages are sent.
+                if (data.agent_type) {
+                    const expectedBackend = getBackendAgentType(currentAgent);
+                    if (expectedBackend !== data.agent_type) {
+                        const correctSlug = Object.keys(AGENT_TYPE_MAP).find(
+                            k => AGENT_TYPE_MAP[k] === data.agent_type
+                        ) || data.agent_type;
+                        if (AGENTS[correctSlug]) {
+                            console.warn(
+                                `[LOAD_CONV] Agent mismatch — URL says "${currentAgent}" (backend "${expectedBackend}"), ` +
+                                `conversation belongs to "${data.agent_type}". Switching to "${correctSlug}".`
+                            );
+                            currentAgent = correctSlug;
+                            window.history.replaceState({}, '', `/${correctSlug}/chat/${convId}`);
+                            if (window.updateActiveNav) window.updateActiveNav();
+                        } else {
+                            console.error(
+                                `[LOAD_CONV] Conversation belongs to unknown agent "${data.agent_type}" — ` +
+                                `cannot resume safely. Showing welcome screen.`
+                            );
+                            renderWelcomeScreen();
+                            return;
+                        }
+                    }
+                }
+
                 // Hide welcome, show chat
                 const welcomeScreen = document.getElementById('welcome-screen');
                 const chatScreen = document.getElementById('chat-screen');
