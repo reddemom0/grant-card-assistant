@@ -1246,7 +1246,7 @@ function checkCharacterCount(sectionNumber, sectionName, text) {
     4: { limit: 2000, note: null },                                    // IP Strategy
     5: { limit: 1800, note: 'per target market' },                     // Market Potential, Opportunities & Competitive Advantages
     6: { limit: 4000, note: 'per benefit field (7 fields total)' },    // Benefits to Canada
-    7: { limit: 4000, note: 'per activity row' }                       // Budget Activity Descriptions
+    7: { limit: 1000, note: 'per activity row' }                       // Budget Activity Descriptions
   };
 
   const entry = CHARACTER_LIMITS[sectionNumber];

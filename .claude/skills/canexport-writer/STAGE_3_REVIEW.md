@@ -96,7 +96,7 @@ Estimated new overall score: 17/20 (up from 16/20)
 - Section 4: ___/2000 ✅❌
 - Section 5 (each target market): ___/1800 ✅❌
 - Section 6 (each benefit): ___/4000 ✅❌
-- Section 7 (each activity): ___/4000 ✅❌
+- Section 7 (each activity): ___/1000 ✅❌
 
 **Budget Alignment**:
 - Section 7 activities match budget template categories ✅❌
@@ -132,7 +132,7 @@ APPLICATION SECTIONS:
 ☐ Section 4: IP Strategy (≤2000 chars)
 ☐ Section 5: Market Potential, Opportunities & Competitive Advantages (≤1800 chars per target market)
 ☐ Section 6: Benefits to Canada (≤4000 chars each benefit type)
-☐ Section 7: Budget Activity Descriptions (≤4000 chars per activity)
+☐ Section 7: Budget Activity Descriptions (≤1000 chars per activity)
 ☐ Overall evaluation score ≥14 (competitive threshold)
 
 SUPPORTING DOCUMENTS (team to gather from client):

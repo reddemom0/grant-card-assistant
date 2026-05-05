@@ -92,17 +92,19 @@ Each benefit type has its own text field (4,000 char limit per field):
 
 ## SECTION 7: Project Budget - Activity Descriptions
 **Format**: TABLE with multiple rows
-**Character Limit**: 4,000 characters **PER ACTIVITY ROW**
+**Character Limit**: 1,000 characters **PER ACTIVITY ROW**
 
-**⚠️ CRITICAL**: This section is a TABLE. Each budgeted activity is a separate row with its own 4,000-character description field.
+**⚠️ PROGRAM CHANGE (2026-27)**: The Section 7 per-activity limit is **1,000 characters**, not 4,000. This is a recent program change. If a user-uploaded document, older internal template, or prior application draft references a 4,000-character limit for Section 7, treat 1,000 as authoritative and flag the conflict for the team.
+
+**⚠️ CRITICAL**: This section is a TABLE. Each budgeted activity is a separate row with its own 1,000-character description field.
 
 **Table columns**:
 - Activity Type (Category A-H)
 - Target Market (country/region)
 - Expense by Fiscal Year (dollar amount)
-- **Activity Description** (4,000 characters PER ROW)
+- **Activity Description** (1,000 characters PER ROW)
 
-**Example**: If client has 6 budgeted activities, that's 6 separate descriptions (each up to 4,000 chars).
+**Example**: If client has 6 budgeted activities, that's 6 separate descriptions (each up to 1,000 chars).
 
 ### Each activity description must include:
 
@@ -136,7 +138,7 @@ Each benefit type has its own text field (4,000 char limit per field):
 | 4 - IP Strategy | 2,000 | Single field |
 | 5 - Market Potential & Competitive Advantages | 1,800 EACH | One per target market |
 | 6 - Benefits to Canada | 4,000 EACH | 7 separate fields |
-| 7 - Budget Activities | 4,000 EACH | One per activity row |
+| 7 - Budget Activities | 1,000 EACH | One per activity row (changed from 4,000 in 2026-27) |
 
 ---
 
