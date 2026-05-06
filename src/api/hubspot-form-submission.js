@@ -120,8 +120,16 @@ export function buildFormFields(sessionData, agentInput) {
   // so a single submission carries the final value)
   const bestFitProduct = computeBestFitProduct(sessionData, input);
 
+  // Fields that must appear in the submission even when their resolved value
+  // is empty — HubSpot rejects the form with a REQUIRED_FIELD error if these
+  // are absent. Filtering them out via the standard null/empty filter (which
+  // protects optional fields from blanking-out existing Contact data) breaks
+  // submissions for sessions that don't carry the value (e.g. inactivity-
+  // timeout finalization with no `planned_activities` collected).
+  const ALWAYS_INCLUDE = new Set(['what_do_you_spend_it_on_', 'phone']);
+
   // Build fields — omit any field whose value is null/undefined to avoid
-  // overwriting existing Contact data with blanks
+  // overwriting existing Contact data with blanks (except ALWAYS_INCLUDE)
   const raw = [
     { name: 'firstname',                                                                         value: firstname || null },
     { name: 'lastname',                                                                          value: lastname  || null },
@@ -140,18 +148,32 @@ export function buildFormFields(sessionData, agentInput) {
     { name: 'estimated_budget_',                                                                 value: trainingBudget in BUDGET_RANGE_MAP ? BUDGET_RANGE_MAP[trainingBudget] : 0 },
     // Long internal name from form schema — the prospect's intent to spend more given reimbursement.
     // Premise of the conversation answers this. Static "Yes" per Phase 1.5 §field 19.
-    { name: 'would_you_spend_more_on_training_your_staff_if_you_had_a_significant___of_cost_reimbursed_with_gr', value: 'Yes' },
+    // Field name is awkwardly truncated by HubSpot at exactly 100 chars including the `_with_gran`
+    // suffix; do not "fix" the spelling — HubSpot owns this property name.
+    { name: 'would_you_spend_more_on_training_your_staff_if_you_had_a_significant___of_cost_reimbursed_with_gran', value: 'Yes' },
     { name: 'where_will_you_be_expanding_',                                                      value: inferExpansionDestination(growthPlans, plannedActiv) },
     { name: 'expansion_budget_',                                                                 value: expansionBudg in BUDGET_RANGE_MAP ? BUDGET_RANGE_MAP[expansionBudg] : 0 },
     { name: 'research_and_development_budget',                                                   value: 0 }, // not collected by widget; default 0 per Phase 1.5 §field 22
-    { name: 'what_do_you_spend_it_on_',                                                          value: plannedActiv || input.activities_summary || pd.activities || null },
+    { name: 'what_do_you_spend_it_on_',                                                          value: plannedActiv || input.activities_summary || pd.activities || '' },
+    // Sentinel placeholder — `phone` is REQUIRED by the HubSpot form but the AI lead-gen widget
+    // never collects a phone number. Confirmed accepted by the form via manual test. Tracked as
+    // a known data-quality gap; decision pending between (a) adding phone capture to the AI
+    // agent's Phase 5 contact-info step or (b) marking the form field optional in HubSpot.
+    { name: 'phone',                                                                             value: '000-000-0000' },
     { name: 'best_fit_product',                                                                  value: bestFitProduct }
   ];
 
-  // objectTypeId 0-1 = Contact (all fields land on Contact via form mapping)
+  // objectTypeId 0-1 = Contact (all fields land on Contact via form mapping).
+  // Standard filter drops null/undefined/empty for optional fields, but
+  // ALWAYS_INCLUDE bypasses that so HubSpot-required fields are always present
+  // (with their empty value coerced to '' so the submission is well-formed).
   return raw
-    .filter((f) => f.value !== null && f.value !== undefined && f.value !== '')
-    .map((f) => ({ objectTypeId: '0-1', name: f.name, value: f.value }));
+    .filter((f) => ALWAYS_INCLUDE.has(f.name) || (f.value !== null && f.value !== undefined && f.value !== ''))
+    .map((f) => ({
+      objectTypeId: '0-1',
+      name: f.name,
+      value: (f.value === null || f.value === undefined) ? '' : f.value
+    }));
 }
 
 // ============================================================================
