@@ -68,6 +68,51 @@ const FIXTURE_INACTIVITY_NO_ACTIVITIES = {
   estimated_funding: null
 };
 
+// Agent-emitted format: en-dash WITHOUT spaces and ASCII-hyphen variants.
+// Real lead-gen agent regenerates these strings from the system prompt and
+// frequently strips whitespace or substitutes ASCII hyphens. Maps' source-of-
+// truth keys use en-dash WITH spaces. Without normalization, all four range
+// lookups silently miss → 4 required fields drop → HubSpot rejects.
+const FIXTURE_AGENT_FORMAT_VARIANTS = {
+  contact_name: 'Sample Lead',
+  contact_email: 'sample@example.com',
+  company_name: 'Sample Co',
+  company_website: 'https://example.com',
+  prospect_data: {
+    industry: 'Technology',
+    revenue: '$500K–$2.5M',          // en-dash, NO spaces (agent variant)
+    employee_count: '5–19',           // en-dash, NO spaces
+    hiring_plans: '1-2 people',       // ASCII hyphen, single space
+    training_budget: '$10K - $25K',   // ASCII hyphen, spaces
+    expansion_budget: '$25K–$50K',    // en-dash, NO spaces
+    planned_activities: 'export and hiring',
+    province: 'Alberta'
+  },
+  estimated_funding: '$30K-$60K'
+};
+
+// Unmappable input: revenue value that has no key in REVENUE_MAP under any
+// normalization. Should fire the [FORM-FIELD-MISSING] warning AND the field
+// should be filtered out of the submission (since revenue isn't in
+// ALWAYS_INCLUDE).
+const FIXTURE_UNMAPPABLE_REVENUE = {
+  contact_name: 'Bad Data Lead',
+  contact_email: 'bad@example.com',
+  company_name: 'Bad Data Co',
+  company_website: 'https://example.com',
+  prospect_data: {
+    industry: 'Technology',
+    revenue: '$999B',                 // not a valid REVENUE_MAP key
+    employee_count: '5 – 19',
+    hiring_plans: 'Not hiring right now',
+    training_budget: 'None planned',
+    expansion_budget: 'None planned',
+    planned_activities: 'whatever',
+    province: 'British Columbia'
+  },
+  estimated_funding: '$30K-$60K'
+};
+
 const FIXTURE_NONPROFIT_FOOD_PROCESSING = {
   contact_name: 'Test Charity',
   contact_email: 'test@charity.org',
@@ -129,6 +174,19 @@ function names(fields) {
 function valueFor(fields, name) {
   const f = fields.find((x) => x.name === name);
   return f ? f.value : undefined;
+}
+
+// Capture console.warn output for the duration of `fn`, return [result, warnings[]].
+async function captureWarnings(fn) {
+  const original = console.warn;
+  const warnings = [];
+  console.warn = (...args) => warnings.push(args.map((a) => typeof a === 'string' ? a : JSON.stringify(a)).join(' '));
+  try {
+    const result = await fn();
+    return [result, warnings];
+  } finally {
+    console.warn = original;
+  }
 }
 
 // ============================================================================
@@ -218,6 +276,79 @@ function valueFor(fields, name) {
       'pre-revenue + solo → has_your_business_existed_for_a_year_ = "no"'
     );
     console.log(`   → ${out.length} fields emitted\n`);
+  }
+
+  // ── AGENT-FORMAT VARIANTS (en-dash without spaces, ASCII hyphen, etc.) ─
+  console.log('━━━ Fixture 4: Agent-format range variants (en-dash no-space, ASCII hyphen) ━━━');
+  {
+    const [out, warnings] = await captureWarnings(() => buildFormFields(FIXTURE_AGENT_FORMAT_VARIANTS, null));
+    const present = names(out);
+
+    for (const r of requiredFields) {
+      assert(present.has(r.name), `required field present: ${r.name}`);
+    }
+
+    // Each range field should resolve through normalization to its mapped value.
+    assert(
+      valueFor(out, 'annual_revenue_from_the_last_fiscal_year') === '$500K to $2.5 million',
+      'revenue "$500K–$2.5M" (en-dash, no spaces) normalizes through REVENUE_MAP'
+    );
+    assert(
+      valueFor(out, 'numemployees') === 5,
+      'employee_count "5–19" (en-dash, no spaces) normalizes through EMPLOYEE_COUNT_MAP'
+    );
+    assert(
+      valueFor(out, 'number_of_full_time_positions_') === 2,
+      'hiring_plans "1-2 people" (ASCII hyphen) normalizes through HIRING_PLANS_MAP'
+    );
+    assert(
+      valueFor(out, 'estimated_budget_') === 10000,
+      'training_budget "$10K - $25K" (ASCII hyphen, spaces) normalizes through BUDGET_RANGE_MAP'
+    );
+    assert(
+      valueFor(out, 'expansion_budget_') === 25000,
+      'expansion_budget "$25K–$50K" (en-dash, no spaces) normalizes through BUDGET_RANGE_MAP'
+    );
+    // No FORM-FIELD-MISSING warnings should fire — every range resolved
+    const missingWarnings = warnings.filter((w) => w.includes('[FORM-FIELD-MISSING]'));
+    assert(
+      missingWarnings.length === 0,
+      `no [FORM-FIELD-MISSING] warnings on agent-format variants (got ${missingWarnings.length})`
+    );
+    if (missingWarnings.length) {
+      for (const w of missingWarnings) console.log(`     ⚠ unexpected warning: ${w}`);
+    }
+    console.log(`   → ${out.length} fields emitted, ${warnings.length} warnings\n`);
+  }
+
+  // ── UNMAPPABLE INPUT (warning should fire) ─────────────────────────
+  console.log('━━━ Fixture 5: Unmappable revenue value (warning expected) ━━━');
+  {
+    const [out, warnings] = await captureWarnings(() => buildFormFields(FIXTURE_UNMAPPABLE_REVENUE, null));
+    const missingWarnings = warnings.filter((w) => w.includes('[FORM-FIELD-MISSING]'));
+
+    assert(
+      missingWarnings.length >= 1,
+      'at least one [FORM-FIELD-MISSING] warning fired for unmappable revenue'
+    );
+    const revenueWarn = missingWarnings.find((w) => w.includes('field=annual_revenue_from_the_last_fiscal_year'));
+    assert(
+      !!revenueWarn,
+      '[FORM-FIELD-MISSING] warning specifically targeted annual_revenue_from_the_last_fiscal_year'
+    );
+    assert(
+      revenueWarn && revenueWarn.includes('"$999B"'),
+      'warning includes raw_input="$999B"'
+    );
+    // Unmapped revenue field should be filtered out (not in ALWAYS_INCLUDE)
+    assert(
+      !names(out).has('annual_revenue_from_the_last_fiscal_year'),
+      'unmappable revenue field is filtered out of the submission'
+    );
+    // Print captured warnings so the human verifying the run can see them
+    console.log('   captured warnings:');
+    for (const w of warnings) console.log(`     ${w}`);
+    console.log(`   → ${out.length} fields emitted, ${warnings.length} warnings\n`);
   }
 
   // ── SUMMARY ────────────────────────────────────────────────────────

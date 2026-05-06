@@ -173,6 +173,41 @@ export const WIDGET_TO_HUBSPOT_INDUSTRY = {
 };
 
 // ============================================================================
+// RANGE-KEY NORMALIZATION
+//
+// The static range maps above (REVENUE_MAP, EMPLOYEE_COUNT_MAP, etc.) use
+// en-dashes (U+2013) surrounded by spaces in their keys (e.g. "5 – 19"),
+// matching the widget's display labels. The lead-gen agent regenerates these
+// values from the system prompt rather than passing the original widget
+// string verbatim, so it sometimes emits whitespace-stripped variants like
+// "5–19" or ASCII-hyphen variants like "5-19". A direct `MAP[input]` lookup
+// then misses, the field resolves to undefined, the null filter drops it,
+// and HubSpot rejects the submission as missing a required field.
+//
+// `normalizeRangeKey` collapses the variants. `lookupRangeMap` normalizes
+// both the input AND the map's keys at lookup time so existing source-of-
+// truth maps don't have to change.
+// ============================================================================
+
+export function normalizeRangeKey(input) {
+  if (input == null) return input;
+  return String(input)
+    .replace(/[–—]/g, '-')   // en-dash (U+2013), em-dash (U+2014) → ASCII hyphen
+    .replace(/\s+/g, ' ')               // collapse any whitespace runs to single space
+    .replace(/\s*-\s*/g, '-')           // strip whitespace adjacent to hyphens
+    .trim();
+}
+
+export function lookupRangeMap(map, rawKey) {
+  if (rawKey == null) return undefined;
+  const target = normalizeRangeKey(rawKey);
+  for (const k of Object.keys(map)) {
+    if (normalizeRangeKey(k) === target) return map[k];
+  }
+  return undefined;
+}
+
+// ============================================================================
 // EXPANSION DESTINATION — keyword-based inference
 //
 // The widget collects an expansion BUDGET (amount enum) but no destination.

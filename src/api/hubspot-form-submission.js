@@ -22,7 +22,9 @@ import {
   HIRING_PLANS_MAP,
   BUDGET_RANGE_MAP,
   WIDGET_TO_HUBSPOT_INDUSTRY,
-  inferExpansionDestination
+  inferExpansionDestination,
+  lookupRangeMap,
+  normalizeRangeKey
 } from './hubspot-form-mappings.js';
 import { computeBestFitProduct } from './lead-gen-helpers.js';
 
@@ -141,18 +143,18 @@ export function buildFormFields(sessionData, agentInput) {
     { name: 'have_you_applied_for_grants_before_',                                               value: priorGrantExperienceToYesNo(priorGrantExp) },
     { name: 'is_your_organization_for_profit_or_non_profit_',                                    value: isForProfit(industry) },
     { name: 'has_your_business_existed_for_a_year_',                                             value: hasBusinessExistedForAYear(revenueRange, employeeCount) },
-    { name: 'annual_revenue_from_the_last_fiscal_year',                                          value: revenueRange ? (REVENUE_MAP[revenueRange] || null) : null },
+    { name: 'annual_revenue_from_the_last_fiscal_year',                                          value: lookupRangeMap(REVENUE_MAP, revenueRange) ?? null },
     { name: 'where_is_your_organizations_headquartered_',                                        value: commaProvincesToSemicolon(province) || null },
-    { name: 'numemployees',                                                                      value: employeeCount in EMPLOYEE_COUNT_MAP ? EMPLOYEE_COUNT_MAP[employeeCount] : null },
-    { name: 'number_of_full_time_positions_',                                                    value: hiringPlans in HIRING_PLANS_MAP ? HIRING_PLANS_MAP[hiringPlans] : null },
-    { name: 'estimated_budget_',                                                                 value: trainingBudget in BUDGET_RANGE_MAP ? BUDGET_RANGE_MAP[trainingBudget] : 0 },
+    { name: 'numemployees',                                                                      value: lookupRangeMap(EMPLOYEE_COUNT_MAP, employeeCount) ?? null },
+    { name: 'number_of_full_time_positions_',                                                    value: lookupRangeMap(HIRING_PLANS_MAP, hiringPlans) ?? null },
+    { name: 'estimated_budget_',                                                                 value: lookupRangeMap(BUDGET_RANGE_MAP, trainingBudget) ?? 0 },
     // Long internal name from form schema — the prospect's intent to spend more given reimbursement.
     // Premise of the conversation answers this. Static "Yes" per Phase 1.5 §field 19.
     // Field name is awkwardly truncated by HubSpot at exactly 100 chars including the `_with_gran`
     // suffix; do not "fix" the spelling — HubSpot owns this property name.
     { name: 'would_you_spend_more_on_training_your_staff_if_you_had_a_significant___of_cost_reimbursed_with_gran', value: 'Yes' },
     { name: 'where_will_you_be_expanding_',                                                      value: inferExpansionDestination(growthPlans, plannedActiv) },
-    { name: 'expansion_budget_',                                                                 value: expansionBudg in BUDGET_RANGE_MAP ? BUDGET_RANGE_MAP[expansionBudg] : 0 },
+    { name: 'expansion_budget_',                                                                 value: lookupRangeMap(BUDGET_RANGE_MAP, expansionBudg) ?? 0 },
     { name: 'research_and_development_budget',                                                   value: 0 }, // not collected by widget; default 0 per Phase 1.5 §field 22
     { name: 'what_do_you_spend_it_on_',                                                          value: plannedActiv || input.activities_summary || pd.activities || '' },
     // Sentinel placeholder — `phone` is REQUIRED by the HubSpot form but the AI lead-gen widget
@@ -162,6 +164,33 @@ export function buildFormFields(sessionData, agentInput) {
     { name: 'phone',                                                                             value: '000-000-0000' },
     { name: 'best_fit_product',                                                                  value: bestFitProduct }
   ];
+
+  // ─── Defensive guard ──────────────────────────────────────────────────────
+  // Surface any required-at-form field that resolved to empty before HubSpot
+  // does. The submission still proceeds (so HubSpot can tell us what it
+  // accepts), but any silent map miss or upstream null is loud in Railway
+  // logs with both the raw input and the normalized lookup key for diagnosis.
+  const REQUIRED_AT_FORM_RAW_INPUTS = {
+    firstname: firstname,
+    lastname: lastname,
+    email: email,
+    company: company,
+    website: website,
+    industry_contact: industry,
+    annual_revenue_from_the_last_fiscal_year: revenueRange,
+    where_is_your_organizations_headquartered_: province,
+    numemployees: employeeCount,
+    number_of_full_time_positions_: hiringPlans,
+    estimated_budget_: trainingBudget,
+    expansion_budget_: expansionBudg
+  };
+  for (const f of raw) {
+    if (REQUIRED_AT_FORM_RAW_INPUTS.hasOwnProperty(f.name) &&
+        (f.value === null || f.value === undefined || f.value === '')) {
+      const rawIn = REQUIRED_AT_FORM_RAW_INPUTS[f.name];
+      console.warn(`[FORM-FIELD-MISSING] field=${f.name} raw_input=${JSON.stringify(rawIn)} normalized=${JSON.stringify(rawIn != null ? normalizeRangeKey(rawIn) : null)}`);
+    }
+  }
 
   // objectTypeId 0-1 = Contact (all fields land on Contact via form mapping).
   // Standard filter drops null/undefined/empty for optional fields, but
