@@ -25,9 +25,9 @@ import {
 } from './hubspot-form-submission.js';
 import { sendEmail, wrapInBrandedTemplate } from '../email/sendEmail.js';
 import { notifyTeamOfLead } from '../services/lead-notification.js';
+import { getBookingLink, NATALIE_INTRO_LINK } from './booking-link-routing.js';
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
-const BOOKING_LINK = 'https://meetings.hubspot.com/natalie392/15min-intro-to-granted';
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -264,8 +264,10 @@ function buildNoteBody(sessionData, trigger) {
   lines.push('');
 
   // Booking link
+  // (buildNoteBody is dead — only buildNoteBodyComprehensive is wired up.
+  // Constant rename for parse-safety; no routing logic here.)
   lines.push('---');
-  lines.push(`Booking link: ${BOOKING_LINK}`);
+  lines.push(`Booking link: ${NATALIE_INTRO_LINK}`);
 
   return lines.join('\n');
 }
@@ -507,12 +509,12 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
       }
 
       // Consultant Assignment
+      // (Note: booking link is rendered below in the BOOKING LINK block via
+      // getBookingLink() — best_fit_product-driven, not tier-driven. This
+      // section retains only the consultant name for sales-prep context.)
       if (categorizationData.consultant_assignment) {
         const consultant = categorizationData.consultant_assignment;
         lines.push(`Assigned Consultant: ${consultant.name}`);
-        if (consultant.booking_link) {
-          lines.push(`Booking Link: ${consultant.booking_link}`);
-        }
       }
     }
 
@@ -652,16 +654,25 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
   lines.push('');
 
   // =========================================================================
-  // BOOKING LINK (tier-based)
+  // BOOKING LINK (best_fit_product-driven)
   // =========================================================================
 
-  // Only include booking link for Starter ($15K+) and Pro ($30K+) tiers
-  // Exclude for GetGranted (under $15K)
-  // Use finalServiceTier (agent-recommended if available, otherwise computed)
-  const bookingTier = agentRecommendedTier || serviceTier;
-  if (bookingTier && bookingTier !== 'getgranted') {
+  // null link → no booking-link line (Get Granted / Not a Fit).
+  // industry-routed → consultant URL (Ruk or Steph for Pro/Waitlist).
+  // natalie-intro → Natalie's intro link (Starter / Pro Lite / Nonprofit / Unknown).
+  const bestFitProduct = sessionData.best_fit_product
+    || (categorizationData && categorizationData.best_fit_product)
+    || null;
+  const noteRouted = getBookingLink({
+    best_fit_product: bestFitProduct,
+    industry: pd.industry || (categorizationData && categorizationData.matched_industry)
+  });
+  if (noteRouted.link) {
     lines.push('---');
-    lines.push(`📅 Booking Link: https://meetings.hubspot.com/natalie392/15min-intro-to-granted`);
+    const sourceLabel = noteRouted.source === 'industry-routed' && noteRouted.consultantName
+      ? ` (${noteRouted.consultantName})`
+      : '';
+    lines.push(`📅 Booking Link: ${noteRouted.link}${sourceLabel}`);
   }
 
   return lines.join('\n');
@@ -674,9 +685,10 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
  * @param {string} firstName - Recipient's first name
  * @returns {string} HTML email content
  */
-function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null) {
+function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null, bestFitProduct = null) {
   const pd = prospectData || {};
   const companyName = pd.company_name || 'your company';
+  const routed = getBookingLink({ best_fit_product: bestFitProduct, industry: pd.industry });
   const activities = pd.activities || pd.activities_discussed || 'your growth plans';
 
   // Determine tier: use provided serviceTier if available, otherwise derive from funding amount
@@ -761,13 +773,13 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 
 <p><a href="https://granted.ca/grantedpro/" style="color: #0066cc; font-weight: bold;">Learn more about GrantedPro</a></p>
     `;
-    bookingCTA = `
+    bookingCTA = routed.link ? `
 <p>Book a free 15-minute call and we'll map out the exact programs, timing, and application strategy for your business:</p>
 
 <p style="text-align: center;">
-  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your Free Consultation</a>
+  <a href="${routed.link}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your Free Consultation</a>
 </p>
-    `;
+    ` : '';
   } else if (tier === 'medium') {
     // $10-29K → Granted Starter (PRIMARY), GetGranted 2.0 (SECONDARY)
     tierContent = `
@@ -777,13 +789,13 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 
 <p>We're also launching an upgraded platform soon (GetGranted 2.0) with smart matching and step-by-step guidance. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
     `;
-    bookingCTA = `
+    bookingCTA = routed.link ? `
 <p>If you'd prefer to talk through your options with someone on our team first, you can book a quick call:</p>
 
 <p style="text-align: center;">
-  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book a Call</a>
+  <a href="${routed.link}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book a Call</a>
 </p>
-    `;
+    ` : '';
   } else {
     // Under $10K → GetGranted database (PRIMARY), GetGranted 2.0 Lite (SECONDARY)
     tierContent = `
@@ -793,13 +805,13 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 
 <p>We're also launching an upgraded version (GetGranted 2.0 Lite) with real-time matching and alerts for $55/month. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
     `;
-    bookingCTA = `
+    bookingCTA = routed.link ? `
 <p>Have questions or want a second opinion? You can always book a free call with our team:</p>
 
 <p style="text-align: center;">
-  <a href="${BOOKING_LINK}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book a Call</a>
+  <a href="${routed.link}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book a Call</a>
 </p>
-    `;
+    ` : '';
   }
 
   return `
@@ -962,7 +974,8 @@ export async function sendLeadGenEmail(sessionId) {
       session.estimated_funding || prospectData.estimated_funding,
       firstName,
       mergedEstimate,
-      serviceTier
+      serviceTier,
+      prospectData.best_fit_product || null
     );
   } else {
     console.log(`📧 Using agent-generated email_summary_body (${emailBodyHtml.length} chars)`);
@@ -989,12 +1002,34 @@ export async function sendLeadGenEmail(sessionId) {
     console.log(`  🎨 Converted markdown to HTML in email body`);
   }
 
-  // Fix booking links
-  const wrongBookingLinkRegex = /https:\/\/meetings\.hubspot\.com\/[^\s"'<>]+/g;
-  const matches = emailBodyHtml.match(wrongBookingLinkRegex);
-  if (matches && matches.some(link => link !== BOOKING_LINK)) {
-    console.log(`⚠️  Found incorrect booking link, replacing with ${BOOKING_LINK}`);
-    emailBodyHtml = emailBodyHtml.replace(wrongBookingLinkRegex, BOOKING_LINK);
+  // Booking link normalization (best_fit_product-driven)
+  // - non-null link: rewrite all meetings.hubspot.com URLs to the routed link
+  // - null link (Get Granted / Not a Fit): strip any <p> containing a booking link
+  const routed = getBookingLink({
+    best_fit_product: prospectData.best_fit_product || null,
+    industry: prospectData.industry
+  });
+  const meetingsLinkRegex = /https:\/\/meetings\.hubspot\.com\/[^\s"'<>]+/g;
+
+  if (routed.link) {
+    const matches = emailBodyHtml.match(meetingsLinkRegex);
+    if (matches && matches.some(link => link !== routed.link)) {
+      console.log(`⚠️  Rewriting booking links → ${routed.link} (source=${routed.source})`);
+      emailBodyHtml = emailBodyHtml.replace(meetingsLinkRegex, routed.link);
+    }
+  } else {
+    const ctaParagraphRegex = /<p\b[^>]*>[\s\S]*?meetings\.hubspot\.com[\s\S]*?<\/p>\s*/gi;
+    const before = emailBodyHtml.length;
+    emailBodyHtml = emailBodyHtml.replace(ctaParagraphRegex, '');
+    if (emailBodyHtml.length !== before) {
+      console.log(`🚫 Stripped booking-link CTA paragraph(s) (best_fit_product=${prospectData.best_fit_product})`);
+    }
+    // Defensive: warn if any meetings.hubspot.com URL survived (e.g. emitted
+    // inline in a sentence rather than wrapped in <p>). Do not modify; partial
+    // rewrites read worse than the leak.
+    if (/https:\/\/meetings\.hubspot\.com\//i.test(emailBodyHtml)) {
+      console.warn(`[BOOKING-LINK-LEAK] Inline meetings.hubspot.com URL survived CTA strip. best_fit_product=${prospectData.best_fit_product}, session=${sessionId}`);
+    }
   }
 
   // Wrap in template
@@ -1238,6 +1273,24 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
     const emailSummaryBody = (agentInput && agentInput.email_summary_body) ||
                              enrichedSession.prospect_data?.email_summary_body ||
                              null;
+
+    // Persist best_fit_product so downstream surfaces (buildNoteBodyComprehensive
+    // below, sendLeadGenEmail's regex normalizer via separate DB re-read) can
+    // route the booking link without recomputing. In-memory for this function;
+    // jsonb merge into prospect_data for sendLeadGenEmail's separate session load.
+    enrichedSession.best_fit_product = bestFitProduct;
+    enrichedSession.prospect_data = enrichedSession.prospect_data || {};
+    enrichedSession.prospect_data.best_fit_product = bestFitProduct;
+    try {
+      await query(
+        `UPDATE lead_gen_conversations
+         SET prospect_data = prospect_data || $1::jsonb
+         WHERE session_id = $2`,
+        [JSON.stringify({ best_fit_product: bestFitProduct }), sessionId]
+      );
+    } catch (err) {
+      console.warn(`[BEST-FIT-PRODUCT-PERSIST-FAIL] session=${sessionId} err=${err.message} — continuing; CTA stripping may fall back to Natalie`);
+    }
 
     const patchResult = await patchAIContactProperties(
       contactId,

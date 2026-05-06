@@ -345,7 +345,7 @@ function evaluateCondition(condition, context) {
  * @param {string} industry - Standardized industry string
  * @returns {object} { name, booking_link }
  */
-function assignConsultant(industry) {
+export function assignConsultant(industry) {
   loadDataFiles();
 
   for (const [key, consultant] of Object.entries(consultantRouting.consultants)) {
