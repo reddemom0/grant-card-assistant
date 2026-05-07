@@ -13,7 +13,7 @@ This skill runs the recap workflow: read the transcript, cross-reference what's 
 
 **1. Anchor by label, never by row number.** Row numbers in the sheet shift week to week — the team adds or removes action items, edits the Template, etc. Always find sections at runtime by reading column A.
 
-**2. One cell per write call. Never build value arrays for batch writes.** Constructing arrays risks misalignment between intended rows and array indices, which has caused header rows to be overwritten with data and data rows to be overwritten with empty strings. Always use `update_sheet_range` with a single-cell range like `'<tab>'!E20` and a 1×1 values array (`[["the note text"]]`). Yes, this means more API calls — that's the cost of guaranteed correctness.
+**2. Batch writes per section, never across sections.** When writing column E for a department section, batch all that section's data rows into a single `update_sheet_range` call covering the section's range (e.g., `E30:E33` for Strat). Do NOT batch across multiple sections in one call — that's what caused alignment failures where the AI section's content bled into Finance's header. The section map from Step 3 gives you the exact start and end row of each section's data; that's the range for each batch. Action items use per-row writes since their counts vary.
 
 **3. The only fixed identifier is the spreadsheet ID.** Everything else — section row positions, action item count, header labels — is discovered live.
 
@@ -54,7 +54,7 @@ Then `granola_get_meeting_transcript` for the verbatim transcript. Verbatim is p
 
 Use `read_sheet_range` to read the relevant columns of the entire tab in one call: `'<tab>'!A1:E125`. (Reading to row 125 ensures the bottom of the sheet is captured regardless of how many action item rows the team added.)
 
-Walk column A row by row. Build the section map — a list of records, one per row, capturing the row index, the column A label, and a classification.
+Walk column A row by row. Identify the row index of every recognized anchor and build a section map.
 
 **Recognized section header anchors** (rows where Oracle never writes to column E):
 
@@ -75,36 +75,55 @@ Walk column A row by row. Build the section map — a list of records, one per r
 - Column A starts with "Action Items from last week"
 - Column A starts with "Action Items for coming week"
 
-**Recognized end-of-action-items boundary:** the next row after "Action Items for coming week" where column A has any non-empty value. The boundary label can vary ("Customer Headlines", "Identify, Discuss, Solve", or anything else) — don't hard-code the label, just find the next non-empty column A row after the coming-week header.
+**Recognized end-of-action-items boundary:** the next row after "Action Items for coming week" where column A has any non-empty value (after walking past pre-existing carry-forward items). Don't hard-code the boundary label.
+
+For each department section, record:
+- `header_row` — the row of the section's header
+- `data_start_row` — `header_row + 1` (or `header_row + 2` if the row immediately below is a sub-header like "Target / Actual")
+- `data_end_row` — the last row before the next recognized header
 
 If the "Action Items from last week" or "Action Items for coming week" anchors are missing, stop and tell the user the Template structure has changed.
 
 ### Step 4 — Fill the Oracle Notes cells (the reasoning step)
 
-Iterate through every row in the section map. For each row, classify it:
+This step uses **per-section batched writes**.
 
-- **Section header row** → SKIP. Never write to column E.
-- **Sub-header row** (column A empty, column B = Target/Benchmark) → SKIP.
-- **Empty-label continuation row** (column A empty AND column B/C/D have data, e.g. LinkedIn metric breakdown sub-rows) → SKIP. The discussion context belongs in the parent row's column E.
-- **Data row** (column A has a label that's not a section header AND not an action-item anchor) → CANDIDATE for an Oracle Note.
+For each department section in the section map (Company KPIs, Strat, GCs, Research, Marketing/Communications, AI, Finance, Research Grant Highlights, Quarterly Goals):
 
-For each candidate row, decide between three outcomes:
+**4a. Build the values array for the section.**
 
-1. **The line item was discussed in the transcript.** Write the note in column E for that row.
-2. **The line item wasn't discussed, but Oracle has cross-reference data worth surfacing.** Write the cross-ref note in column E with a `(no team discussion — context from HubSpot/GG)` or `(no team discussion — context from web)` prefix.
-3. **Nothing relevant either way.** Skip — don't write anything to that cell.
+The section's range is `data_start_row` through `data_end_row` (inclusive). For each row in that range, decide what value goes in column E:
 
-**Write strategy: one cell at a time.** For each cell that gets a note, make a separate `update_sheet_range` call:
+- **Skip rows that classify as sub-headers** (column A empty AND column B = Target/Benchmark). Value: `""` (empty string).
+- **Skip empty-label continuation rows** (column A empty but column B/C/D have data, e.g., LinkedIn metric breakdown sub-rows). Value: `""`.
+- **Data rows** (column A has a label) — three outcomes:
+  1. Discussed in transcript → write the note in Oracle's voice (third-person objective). One or two sentences.
+  2. Not discussed but Oracle has cross-reference data worth surfacing → write the cross-ref note prefixed with `(no team discussion — context from HubSpot/GG)` or `(no team discussion — context from web)`.
+  3. Nothing relevant either way → value: `""`.
+
+**4b. Verify array length before writing.**
+
+Confirm `len(values_array) == (data_end_row - data_start_row + 1)`. If not, do NOT write — stop and report the discrepancy. This check catches misalignment bugs before they corrupt the sheet.
+
+**4c. Write the section.**
+
+Make a single `update_sheet_range` call:
 
 ```
 update_sheet_range({
   spreadsheet_id: "1SGZ0HombWMiOI7k_oAL3m9nfMXK2LU1NnLpUOIOaEaA",
-  range: "'<tab>'!E<row>",
-  values: [["the note text"]]
+  range: "'<tab>'!E<data_start_row>:E<data_end_row>",
+  values: [
+    ["note for first row, or ''"],
+    ["note for second row, or ''"],
+    ...
+  ]
 })
 ```
 
-One call per cell. Do not assemble arrays of values across rows. Do not call `update_sheet_range` once with a multi-row range — that has produced misalignment errors where notes land one row off, header text bleeds into data rows, and AI-section notes leak into Finance headers.
+The values array is a 2D array — one inner array per row, each containing exactly one string (the note for column E, or `""` to skip).
+
+Do this for each section, one batch per section. Approximately 9 calls total for all department sections combined. Never combine multiple sections into one call.
 
 **Cross-reference behavior.** When the transcript mentions a verifiable claim, look it up:
 - Deal/company claims → `search_grant_applications` (with `company_name`) or `search_hubspot_companies` (with `query`)
@@ -120,49 +139,55 @@ When the transcript matches reality, write the note as stated. When it contradic
 
 *Name attribution — be conservative.* Only attribute a statement by name when the transcript explicitly identifies the speaker for that specific statement. If the transcript shows a comment without a clear speaker tag, write it without naming anyone. Use neutral phrasing instead: "Team noted...", "Discussion covered...", or just state the fact directly. Don't infer who said something based on context, role, or which department the topic falls under. (The exception is action item ownership in Step 6 — for those, work harder to determine ownership because that's the operational point.)
 
-**Example cell content:**
+**Example values array for the Strat section** (data rows 30-33):
 
-> Monthly Submissions row: "Q4 began this week — $50 actual against $100K monthly target. Heavy reliance on M/E grants this quarter; 2-3 RTRIs and 2 CanExports expected."
-
-> Strat - Outreach/Leads row: "(no team discussion — context from HubSpot) 5 outreach activities logged this month against 100 target."
-
-> Research Grant Highlights row: "Graduate to Opportunity Innovate (GTO Innovate) confirmed as brand new — Nova Scotia hiring subsidy for master's/PhD grads, up to $31K, financial support for 2 years. GG database has 0 matches; net-new program."
+```
+values: [
+  ["Beginning of month — 5 logged against 100 target. Discussion focused on May webinar attendees and food-sector contacts."],
+  ["Green Jobs Initiative applied last week — brand new grant submitted just before close."],
+  ["2 discovery calls logged so far this month."],
+  ["Hiring decision imminent — down to 2 candidates, offer going out today."]
+]
+```
 
 ### Step 5 — Mark last week's action items
 
-Find the row where column A starts with "Action Items from last week" — call this `LW_HEADER_ROW`. Find the row where column A starts with "Action Items for coming week" — call this `CW_HEADER_ROW`.
+Find `LW_HEADER_ROW` (the "Action Items from last week" anchor) and `CW_HEADER_ROW` (the "Action Items for coming week" anchor) from Step 3.
 
-For each row R between `LW_HEADER_ROW + 1` and `CW_HEADER_ROW - 1`:
-- If column A of row R is empty, skip.
-- If column A of row R has content (an actual action item), search the transcript for evidence the item was completed, in progress, or blocked.
+Walk every row between `LW_HEADER_ROW + 1` and `CW_HEADER_ROW - 1`. For each row that has content in column A, search the transcript for evidence the item was completed.
 
-For each row that needs an update, write column E only — one cell at a time:
+**Build a single column E values array for the entire last-week range.** For each row:
+- `"TRUE"` if transcript indicates clear completion
+- `"FALSE"` if not done, blocked, ambiguous, or no mention
+- `""` (empty string) for empty rows in the range (no item to mark)
+
+Verify array length matches the row count, then write in one batch:
 
 ```
 update_sheet_range({
   spreadsheet_id: "...",
-  range: "'<tab>'!E<R>",
-  values: [["TRUE"]]    // or [["FALSE"]]
+  range: "'<tab>'!E<LW_HEADER_ROW + 1>:E<CW_HEADER_ROW - 1>",
+  values: [["TRUE"], ["FALSE"], ...]
 })
 ```
 
-`TRUE` only if the transcript indicates clear completion. `FALSE` if not done, blocked, ambiguous, or no mention. Never write to columns A-D of last-week's items.
+Never write to columns A-D of last-week's items.
 
-If transcript mentions partial progress, default to `FALSE` and surface in the final summary.
+If transcript mentions partial progress, default to `"FALSE"` and surface in the final summary.
 
 ### Step 6 — Propose coming-week action items
 
-Find `CW_HEADER_ROW` (already located in Step 5). Find the boundary row: the next row after `CW_HEADER_ROW` where column A has any non-empty value AND that row is NOT `CW_HEADER_ROW + 1` (since there might be carry-forward items immediately below). Call this `BOUNDARY_ROW`.
-
-To find `BOUNDARY_ROW` correctly:
+Find `CW_HEADER_ROW` (already located). Find `BOUNDARY_ROW`:
 1. Walk forward from `CW_HEADER_ROW + 1`
-2. Skip any rows that have content in column A (these are pre-existing carry-forward items — don't overwrite)
+2. Skip rows that have content in column A (these are pre-existing carry-forward items — don't overwrite)
 3. The first row where column A is empty — call this `FIRST_WRITE_ROW`
-4. Continue walking forward from `FIRST_WRITE_ROW`. The first row where column A is non-empty AGAIN is `BOUNDARY_ROW` (this is the next labeled section, e.g., "Customer Headlines" or "Identify, Discuss, Solve" or anything else).
+4. Continue walking forward from `FIRST_WRITE_ROW`. The first row where column A is non-empty AGAIN is `BOUNDARY_ROW`.
 
-Identify items the team committed to in the transcript (not aspirational discussion). For each new item, write it to a row starting at `FIRST_WRITE_ROW` and incrementing. Do not skip rows. Do not leave gaps. Stop before reaching `BOUNDARY_ROW`.
+Identify items the team committed to in the transcript (not aspirational discussion). Look for explicit commitments ("I'll handle X", "let's get Y done by Friday", "[name] is owning this").
 
-For each item, write columns A through E in a single multi-cell write:
+Write items sequentially starting at `FIRST_WRITE_ROW`, one row at a time, no gaps. Stop before reaching `BOUNDARY_ROW`.
+
+**Per-row writes for action items** (each row needs columns A through E):
 
 ```
 update_sheet_range({
@@ -172,16 +197,16 @@ update_sheet_range({
 })
 ```
 
-Each row written individually. Do NOT batch multiple rows into one call.
+One call per item. With 5-10 items typical per week, this is ~5-10 calls — well within iteration budget.
 
 For each proposed item:
 - A: short action description
 - B: primary responsible party (use names from the transcript — Steph, Ruk, Natalie, Olivia, Souad, Chris, Delpreet — or department names: Strategy, GCs, Research, Marketing, AI)
-- C: secondary responsible party if mentioned, else blank string
-- D: due date if mentioned, else blank string
-- E: "FALSE"
+- C: secondary responsible party if mentioned, else `""`
+- D: due date if mentioned, else `""`
+- E: `"FALSE"`
 
-For action item ownership specifically, work harder than for general name attribution — the operational value of these rows is knowing who's doing what. If the transcript doesn't make ownership clear, infer from context (whoever raised the work, whoever owns the area) but be conservative: when truly ambiguous, leave column B blank and surface the unassigned items in the final summary.
+For action item ownership specifically, work harder than for general name attribution — the operational value of these rows is knowing who's doing what. If the transcript doesn't make ownership clear, infer from context (whoever raised the work, whoever owns the area) but be conservative: when truly ambiguous, leave column B `""` and surface the unassigned items in the final summary.
 
 If there are more proposed items than rows available before `BOUNDARY_ROW`, list the overflow in the final summary rather than truncating silently. Do NOT insert new rows or push other content down.
 
@@ -197,6 +222,18 @@ After all writes complete, summarize for the user:
 - Any proposed coming-week items that didn't fit (overflow before the boundary row)
 
 Don't enumerate every cell — the user can read the sheet. Surface the parts that need human attention.
+
+## Iteration budget
+
+This workflow uses approximately 18-25 agent loop iterations:
+- 2-3: tab metadata read + transcript fetch
+- 1: full sheet read for section map
+- 9: section batches for Oracle Notes (Company KPIs, Strat, GCs, Research, Marketing/Comms, AI, Finance, Grant Highlights, Quarterly Goals)
+- 1: last-week action items batch
+- 5-10: per-row writes for new coming-week items
+- 1: final summary
+
+Cross-reference lookups (HubSpot, web_search, search_getgranted) add iterations as needed but should be used sparingly — only when the transcript surfaces a verifiable claim worth checking.
 
 ## Out of scope
 
@@ -215,10 +252,11 @@ Don't enumerate every cell — the user can read the sheet. Surface the parts th
 - **Sparse transcripts** — if under ~500 words, tell the user before writing notes; the recap will be thin.
 - **Cross-reference timeouts** — if a HubSpot or web search fails, write the note without verification rather than blocking.
 - **Filling cells with filler** — if there's no discussion AND no relevant cross-ref, leave the cell blank.
-- **Writing to header rows** — every section header row has column E that says "Oracle Notes" or is blank. Verify against the section map from Step 3 before writing.
+- **Writing to header rows** — every section header row has column E that says "Oracle Notes" or is blank. Per-section batching with `data_start_row` (one row below the header) prevents this categorically.
 - **Row numbers from memory** — never use a remembered row number. Always use the section map from the *current* tab.
 - **First-person voice creep** — third-person always.
 - **Over-attribution** — only name a speaker when the transcript explicitly tags them.
-- **Batch arrays for column E writes** — never. One cell per call. The misalignment risk is too high.
-- **Skipping rows in coming-week section** — don't search for "the first empty row" in the middle of an empty section. Walk past pre-existing items, then write sequentially starting at the first empty row, no gaps.
-- **Bold formatting in writes** — Oracle's writes don't apply formatting; values land in whatever style the cell already has. If notes are coming out bold, the underlying cell formatting in the Template needs to be cleaned (one-time human fix), not the skill.
+- **Cross-section batching** — never combine sections in one write call. The misalignment risk is the original v2 bug.
+- **Array-length mismatch** — always verify `len(values) == (end_row - start_row + 1)` before writing. If it doesn't match, stop and report — don't write a misaligned batch.
+- **Per-cell writes for column E** — don't. The iteration cost is too high (50+ iterations vs. budget of ~25). Section batches are the correct grain.
+- **Bold formatting in writes** — Oracle's writes don't apply formatting; values land in whatever style the cell already has. If notes are coming out bold, the underlying cell formatting in the Template needs to be cleaned, not the skill.
