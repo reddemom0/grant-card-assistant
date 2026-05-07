@@ -77,7 +77,7 @@ function convertMarkdownToHtml(text) {
 
 // DEPRECATED: These are now set dynamically based on query complexity
 // Kept for backwards compatibility
-const FALLBACK_MAX_AGENT_LOOPS = 20;
+const FALLBACK_MAX_AGENT_LOOPS = 50;
 const FALLBACK_MODEL = 'claude-sonnet-4-6'; // Use latest Sonnet 4.6
 const FALLBACK_MAX_TOKENS = 16000;
 const FALLBACK_THINKING_BUDGET = 10000;

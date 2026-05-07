@@ -295,7 +295,7 @@ export function getIterationLimit(queryComplexity) {
     return 10; // Moderate exploration
   }
 
-  return 20; // Allow thorough exploration for complex queries
+  return 50; // Allow thorough exploration for complex agentic workflows (sheets/HubSpot multi-step)
 }
 
 /**
@@ -343,7 +343,7 @@ export function getQueryConfigForModel(model, overrides = {}) {
     thinking: isHaiku ? undefined : { type: 'enabled', budget_tokens: 10000 },
     maxTokens: isHaiku ? 8000 : 16000,
     temperature: isHaiku ? 0.3 : 1.0,
-    maxIterations: overrides.maxIterations || (isHaiku ? 6 : 20),
+    maxIterations: overrides.maxIterations || (isHaiku ? 6 : 50),
 
     metadata: {
       forcedModel: true,
