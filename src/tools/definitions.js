@@ -1417,6 +1417,9 @@ Use when simple information retrieval is insufficient and you need specialized e
 **Genre Tagging Skill:**
 - \`overview\` - Score grant programs against Granted smart filter genres (v1: Building Bench of Talent)
 
+**Staff Meeting Recap Skill:**
+- \`overview\` - End-to-end weekly staff meeting recap (Granola transcript → Weekly Staff Meeting Sheet Oracle Notes column + last-week/coming-week action items). MANDATORY for any "process/recap/fill in [date] staff meeting" request.
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1439,13 +1442,15 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)
 - "Create a WorkBC deal for TechCo" → load_skill(hubspot, DEAL_CREATION)
 - "Draft a Grant Blast for GetGranted" → load_skill(granted-marketing, GRANT_BLASTS)
-- "Score this program against smart filter genres" → load_skill(genre-tagging, overview)`,
+- "Score this program against smart filter genres" → load_skill(genre-tagging, overview)
+- "Process the May 6 staff meeting" → load_skill(staff-meeting-recap, overview)
+- "Recap last Tuesday's meeting" → load_skill(staff-meeting-recap, overview)`,
   input_schema: {
     type: 'object',
     properties: {
       skill_name: {
         type: 'string',
-        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'genre-tagging'],
+        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'genre-tagging', 'staff-meeting-recap'],
         description: 'The skill domain to load'
       },
       sub_skill: {

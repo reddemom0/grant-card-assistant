@@ -62,6 +62,9 @@ const SKILL_PATHS = {
   },
   'genre-tagging': {
     overview: '.claude/skills/genre-tagging/SKILL.md'
+  },
+  'staff-meeting-recap': {
+    overview: '.claude/skills/staff-meeting-recap/SKILL.md'
   }
 };
 
