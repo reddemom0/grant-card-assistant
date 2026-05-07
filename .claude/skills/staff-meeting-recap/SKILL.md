@@ -5,9 +5,15 @@ description: Process a Granted weekly staff meeting end-to-end — pull the Gran
 
 # Staff Meeting Recap
 
-Each week, the Granted team holds a staff meeting that's transcribed by Granola. The Weekly Staff Meeting Google Sheet has one tab per meeting, structured into department sections (Strat, GCs, Research, Marketing, AI, Finance) plus Company KPIs, Research Grant Highlights, Quarterly Goals, and action-item rows. Each tab has an "Oracle Notes" column at column E.
+Each week, the Granted team holds a staff meeting that's transcribed by Granola. The Weekly Staff Meeting Google Sheet has one tab per meeting, structured into department sections (Strat, GCs, Research, Marketing/Communications, AI, Finance) plus Company KPIs, Research Grant Highlights, Quarterly Goals, and action-item sections. Each tab has an "Oracle Notes" column at column E.
 
-This skill runs the recap workflow: read the transcript, cross-reference what's verifiable, fill in per-line context for ~50 cells, update last week's action items, and propose coming-week items.
+This skill runs the recap workflow: read the transcript, cross-reference what's verifiable, fill in per-line context for the data rows of each section, update last week's action items, and propose coming-week items.
+
+## Critical principle: anchor by label, never by row number
+
+Row numbers in the sheet shift week to week — the team adds or removes action items, edits the Template, etc. **Never assume any section sits at a fixed row.** Always find sections at runtime by reading column A and matching the section's label.
+
+The only fixed identifier is the spreadsheet ID itself. Everything else is discovered live.
 
 ## When this skill triggers
 
@@ -16,7 +22,7 @@ This skill runs the recap workflow: read the transcript, cross-reference what's 
 - "Write up Tuesday's meeting"
 - Any request that references the staff meeting sheet and a date
 
-If the user gives a relative reference ("last Tuesday", "this week's") without a specific date, resolve it before proceeding. If genuinely ambiguous, ask which meeting.
+If the user gives a relative reference ("last Tuesday", "this week's") without a specific date, resolve it before proceeding. If genuinely ambiguous, ask which meeting. If the user gives an exact tab name (e.g., "the TEST May 6, 2026 tab"), use that exact name and skip date-matching.
 
 ## Inputs
 
@@ -28,11 +34,11 @@ If the user gives a relative reference ("last Tuesday", "this week's") without a
 
 ### Step 1 — Find the meeting tab
 
-Use `read_sheet_metadata` with the spreadsheet ID to get the spreadsheet title and the list of all tabs. Match the user's date against tab names liberally (date components, not exact string).
+Use `read_sheet_metadata` with the spreadsheet ID to get the spreadsheet title and the list of all tabs. Match the user's date against tab names liberally (date components, not exact string). If the user gave an exact tab name, use that exact name.
 
-If no matching tab exists, stop and tell the user the tab needs to be created first. Example response: "I don't see a tab for May 13, 2026 yet. Once someone duplicates the Template tab and names it, I can populate it." Don't try to create the tab — humans handle weekly tab creation.
+If no matching tab exists, stop and tell the user the tab needs to be created first. Don't try to create the tab — humans handle weekly tab creation.
 
-Save the resolved tab name for use in all subsequent range arguments. Tab names containing spaces or special characters need single quotes when used in A1 ranges: `'May 6, 2026'!E20`.
+Save the resolved tab name for use in all subsequent range arguments. Tab names containing spaces or special characters need single quotes when used in A1 ranges: `'May 6, 2026'!A19`.
 
 ### Step 2 — Pull the Granola transcript
 
@@ -42,53 +48,49 @@ If multiple meetings match, prefer the longest. If none match after the ±1 day 
 
 Then `granola_get_meeting_transcript` for the verbatim transcript. Verbatim is preferred over enhanced notes — accuracy on action items and quoted claims matters more than polish.
 
-### Step 3 — Read the current state of the tab
+### Step 3 — Read the tab and build a section map
 
-Use `read_sheet_range` for `'<tab>'!A19:E101` in one call. This captures every section header, every line item label, and the current state of all Oracle Notes cells and action item rows. Use this as your reference throughout the rest of the workflow rather than re-reading.
+Use `read_sheet_range` to read column A and column E of the entire tab in one call: `'<tab>'!A1:E125`. (Reading to row 125 ensures the Bravo Card row at the bottom is captured regardless of how many action item rows the team added.)
 
-### Step 3.5 — Validate Template structure
+Walk column A and identify the row of every recognized anchor label below. This produces the section map for this specific tab.
 
-Before writing any cells, confirm the row layout matches expected. Check that column A of each row contains the expected label:
+**Section header anchors** (rows where Oracle never writes to column E — these are headers):
 
-- Row 19: starts with "Company KPIs"
-- Row 29: "Strat"
-- Row 34: "GCs"
-- Row 44: "Research"
-- Row 49: "Marketing/Communications"
-- Row 59: "AI"
-- Row 62: "Finance"
-- Row 71: starts with "Research Grant Highlights"
-- Row 75: "Quarterly Goals"
-- Row 84: starts with "Action Items from last week"
-- Row 92: starts with "Action Items for coming week"
+- "Company KPIs" (column A starts with this — there's usually a month parenthetical)
+- "Strat"
+- "GCs"
+- "Research"
+- "Marketing/Communications"
+- "AI"
+- "Finance"
+- "Research Grant Highlights of the Week"
+- "Quarterly Goals"
+- "Departmental KPIs for this month"
+- Any row where column A is empty AND column B contains "Target" or "Benchmark" (these are sub-header rows like the "Target / Actual" row that sits between Departmental KPIs and Strat)
 
-Match leniently — case-insensitive and whitespace-tolerant. If any check fails, stop and tell the user: "The Template structure has changed since this skill was written. Section [X] is no longer at row [N]. The skill needs an update before I can reliably populate the tab." Don't try to guess or write to wrong rows — surface the drift.
+**Action item anchors:**
+
+- "Action Items from last week" — start of last-week section
+- "Action Items for coming week" — start of coming-week section (also marks end of last-week section)
+- "Customer Headlines" — end of coming-week section (Oracle must never write at or below this row)
+
+If any of these anchors are missing, stop and tell the user the Template structure has changed: "I can't find a row labeled '[X]' — the Template structure has changed since this skill was written and I need to be updated before I can populate this tab reliably."
 
 ### Step 4 — Fill the Oracle Notes cells (the reasoning step)
 
-This is the substantive part of the workflow. Oracle is writing context to up to ~50 cells across 9 sections. Not every cell gets filled — for each cell, decide between three outcomes:
+For each department section identified in Step 3, the **data rows** are every row between its header and the next recognized header (whether that's another department header, an action-items anchor, or the column-A-empty/column-B-Target sub-header rows).
 
-1. **The line item was discussed in the transcript.** Write what was said, in Oracle's voice (third-person objective). Include who flagged what if it's relevant. Keep it tight — one or two sentences usually.
+For each data row in each section, decide between three outcomes:
 
-2. **The line item wasn't discussed, but Oracle has cross-reference data worth surfacing.** Write the cross-ref note, prefixed with `(no team discussion — context from HubSpot/GG)` or `(no team discussion — context from web)`. Examples: pipeline counts that contradict the actual reported number, recent news about a funder, GG database matches for a highlighted grant.
+1. **The line item was discussed in the transcript.** Write what was said in column E for that row, in Oracle's voice (third-person objective). Keep it tight — one or two sentences usually.
 
-3. **Nothing relevant either way.** Leave blank. Don't fill cells just because they're there.
+2. **The line item wasn't discussed, but Oracle has cross-reference data worth surfacing.** Write the cross-ref note in column E, prefixed with `(no team discussion — context from HubSpot/GG)` or `(no team discussion — context from web)`. Examples: pipeline counts that contradict the actual reported number, recent news about a funder, GG database matches for a highlighted grant.
 
-Cells to consider, by section:
+3. **Nothing relevant either way.** Leave column E blank. Don't fill cells just because they're there.
 
-| Section | Header cell | Per-line cells Oracle writes to | Notes |
-|---|---|---|---|
-| Company KPIs | E19 (skip — header) | E20:E26 | KPI rows: Monthly Subs, Pending Approvals, New Clients, Renewals, Pipeline |
-| Strat | E29 (skip) | E30:E33 | Outreach/Leads, New Grants, 20 DCs, Challenges/Support |
-| GCs | E34 (skip) | E35:E43 | Deal stages, training stages, hiring stages, vetting, claims, Challenges |
-| Research | E44 (skip) | E45:E48 | New Grants, Updates, Funder Reachouts, Challenges |
-| Marketing/Comms | E49 (skip) | E50:E58 | Calculator subs, Pro/Online, LinkedIn, Blogs, Elivated, Challenges. **Skip E53 and E55 — empty-label sub-rows of E52 and E54.** |
-| AI | E59 (skip) | E60:E61 | Single data row + Challenges. AI section has Chris demoing/discussing AI work — write objectively ("Chris demoed X", not "I demoed X") |
-| Finance | E62 (skip) | E63:E69 | Multiple data rows + Challenges |
-| Research Grant Highlights | E71 (skip) | E72:E74 | Per-grant cells. Cross-reference each highlighted grant against GG database AND web search; combine with team commentary if the grant was discussed |
-| Quarterly Goals | E75 (skip) | E76:E82 | Per-quarterly-metric context |
+**Header row protection.** Every section header row identified in Step 3 has column E left untouched. The Template seeds those cells with the literal text "Oracle Notes" — don't overwrite that. If column E of a header row is somehow blank, still don't write to it.
 
-The header cells (E19, E29, E34, E44, E49, E59, E62, E71, E75) already say "Oracle Notes" in the Template — don't overwrite those.
+**Empty-label rows.** Some sections have rows where column A is empty but column B/C/D have data — these are continuation rows of the row above (e.g., LinkedIn metric breakdowns under "LinkedIn - last 7 days", or sub-rows under "Online Services"). Skip these. The discussion context belongs in the parent row's column E.
 
 **Cross-reference behavior.** When the transcript mentions a verifiable claim, look it up:
 - Deal/company claims → `search_grant_applications` (with `company_name`) or `search_hubspot_companies` (with `query`)
@@ -98,73 +100,87 @@ The header cells (E19, E29, E34, E44, E49, E59, E62, E71, E75) already say "Orac
 
 When the transcript matches reality, write the note as stated. When it contradicts, write the note AND flag the contradiction inline. Don't quietly correct — surface disagreements so humans can resolve.
 
+**Voice rules.**
+
+*Third-person objective throughout.* "Chris demoed the new workflow", not "I demoed". Even when the cells are written by Oracle on Chris's behalf, the artifact is for the team.
+
+*Name attribution — be conservative.* Only attribute a statement by name when the transcript explicitly identifies the speaker for that specific statement. If the transcript shows a comment without a clear speaker tag, write it without naming anyone. Use neutral phrasing instead: "Team noted...", "Discussion covered...", or just state the fact directly. Don't infer who said something based on context, role, or which department the topic falls under. (The exception is action item ownership in Step 6 — for those, work harder to determine ownership because that's the operational point.)
+
 **Example cell content:**
 
-> E20 (Monthly Submissions): "Steph reported 12 submissions to date, on track for monthly target. Discussion focused on pushing remaining 4 by month-end."
+> Monthly Submissions row: "Q4 began this week — $50 actual against $100K monthly target. Heavy reliance on M/E grants this quarter; 2-3 RTRIs and 2 CanExports expected."
 
-> E30 (Strat - Outreach/Leads): "(no team discussion — context from HubSpot) 47 outreach activities logged this month against 100 target."
+> Strat - Outreach/Leads row: "(no team discussion — context from HubSpot) 5 outreach activities logged this month against 100 target."
 
-> E72 (Research Grant Highlights): "BC Employer Training Grant featured. GG database shows 3 active clients pursuing this; Steph noted strong fit for manufacturing leads. Web check: program reopened May 1 with $300K cap unchanged."
+> Research Grant Highlights row: "Graduate to Opportunity Innovate (GTO Innovate) confirmed as brand new — Nova Scotia hiring subsidy for master's/PhD grads, up to $31K, financial support for 2 years. GG database has 0 matches; net-new program."
 
-**Voice rule:** Third-person objective throughout, including the AI section. "Chris demoed the new workflow" not "I demoed". Even when the cells are written by Oracle on Chris's behalf, the artifact is for the team.
-
-**Write strategy:** Build the full set of cell updates first (in memory), then write in batches. Use `update_sheet_range` for the full E20:E82 range with an array of values rather than 50 individual calls. For ranges with skips (like E50:E58 where E53 and E55 are blank), pass empty strings for skipped rows so the existing content isn't disturbed. Note that batch ranges include the section-header rows (E29, E34, etc.) — pass empty strings for those too so the "Oracle Notes" headers aren't overwritten.
+**Write strategy.** Build the full set of cell updates first (in memory), then write column E in one batch using `update_sheet_range` with a range covering all the data rows. For ranges that span multiple sections, pass empty strings for header rows, empty-label continuation rows, and rows where Oracle decided to leave the cell blank — those values won't disturb existing content because they're explicitly empty. Confirm via the section map from Step 3 that header rows get empty-string values, never content.
 
 ### Step 5 — Mark last week's action items
 
-Read the action items rows (already captured in Step 3, A85:E91). Each row has: A=description, B=responsibility, C=2nd responsibility, D=due date, E=Done? (boolean).
+Find the "Action Items from last week" row (located in Step 3). The action item rows are every row between this anchor and the "Action Items for coming week" anchor. Skip any row in this range where column A is empty (no item to mark).
 
-For each non-empty row, search the transcript for evidence the item was completed, in progress, or blocked. Update column E:
-- `TRUE` if the transcript indicates completion
-- `FALSE` if not done, blocked, or no mention
+For each row that has content in column A, search the transcript for evidence the item was completed, in progress, or blocked. Update column E only:
+- `TRUE` if the transcript indicates clear completion
+- `FALSE` if not done, blocked, ambiguous, or no mention
 
-Write column E only — don't touch columns A-D of last week's items. Use `update_sheet_range` with range `'<tab>'!E85:E91` and a single column of values.
+Never write to columns A-D of last-week's items. Use `update_sheet_range` with a range targeting just column E of those rows.
 
-If there's ambiguity — e.g., transcript mentions partial progress — default to `FALSE` and surface it in the final summary. Don't mark `TRUE` unless there's clear evidence of completion.
+If transcript mentions partial progress, default to `FALSE` and surface it in the final summary. Don't mark `TRUE` unless there's clear evidence of completion.
 
 ### Step 6 — Propose coming-week action items
 
-The coming-week rows are A93:E101 — A=description, B=responsibility, C=2nd responsibility, D=due date, E=Done? (FALSE for new items).
+Find the "Action Items for coming week" anchor (located in Step 3) and the "Customer Headlines" anchor (the boundary).
 
-From the transcript, identify items the team committed to for the coming week. Look for explicit commitments ("I'll handle X", "let's get Y done by Friday") rather than aspirational discussion.
+The coming-week section is every row between these two anchors. Some rows in this section may already have content (e.g., a carry-forward item from the Template, or items that were typed in pre-meeting). Don't overwrite rows that already have content in column A.
 
-Don't overwrite rows that already have content. Find the first empty row (E93+) and write proposed items starting there. Stop at row 101 — if there are more items than rows, surface the overflow in the final summary rather than truncating silently.
+Find the first empty row below the "Action Items for coming week" anchor and below any pre-existing items. Write proposed new items starting there. Stop before reaching the "Customer Headlines" row.
 
 For each proposed item:
 - A: short action description
-- B: primary responsible party (use names from the transcript: Steph, Ruk, Natalie, etc., or department names: Strategy, GCs, Research)
+- B: primary responsible party (use names from the transcript — Steph, Ruk, Natalie, Olivia, Souad, Chris, Delpreet — or department names: Strategy, GCs, Research, Marketing, AI)
 - C: secondary responsible party if mentioned, else blank
 - D: due date if mentioned, else blank
 - E: FALSE
 
-Write with `update_sheet_range` using range `'<tab>'!A93:E101`.
+Identify items the team committed to, not aspirational discussion. Look for explicit commitments ("I'll handle X", "let's get Y done by Friday", "[name] is owning this").
+
+For action item ownership specifically, work harder than for general name attribution — the operational value of these rows is knowing who's doing what. If the transcript doesn't make ownership clear, infer from the context (whoever raised the work, whoever owns the area) but be conservative: when truly ambiguous, leave column B blank and surface the unassigned items in the final summary.
+
+If there are more proposed items than rows available before "Customer Headlines", list the overflow in the final summary rather than truncating silently. Don't insert new rows or push other content down.
+
+Use `update_sheet_range` with a range targeting just the rows being added (A:E of the empty rows in the coming-week section).
 
 ### Step 7 — Final summary
 
 After all writes complete, summarize for the user:
+
 - Tab populated and date
-- Count of Oracle Notes cells filled (e.g., "Filled 31 of ~50 candidate cells; rest left blank because not discussed and no relevant cross-ref")
+- Count of Oracle Notes cells filled (e.g., "Filled 31 cells; rest left blank because not discussed and no relevant cross-ref")
 - Any contradictions flagged during cross-reference
-- Any action items marked differently than they currently appeared (e.g., "Marked R86 'Update marketing dashboard' as done based on Steph mentioning shipped Tuesday")
-- Any proposed coming-week items that didn't fit (overflow past row 101)
+- Any action items marked differently than they currently appeared
+- Any unassigned coming-week items (column B blank)
+- Any proposed coming-week items that didn't fit (overflow before Customer Headlines)
 
 Don't enumerate every cell — the user can read the sheet. Surface the parts that need human attention.
 
 ## Out of scope
 
-- The Identify/Discuss/Solve section at row 109+ — skip entirely.
+- The Identify/Discuss/Solve section — skip entirely.
 - Tab creation or duplication — humans handle this before invoking the workflow.
 - Old tabs that predate the Oracle Notes column — only process tabs duplicated from the current Template.
-- The Bravo Card row (115).
+- The Bravo Card row.
 - Retroactive backfilling of historical tabs.
 - Modifying the Template tab itself.
 
 ## Common failure modes
 
-- **Tab name mismatch** — the date is right but the tab name has irregular spacing/punctuation. Always match on date components, not exact string.
+- **Tab name mismatch** — the date is right but the tab name has irregular spacing/punctuation. Always match on date components, not exact string. If the user gave an exact tab name, use that exact name.
 - **No Granola meeting found** — the staff meeting may be recorded under a slightly different title or the wrong date due to timezone. Try ±1 day before giving up.
 - **Sparse transcripts** — if the transcript is under ~500 words, the recap will be thin. Tell the user before writing notes.
 - **Cross-reference timeouts** — if a HubSpot lookup or web search fails, write the note without verification rather than blocking. Note the unverified status.
 - **Filling cells with filler** — if there's no discussion AND no relevant cross-ref, leave the cell blank. Don't write "No discussion this week" in 30 cells.
+- **Writing to header rows** — every section header row (Strat, GCs, Company KPIs, etc.) has column E that says "Oracle Notes" or is blank. Don't overwrite. Verify against the section map from Step 3 before writing.
+- **Row numbers from memory** — never use a remembered row number from a previous run. Always use the section map from Step 3 of the *current* tab.
 - **First-person voice creep** — when summarizing AI section content where Chris was the speaker, the temptation is to write "I" or "we" — always third-person.
-- **Template drift** — if the validation step (3.5) fails, stop and surface the drift. Don't write to wrong rows.
+- **Over-attribution** — only name a speaker when the transcript explicitly tags them for that statement. Default to neutral phrasing.
