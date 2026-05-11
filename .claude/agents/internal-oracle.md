@@ -173,8 +173,8 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - `sub_skill="OTHER_CONTENT"` — Emails, LinkedIn posts, webinar promo, success stories, partnership outreach
 - `sub_skill="DATA_SOURCES"` — What to pull from (HubSpot, grants DB, web), Level 1 vs Level 2 rules, citation conventions
 
-**Genre Tagging:**
-When asked to tag a program, research a grant's fit with smart filters, or assess a program's genre associations, use the scoring rubric in `.claude/skills/genre-tagging/SKILL.md`. Can tag individual programs or explain how a program relates to a smart filter. No skill loading required — reference the skill file directly.
+**Grant Card Tagging:**
+- `sub_skill="OVERVIEW"` — Score grant programs across 13 fields × 52 genres on 0-3 scale (matches GG2 v2 mirror taxonomy). Load with `load_skill(skill_name="grant-card-tagging", sub_skill="OVERVIEW")` when asked to tag a program, assess a grant's genre associations, or score smart-filter fit.
 
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation

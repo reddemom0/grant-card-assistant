@@ -82,7 +82,7 @@ Separate world with its own:
 
 ## Skills
 
-Skills are runtime-loadable content modules that agents invoke via the `load_skill` tool. Currently **8 registered skills**: `sales`, `research`, `grants`, `canexport-writer`, `bcafe-writer`, `hubspot`, `granted-marketing`, `genre-tagging`.
+Skills are runtime-loadable content modules that agents invoke via the `load_skill` tool. Currently **10 registered skills**: `sales`, `research`, `grants`, `canexport-writer`, `bcafe-writer`, `hubspot`, `granted-marketing`, `staff-meeting-recap`, `grant-card-writing`, `grant-card-tagging`.
 
 **Critical: skills have FIVE registration touchpoints.** Missing any one causes silent drift:
 1. Folder + files on disk under `.claude/skills/{skill-name}/`

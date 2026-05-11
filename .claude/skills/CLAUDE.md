@@ -65,7 +65,8 @@ The "Invoked by" column shows agents whose prompts actually invoke the skill —
 | `bcafe-writer` | `FINAL_REPORT` | bcafe-writer |
 | `hubspot` | `DEAL_CREATION` | Oracle |
 | `granted-marketing` | `overview`, `FOUNDATIONS`, `COMPANY_CONTEXT`, `GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`, `DATA_SOURCES` | Oracle |
-| `genre-tagging` | `overview` | (available to any agent with `LOAD_SKILL_TOOL`; no prompt currently invokes it) |
+| `grant-card-writing` | `OVERVIEW`, `RD`, `BUSINESS_ASSESSMENT`, `MARKET_EXPANSION`, `HIRING_TRAINING`, `SYSTEMS_PROCESSES`, `CAPITAL_COST`, `LOANS`, `INVESTMENT`, `PRIZES_CONTESTS` | grant-card-generator |
+| `grant-card-tagging` | `OVERVIEW` | grant-card-generator |
 
 ### Which agents have `LOAD_SKILL_TOOL`
 
@@ -75,6 +76,7 @@ Only agents with `LOAD_SKILL_TOOL` in their `getToolsForAgent` case (see `src/to
 - `canexport-writer` (line 2091)
 - `internal-oracle` (line 2105)
 - `orchestrator` (line 2114) — receives it transitively via `ALL_TOOLS`
+- `grant-card-generator` (line 2257)
 
 Having the tool doesn't mean a skill is invoked. `bcafe-writer` and `canexport-writer` have `LOAD_SKILL_TOOL` and HubSpot tool access, but their prompts don't instruct invoking `hubspot/DEAL_CREATION`. Only Oracle's prompt currently invokes the `hubspot` skill.
 
@@ -86,7 +88,7 @@ Having the tool doesn't mean a skill is invoked. `bcafe-writer` and `canexport-w
 
 ## Naming conventions
 
-The `overview` sub-skill is consistently lowercase across every skill that uses it (`grants`, `canexport-writer`, `granted-marketing`, `genre-tagging`). Use `overview` when creating an entry-point sub-skill.
+The `overview` sub-skill is consistently lowercase across every skill that uses it (`grants`, `canexport-writer`, `granted-marketing`, `staff-meeting-recap`). Newer skills (`grant-card-writing`, `grant-card-tagging`) use uppercase `OVERVIEW` for the parent entry — both casings coexist intentionally in the global `sub_skill` enum.
 
 For non-`overview` sub-skills, convention splits by vintage:
 

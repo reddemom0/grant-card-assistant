@@ -12,6 +12,13 @@ Format:
 
 ---
 
+## 2026-05-11 — Grant card agent rewrite to skill-based architecture
+**What:** Replaced 1,288-line `grant-card-generator` prompt with 172-line workflow orchestrator. Added `grant-card-writing` skill (parent `OVERVIEW` + 9 grant-type sub-skills: `RD`, `BUSINESS_ASSESSMENT`, `MARKET_EXPANSION`, `HIRING_TRAINING`, `SYSTEMS_PROCESSES`, `CAPITAL_COST`, `LOANS`, `INVESTMENT`, `PRIZES_CONTESTS`) and `grant-card-tagging` skill (`OVERVIEW`: 13 fields × 52 genres, 0-3 scoring, GG2 v2 mirror-taxonomy compatible). Deleted `genre-tagging` stub. Added `LOAD_SKILL_TOOL` to `grant-card-generator` loadout — meaningful capability change. New uppercase `OVERVIEW` sub-skill entry coexists with existing lowercase `overview` (both intentional).
+**Why:** Old prompt cited 4 non-existent KB docs (`GRANT-CRITERIA-Formatter Instructions`, `PREVIEW-SECTION-Generator`, `GENERAL-REQUIREMENTS-Creator`, `MISSING-INFO-Generator`), advertised a fictional `searchGrants` tool (real tool is `search_getgranted`, already wired), and instructed `load_skill` calls the agent couldn't make. Skill-based architecture separates orchestration (agent prompt) from general format rules (`OVERVIEW`) from type-specific section rules (per-type sub-skill) from tagging taxonomy — each piece individually editable.
+**Impact:** `.claude/agents/grant-card-generator.md` (rewritten), `.claude/skills/grant-card-writing/` (new, 10 files), `.claude/skills/grant-card-tagging/` (new, 1 file), `.claude/skills/genre-tagging/` (deleted), `src/tools/load-skill.js`, `src/tools/definitions.js` (`SKILL_PATHS`, `skill_name` + `sub_skill` enums, `LOAD_SKILL_TOOL.description`, `grant-card-generator` loadout), root `CLAUDE.md`, `.claude/skills/CLAUDE.md`, `.claude/recipes/add-skill.md`.
+
+---
+
 ## 2026-04-30 — Granola MCP integration: 4-task architectural arc
 **What:** First remote-MCP-as-tool-source integration in the hub, shipped across Tasks 1 (streamable-HTTP client foundation), 2 (per-user OAuth token storage), 3A-C (DCR client storage, OAuth flow, tool wiring), and 4 (connection UI). Seven decisions worth preserving:
 1. **SDK-managed OAuth ceremony** — implement only `OAuthClientProvider` storage adapters; the SDK handles DCR, PKCE, and refresh. Avoided ~200 lines of hand-rolled crypto.

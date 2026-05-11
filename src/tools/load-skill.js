@@ -60,11 +60,23 @@ const SKILL_PATHS = {
     OTHER_CONTENT: '.claude/skills/granted-marketing/OTHER_CONTENT.md',
     DATA_SOURCES: '.claude/skills/granted-marketing/DATA_SOURCES.md'
   },
-  'genre-tagging': {
-    overview: '.claude/skills/genre-tagging/SKILL.md'
-  },
   'staff-meeting-recap': {
     overview: '.claude/skills/staff-meeting-recap/SKILL.md'
+  },
+  'grant-card-writing': {
+    OVERVIEW: '.claude/skills/grant-card-writing/OVERVIEW.md',
+    RD: '.claude/skills/grant-card-writing/RD.md',
+    BUSINESS_ASSESSMENT: '.claude/skills/grant-card-writing/BUSINESS_ASSESSMENT.md',
+    MARKET_EXPANSION: '.claude/skills/grant-card-writing/MARKET_EXPANSION.md',
+    HIRING_TRAINING: '.claude/skills/grant-card-writing/HIRING_TRAINING.md',
+    SYSTEMS_PROCESSES: '.claude/skills/grant-card-writing/SYSTEMS_PROCESSES.md',
+    CAPITAL_COST: '.claude/skills/grant-card-writing/CAPITAL_COST.md',
+    LOANS: '.claude/skills/grant-card-writing/LOANS.md',
+    INVESTMENT: '.claude/skills/grant-card-writing/INVESTMENT.md',
+    PRIZES_CONTESTS: '.claude/skills/grant-card-writing/PRIZES_CONTESTS.md'
+  },
+  'grant-card-tagging': {
+    OVERVIEW: '.claude/skills/grant-card-tagging/OVERVIEW.md'
   }
 };
 

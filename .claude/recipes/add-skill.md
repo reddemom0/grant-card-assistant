@@ -20,7 +20,7 @@ Collect these from the user before touching any file. If any are unclear, stop a
 
 1. **Skill name** — lowercase-kebab-case (e.g., `granted-validation`, `workbc-claims`). For new skills, folder name should match skill name. Note: three legacy skills (`sales`, `grants`, `research`) use `-consultant`-suffixed folder names (`sales-consultant/`, etc.); don't copy that pattern for new skills.
 2. **Sub-skill name(s)** — one or more. Naming convention depends on skill:
-   - For new skills or sub-skills added to `canexport-writer`, `bcafe-writer`, `hubspot`, `granted-marketing`, `genre-tagging`: use UPPERCASE_SNAKE_CASE (e.g., `RUBRIC_V1`, `CLAIMS_PACKAGE`)
+   - For new skills or sub-skills added to `canexport-writer`, `bcafe-writer`, `hubspot`, `granted-marketing`, `grant-card-writing`, `grant-card-tagging`: use UPPERCASE_SNAKE_CASE (e.g., `RUBRIC_V1`, `CLAIMS_PACKAGE`)
    - For sub-skills added to `sales`, `grants`, `research`: use lowercase_snake_case (e.g., `lead_farming`, `eligibility`)
    - The `overview` sub-skill name is reserved for top-level skill entry points
 3. **Skill content** — the `.md` file content for each sub-skill. Must be pre-written before starting this recipe.
@@ -38,7 +38,7 @@ ls .claude/skills/
 If a folder with your proposed name already exists, STOP. Either you're adding a sub-skill (skip Step 1 below) or you need a different name.
 
 **Check 2: sub-skill names don't collide with existing enum values**
-Read `src/tools/definitions.js` lines 1386-1393 (the `sub_skill` enum). The `sub_skill` namespace is GLOBAL across all skills — if any existing skill uses the same sub-skill name, you'll share the enum entry. The `overview` entry is already shared across `grants`, `canexport-writer`, `granted-marketing`, `genre-tagging` — this is intentional. For other names, decide deliberately whether sharing or renaming is correct.
+Read `src/tools/definitions.js` lines 1386-1393 (the `sub_skill` enum). The `sub_skill` namespace is GLOBAL across all skills — if any existing skill uses the same sub-skill name, you'll share the enum entry. The lowercase `overview` entry is already shared across `grants`, `canexport-writer`, `granted-marketing`, `staff-meeting-recap`; the uppercase `OVERVIEW` entry is shared across `grant-card-writing`, `grant-card-tagging` — both are intentional. For other names, decide deliberately whether sharing or renaming is correct.
 
 **Check 3: at least one target agent has `LOAD_SKILL_TOOL`**
 Open `src/tools/definitions.js`, find `getToolsForAgent` at line 2047. Agents with `LOAD_SKILL_TOOL`: `bcafe-writer` (line 2083), `canexport-writer` (line 2091), `internal-oracle` (line 2105), and `orchestrator` via `ALL_TOOLS` (line 2114).
@@ -99,7 +99,7 @@ Append your skill name to the array. Live enum is insertion-order, not alphabeti
 ```javascript
 skill_name: {
   type: "string",
-  enum: ["sales", "research", "grants", "canexport-writer", "bcafe-writer", "hubspot", "granted-marketing", "genre-tagging", "<your-skill-name>"]
+  enum: ["sales", "research", "grants", "canexport-writer", "bcafe-writer", "hubspot", "granted-marketing", "staff-meeting-recap", "grant-card-writing", "grant-card-tagging", "<your-skill-name>"]
 }
 ```
 
@@ -118,7 +118,7 @@ Open `src/tools/definitions.js`, find `LOAD_SKILL_TOOL.description` (lines 1305-
 - `<skill-name>`: <one-line purpose>
 ````
 
-**4b: Add at least one invocation example** in the examples block (runs from 1362-1375). Insert before line 1375 (the genre-tagging example):
+**4b: Add at least one invocation example** in the examples block (runs from 1362-1375). Insert before the trailing grant-card-tagging example line:
 ````
 "<natural language trigger>" → load_skill(<skill-name>, <SUB_SKILL>)
 ````

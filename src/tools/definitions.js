@@ -1414,11 +1414,23 @@ Use when simple information retrieval is insufficient and you need specialized e
 - \`OTHER_CONTENT\` - Other content formats (newsletters, case studies, etc.)
 - \`DATA_SOURCES\` - Content sourcing and data references
 
-**Genre Tagging Skill:**
-- \`overview\` - Score grant programs against Granted smart filter genres (v1: Building Bench of Talent)
-
 **Staff Meeting Recap Skill:**
 - \`overview\` - End-to-end weekly staff meeting recap (Granola transcript → Weekly Staff Meeting Sheet Oracle Notes column + last-week/coming-week action items). MANDATORY for any "process/recap/fill in [date] staff meeting" request.
+
+**Grant Card Writing Skill:**
+- \`OVERVIEW\` - General formatting rules, grant-type detection, and routing to the type-specific sub-skill (load first)
+- \`RD\` - R&D grant card format (TRL, scalability, IP, GHG outcomes)
+- \`BUSINESS_ASSESSMENT\` - Advisory/planning/coaching grant card format
+- \`MARKET_EXPANSION\` - Domestic/international market entry grant card format
+- \`HIRING_TRAINING\` - Wage subsidy/student placement/workforce grant card format
+- \`SYSTEMS_PROCESSES\` - Software adoption/automation/process improvement grant card format
+- \`CAPITAL_COST\` - Equipment/facility/retrofit grant card format
+- \`LOANS\` - Repayable financing program card format
+- \`INVESTMENT\` - Equity investment program card format
+- \`PRIZES_CONTESTS\` - Competition/award/prize program card format
+
+**Grant Card Tagging Skill:**
+- \`OVERVIEW\` - Score grant programs across 13 fields × 52 genres on 0-3 scale (matches GG2 v2 mirror taxonomy)
 
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
@@ -1442,15 +1454,17 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)
 - "Create a WorkBC deal for TechCo" → load_skill(hubspot, DEAL_CREATION)
 - "Draft a Grant Blast for GetGranted" → load_skill(granted-marketing, GRANT_BLASTS)
-- "Score this program against smart filter genres" → load_skill(genre-tagging, overview)
 - "Process the May 6 staff meeting" → load_skill(staff-meeting-recap, overview)
-- "Recap last Tuesday's meeting" → load_skill(staff-meeting-recap, overview)`,
+- "Recap last Tuesday's meeting" → load_skill(staff-meeting-recap, overview)
+- "Write a grant card for this RFP" → load_skill(grant-card-writing, OVERVIEW)
+- "This looks like an R&D program — generate the card" → load_skill(grant-card-writing, RD)
+- "Generate genre tags for this program" → load_skill(grant-card-tagging, OVERVIEW)`,
   input_schema: {
     type: 'object',
     properties: {
       skill_name: {
         type: 'string',
-        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'genre-tagging', 'staff-meeting-recap'],
+        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'staff-meeting-recap', 'grant-card-writing', 'grant-card-tagging'],
         description: 'The skill domain to load'
       },
       sub_skill: {
@@ -1461,9 +1475,11 @@ Use when simple information retrieval is insufficient and you need specialized e
           'PROGRAM_DETAILS', 'APPLICATION_STRUCTURE', 'KNOWLEDGE_BASE_INDEX',
           'STAGE_1_READINESS', 'STAGE_1_BUDGET_GUIDE', 'STAGE_1_INTERVIEW_QUESTIONS',
           'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT', 'DEAL_CREATION',
-          'FOUNDATIONS', 'COMPANY_CONTEXT', 'GRANT_BLASTS', 'BLOGS', 'OTHER_CONTENT', 'DATA_SOURCES'
+          'FOUNDATIONS', 'COMPANY_CONTEXT', 'GRANT_BLASTS', 'BLOGS', 'OTHER_CONTENT', 'DATA_SOURCES',
+          'OVERVIEW', 'RD', 'BUSINESS_ASSESSMENT', 'MARKET_EXPANSION', 'HIRING_TRAINING',
+          'SYSTEMS_PROCESSES', 'CAPITAL_COST', 'LOANS', 'INVESTMENT', 'PRIZES_CONTESTS'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), OTHER_CONTENT (newsletters/case studies), DATA_SOURCES (content sourcing). For genre-tagging: overview (score programs against smart filter genres).'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), OTHER_CONTENT (newsletters/case studies), DATA_SOURCES (content sourcing). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible).'
       }
     },
     required: ['skill_name', 'sub_skill']
@@ -2255,8 +2271,8 @@ export function getToolsForAgent(agentType) {
   // Curated tool sets per agent - only include what each agent actually uses
   switch (agentType) {
     case 'grant-card-generator':
-      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools)`);
-      return [...baseTools, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
+      console.log(`🔧 Agent ${agentType} using curated tool set (${baseTools.length + 1 + coreHubSpotTools.length + GOOGLE_DRIVE_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools)`);
+      return [...baseTools, LOAD_SKILL_TOOL, ...coreHubSpotTools, ...GOOGLE_DRIVE_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
 
     case 'etg-writer':
     case 'buybc-writer':
