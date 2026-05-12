@@ -58,7 +58,8 @@ const SKILL_PATHS = {
     GRANT_BLASTS: '.claude/skills/granted-marketing/GRANT_BLASTS.md',
     BLOGS: '.claude/skills/granted-marketing/BLOGS.md',
     OTHER_CONTENT: '.claude/skills/granted-marketing/OTHER_CONTENT.md',
-    DATA_SOURCES: '.claude/skills/granted-marketing/DATA_SOURCES.md'
+    DATA_SOURCES: '.claude/skills/granted-marketing/DATA_SOURCES.md',
+    EXPLORATION: '.claude/skills/granted-marketing/EXPLORATION.md'
   },
   'staff-meeting-recap': {
     overview: '.claude/skills/staff-meeting-recap/SKILL.md'
