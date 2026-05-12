@@ -167,10 +167,10 @@ Use this to match length, specificity, and CTA to the audience.
 When a Grant Blast cites stats, they come from one of these sources:
 
 ### Granted's own stats
-- **Per-program success rate** — from HubSpot (Level 2 integration)
-- **Typical turnaround time** — from HubSpot
-- **Number of applications supported** — from HubSpot
-- **General aggregate proof** — 92% / 18,000+ / 1,400+ (always available, use exactly)
+- **Per-program success rate** — call `get_program_stats(program_name)`. Apply citation discipline from `DATA_SOURCES` (confidence thresholds, zero-losses rule).
+- **Typical turnaround time** — call `get_program_stats(program_name)`; the `avg_deal_days` field returns deal-creation-to-close days. Note: this is not the same as submission-to-approval — cite as "average deal turnaround" not "average approval time."
+- **Number of applications supported** — call `get_deal_count(program_name, date_range_months)`.
+- **General aggregate proof** — 92% / 18,000+ / 1,400+ (use exactly from `COMPANY_CONTEXT`).
 
 ### Public stats (when Granted-specific isn't available)
 - Program-wide success rates reported elsewhere (e.g., CanExport 36–40%, RTRI 6%)

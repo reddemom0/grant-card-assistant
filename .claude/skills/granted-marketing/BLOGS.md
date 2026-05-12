@@ -64,8 +64,17 @@ The Oracle asks for any missing:
 2. **SEO keyword** (if SEO-driven)
 3. **Length target** (default 1,200–1,800 words)
 4. **CTA destination** — grant calculator, demo, specific landing page, subscribe
-5. **Specific data to include** — program names, stats, recent news tie-ins
-6. **Any case study or client example to reference** — check `COMPANY_CONTEXT` for the public list
+5. **Any case study or client example to reference** — check `COMPANY_CONTEXT` for the public list
+
+Then ground the draft by fetching real data — never write from training memory:
+
+- **Program details** — for any program named in the blog, call `search_getgranted` to get current eligibility, funding amount, and deadline. Cite from the tool result, not from memory.
+- **Recent client questions** — call `granola_query_meetings(query="<topic keyword>")` to surface real client confusion or objections from recent consulting calls. These make the blog read true-to-life. Skip the call if the blog is purely evergreen with no current-week framing.
+- **Recent grantor changes** — call `get_visualping_alerts(days=30, priority="medium")` if the blog references a specific program; post-filter the results for that program's URL to confirm nothing material changed recently that would make the blog stale on publication.
+- **News tie-in (optional)** — call `web_search` if the blog ties to current news (a budget release, a federal announcement). Only for time-sensitive framing.
+- **Granted's own stats** — for portfolio aggregates (92%, 18,000+, 1,400+), use `COMPANY_CONTEXT` values exactly. For program-specific stats, call `get_program_stats(program_name)` and apply the citation discipline from `DATA_SOURCES`.
+
+If the user can supply the data themselves and prefers to, that's fine too — the discipline is that data either comes from a tool call or from the user, never from training memory.
 
 ### Step 3 — Pick a structural template
 
@@ -132,19 +141,25 @@ User says: *"Refresh the [topic] blog"* or *"Which blog should we refresh this m
 
 ### Step 1 — Identify candidates
 
-If the user specifies a blog, use that. If not, the Oracle recommends candidates based on:
+If the user specifies a blog, use that. If not, the Oracle recommends candidates by combining signals:
 
-- **Program changes** — blogs that reference programs with recent amount changes, new eligibility, new deadlines
-- **Seasonal relevance** — blogs matching upcoming content calendar moments (e.g., budget-season blogs before budget release)
-- **Stale figures** — blogs with year-specific stats from 2024 or earlier
-- **Traffic/performance signals** — blogs that rank well but haven't been updated in 6+ months (Level 2: pulls traffic data)
+- **Program changes** — call `get_visualping_alerts(days=60, priority="medium")` to find programs that have had material changes (deadline shifts, funding changes, eligibility updates, new programs). Any blog referencing one of these programs is a strong refresh candidate.
+- **Stale program details** — for blogs referencing specific programs by name, call `search_getgranted` on the named program. Compare the live amounts, deadlines, and eligibility against what the blog currently says. Discrepancies = refresh signal.
+- **Seasonal relevance** — blogs matching upcoming content calendar moments (e.g., budget-season blogs before budget release). The hardcoded 2026 calendar in §5 covers the planned rhythm; for what's actually scheduled this week, see the calendar source note at the end of §5.
+- **Stale figures** — blogs with year-specific stats from 2024 or earlier are mechanical refresh candidates regardless of program changes.
+- **Traffic/performance signals** — *not currently tool-backed.* No blog analytics tool exists in Oracle's toolkit yet. If the user has traffic data, they can supply it; otherwise this criterion is not available.
 
 ### Step 2 — List what's changed
 
-Before editing, identify:
-- **What's changed** in the program or topic since the blog was written
-- **What's stale** (dates, amounts, eligibility criteria, program names that have been renamed)
-- **What new intel is available** — from recent consulting conversations, HubSpot data, public program updates
+Before editing, run these queries and combine the results:
+
+1. **Live program details** — `search_getgranted` on every program named in the blog. Note any discrepancies between blog content and current eligibility, amounts, deadlines, or program names.
+2. **Grantor page changes** — `get_visualping_alerts(days=90, priority="medium")` and post-filter for each named program's URL. Recent changes flagged by Visualping are likely already reflected in `search_getgranted` results, but the alert payload often surfaces *what specifically changed* in human-readable form.
+3. **New intel from the team** — `granola_query_meetings(query="<program name>")` to surface what consultants have learned about each program in the past 1-2 months. Patterns ("clients keep asking X," "the form now requires Y") are blog gold.
+4. **Granted's own track record** — `get_program_stats(program_name)` if the blog cites historical numbers. Update if confidence is medium-or-higher and the new numbers differ from what's published.
+5. **External news** — `web_search` for budget releases, federal announcements, or sector news from the past 60 days that could update the blog's framing.
+
+Compile the findings as: **what's stale** (specific blog passages with their replacement source), **what's new** (passages to add), **what's still accurate** (don't touch).
 
 ### Step 3 — Produce targeted edits
 
@@ -207,6 +222,8 @@ Use these as the default monthly picks unless redirected:
 | November | Federal Budget Release |
 | December | Break |
 
+**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar lives in the "2026 Marketing/Ops Calendar" Google Sheet (`1QdnkahdfEx18HCBj6Ky1Eb-akB-KAlEwFVcsYOsMshQ`). When the user asks *"what's actually scheduled this week?"* or *"what blog is up for [month]?"*, call `read_sheet_range` against the relevant month's tab (tabs are named for the month: `January`, `February`, etc.). The Sheet uses a visual weekly-grid layout, not a clean table — parse blog entries by looking for "Blog:" prefixes in the day cells. Oracle has read-only access; do not attempt writes.
+
 ---
 
 ## 6. Backlog topics (refresh or replacement options)
@@ -262,7 +279,7 @@ Including a "what grants don't fund" section in a blog is often a trust-builder 
 
 - **"Ultimate guide" posts without specifics.** Generic, encyclopedic content that doesn't help the reader decide anything.
 - **Burying the CTA.** The reader should know what to do next before they leave the page. Don't hide the CTA in the last line of a wall of text.
-- **Stale program details.** Funding amounts, deadlines, eligibility change. If a blog references any of these, flag for the user: *"[confirm current figures for this program]"*.
+- **Stale program details.** Funding amounts, deadlines, eligibility change. If a blog references any of these, do not flag for the user — call `search_getgranted` on the named program and use the live values. Falling back to "[confirm current figures]" is acceptable only if the tool returns nothing or errors.
 - **Over-claiming eligibility in writing.** A blog that reads *"your business can apply for…"* creates legal and reputation risk. Use *"may qualify if..."* / *"eligible businesses include..."*
 - **Fabricating case study numbers.** Only reference clients on the public list (see `COMPANY_CONTEXT`). For anonymous examples, use *"a BC-based manufacturer"* style — not invented specifics like "Acme Corp secured $100K."
 - **Pulling strategic application advice into public content.** *"Here's exactly how to frame your CanExport application"* — paid-tier only. Public content teaches eligibility and opportunity; strategic angles are gated.
@@ -328,9 +345,9 @@ Including a "what grants don't fund" section in a blog is often a trust-builder 
 
 ### Oracle's approach
 
-1. **Identify stale content** — any program names that have changed, funding amounts that moved, deadlines or eligibility criteria that changed in the last year
-2. **Layer new intel** — what have we learned since writing it? (From recent consulting conversations — Level 2 pull from transcripts when available)
-3. **Flag budget-era context** — is there a provincial or federal budget that would inform one of the myths?
+1. **Identify stale content** — call `search_getgranted` on every program named in the blog; flag any discrepancies between blog text and live program details.
+2. **Layer new intel** — call `granola_query_meetings(query="grant myths")` or similar to surface what consultants have learned since the original publication. Patterns from real client conversations beat training-data assumptions.
+3. **Flag budget-era context** — call `web_search` for recent provincial or federal budget announcements that could update the myths (e.g., a budget that changes the SR&ED timing myth).
 
 ### Output
 
