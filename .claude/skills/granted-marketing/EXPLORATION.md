@@ -1,0 +1,195 @@
+---
+name: granted-marketing / EXPLORATION
+description: How to use Oracle's data tools to find what's worth writing about. Load when the user is asking what to write — brainstorming, weekly briefings, topic discovery, "what's interesting this week." Do NOT load for direct drafting requests where the subject is already settled.
+---
+
+# Marketing Exploration
+
+> **Purpose.** Teach Oracle to look at the data *before* deciding what to draft — to surface activity, shifts, and angles the marketer didn't know to ask about. This sub-skill covers idea generation. Verification of specific numbers in final output is covered separately in `DATA_SOURCES`.
+
+> **Prerequisites.** Load `FOUNDATIONS` first (voice, audience, anti-fabrication rules). Load `DATA_SOURCES` alongside this file when the exploration is likely to feed into copy with specific numbers — most exploration sessions do.
+
+---
+
+## 1. When to load this sub-skill
+
+Load `EXPLORATION` when the user is asking **what to write about**:
+
+- *"What should we send out this week?"*
+- *"Help me brainstorm a blog topic"*
+- *"Anything interesting in the data?"*
+- *"Got a Grant Blast for me to do?"*
+- *"What success stories could we write up?"*
+- *"Pitch me three angles for a LinkedIn post"*
+
+Do NOT load `EXPLORATION` when the subject is already settled:
+
+- *"Draft a Grant Blast for CanExport"* — subject specified, go straight to drafting
+- *"Rewrite this LinkedIn post in our voice"* — refinement, no exploration needed
+- *"Make this blog intro tighter"* — editing, no exploration needed
+- *"Turn this case study into a 500-word version"* — format change, no exploration needed
+
+When in doubt, ask: *"Is the user telling me what to write about, or asking me to help figure that out?"* Only the second case calls for exploration.
+
+---
+
+## 2. The three modes
+
+Every marketing request falls into one of three modes. Oracle reads the request to determine which.
+
+| Mode | Trigger | What Oracle does | Which sub-skills load |
+|---|---|---|---|
+| **Explore** | User is asking what to write | Run a structured digest, propose 2–3 angles, let user pick | `FOUNDATIONS` + `EXPLORATION` + relevant playbook + `DATA_SOURCES` |
+| **Draft** | Subject is settled | Go straight to the playbook for that content type | `FOUNDATIONS` + playbook + `COMPANY_CONTEXT` |
+| **Verify** | Output contains specific numbers | Apply citation discipline from `DATA_SOURCES` | `DATA_SOURCES` loads in addition to whatever else |
+
+Explore and Verify can both apply in a single conversation: exploration surfaces an angle, the user picks it, drafting proceeds, and verification kicks in when the draft cites numbers. They are stages, not alternatives.
+
+---
+
+## 3. The default move: the weekly digest
+
+When the user invokes exploration with no specific framing ("what's interesting this week?", "what should we write about?"), Oracle runs a structured digest. Same shape every time, so the marketer can scan it fast and the model can stabilize on the pattern.
+
+### The digest
+
+Run these queries in parallel where possible, then assemble:
+
+1. **Grantor page changes** — `get_visualping_alerts(days=14, priority="medium")` to capture material updates from the past two weeks. Available priority levels: `critical` (new programs, major changes), `high` (significant updates), `medium` (guideline tweaks), `low` (minor). Available change types: `new_program`, `deadline_change`, `eligibility_update`, `guidelines_update`, `funding_change`, `minor_update`. For the weekly digest, `priority="medium"` or higher excludes noise; use `change_type` to drill into a specific kind of change if needed.
+
+2. **Programs with recent activity** — `get_deal_count(program_name, date_range_months=3)` against the top 5–10 programs Granted typically works with (CanExport, ETG, IRAP, BC ETG, hiring grants). Surface the 2–3 with the most recent volume.
+
+3. **Programs opening or closing soon** — `search_getgranted` filtered to programs with status changes in the next 30 days.
+
+4. **Recent consulting conversations** — `granola_query_meetings` for the past 7–14 days, scanning for repeated client questions, common objections, or insight worth a blog. Search terms like "objection," "question," "didn't know," or specific program names.
+
+5. **Last week's digest** — `memory_recall(key="marketing_last_digest")` if it exists. Use this to avoid repeating the same angles. If today's queries surface the same top program as last week, find a different angle (industry slice, recent win, refresh angle) or skip it.
+
+### The output
+
+Return a one-screen brief in this shape:
+
+```
+This week's content options
+
+🟢 Grant Blast candidate(s) — [program name] — [why: e.g. "deadline in 18 days, 4 deals in pipeline this quarter, no Grant Blast sent on this program in the past 60 days"]
+📝 Blog angle(s) — [topic] — [why: e.g. "three consulting conversations this week hit the same objection about CanExport eligibility — could be a clarifier post"]
+🏆 Success story candidate(s) — [client name if consented, else industry/program shape] — [why: e.g. "won deal in past 30 days, no story written yet"]
+🔗 LinkedIn moment(s) — [topic] — [why: e.g. "[grantor] page updated yesterday — react to the change"]
+```
+
+Two to four total items, not all of each type. Stop at four — saturation is worse than a tight brief. Include the rationale on every item; it's how the marketer decides what to pick.
+
+After delivering the brief, store it: `memory_store(key="marketing_last_digest", value=<today's brief>)`. This lets next week's run avoid repetition. Next week, call `memory_recall(key="marketing_last_digest")` as the first step of the digest and use it to skip already-covered angles.
+
+---
+
+## 4. Scoped exploration
+
+When the user invokes exploration with a specific framing — an industry, a program, a content type — narrow the queries instead of running the full digest.
+
+### By industry
+
+User: *"Anything interesting in food and beverage this week?"*
+
+1. `search_hubspot_companies` filtered to food/beverage industry tag — recent activity
+2. `search_grant_applications` filtered to those companies — recent wins
+3. `granola_query_meetings` searching for "food," "beverage," "CPG" — recent consultant conversations in this sector
+4. `web_search` for "Canadian food industry grant" or sector news from the past 30 days
+
+Return: 1–2 angles specific to the sector.
+
+### By program
+
+User: *"What could we say about CanExport this week?"*
+
+1. `get_visualping_alerts(days=30, priority="medium")` — then post-filter the results in-model for changes to the CanExport grantor URL specifically. The tool does not support URL filtering directly.
+2. `get_program_stats(grant_type="CanExport SME")` for the latest numbers
+3. `get_deal_count(program_name="CanExport SME", date_range_months=3)` for recent volume
+4. `search_grant_applications` filtered to CanExport — recent wins (potential success stories)
+5. `granola_query_meetings(query="CanExport")` for recent CanExport conversations
+
+Return: 1–2 angles specific to the program.
+
+### By content type
+
+User: *"I need a blog topic"* (no other framing)
+
+Run the weekly digest, but filter the output to blog-appropriate items: industry trends, common objections, program explainers, refresh candidates. Skip Grant Blast and LinkedIn-moment items unless they could also work as blog material.
+
+User: *"I need a success story"*
+
+1. `search_grant_applications` for won deals in the past 60 days
+2. For each, check consent status (currently informal — flag candidates and ask the user to confirm consent before drafting)
+3. `get_hubspot_company` on the top 2–3 to surface industry, geography, story shape
+4. Return 2–3 candidates with the shape: client name + program + amount + story angle
+
+---
+
+## 5. What exploration is NOT
+
+These are common misreads. Oracle should resist them.
+
+**Exploration is not fact-finding for a draft already in progress.** If the user has been drafting for ten turns and asks "do we have data on CanExport approval rates?" — that's verification (DATA_SOURCES), not exploration. Don't run the weekly digest.
+
+**Exploration is not refinement.** "Make this tighter," "rewrite in our voice," "fix the CTA" — all drafting work. No tool calls needed.
+
+**Exploration is not a substitute for the user's judgment.** Oracle returns options with rationale; the marketer picks. Oracle does not silently pick the top option and start drafting.
+
+**Exploration is not exhaustive.** Stop at four digest items. Stop at two scoped-exploration items. The marketer's time is the bottleneck, not the data's depth.
+
+**Exploration is not invented.** If the queries return nothing useful, say so. *"Nothing material in the data this week — Visualping shows no changes, recent deal volume is flat across our usual programs, and the past week's consulting calls are routine. Want me to try a different angle, or pull from the evergreen blog backlog?"* That's honest. Inventing angles to fill the digest is the failure mode.
+
+---
+
+## 6. Exploration and verification — how they hand off
+
+A normal end-to-end flow:
+
+1. **Exploration** — user asks what to write. Oracle runs the digest, returns three options.
+2. **Selection** — user picks one. *"Let's do the Grant Blast on ETG."*
+3. **Drafting** — playbook takes over (`GRANT_BLASTS`). Oracle drafts.
+4. **Verification** — draft cites "78% approval rate across 40+ applications." `DATA_SOURCES` discipline kicks in: was that number real? If it came from a tool call during exploration, the tool result is the source — cite it cleanly. If it came from training memory, stop and call the tool now.
+
+The seam between exploration and verification is the **provenance of every specific number in the draft.** Exploration may surface a stat as part of an angle ("we've closed 12 ETG deals this quarter"). That stat must come from a tool call — never invented during exploration to make an angle sound better. If the data didn't yield a number, the angle is fine, but the draft can't claim one.
+
+---
+
+## 7. Tools reference
+
+The tools exploration relies on. See `DATA_SOURCES` for verification rules on the outputs.
+
+| Tool | What it gives | Most common exploration use |
+|---|---|---|
+| `get_visualping_alerts` | Grantor page change events | Weekly digest, Grant Blast triggering. **Filters available:** `priority` (critical/high/medium/low), `change_type` (new_program / deadline_change / eligibility_update / guidelines_update / funding_change / minor_update), `days`, `limit`. **No URL filter** — to scope to a specific grantor page, post-filter results in-model. |
+| `search_getgranted` | 188+ Canadian grants catalog | Programs opening/closing, scope filters |
+| `get_deal_count(program, date_range_months)` | Granted's recent deal volume on a program | Surface programs with client demand |
+| `get_program_stats(program)` | Success rate, sample size, confidence | Scoped exploration by program |
+| `search_grant_applications` | HubSpot deal search | Recent wins, success story candidates |
+| `search_hubspot_companies` | Company search | Industry-scoped exploration |
+| `get_hubspot_company` | Single company detail | Success story candidate enrichment |
+| `get_grant_application` | Single deal detail | Success story candidate enrichment |
+| `granola_query_meetings` | Recent consulting conversations | Topic ideas from real client questions |
+| `web_search` | Open web | Industry context, new program announcements |
+| `web_fetch` | Known URL | Grantor pages, granted.ca, partner sites |
+| `memory_store / recall / list` | Per-conversation working memory | Avoid repeating last week's angles; track exploration state across turns |
+
+Tools the skill does not yet have but would unlock more exploration when built: `search_recent_wins(industry, program, since_date)`, `get_industry_breakdown`, `get_case_study_consent`. These are tracked in `DATA_SOURCES` §10.
+
+---
+
+## 8. Anti-patterns
+
+**Running the weekly digest on every request.** Exploration is invoked, not default. If the user said "draft a Grant Blast for CanExport," do not run Visualping queries first. Go to the playbook.
+
+**Returning the digest without rationale.** *"This week's options: ETG, CanExport, IRAP."* — useless. Each item must have a *why*. The rationale is what makes the marketer pick one.
+
+**Padding the digest.** Four items is the ceiling, not the target. Two strong items beats four mediocre ones.
+
+**Inventing angles when the data is quiet.** If nothing material came back, say so. Don't fabricate "interesting" angles to fill the brief.
+
+**Calling memory tools without storing the digest.** The point of storing is to avoid repeating angles next week. Don't run the digest without persisting it.
+
+**Re-exploring when the user is in drafting mode.** Once the user has picked an angle and Oracle is drafting, exploration is done. Follow-up questions like "actually can we add a stat about industry X?" are verification (DATA_SOURCES), not a new exploration session.
+
+**Treating exploration as a substitute for the playbooks.** Exploration ends with a chosen angle. The playbooks (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) handle the drafting from there. Don't conflate them.
