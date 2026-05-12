@@ -13,14 +13,24 @@ description: How to use Oracle's data tools to find what's worth writing about. 
 
 ## 1. When to load this sub-skill
 
-Load `EXPLORATION` when the user is asking **what to write about**:
+Load `EXPLORATION` when the user is asking **what to write about**. There are two shapes of this ask, and they trigger different exploration paths.
 
+**Open exploration — the user hasn't picked a content type:**
 - *"What should we send out this week?"*
-- *"Help me brainstorm a blog topic"*
 - *"Anything interesting in the data?"*
-- *"Got a Grant Blast for me to do?"*
+- *"What's worth writing about?"*
+- *"Got anything for the team this week?"*
+
+→ Run the **weekly digest** (§3). Returns 2–4 items across multiple content types.
+
+**Content-type-scoped exploration — the user has picked the content type but not the subject:**
+- *"Got a Grant Blast for me?"*
+- *"Help me brainstorm a blog topic"*
 - *"What success stories could we write up?"*
 - *"Pitch me three angles for a LinkedIn post"*
+- *"Anything for an email blast this week?"*
+
+→ Run **scoped exploration by content type** (§4). Narrow the queries to signals that match the requested format. Return 2–3 candidates of that type only — do NOT mix in other content types.
 
 Do NOT load `EXPLORATION` when the subject is already settled:
 
@@ -29,7 +39,10 @@ Do NOT load `EXPLORATION` when the subject is already settled:
 - *"Make this blog intro tighter"* — editing, no exploration needed
 - *"Turn this case study into a 500-word version"* — format change, no exploration needed
 
-When in doubt, ask: *"Is the user telling me what to write about, or asking me to help figure that out?"* Only the second case calls for exploration.
+When in doubt, ask: *"Has the user told me the content type, the subject, both, or neither?"*
+- **Neither** → open exploration (§3)
+- **Type only** → content-type-scoped exploration (§4)
+- **Subject specified** → no exploration; go to the playbook
 
 ---
 
@@ -113,16 +126,45 @@ Return: 1–2 angles specific to the program.
 
 ### By content type
 
-User: *"I need a blog topic"* (no other framing)
+The principle: each content type has its own *natural signal sources*. Don't run the full weekly digest — narrow the scan to what would actually surface a candidate of the requested type. Return 2–3 candidates **of that type only**. Do not mix in other content types.
 
-Run the weekly digest, but filter the output to blog-appropriate items: industry trends, common objections, program explainers, refresh candidates. Skip Grant Blast and LinkedIn-moment items unless they could also work as blog material.
+**Grant Blast** — *"Got a Grant Blast for me?"*, *"Need something for the weekly blast,"* *"Anything for an email this week?"*
 
-User: *"I need a success story"*
+Grant Blasts announce *external news* about live grant programs: a program just opened, a deadline is closing soon, a major change happened on a grantor page. They are NOT about Granted's internal track record — deal counts and success rates are confidence-checks on a candidate, not signals to surface one.
+
+1. `get_visualping_alerts(days=14, priority="medium")` — what changed in the grant landscape recently? `change_type="new_program"`, `"deadline_change"`, `"funding_change"`, and `"eligibility_update"` are the highest-signal types for Grant Blasts. `"guidelines_update"` and `"minor_update"` rarely make good Grant Blasts on their own.
+2. `search_getgranted` with `open_intakes_only=true` — what programs are open right now with deadlines in the next 30–60 days?
+3. For each candidate that emerges from steps 1–2: `get_deal_count(program_name, date_range_months=12)` — confidence check. Does Granted have meaningful experience with this program? Programs with zero deals in 12 months may not be worth the Blast (Granted can't support applicants well). This is *filter logic*, not the candidate signal itself.
+4. Return 2–3 Grant Blast candidates with the shape: program name + the news angle (what just changed or is about to) + the urgency (deadline / window) + Granted's fit (can we help). One-line rationale per candidate. Recommend one if there's a clear winner.
+
+**Blog topic** — *"Need a blog topic,"* *"Pitch me some blog ideas,"* *"Help me brainstorm a blog post"*
+
+Blogs are explainers, lifecycle posts, common-objection clarifiers, and program landscape pieces. The natural signals are recurring client questions and shifts in deal activity that suggest a "state of X" angle.
+
+1. `granola_query_meetings` — what client questions have come up repeatedly in the past 2–4 weeks? Search for "objection," "didn't know," "confused about," or specific program names. Repeated patterns are blog gold.
+2. `get_deal_count` deltas — call it for a few key programs with `date_range_months=3` and `date_range_months=12` to see what's trending up or down. A program with rising deal activity supports a "state of [program]" or "why [program] is having a moment" angle.
+3. `web_search` for sector news or new program announcements from the past 30 days that could anchor an industry-trend post.
+4. Return 2–3 blog topics with the shape: working title + angle + signal source. Skip if nothing materially new came back — better to point at the evergreen blog backlog than fabricate trend.
+
+**Success story** — *"Any success stories to write up?"*, *"Who could we feature?"*, *"Need a case study"*
 
 1. `search_grant_applications` for won deals in the past 60 days
 2. For each, check consent status (currently informal — flag candidates and ask the user to confirm consent before drafting)
 3. `get_hubspot_company` on the top 2–3 to surface industry, geography, story shape
 4. Return 2–3 candidates with the shape: client name + program + amount + story angle
+
+**LinkedIn moment** — *"Anything for LinkedIn this week?"*, *"What can we react to?"*
+
+LinkedIn moments are smaller, more reactive than Grant Blasts. They include grantor page changes that aren't quite Grant Blast-worthy, sector news, industry observances, or strong recent wins worth a quick brag.
+
+1. `get_visualping_alerts(days=7, priority="medium")` — any page changes too small for a Grant Blast but worth a "did you notice this?" post?
+2. `web_search` for sector news, partner moves, or industry observances coming up in the next 1–2 weeks
+3. `search_grant_applications` for recent named wins (with consent) — could anchor a "celebrate the client" post
+4. Return 2–3 LinkedIn angles with shape: hook + signal source. Keep brief; LinkedIn isn't a deep playbook.
+
+**Email blast (non-Grant-Blast)** — *"Need an email for [audience]"*
+
+Route to `OTHER_CONTENT` rather than running scoped exploration. Email types other than Grant Blasts (success-story share, blog blast, platform promo, re-engagement) usually have a subject the user already has in mind. If the user genuinely doesn't know the subject, ask which email type, then route to the matching scoped exploration above.
 
 ---
 
