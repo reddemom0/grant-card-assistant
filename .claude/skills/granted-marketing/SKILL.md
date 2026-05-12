@@ -72,28 +72,45 @@ Do **not** load this skill for: sales outreach that isn't marketing-led, operati
 
 **Every marketing task loads at least two sub-skills**: `FOUNDATIONS` (always) + the task-specific playbook. Most tasks also need `COMPANY_CONTEXT` for brand facts.
 
+**First, identify the mode.** Every marketing request is in one of three modes:
+
+- **Explore** — the user is asking *what* to write about ("what should we send this week?", "got a Grant Blast for me?", "any blog ideas?"). Load `EXPLORATION`.
+- **Draft** — the user has specified what they want ("draft a Grant Blast for CanExport", "write a blog about hiring grants"). Skip `EXPLORATION`; go straight to the playbook.
+- **Verify** — the draft will cite specific numbers. Load `DATA_SOURCES` in addition to whatever else is loaded.
+
+Explore and Verify often both apply in one conversation: explore first, then draft, then verify the numbers in the draft.
+
 ### Standard loading patterns
 
-**Grant Blast:**
+**Explore (user is asking what to write):**
+1. `FOUNDATIONS` (voice, guardrails)
+2. `EXPLORATION` (digest queries, scoped exploration, mode discipline)
+3. The relevant playbook for the content type the user is leaning toward — `GRANT_BLASTS`, `BLOGS`, or `OTHER_CONTENT`. If unclear, ask after the digest.
+4. `COMPANY_CONTEXT` (proof points)
+5. `DATA_SOURCES` (the digest will cite numbers from tool calls)
+
+**Grant Blast (subject specified):**
 1. `FOUNDATIONS` (voice, audience, guardrails)
 2. `GRANT_BLASTS` (full playbook)
 3. `COMPANY_CONTEXT` (proof points, product names)
 4. `DATA_SOURCES` (if pulling stats from HubSpot or web)
 
-**Blog (new or refresh):**
+**Blog (new or refresh, subject specified):**
 1. `FOUNDATIONS`
 2. `BLOGS`
 3. `COMPANY_CONTEXT` (if the blog needs brand facts or case studies)
 4. `DATA_SOURCES` (for blog refresh stats, or new program details)
 
-**Email, LinkedIn post, webinar promo, success story, or other content:**
+**Email, LinkedIn post, webinar promo, success story, or other content (subject specified):**
 1. `FOUNDATIONS`
 2. `OTHER_CONTENT` (consolidated reference for these types)
 3. `COMPANY_CONTEXT` (usually needed)
 4. `DATA_SOURCES` (only if stats-heavy)
 
 ### Rule of thumb
-If in doubt, load `FOUNDATIONS` + `COMPANY_CONTEXT` + the task-specific playbook. Don't over-load — DATA_SOURCES is only needed when fetching or citing data.
+If in doubt about the mode, ask: *"Is the user telling me what to write about, or asking me to help figure that out?"* Only the second case loads `EXPLORATION`.
+
+Don't over-load — `DATA_SOURCES` is only needed when fetching or citing data. `EXPLORATION` is only needed when the user is asking what to write about.
 
 ---
 
@@ -106,7 +123,8 @@ If in doubt, load `FOUNDATIONS` + `COMPANY_CONTEXT` + the task-specific playbook
 | `GRANT_BLASTS` | Full Grant Blast playbook — 3 content intents × 3 audiences, prompt workflow, worked examples |
 | `BLOGS` | New blog + blog refresh workflows, 2026 topic calendar, structural templates |
 | `OTHER_CONTENT` | Tight playbooks for emails, LinkedIn posts, webinar promo, success stories, other content types |
-| `DATA_SOURCES` | What the Oracle pulls from (HubSpot, grants DB, web) — Level 1 vs Level 2 rules, anti-fabrication discipline |
+| `DATA_SOURCES` | What the Oracle pulls from (HubSpot, grants DB, web) — anti-fabrication discipline, citation conventions |
+| `EXPLORATION` | Idea generation — weekly digests, scoped exploration by industry/program/content-type, explore-vs-draft-vs-verify mode discipline |
 
 ---
 

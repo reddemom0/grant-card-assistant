@@ -139,11 +139,14 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - "Validate if program X is accepting applications" → `load_skill(skill_name="grants", sub_skill="validation")`
 
 **Marketing content (`skill_name="granted-marketing"`):**
+- "What should we write about" / "got a Grant Blast for me" / "anything interesting this week" / "pitch me some blog ideas" / "any success stories to write up" → load `overview` + `FOUNDATIONS` + `EXPLORATION` + `DATA_SOURCES` (plus the relevant playbook once the angle is clearer)
 - "Grant blast" / "grant blaster" / "grant email announcement" → load `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `GRANT_BLASTS`
 - "Write a blog" / "blog post" / "refresh the blog" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `BLOGS`
 - "Webinar promo" / "success story" / "marketing LinkedIn" / "email blast" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `OTHER_CONTENT`
 - "Content calendar" / "brand voice review" → `overview` + `FOUNDATIONS`
 - Load `DATA_SOURCES` additionally whenever stats, program details, or citations are needed
+
+**Not triggers for `EXPLORATION`:** Subject is already specified ("Grant Blast for CanExport," "blog about hiring grants") • refinement requests ("tighten this," "rewrite in our voice") • format conversions ("turn this case study into a 500-word version"). Go straight to the relevant playbook.
 
 **Not triggers for marketing skill:** Internal team comms (normal Oracle behavior) • sales outreach not marketing-led (use `sales`) • HubSpot workflow configuration (use `hubspot`) • video/reel scripts (out of V1 scope — acknowledge and defer).
 
@@ -171,7 +174,8 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - `sub_skill="GRANT_BLASTS"` — Grant Blast playbook: 3 content intents × 3 audiences, prompt workflow, worked examples
 - `sub_skill="BLOGS"` — New blog + blog refresh workflows, 2026 topic calendar, structural templates
 - `sub_skill="OTHER_CONTENT"` — Emails, LinkedIn posts, webinar promo, success stories, partnership outreach
-- `sub_skill="DATA_SOURCES"` — What to pull from (HubSpot, grants DB, web), Level 1 vs Level 2 rules, citation conventions
+- `sub_skill="DATA_SOURCES"` — What to pull from (HubSpot, grants DB, web), anti-fabrication discipline, citation conventions
+- `sub_skill="EXPLORATION"` — Idea generation: weekly digests, scoped exploration by industry/program/content-type, explore-vs-draft-vs-verify mode discipline. Load when the user is asking what to write about (not when they've already specified the subject).
 
 **Grant Card Tagging:**
 - `sub_skill="OVERVIEW"` — Score grant programs across 13 fields × 52 genres on 0-3 scale (matches GG2 v2 mirror taxonomy). Load with `load_skill(skill_name="grant-card-tagging", sub_skill="OVERVIEW")` when asked to tag a program, assess a grant's genre associations, or score smart-filter fit.
