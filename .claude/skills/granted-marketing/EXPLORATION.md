@@ -141,11 +141,23 @@ Grant Blasts announce *external news* about live grant programs: a program just 
 
 Blogs are explainers, lifecycle posts, common-objection clarifiers, and program landscape pieces. The natural signals are recurring client questions and shifts in deal activity that suggest a "state of X" angle.
 
+**Mandatory first step — what's already on the blog?** Before surfacing any candidates, you must check whether the topic has already been covered. Call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic keyword>&per_page=5")` for each topic area you're considering. This is not optional and not a refinement step — it's the gate. Recommending a topic without knowing whether granted.ca already covers it makes the recommendation worthless: every candidate is either a duplicate, a refresh opportunity, or a genuinely new angle, and you cannot tell which without the coverage check.
+
+For broad signal-scanning before you have candidate topics in mind, also call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?modified_after=<6 months ago>&per_page=20&orderby=modified&order=desc")` to see the recent blog cadence — what's been published lately, what categories are getting attention, what gaps exist.
+
+**Then gather the topic signals:**
+
 1. `granola_query_meetings` — what client questions have come up repeatedly in the past 2–4 weeks? Search for "objection," "didn't know," "confused about," or specific program names. Repeated patterns are blog gold.
 2. `get_deal_count` deltas — call it for a few key programs with `date_range_months=3` and `date_range_months=12` to see what's trending up or down. A program with rising deal activity supports a "state of [program]" or "why [program] is having a moment" angle.
 3. `web_search` for sector news or new program announcements from the past 30 days that could anchor an industry-trend post.
-4. `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic candidate>")` for each promising candidate — has this topic already been covered? If yes, the surfaced angle should be either a refresh of the existing post or a clearly distinct angle. Don't recommend topics that duplicate existing coverage.
-5. Return 2–3 blog topics with the shape: working title + angle + signal source + (if applicable) "this would refresh [existing blog]" or "this is a new angle on [related blog]". **Stop after presenting the options.** Do not begin drafting until the user picks one. End the response with a question that requires the user to choose. If nothing materially new came back, say so and point at the evergreen blog backlog — better than fabricating a trend.
+
+**Then cross-reference each candidate against the coverage check.** Every candidate you surface must have one of three labels, based on the coverage check result:
+
+- **New angle** — no existing blog covers this. The strongest candidates.
+- **Refresh** — an existing blog covers this but is stale (check `modified` date) or the underlying program has changed. Frame the candidate as a refresh: *"this would refresh [existing blog title from <date>]."*
+- **Duplicate** — an existing recent blog covers this well. Either drop the candidate or find a clearly distinct angle on the same topic.
+
+Return 2–3 blog topics with the shape: working title + angle + signal source + coverage label (new angle / refresh / distinct angle). **Stop after presenting the options.** Do not begin drafting until the user picks one. End the response with a question that requires the user to choose. If nothing materially new came back and granted.ca already covers the obvious angles, say so honestly and point at the evergreen blog backlog — better than fabricating a trend or recommending a duplicate.
 
 **Success story** — *"Any success stories to write up?"*, *"Who could we feature?"*, *"Need a case study"*
 
