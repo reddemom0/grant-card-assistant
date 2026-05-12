@@ -141,7 +141,14 @@ Grant Blasts announce *external news* about live grant programs: a program just 
 
 Blogs are explainers, lifecycle posts, common-objection clarifiers, and program landscape pieces. The natural signals are recurring client questions and shifts in deal activity that suggest a "state of X" angle.
 
-**Mandatory first step — what's already on the blog?** Before surfacing any candidates, you must check whether the topic has already been covered. Call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic keyword>&per_page=5")` for each topic area you're considering. This is not optional and not a refinement step — it's the gate. Recommending a topic without knowing whether granted.ca already covers it makes the recommendation worthless: every candidate is either a duplicate, a refresh opportunity, or a genuinely new angle, and you cannot tell which without the coverage check.
+**Mandatory first step — what's already on the blog?** Before surfacing any candidates, check whether the topic has already been covered. Call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic keyword>&per_page=5")` for each topic area you're considering. This is not optional — recommending without coverage data means every candidate is unlabeled (could be a duplicate, refresh, or new angle, and you cannot tell which without the check).
+
+**How to read the results.** The WordPress search is lexical, not semantic. A search for "ETG" may return posts that contain the letters "ETG" somewhere but aren't substantively about ETG. Read each result's `title.rendered` and `excerpt.rendered` before labeling:
+
+- **Zero results, or all results are loose/incidental matches** → **New angle.** This is the success state for finding a content gap, not a tool failure. Do not interpret an empty or low-relevance result set as the API being broken.
+- **One or more posts are substantively about the topic** (title or excerpt directly engages it, not just a passing mention) → **Refresh** (if the post is old, check the `modified` field) or **Duplicate** (if a recent substantive post exists). Either drop the candidate or position as a clearly distinct angle on the same topic.
+
+If the coverage check itself returns an actual HTTP error or network failure, say so honestly. Do not invent failure modes that didn't happen — see FOUNDATIONS §6 rule 4.
 
 For broad signal-scanning before you have candidate topics in mind, also call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?modified_after=<6 months ago>&per_page=20&orderby=modified&order=desc")` to see the recent blog cadence — what's been published lately, what categories are getting attention, what gaps exist.
 
