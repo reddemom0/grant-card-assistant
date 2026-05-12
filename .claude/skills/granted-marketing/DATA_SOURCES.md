@@ -117,6 +117,20 @@ If confidence is "insufficient_data" (<5 deals), the Oracle must NOT cite the pr
 
 **Web search and fetch (`web_search`, `web_fetch`)** — Live. Use `web_search` for open research (industry context, competitor moves, new program announcements not yet in our DB). Use `web_fetch` when you have a known URL (a grantor page, a granted.ca blog post, a partner site).
 
+**granted.ca WordPress REST API (via `web_fetch`)** — Live. The granted.ca site exposes its full blog and pages catalog via WordPress's public REST API at `https://granted.ca/wp-json/`. No new tool needed — Oracle calls `web_fetch` against the JSON endpoints below.
+
+The most useful query patterns:
+
+- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?slug=<the-blog-slug>")` — fetch a specific blog by slug. Returns title, full HTML content, modified date, categories, tags. Use this for blog refresh workflows to get the existing blog text before drafting changes.
+- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic>")` — find every existing blog that mentions a topic or program. Use this before drafting a new blog to check what's already been covered.
+- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?modified_after=2025-11-01&per_page=20")` — list blogs not updated since a given date. Use this to find refresh candidates.
+- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?categories=76&per_page=10")` — list posts in a specific category. Categories: 70 (Advice and Explainers), 76 (Customer Success — this is where success stories live), 154 (Grant Summaries), 153 (News), 156 (Product and Service Updates).
+- `web_fetch("https://granted.ca/wp-json/wp/v2/categories")` and `.../tags` — full taxonomy listing if needed.
+
+Key post fields: `title.rendered`, `content.rendered` (full HTML body), `excerpt.rendered`, `modified` / `modified_gmt`, `slug`, `categories` (array of IDs), `tags`, `link` (public URL), `yoast_head_json` (SEO metadata).
+
+The API is read-only from Oracle's perspective — `web_fetch` cannot write. Do not attempt to POST or modify.
+
 ### Still planned
 
 **Publicly disclosed funding recipients dataset** — The government recipient data Stephanie referenced in the April 14 meeting (named companies that received specific grants, totals by year and region). Distinct from `search_getgranted`, which is our internal program catalog. Not yet built.
@@ -351,6 +365,7 @@ Oracle drafts. Every stat in the output is either user-provided, from `COMPANY_C
 ### What's still planned
 - **Publicly disclosed funding recipients dataset** — named companies that received specific grants, totals by year and region. The biggest remaining content-research unlock. Not yet built.
 - **Case study consent tracking** — needs an operational decision on where consent is tracked before a tool can read it
+- **Blog traffic / analytics** — no tool exists yet. The WordPress REST API exposes content metadata (modified dates, categories), but not page views or search rankings. Genuinely Level 3 territory.
 - **Marketing-specific tools** — likely candidates: `search_recent_wins`, `get_industry_breakdown`, `get_case_study_consent`. Designed after the existing tools' coverage gaps are clearer in practice.
 
 ### What changed vs. previous versions

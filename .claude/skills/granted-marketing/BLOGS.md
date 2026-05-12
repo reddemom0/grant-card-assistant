@@ -73,6 +73,7 @@ Then ground the draft by fetching real data — never write from training memory
 - **Recent grantor changes** — call `get_visualping_alerts(days=30, priority="medium")` if the blog references a specific program; post-filter the results for that program's URL to confirm nothing material changed recently that would make the blog stale on publication.
 - **News tie-in (optional)** — call `web_search` if the blog ties to current news (a budget release, a federal announcement). Only for time-sensitive framing.
 - **Granted's own stats** — for portfolio aggregates (92%, 18,000+, 1,400+), use `COMPANY_CONTEXT` values exactly. For program-specific stats, call `get_program_stats(program_name)` and apply the citation discipline from `DATA_SOURCES`.
+- **Existing coverage check** — before drafting, call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic keyword>")` to find any existing blogs on this topic. If there's a close match, flag it to the user: *"We already have [Blog Title] on this — should this new blog be a refresh of that one instead, or a distinct angle?"* Better to refresh than duplicate.
 
 If the user can supply the data themselves and prefers to, that's fine too — the discipline is that data either comes from a tool call or from the user, never from training memory.
 
@@ -147,7 +148,8 @@ If the user specifies a blog, use that. If not, the Oracle recommends candidates
 - **Stale program details** — for blogs referencing specific programs by name, call `search_getgranted` on the named program. Compare the live amounts, deadlines, and eligibility against what the blog currently says. Discrepancies = refresh signal.
 - **Seasonal relevance** — blogs matching upcoming content calendar moments (e.g., budget-season blogs before budget release). The hardcoded 2026 calendar in §5 covers the planned rhythm; for what's actually scheduled this week, see the calendar source note at the end of §5.
 - **Stale figures** — blogs with year-specific stats from 2024 or earlier are mechanical refresh candidates regardless of program changes.
-- **Traffic/performance signals** — *not currently tool-backed.* No blog analytics tool exists in Oracle's toolkit yet. If the user has traffic data, they can supply it; otherwise this criterion is not available.
+- **Update recency** — call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?modified_after=<date 6 months ago>&per_page=50")` to list blogs not updated in the last 6 months. The WordPress API surfaces `modified` timestamps directly — no traffic tool needed for the staleness signal.
+- **Traffic/performance signals** — *traffic data is not currently tool-backed.* No blog analytics tool exists in Oracle's toolkit yet (no Google Analytics or Search Console integration). If the user has traffic data, they can supply it; otherwise rank-based prioritization is not available.
 
 ### Step 2 — List what's changed
 
@@ -158,6 +160,7 @@ Before editing, run these queries and combine the results:
 3. **New intel from the team** — `granola_query_meetings(query="<program name>")` to surface what consultants have learned about each program in the past 1-2 months. Patterns ("clients keep asking X," "the form now requires Y") are blog gold.
 4. **Granted's own track record** — `get_program_stats(program_name)` if the blog cites historical numbers. Update if confidence is medium-or-higher and the new numbers differ from what's published.
 5. **External news** — `web_search` for budget releases, federal announcements, or sector news from the past 60 days that could update the blog's framing.
+6. **The existing blog text** — `web_fetch("https://granted.ca/wp-json/wp/v2/posts?slug=<blog-slug>")` to retrieve the current published version. Without this, the refresh is guessing what the blog says. Use the `content.rendered` field. If the user supplies the blog text directly, skip this call. If the user didn't specify a slug, ask them for either the slug or the public URL.
 
 Compile the findings as: **what's stale** (specific blog passages with their replacement source), **what's new** (passages to add), **what's still accurate** (don't touch).
 

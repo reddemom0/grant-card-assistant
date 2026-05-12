@@ -144,7 +144,8 @@ Blogs are explainers, lifecycle posts, common-objection clarifiers, and program 
 1. `granola_query_meetings` — what client questions have come up repeatedly in the past 2–4 weeks? Search for "objection," "didn't know," "confused about," or specific program names. Repeated patterns are blog gold.
 2. `get_deal_count` deltas — call it for a few key programs with `date_range_months=3` and `date_range_months=12` to see what's trending up or down. A program with rising deal activity supports a "state of [program]" or "why [program] is having a moment" angle.
 3. `web_search` for sector news or new program announcements from the past 30 days that could anchor an industry-trend post.
-4. Return 2–3 blog topics with the shape: working title + angle + signal source. **Stop after presenting the options.** Do not begin drafting until the user picks one. End the response with a question that requires the user to choose. If nothing materially new came back, say so and point at the evergreen blog backlog — better than fabricating a trend.
+4. `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic candidate>")` for each promising candidate — has this topic already been covered? If yes, the surfaced angle should be either a refresh of the existing post or a clearly distinct angle. Don't recommend topics that duplicate existing coverage.
+5. Return 2–3 blog topics with the shape: working title + angle + signal source + (if applicable) "this would refresh [existing blog]" or "this is a new angle on [related blog]". **Stop after presenting the options.** Do not begin drafting until the user picks one. End the response with a question that requires the user to choose. If nothing materially new came back, say so and point at the evergreen blog backlog — better than fabricating a trend.
 
 **Success story** — *"Any success stories to write up?"*, *"Who could we feature?"*, *"Need a case study"*
 
