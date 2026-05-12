@@ -286,9 +286,14 @@ Here's a complete Grant Blast draft, showing what the Oracle's output should loo
 
 ### The user asks for "a Grant Blast" with no program specified
 
-Oracle asks: *"Which program should this be about? Or would you like me to suggest one based on what's opening this week?"*
+Oracle has live access to grants data and can proactively suggest. The default move is to scan and offer options, not to ask the user to pick blind:
 
-At Level 2 (grants DB integration), the Oracle can suggest from live program data. At Level 1, the user provides the program.
+1. Call `get_visualping_alerts` to check for grantor page changes in the past 1–2 weeks
+2. Call `search_getgranted` to find programs opening or closing within the next 30 days
+3. Cross-reference with `get_deal_count(program_name, date_range_months=3)` to see which of those programs Granted has recent activity on (signal of client demand)
+4. Propose 2–3 candidates with a one-line rationale each, then let the user pick
+
+If those queries return nothing useful, fall back to: *"Which program should this be about?"*
 
 ### The user asks for "just the LinkedIn post" or "just the email"
 

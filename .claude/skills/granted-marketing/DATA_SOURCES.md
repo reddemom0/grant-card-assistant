@@ -107,21 +107,21 @@ If confidence is "low" (5–14 deals), the Oracle may cite the stat but must inc
 
 If confidence is "insufficient_data" (<5 deals), the Oracle must NOT cite the program-specific rate. Fall back to the aggregate 92% or flag `[TBD — not enough data for a program-specific stat]`.
 
-### Planned infrastructure (not yet live)
+### Live infrastructure beyond HubSpot
 
-**Government grants database scraper**
-- Publicly disclosed funding recipients (the government database Stephanie referenced in the April 14 meeting)
-- Program funding totals by year and region
-- Named companies that received specific grants (useful for lead gen and blog research)
-- Monthly refresh cadence
+**Grants database (`search_getgranted`)** — Live. 188+ Canadian grant programs, daily-synced. Use this for any current program details: eligibility, amounts, deadlines, status. Replaces "ask the user for program specifics" for any program in the DB.
 
-**granted.ca blog scraper**
-- Existing blog content for refresh identification
-- Traffic / performance signals
-- Internal linking opportunities
+**Meeting transcripts (`granola_query_meetings`)** — Live. Searches recent consulting conversations and team meetings. Use this when blog refresh or success-story drafting calls for "recent intel from the team" — instead of hand-waving, actually query.
 
-**Case study consent tracking**
-- Not yet a HubSpot property. Consent currently tracked informally.
+**Program change alerts (`get_visualping_alerts`)** — Live. Monitors grantor pages for changes. Use this as a primary trigger for Grant Blasts ("what just changed?") and to verify program details are current.
+
+**Web search and fetch (`web_search`, `web_fetch`)** — Live. Use `web_search` for open research (industry context, competitor moves, new program announcements not yet in our DB). Use `web_fetch` when you have a known URL (a grantor page, a granted.ca blog post, a partner site).
+
+### Still planned
+
+**Publicly disclosed funding recipients dataset** — The government recipient data Stephanie referenced in the April 14 meeting (named companies that received specific grants, totals by year and region). Distinct from `search_getgranted`, which is our internal program catalog. Not yet built.
+
+**Case study consent tracking** — Not yet a HubSpot property. Consent currently tracked informally; a structured property is a prerequisite for a `get_case_study_consent` tool.
 - Until formalized, use the public case study list in `COMPANY_CONTEXT` §9 as the authoritative source.
 
 **Public program pages (on-demand fetch)**
@@ -288,7 +288,7 @@ If the Oracle has multiple sources for the same fact, preference order:
 3. **Grantor's current program page** — authoritative for current program details
 4. **`COMPANY_CONTEXT`** — authoritative for Granted's positioning and public facts
 5. **Well-known public stats** — useful for context but subordinate to the above
-6. **Memory / training data** — never used standalone; only as a starting point for "does this sound plausible to fetch?"
+6. **Training data** — never used standalone; only as a starting point for "does this sound plausible to fetch?" Distinct from the `memory_store` tools (per-conversation working memory), which are fine to use for multi-turn drafting state.
 
 If two sources conflict, the Oracle surfaces the conflict to the user rather than silently picking one:
 
@@ -342,17 +342,21 @@ Oracle drafts. Every stat in the output is either user-provided, from `COMPANY_C
 ### What's live now
 - **HubSpot `get_program_stats`** — per-program success rate, deal volume, deal days, confidence scoring
 - **HubSpot `get_deal_count`** — program deal volume over configurable time windows
+- **`search_getgranted`** — 188+ Canadian grants database, daily-synced
+- **`granola_query_meetings`** — searchable consulting meeting transcripts
+- **`get_visualping_alerts`** — grantor page change monitoring
+- **`web_search`, `web_fetch`** — open research and known-URL fetch
 - **Anti-fabrication discipline** — confidence thresholds, zero-losses rule, citation conventions
 
 ### What's still planned
-- **Government grants database scraper** — the biggest remaining unlock. Once live, the Oracle can pull publicly disclosed funding recipients, program totals, and use them for blog research and Grant Blast content.
-- **granted.ca blog scraper** — enables the blog refresh workflow to identify stale content automatically
+- **Publicly disclosed funding recipients dataset** — named companies that received specific grants, totals by year and region. The biggest remaining content-research unlock. Not yet built.
 - **Case study consent tracking** — needs an operational decision on where consent is tracked before a tool can read it
+- **Marketing-specific tools** — likely candidates: `search_recent_wins`, `get_industry_breakdown`, `get_case_study_consent`. Designed after the existing tools' coverage gaps are clearer in practice.
 
 ### What changed vs. previous versions
-HubSpot read tools went live April 2026. The Level 1 / Level 2 distinction has collapsed for Granted's own stats — the Oracle now calls a real tool rather than asking the user for numbers. The user still provides program specifics (amounts, deadlines, eligibility) and the Oracle still fetches public stats from the web on demand.
+HubSpot read tools went live April 2026. As of May 2026, the skill operates at Level 2: Oracle has live access to HubSpot, the grants DB, meeting transcripts, web search, and grantor page alerts. The Level 1 / Level 2 distinction is no longer a real branch — Level 2 is the default. The user is no longer the only source for program specifics or recent intel; Oracle should explore the data before drafting.
 
-Content sub-skills (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) didn't change. They cite this sub-skill for stat sourcing; the tools here got richer, and the content sub-skills inherited the upgrade for free.
+Content sub-skills (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) are being updated in parallel to teach when to explore the data, not just when to verify.
 
 **This is why `DATA_SOURCES` is a separate sub-skill.** Isolating data discipline from content craft means the skill grows new capabilities without rewriting how it writes.
 

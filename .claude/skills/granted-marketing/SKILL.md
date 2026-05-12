@@ -26,15 +26,15 @@ The Oracle's marketing brain. This file is the router. Sub-skills hold the playb
 
 ## 0. Maturity model — what this skill can do right now
 
-This skill supports three progressive levels. HubSpot read tools are now live, putting the skill partially at Level 2.
+This skill supports three progressive levels. The skill is now operating at Level 2 — Oracle has live access to HubSpot data, the grants database, meeting transcripts, web search, and grantor page change alerts.
 
 | Level | Oracle behavior | Human role | Status |
 |---|---|---|---|
 | **1. Assistant** | Drafts in brand voice. Knows content rules. Prompted for every input. | Provides facts, stats, program details. Reviews + edits. | **Foundation — always active** |
-| **2. Data-aware assistant** | Pulls stats from HubSpot, program details from grants DB, calendar context — then drafts. | Confirms intent, reviews, edits. | **Partially live — HubSpot read tools active. Grants DB and blog scraper planned.** |
+| **2. Data-aware assistant** | Pulls HubSpot stats, grants DB program details, recent meeting context, web search results, and program change alerts — uses them to surface ideas and ground drafts. | Confirms intent, reviews, edits. | **Live** |
 | **3. Scheduled + autonomous** | Runs on cadence. Picks the grant. Drafts all versions. Sends to human for approval before posting. | Approves or edits. | **Future** |
 
-**What's live now:** The Oracle can call `get_program_stats` and `get_deal_count` to pull real HubSpot data into drafts. Program specifics (amounts, deadlines, eligibility) still come from the user or web fetch.
+**What's live now:** Oracle can call `get_program_stats` and `get_deal_count` for HubSpot stats, `search_getgranted` for the 188+ Canadian grants database, `granola_query_meetings` for recent consulting conversations, `get_visualping_alerts` for grantor page changes, plus `web_search` and `web_fetch` for open research. See `DATA_SOURCES` for usage.
 
 ---
 

@@ -199,7 +199,7 @@ Content scales in specificity and strategic depth as prospects move through stag
 If the user didn't provide it and the Oracle can't fetch it from a confirmed source:
 1. **Ask the user.** Clarifying questions are always better than guessing.
 2. **If asking isn't possible**, flag explicitly: *"[no stat available — please confirm]"* or *"[deadline TBD — confirm before publishing]"*
-3. **Never guess, estimate, or pull from memory.**
+3. **Never guess, estimate, or pull from training memory.** ("Training memory" = facts the model recalls from its training data. This rule does NOT forbid using the `memory_store` / `memory_recall` / `memory_list` tools, which are Oracle's per-conversation working memory and are encouraged for multi-turn drafting state.)
 
 ### Exceptions — when it's OK to derive
 
