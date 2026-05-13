@@ -77,10 +77,12 @@ Useful patterns when drafting new ones:
 
 See `COMPANY_CONTEXT` §9 for the full list of named, public case studies (Glass Canvas, Keystone Environmental, Prairie Coast Equipment, FansUnite, Santevia, ClearWest) and the testimonial quote bank.
 
-**Coverage check before drafting.** Before writing a new success story, check what already exists on granted.ca:
+**Coverage check before drafting.** Before writing a new success story, check what already exists on granted.ca. **Both calls are mandatory when a specific company is named — do not skip the category call.**
 
-1. Call `check_blog_coverage({ category: 76 })` to surface published Customer Success posts. This is the corpus of stories already on the site.
-2. If drafting on a specific company, also call `check_blog_coverage({ topic: "<client name>" })` to find any post that mentions them.
+1. **Always** call `check_blog_coverage({ category: 76 })` first. This surfaces the corpus of published Customer Success posts on the site.
+2. **Then** call `check_blog_coverage({ topic: "<client name>" })` to find any post that mentions the specific company.
+
+Why both: the topic search is a lexical match and may miss alternate spellings, rebrandings, or posts that mention the client without naming them in the title. The category sweep catches what the topic call misses. Skipping the category call risks treating an existing public story as "no story exists."
 
 Read each result's `title`, `excerpt`, and `modified` date before deciding what to draft. The point is to **shape the angle, not skip the client**:
 
