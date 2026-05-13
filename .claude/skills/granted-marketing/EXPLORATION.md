@@ -141,16 +141,16 @@ Grant Blasts announce *external news* about live grant programs: a program just 
 
 Blogs are explainers, lifecycle posts, common-objection clarifiers, and program landscape pieces. The natural signals are recurring client questions and shifts in deal activity that suggest a "state of X" angle.
 
-**Mandatory first step — what's already on the blog?** Before surfacing any candidates, check whether the topic has already been covered. Call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic keyword>&per_page=5")` for each topic area you're considering. This is not optional — recommending without coverage data means every candidate is unlabeled (could be a duplicate, refresh, or new angle, and you cannot tell which without the check).
+**Mandatory first step — what's already on the blog?** Before surfacing any candidates, check whether the topic has already been covered. Call `check_blog_coverage({ topic: "<topic keyword>" })` for each topic area you're considering. This is not optional — recommending without coverage data means every candidate is unlabeled (could be a duplicate, refresh, or new angle, and you cannot tell which without the check).
 
-**How to read the results.** The WordPress search is lexical, not semantic. A search for "ETG" may return posts that contain the letters "ETG" somewhere but aren't substantively about ETG. Read each result's `title.rendered` and `excerpt.rendered` before labeling:
+**How to read the results.** The WordPress search is lexical, not semantic. A search for "ETG" may return posts that contain the letters "ETG" somewhere but aren't substantively about ETG. Also note that ampersands break the index — `topic: "SR&ED"` returns 0; use `topic: "SRED"` instead. Read each result's `title` and `excerpt` before labeling:
 
-- **Zero results, or all results are loose/incidental matches** → **New angle.** This is the success state for finding a content gap, not a tool failure. Do not interpret an empty or low-relevance result set as the API being broken.
+- **`count: 0`, or all results are loose/incidental matches** → **New angle.** This is the success state for finding a content gap, not a tool failure. Do not interpret an empty or low-relevance result set as the API being broken.
 - **One or more posts are substantively about the topic** (title or excerpt directly engages it, not just a passing mention) → **Refresh** (if the post is old, check the `modified` field) or **Duplicate** (if a recent substantive post exists). Either drop the candidate or position as a clearly distinct angle on the same topic.
 
-If the coverage check itself returns an actual HTTP error or network failure, say so honestly. Do not invent failure modes that didn't happen — see FOUNDATIONS §6 rule 4.
+If `check_blog_coverage` itself returns `success: false`, surface the error honestly. Do not invent failure modes that didn't happen — see FOUNDATIONS §6 rule 4.
 
-For broad signal-scanning before you have candidate topics in mind, also call `web_fetch("https://granted.ca/wp-json/wp/v2/posts?modified_after=<6 months ago>&per_page=20&orderby=modified&order=desc")` to see the recent blog cadence — what's been published lately, what categories are getting attention, what gaps exist.
+For broad signal-scanning before you have candidate topics in mind, also call `check_blog_coverage({ modified_after: "<6 months ago>" })` to see the recent blog cadence — what's been published lately, what gaps exist. (The tool returns up to 5 results per call; for a wider sweep, page by raising the date floor.)
 
 **Then gather the topic signals:**
 

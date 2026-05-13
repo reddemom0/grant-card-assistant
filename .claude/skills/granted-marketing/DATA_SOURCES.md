@@ -117,19 +117,18 @@ If confidence is "insufficient_data" (<5 deals), the Oracle must NOT cite the pr
 
 **Web search and fetch (`web_search`, `web_fetch`)** — Live. Use `web_search` for open research (industry context, competitor moves, new program announcements not yet in our DB). Use `web_fetch` when you have a known URL (a grantor page, a granted.ca blog post, a partner site).
 
-**granted.ca WordPress REST API (via `web_fetch`)** — Live. The granted.ca site exposes its full blog and pages catalog via WordPress's public REST API at `https://granted.ca/wp-json/`. No new tool needed — Oracle calls `web_fetch` against the JSON endpoints below.
+**granted.ca blog corpus (via `check_blog_coverage`)** — Live. Use `check_blog_coverage` for granted.ca blog content (including success stories — they live in the blog corpus). The tool wraps the WordPress REST API with the four supported query patterns: topic, slug, modified_after, category. Do not construct WP REST URLs by hand — call the named tool.
 
-The most useful query patterns:
+The four query patterns:
 
-- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?slug=<the-blog-slug>")` — fetch a specific blog by slug. Returns title, full HTML content, modified date, categories, tags. Use this for blog refresh workflows to get the existing blog text before drafting changes.
-- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?search=<topic>")` — find every existing blog that mentions a topic or program. Use this before drafting a new blog to check what's already been covered.
-- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?modified_after=2025-11-01&per_page=20")` — list blogs not updated since a given date. Use this to find refresh candidates.
-- `web_fetch("https://granted.ca/wp-json/wp/v2/posts?categories=76&per_page=10")` — list posts in a specific category. Categories: 70 (Advice and Explainers), 76 (Customer Success — this is where success stories live), 154 (Grant Summaries), 153 (News), 156 (Product and Service Updates).
-- `web_fetch("https://granted.ca/wp-json/wp/v2/categories")` and `.../tags` — full taxonomy listing if needed.
+- `check_blog_coverage({ slug: "<the-blog-slug>" })` — fetch a specific blog by slug. Returns title, modified date, excerpt, link. Use this for blog refresh workflows to confirm a known post exists.
+- `check_blog_coverage({ topic: "<topic>" })` — find blogs that mention a topic or program. Use this before drafting a new blog to check what's already been covered. Note: the WordPress search index drops ampersands, so `topic: "SR&ED"` returns 0 results — use `topic: "SRED"` instead.
+- `check_blog_coverage({ modified_after: "2025-11-01" })` — list blogs not updated since a given date. Use this to find refresh candidates.
+- `check_blog_coverage({ category: 76 })` — list posts in a specific WP category. Known IDs: 70 (Advice and Explainers), 76 (Customer Success — success stories live here), 154 (Grant Summaries), 153 (News), 156 (Product and Service Updates).
 
-Key post fields: `title.rendered`, `content.rendered` (full HTML body), `excerpt.rendered`, `modified` / `modified_gmt`, `slug`, `categories` (array of IDs), `tags`, `link` (public URL), `yoast_head_json` (SEO metadata).
+The tool returns up to 5 posts per call. Each post has: `id`, `slug`, `title` (HTML stripped), `modified`, `excerpt` (HTML stripped), `link`. The tool is read-only — it cannot publish, edit, or delete.
 
-The API is read-only from Oracle's perspective — `web_fetch` cannot write. Do not attempt to POST or modify.
+For blog body content (full HTML — only when a refresh genuinely needs the existing prose), `web_fetch` against the `link` returned by `check_blog_coverage` is the fallback path.
 
 ### Still planned
 

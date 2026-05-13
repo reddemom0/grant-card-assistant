@@ -722,6 +722,16 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'check_blog_coverage':
+        const { checkBlogCoverage } = await import('./blog-coverage.js');
+        result = await checkBlogCoverage({
+          topic: input.topic,
+          slug: input.slug,
+          modified_after: input.modified_after,
+          category: input.category
+        });
+        break;
+
       // ============================================================================
       // LEAD-GEN KNOWLEDGE BASE TOOLS
       // ============================================================================

@@ -1583,6 +1583,44 @@ This tool provides proactive market intelligence - check it regularly or when cl
     }
   },
   {
+    name: 'check_blog_coverage',
+    description: `Check existing granted.ca blog coverage on a topic before recommending new blog posts or refreshes. Wraps the granted.ca WordPress REST API and returns matching posts (id, slug, title, modified date, excerpt, link).
+
+Use this whenever the marketing skill asks you to check what's already been written — including the §3 universal content-discovery rule in granted-marketing/SKILL.md.
+
+Provide at least one of:
+- topic — free-text search (e.g., "agritech grants", "CanExport"). NOTE: WordPress's search index drops ampersands, so "SR&ED" returns 0 results — use "SRED" instead.
+- slug — exact post slug for known-post lookup
+- modified_after — ISO 8601 date (e.g., "2024-01-01") for freshness/staleness checks
+- category — WordPress category ID. Known IDs: 70 (Advice and Explainers), 76 (Customer Success — success stories live here), 154 (Grant Summaries), 153 (News), 156 (Product and Service Updates).
+
+Returns up to 5 posts per call with title and excerpt HTML stripped. Interpret results:
+- count=0 or all matches loose/incidental → likely a new-angle opportunity
+- multiple substantive recent matches → topic is well-covered, consider refresh or distinct angle
+- matches with old modified dates → refresh candidates`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          description: 'Free-text search query against post title and content.'
+        },
+        slug: {
+          type: 'string',
+          description: 'Exact WordPress post slug for known-post lookup.'
+        },
+        modified_after: {
+          type: 'string',
+          description: 'ISO 8601 date (e.g., "2024-01-01"). Returns only posts modified after this date.'
+        },
+        category: {
+          type: 'number',
+          description: 'WordPress category ID. Use 76 to filter to Customer Success (success stories).'
+        }
+      }
+    }
+  },
+  {
     name: 'search_getgranted',
     description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
 

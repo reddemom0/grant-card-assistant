@@ -12,6 +12,22 @@ Format:
 
 ---
 
+## 2026-05-13 — Added check_blog_coverage tool
+
+Wrapped tool over granted.ca WP REST API. Built because Oracle reliably
+skipped raw `web_fetch` calls against /wp-json/... across three layers of
+prompt salience (SKILL §3, EXPLORATION §4, BLOGS §4). Hypothesis under
+test: model reaches for named tools but skips URL-pattern prose.
+
+Surface: topic | slug | modified_after | category (at least one required).
+10s AbortController timeout. Schema in definitions.js only. Whitelist:
+Oracle + Orchestrator (acceptable); lead-gen excluded (correct).
+
+Phase 2 not done until "got any blog ideas for me?" produces a
+check_blog_coverage call in testing.
+
+---
+
 ## 2026-05-11 — Grant card agent rewrite to skill-based architecture
 **What:** Replaced 1,288-line `grant-card-generator` prompt with 172-line workflow orchestrator. Added `grant-card-writing` skill (parent `OVERVIEW` + 9 grant-type sub-skills: `RD`, `BUSINESS_ASSESSMENT`, `MARKET_EXPANSION`, `HIRING_TRAINING`, `SYSTEMS_PROCESSES`, `CAPITAL_COST`, `LOANS`, `INVESTMENT`, `PRIZES_CONTESTS`) and `grant-card-tagging` skill (`OVERVIEW`: 13 fields × 52 genres, 0-3 scoring, GG2 v2 mirror-taxonomy compatible). Deleted `genre-tagging` stub. Added `LOAD_SKILL_TOOL` to `grant-card-generator` loadout — meaningful capability change. New uppercase `OVERVIEW` sub-skill entry coexists with existing lowercase `overview` (both intentional).
 **Why:** Old prompt cited 4 non-existent KB docs (`GRANT-CRITERIA-Formatter Instructions`, `PREVIEW-SECTION-Generator`, `GENERAL-REQUIREMENTS-Creator`, `MISSING-INFO-Generator`), advertised a fictional `searchGrants` tool (real tool is `search_getgranted`, already wired), and instructed `load_skill` calls the agent couldn't make. Skill-based architecture separates orchestration (agent prompt) from general format rules (`OVERVIEW`) from type-specific section rules (per-type sub-skill) from tagging taxonomy — each piece individually editable.
