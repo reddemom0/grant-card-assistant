@@ -1625,6 +1625,38 @@ Returns up to 5 posts per call with title and excerpt HTML stripped. Interpret r
     }
   },
   {
+    name: 'check_marketing_calendar',
+    description: `Check the team's working Marketing/Ops Calendar Sheet for what content is scheduled. Wraps read_sheet_range against the calendar Sheet — internalizes the Sheet ID, monthly tab resolution, A1 ranges, and prefix-parse logic so you don't have to construct them.
+
+Use this whenever the marketing skill (BLOGS, WEBINARS, EMAILS, LINKEDIN, SUCCESS_STORIES, EXPLORATION) asks you to check what's actually scheduled — including the §5 "before asking the user for topic and date" pre-check in WEBINARS.md and the §2 live-source pointers in BLOGS/WEBINARS.
+
+All three params are optional. Default behavior (no params) scans the current month + next month tabs only — the common case ("is X coming up?"). Pass month: "all" to scan all 12 monthly tabs (use only when the user explicitly asks about full-year scheduling).
+
+- topic — case-insensitive substring filter against the entry text (e.g., "CanExport", "SIF")
+- content_type — restrict to one type. Allowed: "Webinar", "Blog", "Email", "Linkedin"
+- month — single month name ("May", "June", ...) or "all". Omit to default to current + next month.
+
+Returns: { success, count, query, tabs_scanned, entries: [{ month, content_type, entry, cell }] }. Empty results are a valid answer (success: true, count: 0) — not a tool error.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          description: 'Case-insensitive substring filter against entry text. E.g., "CanExport", "SIF", "Strategic Innovation Fund".'
+        },
+        content_type: {
+          type: 'string',
+          enum: ['Webinar', 'Blog', 'Email', 'Linkedin'],
+          description: 'Restrict to one content type. Omit to return all four.'
+        },
+        month: {
+          type: 'string',
+          description: 'Single month name (e.g., "May") or "all" for every monthly tab. Omit to scan current + next month (the default).'
+        }
+      }
+    }
+  },
+  {
     name: 'search_getgranted',
     description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
 

@@ -732,6 +732,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'check_marketing_calendar':
+        const { checkMarketingCalendar } = await import('./marketing-calendar.js');
+        result = await checkMarketingCalendar(userId, {
+          topic: input.topic,
+          content_type: input.content_type,
+          month: input.month
+        });
+        break;
+
       // ============================================================================
       // LEAD-GEN KNOWLEDGE BASE TOOLS
       // ============================================================================
