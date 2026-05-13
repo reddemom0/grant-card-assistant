@@ -77,6 +77,17 @@ Useful patterns when drafting new ones:
 
 See `COMPANY_CONTEXT` §9 for the full list of named, public case studies (Glass Canvas, Keystone Environmental, Prairie Coast Equipment, FansUnite, Santevia, ClearWest) and the testimonial quote bank.
 
+**Coverage check before drafting.** Before writing a new success story, check what already exists on granted.ca:
+
+1. Call `check_blog_coverage({ category: 76 })` to surface published Customer Success posts. This is the corpus of stories already on the site.
+2. If drafting on a specific company, also call `check_blog_coverage({ topic: "<client name>" })` to find any post that mentions them.
+
+Read each result's `title`, `excerpt`, and `modified` date before deciding what to draft. The point is to **shape the angle, not skip the client**:
+
+- **Story exists and is recent** → the new piece is a refresh, a different length variant (long → abridged for social, abridged → long for the website), a different format (written → quote + context for an email), or a follow-up angle ("here's what's happened since"). Don't republish.
+- **Story exists but is stale** (older `modified` date, outdated funding numbers, expired program references) → the new piece is an explicit refresh; reuse the four-part structure but update outcomes and quotes.
+- **No story exists or matches are loose/incidental** → new angle. Proceed with the four-part structure.
+
 ---
 
 *For success story share emails, see `EMAILS`. For LinkedIn success story posts, see `LINKEDIN`. For stat sourcing (funding amounts, deal counts), see `DATA_SOURCES`.*
