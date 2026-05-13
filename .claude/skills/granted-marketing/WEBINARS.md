@@ -6,6 +6,12 @@ Playbook for webinar planning, promotion, and the surrounding monthly content rh
 
 ---
 
+## Resources
+
+**Webinar SOP — `Webinar_SOP_-_2026.md`.** Step-by-step ops guide covering Zoom webinar creation, HubSpot sign-up form, website page setup, redirect handling, workflow enrollment, Zapier integration, and post-webinar email. When a consultant asks about webinar setup, the registration form, workflow enrollment, or any ops step, point at the SOP rather than improvising from training data.
+
+---
+
 ## 1. Cadence
 
 Monthly webinars, typically on the 3rd Thursday. Used for lead capture and sales conversation. Sign-ups feed into segmented HubSpot workflows.
