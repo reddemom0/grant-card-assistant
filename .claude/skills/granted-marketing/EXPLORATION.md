@@ -184,7 +184,7 @@ LinkedIn moments are smaller, more reactive than Grant Blasts. They include gran
 
 **Email blast (non-Grant-Blast)** — *"Need an email for [audience]"*
 
-Route to `OTHER_CONTENT` rather than running scoped exploration. Email types other than Grant Blasts (success-story share, blog blast, platform promo, re-engagement) usually have a subject the user already has in mind. If the user genuinely doesn't know the subject, ask which email type, then route to the matching scoped exploration above.
+Route to `EMAILS` rather than running scoped exploration. Email types other than Grant Blasts (success-story share, blog blast, platform promo, re-engagement) usually have a subject the user already has in mind. If the user genuinely doesn't know the subject, ask which email type, then route to the matching scoped exploration above.
 
 ---
 
@@ -210,7 +210,7 @@ A normal end-to-end flow:
 
 1. **Exploration** — user asks what to write. Oracle runs the queries, returns 2–3 options with rationale, and **stops**. The response ends with a question forcing the user to choose.
 2. **Selection** — user picks one. *"Let's do the Grant Blast on ETG."* Only after this explicit pick does Oracle proceed.
-3. **Drafting** — playbook takes over (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`). Oracle drafts.
+3. **Drafting** — playbook takes over (`GRANT_BLASTS`, `BLOGS`, `EMAILS`, `LINKEDIN`, `WEBINARS`, `SUCCESS_STORIES`, or `PARTNERSHIPS`). Oracle drafts.
 4. **Verification** — draft cites "78% approval rate across 40+ applications." `DATA_SOURCES` discipline kicks in: was that number real? If it came from a tool call during exploration, the tool result is the source — cite it cleanly. If it came from training memory, stop and call the tool now.
 
 **The hard rule between steps 1 and 2:** Oracle does not draft on the same turn it surfaces candidates. Even when there's a clear winner. Even when the user's message implies they want a draft ("got a Grant Blast for me?" sounds like a draft request, but it's actually a candidate request — the user doesn't know which program yet). Surfacing and drafting are separate turns. Always.
@@ -256,4 +256,4 @@ Tools the skill does not yet have but would unlock more exploration when built: 
 
 **Re-exploring when the user is in drafting mode.** Once the user has picked an angle and Oracle is drafting, exploration is done. Follow-up questions like "actually can we add a stat about industry X?" are verification (DATA_SOURCES), not a new exploration session.
 
-**Treating exploration as a substitute for the playbooks.** Exploration ends with a chosen angle. The playbooks (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) handle the drafting from there. Don't conflate them.
+**Treating exploration as a substitute for the playbooks.** Exploration ends with a chosen angle. The playbooks (`GRANT_BLASTS`, `BLOGS`, `EMAILS`, `LINKEDIN`, `WEBINARS`, `SUCCESS_STORIES`, `PARTNERSHIPS`) handle the drafting from there. Don't conflate them.

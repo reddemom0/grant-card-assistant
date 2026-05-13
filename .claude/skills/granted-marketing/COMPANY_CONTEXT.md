@@ -272,4 +272,4 @@ The skill doesn't generate visual design, but drafts that mention brand visual e
 
 ---
 
-*Next: load the task-specific playbook (`GRANT_BLASTS`, `BLOGS`, or `OTHER_CONTENT`). If stats are needed, also load `DATA_SOURCES`.*
+*Next: load the task-specific playbook (`GRANT_BLASTS`, `BLOGS`, `EMAILS`, `LINKEDIN`, `WEBINARS`, `SUCCESS_STORIES`, or `PARTNERSHIPS`). If stats are needed, also load `DATA_SOURCES`.*

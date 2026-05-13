@@ -374,4 +374,4 @@ Including a "what grants don't fund" section in a blog is often a trust-builder 
 
 ---
 
-*For email blasts promoting new or refreshed blogs, see `OTHER_CONTENT`. For stats integration in blogs, see `DATA_SOURCES`.*
+*For email blasts promoting new or refreshed blogs, see `EMAILS`. For LinkedIn posts promoting blogs, see `LINKEDIN`. For stats integration in blogs, see `DATA_SOURCES`.*

@@ -199,7 +199,7 @@ For current figures, fetch the source URL before citing. Always include the cita
 
 **Public list:** Glass Canvas, Keystone Environmental, Prairie Coast Equipment, FansUnite, Santevia, ClearWest (see `COMPANY_CONTEXT` for testimonial quote bank).
 
-**For anonymous examples:** Use the anonymization pattern from `OTHER_CONTENT` §4 — keep industry and scale accurate, invent a plausible pseudonym. Never invent specific dollar amounts or outcomes.
+**For anonymous examples:** Use the anonymization pattern from `SUCCESS_STORIES` §4 — keep industry and scale accurate, invent a plausible pseudonym. Never invent specific dollar amounts or outcomes.
 
 **Never:**
 - Invent client names
@@ -370,10 +370,10 @@ Oracle drafts. Every stat in the output is either user-provided, from `COMPANY_C
 ### What changed vs. previous versions
 HubSpot read tools went live April 2026. As of May 2026, the skill operates at Level 2: Oracle has live access to HubSpot, the grants DB, meeting transcripts, web search, and grantor page alerts. The Level 1 / Level 2 distinction is no longer a real branch — Level 2 is the default. The user is no longer the only source for program specifics or recent intel; Oracle should explore the data before drafting.
 
-Content sub-skills (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) are being updated in parallel to teach when to explore the data, not just when to verify.
+Content sub-skills (`GRANT_BLASTS`, `BLOGS`, `EMAILS`, `LINKEDIN`, `WEBINARS`, `SUCCESS_STORIES`, `PARTNERSHIPS`) are being updated in parallel to teach when to explore the data, not just when to verify.
 
 **This is why `DATA_SOURCES` is a separate sub-skill.** Isolating data discipline from content craft means the skill grows new capabilities without rewriting how it writes.
 
 ---
 
-*Back to `SKILL.md` for routing, or load a content sub-skill (`GRANT_BLASTS`, `BLOGS`, `OTHER_CONTENT`) for the task at hand.*
+*Back to `SKILL.md` for routing, or load a content sub-skill (`GRANT_BLASTS`, `BLOGS`, `EMAILS`, `LINKEDIN`, `WEBINARS`, `SUCCESS_STORIES`, `PARTNERSHIPS`) for the task at hand.*

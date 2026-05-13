@@ -248,4 +248,4 @@ If any check fails, revise before presenting.
 
 ---
 
-*Next: load `COMPANY_CONTEXT` for brand facts, then the task-specific playbook (`GRANT_BLASTS`, `BLOGS`, or `OTHER_CONTENT`).*
+*Next: load `COMPANY_CONTEXT` for brand facts, then the task-specific playbook (`GRANT_BLASTS`, `BLOGS`, `EMAILS`, `LINKEDIN`, `WEBINARS`, `SUCCESS_STORIES`, or `PARTNERSHIPS`).*

@@ -1411,7 +1411,11 @@ Use when simple information retrieval is insufficient and you need specialized e
 - \`COMPANY_CONTEXT\` - Granted Consulting product lines and positioning
 - \`GRANT_BLASTS\` - Grant Blasts content methodology
 - \`BLOGS\` - Blog post creation methodology
-- \`OTHER_CONTENT\` - Other content formats (newsletters, case studies, etc.)
+- \`EMAILS\` - Email drafting playbook (Grant Blast, Blog Blast, webinar promo, success story share, re-engagement, etc.)
+- \`LINKEDIN\` - LinkedIn post types, hook discipline, voice rules, attribution
+- \`WEBINARS\` - Webinar cadence, 2026 schedule, promo sequence, monthly content rhythm
+- \`SUCCESS_STORIES\` - Client success story drafting — four-part narrative, length variants, anonymization
+- \`PARTNERSHIPS\` - Partnership outreach (CPAs, CFOs, accelerators, banks, VCs, industry associations)
 - \`DATA_SOURCES\` - Content sourcing and data references
 - \`EXPLORATION\` - Idea-generation: weekly digests + scoped exploration. Load when the user is asking what to write about (not when they've already specified the subject).
 
@@ -1476,11 +1480,11 @@ Use when simple information retrieval is insufficient and you need specialized e
           'PROGRAM_DETAILS', 'APPLICATION_STRUCTURE', 'KNOWLEDGE_BASE_INDEX',
           'STAGE_1_READINESS', 'STAGE_1_BUDGET_GUIDE', 'STAGE_1_INTERVIEW_QUESTIONS',
           'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT', 'DEAL_CREATION',
-          'FOUNDATIONS', 'COMPANY_CONTEXT', 'GRANT_BLASTS', 'BLOGS', 'OTHER_CONTENT', 'DATA_SOURCES', 'EXPLORATION',
+          'FOUNDATIONS', 'COMPANY_CONTEXT', 'GRANT_BLASTS', 'BLOGS', 'EMAILS', 'LINKEDIN', 'WEBINARS', 'SUCCESS_STORIES', 'PARTNERSHIPS', 'DATA_SOURCES', 'EXPLORATION',
           'OVERVIEW', 'RD', 'BUSINESS_ASSESSMENT', 'MARKET_EXPANSION', 'HIRING_TRAINING',
           'SYSTEMS_PROCESSES', 'CAPITAL_COST', 'LOANS', 'INVESTMENT', 'PRIZES_CONTESTS'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), OTHER_CONTENT (newsletters/case studies), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible).'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), EMAILS (email drafting), LINKEDIN (LinkedIn posts), WEBINARS (webinar planning + monthly rhythm), SUCCESS_STORIES (case study drafting), PARTNERSHIPS (partner outreach), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible).'
       }
     },
     required: ['skill_name', 'sub_skill']

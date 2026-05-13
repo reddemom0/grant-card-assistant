@@ -87,7 +87,7 @@ Explore and Verify often both apply in one conversation: explore first, then dra
 **Explore (user is asking what to write):**
 1. `FOUNDATIONS` (voice, guardrails)
 2. `EXPLORATION` (digest queries, scoped exploration, mode discipline)
-3. The relevant playbook for the content type the user is leaning toward — `GRANT_BLASTS`, `BLOGS`, or `OTHER_CONTENT`. If unclear, ask after the digest.
+3. The relevant playbook for the content type the user is leaning toward — `GRANT_BLASTS`, `BLOGS`, `EMAILS`, `LINKEDIN`, `WEBINARS`, `SUCCESS_STORIES`, or `PARTNERSHIPS`. If unclear, ask after the digest.
 4. `COMPANY_CONTEXT` (proof points)
 5. `DATA_SOURCES` (the digest will cite numbers from tool calls)
 
@@ -103,11 +103,33 @@ Explore and Verify often both apply in one conversation: explore first, then dra
 3. `COMPANY_CONTEXT` (if the blog needs brand facts or case studies)
 4. `DATA_SOURCES` (for blog refresh stats, or new program details)
 
-**Email, LinkedIn post, webinar promo, success story, or other content (subject specified):**
+**Email (subject specified):**
 1. `FOUNDATIONS`
-2. `OTHER_CONTENT` (consolidated reference for these types)
-3. `COMPANY_CONTEXT` (usually needed)
+2. `EMAILS`
+3. `COMPANY_CONTEXT`
 4. `DATA_SOURCES` (only if stats-heavy)
+
+**LinkedIn post (subject specified):**
+1. `FOUNDATIONS`
+2. `LINKEDIN`
+3. `COMPANY_CONTEXT`
+4. `DATA_SOURCES` (only if stats-heavy)
+
+**Webinar planning or promo:**
+1. `FOUNDATIONS`
+2. `WEBINARS` (cadence, schedule, promo sequence, monthly rhythm)
+3. `COMPANY_CONTEXT`
+
+**Success story or case study:**
+1. `FOUNDATIONS`
+2. `SUCCESS_STORIES`
+3. `COMPANY_CONTEXT` (public client list and quote bank)
+4. `DATA_SOURCES` (client funding amounts, deal counts)
+
+**Partnership outreach:**
+1. `FOUNDATIONS`
+2. `PARTNERSHIPS`
+3. `COMPANY_CONTEXT`
 
 ### Rule of thumb
 If in doubt about the mode, ask: *"Is the user telling me what to write about, or asking me to help figure that out?"* Only the second case loads `EXPLORATION`.
@@ -124,7 +146,11 @@ Don't over-load — `DATA_SOURCES` is only needed when fetching or citing data. 
 | `COMPANY_CONTEXT` | About Granted, products, proof points, messaging hierarchy, grant types, internal voices, public case studies |
 | `GRANT_BLASTS` | Full Grant Blast playbook — 3 content intents × 3 audiences, prompt workflow, worked examples |
 | `BLOGS` | New blog + blog refresh workflows, 2026 topic calendar, structural templates |
-| `OTHER_CONTENT` | Tight playbooks for emails, LinkedIn posts, webinar promo, success stories, other content types |
+| `EMAILS` | Email drafting playbook — Grant Blast, Blog Blast, webinar promo, success story share, post-webinar follow-up, re-engagement, GetGranted promo |
+| `LINKEDIN` | LinkedIn post types, hook discipline, voice rules, attribution conventions |
+| `WEBINARS` | Webinar planning, promo cadence, 2026 schedule, monthly content rhythm and calendar |
+| `SUCCESS_STORIES` | Client success story / case study drafting — four-part structure, length variants, anonymization, public client list |
+| `PARTNERSHIPS` | Partnership outreach — CPAs, fractional CFOs, accelerators, banks, VCs, industry associations, tech vendors |
 | `DATA_SOURCES` | What the Oracle pulls from (HubSpot, grants DB, web) — anti-fabrication discipline, citation conventions |
 | `EXPLORATION` | Idea generation — weekly digests, scoped exploration by industry/program/content-type, explore-vs-draft-vs-verify mode discipline |
 
@@ -151,6 +177,9 @@ See `FOUNDATIONS.md` for the full detail on each.
 - **Level 3 autonomous posting** — the Oracle never posts to LinkedIn, sends emails, or publishes blogs. All outputs are drafts for human review.
 - **Competitive analysis in public content** — reserved for gated / sales contexts.
 - **Program application strategy content** — paid-tier insight only (see `FOUNDATIONS.md` on content tiering).
+- **Visual design work** — colors, imagery, graphic composition. The skill references brand colors in `COMPANY_CONTEXT` but doesn't design visuals.
+- **Ad copy / paid media campaigns** — if requested, clarify scope before proceeding. Probably in-scope for the skill but the team hasn't defined the playbook yet.
+- **Podcast / audio scripts** — same as video/reels.
 
 ---
 

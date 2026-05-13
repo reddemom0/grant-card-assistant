@@ -313,4 +313,4 @@ The Oracle drafts the opportunity and eligibility essentials, and flags: *"[Elig
 
 ---
 
-*For email-specific voice, LinkedIn post general patterns, and related content types, see `OTHER_CONTENT`. For stats sources and fetching rules, see `DATA_SOURCES`.*
+*For email-specific voice, see `EMAILS`. For LinkedIn post general patterns, see `LINKEDIN`. For stats sources and fetching rules, see `DATA_SOURCES`.*

@@ -142,7 +142,11 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - "What should we write about" / "got a Grant Blast for me" / "anything interesting this week" / "pitch me some blog ideas" / "any success stories to write up" → load `overview` + `FOUNDATIONS` + `EXPLORATION` + `DATA_SOURCES` (plus the relevant playbook once the angle is clearer)
 - "Grant blast" / "grant blaster" / "grant email announcement" → load `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `GRANT_BLASTS`
 - "Write a blog" / "blog post" / "refresh the blog" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `BLOGS`
-- "Webinar promo" / "success story" / "marketing LinkedIn" / "email blast" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `OTHER_CONTENT`
+- "Email blast" / "Blog Blast" / "webinar promo email" / "re-engagement email" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `EMAILS`
+- "Marketing LinkedIn" / "LinkedIn post" (non-Grant-Blast) → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `LINKEDIN`
+- "Webinar planning" / "webinar promo" / "content calendar" / "monthly rhythm" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `WEBINARS`
+- "Success story" / "case study" / "client writeup" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `SUCCESS_STORIES`
+- "Partnership outreach" / "co-marketing pitch" / "partner email" → `overview` + `FOUNDATIONS` + `COMPANY_CONTEXT` + `PARTNERSHIPS`
 - "Content calendar" / "brand voice review" → `overview` + `FOUNDATIONS`
 - Load `DATA_SOURCES` additionally whenever stats, program details, or citations are needed
 
@@ -173,7 +177,11 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - `sub_skill="COMPANY_CONTEXT"` — About Granted, product architecture, proof points, messaging hierarchy, public case studies
 - `sub_skill="GRANT_BLASTS"` — Grant Blast playbook: 3 content intents × 3 audiences, prompt workflow, worked examples
 - `sub_skill="BLOGS"` — New blog + blog refresh workflows, 2026 topic calendar, structural templates
-- `sub_skill="OTHER_CONTENT"` — Emails, LinkedIn posts, webinar promo, success stories, partnership outreach
+- `sub_skill="EMAILS"` — Email drafting playbook: Grant Blast, Blog Blast, webinar promo, success story share, post-webinar follow-up, re-engagement, GetGranted promo
+- `sub_skill="LINKEDIN"` — LinkedIn post types, hook discipline, voice rules, attribution
+- `sub_skill="WEBINARS"` — Webinar cadence, 2026 schedule, promo sequence, sign-up form fields, monthly content rhythm
+- `sub_skill="SUCCESS_STORIES"` — Client success story drafting: four-part narrative, long/short/abridged variants, anonymization
+- `sub_skill="PARTNERSHIPS"` — Partnership outreach: target partner types, angles, outreach template
 - `sub_skill="DATA_SOURCES"` — What to pull from (HubSpot, grants DB, web), anti-fabrication discipline, citation conventions
 - `sub_skill="EXPLORATION"` — Idea generation: weekly digests, scoped exploration by industry/program/content-type, explore-vs-draft-vs-verify mode discipline. Load when the user is asking what to write about (not when they've already specified the subject).
 

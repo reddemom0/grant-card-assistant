@@ -57,7 +57,11 @@ const SKILL_PATHS = {
     COMPANY_CONTEXT: '.claude/skills/granted-marketing/COMPANY_CONTEXT.md',
     GRANT_BLASTS: '.claude/skills/granted-marketing/GRANT_BLASTS.md',
     BLOGS: '.claude/skills/granted-marketing/BLOGS.md',
-    OTHER_CONTENT: '.claude/skills/granted-marketing/OTHER_CONTENT.md',
+    EMAILS: '.claude/skills/granted-marketing/EMAILS.md',
+    LINKEDIN: '.claude/skills/granted-marketing/LINKEDIN.md',
+    WEBINARS: '.claude/skills/granted-marketing/WEBINARS.md',
+    SUCCESS_STORIES: '.claude/skills/granted-marketing/SUCCESS_STORIES.md',
+    PARTNERSHIPS: '.claude/skills/granted-marketing/PARTNERSHIPS.md',
     DATA_SOURCES: '.claude/skills/granted-marketing/DATA_SOURCES.md',
     EXPLORATION: '.claude/skills/granted-marketing/EXPLORATION.md'
   },
