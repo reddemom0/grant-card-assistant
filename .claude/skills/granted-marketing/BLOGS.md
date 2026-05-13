@@ -225,7 +225,7 @@ Use these as the default monthly picks unless redirected:
 | November | Federal Budget Release |
 | December | Break |
 
-**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar lives in the "2026 Marketing/Ops Calendar" Google Sheet (`1QdnkahdfEx18HCBj6Ky1Eb-akB-KAlEwFVcsYOsMshQ`). When the user asks *"what's actually scheduled this week?"* or *"what blog is up for [month]?"*, call `read_sheet_range` against the relevant month's tab (tabs are named for the month: `January`, `February`, etc.). The Sheet uses a visual weekly-grid layout, not a clean table — parse blog entries by looking for "Blog:" prefixes in the day cells. Oracle has read-only access; do not attempt writes.
+**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar is the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2). When the user asks *"what's actually scheduled this week?"* or *"what blog is up for [month]?"*, call `read_sheet_range` against the relevant month's tab and parse for `Blog:` prefixes in the day cells.
 
 ---
 

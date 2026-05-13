@@ -130,6 +130,12 @@ The tool returns up to 5 posts per call. Each post has: `id`, `slug`, `title` (H
 
 For blog body content (full HTML — only when a refresh genuinely needs the existing prose), `web_fetch` against the `link` returned by `check_blog_coverage` is the fallback path.
 
+**Marketing/Ops Calendar (Google Sheet)** — the team's working content calendar. Sheet ID: `1QdnkahdfEx18HCBj6Ky1Eb-akB-KAlEwFVcsYOsMshQ`. One tab per month, named for the month (`January`, `February`, `March`, ...). Each tab uses a visual weekly-grid layout (rows of weekdays, content entries in day cells prefixed by type — `Blog:`, `Webinar:`, `Email:`, `Linkedin:`). Not a clean row-per-entry table; parse by scanning cells for the relevant prefix.
+
+Tool: `read_sheet_range` against `<Month>` tab. Oracle has read-only access; do not attempt writes.
+
+Consumed by: `BLOGS` §5, `WEBINARS` §2.
+
 ### Still planned
 
 **Publicly disclosed funding recipients dataset** — The government recipient data Stephanie referenced in the April 14 meeting (named companies that received specific grants, totals by year and region). Distinct from `search_getgranted`, which is our internal program catalog. Not yet built.
