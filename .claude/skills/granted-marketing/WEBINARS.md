@@ -27,6 +27,8 @@ Monthly webinars, typically on the 3rd Thursday. Used for lead capture and sales
 | November | Federal Budget Webinar (interview with Jeff Phillips) |
 | December | (break) |
 
+**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar is the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2). When the user asks *"what's the next webinar?"* or *"what's scheduled for [month]?"*, call `read_sheet_range` against the relevant month's tab and parse for `Webinar:` prefixes in the day cells.
+
 ## 3. Standard sign-up form fields
 
 - First name • Last name • Email • Company name • Province
@@ -48,6 +50,8 @@ Always follow this sequence:
 - **Post-webinar email** — recording link (password-protected), CTA to grant calculator, CTA to next webinar
 
 ## 5. Input checklist for webinar promotion
+
+Before asking the user for topic and date, check whether the next webinar is already on the calendar. Call `read_sheet_range` against the current or next month's tab in the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2) and look for `Webinar:` prefixes. If a webinar is scheduled with a topic and date, confirm that's the one we're promoting before asking the user to fill in details we already have.
 
 The Oracle asks for any missing:
 - Webinar topic + angle
@@ -72,6 +76,8 @@ The Oracle asks for any missing:
 - Grant Funding for Cleantech & Climate Tech (industry-specific)
 - Funding for Manufacturing Modernization (industry)
 - AI & Advanced Tech Grant Programs (industry)
+
+Before recommending a backlog topic as the next webinar, call `check_blog_coverage({ topic })` to see what blog content already exists on it. Related blog content informs the webinar angle: a topic with a strong existing blog frames the webinar as a deep-dive or live Q&A on that material; a topic with no coverage frames it as an introduction. The point is to shape the angle, not to skip topics we've blogged about.
 
 ---
 
