@@ -741,6 +741,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'get_recent_granted_ca_post':
+        const { getRecentGrantedCaPost } = await import('./blog-coverage.js');
+        result = await getRecentGrantedCaPost({
+          category: input.category,
+          days: input.days,
+          limit: input.limit
+        });
+        break;
+
       // ============================================================================
       // LEAD-GEN KNOWLEDGE BASE TOOLS
       // ============================================================================

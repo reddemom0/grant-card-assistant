@@ -1657,6 +1657,41 @@ Returns: { success, count, query, tabs_scanned, entries: [{ month, content_type,
     }
   },
   {
+    name: 'get_recent_granted_ca_post',
+    description: `List the most recently modified posts on granted.ca, sorted by modified date descending. Wraps the granted.ca WordPress REST API and returns slim post records (id, slug, title, modified date, excerpt, link).
+
+Use this when the question is "what got published recently?" rather than "is X covered?":
+- EMAILS / LINKEDIN slug-lookup workflows: user asks for a Blog Blast or success-story share / blog promo / success-story post → list recent posts → user picks one → draft.
+- BLOGS refresh discovery: list recent blogs to spot what hasn't been refreshed lately (combine with the modified date in each result).
+
+For category-specific recency:
+- category: 76 → recent Customer Success posts (the published success-story corpus)
+- category: 70 → Advice and Explainers
+- category: 154 → Grant Summaries
+- category: 153 → News
+- category: 156 → Product and Service Updates
+- (omit category to scan all categories)
+
+Defaults: days=30, limit=10, no category filter. limit capped at 20. Returns up to limit posts within the time window. Empty results are a valid answer (count: 0, not an error).`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        category: {
+          type: 'number',
+          description: 'WordPress category ID. Use 76 for Customer Success (success stories). Omit for all categories.'
+        },
+        days: {
+          type: 'number',
+          description: 'How far back to scan, in days. Default 30. Use larger values (e.g., 90) when "recent" should mean quarterly.'
+        },
+        limit: {
+          type: 'number',
+          description: 'How many posts to return. Default 10, max 20.'
+        }
+      }
+    }
+  },
+  {
     name: 'search_getgranted',
     description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
 
