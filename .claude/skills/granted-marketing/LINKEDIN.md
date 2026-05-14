@@ -18,6 +18,22 @@ Playbook for LinkedIn post drafting — Grant Blast posts, webinar promo, blog p
 - **Industry calendar moments** — Manufacturing Month, Small Business Week, Indigenous Peoples Month
 - **Event attendance / speaking** — when Stephanie or team is at an event
 
+## 1a. When the user doesn't name a specific piece of content
+
+When the user names a content type — *"draft a Blog promo"* / *"draft a success story post"* — without saying which blog or which story, list recent candidates from granted.ca before drafting. Don't draft a piece you can't anchor to a real published post.
+
+**Always** call `get_recent_granted_ca_post()` before drafting a Blog promo (no params; defaults to the most recent 10 blog posts in the last 30 days, all categories). **Always** call `get_recent_granted_ca_post({ category: 76 })` before drafting a Success story post (filters to published Customer Success posts).
+
+If the user already named the specific blog or story (slug, title, or URL), skip the call — you already have the subject.
+
+After the call, list the results with `title` and `modified` date, end the response with a "which one would you like to use?" question, and wait for the user to pick before drafting.
+
+Three outcomes to handle:
+
+- **Recent matches found** — list them as candidates and ask the user to pick. Don't pick for them, even when one is clearly the most recent. The marketer's editorial judgment is the point.
+- **No recent matches in the default window** — surface that honestly. Don't auto-widen the window silently; that's a workflow choice the user should make. Ask whether they want to (a) widen the window (e.g., `days: 90`, or `days: 365` for category 76 since success stories are published less often), (b) pivot the approach (write something fresh? draft a teaser without anchoring?), or (c) wait for new content.
+- **No matches across any window the user asks for** — same honesty discipline. Do not invent a blog or story that doesn't exist on granted.ca, and do not synthesize a slug or title from training memory.
+
 ## 2. Core structure
 
 - **Hook in first line** — under 15 words (15-word rule from `FOUNDATIONS`). LinkedIn truncates at ~3 lines, so frontload.
