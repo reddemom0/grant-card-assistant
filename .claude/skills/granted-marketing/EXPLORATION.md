@@ -106,7 +106,7 @@ When the user invokes exploration with a specific framing — an industry, a pro
 User: *"Anything interesting in food and beverage this week?"*
 
 1. `search_hubspot_companies` filtered to food/beverage industry tag — recent activity
-2. `search_grant_applications` filtered to those companies — recent wins
+2. `search_recent_wins({ industry: "food", days: 90 })` — recent wins in the sector. If `available_industry_values` comes back, the substring missed; re-query against one of the returned enum values.
 3. `granola_query_meetings` searching for "food," "beverage," "CPG" — recent consultant conversations in this sector
 4. `web_search` for "Canadian food industry grant" or sector news from the past 30 days
 
@@ -119,7 +119,7 @@ User: *"What could we say about CanExport this week?"*
 1. `get_visualping_alerts(days=30, priority="medium")` — then post-filter the results in-model for changes to the CanExport grantor URL specifically. The tool does not support URL filtering directly.
 2. `get_program_stats(grant_type="CanExport SME")` for the latest numbers
 3. `get_deal_count(program_name="CanExport SME", date_range_months=3)` for recent volume
-4. `search_grant_applications` filtered to CanExport — recent wins (potential success stories)
+4. `search_recent_wins({ program: "CanExport", days: 90 })` — recent wins on CanExport (potential success stories)
 5. `granola_query_meetings(query="CanExport")` for recent CanExport conversations
 
 Return: 1–2 angles specific to the program.
@@ -179,7 +179,7 @@ LinkedIn moments are smaller, more reactive than Grant Blasts. They include gran
 
 1. `get_visualping_alerts(days=7, priority="medium")` — any page changes too small for a Grant Blast but worth a "did you notice this?" post?
 2. `web_search` for sector news, partner moves, or industry observances coming up in the next 1–2 weeks
-3. `search_grant_applications` for recent named wins (with consent) — could anchor a "celebrate the client" post
+3. `search_recent_wins({ days: 30 })` for recent wins (with consent) — could anchor a "celebrate the client" post. See `LINKEDIN` §1b for the full celebration-post workflow with anonymization discipline.
 4. Return 2–3 LinkedIn angles with shape: hook + signal source. **Stop after presenting the options.** Do not begin drafting until the user picks one. End the response with a question that requires the user to choose. Keep the candidate brief — LinkedIn isn't a deep playbook.
 
 **Email blast (non-Grant-Blast)** — *"Need an email for [audience]"*
@@ -229,7 +229,8 @@ The tools exploration relies on. See `DATA_SOURCES` for verification rules on th
 | `search_getgranted` | 188+ Canadian grants catalog | Programs opening/closing, scope filters |
 | `get_deal_count(program, date_range_months)` | Granted's recent deal volume on a program | Surface programs with client demand |
 | `get_program_stats(program)` | Success rate, sample size, confidence | Scoped exploration by program |
-| `search_grant_applications` | HubSpot deal search | Recent wins, success story candidates |
+| `search_recent_wins({ days, program?, industry? })` | Recent won deals (marketing-shaped output) | Celebration posts, proof-point cites, industry analytics. Prefer over `search_grant_applications` for won-deals questions. |
+| `search_grant_applications` | HubSpot deal search | Non-wins deal queries (status filtering, date filtering, custom property filters). For wins specifically, use `search_recent_wins` instead. |
 | `search_hubspot_companies` | Company search | Industry-scoped exploration |
 | `get_hubspot_company` | Single company detail | Success story candidate enrichment |
 | `get_grant_application` | Single deal detail | Success story candidate enrichment |
@@ -238,7 +239,7 @@ The tools exploration relies on. See `DATA_SOURCES` for verification rules on th
 | `web_fetch` | Known URL | Grantor pages, granted.ca, partner sites |
 | `memory_store / recall / list` | Per-conversation working memory | Avoid repeating last week's angles; track exploration state across turns |
 
-Tools the skill does not yet have but would unlock more exploration when built: `search_recent_wins(industry, program, since_date)`, `get_industry_breakdown`, `get_case_study_consent`. These are tracked in `DATA_SOURCES` §10.
+Tools the skill does not yet have but would unlock more exploration when built: `get_industry_breakdown`, `get_case_study_consent`. These are tracked in `DATA_SOURCES` §10.
 
 ---
 

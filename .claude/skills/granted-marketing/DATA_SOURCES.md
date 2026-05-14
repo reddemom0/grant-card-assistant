@@ -384,7 +384,7 @@ Oracle drafts. Every stat in the output is either user-provided, from `COMPANY_C
 - **Publicly disclosed funding recipients dataset** — named companies that received specific grants, totals by year and region. The biggest remaining content-research unlock. Not yet built.
 - **Case study consent tracking** — needs an operational decision on where consent is tracked before a tool can read it
 - **Blog traffic / analytics** — no tool exists yet. The WordPress REST API exposes content metadata (modified dates, categories), but not page views or search rankings. Genuinely Level 3 territory.
-- **Marketing-specific tools** — likely candidates: `search_recent_wins`, `get_industry_breakdown`, `get_case_study_consent`. Designed after the existing tools' coverage gaps are clearer in practice.
+- **Marketing-specific tools** — likely candidates: `get_industry_breakdown`, `get_case_study_consent`. Designed after the existing tools' coverage gaps are clearer in practice.
 
 ### What changed vs. previous versions
 HubSpot read tools went live April 2026. As of May 2026, the skill operates at Level 2: Oracle has live access to HubSpot, the grants DB, meeting transcripts, web search, and grantor page alerts. The Level 1 / Level 2 distinction is no longer a real branch — Level 2 is the default. The user is no longer the only source for program specifics or recent intel; Oracle should explore the data before drafting.
