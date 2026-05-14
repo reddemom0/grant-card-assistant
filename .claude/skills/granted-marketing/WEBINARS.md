@@ -33,7 +33,7 @@ Monthly webinars, typically on the 3rd Thursday. Used for lead capture and sales
 | November | Federal Budget Webinar (interview with Jeff Phillips) |
 | December | (break) |
 
-**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar is the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2). When the user asks *"what's the next webinar?"* or *"what's scheduled for [month]?"*, call `read_sheet_range` against the relevant month's tab and parse for `Webinar:` prefixes in the day cells.
+**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar is the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2). When the user asks *"what's the next webinar?"*, call `check_marketing_calendar({ content_type: "Webinar" })` (defaults to current and next month). When the user asks *"what's scheduled for [month]?"*, call `check_marketing_calendar({ content_type: "Webinar", month: "<MonthName>" })`.
 
 ## 3. Standard sign-up form fields
 
@@ -57,7 +57,7 @@ Always follow this sequence:
 
 ## 5. Input checklist for webinar promotion
 
-Before asking the user for topic and date, check whether the next webinar is already on the calendar. Call `read_sheet_range` against the current or next month's tab in the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2) and look for `Webinar:` prefixes. If a webinar is scheduled with a topic and date, confirm that's the one we're promoting before asking the user to fill in details we already have.
+**Always** call `check_marketing_calendar({ content_type: "Webinar" })` before asking the user for topic or date. The default scan covers the current and next month, which is the relevant window for "what's the next webinar?" If the user proposes a specific topic, also pass `topic` — e.g., `check_marketing_calendar({ content_type: "Webinar", topic: "<topic>" })` — to check whether that topic is already scheduled before asking the user for a date. If a webinar is already scheduled with a topic and date, confirm that's the one we're promoting before asking the user to fill in details we already have. Skipping this risks fabricating a calendar answer without checking.
 
 The Oracle asks for any missing:
 - Webinar topic + angle

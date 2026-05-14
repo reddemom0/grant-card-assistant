@@ -225,7 +225,7 @@ Use these as the default monthly picks unless redirected:
 | November | Federal Budget Release |
 | December | Break |
 
-**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar is the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2). When the user asks *"what's actually scheduled this week?"* or *"what blog is up for [month]?"*, call `read_sheet_range` against the relevant month's tab and parse for `Blog:` prefixes in the day cells.
+**Live source — the working calendar.** The hardcoded table above is the planning rhythm. The team's actual working calendar is the Marketing/Ops Calendar Sheet (see `DATA_SOURCES` §2). When the user asks *"what's actually scheduled this week?"*, call `check_marketing_calendar({ content_type: "Blog" })` (defaults to current and next month). When the user asks *"what blog is up for [month]?"*, call `check_marketing_calendar({ content_type: "Blog", month: "<MonthName>" })`.
 
 ---
 

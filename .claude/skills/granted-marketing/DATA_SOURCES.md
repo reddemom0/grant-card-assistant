@@ -130,11 +130,24 @@ The tool returns up to 5 posts per call. Each post has: `id`, `slug`, `title` (H
 
 For blog body content (full HTML — only when a refresh genuinely needs the existing prose), `web_fetch` against the `link` returned by `check_blog_coverage` is the fallback path.
 
-**Marketing/Ops Calendar (Google Sheet)** — the team's working content calendar. Sheet ID: `1QdnkahdfEx18HCBj6Ky1Eb-akB-KAlEwFVcsYOsMshQ`. One tab per month, named for the month (`January`, `February`, `March`, ...). Each tab uses a visual weekly-grid layout (rows of weekdays, content entries in day cells prefixed by type — `Blog:`, `Webinar:`, `Email:`, `Linkedin:`). Not a clean row-per-entry table; parse by scanning cells for the relevant prefix.
+**Marketing/Ops Calendar (via `check_marketing_calendar`)** — Live. The team's working content calendar lives in a Google Sheet with monthly tabs. Use `check_marketing_calendar` for any "is X scheduled?" / "what's coming up?" question — the tool internalizes Sheet ID, tab resolution, A1 ranges, and prefix parsing so you don't construct them by hand.
 
-Tool: `read_sheet_range` against `<Month>` tab. Oracle has read-only access; do not attempt writes.
+Signature: `check_marketing_calendar({ topic?, content_type?, month? })`. All params optional; pass at least one to filter usefully.
 
-Consumed by: `BLOGS` §5, `WEBINARS` §2.
+- `topic` — case-insensitive substring filter against entry text (e.g., `"CanExport"`, `"SIF"`)
+- `content_type` — restrict to one type. Allowed: `"Webinar"`, `"Blog"`, `"Email"`, `"Linkedin"`
+- `month` — single month name (`"May"`, `"June"`, ...) or `"all"`. Omit to scan current + next month (the default; the right shape for the common "is X coming up?" case)
+
+Example calls:
+- `check_marketing_calendar({ content_type: "Webinar" })` — webinars in the current and next month
+- `check_marketing_calendar({ topic: "CanExport", month: "all" })` — every entry of any type that mentions CanExport across the full year
+- `check_marketing_calendar({ content_type: "Blog", month: "September" })` — blogs scheduled in September
+
+Returns `{ success, count, query, tabs_scanned, entries: [{ month, content_type, entry, cell }] }`. Empty results are a valid answer (`count: 0`, not an error).
+
+Underlying tool is `read_sheet_range` against the Marketing/Ops Calendar Sheet. Do not call `read_sheet_range` directly for calendar reads — use `check_marketing_calendar`.
+
+Sheet ID is hardcoded in the tool implementation (`src/tools/marketing-calendar.js`).
 
 ### Still planned
 
