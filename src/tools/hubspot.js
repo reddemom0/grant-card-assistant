@@ -5108,9 +5108,14 @@ export async function searchRecentWins({ days, program, industry, limit } = {}) 
   let apps = dealResult.applications || [];
 
   // Step 2 (conditional): industry filter via batch association + batch company read.
-  // Hoisted maps so the industry data is also available for output enrichment.
+  // Granted's team populates the custom `industry1` field; the standard HubSpot
+  // `industry` field is mostly empty. Match against either to catch both legacy
+  // (`industry`) and current (`industry1`) data. See src/tools/hubspot.js:1033
+  // comment for the field convention.
+  // Hoisted maps so the data is also available for output enrichment.
   let dealToCompany = new Map();
-  let companyIndustry = new Map();
+  let companyData = new Map(); // id → { industry, industry1 }
+  let filterDataUnavailable = false;
   if (industry && apps.length > 0) {
     try {
       const client = createHubSpotClient();
@@ -5131,22 +5136,39 @@ export async function searchRecentWins({ days, program, industry, limit } = {}) 
         const companiesResp = await client.post(
           '/crm/v3/objects/companies/batch/read',
           {
-            properties: ['industry', 'name'],
+            properties: ['industry', 'industry1', 'name'],
             inputs: uniqueCompanyIds.map(id => ({ id }))
           }
         );
         for (const c of companiesResp.data?.results || []) {
-          companyIndustry.set(String(c.id), c.properties?.industry || '');
+          companyData.set(String(c.id), {
+            industry: c.properties?.industry || '',
+            industry1: c.properties?.industry1 || ''
+          });
         }
       }
 
-      const wantedLower = industry.toLowerCase();
-      apps = apps.filter(a => {
-        const cId = dealToCompany.get(String(a.id));
-        if (!cId) return false;
-        const ind = (companyIndustry.get(cId) || '').toLowerCase();
-        return ind.includes(wantedLower);
-      });
+      // Data-availability signal: count companies with ANY industry data
+      const companiesWithIndustryData = [...companyData.values()]
+        .filter(d => d.industry || d.industry1).length;
+
+      if (companiesWithIndustryData === 0) {
+        // Filter would silently return zero. Skip filtering, surface unfiltered
+        // wins, flag the gap so the caller can disclose it honestly.
+        filterDataUnavailable = true;
+      } else {
+        const wantedLower = industry.toLowerCase();
+        apps = apps.filter(a => {
+          const cId = dealToCompany.get(String(a.id));
+          if (!cId) return false;
+          const data = companyData.get(cId);
+          if (!data) return false;
+          return (
+            data.industry.toLowerCase().includes(wantedLower) ||
+            data.industry1.toLowerCase().includes(wantedLower)
+          );
+        });
+      }
     } catch (err) {
       console.error('search_recent_wins industry-filter error:', err.message);
       return {
@@ -5175,6 +5197,8 @@ export async function searchRecentWins({ days, program, industry, limit } = {}) 
 
   // Step 4: slim to marketing shape. Industry field only populated when the
   // industry filter ran (otherwise we don't know it without extra HubSpot calls).
+  // Prefer industry1 (Granted's populated field) over industry (mostly empty)
+  // when surfacing the value.
   const wins = apps.map(a => {
     const win = {
       company_name: a.companyName || a.name || '',
@@ -5185,16 +5209,24 @@ export async function searchRecentWins({ days, program, industry, limit } = {}) 
     };
     if (industry) {
       const cId = dealToCompany.get(String(a.id));
-      win.industry = cId ? (companyIndustry.get(cId) || '') : '';
+      const data = cId ? companyData.get(cId) : null;
+      win.industry = data ? (data.industry1 || data.industry || '') : '';
     }
     return win;
   });
 
-  return {
+  const result = {
     success: true,
     count: wins.length,
     query: { days: effectiveDays, program, industry, limit: effectiveLimit },
     window_start: windowStart,
     wins
   };
+
+  if (filterDataUnavailable) {
+    result.filter_data_unavailable = true;
+    result.note = 'Industry data is not populated on the companies in this result set; the industry filter could not be applied. Results returned without industry filtering.';
+  }
+
+  return result;
 }

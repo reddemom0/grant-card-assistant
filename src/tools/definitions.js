@@ -1703,7 +1703,9 @@ Wraps search_grant_applications under the hood for marketing analytics use cases
 
 **Amount accuracy:** deal_amount reflects the client_reimbursement field (grant amount won by the client). It may be null for some programs (e.g., CSJ where 76% of past-approval deals lack the field). Surface null amounts honestly; do not invent dollar figures when amounts are missing.
 
-**Filter semantics:** This tool filters by deal stage (past-approval stages across grant pipelines), not by deal status. The two can diverge — a deal may have a "Won" status but be in an Abandoned stage. Stage is the source of truth for "did this grant actually land?" in Granted's workflow.`,
+**Filter semantics:** This tool filters by deal stage (past-approval stages across grant pipelines), not by deal status. The two can diverge — a deal may have a "Won" status but be in an Abandoned stage. Stage is the source of truth for "did this grant actually land?" in Granted's workflow.
+
+**Industry filter data-availability:** When an industry filter is requested but the companies in the result set lack industry data (common for older deals or accounts where industry was not filled in), the response will include \`filter_data_unavailable: true\` and a \`note\` field. In that case, unfiltered wins are returned alongside the flag — surface this honestly to the user; do not pretend the filter applied.`,
     input_schema: {
       type: 'object',
       properties: {
