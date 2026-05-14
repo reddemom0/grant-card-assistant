@@ -1692,6 +1692,37 @@ Defaults: days=30, limit=10, no category filter. limit capped at 20. Returns up 
     }
   },
   {
+    name: 'search_recent_wins',
+    description: `Returns recent won deals. Filterable by program, industry, and date window. Note: industry filtering triggers an extra company-data lookup; prefer program or date filters when both will return what you need.
+
+Wraps search_grant_applications under the hood for marketing analytics use cases — proof points, humanization posts, "what did we win for [industry] this quarter" questions. Defaults: days=90 (one quarter), limit=10, no program or industry filter; cap at 25.
+
+**Returned fields:** company_name, program, deal_amount (approved funding), won_date (close date), consultant (resolved owner name). When industry filter is used, an industry field is also included.
+
+**Consent discipline:** Returns named clients without consent filtering. Treat results as internal reference only. Anonymize before publishing unless the client appears in the public-consent list (COMPANY_CONTEXT §9 of the granted-marketing skill).`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        days: {
+          type: 'number',
+          description: 'Lookback window in days. Default 90 (one quarter). Use 30 for "this month", 365 for "this year".'
+        },
+        program: {
+          type: 'string',
+          description: 'Optional program filter (e.g., "ETG", "CanExport", "BCAFE", "DS4Y", "CSJ"). Pass-through to search_grant_applications, which handles the program-name enum mapping.'
+        },
+        industry: {
+          type: 'string',
+          description: 'Optional industry filter — case-insensitive substring match against the HubSpot industry property on the associated company for each deal (e.g., "Construction", "food", "tech"). Triggers an extra company-data lookup; omit when not needed.'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum wins to return. Default 10, max 25.'
+        }
+      }
+    }
+  },
+  {
     name: 'search_getgranted',
     description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
 

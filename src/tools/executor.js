@@ -750,6 +750,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         });
         break;
 
+      case 'search_recent_wins':
+        result = await hubspot.searchRecentWins({
+          days: input.days,
+          program: input.program,
+          industry: input.industry,
+          limit: input.limit
+        });
+        break;
+
       // ============================================================================
       // LEAD-GEN KNOWLEDGE BASE TOOLS
       // ============================================================================

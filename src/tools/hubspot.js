@@ -4981,3 +4981,143 @@ export async function getDealCount(programName, { date_range_months = 12, includ
     };
   }
 }
+
+// ============================================================================
+// search_recent_wins
+//
+// Wraps searchGrantApplications + (conditional) batch company-association +
+// batch company-properties reads to return marketing-shaped won deals.
+// Bounded latency: 2 HubSpot calls without industry filter, 4 with.
+// Schema lives in src/tools/definitions.js (ORACLE_TOOLS).
+// ============================================================================
+
+const RECENT_WINS_DEFAULT_DAYS = 90;
+const RECENT_WINS_DEFAULT_LIMIT = 10;
+const RECENT_WINS_MAX_LIMIT = 25;
+
+function recentWinsWindowStart(days, today = new Date()) {
+  const ms = today.getTime() - days * 24 * 60 * 60 * 1000;
+  return new Date(ms).toISOString().slice(0, 10); // YYYY-MM-DD for closedate_after
+}
+
+export async function searchRecentWins({ days, program, industry, limit } = {}) {
+  const effectiveDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : RECENT_WINS_DEFAULT_DAYS;
+  let effectiveLimit = Number.isFinite(limit) && limit > 0 ? Math.floor(limit) : RECENT_WINS_DEFAULT_LIMIT;
+  if (effectiveLimit > RECENT_WINS_MAX_LIMIT) effectiveLimit = RECENT_WINS_MAX_LIMIT;
+
+  const windowStart = recentWinsWindowStart(effectiveDays);
+
+  console.log(`   🏆 search_recent_wins: window=${windowStart} program=${program || 'any'} industry=${industry || 'any'} limit=${effectiveLimit}`);
+
+  // Step 1: search won deals via existing tool
+  const dealFilters = {
+    status: 'won',
+    closedate_after: windowStart,
+    limit: effectiveLimit
+  };
+  if (program) dealFilters.grant_program = program;
+
+  const dealResult = await searchGrantApplications(dealFilters);
+  if (!dealResult.success) {
+    return {
+      success: false,
+      error: dealResult.error || 'Deal search failed',
+      query: { days: effectiveDays, program, industry, limit: effectiveLimit },
+      window_start: windowStart,
+      wins: []
+    };
+  }
+
+  let apps = dealResult.applications || [];
+
+  // Step 2 (conditional): industry filter via batch association + batch company read.
+  // Hoisted maps so the industry data is also available for output enrichment.
+  let dealToCompany = new Map();
+  let companyIndustry = new Map();
+  if (industry && apps.length > 0) {
+    try {
+      const client = createHubSpotClient();
+      const dealIds = apps.map(a => a.id).filter(Boolean);
+
+      const assocResp = await client.post(
+        '/crm/v4/associations/deals/companies/batch/read',
+        { inputs: dealIds.map(id => ({ id })) }
+      );
+      for (const r of assocResp.data?.results || []) {
+        const dealId = r.from?.id;
+        const firstCompany = r.to?.[0]?.toObjectId;
+        if (dealId && firstCompany) dealToCompany.set(String(dealId), String(firstCompany));
+      }
+
+      const uniqueCompanyIds = Array.from(new Set(dealToCompany.values()));
+      if (uniqueCompanyIds.length > 0) {
+        const companiesResp = await client.post(
+          '/crm/v3/objects/companies/batch/read',
+          {
+            properties: ['industry', 'name'],
+            inputs: uniqueCompanyIds.map(id => ({ id }))
+          }
+        );
+        for (const c of companiesResp.data?.results || []) {
+          companyIndustry.set(String(c.id), c.properties?.industry || '');
+        }
+      }
+
+      const wantedLower = industry.toLowerCase();
+      apps = apps.filter(a => {
+        const cId = dealToCompany.get(String(a.id));
+        if (!cId) return false;
+        const ind = (companyIndustry.get(cId) || '').toLowerCase();
+        return ind.includes(wantedLower);
+      });
+    } catch (err) {
+      console.error('search_recent_wins industry-filter error:', err.message);
+      return {
+        success: false,
+        error: `Industry filter failed: ${err.message}`,
+        query: { days: effectiveDays, program, industry, limit: effectiveLimit },
+        window_start: windowStart,
+        wins: []
+      };
+    }
+  }
+
+  // Step 3: resolve consultant names via one owners-list call
+  const ownerMap = new Map();
+  try {
+    const ownersResult = await listHubSpotOwners();
+    if (ownersResult.success) {
+      for (const o of ownersResult.owners) {
+        ownerMap.set(String(o.id), o.fullName || o.email || String(o.id));
+      }
+    }
+  } catch (err) {
+    console.warn('search_recent_wins owner-resolve warning:', err.message);
+    // Continue with raw IDs if owner lookup fails.
+  }
+
+  // Step 4: slim to marketing shape. Industry field only populated when the
+  // industry filter ran (otherwise we don't know it without extra HubSpot calls).
+  const wins = apps.map(a => {
+    const win = {
+      company_name: a.companyName || a.name || '',
+      program: a.program || '',
+      deal_amount: a.approvedFunding ? Number(a.approvedFunding) : null,
+      won_date: a.closeDate || '',
+      consultant: ownerMap.get(String(a.ownerId)) || null
+    };
+    if (industry) {
+      const cId = dealToCompany.get(String(a.id));
+      win.industry = cId ? (companyIndustry.get(cId) || '') : '';
+    }
+    return win;
+  });
+
+  return {
+    success: true,
+    count: wins.length,
+    query: { days: effectiveDays, program, industry, limit: effectiveLimit },
+    window_start: windowStart,
+    wins
+  };
+}
