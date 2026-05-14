@@ -5226,6 +5226,17 @@ export async function searchRecentWins({ days, program, industry, limit } = {}) 
   if (filterDataUnavailable) {
     result.filter_data_unavailable = true;
     result.note = 'Industry data is not populated on the companies in this result set; the industry filter could not be applied. Results returned without industry filtering.';
+  } else if (industry && wins.length === 0) {
+    // Filter ran (data was available) but matched nothing. Surface the actual
+    // industry enum values present so the caller can re-query against the
+    // vocabulary that's there, rather than guessing.
+    const valueSet = new Set();
+    for (const data of companyData.values()) {
+      if (data.industry) valueSet.add(data.industry);
+      if (data.industry1) valueSet.add(data.industry1);
+    }
+    result.available_industry_values = [...valueSet].sort();
+    result.match_hint = `Your filter "${industry}" did not substring-match any of the available_industry_values above. Try a different value that substring-matches one of those enums.`;
   }
 
   return result;

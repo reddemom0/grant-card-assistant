@@ -1705,7 +1705,9 @@ Wraps search_grant_applications under the hood for marketing analytics use cases
 
 **Filter semantics:** This tool filters by deal stage (past-approval stages across grant pipelines), not by deal status. The two can diverge — a deal may have a "Won" status but be in an Abandoned stage. Stage is the source of truth for "did this grant actually land?" in Granted's workflow.
 
-**Industry filter data-availability:** When an industry filter is requested but the companies in the result set lack industry data (common for older deals or accounts where industry was not filled in), the response will include \`filter_data_unavailable: true\` and a \`note\` field. In that case, unfiltered wins are returned alongside the flag — surface this honestly to the user; do not pretend the filter applied.`,
+**Industry filter data-availability:** When an industry filter is requested but the companies in the result set lack industry data (common for older deals or accounts where industry was not filled in), the response will include \`filter_data_unavailable: true\` and a \`note\` field. In that case, unfiltered wins are returned alongside the flag — surface this honestly to the user; do not pretend the filter applied.
+
+**Industry filter zero-match with vocabulary mismatch:** When the industry filter substring-matches nothing but companies in the result set DO have industry data (e.g., user searched "food" but the actual enum values are "RESTAURANTS", "COFFEE_TEA", etc.), the response includes \`available_industry_values\` (the full sorted list of industry enum values present in the result set) plus a \`match_hint\` field. Use this list to re-query against the actual vocabulary rather than the user's natural-language phrasing.`,
     input_schema: {
       type: 'object',
       properties: {
