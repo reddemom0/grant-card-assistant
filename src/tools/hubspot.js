@@ -4995,6 +4995,70 @@ const RECENT_WINS_DEFAULT_DAYS = 90;
 const RECENT_WINS_DEFAULT_LIMIT = 10;
 const RECENT_WINS_MAX_LIMIT = 25;
 
+// Past-approval dealstage IDs across Granted's grant pipelines.
+// Derived from HubSpot pipelines/deals enumeration: every stage with
+// probability=1.0 in a grant-flavored pipeline. Annual-fee subscription
+// stages excluded (they aren't grant awards). See diag-pipelines-stages.mjs
+// run on 2026-05-14 for the source-of-truth audit.
+const PAST_APPROVAL_STAGE_IDS = [
+  // Hiring Grants Pipeline (id=2662913) — 9 stages
+  '9371218',     // Hiring PIF/FA Stage
+  '82783498',    // Hiring PIF Waitlist
+  '9371219',     // Hiring One Claim
+  '1021956245',  // Hiring Twice Claim
+  '1021956246',  // Hiring Multiple - Set by Program
+  '1021956247',  // Hiring Monthly Claim
+  '1021956248',  // Hiring No Claim
+  '36001443',    // Hiring End Date Passed
+  '54951551',    // Hiring Waiting for Funds
+
+  // Training Grants Pipeline (id=2662912) — 5 stages
+  '9371208',     // Training Open Claims
+  '9371210',     // Training Claims Checker
+  '9371211',     // Training Claim Returned
+  '89660934',    // Training Completion Report Pending
+  '9371214',     // Training Completion Report Open
+
+  // Market Expansion Pipeline (id=10188292) — 6 stages
+  '32843618',    // Market Expansion Claim 1
+  '1089132035',  // Market Expansion Claim 2
+  '1089132036',  // Market Expansion Claim 3
+  '1089132037',  // Market Expansion Claim 4
+  '958754404',   // Market Expansion Reporting
+  '1167644956',  // Market Expansion Waiting for the Funds
+
+  // Misc. Grant Pipeline (id=26501516) — 2 stages
+  '60521260',    // Misc Claims
+  '60521261',    // Misc Received the funds
+
+  // Granted Starter Hiring Grants Pipeline (id=48715861) — 7 stages
+  '100592667',   // Approved, PIF/FA - Starter Hiring
+  '100554589',   // One Off Claim - Starter Hiring
+  '128251235',   // Monthly Claim - Starter Hiring
+  '266737454',   // Twice Claim - Starter Hiring
+  '266737455',   // Multiple Claim, Set by Program - Starter Hiring
+  '100554591',   // Waiting for Funds - Starter Hiring
+  '100554590',   // End Date Passed - Starter Hiring
+
+  // Granted Starter Training Grants Pipeline (id=48715862) — 7 stages
+  '179017013',   // Approved - Starter Training
+  '100592673',   // Open Claims - Starter Training
+  '100592674',   // Claims Checker - Starter Training
+  '101464836',   // Claim Returned - Starter Training
+  '101464839',   // Completion Report Pending - Starter Training
+  '101464837',   // Completion Report Open - Starter Training
+  '101464838',   // Waiting for Funds - Starter Training
+
+  // Completed Deals Pipeline (id=11191120) — grant flavors only.
+  // EXCLUDES 959845140 "Completed Annual Fee Deals" and 1018808720
+  // "Completed Starte Annual Deals" — those are Granted Starter
+  // subscription deals, not grant awards.
+  '32991256',    // Completed Training Deals
+  '32991257',    // Complete Hiring Deals
+  '32991258',    // Completed Market Expansion Deals
+  '79657631'     // Completed Misc Deals
+];
+
 function recentWinsWindowStart(days, today = new Date()) {
   const ms = today.getTime() - days * 24 * 60 * 60 * 1000;
   return new Date(ms).toISOString().slice(0, 10); // YYYY-MM-DD for closedate_after
@@ -5009,11 +5073,24 @@ export async function searchRecentWins({ days, program, industry, limit } = {}) 
 
   console.log(`   🏆 search_recent_wins: window=${windowStart} program=${program || 'any'} industry=${industry || 'any'} limit=${effectiveLimit}`);
 
-  // Step 1: search won deals via existing tool
+  // Step 1: search wins. Filter by dealstage IN past-approval stages
+  // AND client_reimbursement HAS_PROPERTY. NO state-based filter — stage
+  // is the source of truth for "did this grant actually land?" Status
+  // can diverge (some Lost-stage deals carry a Won state from old workflow).
   const dealFilters = {
-    status: 'won',
     closedate_after: windowStart,
-    limit: effectiveLimit
+    limit: effectiveLimit,
+    custom_filters: [
+      {
+        propertyName: 'dealstage',
+        operator: 'IN',
+        values: PAST_APPROVAL_STAGE_IDS
+      },
+      {
+        propertyName: 'client_reimbursement',
+        operator: 'HAS_PROPERTY'
+      }
+    ]
   };
   if (program) dealFilters.grant_program = program;
 

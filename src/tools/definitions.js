@@ -1699,7 +1699,11 @@ Wraps search_grant_applications under the hood for marketing analytics use cases
 
 **Returned fields:** company_name, program, deal_amount (approved funding), won_date (close date), consultant (resolved owner name). When industry filter is used, an industry field is also included.
 
-**Consent discipline:** Returns named clients without consent filtering. Treat results as internal reference only. Anonymize before publishing unless the client appears in the public-consent list (COMPANY_CONTEXT §9 of the granted-marketing skill).`,
+**Consent discipline:** Returns named clients without consent filtering. Treat results as internal reference only. Anonymize before publishing unless the client appears in the public-consent list (COMPANY_CONTEXT §9 of the granted-marketing skill).
+
+**Amount accuracy:** deal_amount reflects the client_reimbursement field (grant amount won by the client). It may be null for some programs (e.g., CSJ where 76% of past-approval deals lack the field). Surface null amounts honestly; do not invent dollar figures when amounts are missing.
+
+**Filter semantics:** This tool filters by deal stage (past-approval stages across grant pipelines), not by deal status. The two can diverge — a deal may have a "Won" status but be in an Abandoned stage. Stage is the source of truth for "did this grant actually land?" in Granted's workflow.`,
     input_schema: {
       type: 'object',
       properties: {
