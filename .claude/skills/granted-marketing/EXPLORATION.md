@@ -168,9 +168,9 @@ Return 2–3 blog topics with the shape: working title + angle + signal source +
 
 **Success story** — *"Any success stories to write up?"*, *"Who could we feature?"*, *"Need a case study"*
 
-1. `search_grant_applications` for won deals in the past 60 days
+1. `search_recent_wins({ days: 60 })` for won deals in the past 60 days.
 2. For each, check consent status (currently informal — flag candidates and ask the user to confirm consent before drafting)
-3. `get_hubspot_company` on the top 2–3 to surface industry, geography, story shape
+3. If a candidate needs additional company context beyond `search_recent_wins`'s return shape (e.g., industry, geography, website), call `get_hubspot_company` on the top 2–3 to enrich. Most marketing tasks don't need this extra call — the candidate fields are sufficient.
 4. Return 2–3 candidates with the shape: client name + program + amount + story angle. **Stop after presenting the options.** Do not begin drafting until the user picks one and confirms consent for the chosen client. End the response with a question that requires the user to choose.
 
 **LinkedIn moment** — *"Anything for LinkedIn this week?"*, *"What can we react to?"*

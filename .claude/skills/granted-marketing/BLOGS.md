@@ -74,6 +74,7 @@ Then ground the draft by fetching real data — never write from training memory
 - **News tie-in (optional)** — call `web_search` if the blog ties to current news (a budget release, a federal announcement). Only for time-sensitive framing.
 - **Granted's own stats** — for portfolio aggregates (92%, 18,000+, 1,400+), use `COMPANY_CONTEXT` values exactly. For program-specific stats, call `get_program_stats(program_name)` and apply the citation discipline from `DATA_SOURCES`.
 - **Existing coverage check** — before drafting, call `check_blog_coverage({ topic: "<topic keyword>" })` to find any existing blogs on this topic. If there's a close match, flag it to the user: *"We already have [Blog Title] on this — should this new blog be a refresh of that one instead, or a distinct angle?"* Better to refresh than duplicate.
+- **Industry-themed blogs (recent-wins anchor)** — if the blog has an industry hook (e.g., "Agri-food grants in Canada", "Manufacturing Month" piece), open with concrete recent-wins data via `search_recent_wins({ industry: "construction", days: 365 })`. Cite anonymized — *"BC manufacturers secured $X across N grants this year"* — unless clients appear in COMPANY_CONTEXT §9 (public-consent list). If `available_industry_values` comes back, the substring missed; re-query against one of the returned enum values rather than fabricating an industry label or stat.
 
 If the user can supply the data themselves and prefers to, that's fine too — the discipline is that data either comes from a tool call or from the user, never from training memory.
 

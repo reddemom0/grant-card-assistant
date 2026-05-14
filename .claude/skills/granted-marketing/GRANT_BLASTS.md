@@ -176,6 +176,14 @@ When a Grant Blast cites stats, they come from one of these sources:
 - Program-wide success rates reported elsewhere (e.g., CanExport 36–40%, RTRI 6%)
 - Always cite the source: *"CanExport's published success rate is 36–40% (Global Affairs Canada)"*
 
+### Recent wins as anecdotal proof
+
+For Intent A ("we can help") and Intent C ("timing is tight") drafts, a recent-win cite strengthens the credibility line beyond aggregate stats. Call `search_recent_wins({ program: "ETG", days: 90 })` (or `days: 365` for slower programs like CanExport / BCAFE where wins are quarterly rather than monthly) to find recent wins on the program being announced.
+
+Cite the result inline as anecdotal proof — not as a stat. Anonymize the client by default — *"a manufacturing firm in BC"* — unless they appear in the public-consent list at COMPANY_CONTEXT §9. If `available_industry_values` comes back, the substring missed; re-query against one of the returned enum values rather than fabricating an industry label.
+
+**Don't cite when count is 0.** Absence of a recent win isn't proof of anything; skip the anecdotal line and rely on aggregate stats instead. Aggregate stats from `get_program_stats` still count — that's program lifetime success rate, not the last 90 days. The two are different framings.
+
 ### Anti-fabrication rule
 
 **The Oracle does not make up stats.** If a stat isn't provided or fetchable:
