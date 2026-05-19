@@ -1841,6 +1841,129 @@ This tool searches the internal GetGranted database (188+ Canadian grants, synce
       },
       required: []
     }
+  },
+  {
+    name: 'search_federal_grants_aggregate',
+    description: `Aggregate-mode search over the Government of Canada Proactive Disclosure dataset (federal grants and contribution agreements, ~1.26M rows). Returns grouped rollups: counts, total dollars, average award size, median, YoY growth, p90. Always returns net values — queries run against pdg_latest_amendments (one row per ref_number) so amendments don't double-count.
+
+**When to use:** the question is "what's the trend / how much / by which program or department / which industries / which provinces". For "show me actual recipients" or "list the agreements", use search_federal_grants_records instead.
+
+**Source routing (transparent):** when group_by + filters + metrics fit the pdg_program_yearly matview shape (program / department / fiscal_year / province / recipient_type), the matview is used (sub-second). Otherwise falls back to pdg_latest_amendments (slower but supports naics, riding, city, description keyword, having_distinct, p90, fiscal_quarter, min/max value, agreement_type, recipient_business_number). The response includes a query_path field so you can see which was used.
+
+**NAICS filters:** pass EITHER naics_industry (substring matched against StatsCan NAICS label_en — e.g., "agriculture", "manufacturing") OR naics_prefix (raw 2-6 digit code — e.g., "11", "311"). Not both.
+
+**having_distinct:** group_by + HAVING COUNT(DISTINCT field) >= min_count. Use for "companies with multiple federal grants across different programs" — group_by recipient_business_number, having_distinct={field:'program', min_count:2}. Forces latest_view path.
+
+**Data caveats:** federal only (no provincial/municipal). Post-award only (no rejections). Program names are not de-duplicated — the same program may appear under spelling variants. Treat top-N lists as approximate.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        group_by: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['program', 'department', 'province', 'recipient_type', 'naics_industry', 'fiscal_year', 'fiscal_quarter', 'riding', 'recipient_business_number']
+          },
+          description: 'One or more grouping dimensions. Most queries use 1-2.'
+        },
+        metrics: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['count', 'total_value', 'avg_value', 'median_value', 'yoy_growth', 'p90_value']
+          },
+          description: 'What to compute per group. Default ["count","total_value"]. yoy_growth compares last 12 months to the prior 12 months per group (do NOT combine with fiscal_year group_by). p90_value forces latest_view path.'
+        },
+        filters: {
+          type: 'object',
+          properties: {
+            program_name:        { type: 'string', description: 'Substring match against prog_name_en.' },
+            department:          { type: 'string', description: 'Substring match against owner_org_title.' },
+            province:            { type: 'string', description: '2-letter province code (e.g., "BC").' },
+            recipient_type:      { type: 'string', enum: ['F','N','A','S','P','G','I','O'], description: 'F=for-profit, N=non-profit, A=Indigenous, S=academia, P=individual, G=government, I=international, O=other.' },
+            naics_industry:      { type: 'string', description: 'Substring matched against StatsCan NAICS label_en (e.g., "agriculture"). Resolved to codes, then applied as a NAICS prefix filter. Mutually exclusive with naics_prefix.' },
+            naics_prefix:        { type: 'string', description: 'Raw 2-6 digit NAICS code prefix (e.g., "11" or "311"). Mutually exclusive with naics_industry.' },
+            riding_number:       { type: 'string' },
+            city:                { type: 'string', description: 'Substring match against recipient_city.' },
+            min_value:           { type: 'number' },
+            max_value:           { type: 'number' },
+            agreement_type:      { type: 'string', enum: ['G','C','O'], description: 'G=Grant, C=Contribution, O=Other.' },
+            description_keyword: { type: 'string', description: 'Trigram match against description_en. Forces latest_view path.' },
+            recipient_business_number: { type: 'string', description: 'Exact CRA BN match.' }
+          }
+        },
+        date_range: {
+          type: 'object',
+          properties: {
+            start:            { type: 'string', description: 'ISO date — applies to agreement_start_date.' },
+            end:              { type: 'string', description: 'ISO date.' },
+            lookback_months:  { type: 'number', description: 'Convenience: last N months from today. Mutually exclusive with start/end.' }
+          }
+        },
+        having_distinct: {
+          type: 'object',
+          properties: {
+            field:     { type: 'string', enum: ['program', 'department'] },
+            min_count: { type: 'number' }
+          },
+          description: 'Filter groups to those with >= min_count distinct values of field. Use for repeat-recipient / multi-program queries.'
+        },
+        sort_by: { type: 'string', description: 'Metric name to sort by (default: total_value). Ignored when yoy_growth is requested (always sorts by yoy_growth DESC).' },
+        limit:   { type: 'number', description: 'Max groups to return. Default 25, cap 100.' }
+      },
+      required: ['group_by']
+    }
+  },
+  {
+    name: 'search_federal_grants_records',
+    description: `Record-mode search over the Government of Canada Proactive Disclosure dataset. Returns individual grant/contribution agreements with recipient, program, value, and dates.
+
+**When to use:** the question is "show me the agreements that match X" or "which companies received funding for Y". For totals or rollups, use search_federal_grants_aggregate instead.
+
+**Amendment handling:** by default reads pdg_latest_amendments (one row per ref_number, latest amendment). Pass include_amendments=true ONLY when explicitly auditing amendment history — that path reads the raw table and returns every amendment row.
+
+**NAICS filters:** same convention as search_federal_grants_aggregate — pass EITHER naics_industry (label substring) OR naics_prefix (raw code). Not both.
+
+**Data caveats:** federal only (no provincial/municipal). Post-award only (no rejections). Program names not de-duplicated; recipient names may have casing/punctuation variants — use recipient_name_query (trigram fuzzy match) rather than exact equality when looking up by name.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        filters: {
+          type: 'object',
+          properties: {
+            recipient_name_query:      { type: 'string', description: 'Fuzzy (trigram) match against recipient_legal_name and recipient_operating_name.' },
+            recipient_business_number: { type: 'string', description: 'Exact CRA BN9 / BN15.' },
+            program_name:              { type: 'string' },
+            department:                { type: 'string' },
+            province:                  { type: 'string', description: '2-letter province code.' },
+            city:                      { type: 'string' },
+            riding_number:             { type: 'string' },
+            recipient_type:            { type: 'string', enum: ['F','N','A','S','P','G','I','O'] },
+            naics_industry:            { type: 'string', description: 'Substring matched against NAICS label_en. Mutually exclusive with naics_prefix.' },
+            naics_prefix:              { type: 'string', description: 'Raw 2-6 digit NAICS code prefix.' },
+            min_value:                 { type: 'number' },
+            max_value:                 { type: 'number' },
+            description_keyword:       { type: 'string', description: 'Trigram match against description_en.' },
+            agreement_type:            { type: 'string', enum: ['G','C','O'] }
+          }
+        },
+        date_range: {
+          type: 'object',
+          properties: {
+            start:           { type: 'string' },
+            end:             { type: 'string' },
+            lookback_months: { type: 'number' }
+          }
+        },
+        sort_by: {
+          type: 'string',
+          enum: ['agreement_value_desc', 'agreement_value_asc', 'start_date_desc', 'start_date_asc'],
+          description: 'Default agreement_value_desc.'
+        },
+        limit:               { type: 'number', description: 'Max records. Default 25, cap 200.' },
+        include_amendments:  { type: 'boolean', description: 'When false (default), returns only the latest amendment per ref_number. When true, returns every amendment row (audit history).' }
+      }
+    }
   }
 ];
 

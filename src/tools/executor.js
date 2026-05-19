@@ -15,6 +15,7 @@ import { createAdvancedDocumentTool } from './google-docs-advanced.js';
 import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 import { isServerTool } from './definitions.js';
 import * as getgrantedTools from './getgranted-tools.js';
+import * as federalGrants from './federal-grants.js';
 import * as programCards from '../utils/program-cards.js';
 import { categorizeProspect } from '../services/grant-categorization.js';
 import { runFocusedSearch } from '../services/grant-search-pipeline.js';
@@ -669,6 +670,14 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             include_starter: input.include_starter !== false
           }
         );
+        break;
+
+      case 'search_federal_grants_aggregate':
+        result = await federalGrants.searchFederalGrantsAggregate(input);
+        break;
+
+      case 'search_federal_grants_records':
+        result = await federalGrants.searchFederalGrantsRecords(input);
         break;
 
       // ============================================================================
