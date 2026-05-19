@@ -12,6 +12,13 @@ Format:
 
 ---
 
+## 2026-05-14 — Federal grants ingest v1 shipped — three follow-ups deferred
+**What:** Ingested Government of Canada proactive disclosure grants (1.26M rows) into Railway Postgres via migration 021 + scripts/ingest-federal-grants.js. Oracle tool wiring deferred to next task. Three quality items intentionally deferred: (1) Granted-industry vocabulary alignment — v1 uses StatsCan NAICS labels directly; see .claude/scratchpad/granted-industry-vocabulary.md. (2) `prog_name_en` aliasing — top-10 queries visibly show "International Development Assistance program" vs "Program" as separate rows; build an alias table when noise becomes a real problem. (3) `naics_labels.parent_code` self-FK was dropped after StatsCan data violated it — capture in 022_drop_naics_parent_fk.sql when convenient.
+**Why:** Each deferred item is "nice to have", not blocking. Punting keeps v1 focused on shipping queryable data, not perfecting it.
+**Impact:** migrations/021_proactive_disclosure_grants.sql, scripts/ingest-federal-grants.js, package.json (+pg-copy-streams, +csv-parse), naics_labels + proactive_disclosure_grants + proactive_disclosure_meta + pdg_latest_amendments view + pdg_program_yearly matview on Railway Postgres. Oracle wiring (next task) unblocked.
+
+---
+
 ## 2026-05-13 — Added check_blog_coverage tool
 
 Wrapped tool over granted.ca WP REST API. Built because Oracle reliably

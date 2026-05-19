@@ -59,12 +59,10 @@ import fs from 'node:fs/promises';
 const SOURCE_URL = process.env.FEDERAL_GRANTS_CSV_URL
   || 'https://open.canada.ca/data/dataset/432527ab-7aac-45b5-81d6-7597107a7013/resource/1d15a62f-5656-49ad-8c88-f40ce689d831/download/grants.csv';
 
-// VERIFY ON FIRST RUN — actual download URL must be resolved from the StatsCan
-// dataset page (https://www.statcan.gc.ca/en/concepts/industry/2022/naics-scian-2022-v1-eng.htm
-// or the open.canada.ca equivalent). Placeholder below is not guaranteed correct;
-// override via NAICS_LABELS_CSV_URL env var on first run if it 404s.
+// StatsCan NAICS Canada 2022 v1.0 classification structure (verified URL).
+// Override via NAICS_LABELS_CSV_URL env var if StatsCan moves the file.
 const NAICS_URL = process.env.NAICS_LABELS_CSV_URL
-  || 'https://www.statcan.gc.ca/en/statistical-programs/document/naics-scian-2022-v1-eng.csv';
+  || 'https://www.statcan.gc.ca/en/statistical-programs/document/naics-scian-2022-structure-v1-eng.csv';
 
 const REJECTED_PATH = '/tmp/federal-grants-rejected.csv';
 const ERROR_LOG_PATH = '/tmp/federal-grants-ingest-error.log';
