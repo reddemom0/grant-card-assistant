@@ -5,6 +5,52 @@
  * Streams chunks to the frontend in real-time and collects the full response.
  */
 
+import { query } from '../database/connection.js';
+import { substituteBookingLink, BookingLinkRoutingError } from '../api/booking-link-routing.js';
+
+/**
+ * Look up Pro/Pro Waitlist routing context for a lead-gen session.
+ *
+ * Reads from lead_gen_conversations.prospect_data, where save_lead_data writes
+ * best_fit_product (via finalizeLeadGenConversation) and industry. By the time
+ * an end_turn chat flush happens for the opening estimate turn, save_lead_data
+ * has already run and persisted both fields.
+ *
+ * @param {string} conversationId - lead-gen session_id (same value as conversationId)
+ * @returns {Promise<{best_fit_product: string|null, industry: string|null}>}
+ */
+async function lookupLeadGenRouting(conversationId) {
+  if (!conversationId) return { best_fit_product: null, industry: null };
+  const r = await query(
+    `SELECT prospect_data->>'best_fit_product' AS bfp,
+            prospect_data->>'industry'         AS industry
+       FROM lead_gen_conversations
+      WHERE session_id = $1`,
+    [conversationId]
+  );
+  const row = r.rows[0] || {};
+  return { best_fit_product: row.bfp || null, industry: row.industry || null };
+}
+
+/**
+ * Apply booking-link sentinel substitution to a buffered lead-gen chat text
+ * payload before it streams to the widget. Returns the input unchanged when
+ * the text contains neither the sentinel nor a hardcoded meetings.hubspot.com
+ * URL (cheap shortcut — skips the DB lookup).
+ *
+ * Throws BookingLinkRoutingError when the sentinel requires routing data the
+ * lead doesn't have yet (best_fit_product or industry missing). The caller is
+ * responsible for sending an SSE error and aborting the stream.
+ */
+export async function applyChatBookingSubstitution(text, conversationId) {
+  if (!text || typeof text !== 'string') return text;
+  if (!text.includes('{{BOOKING_LINK}}') && !/meetings\.hubspot\.com/i.test(text)) {
+    return text;
+  }
+  const routing = await lookupLeadGenRouting(conversationId);
+  return substituteBookingLink(text, routing, { mode: 'chat' });
+}
+
 /**
  * Convert markdown formatting to HTML (safety net)
  * Handles bold, links, and basic formatting that the model might output
@@ -23,11 +69,14 @@ function convertMarkdownToHtml(text) {
  * Stream Claude response to frontend via SSE and collect full response
  * @param {AsyncIterable} stream - Claude API stream
  * @param {Object} res - Express response object
- * @param {string} sessionId - Unique session ID for this request
+ * @param {string} sessionId - Unique session ID for this request (SSE connection ID)
  * @param {string} agentType - Agent type (for lead-gen specific handling)
+ * @param {string} [conversationId] - Conversation ID; for lead-gen this is the
+ *        lead session_id used to look up routing data (best_fit_product / industry)
+ *        when substituting the {{BOOKING_LINK}} sentinel at end_turn flush.
  * @returns {Promise<Object>} Full collected response
  */
-export async function streamToSSE(stream, res, sessionId, agentType = null) {
+export async function streamToSSE(stream, res, sessionId, agentType = null, conversationId = null) {
   const fullResponse = {
     content: [],
     stop_reason: null,
@@ -240,8 +289,32 @@ export async function streamToSSE(stream, res, sessionId, agentType = null) {
               // This is the final iteration - stream the buffered text
               console.log(`  📝 Streaming final iteration text: ${textBuffer.length} chars (lead-gen mode)`);
 
+              // Booking-link sentinel substitution — runs BEFORE markdown→HTML.
+              // The sentinel has no markdown semantics, so it survives the
+              // conversion either way; running substitution first means the
+              // routed URL is what flows into <a href> conversion (when the
+              // model wrapped the sentinel as a markdown link).
+              let substituted;
+              try {
+                substituted = await applyChatBookingSubstitution(textBuffer, conversationId);
+              } catch (subErr) {
+                if (subErr instanceof BookingLinkRoutingError) {
+                  console.error(
+                    `[BOOKING-LINK-FAILURE] chat-stream — refusing to ship sentinel. conversationId=${conversationId}, best_fit_product=${subErr.context?.best_fit_product}, industry=${subErr.context?.industry}, reason=${subErr.context?.reason}, message="${subErr.message}"`
+                  );
+                  res.write(`data: ${JSON.stringify({
+                    type: 'error',
+                    error: 'Something went wrong, please try again.',
+                    sessionId
+                  })}\n\n`);
+                  res.end();
+                  throw subErr;
+                }
+                throw subErr;
+              }
+
               // Convert markdown to HTML before streaming
-              const htmlConverted = convertMarkdownToHtml(textBuffer);
+              const htmlConverted = convertMarkdownToHtml(substituted);
 
               res.write(`data: ${JSON.stringify({
                 type: 'text_delta',

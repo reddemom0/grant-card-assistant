@@ -25,7 +25,7 @@ import {
 } from './hubspot-form-submission.js';
 import { sendEmail, wrapInBrandedTemplate } from '../email/sendEmail.js';
 import { notifyTeamOfLead } from '../services/lead-notification.js';
-import { getBookingLink, NATALIE_INTRO_LINK } from './booking-link-routing.js';
+import { getBookingLink, NATALIE_INTRO_LINK, substituteBookingLink, BookingLinkRoutingError } from './booking-link-routing.js';
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 
@@ -1002,34 +1002,46 @@ export async function sendLeadGenEmail(sessionId) {
     console.log(`  🎨 Converted markdown to HTML in email body`);
   }
 
-  // Booking link normalization (best_fit_product-driven)
-  // - non-null link: rewrite all meetings.hubspot.com URLs to the routed link
-  // - null link (Get Granted / Not a Fit): strip any <p> containing a booking link
-  const routed = getBookingLink({
-    best_fit_product: prospectData.best_fit_product || null,
-    industry: prospectData.industry
-  });
-  const meetingsLinkRegex = /https:\/\/meetings\.hubspot\.com\/[^\s"'<>]+/g;
-
-  if (routed.link) {
-    const matches = emailBodyHtml.match(meetingsLinkRegex);
-    if (matches && matches.some(link => link !== routed.link)) {
-      console.log(`⚠️  Rewriting booking links → ${routed.link} (source=${routed.source})`);
-      emailBodyHtml = emailBodyHtml.replace(meetingsLinkRegex, routed.link);
+  // Booking link substitution (sentinel-driven + defensive URL rewrite).
+  // See substituteBookingLink in booking-link-routing.js for the full contract.
+  // Hard-fails (BookingLinkRoutingError) when routing data required by the
+  // sentinel is missing — we'd rather not send than ship a literal
+  // "{{BOOKING_LINK}}" or a wrong-consultant URL.
+  try {
+    const beforeLen = emailBodyHtml.length;
+    emailBodyHtml = substituteBookingLink(
+      emailBodyHtml,
+      { best_fit_product: prospectData.best_fit_product || null, industry: prospectData.industry || null },
+      { mode: 'email' }
+    );
+    if (emailBodyHtml.length !== beforeLen) {
+      console.log(`✓ Booking link substitution applied (best_fit_product=${prospectData.best_fit_product}, industry=${prospectData.industry})`);
     }
-  } else {
-    const ctaParagraphRegex = /<p\b[^>]*>[\s\S]*?meetings\.hubspot\.com[\s\S]*?<\/p>\s*/gi;
-    const before = emailBodyHtml.length;
-    emailBodyHtml = emailBodyHtml.replace(ctaParagraphRegex, '');
-    if (emailBodyHtml.length !== before) {
-      console.log(`🚫 Stripped booking-link CTA paragraph(s) (best_fit_product=${prospectData.best_fit_product})`);
-    }
-    // Defensive: warn if any meetings.hubspot.com URL survived (e.g. emitted
-    // inline in a sentence rather than wrapped in <p>). Do not modify; partial
-    // rewrites read worse than the leak.
+    // Defensive: if any meetings.hubspot.com URL slipped past substitution
+    // (e.g. emitted inline rather than wrapped in <p> for a null-tier),
+    // surface it without modifying — partial rewrites read worse than the leak.
     if (/https:\/\/meetings\.hubspot\.com\//i.test(emailBodyHtml)) {
-      console.warn(`[BOOKING-LINK-LEAK] Inline meetings.hubspot.com URL survived CTA strip. best_fit_product=${prospectData.best_fit_product}, session=${sessionId}`);
+      const routed = getBookingLink({
+        best_fit_product: prospectData.best_fit_product || null,
+        industry: prospectData.industry || null
+      });
+      if (!routed.link) {
+        console.warn(`[BOOKING-LINK-LEAK] Inline meetings.hubspot.com URL survived sentinel substitution for null-link tier. best_fit_product=${prospectData.best_fit_product}, session=${sessionId}`);
+      }
     }
+  } catch (err) {
+    if (err instanceof BookingLinkRoutingError) {
+      console.error(
+        `[BOOKING-LINK-FAILURE] Cannot route booking link for email — refusing to send. session=${sessionId}, contact_email=${session.contact_email}, best_fit_product=${prospectData.best_fit_product}, industry=${prospectData.industry}, reason=${err.context?.reason}, message="${err.message}"`
+      );
+      return {
+        success: false,
+        error: `Booking link routing failed: ${err.message}`,
+        bookingLinkFailure: true,
+        recipient: session.contact_email
+      };
+    }
+    throw err;
   }
 
   // Wrap in template

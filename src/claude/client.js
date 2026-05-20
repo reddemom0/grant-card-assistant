@@ -15,7 +15,8 @@ import { loadLearningMemory } from '../tools/learning-memory.js';
 import { getLeadGenFormContext } from '../utils/lead-gen-context.js';
 import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
-import { streamToSSE, setupSSE, closeSSE, sendSSE } from './streaming.js';
+import { streamToSSE, setupSSE, closeSSE, sendSSE, applyChatBookingSubstitution } from './streaming.js';
+import { BookingLinkRoutingError } from '../api/booking-link-routing.js';
 import { getQueryConfig, getQueryConfigForModel, logConfigDecision } from './query-classifier.js';
 import {
   getMaxTurnsForAgent,
@@ -536,7 +537,7 @@ export async function runAgent({
       });
 
       // Stream response to frontend and collect full response
-      const fullResponse = await streamToSSE(stream, res, sessionId, agentType);
+      const fullResponse = await streamToSSE(stream, res, sessionId, agentType, conversationId);
 
       console.log(`✓ Response received - stop_reason: ${fullResponse.stop_reason}`);
 
@@ -702,10 +703,27 @@ export async function runAgent({
           console.log('✓ Messages saved to database');
         }
 
-        // Flush any unstreamed accumulated text before sending done event
+        // Flush any unstreamed accumulated text before sending done event.
+        // Apply booking-link sentinel substitution here too — substantive
+        // tool-narration text can contain the sentinel for Pro/Pro Waitlist
+        // leads, same hard-fail contract as the end_turn flush in streamToSSE.
         if (agentType === 'lead-gen' && hasUnstreamedText && accumulatedText && accumulatedText.trim()) {
           console.log(`📤 Flushing unstreamed accumulated text (${accumulatedText.length} chars) before done event`);
-          sendSSE(res, { type: 'text_delta', text: accumulatedText });
+          let flushText = accumulatedText;
+          try {
+            flushText = await applyChatBookingSubstitution(accumulatedText, conversationId);
+          } catch (subErr) {
+            if (subErr instanceof BookingLinkRoutingError) {
+              console.error(
+                `[BOOKING-LINK-FAILURE] chat-flush (unstreamed) — refusing to ship sentinel. conversationId=${conversationId}, best_fit_product=${subErr.context?.best_fit_product}, industry=${subErr.context?.industry}, reason=${subErr.context?.reason}, message="${subErr.message}"`
+              );
+              sendSSE(res, { type: 'error', error: 'Something went wrong, please try again.' });
+              closeSSE(res);
+              throw subErr;
+            }
+            throw subErr;
+          }
+          sendSSE(res, { type: 'text_delta', text: flushText });
           sendSSE(res, { type: 'message_complete' });
         }
 
