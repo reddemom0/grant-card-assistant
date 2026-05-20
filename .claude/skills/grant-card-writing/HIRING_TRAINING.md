@@ -56,12 +56,12 @@ Quickly explain:
 - why the program exists
 
 **Length & depth:**
-- 1–2 sentences only
+- 2–3 lines maximum (1–2 sentences)
 - Paragraph format, not bullets
-- No dollar amounts, no eligibility details, no process
+- No dollar amounts, no percentages, no eligibility details, no deadlines, no process, no project examples, no program history, no government commitments
 
 **Language style:**
-- Plain business language
+- Plain business language ("Layman's language")
 - Outcome-focused (what the business gets)
 - No jargon, no program mechanics
 
@@ -69,7 +69,7 @@ Quickly explain:
 - Single paragraph
 - No bullets
 
-**AI Rule:** Clearly identify whether the funding supports hiring, training, or both.
+**AI Rule:** Clearly identify whether the funding supports hiring, training, or both. The Preview answers "what is this program?" — nothing else. If a sentence contains a number, a percentage, a date, or the word "eligible," remove it.
 
 **Examples by sub-type:**
 
@@ -85,24 +85,31 @@ Quickly explain:
 
 ### 3.1 Grant Overview
 
-**Aim:** Add key qualifiers to the preview — funding structure, program scope, and who it's for.
+**Aim:** Expand the Preview by adding the key details an applicant needs to decide if the program is a fit for them. Answers: "What is this program, and is it a fit for me?" For Hiring/Training programs, add the funding structure, program scope, and who it's for.
 
 **Length & depth:**
-- 2–4 sentences max
+- 3–4 lines maximum (2–4 sentences)
 - Includes:
-  - funding model (%, max, in-kind)
+  - funding model (%, max, in-kind) — per-applicant value, not total program budget
   - key eligibility signal
   - program intent
+- Add additional context only when relevant: contribution percentage, expected outcomes
 
 **Language style:**
 - Still plain, but slightly more detailed
 - Informational, not instructional
+- Not narrative history — do not describe when the program launched or government priorities
 
 **Formatting:**
 - Paragraph format
 - Followed by "Grant Value" as a separate line or block
 
-**AI Rule:** Expand the preview by adding who it's for + how funding works, without going into lists.
+**Critical distinction — total program budget vs. grant value:**
+- The program's total budget (e.g., "$291 million initiative") is rarely useful to an individual employer.
+- The grant value is what an individual employer can receive (e.g., "up to $7K per hired graduate").
+- Always report grant value to the applicant. Never use total program budget as the headline figure.
+
+**AI Rule:** Expand the preview by adding who it's for + how funding works, without going into lists. If a sentence describes program mechanics, history, or government goals rather than what's offered to the applicant, remove it.
 
 ### 3.2 Grant Value
 
@@ -110,10 +117,12 @@ Quickly explain:
 
 **Length & depth:**
 - As short as possible
-- Include:
-  - % of funding
-  - maximum amounts
-  - special tiers, funding range based on hours worked (if applicable)
+- Bullets in this order:
+  - % of funding (coverage percentage of wages or training costs)
+  - maximum amounts per hire / per trainee / per employer
+  - special tiers — funding range based on hours worked (if applicable)
+  - additional funding for specific project types or applicant groups (if applicable — e.g., underrepresented hires, equity-deserving groups, Indigenous applicants)
+  - applicant contribution requirement (if applicable)
 
 **Language style:**
 - Numeric and precise
@@ -122,6 +131,12 @@ Quickly explain:
 **Formatting:**
 - Bullet points or short lines
 - Separate streams/tiers clearly
+- Use consistent wording across cards: "Up to X% of wages," "Up to $X per hire," "Up to $X per trainee"
+
+**Critical distinction — program budget vs. applicant value:**
+- Report grant value to the applicant, not the program's total budget.
+- If the source material only gives a total program budget without per-applicant figures, state that the per-applicant maximum is not specified in source material. Do not divide, estimate, or infer.
+- If a value isn't in the source material, omit the bullet. Do not fabricate.
 
 **AI Rule:** Break funding into clean tiers when necessary.
 
@@ -279,6 +294,7 @@ Same aim, structure, and formatting as Eligible Applicants. Include only if clea
 
 **Language style:**
 - Operational, structured
+- Vary sentence structure across bullets. Avoid stacking many short, formulaic openings ("Employers must...", "Funding is...", "Hires must..."). Combine related rules into flowing phrasing where natural. Write like a knowledgeable consultant briefing a client, not a policy document.
 
 **Formatting:**
 - Bullet points ending with semicolons
@@ -335,11 +351,17 @@ Same aim, structure, and formatting as Eligible Applicants. Include only if clea
 
 Direct access to application materials. No descriptions, just links.
 
-- Program website: [click here]
-- Program Guidelines: [click here]
-- Application Portal: [click here]
+- Program Website: [URL from source material]
+- Program Guidelines: [URL from source material]
+- Application Portal: [URL from source material]
 
-**AI Rule:** No descriptions, just links.
+**Rules:**
+- Use these three labels exactly (Title Case). Do not invent alternative labels (e.g., "FCM Portal," "Eligible Costs Document," "FAQ").
+- If a URL is in the source material, include it as a clickable link.
+- If a URL is not in the source material, omit that bullet entirely. Do not write "[click here]," "TBD," or any placeholder.
+- Do not add new rows beyond these three labels, even if the source material contains additional resources.
+
+**AI Rule:** Exactly three possible rows. Include each only if you have a real URL from the source. No descriptions, no placeholders, no extras.
 
 ---
 

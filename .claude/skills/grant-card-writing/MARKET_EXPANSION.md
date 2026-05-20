@@ -43,12 +43,12 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 - Why the program exists
 
 **Length & depth:**
-- 1–2 sentences only
+- 2–3 lines maximum (1–2 sentences)
 - Paragraph format, not bullets
-- No dollar amounts, no eligibility details, no process
+- No dollar amounts, no percentages, no eligibility details, no deadlines, no process, no project examples, no program history, no government commitments
 
 **Language style:**
-- Plain business language
+- Plain business language ("Layman's language")
 - Vocabulary: expand, diversify, export, enter new markets, increase sales, trade resilience
 - No jargon, no program mechanics
 
@@ -56,7 +56,7 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 - Single short paragraph
 - No bullets
 
-**AI Rule:** Describe where the business is expanding + how the program helps them get there.
+**AI Rule:** Describe where the business is expanding + how the program helps them get there. The Preview answers "what is this program?" — nothing else. If a sentence contains a number, a percentage, a date, or the word "eligible," remove it.
 
 ---
 
@@ -64,18 +64,16 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 
 ### 3.1 Grant Overview
 
-**Aim:** Expand the preview by explaining:
-- funding model
-- project types
-- broad target audience
+**Aim:** Expand the Preview by adding the key details an applicant needs to decide if the program is a fit for them. Answers: "What is this program, and is it a fit for me?" For Market Expansion programs, explain the funding model, project streams, and broad target audience.
 
 **Length & depth:**
-- 2–4 sentences
+- 3–4 lines maximum (2–4 sentences)
 - Must include:
-  - funding %
-  - max contribution
+  - funding % (per-applicant coverage)
+  - maximum contribution (per-applicant value, not total program budget)
   - major project streams/categories
   - broad applicant type
+- Add additional context only when relevant: expected outcomes
 
 **Language style:**
 - Plain language. Market expansion programs frequently have multiple project streams:
@@ -85,12 +83,18 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
   - export development
   - equipment tied to expansion
 - Informational, not instructional
+- Not narrative history — do not describe when the program launched or government priorities
 
 **Formatting:**
 - Paragraph format
 - Followed by "Grant Value" as a separate line or block
 
-**AI Rule:** Explain what kind of growth activities the funding supports.
+**Critical distinction — total program budget vs. grant value:**
+- The program's total budget (e.g., "$291 million initiative") is rarely useful to an individual applicant.
+- The grant value is what an individual applicant can receive.
+- Always report grant value to the applicant. Never use total program budget as the headline figure.
+
+**AI Rule:** Explain what kind of growth activities the funding supports. If a sentence describes program mechanics, history, or government goals rather than what's offered to the applicant, remove it.
 
 ### 3.2 Grant Value
 
@@ -98,6 +102,14 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 
 **Length & depth:**
 - As short as possible
+- Bullets in this order:
+  - % contribution (coverage percentage of eligible costs)
+  - maximum funding amount per applicant
+  - average funding (if relevant — add NOTE if averages differ from caps)
+  - minimum spend thresholds (if applicable)
+  - multiple caps by activity type (mention in Expenses section if needed)
+  - additional funding for specific project types or applicant groups (if applicable)
+  - applicant contribution requirement (if applicable)
 
 **Language style:**
 - Numeric and precise
@@ -105,11 +117,12 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 
 **Formatting:**
 - Bullet points or short lines
-- Include:
-  - max funding
-  - % contribution
-  - average funding (if relevant)
-  - Add NOTE if averages differ from caps
+- Use consistent wording across cards: "Up to X% of eligible costs," "Up to $X per [project/applicant/year]"
+
+**Critical distinction — program budget vs. applicant value:**
+- Report grant value to the applicant, not the program's total budget.
+- If the source material only gives a total program budget without per-applicant figures, state that the per-applicant maximum is not specified in source material. Do not divide, estimate, or infer.
+- If a value isn't in the source material, omit the bullet. Do not fabricate.
 
 **AI Rule:** Market Expansion programs often have:
 - minimum spend thresholds
@@ -258,6 +271,7 @@ Same structure and formatting as Eligible Expenses. Include only if clearly cite
 
 **Language style:**
 - Operational, structured
+- Vary sentence structure across bullets. Avoid stacking many short, formulaic openings ("Projects must...", "Funding is...", "Applicants must..."). Combine related rules into flowing phrasing where natural. Write like a knowledgeable consultant briefing a client, not a policy document.
 
 **Formatting:**
 - Bullet points ending with semicolons
@@ -329,11 +343,17 @@ Same structure and formatting as Eligible Expenses. Include only if clearly cite
 
 Direct access to application materials. No descriptions, just links.
 
-- Program Website: [click here]
-- Program Guidelines: [click here]
-- Application Portal: [click here]
+- Program Website: [URL from source material]
+- Program Guidelines: [URL from source material]
+- Application Portal: [URL from source material]
 
-**AI Rule:** No descriptions, just links.
+**Rules:**
+- Use these three labels exactly (Title Case). Do not invent alternative labels (e.g., "FCM Portal," "Eligible Costs Document," "FAQ").
+- If a URL is in the source material, include it as a clickable link.
+- If a URL is not in the source material, omit that bullet entirely. Do not write "[click here]," "TBD," or any placeholder.
+- Do not add new rows beyond these three labels, even if the source material contains additional resources.
+
+**AI Rule:** Exactly three possible rows. Include each only if you have a real URL from the source. No descriptions, no placeholders, no extras.
 
 ---
 

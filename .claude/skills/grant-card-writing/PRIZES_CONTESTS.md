@@ -53,12 +53,12 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 **Aim:** A quick, high-level explanation of who the competition is for, what they can win, and what achievement or business profile is being recognized.
 
 **Length & depth:**
-- 1–2 sentences only
+- 2–3 lines maximum (1–2 sentences)
 - Paragraph format, not bullets
-- No dollar amounts, no eligibility details, no process
+- No dollar amounts, no percentages, no eligibility details, no deadlines, no process, no project examples, no program history, no government commitments
 
 **Language style:**
-- Plain business language
+- Plain business language ("Layman's language")
 - Outcome-focused (what the business gets)
 - No jargon, no program mechanics
 
@@ -66,7 +66,7 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 - Single paragraph
 - No bullets
 
-**AI Rule:** Describe who can compete + prize/recognition type + competition purpose.
+**AI Rule:** Describe who can compete + prize/recognition type + competition purpose. The Preview answers "what is this program?" — nothing else. If a sentence contains a number, a percentage, a date, or the word "eligible," remove it.
 
 ---
 
@@ -74,35 +74,43 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 
 ### 3.1 Grant Overview
 
-**Aim:** Add key qualifiers to the preview — funding structure, program scope, and who it's for.
+**Aim:** Expand the Preview by adding the key details an applicant needs to decide if the program is a fit for them. Answers: "What is this program, and is it a fit for me?"
 
 **Length & depth:**
-- 2–4 sentences max
-- Includes:
-  - funding model (%, max, in-kind)
-  - key eligibility signal
-  - program intent
+- 3–4 lines maximum (2–4 sentences)
+- Includes, in this order, only when relevant:
+  - prize value to the winner
+  - contribution percentage or matching requirement (if applicable)
+  - expected outcomes of the program (recognition, exposure, mentorship)
+  - who it's for
 
 **Language style:**
-- Still plain, but slightly more detailed
+- Plain business language ("Layman's language")
 - Informational, not instructional
+- Not narrative history
 
 **Formatting:**
 - Paragraph format
 - Followed by "Prize Value" as a separate line or block
 
-**AI Rule:** Expand the preview by adding who it's for + how funding works, without going into lists.
+**Critical distinction — total prize pool vs. prize value to winner:**
+- Report prize value to the winner, not the total prize pool (unless the total pool is the single award).
+- Never lead with the total program budget or aggregate prize fund.
+
+**AI Rule:** If a sentence describes program mechanics, history, or government goals rather than what's offered to the winner, remove it.
 
 ### 3.2 Prize Value
 
-**Aim:** Clearly quantify the financial or in-kind support.
+**Aim:** Clearly quantify the financial or in-kind support. Consistent structure across all cards.
 
 **Length & depth:**
 - As short as possible
-- Include:
-  - % of funding
-  - maximum amounts
-  - special tiers, prize value range, etc.
+- Bullets in this order:
+  - cash prize amounts (top prize and tiered prizes if applicable)
+  - in-kind value (coaching, mentorship, exposure, recognition)
+  - finalist or runner-up awards (if applicable)
+  - prize structure cadence (annual/monthly/quarterly)
+  - additional benefits for specific project types or applicant groups (if applicable)
 
 **Language style:**
 - Numeric and precise
@@ -111,15 +119,14 @@ Standard metadata block. Fill in what's clearly cited; mark unavailable if not.
 **Formatting:**
 - Bullet points or short lines
 - Separate prize tiers when applicable
+- Use consistent wording across cards: "$X grand prize," "$X runner-up," "Up to $X in in-kind services"
 
-**Typical content:**
-- cash prize amounts
-- in-kind services
-- finalist awards
-- annual / monthly / quarterly prize structure
-- coaching, mentorship, exposure, or recognition benefits
+**Critical distinction — total prize pool vs. winner value:**
+- Report what a winner receives, not the total prize pool.
+- If the source material only gives a total prize pool without per-winner figures, state that the per-winner amount is not specified in source material. Do not divide, estimate, or infer.
+- If a value isn't in the source material, omit the bullet. Do not fabricate.
 
-**AI Rule:** Use **Prize Value** or **Award Value**, not Grant Value. Clearly list prize amounts and categories.
+**AI Rule:** Use "Prize Value" or "Award Value" as the section heading, not "Grant Value." Clearly list prize amounts and categories.
 
 ### 3.3 Turnaround Time
 
@@ -212,6 +219,7 @@ Same aim, structure, and formatting as Eligible Applicants. Include only if clea
 
 **Language style:**
 - Operational, structured
+- Vary sentence structure across bullets. Avoid stacking many short, formulaic openings. Combine related rules into flowing phrasing where natural. Write like a knowledgeable consultant briefing a client, not a policy document.
 
 **Formatting:**
 - Bullet points ending with semicolons
@@ -264,11 +272,17 @@ Same aim, structure, and formatting as Eligible Applicants. Include only if clea
 
 Direct access to application materials. No descriptions, just links.
 
-- Program website: [click here]
-- Program Guidelines: [click here]
-- Application Portal: [click here]
+- Program Website: [URL from source material]
+- Program Guidelines: [URL from source material]
+- Application Portal: [URL from source material]
 
-**AI Rule:** No descriptions, just links.
+**Rules:**
+- Use these three labels exactly (Title Case). Do not invent alternative labels (e.g., "FCM Portal," "Eligible Costs Document," "FAQ").
+- If a URL is in the source material, include it as a clickable link.
+- If a URL is not in the source material, omit that bullet entirely. Do not write "[click here]," "TBD," or any placeholder.
+- Do not add new rows beyond these three labels, even if the source material contains additional resources.
+
+**AI Rule:** Exactly three possible rows. Include each only if you have a real URL from the source. No descriptions, no placeholders, no extras.
 
 ---
 
