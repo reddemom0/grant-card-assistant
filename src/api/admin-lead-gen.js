@@ -194,25 +194,27 @@ export async function handleLeadGenStats(req, res) {
     estimatesQuery += ` GROUP BY source ORDER BY count DESC`;
 
     // tier_funnel
+    // Counts ALL conversation rows in range. Missing best_fit_product buckets as
+    // "Not Recommended" to surface persistence gaps (vs hiding them). Filtered by
+    // created_at so unfinalized sessions are still counted; minor edge case: a
+    // session created May 19 but finalized May 22 will count in May 1-21 funnel
+    // but not in same-range estimates query.
     let tierQuery = `
-      SELECT prospect_data->>'best_fit_product' AS tier,
+      SELECT COALESCE(NULLIF(prospect_data->>'best_fit_product', ''), 'Not Recommended') AS tier,
              COUNT(*) AS count
       FROM lead_gen_conversations
-      WHERE finalized = true
-        AND prospect_data ? 'best_fit_product'
-        AND prospect_data->>'best_fit_product' IS NOT NULL
-        AND created_at >= '${DATA_FLOOR}'
+      WHERE created_at >= '${DATA_FLOOR}'
     `;
     const tierParams = [];
     if (start_date) {
       tierParams.push(start_date);
-      tierQuery += ` AND finalized_at >= $${tierParams.length}::date`;
+      tierQuery += ` AND created_at >= $${tierParams.length}::date`;
     }
     if (end_date) {
       tierParams.push(end_date);
-      tierQuery += ` AND finalized_at < $${tierParams.length}::date + INTERVAL '1 day'`;
+      tierQuery += ` AND created_at < $${tierParams.length}::date + INTERVAL '1 day'`;
     }
-    tierQuery += ` GROUP BY tier ORDER BY count DESC`;
+    tierQuery += ` GROUP BY tier ORDER BY CASE WHEN tier = 'Not Recommended' THEN 1 ELSE 0 END, count DESC`;
 
     const [estimatesResult, tierResult] = await Promise.all([
       query(estimatesQuery, estimatesParams),
