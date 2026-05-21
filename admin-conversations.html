@@ -78,6 +78,36 @@
       margin-top: 4px;
     }
 
+    .stat-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 4px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 15px;
+      color: #1a2332;
+    }
+
+    .stat-row-label {
+      color: #1a2332;
+    }
+
+    .stat-row-count {
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat-row-empty {
+      font-size: 13px;
+      color: #6d7881;
+      font-style: italic;
+    }
+
     /* Filters */
     .filters {
       background: #fff;
@@ -429,21 +459,19 @@
       <p class="subtitle">Monitor and analyze lead generation chatbot conversations</p>
     </header>
 
-    <!-- Stats Bar - Funnel (sourced from lead_gen_events) -->
+    <!-- Stats Bar - Cards reflect the date range selected in Filters below -->
     <div class="stats-bar">
       <div class="stat-card">
-        <div class="stat-label">Widget Opens</div>
-        <div class="stat-value" id="stat-opens">-</div>
+        <div class="stat-label">Estimates by Source</div>
+        <div class="stat-rows" id="stat-estimates-by-source">
+          <div class="stat-row-empty">Loading...</div>
+        </div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Estimates Delivered</div>
-        <div class="stat-value" id="stat-estimates">-</div>
-        <div class="stat-subtitle" id="stat-estimates-pct">-</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Email Summaries Sent</div>
-        <div class="stat-value" id="stat-emails">-</div>
-        <div class="stat-subtitle" id="stat-emails-pct">-</div>
+        <div class="stat-label">Tier Funnel</div>
+        <div class="stat-rows" id="stat-tier-funnel">
+          <div class="stat-row-empty">Loading...</div>
+        </div>
       </div>
     </div>
 
@@ -528,18 +556,55 @@
     let expandedRows = new Set();
     let currentSort = { column: 'created_at', direction: 'desc' };
 
+    const WIDGET_MODE_LABELS = {
+      floating: 'Popout',
+      inline: 'Inline',
+    };
+
+    function renderStatRows(containerId, rows, labelKey, emptyText, labelMap) {
+      const container = document.getElementById(containerId);
+      if (!rows || rows.length === 0) {
+        container.innerHTML = `<div class="stat-row-empty">${emptyText}</div>`;
+        return;
+      }
+      container.innerHTML = rows.map(row => {
+        const rawLabel = row[labelKey];
+        const displayLabel = (labelMap && labelMap[rawLabel]) || rawLabel || 'Unknown';
+        return `
+          <div class="stat-row">
+            <span class="stat-row-label">${escapeHtml(displayLabel)}</span>
+            <span class="stat-row-count">${row.count}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
     async function loadStats() {
+      const params = new URLSearchParams();
+      const startDate = document.getElementById('filter-start').value;
+      const endDate = document.getElementById('filter-end').value;
+      if (startDate) params.set('start_date', startDate);
+      if (endDate) params.set('end_date', endDate);
+
       try {
-        const response = await fetch('/api/admin/lead-gen-stats');
+        const response = await fetch(`/api/admin/lead-gen-stats?${params}`);
         const data = await response.json();
 
         if (data.success) {
-          const s = data.stats;
-          document.getElementById('stat-opens').textContent = s.widget_opens;
-          document.getElementById('stat-estimates').textContent = s.estimates_delivered;
-          document.getElementById('stat-estimates-pct').textContent = s.estimate_rate + '% of opens';
-          document.getElementById('stat-emails').textContent = s.email_summaries;
-          document.getElementById('stat-emails-pct').textContent = s.email_rate + '% of estimates';
+          renderStatRows(
+            'stat-estimates-by-source',
+            data.stats.estimates_by_source,
+            'source',
+            'No estimates delivered in this range',
+            WIDGET_MODE_LABELS
+          );
+          renderStatRows(
+            'stat-tier-funnel',
+            data.stats.tier_funnel,
+            'tier',
+            'No finalized sessions in this range',
+            null
+          );
         }
       } catch (error) {
         console.error('Failed to load stats:', error);
@@ -784,22 +849,32 @@
 
     function applyFilters() {
       expandedRows.clear();
+      loadStats();
       loadConversations();
     }
 
+    function setDefaultDateRange() {
+      const today = new Date();
+      const sevenDaysAgo = new Date(today);
+      sevenDaysAgo.setDate(today.getDate() - 7);
+      document.getElementById('filter-start').value = sevenDaysAgo.toISOString().slice(0, 10);
+      document.getElementById('filter-end').value = today.toISOString().slice(0, 10);
+    }
+
     function resetFilters() {
-      document.getElementById('filter-start').value = '';
-      document.getElementById('filter-end').value = '';
+      setDefaultDateRange();
       document.getElementById('filter-province').value = 'all';
       document.getElementById('filter-industry').value = '';
       document.getElementById('filter-finalized').value = 'all';
       document.getElementById('filter-min-messages').value = '';
       expandedRows.clear();
+      loadStats();
       loadConversations();
     }
 
     // Load on page load
     document.addEventListener('DOMContentLoaded', () => {
+      setDefaultDateRange();
       loadStats();
       loadConversations();
     });

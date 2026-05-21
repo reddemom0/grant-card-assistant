@@ -157,44 +157,78 @@ export async function handleListLeadGenConversations(req, res) {
 /**
  * GET /api/admin/lead-gen-stats
  *
- * Get summary statistics for lead-gen dashboard.
- * Uses lead_gen_events table for accurate user-behavior metrics
- * (not lead_gen_conversations, which tracks agent-side state and inflates numbers).
+ * Returns two datasets for the dashboard cards:
+ *   - estimates_by_source: counts of estimate_delivered events grouped by widget_mode
+ *   - tier_funnel: counts of finalized conversations grouped by best_fit_product
+ *
+ * Query params (both optional, mirror handleListLeadGenConversations):
+ *   - start_date (YYYY-MM-DD): inclusive lower bound
+ *   - end_date (YYYY-MM-DD): inclusive upper bound (SQL applies < end_date + 1 day)
+ *
+ * estimates_by_source filters on lead_gen_events.created_at.
+ * tier_funnel filters on lead_gen_conversations.finalized_at (the bucket should
+ * reflect when the recommendation was made, not when the session started).
  */
 export async function handleLeadGenStats(req, res) {
   try {
-    // Widget opens have no session_id (event fires before session exists), so
-    // this is a raw view count, not unique users. Estimates and CTA clicks
-    // are deduped by session_id since the widget can re-fire these events
-    // on navigation/refresh within a single session.
-    const funnelResult = await query(`
-      SELECT
-        COUNT(CASE WHEN event_type = 'widget_opened' THEN 1 END) as widget_opens,
-        COUNT(DISTINCT CASE WHEN event_type = 'estimate_delivered' THEN session_id END) as estimates_delivered,
-        COUNT(DISTINCT CASE WHEN event_type = 'cta_clicked' AND event_data->>'cta_type' = 'email_summary' THEN session_id END) as email_summaries
+    const { start_date, end_date } = req.query;
+
+    // estimates_by_source
+    let estimatesQuery = `
+      SELECT event_data->>'widget_mode' AS source,
+             COUNT(*) AS count
       FROM lead_gen_events
-      WHERE created_at >= '${DATA_FLOOR}'
-    `);
+      WHERE event_type = 'estimate_delivered'
+        AND created_at >= '${DATA_FLOOR}'
+    `;
+    const estimatesParams = [];
+    if (start_date) {
+      estimatesParams.push(start_date);
+      estimatesQuery += ` AND created_at >= $${estimatesParams.length}::date`;
+    }
+    if (end_date) {
+      estimatesParams.push(end_date);
+      estimatesQuery += ` AND created_at < $${estimatesParams.length}::date + INTERVAL '1 day'`;
+    }
+    estimatesQuery += ` GROUP BY source ORDER BY count DESC`;
 
-    const widgetOpens = parseInt(funnelResult.rows[0].widget_opens, 10);
-    const estimatesDelivered = parseInt(funnelResult.rows[0].estimates_delivered, 10);
-    const emailSummaries = parseInt(funnelResult.rows[0].email_summaries, 10);
+    // tier_funnel
+    let tierQuery = `
+      SELECT prospect_data->>'best_fit_product' AS tier,
+             COUNT(*) AS count
+      FROM lead_gen_conversations
+      WHERE finalized = true
+        AND prospect_data ? 'best_fit_product'
+        AND prospect_data->>'best_fit_product' IS NOT NULL
+        AND created_at >= '${DATA_FLOOR}'
+    `;
+    const tierParams = [];
+    if (start_date) {
+      tierParams.push(start_date);
+      tierQuery += ` AND finalized_at >= $${tierParams.length}::date`;
+    }
+    if (end_date) {
+      tierParams.push(end_date);
+      tierQuery += ` AND finalized_at < $${tierParams.length}::date + INTERVAL '1 day'`;
+    }
+    tierQuery += ` GROUP BY tier ORDER BY count DESC`;
 
-    const estimateRate = widgetOpens > 0
-      ? Math.round((estimatesDelivered / widgetOpens) * 100)
-      : 0;
-    const emailRate = estimatesDelivered > 0
-      ? Math.round((emailSummaries / estimatesDelivered) * 100)
-      : 0;
+    const [estimatesResult, tierResult] = await Promise.all([
+      query(estimatesQuery, estimatesParams),
+      query(tierQuery, tierParams),
+    ]);
 
     return res.json({
       success: true,
       stats: {
-        widget_opens: widgetOpens,
-        estimates_delivered: estimatesDelivered,
-        estimate_rate: estimateRate,
-        email_summaries: emailSummaries,
-        email_rate: emailRate,
+        estimates_by_source: estimatesResult.rows.map(r => ({
+          source: r.source,
+          count: parseInt(r.count, 10),
+        })),
+        tier_funnel: tierResult.rows.map(r => ({
+          tier: r.tier,
+          count: parseInt(r.count, 10),
+        })),
       }
     });
   } catch (err) {
