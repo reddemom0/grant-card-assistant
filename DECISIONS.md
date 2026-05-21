@@ -12,6 +12,32 @@ Format:
 
 ---
 
+## 2026-05-21 — service_tier_recommended is documentation-only; best_fit_product is the source of truth
+
+**Scope:** lead-gen agent, HubSpot enrichment, admin dashboard
+
+The lead-gen system-operations prompt (system-operations.md:51-66) instructs the agent to call `memory_store('service_tier_recommended', ...)` after delivering an estimate. The intent was to preserve the agent's judgment about which tier to recommend in HubSpot notes, separate from the deterministic best_fit_product calculation.
+
+The agent has been calling it as instructed. But the executor's prospectDataKeys allowlist at src/tools/executor.js:339-349 doesn't include `service_tier_recommended`, so the memory_store call writes to the `memories` table but the merge into `lead_gen_conversations.prospect_data` silently drops it. The field is mostly null in production.
+
+**Decision:** Treat `prospect_data->>'best_fit_product'` (written deterministically by `computeBestFitProduct()` at src/api/lead-gen-finalization.js:1285-1306) as the canonical tier recommendation. It's already the source for HubSpot PATCH and the new admin dashboard Tier Funnel card.
+
+**Follow-up (not blocking):** Either add `service_tier_recommended` to the executor allowlist OR strip the instruction from system-operations.md. The current state where the prompt lies to itself is the worst of both worlds. Park until next lead-gen prompt revision.
+
+---
+
+## 2026-05-21 — widget_mode canonical values are 'floating' and 'inline' (not 'popup')
+
+**Scope:** lead-gen widget, lead_gen_events schema docs
+
+Migration 014 (`migrations/014_lead_gen_events.sql`) includes a comment claiming widget_mode values are `'inline' / 'popup'`. The live widget code uses `'floating'` and `'inline'` (widget/getgranted-widget.js:39, 1505-1506, 2495, 2649).
+
+**Decision:** `'floating'` and `'inline'` are canonical. The admin dashboard renders `'floating'` as "Popout" for staff readability (this label transform lives in admin-conversations.html, not in event data).
+
+**Follow-up (not blocking):** Update the migration 014 comment in a future cleanup pass. No data change needed — only a stale comment.
+
+---
+
 ## 2026-05-20 — Lead-gen booking-link sentinel substitution
 **What:** Replaced URL-regex rewrite with `{{BOOKING_LINK}}` sentinel substitution. Prompts (Variant B `client-communication.md` + `system-operations.md`) now require the model to emit the literal `{{BOOKING_LINK}}` string in Pro/Pro Waitlist chat and email output. Code substitutes via new `substituteBookingLink` in `src/api/booking-link-routing.js`, applied in both `lead-gen-finalization.js` (email finalization) and `src/claude/streaming.js` (chat end_turn flush, plus the lead-gen unstreamed-text flush in `client.js`). On missing routing data (Pro/Waitlist + no industry, or sentinel present + no best_fit_product), hard-fails with `BookingLinkRoutingError` rather than fallback to Natalie — email refuses to send; chat aborts the stream with an SSE error event. Also corrected Pro pricing in prompts to `$5,000/year + 20% success fee` (was being hallucinated as 25% from Starter's number) and changed Pro/Pro Waitlist booking-call language from "15-minute intro" to "30-minute discovery." Starter / GetGranted / Not-a-Fit copy untouched per scope.
 **Why:** Verification on 4 recent Pro leads (Heather/Tech-AI, Fora/Healthcare, Jeremie/Construction, Lee/Food-Manufacturing) found 3 had broken emails: literal `[booking link will be inserted by system]` shipped, or no link at all. Root cause: URL-regex rewrite pattern (`finalization.js:1014-1018`) only caught hardcoded `meetings.hubspot.com/...` URLs, but the prompt actively instructed the model NOT to write that URL — so most LLM outputs slipped past the rewrite step. Sentinel pattern aligns the prompt's instruction ("emit this exact string") with the code's substitution surface ("substitute this exact string"). Smoke test extended to 56 assertions covering sentinel substitution, null-tier paragraph/inline strip, URL-rewrite backward-compat, and hard-fail paths — all pass.
