@@ -176,7 +176,8 @@ export async function handleLeadGenStats(req, res) {
     // estimates_by_source
     let estimatesQuery = `
       SELECT event_data->>'widget_mode' AS source,
-             COUNT(*) AS count
+             -- DISTINCT session_id: widget emits estimate_delivered per assistant message containing a dollar-amount regex match (widget L1936-1939), so raw COUNT(*) overcounts
+             COUNT(DISTINCT session_id) AS count
       FROM lead_gen_events
       WHERE event_type = 'estimate_delivered'
         AND created_at >= '${DATA_FLOOR}'
