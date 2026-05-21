@@ -900,11 +900,16 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
 
                 console.log(`  ✅ Auto-captured ${grantNames.length} grant names from focused search`);
 
-                // Step 6.5: Add tier-specific reminder for Starter/GetGranted prospects
+                // Step 6.5: Add tier-specific reminder for Starter/GetGranted/Not-a-Fit prospects
                 const tier = categorization.service_tier?.toLowerCase();
+                let tierReminder = null;
                 if (tier === 'starter' || tier === 'getgranted') {
-                  const tierReminder = "CRITICAL REMINDER: This is a Starter/GetGranted prospect. You MUST mention GetGranted 2.0 in your opening message. Include this exact line somewhere in your response: 'We're also launching GetGranted 2.0 — an all-in-one grant platform starting at $55/month. You can join the waitlist at <a href=\"https://getgranted.ca/waitlist/\">getgranted.ca/waitlist</a>.'";
+                  tierReminder = "CRITICAL REMINDER: This is a Starter/GetGranted prospect. You MUST mention GetGranted 2.0 in your opening message. Include this exact line somewhere in your response: 'We're also launching GetGranted 2.0 — an all-in-one grant platform starting at $55/month. You can join the waitlist at <a href=\"https://getgranted.ca/waitlist/\">getgranted.ca/waitlist</a>.'";
+                } else if (tier === 'not_a_fit') {
+                  tierReminder = "CRITICAL REMINDER: This prospect is NOT a fit for any Granted service tier (pre-revenue, solo founder, unincorporated, or non-profit). Do NOT deliver a service tier recommendation. Do NOT pitch GrantedPro, Granted Starter, or GetGranted as a paid path. Do NOT include a booking link — no {{BOOKING_LINK}} sentinel, no meetings.hubspot.com URL, no booking CTA paragraph anywhere. Route them to free resources only (GetGranted database, Small Business Guidebook, Startup Grants Guide, Granted Blog) with a 'come back when X changes' message — be specific about what would change the equation (incorporation, revenue, first hire, hiring a second person). Capture the lead for nurture via save_lead_data with hs_lead_status appropriate for a non-qualifying lead.";
+                }
 
+                if (tierReminder) {
                   await dbQuery(
                     `INSERT INTO conversation_memory (conversation_id, key, value)
                      VALUES ($1, 'tier_specific_reminder', $2)

@@ -16,6 +16,11 @@
       "reason": "Pre-revenue stage"
     },
     {
+      "condition": "num_ftes < 2",
+      "tier": "not_a_fit",
+      "reason": "Solo founder — insufficient team capacity for managed service"
+    },
+    {
       "condition": "revenue_tier == 'lt_500k' && funds_raised < 500000",
       "tier": "starter",
       "reason": "Revenue <$500K, limited funds raised"

@@ -273,7 +273,8 @@ function determineTier(prospectData, industryGroup) {
     is_incorporated_1yr: prospectData.is_incorporated_1yr !== false, // Default true
     revenue_tier: prospectData.revenue_tier || 'unknown',
     funds_raised: prospectData.funds_raised || 0,
-    industry_group: industryGroup
+    industry_group: industryGroup,
+    num_ftes: prospectData.num_ftes || 0
   };
 
   // Evaluate rules in order

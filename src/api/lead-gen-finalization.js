@@ -567,7 +567,8 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
     const tierLabels = {
       pro: 'GrantedPro ($30K+)',
       starter: 'Granted Starter ($15K-$29,999)',
-      getgranted: 'GetGranted (under $15K)'
+      getgranted: 'GetGranted (under $15K)',
+      not_a_fit: 'Not a Fit — Nurture'
     };
     lines.push(`Service Tier Recommended: ${tierLabels[finalServiceTier] || finalServiceTier}`);
     lines.push('');

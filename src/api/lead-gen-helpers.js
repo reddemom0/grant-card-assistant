@@ -113,6 +113,11 @@ export function parseFundingEstimate(fundingStr) {
   return parseInt(match[1].replace(/,/g, ''), 10);
 }
 
+// Form revenue buckets that fall below the $2.5M Pro floor.
+// Prospects in these buckets cap at Granted Starter regardless of estimate.
+// Source of truth: REVENUE_RANGES in widget/getgranted-widget.js:179-185
+const SUB_2_5M_REVENUE_BUCKETS = ['Pre-revenue', 'Under $500K', '$500K – $2.5M'];
+
 /**
  * Compute best_fit_product (the AI's product recommendation) from session +
  * agent input. Used by the HubSpot form submission and post-submission PATCH.
@@ -120,8 +125,11 @@ export function parseFundingEstimate(fundingStr) {
  * Order of precedence:
  *   1. industry === "Charity/Non-Profit" → "Nonprofit" (overrides everything)
  *   2. service_tier === "not_a_fit" OR $0/null estimate → "Not a Fit"
- *   3. revenue $5M+ AND estimate ≥ $25K → "Granted Pro"
- *   4. tier ladder by 12-month estimate:
+ *   3. revenue $5M+ → "Granted Pro" (regardless of estimate magnitude)
+ *   4. revenue below $2.5M (Pre-revenue, Under $500K, $500K – $2.5M):
+ *        estimate ≥ $15K → "Granted Starter"
+ *        estimate < $15K → "Get Granted"
+ *   5. revenue $2.5M – $5M (tier ladder by 12-month estimate):
  *        ≥ $30K → "Granted Pro"
  *        $15K-$29K → "Granted Starter"
  *        < $15K → "Get Granted"
@@ -151,13 +159,18 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
   const fundingNum = parseFundingEstimate(estimate);
   if (fundingNum === 0) return 'Not a Fit';
 
-  // 3. Pro override — $5M+ revenue cohort with non-trivial estimate
   const revenueRange = pd.revenue_range || pd.revenue || input.revenue || null;
-  if (revenueRange === '$5M+' && fundingNum !== null && fundingNum >= 25) {
-    return 'Granted Pro';
+
+  // 3. $5M+ → Pro (regardless of estimate magnitude, as long as not_a_fit gates passed)
+  if (revenueRange === '$5M+') return 'Granted Pro';
+
+  // 4. Sub-$2.5M revenue cap — never routes to Pro on estimate alone
+  if (SUB_2_5M_REVENUE_BUCKETS.includes(revenueRange)) {
+    if (fundingNum !== null && fundingNum >= 15) return 'Granted Starter';
+    return 'Get Granted';
   }
 
-  // 4. Tier ladder
+  // 5. $2.5M – $5M (or unknown revenue): standard estimate ladder
   if (fundingNum !== null && fundingNum >= 30) return 'Granted Pro';
   if (fundingNum !== null && fundingNum >= 15) return 'Granted Starter';
   return 'Get Granted';
