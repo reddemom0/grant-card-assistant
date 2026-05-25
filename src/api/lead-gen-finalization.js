@@ -1276,35 +1276,34 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
   }
 
   // -------------------------------------------------------------------------
-  // 6. PATCH AI-specific Contact properties
-  //    submission_source and email_summary_body aren't part of the form's
-  //    field schema; best_fit_product is also re-written defensively.
+  // 6. Persist best_fit_product locally (unconditional), then PATCH AI Contact
+  //    properties (HubSpot only when contactId resolved).
+  //    Local persistence runs regardless of HubSpot state — downstream surfaces
+  //    (buildNoteBodyComprehensive below, sendLeadGenEmail's separate DB re-read)
+  //    depend on prospect_data.best_fit_product being present; previously these
+  //    failed for sessions where HubSpot contact lookup retries exhausted.
   // -------------------------------------------------------------------------
 
+  const bestFitProduct  = computeBestFitProduct(enrichedSession, agentInput);
+  const emailSummaryBody = (agentInput && agentInput.email_summary_body) ||
+                           enrichedSession.prospect_data?.email_summary_body ||
+                           null;
+
+  enrichedSession.best_fit_product = bestFitProduct;
+  enrichedSession.prospect_data = enrichedSession.prospect_data || {};
+  enrichedSession.prospect_data.best_fit_product = bestFitProduct;
+  try {
+    await query(
+      `UPDATE lead_gen_conversations
+       SET prospect_data = prospect_data || $1::jsonb
+       WHERE session_id = $2`,
+      [JSON.stringify({ best_fit_product: bestFitProduct }), sessionId]
+    );
+  } catch (err) {
+    console.warn(`[BEST-FIT-PRODUCT-PERSIST-FAIL] session=${sessionId} err=${err.message} — continuing; CTA stripping may fall back to Natalie`);
+  }
+
   if (contactId) {
-    const bestFitProduct  = computeBestFitProduct(enrichedSession, agentInput);
-    const emailSummaryBody = (agentInput && agentInput.email_summary_body) ||
-                             enrichedSession.prospect_data?.email_summary_body ||
-                             null;
-
-    // Persist best_fit_product so downstream surfaces (buildNoteBodyComprehensive
-    // below, sendLeadGenEmail's regex normalizer via separate DB re-read) can
-    // route the booking link without recomputing. In-memory for this function;
-    // jsonb merge into prospect_data for sendLeadGenEmail's separate session load.
-    enrichedSession.best_fit_product = bestFitProduct;
-    enrichedSession.prospect_data = enrichedSession.prospect_data || {};
-    enrichedSession.prospect_data.best_fit_product = bestFitProduct;
-    try {
-      await query(
-        `UPDATE lead_gen_conversations
-         SET prospect_data = prospect_data || $1::jsonb
-         WHERE session_id = $2`,
-        [JSON.stringify({ best_fit_product: bestFitProduct }), sessionId]
-      );
-    } catch (err) {
-      console.warn(`[BEST-FIT-PRODUCT-PERSIST-FAIL] session=${sessionId} err=${err.message} — continuing; CTA stripping may fall back to Natalie`);
-    }
-
     const patchResult = await patchAIContactProperties(
       contactId,
       { bestFitProduct, emailSummaryBody },
