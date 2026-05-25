@@ -538,7 +538,7 @@
             <th>Employees</th>
             <th class="sortable" data-sort="estimated_funding" onclick="toggleSort('estimated_funding', this)">Estimate</th>
             <th class="sortable" data-sort="message_count" onclick="toggleSort('message_count', this)">Messages</th>
-            <th>Finalized</th>
+            <th>Tier</th>
           </tr>
         </thead>
         <tbody id="conversations-table">
@@ -591,9 +591,20 @@
         const data = await response.json();
 
         if (data.success) {
+          // Zero-fill missing widget_mode keys so Inline:0 and Popout:0 always
+          // render, instead of silently disappearing. Avoids the "is missing
+          // Inline = 0, or just hidden?" confusion.
+          const byKey = Object.fromEntries(
+            (data.stats.estimates_by_source || []).map(r => [r.source, r.count])
+          );
+          const estimatesPadded = Object.keys(WIDGET_MODE_LABELS).map(key => ({
+            source: key,
+            count: byKey[key] || 0,
+          }));
+
           renderStatRows(
             'stat-estimates-by-source',
-            data.stats.estimates_by_source,
+            estimatesPadded,
             'source',
             'No estimates delivered in this range',
             WIDGET_MODE_LABELS
@@ -696,8 +707,10 @@
         const employees = pd.employee_count || 'N/A';
         const estimate = conv.estimated_funding || 'N/A';
         const messages = conv.message_count || 0;
-        const finalized = conv.finalized ? 'Yes' : 'No';
-        const finalizedClass = conv.finalized ? 'finalized-yes' : 'finalized-no';
+        // Match the tier_funnel card's COALESCE/NULLIF logic so the row matches
+        // its bucket. Empty string is treated the same as missing.
+        const rawTier = pd.best_fit_product;
+        const tier = (rawTier && rawTier.trim()) ? rawTier : 'Not Recommended';
 
         const isExpanded = expandedRows.has(index);
 
@@ -711,7 +724,7 @@
             <td>${escapeHtml(String(employees))}</td>
             <td>${escapeHtml(estimate)}</td>
             <td>${messages}</td>
-            <td><span class="badge ${finalizedClass}">${finalized}</span></td>
+            <td>${escapeHtml(tier)}</td>
           </tr>
           <tr class="transcript-row">
             <td colspan="9" style="padding:0;">
