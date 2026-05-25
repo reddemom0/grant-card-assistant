@@ -199,22 +199,33 @@ export async function handleLeadGenStats(req, res) {
     // created_at so unfinalized sessions are still counted; minor edge case: a
     // session created May 19 but finalized May 22 will count in May 1-21 funnel
     // but not in same-range estimates query.
-    let tierQuery = `
-      SELECT COALESCE(NULLIF(prospect_data->>'best_fit_product', ''), 'Not Recommended') AS tier,
-             COUNT(*) AS count
-      FROM lead_gen_conversations
-      WHERE created_at >= '${DATA_FLOOR}'
-    `;
+    //
+    // Inner subquery wrap is required because Postgres rejects alias references
+    // in GROUP BY / ORDER BY expressions when the alias is defined by a complex
+    // expression like COALESCE/NULLIF. The subquery promotes `tier` to a real
+    // column on the outer FROM, where it can be referenced freely.
+    let tierInnerWhere = `WHERE created_at >= '${DATA_FLOOR}'`;
     const tierParams = [];
     if (start_date) {
       tierParams.push(start_date);
-      tierQuery += ` AND created_at >= $${tierParams.length}::date`;
+      tierInnerWhere += ` AND created_at >= $${tierParams.length}::date`;
     }
     if (end_date) {
       tierParams.push(end_date);
-      tierQuery += ` AND created_at < $${tierParams.length}::date + INTERVAL '1 day'`;
+      tierInnerWhere += ` AND created_at < $${tierParams.length}::date + INTERVAL '1 day'`;
     }
-    tierQuery += ` GROUP BY tier ORDER BY CASE WHEN tier = 'Not Recommended' THEN 1 ELSE 0 END, count DESC`;
+    const tierQuery = `
+      SELECT tier, COUNT(*) AS count
+      FROM (
+        SELECT COALESCE(NULLIF(prospect_data->>'best_fit_product', ''), 'Not Recommended') AS tier
+        FROM lead_gen_conversations
+        ${tierInnerWhere}
+      ) AS tiered_conversations
+      GROUP BY tier
+      ORDER BY
+        CASE WHEN tier = 'Not Recommended' THEN 1 ELSE 0 END,
+        count DESC
+    `;
 
     const [estimatesResult, tierResult] = await Promise.all([
       query(estimatesQuery, estimatesParams),
