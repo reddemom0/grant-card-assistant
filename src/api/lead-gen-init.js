@@ -109,7 +109,8 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
     hiring_plans: formData.hiring_plans,
     training_budget: formData.training_budget,
     expansion_budget: formData.expansion_budget,
-    planned_activities: formData.planned_activities
+    planned_activities: formData.planned_activities,
+    marketing_opt_in: formData.marketing_opt_in || 'false'
   };
 
   // Create the lead-gen-specific metadata row with form data

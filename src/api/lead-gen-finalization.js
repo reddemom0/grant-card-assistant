@@ -1306,7 +1306,11 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
   if (contactId) {
     const patchResult = await patchAIContactProperties(
       contactId,
-      { bestFitProduct, emailSummaryBody },
+      {
+        bestFitProduct,
+        emailSummaryBody,
+        marketingOptIn: enrichedSession.prospect_data?.marketing_opt_in || 'false'
+      },
       hubspotClient
     );
 

@@ -1658,6 +1658,13 @@
             <div class="gg-form-hint">Optional — helps us tailor your estimate</div>
           </div>
 
+          <div class="gg-form-field">
+            <label class="gg-form-checkbox">
+              <input type="checkbox" id="gg-marketing-opt-in" />
+              <span>Yes, I want to receive grant updates, newsletters, and event invites from Granted.</span>
+            </label>
+          </div>
+
           <div class="gg-form-buttons">
             <button type="button" class="gg-form-back" id="gg-form-back">← Back</button>
             <button type="button" class="gg-form-submit in-page-2" id="gg-form-final-submit" disabled>Get My Free Estimate →</button>
@@ -2167,6 +2174,7 @@
     const training = shadowRoot?.getElementById('gg-training').value;
     const expansion = shadowRoot?.getElementById('gg-expansion').value;
     const plannedActivities = shadowRoot?.getElementById('gg-planned-activities').value.trim();
+    const marketingOptIn = shadowRoot?.getElementById('gg-marketing-opt-in').checked;
 
     // If "no website" is checked, set website to null
     if (noWebsite) {
@@ -2195,6 +2203,7 @@
       training_budget: training || null,
       expansion_budget: expansion || null,
       planned_activities: plannedActivities || null,
+      marketing_opt_in: marketingOptIn ? 'true' : 'false',
       _fax: honeypot // Hidden field for bot detection (fax field to avoid autofill)
     };
 

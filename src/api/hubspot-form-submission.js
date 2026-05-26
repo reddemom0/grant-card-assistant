@@ -326,13 +326,14 @@ export async function findContactByEmailWithRetry(email, hubspotClient, attempts
 // CRM v3 endpoint.
 // ============================================================================
 
-export async function patchAIContactProperties(contactId, { bestFitProduct, emailSummaryBody }, hubspotClient) {
+export async function patchAIContactProperties(contactId, { bestFitProduct, emailSummaryBody, marketingOptIn }, hubspotClient) {
   const properties = {
     submission_source: SUBMISSION_SOURCE_VALUE
   };
 
   if (bestFitProduct)   properties.best_fit_product   = bestFitProduct;
   if (emailSummaryBody) properties.email_summary_body = emailSummaryBody;
+  if (marketingOptIn !== undefined) properties.marketing_opt_in = marketingOptIn;
 
   // TEST MODE: log and return success
   if (process.env.LEAD_GEN_TEST_MODE === 'true') {
