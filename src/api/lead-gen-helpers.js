@@ -124,7 +124,7 @@ const SUB_2_5M_REVENUE_BUCKETS = ['Pre-revenue', 'Under $500K', '$500K – $2.5M
  *
  * Order of precedence:
  *   1. industry === "Charity/Non-Profit" → "Nonprofit" (overrides everything)
- *   2. service_tier === "not_a_fit" OR $0/null estimate → "Not a Fit"
+ *   2. service_tier === "not_a_fit" OR $0/null estimate → "Get Granted"
  *   3. revenue $5M+ → "Granted Pro" (regardless of estimate magnitude)
  *   4. revenue below $2.5M (Pre-revenue, Under $500K, $500K – $2.5M):
  *        estimate ≥ $15K → "Granted Starter"
@@ -138,7 +138,7 @@ const SUB_2_5M_REVENUE_BUCKETS = ['Pre-revenue', 'Under $500K', '$500K – $2.5M
  *
  * @param {Object} sessionData - Enriched session (from loadEnrichedSessionData)
  * @param {Object} [agentInput] - The full input object passed to save_lead_data
- * @returns {'Granted Pro'|'Granted Starter'|'Get Granted'|'Nonprofit'|'Not a Fit'}
+ * @returns {'Granted Pro'|'Granted Starter'|'Get Granted'|'Nonprofit'}
  */
 export function computeBestFitProduct(sessionData, agentInput = null) {
   const pd = sessionData?.prospect_data || {};
@@ -148,16 +148,16 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
   const industry = pd.industry || input.industry || null;
   if (industry === 'Charity/Non-Profit') return 'Nonprofit';
 
-  // 2. Not a Fit signals
+  // 2. Not-yet-ready signals
   const serviceTier = pd.service_tier || sessionData?.service_tier || null;
-  if (serviceTier === 'not_a_fit') return 'Not a Fit';
+  if (serviceTier === 'not_a_fit') return 'Get Granted';
 
   const estimate = sessionData?.estimated_funding || input.estimated_funding || null;
-  if (!estimate) return 'Not a Fit';
-  if (/\$?0K[\s\-–]+\$?0K/.test(estimate)) return 'Not a Fit';
+  if (!estimate) return 'Get Granted';
+  if (/\$?0K[\s\-–]+\$?0K/.test(estimate)) return 'Get Granted';
 
   const fundingNum = parseFundingEstimate(estimate);
-  if (fundingNum === 0) return 'Not a Fit';
+  if (fundingNum === 0) return 'Get Granted';
 
   const revenueRange = pd.revenue_range || pd.revenue || input.revenue || null;
 

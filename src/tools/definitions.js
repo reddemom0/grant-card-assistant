@@ -394,7 +394,7 @@ export const HUBSPOT_TOOLS = [
         },
         best_fit_product_company: {
           type: 'string',
-          description: 'Best fit product/service for this company (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport", "Not a Fit")'
+          description: 'Best fit product/service for this company (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport", "Get Granted")'
         },
         extra6: {
           type: 'string',
@@ -448,7 +448,7 @@ export const HUBSPOT_TOOLS = [
             },
             best_fit_product_company: {
               type: 'string',
-              description: 'Best fit product/service for this company (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport", "Not a Fit")'
+              description: 'Best fit product/service for this company (e.g., "Granted Pro", "Granted Starter", "Custom", "CanExport", "Get Granted")'
             },
             extra6: {
               type: 'string',
