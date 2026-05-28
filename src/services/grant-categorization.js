@@ -505,9 +505,16 @@ function getFallbackSmartFilterMapping(prospectData) {
  * Main categorization function
  *
  * @param {object} prospectData - Webform + agent-collected data
+ * @param {object} [options]
+ * @param {boolean} [options.skipHaiku=false] - When true, skip the Haiku
+ *   smart-filter call and use the deterministic fallback inline. Used by
+ *   intake-time categorization (lead-gen-init.js) to keep POST /init fast.
+ *   Search-handler categorization (executor.js) leaves this false to get
+ *   AI-refined smart filters for ranking.
  * @returns {Promise<object>} Categorization result
  */
-export async function categorizeProspect(prospectData) {
+export async function categorizeProspect(prospectData, options = {}) {
+  const { skipHaiku = false } = options;
   loadDataFiles();
 
   console.log('\n🏷️  CATEGORIZING PROSPECT');
@@ -580,9 +587,11 @@ export async function categorizeProspect(prospectData) {
     prospectData
   );
 
-  // Step 8: Map prospect to smart filters using AI
-  const smartFilterWeights = await mapProspectToSmartFilters(prospectData, industryResolution.matched_industry);
-  console.log(`✅ Smart filters: ${Object.entries(smartFilterWeights).map(([f, w]) => `${f} (${w})`).join(', ')}`);
+  // Step 8: Map prospect to smart filters using AI (or deterministic fallback when skipHaiku)
+  const smartFilterWeights = skipHaiku
+    ? getFallbackSmartFilterMapping(prospectData)
+    : await mapProspectToSmartFilters(prospectData, industryResolution.matched_industry);
+  console.log(`✅ Smart filters${skipHaiku ? ' (deterministic, no Haiku)' : ''}: ${Object.entries(smartFilterWeights).map(([f, w]) => `${f} (${w})`).join(', ')}`);
 
   console.log('✅ CATEGORIZATION COMPLETE\n');
 

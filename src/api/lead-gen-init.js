@@ -25,6 +25,9 @@ import { v4 as uuidv4 } from 'uuid';
 import { query } from '../database/connection.js';
 import { createConversation } from '../database/messages.js';
 import Anthropic from '@anthropic-ai/sdk';
+import { categorizeProspect } from '../services/grant-categorization.js';
+import { buildProspectDataFromForm } from '../services/build-prospect-data.js';
+import { computeBestFitProduct } from './lead-gen-helpers.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -148,7 +151,133 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
     console.log(`  📋 Planned Activities: ${formData.planned_activities.substring(0, 100)}${formData.planned_activities.length > 100 ? '...' : ''}`);
   }
 
+  // Intake-time categorization: compute service_tier / best_fit_product /
+  // baseline_estimate from form data so every session has durable categorization
+  // regardless of whether the agent ever calls search_getgranted. Swallows errors
+  // so a categorization failure never blocks session creation — the search
+  // handler will re-run categorization (and upsert) if the agent later searches.
+  await runIntakeCategorization(sessionId, prospectData);
+
   return sessionId;
+}
+
+/**
+ * Run deterministic categorization at session-init time and persist:
+ *   - conversation_memory rows: `categorization`, `merged_estimate` (upsert)
+ *   - lead_gen_conversations.prospect_data top-level: service_tier,
+ *     best_fit_product, estimated_funding
+ *
+ * Uses skipHaiku mode (deterministic smart-filter fallback only) — no Haiku
+ * call, no network. The search-handler path in executor.js will upsert these
+ * rows with Haiku-refined smart filters and real program data when the agent
+ * later calls search_getgranted.
+ *
+ * Errors are caught and logged loudly with [INTAKE-CATEGORIZATION-FAIL]; the
+ * session creation never fails because of categorization. Note: a swallowed
+ * failure here silently recreates the KO failure mode (empty service_tier /
+ * best_fit_product on the row) until Layer 2's fallback-email hardening lands.
+ * Monitor via the blast-radius query on empty best_fit_product as an ongoing
+ * canary.
+ */
+async function runIntakeCategorization(sessionId, prospectDataFromForm) {
+  try {
+    console.log('\n🏷️  INTAKE CATEGORIZATION STARTING...');
+
+    const prospectData = buildProspectDataFromForm(prospectDataFromForm);
+    const categorization = await categorizeProspect(prospectData, { skipHaiku: true });
+
+    // Mirror the search-handler's merged_estimate shape (executor.js:858-868)
+    // so downstream readers see the same structure. confidence_level=null
+    // because no programs have been searched yet; programs_for_hubspot /
+    // matched_programs_detail are empty arrays and will be populated when
+    // search_getgranted runs.
+    const mergedEstimate = {
+      estimate: categorization.baseline_estimate,
+      confidence_level: null,
+      service_tier: categorization.service_tier,
+      tier_reasoning: categorization.tier_reasoning,
+      consultant_assignment: categorization.consultant_assignment,
+      booking_link: categorization.booking_link,
+      agent_talking_points: [],
+      programs_for_hubspot: [],
+      matched_programs_detail: []
+    };
+
+    // Persist categorization + merged_estimate to conversation_memory.
+    // Upsert pattern matches executor.js:873-887; search-handler's later
+    // write will overwrite cleanly with full search-derived data.
+    // Deliberately NOT writing `auto_matched_grants` at intake: an empty
+    // array would short-circuit truthiness checks in downstream readers
+    // (e.g. lead-notification.js:118) that today fall through on undefined.
+    await query(
+      `INSERT INTO conversation_memory (conversation_id, key, value)
+       VALUES ($1, 'categorization', $2)
+       ON CONFLICT (conversation_id, key)
+       DO UPDATE SET value = $2`,
+      [sessionId, JSON.stringify(categorization)]
+    );
+    await query(
+      `INSERT INTO conversation_memory (conversation_id, key, value)
+       VALUES ($1, 'merged_estimate', $2)
+       ON CONFLICT (conversation_id, key)
+       DO UPDATE SET value = $2`,
+      [sessionId, JSON.stringify(mergedEstimate)]
+    );
+
+    // Format estimated_funding string ("$XK-$YK") for non-not_a_fit leads only.
+    // For not_a_fit (pre-revenue / unincorporated / sub-2-FTE / nonprofit),
+    // "no estimate" is more honest than "$0K-$0K" — keep the ugly zero string
+    // out of the DB and dashboard. The key is OMITTED from the prospect_data
+    // JSONB merge below (rather than set to null) for symmetry with the
+    // auto_matched_grants decision: every downstream reader uses `||`
+    // truthiness chains, so absent and null are behaviorally equivalent, and
+    // absent matches the pre-PR shape for these sessions.
+    const serviceTier = categorization.service_tier;
+    const isNotAFit = serviceTier === 'not_a_fit';
+    const totalLowK = Math.round((categorization.baseline_estimate?.total_low || 0) / 1000);
+    const totalHighK = Math.round((categorization.baseline_estimate?.total_high || 0) / 1000);
+    const estimatedFunding = isNotAFit ? null : `$${totalLowK}K-$${totalHighK}K`;
+
+    // Promote categorization outputs to top-level prospect_data keys that
+    // downstream readers (admin dashboard at admin-lead-gen.js:220,
+    // finalizeLeadGenConversation's computeBestFitProduct call) read directly.
+    // For not_a_fit, computeBestFitProduct short-circuits on service_tier at
+    // lead-gen-helpers.js:153 before reading the estimate, so passing null
+    // estimate is safe.
+    const bestFitProduct = computeBestFitProduct(
+      {
+        prospect_data: {
+          ...prospectDataFromForm,
+          service_tier: serviceTier
+        },
+        estimated_funding: estimatedFunding
+      },
+      null
+    );
+
+    const prospectDataPatch = {
+      service_tier: serviceTier,
+      best_fit_product: bestFitProduct
+    };
+    if (estimatedFunding !== null) {
+      prospectDataPatch.estimated_funding = estimatedFunding;
+    }
+
+    await query(
+      `UPDATE lead_gen_conversations
+       SET prospect_data = prospect_data || $1::jsonb
+       WHERE session_id = $2`,
+      [JSON.stringify(prospectDataPatch), sessionId]
+    );
+
+    console.log(`✅ INTAKE CATEGORIZATION COMPLETE — tier=${serviceTier}, best_fit=${bestFitProduct}, estimate=${estimatedFunding ?? '(omitted for not_a_fit)'}\n`);
+
+  } catch (err) {
+    console.error(
+      `[INTAKE-CATEGORIZATION-FAIL] session=${sessionId} err=${err.message} — session created without categorization; search-handler will populate if agent searches, otherwise finalization will see empty fields.`
+    );
+    if (err.stack) console.error(err.stack);
+  }
 }
 
 /**
