@@ -124,7 +124,23 @@ export async function handleListLeadGenConversations(req, res) {
       queryText += ` AND contact_email IS NULL`;
     }
 
-    // Order and limit
+    // Order and limit.
+    //
+    // SORT_WHITELIST values are SQL expression fragments interpolated into
+    // `ORDER BY ${sortColumn}` below. Safety: lookup is by static key only
+    // (`SORT_WHITELIST[sort_by]`); user input never reaches the SQL string.
+    // Unknown sort_by values fall back to 'created_at'.
+    //
+    // The three bucketed-string columns (revenue_range, employee_count,
+    // best_fit_product) need rank CASE expressions instead of plain column
+    // references — alphabetical sort on '$5M+' / 'Pre-revenue' / 'Get Granted'
+    // gives wrong order. Unknown bucket variants sort to rank 99 (end), never
+    // silently mis-ordered.
+    //
+    // employee_count normalization: production data has 12 distinct strings
+    // with dash/spacing variants ('1 – 4', '1-4', '1–4', '5–19', '5 – 19', etc.).
+    // Two-pass regex: replace en/em-dash with hyphen, then strip whitespace,
+    // then bucket. Collapses 12 raw strings to 7 normalized buckets.
     const SORT_WHITELIST = {
       created_at: 'created_at',
       estimated_funding: 'estimated_funding',
@@ -132,6 +148,35 @@ export async function handleListLeadGenConversations(req, res) {
       company_name: "prospect_data->>'company_name'",
       industry: "prospect_data->>'industry'",
       province: "prospect_data->>'province'",
+      revenue_range: `CASE prospect_data->>'revenue_range'
+        WHEN 'Pre-revenue'    THEN 1
+        WHEN 'Under $500K'    THEN 2
+        WHEN '$500K – $2.5M'  THEN 3
+        WHEN '$2.5M – $5M'    THEN 4
+        WHEN '$5M+'           THEN 5
+        ELSE 99
+      END`,
+      employee_count: `CASE regexp_replace(
+             regexp_replace(lower(prospect_data->>'employee_count'), '[–—]', '-', 'g'),
+             '\\s', '', 'g'
+           )
+        WHEN 'justme'                   THEN 1
+        WHEN 'solo(planningtohire1-2)'  THEN 1
+        WHEN '1(startingnextweek)'      THEN 2
+        WHEN '1-4'                      THEN 3
+        WHEN '5-19'                     THEN 4
+        WHEN '20-49'                    THEN 5
+        WHEN '50-99'                    THEN 6
+        WHEN '100-499'                  THEN 7
+        ELSE 99
+      END`,
+      best_fit_product: `CASE prospect_data->>'best_fit_product'
+        WHEN 'Granted Pro'      THEN 1
+        WHEN 'Granted Starter'  THEN 2
+        WHEN 'Get Granted'      THEN 3
+        WHEN 'Nonprofit'        THEN 4
+        ELSE 99
+      END`,
     };
     const sortColumn = SORT_WHITELIST[sort_by] || 'created_at';
     const sortDirection = sort_dir === 'asc' ? 'ASC' : 'DESC';

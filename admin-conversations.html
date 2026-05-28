@@ -18,83 +18,172 @@
     crossorigin="anonymous"
   ></script>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
+    /* ------------------------------------------------------------------
+       Brand tokens — inlined from public/css/shared-layout.css (Granted
+       Brand Colors block only, ~lines 9-37 of that file). NOT linked
+       whole-cloth because shared-layout.css also imposes Open Sans /
+       Montserrat at body + h1-h4 level and forces a dark theme by
+       default — both conflict with this page's "sharpened system stack"
+       direction. Token-drift risk accepted: if the brand palette in
+       shared-layout.css changes, update here too.
+       ------------------------------------------------------------------ */
+    :root {
+      --primary-navy: #07334A;
+      --primary-cyan: #36CAFA;
+      --teal: #26C4B6;
+      --light-cyan: #D7F0FF;
+      --off-white: #F2F0EF;
+      --coral-red: #D64550;
+      --blue: #1F7FA3;
+
+      /* Derived utility variables for this page */
+      --surface: #ffffff;
+      --bg: #f7f8fa;
+      --border: rgba(7, 51, 74, 0.10);
+      --border-strong: rgba(7, 51, 74, 0.18);
+      --text-primary: var(--primary-navy);
+      --text-secondary: rgba(7, 51, 74, 0.62);
+      --text-tertiary: rgba(7, 51, 74, 0.42);
+      --shadow-card: 0 1px 2px rgba(7,51,74,0.06), 0 8px 24px -10px rgba(7,51,74,0.10);
+      --shadow-card-hover: 0 1px 2px rgba(7,51,74,0.08), 0 16px 32px -12px rgba(7,51,74,0.16);
+      --focus-ring: 0 0 0 3px rgba(54,202,250,0.28);
     }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #f5f7fa;
-      color: #1a2332;
-      line-height: 1.6;
+      background: var(--bg);
+      color: var(--text-primary);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     .container {
       max-width: 1400px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 24px 24px 48px;
     }
 
-    header {
-      background: #fff;
-      padding: 20px;
-      margin-bottom: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    /* ------------------------------------------------------------------
+       Entry animation — runs ONCE on initial page load. Bound to outer
+       static containers (header, .stat-card, .filters, .table-container)
+       which don't re-render on filter changes (only tbody/stat-rows
+       contents swap). So this stagger plays on load and never replays.
+       Respects prefers-reduced-motion via the universal guard below.
+       ------------------------------------------------------------------ */
+    @keyframes fade-up {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: none; }
     }
+
+    header,
+    .stat-card,
+    .filters,
+    .table-container {
+      opacity: 0;
+      animation: fade-up 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+    }
+    header                         { animation-delay: 0ms; }
+    .stats-bar .stat-card:nth-child(1) { animation-delay: 60ms; }
+    .stats-bar .stat-card:nth-child(2) { animation-delay: 120ms; }
+    .filters                       { animation-delay: 180ms; }
+    .table-container               { animation-delay: 240ms; }
+
+    /* ------------------------------------------------------------------
+       Header — "← Back to Hub" kicker above h1 (editorial nav, no
+       button chrome). h1 sharpened: weight 700, -0.01em tracking.
+       ------------------------------------------------------------------ */
+    header {
+      background: var(--surface);
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--primary-cyan);
+      text-decoration: none;
+      margin-bottom: 14px;
+      transition: color 0.15s;
+    }
+    .back-link:hover { color: var(--blue); text-decoration: underline; text-underline-offset: 3px; }
+    .back-link .chev { font-size: 14px; line-height: 1; }
 
     h1 {
-      font-size: 24px;
-      font-weight: 600;
-      margin-bottom: 5px;
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: -0.012em;
+      color: var(--primary-navy);
+      margin-bottom: 6px;
     }
 
     .subtitle {
-      color: #6d7881;
+      color: var(--text-secondary);
       font-size: 14px;
     }
 
-    /* Stats Bar */
+    /* ------------------------------------------------------------------
+       Stat cards — number 28px → 44px, brand-navy, tabular-nums.
+       Hover lift + shadow expansion.
+       ------------------------------------------------------------------ */
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 15px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
       margin-bottom: 20px;
     }
 
     .stat-card {
-      background: #fff;
-      padding: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      background: var(--surface);
+      padding: 22px 24px;
+      border-radius: 12px;
+      box-shadow: var(--shadow-card);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card-hover);
     }
 
     .stat-label {
-      font-size: 13px;
-      color: #6d7881;
+      font-size: 11px;
+      color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 14px;
     }
 
     .stat-value {
-      font-size: 28px;
-      font-weight: 600;
-      color: #1a2332;
+      font-size: 44px;
+      font-weight: 700;
+      color: var(--primary-navy);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      line-height: 1;
     }
 
     .stat-subtitle {
       font-size: 13px;
-      color: #6d7881;
+      color: var(--text-secondary);
       margin-top: 4px;
     }
 
     .stat-rows {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
       margin-top: 4px;
     }
 
@@ -103,371 +192,488 @@
       justify-content: space-between;
       align-items: baseline;
       font-size: 15px;
-      color: #1a2332;
+      color: var(--primary-navy);
     }
 
-    .stat-row-label {
-      color: #1a2332;
-    }
+    .stat-row-label { color: var(--primary-navy); }
 
     .stat-row-count {
-      font-weight: 600;
+      font-weight: 700;
       font-variant-numeric: tabular-nums;
+      color: var(--primary-navy);
     }
 
     .stat-row-empty {
       font-size: 13px;
-      color: #6d7881;
+      color: var(--text-tertiary);
       font-style: italic;
     }
 
-    /* Filters */
+    /* ------------------------------------------------------------------
+       Filters — inputs get 8px radius + cyan focus ring (3px outer
+       glow). Buttons: primary navy with hover lift; secondary outlined.
+       ------------------------------------------------------------------ */
     .filters {
-      background: #fff;
-      padding: 20px;
+      background: var(--surface);
+      padding: 22px 24px;
       margin-bottom: 20px;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      border-radius: 12px;
+      box-shadow: var(--shadow-card);
     }
 
     .filters-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 15px;
-      margin-bottom: 15px;
+      gap: 16px;
+      margin-bottom: 16px;
     }
 
-    .filter-group {
-      display: flex;
-      flex-direction: column;
-    }
+    .filter-group { display: flex; flex-direction: column; }
 
     .filter-group label {
-      font-size: 13px;
-      font-weight: 500;
-      margin-bottom: 5px;
-      color: #1a2332;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      color: var(--text-secondary);
     }
 
     .filter-group input,
     .filter-group select {
-      padding: 8px 12px;
-      border: 1px solid #dde1e3;
-      border-radius: 6px;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
       font-size: 14px;
       font-family: inherit;
+      color: var(--primary-navy);
+      background: var(--surface);
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
+
+    .filter-group input:hover,
+    .filter-group select:hover { border-color: var(--border-strong); }
 
     .filter-group input:focus,
     .filter-group select:focus {
       outline: none;
-      border-color: #008abf;
+      border-color: var(--primary-cyan);
+      box-shadow: var(--focus-ring);
     }
 
-    .filter-actions {
-      display: flex;
-      gap: 10px;
-    }
+    .filter-actions { display: flex; gap: 10px; }
 
     button {
       padding: 10px 20px;
-      background: #008abf;
+      background: var(--primary-navy);
       color: #fff;
-      border: none;
-      border-radius: 6px;
+      border: 1px solid var(--primary-navy);
+      border-radius: 8px;
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
+      font-family: inherit;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
     }
 
     button:hover {
-      background: #006d99;
+      background: #05273a;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 18px -8px rgba(7,51,74,0.4);
+    }
+
+    button:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring), 0 8px 18px -8px rgba(7,51,74,0.4);
     }
 
     button.secondary {
-      background: #fff;
-      color: #1a2332;
-      border: 1px solid #dde1e3;
+      background: var(--surface);
+      color: var(--primary-navy);
+      border: 1px solid var(--border-strong);
     }
 
     button.secondary:hover {
-      background: #f5f7fa;
+      background: rgba(7,51,74,0.04);
+      border-color: var(--primary-navy);
     }
 
-    /* Table */
+    /* ------------------------------------------------------------------
+       Table — sticky thead via border-collapse: separate + border-radius
+       on outer corner cells (so removing overflow:hidden on .table-
+       container doesn't break the rounded card aesthetic).
+       Zebra rows, cyan-tinted hover, 3px cyan inset left border on
+       expanded rows.
+       ------------------------------------------------------------------ */
     .table-container {
-      background: #fff;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-      overflow: hidden;
+      background: var(--surface);
+      border-radius: 12px;
+      box-shadow: var(--shadow-card);
     }
 
     table {
       width: 100%;
-      border-collapse: collapse;
+      border-collapse: separate;
+      border-spacing: 0;
     }
 
     thead {
-      background: #f8fafb;
-      border-bottom: 2px solid #dde1e3;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: var(--surface);
+    }
+
+    thead::after {
+      /* Subtle divider under the sticky header. Using a pseudo-element
+         instead of border so border-collapse: separate doesn't double up. */
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 1px;
+      background: var(--border-strong);
     }
 
     th {
       text-align: left;
-      padding: 12px 15px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #6d7881;
+      padding: 14px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.08em;
+      background: var(--surface);
+      white-space: nowrap;
     }
+
+    th:first-child { border-top-left-radius: 12px; padding-left: 22px; }
+    th:last-child  { border-top-right-radius: 12px; padding-right: 22px; }
 
     th.sortable {
       cursor: pointer;
       user-select: none;
       position: relative;
-      padding-right: 24px;
+      padding-right: 28px;
+      transition: color 0.15s;
     }
 
-    th.sortable:hover {
-      color: #1a2332;
-    }
+    th.sortable:hover { color: var(--primary-navy); }
 
     th.sortable::after {
       content: '\2195';
       position: absolute;
-      right: 8px;
+      right: 10px;
       top: 50%;
       transform: translateY(-50%);
-      font-size: 12px;
-      opacity: 0.4;
+      font-size: 11px;
+      opacity: 0.32;
+      transition: opacity 0.15s, color 0.15s;
     }
 
-    th.sortable.sort-asc::after {
-      content: '\2191';
-      opacity: 1;
-      color: #008abf;
-    }
+    th.sortable.sort-asc::after  { content: '\2191'; opacity: 1; color: var(--primary-cyan); }
+    th.sortable.sort-desc::after { content: '\2193'; opacity: 1; color: var(--primary-cyan); }
 
-    th.sortable.sort-desc::after {
-      content: '\2193';
-      opacity: 1;
-      color: #008abf;
+    /* Trash icon column header: no label, narrow width, no sort. */
+    th.col-delete {
+      width: 44px;
+      padding-left: 8px;
+      padding-right: 16px;
     }
 
     tbody tr {
-      border-bottom: 1px solid #f0f2f4;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: background 0.15s, box-shadow 0.15s;
     }
 
-    tbody tr:hover {
-      background: #f8fafb;
-    }
+    tbody tr:nth-child(4n+1) { background: rgba(7,51,74,0.022); }
+
+    tbody tr:hover { background: var(--light-cyan); }
 
     tbody tr.expanded {
-      background: #f8fafb;
+      background: var(--light-cyan);
+      box-shadow: inset 3px 0 0 var(--primary-cyan);
     }
 
-    tbody tr.transcript-row {
-      cursor: default;
-    }
-
-    tbody tr.transcript-row:hover {
-      background: transparent;
-    }
+    tbody tr.transcript-row { cursor: default; }
+    tbody tr.transcript-row:hover { background: transparent; }
+    tbody tr.transcript-row:nth-child(4n+1) { background: transparent; }
 
     td {
-      padding: 12px 15px;
+      padding: 13px 16px;
       font-size: 14px;
+      color: var(--primary-navy);
+      border-bottom: 1px solid var(--border);
     }
+
+    td:first-child { padding-left: 22px; }
+    td:last-child  { padding-right: 22px; }
+
+    /* Tabular-nums on numeric columns: Date, Estimate, Messages */
+    td.col-date,
+    td.col-estimate,
+    td.col-messages { font-variant-numeric: tabular-nums; }
+
+    /* Per-row trash icon button — neutral grey at rest, coral on hover.
+       Commit 3 wires the real handler; today this is a stub. */
+    .row-delete-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      transition: color 0.15s, background 0.15s, border-color 0.15s;
+    }
+    .row-delete-btn:hover {
+      color: var(--coral-red);
+      background: rgba(214,69,80,0.08);
+      border-color: rgba(214,69,80,0.18);
+      transform: none;
+      box-shadow: none;
+    }
+    .row-delete-btn:focus-visible {
+      outline: none;
+      box-shadow: 0 0 0 3px rgba(214,69,80,0.22);
+    }
+    .row-delete-btn svg { display: block; width: 16px; height: 16px; stroke-width: 2; }
+
+    td.col-delete { text-align: right; padding-right: 18px; }
+
+    /* Round the bottom corners of the last row (data row or transcript-row),
+       so the card's rounded shape carries through without overflow:hidden. */
+    tbody tr:last-child td:first-child { border-bottom-left-radius: 12px; }
+    tbody tr:last-child td:last-child  { border-bottom-right-radius: 12px; }
+    tbody tr:last-child td              { border-bottom: none; }
 
     .badge {
       display: inline-block;
       padding: 4px 8px;
       border-radius: 4px;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 600;
     }
+    .badge.finalized-yes { background: rgba(38,196,182,0.16); color: #0c5b53; }
+    .badge.finalized-no  { background: rgba(214,69,80,0.14);  color: #7a2630; }
 
-    .badge.finalized-yes {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .badge.finalized-no {
-      background: #f8d7da;
-      color: #721c24;
-    }
-
-    /* Detail panel */
+    /* ------------------------------------------------------------------
+       Detail panel — same row, expanded inline
+       ------------------------------------------------------------------ */
     .detail-panel {
       display: none;
-      background: #f8fafb;
-      padding: 20px;
-      border-top: 1px solid #dde1e3;
+      background: rgba(7,51,74,0.025);
+      padding: 22px 24px;
+      border-top: 1px solid var(--border);
     }
-
-    .detail-panel.visible {
-      display: block;
-    }
+    .detail-panel.visible { display: block; }
 
     .detail-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 20px;
+      gap: 24px;
       margin-bottom: 20px;
     }
 
     .detail-section h4 {
-      font-size: 12px;
-      color: #6d7881;
+      font-size: 11px;
+      color: var(--text-secondary);
       text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 8px;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      margin-bottom: 10px;
     }
 
     .detail-row {
       display: flex;
       gap: 8px;
-      margin-bottom: 4px;
+      margin-bottom: 5px;
       font-size: 14px;
     }
 
-    .detail-label {
-      color: #6d7881;
-      min-width: 80px;
-    }
+    .detail-label   { color: var(--text-secondary); min-width: 80px; }
+    .detail-value   { color: var(--primary-navy); }
+    .detail-value a { color: var(--blue); text-decoration: none; }
+    .detail-value a:hover { text-decoration: underline; text-underline-offset: 2px; }
 
-    .detail-value {
-      color: #1a2332;
-    }
-
-    .detail-value a {
-      color: #2563eb;
-      text-decoration: none;
-    }
-
-    .detail-value a:hover {
-      text-decoration: underline;
-    }
-
-    .detail-links {
-      display: flex;
-      gap: 10px;
-      margin-top: 12px;
-    }
-
+    .detail-links { display: flex; gap: 10px; margin-top: 14px; }
     .detail-links a {
       display: inline-block;
-      padding: 6px 14px;
-      border-radius: 5px;
+      padding: 7px 14px;
+      border-radius: 6px;
       font-size: 13px;
       font-weight: 600;
       text-decoration: none;
       color: #fff;
     }
+    .detail-links a.hubspot-link { background: #ff5c35; }
+    .detail-links a.hubspot-link:hover { background: #e64f2d; }
 
-    .detail-links a.hubspot-link {
-      background: #ff5c35;
-    }
-
-    .programs-list {
-      list-style: none;
-      padding: 0;
-    }
-
+    .programs-list { list-style: none; padding: 0; }
     .programs-list li {
-      padding: 3px 0;
+      padding: 4px 0;
       font-size: 13px;
-      color: #374151;
+      color: var(--primary-navy);
     }
-
     .programs-list li::before {
       content: '\2022';
-      color: #008abf;
+      color: var(--primary-cyan);
       margin-right: 8px;
     }
 
     .prospect-summary {
       font-style: italic;
-      color: #374151;
+      color: var(--primary-navy);
       font-size: 14px;
       margin-top: 8px;
-      padding: 10px 14px;
-      background: #fff;
-      border-radius: 6px;
-      border-left: 3px solid #008abf;
+      padding: 12px 16px;
+      background: var(--surface);
+      border-radius: 8px;
+      border-left: 3px solid var(--primary-cyan);
     }
 
     /* Transcript */
     .transcript {
-      border-top: 1px solid #dde1e3;
-      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      padding-top: 18px;
     }
 
     .transcript-header {
-      font-weight: 600;
-      margin-bottom: 15px;
-      color: #1a2332;
-      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--primary-navy);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
     }
 
     .message {
-      margin-bottom: 15px;
-      padding: 12px;
-      border-radius: 6px;
+      margin-bottom: 16px;
+      padding: 14px 16px;
+      border-radius: 10px;
       max-width: 80%;
     }
 
     .message.user {
-      background: #e5f4fa;
+      background: var(--light-cyan);
       margin-left: auto;
-      text-align: right;
     }
 
     .message.assistant {
-      background: #fff;
-      border: 1px solid #dde1e3;
+      background: var(--surface);
+      border: 1px solid var(--border);
     }
 
     .message .role {
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 10px;
+      font-weight: 700;
       text-transform: uppercase;
-      color: #6d7881;
-      margin-bottom: 5px;
+      color: var(--text-tertiary);
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
     }
 
     .message .content {
       font-size: 14px;
-      line-height: 1.5;
+      line-height: 1.55;
       white-space: pre-wrap;
       word-break: break-word;
+      color: var(--primary-navy);
+    }
+    .message .content a {
+      color: var(--blue);
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
 
-    .loading {
-      text-align: center;
-      padding: 40px;
-      color: #6d7881;
-    }
-
+    .loading,
     .empty {
       text-align: center;
-      padding: 60px 20px;
-      color: #6d7881;
+      padding: 50px 20px;
+      color: var(--text-secondary);
+    }
+    .empty-icon {
+      font-size: 42px;
+      margin-bottom: 12px;
+      color: var(--text-tertiary);
     }
 
-    .empty-icon {
-      font-size: 48px;
-      margin-bottom: 15px;
+    /* ------------------------------------------------------------------
+       Delete confirmation modal scaffolding — hidden by default,
+       styled per polish system. Commit 3 wires open/close + handler.
+       ------------------------------------------------------------------ */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(7,51,74,0.35);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border-radius: 14px;
+      max-width: 440px;
+      width: 100%;
+      padding: 28px;
+      box-shadow: 0 20px 60px -20px rgba(7,51,74,0.4), 0 4px 12px rgba(7,51,74,0.08);
+    }
+    .modal h3 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--primary-navy);
+      margin-bottom: 8px;
+    }
+    .modal p {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 22px;
+      line-height: 1.55;
+    }
+    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .modal-actions button.danger {
+      background: var(--coral-red);
+      border-color: var(--coral-red);
+    }
+    .modal-actions button.danger:hover {
+      background: #b8353f;
+      border-color: #b8353f;
+    }
+
+    /* ------------------------------------------------------------------
+       Reduced-motion guard — kills entry animations and hover transforms
+       for users who request reduced motion.
+       ------------------------------------------------------------------ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+      header, .stat-card, .filters, .table-container { opacity: 1; }
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
+      <a class="back-link" href="/oracle/new">
+        <span class="chev" aria-hidden="true">&larr;</span>
+        <span>Back to Hub</span>
+      </a>
       <h1>Lead-Gen Dashboard</h1>
       <p class="subtitle">Monitor and analyze lead generation chatbot conversations</p>
     </header>
@@ -543,23 +749,41 @@
       <table>
         <thead>
           <tr>
-            <th class="sortable sort-desc" data-sort="created_at" onclick="toggleSort('created_at', this)">Date</th>
-            <th class="sortable" data-sort="company_name" onclick="toggleSort('company_name', this)">Company</th>
-            <th class="sortable" data-sort="industry" onclick="toggleSort('industry', this)">Industry</th>
-            <th class="sortable" data-sort="province" onclick="toggleSort('province', this)">Province</th>
-            <th>Revenue</th>
-            <th>Employees</th>
-            <th class="sortable" data-sort="estimated_funding" onclick="toggleSort('estimated_funding', this)">Estimate</th>
-            <th class="sortable" data-sort="message_count" onclick="toggleSort('message_count', this)">Messages</th>
-            <th>Tier</th>
+            <th class="sortable sort-desc" data-sort="created_at"        onclick="toggleSort('created_at', this)">Date</th>
+            <th class="sortable"           data-sort="company_name"      onclick="toggleSort('company_name', this)">Company</th>
+            <th class="sortable"           data-sort="industry"          onclick="toggleSort('industry', this)">Industry</th>
+            <th class="sortable"           data-sort="province"          onclick="toggleSort('province', this)">Province</th>
+            <th class="sortable"           data-sort="revenue_range"     onclick="toggleSort('revenue_range', this)">Revenue</th>
+            <th class="sortable"           data-sort="employee_count"    onclick="toggleSort('employee_count', this)">Employees</th>
+            <th class="sortable"           data-sort="estimated_funding" onclick="toggleSort('estimated_funding', this)">Estimate</th>
+            <th class="sortable"           data-sort="message_count"     onclick="toggleSort('message_count', this)">Messages</th>
+            <th class="sortable"           data-sort="best_fit_product"  onclick="toggleSort('best_fit_product', this)">Tier</th>
+            <th class="col-delete" aria-label="Actions"></th>
           </tr>
         </thead>
         <tbody id="conversations-table">
           <tr>
-            <td colspan="9" class="loading">Loading conversations...</td>
+            <td colspan="10" class="loading">Loading conversations...</td>
           </tr>
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Delete confirmation modal scaffolding. Hidden by default. Commit 3
+       wires open/close + DELETE handler. CSS is in place so styling lands
+       correctly once the handler is implemented. -->
+  <div id="delete-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" onclick="if(event.target===this) closeDeleteModal()">
+    <div class="modal">
+      <h3 id="delete-modal-title">Delete this conversation?</h3>
+      <p>
+        This permanently removes <strong id="delete-modal-company">this conversation</strong>
+        from the database and clears its contribution to the stat cards. Cannot be undone.
+      </p>
+      <div class="modal-actions">
+        <button type="button" class="secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button type="button" class="danger" onclick="console.log('[Commit 3 TODO] confirm delete', document.getElementById('delete-modal').dataset.sessionId); closeDeleteModal();">Delete</button>
+      </div>
     </div>
   </div>
 
@@ -681,7 +905,7 @@
       } catch (error) {
         console.error('Failed to load conversations:', error);
         document.getElementById('conversations-table').innerHTML = `
-          <tr><td colspan="9" class="empty">
+          <tr><td colspan="10" class="empty">
             <div class="empty-icon">Warning</div>
             <div>Failed to load conversations</div>
           </td></tr>
@@ -706,12 +930,24 @@
       loadConversations();
     }
 
+    // Trash icon (Lucide trash-2). Stroke set in CSS via currentColor on the
+    // .row-delete-btn wrapper so neutral/hover/focus colors flow through.
+    const TRASH_ICON_SVG = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 6h18"></path>
+        <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+        <line x1="10" y1="11" x2="10" y2="17"></line>
+        <line x1="14" y1="11" x2="14" y2="17"></line>
+      </svg>
+    `;
+
     function renderTable() {
       const tbody = document.getElementById('conversations-table');
 
       if (conversations.length === 0) {
         tbody.innerHTML = `
-          <tr><td colspan="9" class="empty">
+          <tr><td colspan="10" class="empty">
             <div class="empty-icon">No results</div>
             <div>No conversations found</div>
           </td></tr>
@@ -743,18 +979,29 @@
 
         return `
           <tr onclick="toggleDetail(${index})" class="${isExpanded ? 'expanded' : ''}" data-session="${conv.session_id}">
-            <td>${date}</td>
+            <td class="col-date">${date}</td>
             <td><strong>${escapeHtml(companyName)}</strong></td>
             <td>${escapeHtml(industry)}</td>
             <td>${escapeHtml(province)}</td>
             <td>${escapeHtml(revenue)}</td>
             <td>${escapeHtml(String(employees))}</td>
-            <td>${escapeHtml(estimate)}</td>
-            <td>${messages}</td>
+            <td class="col-estimate">${escapeHtml(estimate)}</td>
+            <td class="col-messages">${messages}</td>
             <td>${escapeHtml(tier)}</td>
+            <td class="col-delete">
+              <button
+                type="button"
+                class="row-delete-btn"
+                title="Delete conversation"
+                aria-label="Delete conversation"
+                data-session-id="${escapeHtml(conv.session_id)}"
+                data-company-name="${escapeHtml(companyName)}"
+                onclick="event.stopPropagation(); requestDeleteConversation(this.dataset.sessionId, this.dataset.companyName)"
+              >${TRASH_ICON_SVG}</button>
+            </td>
           </tr>
           <tr class="transcript-row">
-            <td colspan="9" style="padding:0;">
+            <td colspan="10" style="padding:0;">
               <div id="detail-${index}" class="detail-panel ${isExpanded ? 'visible' : ''}">
                 ${isExpanded ? renderDetailPanel(conv) : ''}
               </div>
@@ -762,6 +1009,30 @@
           </tr>
         `;
       }).join('');
+    }
+
+    // Delete handler stubs — real implementation lands in Commit 3.
+    // The trash icon button is fully styled and clickable today; clicking
+    // opens a console-only stub so the UI is testable without yet performing
+    // any destructive operation.
+    function requestDeleteConversation(sessionId, companyName) {
+      console.log('[Commit 3 TODO] Delete requested for session', sessionId, '(' + companyName + ')');
+      // Commit 3 will wire: openDeleteModal(sessionId, companyName);
+    }
+    function openDeleteModal(sessionId, companyName) {
+      // Scaffolding for Commit 3 — opens .modal-backdrop, populates the
+      // company name in the modal body, attaches the confirm handler to
+      // call DELETE /api/admin/lead-gen-conversations/:sessionId.
+      const backdrop = document.getElementById('delete-modal');
+      if (backdrop) {
+        document.getElementById('delete-modal-company').textContent = companyName || 'this conversation';
+        backdrop.dataset.sessionId = sessionId;
+        backdrop.classList.add('open');
+      }
+    }
+    function closeDeleteModal() {
+      const backdrop = document.getElementById('delete-modal');
+      if (backdrop) backdrop.classList.remove('open');
     }
 
     function renderDetailPanel(conv) {
