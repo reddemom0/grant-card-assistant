@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Lead-Gen Dashboard | Granted</title>
+  <!--
+    DOMPurify pinned to 3.1.6 for sanitizing assistant-message HTML in the
+    transcript viewer. Loaded synchronously (no defer/async) so it's available
+    by the time the inline script at end-of-body runs. SRI integrity hash
+    computed via:
+      curl -sL https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js | openssl dgst -sha384 -binary | openssl base64 -A
+    If the script needs to be updated, recompute the hash for the new version.
+  -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"
+    integrity="sha384-+VfUPEb0PdtChMwmBcBmykRMDd+v6D/oFmB3rZM/puCMDYcIvF968OimRh4KQY9a"
+    crossorigin="anonymous"
+  ></script>
   <style>
     * {
       box-sizing: border-box;
@@ -556,6 +569,20 @@
     let expandedRows = new Set();
     let currentSort = { column: 'created_at', direction: 'desc' };
 
+    // DOMPurify hook: force every <a> in sanitized assistant content to open
+    // in a new tab with noopener/noreferrer. Registered once at script load
+    // so it applies to every subsequent sanitize call.
+    if (typeof DOMPurify !== 'undefined') {
+      DOMPurify.addHook('afterSanitizeAttributes', node => {
+        if (node.tagName === 'A') {
+          node.setAttribute('target', '_blank');
+          node.setAttribute('rel', 'noopener noreferrer');
+        }
+      });
+    } else {
+      console.warn('DOMPurify not loaded — assistant messages will fall back to escaped text rendering');
+    }
+
     const WIDGET_MODE_LABELS = {
       floating: 'Popout',
       inline: 'Inline',
@@ -810,11 +837,7 @@
           const roleLabel = isUser ? 'User' : 'Assistant';
           let content = msg.content || '';
           if (content.length > 2000) content = content.substring(0, 2000) + '... [truncated]';
-          html += `
-            <div class="message ${roleClass}">
-              <div class="role">${roleLabel}</div>
-              <div class="content">${escapeHtml(content)}</div>
-            </div>`;
+          html += renderMessageBubble(roleClass, roleLabel, content, isUser);
         });
         html += '</div>';
       }
@@ -858,6 +881,54 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    // Render one transcript message bubble. User messages stay as escaped
+    // plain text (a user could type literal "<script>" or "<strong>" and we
+    // must never render that). Assistant messages contain intentional markup
+    // (<strong>, <a href>, <em>, <br>, <p>, <ul>/<ol>/<li>) plus a trailing
+    // <!--suggestions:[...]--> comment recording the quick-replies shown to
+    // the user — extract those, sanitize the rest, render as HTML.
+    //
+    // Sanitization is allowlist-based via DOMPurify with a tight tag set.
+    // The afterSanitizeAttributes hook (registered above) forces all <a>
+    // links to open in a new tab with rel=noopener noreferrer.
+    function renderMessageBubble(roleClass, roleLabel, content, isUser) {
+      if (isUser || typeof DOMPurify === 'undefined') {
+        // User-message path (always) and DOMPurify-unavailable fallback path.
+        return `
+            <div class="message ${roleClass}">
+              <div class="role">${roleLabel}</div>
+              <div class="content">${escapeHtml(content)}</div>
+            </div>`;
+      }
+
+      // Assistant path: strip suggestions comment, sanitize remainder.
+      const suggMatch = content.match(/<!--suggestions:(\[[\s\S]*?\])-->/);
+      let cleanContent = content;
+      let suggestions = [];
+      if (suggMatch) {
+        try { suggestions = JSON.parse(suggMatch[1]); } catch (e) { suggestions = []; }
+        cleanContent = content.replace(suggMatch[0], '').trim();
+      }
+
+      const safeHtml = DOMPurify.sanitize(cleanContent, {
+        ALLOWED_TAGS: ['strong','em','b','i','a','br','p','ul','ol','li'],
+        ALLOWED_ATTR: ['href','target','rel']
+      });
+
+      let suggestionsHtml = '';
+      if (suggestions.length > 0) {
+        const safeChips = suggestions.map(s => escapeHtml(String(s))).join(' · ');
+        suggestionsHtml = `<div class="suggestions-shown" style="margin-top:8px;padding-top:8px;border-top:1px dashed #dde1e3;font-size:12px;color:#6d7881;font-style:italic;">Suggestions shown: ${safeChips}</div>`;
+      }
+
+      return `
+            <div class="message ${roleClass}">
+              <div class="role">${roleLabel}</div>
+              <div class="content">${safeHtml}</div>
+              ${suggestionsHtml}
+            </div>`;
     }
 
     function applyFilters() {
