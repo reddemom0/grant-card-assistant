@@ -450,6 +450,18 @@
 
     td.col-delete { text-align: right; padding-right: 18px; }
 
+    /* Optimistic fade-out applied to the row being deleted. Click → fade
+       starts immediately, fetch fires in parallel. On success the next
+       loadConversations() removes the row entirely. On error the class is
+       removed and the row reverts. */
+    tbody tr.deleting,
+    tbody tr.transcript-row.deleting {
+      opacity: 0.4;
+      transform: scale(0.985);
+      pointer-events: none;
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+
     /* Round the bottom corners of the last row (data row or transcript-row),
        so the card's rounded shape carries through without overflow:hidden. */
     tbody tr:last-child td:first-child { border-bottom-left-radius: 12px; }
@@ -608,55 +620,6 @@
     }
 
     /* ------------------------------------------------------------------
-       Delete confirmation modal scaffolding — hidden by default,
-       styled per polish system. Commit 3 wires open/close + handler.
-       ------------------------------------------------------------------ */
-    .modal-backdrop {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(7,51,74,0.35);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-      z-index: 100;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-    .modal-backdrop.open { display: flex; }
-
-    .modal {
-      background: var(--surface);
-      border-radius: 14px;
-      max-width: 440px;
-      width: 100%;
-      padding: 28px;
-      box-shadow: 0 20px 60px -20px rgba(7,51,74,0.4), 0 4px 12px rgba(7,51,74,0.08);
-    }
-    .modal h3 {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-      color: var(--primary-navy);
-      margin-bottom: 8px;
-    }
-    .modal p {
-      font-size: 14px;
-      color: var(--text-secondary);
-      margin-bottom: 22px;
-      line-height: 1.55;
-    }
-    .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
-    .modal-actions button.danger {
-      background: var(--coral-red);
-      border-color: var(--coral-red);
-    }
-    .modal-actions button.danger:hover {
-      background: #b8353f;
-      border-color: #b8353f;
-    }
-
-    /* ------------------------------------------------------------------
        Reduced-motion guard — kills entry animations and hover transforms
        for users who request reduced motion.
        ------------------------------------------------------------------ */
@@ -770,23 +733,6 @@
           </tr>
         </tbody>
       </table>
-    </div>
-  </div>
-
-  <!-- Delete confirmation modal scaffolding. Hidden by default. Commit 3
-       wires open/close + DELETE handler. CSS is in place so styling lands
-       correctly once the handler is implemented. -->
-  <div id="delete-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" onclick="if(event.target===this) closeDeleteModal()">
-    <div class="modal">
-      <h3 id="delete-modal-title">Delete this conversation?</h3>
-      <p>
-        This permanently removes <strong id="delete-modal-company">this conversation</strong>
-        from the database and clears its contribution to the stat cards. Cannot be undone.
-      </p>
-      <div class="modal-actions">
-        <button type="button" class="secondary" onclick="closeDeleteModal()">Cancel</button>
-        <button type="button" class="danger" onclick="console.log('[Commit 3 TODO] confirm delete', document.getElementById('delete-modal').dataset.sessionId); closeDeleteModal();">Delete</button>
-      </div>
     </div>
   </div>
 
@@ -978,7 +924,7 @@
                 aria-label="Delete conversation"
                 data-session-id="${escapeHtml(conv.session_id)}"
                 data-company-name="${escapeHtml(companyName)}"
-                onclick="event.stopPropagation(); requestDeleteConversation(this.dataset.sessionId, this.dataset.companyName)"
+                onclick="event.stopPropagation(); requestDeleteConversation(this.dataset.sessionId, this.dataset.companyName, this)"
               >${TRASH_ICON_SVG}</button>
             </td>
           </tr>
@@ -993,28 +939,50 @@
       }).join('');
     }
 
-    // Delete handler stubs — real implementation lands in Commit 3.
-    // The trash icon button is fully styled and clickable today; clicking
-    // opens a console-only stub so the UI is testable without yet performing
-    // any destructive operation.
-    function requestDeleteConversation(sessionId, companyName) {
-      console.log('[Commit 3 TODO] Delete requested for session', sessionId, '(' + companyName + ')');
-      // Commit 3 will wire: openDeleteModal(sessionId, companyName);
-    }
-    function openDeleteModal(sessionId, companyName) {
-      // Scaffolding for Commit 3 — opens .modal-backdrop, populates the
-      // company name in the modal body, attaches the confirm handler to
-      // call DELETE /api/admin/lead-gen-conversations/:sessionId.
-      const backdrop = document.getElementById('delete-modal');
-      if (backdrop) {
-        document.getElementById('delete-modal-company').textContent = companyName || 'this conversation';
-        backdrop.dataset.sessionId = sessionId;
-        backdrop.classList.add('open');
+    // Hard-delete a lead-gen conversation (one click, no confirmation).
+    // Optimistic UI: the row fades immediately, the fetch fires in parallel.
+    // On success, loadConversations() removes the row entirely + loadStats()
+    // refreshes the Tier Funnel count. On error: revert the fade, log the
+    // full error to console (for debugging), and surface a brief alert.
+    async function requestDeleteConversation(sessionId, companyName, button) {
+      // Button reference is passed explicitly from the inline onclick (this).
+      // Capture row references synchronously before any await — DOM lookups
+      // are reliable here even after an await (the elements stay in place
+      // until we mutate them).
+      const dataRow = button.closest('tr');
+      const transcriptRow = dataRow ? dataRow.nextElementSibling : null;
+      const transcriptRowIsPair =
+        transcriptRow && transcriptRow.classList && transcriptRow.classList.contains('transcript-row');
+
+      if (dataRow) dataRow.classList.add('deleting');
+      if (transcriptRowIsPair) transcriptRow.classList.add('deleting');
+
+      try {
+        const response = await fetch(
+          `/api/admin/lead-gen-conversations/${encodeURIComponent(sessionId)}`,
+          { method: 'DELETE' }
+        );
+        if (!response.ok) {
+          let serverMsg = `HTTP ${response.status}`;
+          try {
+            const body = await response.json();
+            if (body && body.error) serverMsg = body.error;
+          } catch (_) { /* response wasn't JSON */ }
+          throw new Error(serverMsg);
+        }
+        // Success — fire stats refresh in parallel, await the row re-render
+        // so the next user interaction sees the up-to-date list.
+        loadStats();
+        // Clear from expandedRows so the post-render state doesn't try to
+        // re-expand a now-missing index.
+        expandedRows.clear();
+        await loadConversations();
+      } catch (err) {
+        console.error('Delete failed for session', sessionId, '(' + (companyName || 'unknown') + '):', err);
+        if (dataRow) dataRow.classList.remove('deleting');
+        if (transcriptRowIsPair) transcriptRow.classList.remove('deleting');
+        alert(`Could not delete ${companyName || 'conversation'}: ${err.message}`);
       }
-    }
-    function closeDeleteModal() {
-      const backdrop = document.getElementById('delete-modal');
-      if (backdrop) backdrop.classList.remove('open');
     }
 
     function renderDetailPanel(conv) {

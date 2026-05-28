@@ -55,7 +55,7 @@ import {
 import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js';
 import { handleLeadGenInit } from './src/api/lead-gen-init.js';
 import { handleLeadGenEvent } from './src/api/lead-gen-event.js';
-import { handleListLeadGenConversations, handleGetLeadGenMessages, handleLeadGenStats } from './src/api/admin-lead-gen.js';
+import { handleListLeadGenConversations, handleGetLeadGenMessages, handleLeadGenStats, handleDeleteLeadGenConversation } from './src/api/admin-lead-gen.js';
 
 // Test endpoint (temporary for email debugging)
 import testEmailHandler from './api/test-email.js';
@@ -389,6 +389,7 @@ app.get('/api/lead-gen/analytics', authenticateUser, handleLeadGenAnalytics);
 app.get('/api/admin/lead-gen-conversations', authenticateUser, handleListLeadGenConversations);
 app.get('/api/admin/lead-gen-messages/:sessionId', authenticateUser, handleGetLeadGenMessages);
 app.get('/api/admin/lead-gen-stats', authenticateUser, handleLeadGenStats);
+app.delete('/api/admin/lead-gen-conversations/:sessionId', authenticateUser, handleDeleteLeadGenConversation);
 
 // Test endpoint for email debugging (temporary - remove after email confirmed working)
 app.get('/api/test-email', testEmailHandler);

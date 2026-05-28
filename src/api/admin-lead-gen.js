@@ -5,7 +5,7 @@
  * Requires authentication (JWT token).
  */
 
-import { query } from '../database/connection.js';
+import { query, transaction } from '../database/connection.js';
 
 // Exclude test data created before this date from all queries
 const DATA_FLOOR = '2026-04-01';
@@ -340,6 +340,120 @@ export async function handleGetLeadGenMessages(req, res) {
     return res.status(500).json({
       success: false,
       error: 'Failed to load messages'
+    });
+  }
+}
+
+/**
+ * DELETE /api/admin/lead-gen-conversations/:sessionId
+ *
+ * Hard-delete a lead-gen conversation. Atomic across three tables:
+ *   1. lead_gen_events            — no FK to lead_gen_conversations, manual
+ *   2. lead_gen_conversations     — cascades lead_gen_analytics
+ *   3. conversations              — cascades messages + conversation_memory
+ *
+ * Wrapped in a transaction via the connection.js `transaction()` helper.
+ * Any error in any of the three DELETEs rolls back the entire operation —
+ * no partial state where (e.g.) events are cleaned but the conversation row
+ * remains.
+ *
+ * Auth: authenticateUser middleware attaches req.user. We explicitly reject
+ * if it's absent — stricter than the GET handlers because this is destructive.
+ *
+ * 404 on a non-existent session_id (rowCount=0 on the lead_gen_conversations
+ * DELETE) so a stale double-click returns useful info instead of "deleted
+ * nothing, 200 OK".
+ *
+ * Does NOT touch HubSpot. Local DB delete only. If the Contact in HubSpot
+ * needs to go too, that's a separate operator step.
+ */
+export async function handleDeleteLeadGenConversation(req, res) {
+  // Explicit auth gate — stricter than the GETs (destructive action).
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: 'Authentication required'
+    });
+  }
+
+  const { sessionId } = req.params;
+
+  // UUID sanity check. Not security (the parameterized DELETE is what
+  // prevents injection); just a friendly reject for malformed paths so
+  // we don't open a transaction for a URL that obviously won't match.
+  if (!sessionId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sessionId)) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid session_id format (must be a UUID)'
+    });
+  }
+
+  try {
+    const result = await transaction(async (client) => {
+      // 1. lead_gen_events — no FK, must be explicit. A session may have
+      //    zero events (e.g. agent never delivered an estimate), so 0 rows
+      //    is not a "session doesn't exist" signal.
+      const eventsResult = await client.query(
+        'DELETE FROM lead_gen_events WHERE session_id = $1',
+        [sessionId]
+      );
+
+      // 2. lead_gen_conversations — this is the row that represents the
+      //    session. If rowCount=0, the session never existed (or was
+      //    already deleted by a concurrent request). Throw a tagged error
+      //    so the outer catch can return 404 instead of 500.
+      const lgcResult = await client.query(
+        'DELETE FROM lead_gen_conversations WHERE session_id = $1',
+        [sessionId]
+      );
+      if (lgcResult.rowCount === 0) {
+        const err = new Error('Session not found');
+        err.code = 'SESSION_NOT_FOUND';
+        throw err;
+      }
+
+      // 3. conversations (internal) — same UUID as session_id. Cascades
+      //    messages + conversation_memory via existing FKs. rowCount=0 is
+      //    acceptable here (some lead-gen flows may not have created an
+      //    internal conversations row in edge cases).
+      const convResult = await client.query(
+        'DELETE FROM conversations WHERE id = $1',
+        [sessionId]
+      );
+
+      return {
+        events_deleted: eventsResult.rowCount,
+        conversations_row_deleted: lgcResult.rowCount,
+        internal_conversations_deleted: convResult.rowCount
+      };
+    });
+
+    // Audit log — captured in Railway stdout.
+    console.log(
+      `🗑️  [DELETE LEAD-GEN] session=${sessionId} ` +
+      `events=${result.events_deleted} ` +
+      `internal_conv=${result.internal_conversations_deleted} ` +
+      `by=${req.user.email || 'unknown'}`
+    );
+
+    return res.json({
+      success: true,
+      deleted_session: sessionId,
+      events_deleted: result.events_deleted,
+      conversations_deleted: result.conversations_row_deleted,
+      internal_conversations_deleted: result.internal_conversations_deleted
+    });
+  } catch (err) {
+    if (err.code === 'SESSION_NOT_FOUND') {
+      return res.status(404).json({
+        success: false,
+        error: 'Session not found'
+      });
+    }
+    console.error(`❌ Error deleting lead-gen conversation ${sessionId}:`, err);
+    return res.status(500).json({
+      success: false,
+      error: err.message || 'Failed to delete conversation'
     });
   }
 }
