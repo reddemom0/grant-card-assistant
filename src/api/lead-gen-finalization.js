@@ -680,46 +680,111 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
 }
 
 /**
- * Generate fallback email summary when agent didn't provide one
- * @param {Object} prospectData - Prospect information from session
- * @param {string} estimatedFunding - Funding estimate range
+ * Generate fallback email summary when agent didn't provide one.
+ *
+ * Branches on canonical `prospect_data.best_fit_product` + `service_tier`
+ * (Layer 1 intake writes both for every session). Six-row matrix:
+ *
+ *   best_fit_product   | service_tier | Email           | Estimate | Booking
+ *   -------------------|--------------|-----------------|----------|--------
+ *   Granted Pro        | any          | Pro pitch       | yes      | yes
+ *   Granted Starter    | any          | Starter pitch   | yes      | yes
+ *   Get Granted        | not_a_fit    | NOT-YET-READY   | NO       | NO
+ *   Get Granted        | else         | Regular Get Gr. | yes      | NO
+ *   Nonprofit          | any          | NOT-YET-READY*  | NO       | NO
+ *   null / unknown     | —            | NOT-YET-READY   | NO       | NO
+ *
+ *   * Nonprofit shares NOT-YET-READY copy in v1. Last paragraph mentioning
+ *     "incorporation / first revenue / first hire" is mildly off for an
+ *     established nonprofit — refine in a follow-up.
+ *
+ * SAFE DEFAULT: unknown / null tier routes to NOT-YET-READY, never to a paid
+ * pitch. The 6th and 5th args (bestFitProduct, serviceTier) are accepted as
+ * overrides for callers who want to force a branch, but the function reads
+ * canonical values from `prospectData` directly when not overridden — making
+ * the historical arg-omission bug irrelevant.
+ *
+ * @param {Object} prospectData - Prospect information from session (must include
+ *                                best_fit_product + service_tier from Layer 1 intake)
+ * @param {string} estimatedFunding - Funding estimate range (legacy arg, used as
+ *                                    fallback when mergedEstimate not provided)
  * @param {string} firstName - Recipient's first name
+ * @param {Object} [mergedEstimate] - Pillar-broken-down estimate object
+ * @param {string} [serviceTier] - Override for pd.service_tier
+ * @param {string} [bestFitProduct] - Override for pd.best_fit_product
  * @returns {string} HTML email content
  */
-function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null, bestFitProduct = null) {
+export function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'there', mergedEstimate = null, serviceTier = null, bestFitProduct = null) {
   const pd = prospectData || {};
   const companyName = pd.company_name || 'your company';
-  const routed = getBookingLink({ best_fit_product: bestFitProduct, industry: pd.industry });
   const activities = pd.activities || pd.activities_discussed || 'your growth plans';
 
-  // Determine tier: use provided serviceTier if available, otherwise derive from funding amount
-  let tier;
-  if (serviceTier) {
-    // Map service_tier values to tier codes
-    const tierMap = {
-      'pro': 'high',
-      'grantedpro': 'high',
-      'starter': 'medium',
-      'getgranted': 'low'
-    };
-    tier = tierMap[serviceTier.toLowerCase()] || 'medium';
-  } else {
-    tier = determineFundingTier(estimatedFunding);
+  // Canonical source of truth: prospect_data (Layer 1 intake writes these for
+  // every session). Args treated as overrides; null/missing falls through to pd.
+  const effectiveBfp  = bestFitProduct || pd.best_fit_product || null;
+  const effectiveTier = serviceTier    || pd.service_tier    || null;
+
+  // ---------------------------------------------------------------------------
+  // NOT-YET-READY branch (safe default).
+  // Fires for: best_fit_product === 'Get Granted' && service_tier === 'not_a_fit',
+  //            best_fit_product === 'Nonprofit',
+  //            and any unknown/null tier as safe fallback.
+  // No estimate paragraph, no booking content, future-oriented framing.
+  // ---------------------------------------------------------------------------
+  const isNotYetReady =
+    (effectiveBfp === 'Get Granted' && effectiveTier === 'not_a_fit') ||
+    effectiveBfp === 'Nonprofit' ||
+    !['Granted Pro', 'Granted Starter', 'Get Granted'].includes(effectiveBfp);
+
+  if (isNotYetReady) {
+    return `
+<p>Hi ${firstName},</p>
+
+<p>Thanks for taking the time to share about ${companyName}. I pulled together what makes sense for where your business is right now.</p>
+
+<p>Based on what you shared, you're at an early stage where the paid grant programs we specialize in (which reward established revenue and operating history) aren't the right fit just yet. I'd rather be straight with you about that than point you at funding that isn't realistic today.</p>
+
+<p>That said — here's what is genuinely useful for you right now:</p>
+
+<p><a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">GetGranted Database</a> is your match. It's our grant database where you can track programs as your business grows. You can start watching what's out there today, even pre-revenue — and as you incorporate, hire, and generate revenue, the grants you're eligible for grow with you.</p>
+
+<p>We're also launching an upgraded platform soon (GetGranted 2.0 Lite) with smart matching and step-by-step guidance. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
+
+<p>A couple of resources worth bookmarking too:</p>
+<ul>
+  <li><a href="https://granted.ca/grants-for-small-business-guidebook/" style="color: #0066cc;">Small Business Grants Guidebook</a></li>
+  <li><a href="https://granted.ca/government-business-grants-for-canadian-startups/" style="color: #0066cc;">Startup Grants Guide</a></li>
+  <li><a href="https://granted.ca/blog/" style="color: #0066cc;">Granted Blog</a></li>
+</ul>
+
+<p>When your situation changes — incorporation, first revenue, first hire — come back and we'll put together a full funding picture for you. You'll be in a much stronger position then.</p>
+
+<p>Talk soon,<br>The Granted Team</p>
+    `.trim();
   }
 
-  // Build funding summary
+  // ---------------------------------------------------------------------------
+  // Estimate paragraph: emitted ONLY when a real estimate exists.
+  // "Real" = mergedEstimate with total_high > 0, OR a present estimatedFunding
+  // string that doesn't parse to all-zero. Drops the legacy '$10-30K' literal
+  // default and the '$0K-$0K' rendering — no invented numbers.
+  // ---------------------------------------------------------------------------
+  const hasMergedEstimate = !!(mergedEstimate && mergedEstimate.total_high > 0);
+  const candidateEstimate = estimatedFunding || pd.estimated_funding || null;
+  const candidateIsZero = candidateEstimate && /\$?0K?[\s\-–]+\$?0K?/i.test(candidateEstimate);
+  const hasRealEstimate = hasMergedEstimate || (!!candidateEstimate && !candidateIsZero);
+
   let fundingSummary = '';
   let pillarBreakdown = '';
 
-  if (mergedEstimate) {
+  if (hasMergedEstimate) {
     // Use merged_estimate for accurate pillar-by-pillar breakdown
     const totalLow = Math.round(mergedEstimate.total_low / 1000);
     const totalHigh = Math.round(mergedEstimate.total_high / 1000);
     const funding12Mo = `$${totalLow}K–$${totalHigh}K`;
 
-    fundingSummary = `Based on what you shared, you're looking at an estimated <strong>${funding12Mo}</strong> over the next 12 months across multiple programs.`;
+    fundingSummary = `<p>Based on what you shared, you're looking at an estimated <strong>${funding12Mo}</strong> over the next 12 months across multiple programs.</p>`;
 
-    // Build pillar breakdown
     const pillars = [];
     if (mergedEstimate.hiring?.high > 0) {
       const low = Math.round(mergedEstimate.hiring.low / 1000);
@@ -749,26 +814,29 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
   <li>${pillars.join('</li>\n  <li>')}</li>
 </ul>`;
     }
-  } else {
-    // Fallback to generic estimate if merged_estimate not available
+  } else if (hasRealEstimate) {
+    // Plain-string estimate (legacy path, no pillar breakdown available)
     const fundingNow = pd.available_now_funding || null;
-    const funding12Mo = estimatedFunding || pd.estimated_funding || '$10-30K';
-
-    if (fundingNow && fundingNow !== funding12Mo) {
-      fundingSummary = `Right now, you're looking at an estimated <strong>${fundingNow}</strong> across programs currently accepting applications. Over the next 12 months, as more programs open seasonal intakes, that grows to an estimated <strong>${funding12Mo}</strong>.`;
+    if (fundingNow && fundingNow !== candidateEstimate) {
+      fundingSummary = `<p>Right now, you're looking at an estimated <strong>${fundingNow}</strong> across programs currently accepting applications. Over the next 12 months, as more programs open seasonal intakes, that grows to an estimated <strong>${candidateEstimate}</strong>.</p>`;
     } else {
-      fundingSummary = `Based on what you shared, you're looking at an estimated <strong>${funding12Mo}</strong> over the next 12 months across multiple programs.`;
+      fundingSummary = `<p>Based on what you shared, you're looking at an estimated <strong>${candidateEstimate}</strong> over the next 12 months across multiple programs.</p>`;
     }
-
     pillarBreakdown = `<p>This includes hiring support, training reimbursements, and market expansion funding — the exact mix depends on timing, your province, and which intakes are open.</p>`;
   }
+  // else: no estimate paragraph at all. Caller (Regular Get Granted at most)
+  // proceeds without it — better than '$0K-$0K' or invented '$10-30K'.
 
-  // Build tier-specific email content
+  // ---------------------------------------------------------------------------
+  // Tier-specific content + booking CTA.
+  // Booking CTA gates BOTH lead-in text AND URL together (closes the orphaned-
+  // lead-in bug). For Get Granted (Regular), no CTA emitted at all.
+  // ---------------------------------------------------------------------------
+  const routed = getBookingLink({ best_fit_product: effectiveBfp, industry: pd.industry });
   let tierContent = '';
   let bookingCTA = '';
 
-  if (tier === 'high') {
-    // $30K+ → GrantedPro
+  if (effectiveBfp === 'Granted Pro') {
     tierContent = `
 <p>With this level of funding potential across multiple programs, a dedicated grant strategist makes sure nothing falls through the cracks — coordinating timing, stacking programs, and managing claims to maximize your return. Our GrantedPro service includes a dedicated Grant Strategist, unlimited applications, complete claims management, and a 93% approval rate.</p>
 
@@ -781,8 +849,7 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
   <a href="${routed.link}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book Your Free Consultation</a>
 </p>
     ` : '';
-  } else if (tier === 'medium') {
-    // $10-29K → Granted Starter (PRIMARY), GetGranted 2.0 (SECONDARY)
+  } else if (effectiveBfp === 'Granted Starter') {
     tierContent = `
 <p>For your profile, Granted Starter is a great fit — you get expert guidance on your applications without full-service overhead. Our team reviews your applications, provides feedback, and helps you maximize your approval chances.</p>
 
@@ -798,7 +865,8 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 </p>
     ` : '';
   } else {
-    // Under $10K → GetGranted database (PRIMARY), GetGranted 2.0 Lite (SECONDARY)
+    // Regular Get Granted (best_fit_product === 'Get Granted' && service_tier !== 'not_a_fit').
+    // Estimate shown above (if present), database + waitlist content, NO booking.
     tierContent = `
 <p>Our GetGranted database is a great starting point — you get access to Canada's largest grant database with smart filtering tailored to your business.</p>
 
@@ -806,13 +874,8 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 
 <p>We're also launching an upgraded version (GetGranted 2.0 Lite) with real-time matching and alerts for $55/month. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
     `;
-    bookingCTA = routed.link ? `
-<p>Have questions or want a second opinion? You can always book a free call with our team:</p>
-
-<p style="text-align: center;">
-  <a href="${routed.link}" style="display: inline-block; padding: 12px 24px; background-color: #0066cc; color: #ffffff; text-decoration: none; border-radius: 5px; font-weight: bold;">Book a Call</a>
-</p>
-    ` : '';
+    // No bookingCTA for Regular Get Granted. Both lead-in AND URL absent
+    // (closes the Small Point dangling-text bug at the source).
   }
 
   return `
@@ -820,7 +883,7 @@ function generateFallbackEmail(prospectData, estimatedFunding, firstName = 'ther
 
 <p>It was great chatting about ${companyName}. We talked about ${activities}, and I pulled together what grant funding could be available for you.</p>
 
-<p>${fundingSummary}</p>
+${fundingSummary}
 
 ${pillarBreakdown}
 
@@ -880,15 +943,24 @@ function getResourceLink(tier) {
  *
  * This function is INDEPENDENT of finalization - it can be called multiple times
  * and will only send if:
- * 1. cta_selected includes 'email'
- * 2. contact_email exists
- * 3. Email hasn't been sent yet (checks prospect_data.email_sent_at)
+ * 1. cta_selected includes 'email', OR
+ * 2. agent set email_summary_body, OR
+ * 3. caller passed { forceGenerate: true } (used by finalize for inactivity_timeout)
+ * AND
+ * 4. contact_email exists
+ * 5. Email hasn't been sent yet (checks prospect_data.email_sent_at)
  *
  * @param {string} sessionId - Session ID
+ * @param {Object} [options]
+ * @param {boolean} [options.forceGenerate=false] - When true, skip the
+ *   "not requested" early-return and generate a fallback body inline. Used by
+ *   finalizeLeadGenConversation for inactivity_timeout (these leads need an
+ *   email but never set cta_selected or email_summary_body themselves).
  * @returns {Object} Email send result
  */
-export async function sendLeadGenEmail(sessionId) {
-  console.log(`\n📧 sendLeadGenEmail called for session ${sessionId}`);
+export async function sendLeadGenEmail(sessionId, options = {}) {
+  const { forceGenerate = false } = options;
+  console.log(`\n📧 sendLeadGenEmail called for session ${sessionId}${forceGenerate ? ' (forceGenerate)' : ''}`);
 
   // Load session data
   const sessionResult = await query(
@@ -918,8 +990,17 @@ export async function sendLeadGenEmail(sessionId) {
   const hasExplicitRequest = prospectData.cta_selected && prospectData.cta_selected.includes('email');
   const hasEmailBody = !!prospectData.email_summary_body;
 
-  if (!hasExplicitRequest && !hasEmailBody) {
-    console.log(`ℹ️  Email summary NOT requested and no email body prepared — skipping`);
+  if (!hasExplicitRequest && !hasEmailBody && !forceGenerate) {
+    // Warn loudly: a caller that hits this path WITHOUT forceGenerate=true is
+    // likely a regression of the cron-finalization fix. The contract is:
+    // anyone finalizing an inactive lead must opt in to fallback generation
+    // via forceGenerate, or the lead will silently receive no email. This
+    // catches future call sites that forget the flag.
+    console.warn(
+      `[SEND-LEAD-GEN-EMAIL-SKIPPED] session=${sessionId} — no explicit request, no agent body, forceGenerate=false. ` +
+      `If this session needs an email (e.g. inactivity_timeout finalization), the caller must pass { forceGenerate: true }. ` +
+      `Otherwise this is correct and expected (e.g. mid-conversation save_lead_data without an email CTA).`
+    );
     return { success: false, error: 'Email not requested' };
   }
 
@@ -1452,11 +1533,15 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
   // from save_lead_data. This allows email to be sent even if finalization
   // has already happened (e.g., second call to save_lead_data with email CTA).
   //
-  // We still attempt to send here for backwards compatibility with the timeout
-  // trigger (inactivity_timeout), but the main email sending path is now through
-  // save_lead_data → sendLeadGenEmail().
+  // For inactivity_timeout finalization, pass forceGenerate so sendLeadGenEmail
+  // generates and sends a fallback body inline (these leads never set
+  // cta_selected or email_summary_body themselves, but they DO need an email).
+  // This is the consolidated single send path — the cron loop no longer
+  // generates its own redundant (and historically broken) fallback body.
 
-  const emailResult = await sendLeadGenEmail(sessionId);
+  const emailResult = await sendLeadGenEmail(sessionId, {
+    forceGenerate: trigger === 'inactivity_timeout'
+  });
   if (emailResult.success) {
     results.email = { action: 'sent', recipient: emailResult.recipient, messageId: emailResult.messageId };
   } else if (emailResult.alreadySent) {
@@ -1546,102 +1631,11 @@ export async function finalizeInactiveSessions(inactivityMinutes = 5, batchSize 
         if (result.success) {
           results.finalized++;
           console.log(`✅ [${results.processed}/${sessions.length}] Finalized: ${session.prospect_data?.company_name || session.session_id}`);
-
-          // Auto-send funding summary email if conditions are met
-          const prospectData = session.prospect_data || {};
-          const hasEmail = !!session.contact_email;
-          let hasEmailBody = !!prospectData.email_summary_body;
-
-          if (!hasEmail) {
-            console.log(`⚠️  No contact_email — skipping auto-send`);
-          } else {
-            // Generate fallback email if agent didn't provide one
-            if (!hasEmailBody) {
-              console.log(`⚠️  No email_summary_body from agent — generating fallback for auto-send`);
-
-              try {
-                // Load enriched session data (includes conversation_memory)
-                console.log(`📊 Loading enriched session data from conversation_memory...`);
-                const enrichedSession = await loadEnrichedSessionData(session.session_id);
-
-                // Extract merged estimate and tier data
-                let mergedEstimate = null;
-                let serviceTier = null;
-
-                if (enrichedSession?.prospect_data?.merged_estimate) {
-                  const rawEstimate = typeof enrichedSession.prospect_data.merged_estimate === 'string'
-                    ? JSON.parse(enrichedSession.prospect_data.merged_estimate)
-                    : enrichedSession.prospect_data.merged_estimate;
-                  mergedEstimate = rawEstimate.estimate || null;
-                  serviceTier = rawEstimate.service_tier || null;
-                  console.log(`✅ Loaded merged_estimate: total $${Math.round(mergedEstimate?.total_low / 1000)}K–$${Math.round(mergedEstimate?.total_high / 1000)}K, tier: ${serviceTier}`);
-                }
-
-                // Fallback to categorization if merged_estimate not available
-                if (!serviceTier && enrichedSession?.prospect_data?.categorization) {
-                  const categorization = typeof enrichedSession.prospect_data.categorization === 'string'
-                    ? JSON.parse(enrichedSession.prospect_data.categorization)
-                    : enrichedSession.prospect_data.categorization;
-                  serviceTier = categorization.service_tier || null;
-                  console.log(`✅ Loaded service_tier from categorization: ${serviceTier}`);
-                }
-
-                // Extract first name for personalization
-                const nameParts = (session.contact_name || 'there').trim().split(/\s+/);
-                const firstName = nameParts[0] || 'there';
-
-                // Generate fallback email with enriched data
-                const fallbackBody = generateFallbackEmail(
-                  prospectData,
-                  session.estimated_funding || prospectData.estimated_funding,
-                  firstName,
-                  mergedEstimate,
-                  serviceTier
-                );
-
-                if (fallbackBody) {
-                  console.log(`✅ Generated fallback email (${fallbackBody.length} chars)`);
-
-                  // Update session with generated email body
-                  prospectData.email_summary_body = fallbackBody;
-                  await query(
-                    `UPDATE lead_gen_conversations
-                     SET prospect_data = $1
-                     WHERE session_id = $2`,
-                    [JSON.stringify(prospectData), session.session_id]
-                  );
-
-                  console.log(`✅ Updated session with fallback email body`);
-                  hasEmailBody = true;
-                } else {
-                  console.warn(`⚠️  Fallback email generation returned empty — skipping auto-send`);
-                }
-              } catch (fallbackErr) {
-                console.error(`❌ Fallback email generation failed: ${fallbackErr.message}`);
-              }
-            }
-
-            // Send email if we have a body (agent-generated or fallback)
-            if (hasEmailBody) {
-              try {
-                console.log(`📧 Auto-sending funding summary email to ${session.contact_email} (inactivity timeout)...`);
-                const emailResult = await sendLeadGenEmail(session.session_id);
-
-                if (emailResult.success) {
-                  console.log(`📧 Auto-sent funding summary email to ${session.contact_email} (inactivity timeout)`);
-                } else if (emailResult.alreadySent) {
-                  console.log(`ℹ️  Email already sent at ${emailResult.sentAt} — skipping duplicate`);
-                } else {
-                  console.warn(`⚠️  Email send failed: ${emailResult.error}`);
-                }
-              } catch (emailErr) {
-                console.error(`⚠️  Error auto-sending email: ${emailErr.message}`);
-                // Don't fail finalization if email fails
-              }
-            } else {
-              console.log(`⚠️  No email body available — skipping auto-send`);
-            }
-          }
+          // Email sending is consolidated inside finalizeLeadGenConversation,
+          // which calls sendLeadGenEmail with { forceGenerate: true } for
+          // inactivity_timeout. No redundant fallback generation here — the
+          // earlier cron-loop block (now removed) was the source of the
+          // mis-routed Starter-pitch emails for not_a_fit leads.
         } else if (result.alreadyFinalized) {
           // Skip — was finalized by another process
           console.log(`⚠️  [${results.processed}/${sessions.length}] Already finalized: ${session.session_id}`);
