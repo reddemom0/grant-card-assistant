@@ -138,7 +138,11 @@
        ------------------------------------------------------------------ */
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      /* Track max set to 480px so a single remaining card (Tier Funnel after
+         the Estimates-by-Source removal) doesn't stretch to the full 1352px
+         container width. If a second stat card is added later, two tracks of
+         up to 480px each fit comfortably side-by-side. */
+      grid-template-columns: repeat(auto-fit, minmax(280px, 480px));
       gap: 16px;
       margin-bottom: 20px;
     }
@@ -678,14 +682,13 @@
       <p class="subtitle">Monitor and analyze lead generation chatbot conversations</p>
     </header>
 
-    <!-- Stats Bar - Cards reflect the date range selected in Filters below -->
+    <!-- Stats Bar - Card reflects the date range selected in Filters below.
+         "Estimates by Source" was removed in 2026-05 — the metric (counts of
+         estimate_delivered events grouped by widget_mode) was confusingly
+         co-rendered with Tier Funnel (counts of finalized conversations by
+         best_fit_product). Backend still returns the data; frontend just
+         doesn't read it. -->
     <div class="stats-bar">
-      <div class="stat-card">
-        <div class="stat-label">Estimates by Source</div>
-        <div class="stat-rows" id="stat-estimates-by-source">
-          <div class="stat-row-empty">Loading...</div>
-        </div>
-      </div>
       <div class="stat-card">
         <div class="stat-label">Tier Funnel</div>
         <div class="stat-rows" id="stat-tier-funnel">
@@ -807,11 +810,6 @@
       console.warn('DOMPurify not loaded — assistant messages will fall back to escaped text rendering');
     }
 
-    const WIDGET_MODE_LABELS = {
-      floating: 'Popout',
-      inline: 'Inline',
-    };
-
     function renderStatRows(containerId, rows, labelKey, emptyText, labelMap) {
       const container = document.getElementById(containerId);
       if (!rows || rows.length === 0) {
@@ -842,24 +840,8 @@
         const data = await response.json();
 
         if (data.success) {
-          // Zero-fill missing widget_mode keys so Inline:0 and Popout:0 always
-          // render, instead of silently disappearing. Avoids the "is missing
-          // Inline = 0, or just hidden?" confusion.
-          const byKey = Object.fromEntries(
-            (data.stats.estimates_by_source || []).map(r => [r.source, r.count])
-          );
-          const estimatesPadded = Object.keys(WIDGET_MODE_LABELS).map(key => ({
-            source: key,
-            count: byKey[key] || 0,
-          }));
-
-          renderStatRows(
-            'stat-estimates-by-source',
-            estimatesPadded,
-            'source',
-            'No estimates delivered in this range',
-            WIDGET_MODE_LABELS
-          );
+          // Estimates by Source was removed in 2026-05; the backend still
+          // returns data.stats.estimates_by_source but we no longer render it.
           renderStatRows(
             'stat-tier-funnel',
             data.stats.tier_funnel,
