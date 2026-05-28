@@ -766,7 +766,12 @@
 
     function renderDetailPanel(conv) {
       const pd = conv.prospect_data || {};
-      const messages = conv.messages || [];
+      // Same defensive pattern as programs below: || only falls through on
+      // null/undefined, so a truthy non-array (e.g. a stringified JSONB) would
+      // crash messages.forEach in the transcript loop. Coerce to [] when not
+      // a real array.
+      const rawMessages = conv.messages || [];
+      const messages = Array.isArray(rawMessages) ? rawMessages : [];
 
       // Contact info
       const name = conv.contact_name || pd.contact_name || null;
@@ -778,8 +783,12 @@
       const companyId = pd.hubspot_company_id || null;
       const contactId = conv.hubspot_contact_id || pd.hubspot_contact_id || null;
 
-      // Programs
-      const programs = conv.matched_programs || pd.matched_programs || [];
+      // Programs — defensive: || only falls through on null/undefined, but the
+      // API has been observed to return a truthy non-array (likely a JSONB string)
+      // which then crashes programs.slice/.forEach below. Coerce to [] when not
+      // a real array. Root cause (backend serialization?) is a separate diagnostic.
+      const rawPrograms = conv.matched_programs || pd.matched_programs || [];
+      const programs = Array.isArray(rawPrograms) ? rawPrograms : [];
 
       // Summary
       const summary = pd.prospect_summary || null;
