@@ -82,6 +82,14 @@ const SKILL_PATHS = {
   },
   'grant-card-tagging': {
     OVERVIEW: '.claude/skills/grant-card-tagging/OVERVIEW.md'
+  },
+  'granted-insights': {
+    OVERVIEW: '.claude/skills/granted-insights/OVERVIEW.md',
+    HIRING: '.claude/skills/granted-insights/HIRING.md',
+    TRAINING: '.claude/skills/granted-insights/TRAINING.md',
+    MARKET_EXPANSION: '.claude/skills/granted-insights/MARKET_EXPANSION.md',
+    RD_CAPEX: '.claude/skills/granted-insights/RD_CAPEX.md',
+    REPAYABLE_FUNDING: '.claude/skills/granted-insights/REPAYABLE_FUNDING.md'
   }
 };
 

@@ -1437,6 +1437,14 @@ Use when simple information retrieval is insufficient and you need specialized e
 **Grant Card Tagging Skill:**
 - \`OVERVIEW\` - Score grant programs across 13 fields × 52 genres on 0-3 scale (matches GG2 v2 mirror taxonomy)
 
+**Granted Insights Skill:**
+- \`OVERVIEW\` - Consultant-grade strategic insights framework: voice, anti-fabrication discipline, grant-type classification, and fallback output format (load first)
+- \`HIRING\` - Strategic read on Pure/dominant Hiring grants (net-new requirement, candidate constraints, timing rules, reimbursement burden)
+- \`TRAINING\` - Strategic read on Training grants (fine-print exclusions, exam/certification fees, approved-provider lists, pre-approval)
+- \`MARKET_EXPANSION\` - Strategic read on Market Expansion grants (export-readiness bar, eligible markets, project window, spend-first cash flow)
+- \`RD_CAPEX\` - Strategic read on R&D and Capital Cost grants (TRL fit, pre-approval, matching funds, max-vs-realistic funding)
+- \`REPAYABLE_FUNDING\` - Strategic read on loans/repayable/non-dilutive financing (forgivable portion, guarantees, underwriting, "sounds like a grant" trap)
+
 **Research Skill (coming soon):**
 - \`company_intelligence\` - Systematic company research with multi-source validation
 
@@ -1463,13 +1471,16 @@ Use when simple information retrieval is insufficient and you need specialized e
 - "Recap last Tuesday's meeting" → load_skill(staff-meeting-recap, overview)
 - "Write a grant card for this RFP" → load_skill(grant-card-writing, OVERVIEW)
 - "This looks like an R&D program — generate the card" → load_skill(grant-card-writing, RD)
-- "Generate genre tags for this program" → load_skill(grant-card-tagging, OVERVIEW)`,
+- "Generate genre tags for this program" → load_skill(grant-card-tagging, OVERVIEW)
+- "Give me the Granted Insights on this program" → load_skill(granted-insights, OVERVIEW)
+- "Strategic read on this hiring grant — is it worth pursuing?" → load_skill(granted-insights, HIRING)
+- "Should we recommend this loan program to a client?" → load_skill(granted-insights, REPAYABLE_FUNDING)`,
   input_schema: {
     type: 'object',
     properties: {
       skill_name: {
         type: 'string',
-        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'staff-meeting-recap', 'grant-card-writing', 'grant-card-tagging'],
+        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'staff-meeting-recap', 'grant-card-writing', 'grant-card-tagging', 'granted-insights'],
         description: 'The skill domain to load'
       },
       sub_skill: {
@@ -1482,9 +1493,10 @@ Use when simple information retrieval is insufficient and you need specialized e
           'STAGE_2_DRAFTING', 'STAGE_3_REVIEW', 'FINAL_REPORT', 'DEAL_CREATION',
           'FOUNDATIONS', 'COMPANY_CONTEXT', 'GRANT_BLASTS', 'BLOGS', 'EMAILS', 'LINKEDIN', 'WEBINARS', 'SUCCESS_STORIES', 'PARTNERSHIPS', 'DATA_SOURCES', 'EXPLORATION',
           'OVERVIEW', 'RD', 'BUSINESS_ASSESSMENT', 'MARKET_EXPANSION', 'HIRING_TRAINING',
-          'SYSTEMS_PROCESSES', 'CAPITAL_COST', 'LOANS', 'INVESTMENT', 'PRIZES_CONTESTS'
+          'SYSTEMS_PROCESSES', 'CAPITAL_COST', 'LOANS', 'INVESTMENT', 'PRIZES_CONTESTS',
+          'HIRING', 'TRAINING', 'RD_CAPEX', 'REPAYABLE_FUNDING'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), EMAILS (email drafting), LINKEDIN (LinkedIn posts), WEBINARS (webinar planning + monthly rhythm), SUCCESS_STORIES (case study drafting), PARTNERSHIPS (partner outreach), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible).'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), EMAILS (email drafting), LINKEDIN (LinkedIn posts), WEBINARS (webinar planning + monthly rhythm), SUCCESS_STORIES (case study drafting), PARTNERSHIPS (partner outreach), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible). For granted-insights: OVERVIEW (general strategic-insights framework + fallback output format, load first), HIRING/TRAINING/MARKET_EXPANSION/RD_CAPEX/REPAYABLE_FUNDING (type-specific consultant read — fit, effort, competitiveness, watchouts).'
       }
     },
     required: ['skill_name', 'sub_skill']

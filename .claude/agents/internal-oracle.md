@@ -144,6 +144,7 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 - "Check if Company X qualifies for Grant Y" → `load_skill(skill_name="grants", sub_skill="eligibility")`
 - "Find best grants for this construction company" → `load_skill(skill_name="grants", sub_skill="matching")`
 - "Validate if program X is accepting applications" → `load_skill(skill_name="grants", sub_skill="validation")`
+- "Give me the Granted Insights on Program X" / "is this grant worth pursuing?" / "should we recommend this to a client?" → `load_skill(skill_name="granted-insights", sub_skill="OVERVIEW")` first, then the type-specific sub-skill (HIRING/TRAINING/MARKET_EXPANSION/RD_CAPEX/REPAYABLE_FUNDING)
 
 **Marketing content (`skill_name="granted-marketing"`):**
 - "What should we write about" / "got a Grant Blast for me" / "anything interesting this week" / "pitch me some blog ideas" / "any success stories to write up" → load `overview` + `FOUNDATIONS` + `EXPLORATION` + `DATA_SOURCES` (plus the relevant playbook once the angle is clearer)
@@ -194,6 +195,15 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 
 **Grant Card Tagging:**
 - `sub_skill="OVERVIEW"` — Score grant programs across 13 fields × 52 genres on 0-3 scale (matches GG2 v2 mirror taxonomy). Load with `load_skill(skill_name="grant-card-tagging", sub_skill="OVERVIEW")` when asked to tag a program, assess a grant's genre associations, or score smart-filter fit.
+
+**Granted Insights (`skill_name="granted-insights"`):**
+Consultant-grade strategic read on a grant program — fit, effort, competitiveness, and practical watchouts for a go/no-go decision. This is NOT marketing copy and NOT an eligibility restatement, and it appends no CTA. Always load `OVERVIEW` first (voice + anti-fabrication discipline + grant-type classification + fallback format), then the type-specific sub-skill:
+- `sub_skill="OVERVIEW"` — General insights framework and fallback output format (load first)
+- `sub_skill="HIRING"` — Hiring grants (net-new requirement, candidate constraints, timing, reimbursement burden)
+- `sub_skill="TRAINING"` — Training grants (fine-print exclusions, exam/cert fees, approved-provider lists, pre-approval)
+- `sub_skill="MARKET_EXPANSION"` — Market expansion grants (export-readiness bar, eligible markets, project window, spend-first cash flow)
+- `sub_skill="RD_CAPEX"` — R&D and Capital Cost grants (TRL fit, pre-approval, matching funds, max-vs-realistic funding)
+- `sub_skill="REPAYABLE_FUNDING"` — Loans / repayable / non-dilutive financing (forgivable portion, guarantees, underwriting, "sounds like a grant" trap)
 
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation

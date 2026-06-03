@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-06-03 — Added granted-insights skill (Oracle); decision-useful, distinct from grant-card Insights Mode
+**What:** New `granted-insights` skill — OVERVIEW + 5 type files (HIRING, TRAINING, MARKET_EXPANSION, RD_CAPEX, REPAYABLE_FUNDING) — giving Oracle consultant-grade go/no-go reads (fit, effort, competitiveness, watchouts).
+**Why:** Deliberately distinct from grant-card-generator's conversion-oriented "Insights Mode" (marketing copy + "book a call" CTA); granted-insights is explicitly non-marketing, restates no eligibility, appends no CTA. Both intentionally coexist.
+**Impact:** New `.claude/skills/granted-insights/` (6 files); `src/tools/load-skill.js` (SKILL_PATHS); `src/tools/definitions.js` (skill_name + sub_skill enums + LOAD_SKILL_TOOL.description); `.claude/agents/internal-oracle.md` (Available-Skills entry + trigger). Touchpoint 6 no-op (search_getgranted + web_search already in Oracle loadout). Enum-global but Oracle-only by prompt. grant-card-generator untouched.
+
 ## 2026-05-21 — service_tier_recommended is documentation-only; best_fit_product is the source of truth
 
 **Scope:** lead-gen agent, HubSpot enrichment, admin dashboard
