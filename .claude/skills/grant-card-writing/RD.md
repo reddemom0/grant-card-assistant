@@ -261,17 +261,7 @@ Define what costs are excluded. Same structure and formatting as Eligible Expens
 **Length & depth:**
 - 6–15 concise bullet points
 
-**Language style:**
-- Operational, structured
-- Vary sentence structure across bullets. Avoid stacking many short, formulaic openings ("Projects must...", "Funding is...", "Applicants must..."). Combine related rules into flowing phrasing where natural. Write like a knowledgeable consultant briefing a client, not a policy document.
-
-**Formatting:**
-- Bullet points ending with semicolons
-- Group by:
-  - structure (phases, streams)
-  - timelines
-  - limits (applications, duration)
-  - evaluation criteria
+**Voice and format:** See OVERVIEW.md → "Section 5 (Program Details) — bullet voice." Every bullet is a complete sentence; no bold-label fragments.
 
 **AI Rule:** This section explains program mechanics, not eligibility.
 

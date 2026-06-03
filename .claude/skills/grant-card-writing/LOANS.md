@@ -276,16 +276,7 @@ Same structure and formatting as Eligible Expenses. Include only if clearly cite
 **Length & depth:**
 - 5–15 concise bullet points
 
-**Language style:**
-- Operational, structured
-- Vary sentence structure across bullets. Avoid stacking many short, formulaic openings ("Applicants must...", "The loan must...", "Repayment is..."). Combine related rules into flowing phrasing where natural. Write like a knowledgeable consultant briefing a client, not a policy document.
-
-**Formatting:**
-- Bullet points ending with semicolons
-- Group by:
-  - structure
-  - timelines
-  - limits / thresholds
+**Voice and format:** See OVERVIEW.md → "Section 5 (Program Details) — bullet voice." Every bullet is a complete sentence; no bold-label fragments.
 
 **AI Rule:** This section explains the financial mechanics and project delivery rules.
 

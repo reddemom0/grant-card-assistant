@@ -217,16 +217,7 @@ Same aim, structure, and formatting as Eligible Applicants. Include only if clea
 **Length & depth:**
 - 5–15 concise bullet points
 
-**Language style:**
-- Operational, structured
-- Vary sentence structure across bullets. Avoid stacking many short, formulaic openings. Combine related rules into flowing phrasing where natural. Write like a knowledgeable consultant briefing a client, not a policy document.
-
-**Formatting:**
-- Bullet points ending with semicolons
-- Group by:
-  - structure (phases, streams)
-  - timelines
-  - limits (applications, duration)
+**Voice and format:** See OVERVIEW.md → "Section 5 (Program Details) — bullet voice." Every bullet is a complete sentence; no bold-label fragments.
 
 **AI Rule:** This section explains the competition mechanics.
 

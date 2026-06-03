@@ -74,6 +74,41 @@ These apply to every card, every section, every grant type. Sub-skills extend th
 
 ---
 
+## Section 5 (Program Details) — bullet voice
+
+This applies to every grant type. Section 5 produces the dominant failure mode in client-facing review, so the rule is explicit.
+
+**Every bullet is a complete sentence.** Subject, verb, full thought. 1-2 sentences max per bullet.
+
+**Ban the bold-label fragment pattern.** Do not write bullets in the form `**Application window:** May 12–June 15, 2026` or `**Funding scope:** Total program funding of $50M`. The bolded field-label followed by a value or noun phrase is the most common Section 5 failure. It reads as a database field, not a consultant's brief.
+
+**Vary openings across bullets, but don't avoid declarative ones.** The fix isn't to dodge "The program…" or "Applicants must…" — those are often the cleanest form. The fix is to not stack three bullets in a row that open the same way. Mix declarative leads, conditional clauses ("Where the project includes…"), and consequence-first phrasings ("Costs incurred before approval are not reimbursed") so the section breathes.
+
+**Use active voice and plain language.** Suitable for grant applicants, entrepreneurs, and business owners. No policy-document register.
+
+**Worked examples.**
+
+Bad:
+- Up to 50% of eligible project costs.
+- Applicant contribution minimum 50%.
+
+Good:
+- The program covers up to 50% of eligible project costs, and applicants must contribute at least the remaining 50%.
+
+Bad:
+- **Application window:** May 12–June 15, 2026.
+- **Project duration:** 6–18 months.
+- **Reimbursement:** Quarterly claims required.
+
+Good:
+- The application window runs from May 12 to June 15, 2026.
+- Projects must be completed within 6 to 18 months of approval.
+- Reimbursement is paid quarterly, and claims must be submitted within 60 days of each milestone.
+
+**Grouping.** Within Section 5, group bullets by logical theme — structure and phases, timelines, limits and constraints, consultant or partner requirements — so the section scans cleanly even when read fast.
+
+---
+
 ## Card Structure (Shared Across All Grant Types)
 
 Every grant card follows this section structure. Sub-skills define how to write each section for their specific grant type.

@@ -17,6 +17,7 @@ A successful grant card lets a small business owner or non-profit leader make an
 - Don't infer exclusions (ineligible applicants, projects, activities, expenses). Include only if clearly cited.
 - Plain business language. No marketing fluff, no hedging, no jargon.
 - One responsibility per section. Eligibility ≠ Activities ≠ Expenses ≠ Program Details.
+- Program Details (Section 5) bullets are always complete sentences, never bold-label fragments. Full rule in grant-card-writing/OVERVIEW.md.
 
 ## Workflow
 
