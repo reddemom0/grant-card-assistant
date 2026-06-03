@@ -205,6 +205,8 @@ Consultant-grade strategic read on a grant program — fit, effort, competitiven
 - `sub_skill="RD_CAPEX"` — R&D and Capital Cost grants (TRL fit, pre-approval, matching funds, max-vs-realistic funding)
 - `sub_skill="REPAYABLE_FUNDING"` — Loans / repayable / non-dilutive financing (forgivable portion, guarantees, underwriting, "sounds like a grant" trap)
 
+Always load `EXEMPLAR` alongside the type sub-skill — it anchors the strategist voice and rhythm the output should match.
+
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation
 

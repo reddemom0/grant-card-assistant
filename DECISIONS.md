@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-06-03 — granted-insights voice upgrade: EXEMPLAR sub-skill + always-load voice anchor
+**What:** Added a 7th sub-skill `EXEMPLAR.md` (a fenced strategist-voice worked example + unfenced annotations) and replaced OVERVIEW's thin "Audience and voice" section with explicit anti-AI-pattern voice discipline (kill contrastive negation / telegraphing / em dashes / generic intensifiers / passive voice / rhythm flatlining / tic phrases; use contractions, specifics, direct opinions; vibe-check before delivering).
+**Why:** First-pass insights read AI-flavored. A concrete exemplar anchors voice/rhythm better than abstract "plain language" rules, and naming the exact patterns to avoid is more enforceable. New "always load EXEMPLAR alongside the type sub-skill" convention wired in both OVERVIEW and Oracle's prompt.
+**Impact:** New `.claude/skills/granted-insights/EXEMPLAR.md`; modified OVERVIEW.md (voice + "## Always load" section after the if-ambiguous line), `load-skill.js` (SKILL_PATHS → 7 keys), `definitions.js` (sub_skill enum + description body + description string), `internal-oracle.md` (always-load line). 5 type files byte-identical to 6ed05f1e; grant-card-generator and all other skills/agents untouched.
+
 ## 2026-06-03 — Added granted-insights skill (Oracle); decision-useful, distinct from grant-card Insights Mode
 **What:** New `granted-insights` skill — OVERVIEW + 5 type files (HIRING, TRAINING, MARKET_EXPANSION, RD_CAPEX, REPAYABLE_FUNDING) — giving Oracle consultant-grade go/no-go reads (fit, effort, competitiveness, watchouts).
 **Why:** Deliberately distinct from grant-card-generator's conversion-oriented "Insights Mode" (marketing copy + "book a call" CTA); granted-insights is explicitly non-marketing, restates no eligibility, appends no CTA. Both intentionally coexist.

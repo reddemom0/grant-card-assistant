@@ -89,7 +89,8 @@ const SKILL_PATHS = {
     TRAINING: '.claude/skills/granted-insights/TRAINING.md',
     MARKET_EXPANSION: '.claude/skills/granted-insights/MARKET_EXPANSION.md',
     RD_CAPEX: '.claude/skills/granted-insights/RD_CAPEX.md',
-    REPAYABLE_FUNDING: '.claude/skills/granted-insights/REPAYABLE_FUNDING.md'
+    REPAYABLE_FUNDING: '.claude/skills/granted-insights/REPAYABLE_FUNDING.md',
+    EXEMPLAR: '.claude/skills/granted-insights/EXEMPLAR.md'
   }
 };
 

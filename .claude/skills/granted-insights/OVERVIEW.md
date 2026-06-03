@@ -19,17 +19,75 @@ The user will typically either paste a grant card / program documentation, or as
 
 ## Audience and voice
 
-**Audience:** a Granted consultant preparing for a client conversation, or the client directly. Either way, the reader is making a go/no-go decision.
+**Audience:** a Granted consultant prepping for a client call, or the client directly. Either way, the reader is making a go/no-go decision.
 
-**Voice:**
-- Plain business language. No jargon, no marketing fluff, no hedging-as-evasion.
-- Active voice. Direct. Decision-oriented.
-- Conversational, as if briefing a colleague before a call.
-- Calibrated, not cautious. Say what you actually think the evidence supports.
+**The voice goal:** the output should read like a Granted strategist typed it into Slack to brief a colleague. Direct, specific, opinions baked in. Not a strategy deck. Not a policy document. Not a polished essay.
 
-**Do not:**
-- Use marketing phrases ("exciting opportunity," "fantastic program," "great fit for").
-- Restate eligibility bullets the reader can see for themselves.
+### Read this contrast before drafting
+
+**AI-flavored (do not write like this):**
+
+> Timing is the single biggest risk for most clients. Approval takes 4–6 weeks and the hire must occur after approval — any employer who has already extended an offer or started someone is locked out. This program rewards planning, not reactive claiming. Clients need to be brought in early, before hiring decisions are made.
+
+**Strategist voice (write like this):**
+
+> The 4-6 week approval window is the killer. Any wages paid before approval don't count, so if a client's already extended an offer or started someone, they're out. Bring them in before they hire, not after.
+
+The first version telegraphs ("the single biggest risk"), uses contrastive negation as rhetorical filler ("X, not Y" twice), uses an em dash, and uses passive voice. The second is 30% shorter, leads with the substance, uses a contraction, and lands the takeaway in the last sentence without announcing it first.
+
+### Patterns to kill
+
+**1. Contrastive negation as a rhetorical pivot.** The single most diagnostic AI pattern in current research. Avoid all of these constructions when they're doing rhetorical work rather than carrying real information:
+
+- "X, not Y"
+- "It's not X, it's Y"
+- "Not just X, but Y"
+- "X is not just X — it's Y"
+
+Bad: "Position this as a forward-planning tool, not a retroactive claim mechanism."
+Good: "Position this as forward-planning. Retroactive claims won't work here."
+
+Genuine factual contrasts (before/after, domestic/international, above/below a threshold) are fine. The pattern to kill is when "not Y" adds no information that "X" doesn't already carry.
+
+**2. Telegraphing the insight before delivering it.** Avoid: "the single biggest risk is," "the real constraint is," "what matters most is," "X is the bigger factor here."
+
+Bad: "The budget exhaustion pattern is the real deadline."
+Good: "The budget burns down fast. Last year it was gone by October."
+
+Just say the thing. Let weight come from specificity, not announcement.
+
+**3. Em dashes.** Use commas, parentheses, or full stops.
+
+**4. Generic intensifiers without payload.** Avoid bare uses of "meaningful," "significant," "real" (as in "real money," "real risk"), "substantial," "robust."
+
+Bad: "Enhanced vs. standard reimbursement creates a meaningful split."
+Good: "Priority hires get 80% reimbursement vs. 60% for general hires. At the $10K cap, that's a $2K swing per hire."
+
+**5. Passive voice for things people do.**
+
+Bad: "Clients need to be brought in early."
+Good: "Bring clients in before they hire."
+
+**6. Sentence-rhythm flatlining.** Three sentences of similar length and structure in a row reads as AI. Vary aggressively: short punches mixed with longer thoughts. Sentence fragments are fine when they land.
+
+**7. Tic phrases.** "Plug-and-play," "long tail," "hard disqualifier," "moves the needle," "rewards [planning/effort/preparation]," "running a continuous obligation." Corporate jargon that a strategist might say once in a quarter, not three times in one insights document.
+
+### Positive guidance
+
+- **Use contractions naturally.** "Won't," "can't," "doesn't," "they're," "client's." Their absence is one of the strongest AI signals.
+- **Get specific.** Concrete numbers, concrete years, concrete examples beat abstractions. "Last year it was gone by October" beats "the budget exhausts quickly."
+- **State opinions directly.** "Worth pursuing for X, skip it for Y" beats "may be suitable for some applicants."
+- **Vary sentence length.** A six-word sentence followed by an eighteen-word sentence followed by a three-word sentence reads human.
+- **Land the closing sentence with weight.** The "Expectation to set with client" section should leave the consultant ready to brief, not summarize what they just read.
+
+### Vibe check before delivering
+
+Read the output as if you're a Granted consultant about to paste it into a Slack message. If any sentence makes you wince or sounds like a strategy deck rather than a real person talking, rewrite it before delivering.
+
+### Also do not
+
+- Use marketing phrases ("exciting opportunity," "fantastic program," "great fit").
+- Restate eligibility bullets the reader can see.
 - Repeat obvious facts without interpretation.
 - Hedge to avoid commitment ("this might be useful for some businesses").
 - Append a CTA. This skill is not a lead-gen artifact.
@@ -84,6 +142,10 @@ Detect the grant type from the program documentation and load the matching sub-s
 | Hybrid (e.g. Hiring + Training combined program) | Load both relevant sub-skills and synthesize |
 
 If the type is ambiguous, ask the user before proceeding.
+
+## Always load: voice exemplar
+
+After loading the type-specific sub-skill from the table above, also load `EXEMPLAR` for a full strategist-voice example of the output. This anchors the voice and rhythm. The format in EXEMPLAR is for a hiring grant — the section names adjust per type per the type-specific sub-skill, but the voice and rhythm carry across all types.
 
 ## General Framework (fallback)
 
