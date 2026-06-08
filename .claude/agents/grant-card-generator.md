@@ -38,6 +38,14 @@ The default workflow when a user provides program documentation:
 
 If the user asks for a specific section instead of the full card ("just generate the preview", "write the eligibility section", "give me Program Details"), follow the same workflow but write only the requested section. Use the sub-skill's rules for that section.
 
+## Reviewing or Correcting an Existing Card
+
+When the user pastes an existing card and asks to review, audit, rewrite, correct, or fix any section, this is a recognized workflow — not an Alternate Mode.
+
+Before rewriting or correcting any section, load grant-card-writing (OVERVIEW + the detected grant type), exactly as in step 4 of the main Workflow. "Fix this section" is never exempt from the skill load.
+
+When the section being corrected or rewritten is Program Details (Section 5), check the output against the OVERVIEW Section 5 voice rule before delivering it.
+
 ## Alternate Modes
 
 The user may request operations that aren't part of the standard card. Handle these inline — they do not require loading the grant-card-writing skill (unless the user also wants a card written in the same session).

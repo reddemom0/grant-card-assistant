@@ -82,6 +82,8 @@ This applies to every grant type. Section 5 produces the dominant failure mode i
 
 **Ban the bold-label fragment pattern.** Do not write bullets in the form `**Application window:** May 12–June 15, 2026` or `**Funding scope:** Total program funding of $50M`. The bolded field-label followed by a value or noun phrase is the most common Section 5 failure. It reads as a database field, not a consultant's brief.
 
+**Bullets only — no prose, no bold sub-headers.** Write Program Details as bullet points only. Never prose paragraphs, and never bold sub-headers (e.g. `**Cost-Share Requirements**`) with explanatory text beneath them.
+
 **Vary openings across bullets, but don't avoid declarative ones.** The fix isn't to dodge "The program…" or "Applicants must…" — those are often the cleanest form. The fix is to not stack three bullets in a row that open the same way. Mix declarative leads, conditional clauses ("Where the project includes…"), and consequence-first phrasings ("Costs incurred before approval are not reimbursed") so the section breathes.
 
 **Use active voice and plain language.** Suitable for grant applicants, entrepreneurs, and business owners. No policy-document register.
@@ -104,6 +106,14 @@ Good:
 - The application window runs from May 12 to June 15, 2026.
 - Projects must be completed within 6 to 18 months of approval.
 - Reimbursement is paid quarterly, and claims must be submitted within 60 days of each milestone.
+
+Bad:
+**Cost-Share Requirements**
+Funding is cost-shared; the business must contribute a minimum of 25% to 50% of project costs. The program does not fund retroactive costs—only future expenses going forward.
+
+Good:
+- Funding is cost-shared: the business contributes 25–50% of project costs.
+- The program covers only future expenses from the application date forward, not retroactive costs.
 
 **Grouping.** Within Section 5, group bullets by logical theme — structure and phases, timelines, limits and constraints, consultant or partner requirements — so the section scans cleanly even when read fast.
 
