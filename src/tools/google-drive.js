@@ -7,6 +7,7 @@
  */
 
 import { google } from 'googleapis';
+import { PDFParse, VerbosityLevel } from 'pdf-parse';
 
 // OAuth2 credentials from environment (for user access)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
@@ -201,13 +202,12 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
       }, { responseType: 'arraybuffer' });
 
       try {
-        // Extract text from PDF using pdf-parse
-        // Dynamic import to avoid ES module issues
-        const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+        // Extract text from PDF using pdf-parse v2 (PDFParse class API)
         const pdfBuffer = Buffer.from(response.data);
-        const pdfData = await pdfParse(pdfBuffer);
+        const parser = new PDFParse({ data: pdfBuffer, verbosity: VerbosityLevel.ERRORS });
+        const pdfData = await parser.getText();
         content = pdfData.text;
-        console.log(`✓ PDF text extracted: ${pdfData.numpages} pages, ${content.length} characters`);
+        console.log(`✓ PDF text extracted: ${pdfData.total} pages, ${content.length} characters`);
       } catch (pdfError) {
         console.error('❌ PDF text extraction failed:', pdfError.message);
         content = `[PDF file - text extraction failed: ${pdfError.message}. File size: ${response.data.byteLength} bytes]`;
