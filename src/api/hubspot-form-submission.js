@@ -104,6 +104,14 @@ export function buildFormFields(sessionData, agentInput) {
   const company = sessionData.company_name || pd.company_name || input.company_name || '';
   const website = sessionData.company_website || pd.company_website || null;
 
+  // Phone — collected on the widget pre-chat form (required), lives in
+  // prospect_data.phone. Falls back to the sentinel below only for pre-deploy
+  // sessions created before phone capture shipped (no prospect_data.phone).
+  const phone = pd.phone || sessionData.phone || null;
+  if (!phone) {
+    console.warn(`[PHONE-MISSING] No phone in prospect_data for ${sessionData.contact_email || email || 'unknown'} — falling back to sentinel (likely a pre-deploy session).`);
+  }
+
   // Widget enums (always in prospect_data when widget submitted them)
   const industry       = pd.industry       || input.industry       || null;
   const revenueRange   = pd.revenue_range  || pd.revenue           || input.revenue   || null;
@@ -157,11 +165,11 @@ export function buildFormFields(sessionData, agentInput) {
     { name: 'expansion_budget_',                                                                 value: lookupRangeMap(BUDGET_RANGE_MAP, expansionBudg) ?? 0 },
     { name: 'research_and_development_budget',                                                   value: 0 }, // not collected by widget; default 0 per Phase 1.5 §field 22
     { name: 'what_do_you_spend_it_on_',                                                          value: plannedActiv || input.activities_summary || pd.activities || '' },
-    // Sentinel placeholder — `phone` is REQUIRED by the HubSpot form but the AI lead-gen widget
-    // never collects a phone number. Confirmed accepted by the form via manual test. Tracked as
-    // a known data-quality gap; decision pending between (a) adding phone capture to the AI
-    // agent's Phase 5 contact-info step or (b) marking the form field optional in HubSpot.
-    { name: 'phone',                                                                             value: '000-000-0000' },
+    // `phone` is REQUIRED by the HubSpot form. The widget now collects it on the pre-chat form
+    // (prospect_data.phone). The '000-000-0000' sentinel survives only as a fallback for
+    // pre-deploy sessions with no captured phone — kept so the required-field constraint is
+    // always satisfied. The [PHONE-MISSING] warn above tracks when the fallback fires.
+    { name: 'phone',                                                                             value: phone || '000-000-0000' },
     { name: 'best_fit_product',                                                                  value: bestFitProduct }
   ];
 

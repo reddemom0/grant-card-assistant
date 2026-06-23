@@ -1547,6 +1547,12 @@
             <span class="error-message">Please enter a valid email address</span>
           </div>
 
+          <div class="gg-form-field">
+            <label for="gg-contact-phone">Phone <span class="required">*</span></label>
+            <input type="tel" id="gg-contact-phone" required />
+            <span class="error-message">Please enter your phone number</span>
+          </div>
+
           <!-- Honeypot field (hidden from real users, visible to bots) -->
           <div class="gg-honeypot-field">
             <label for="gg-company-fax">Company Fax</label>
@@ -2011,6 +2017,7 @@
   function validatePage1() {
     const contactName = shadowRoot?.getElementById('gg-contact-name').value.trim();
     const contactEmail = shadowRoot?.getElementById('gg-contact-email').value.trim();
+    const contactPhone = shadowRoot?.getElementById('gg-contact-phone').value.trim();
     const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
     const companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
     const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
@@ -2025,6 +2032,11 @@
 
     // Email validation
     if (!contactEmail || !contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      isValid = false;
+    }
+
+    // Phone validation (required; must contain at least one digit)
+    if (!contactPhone || !/\d/.test(contactPhone)) {
       isValid = false;
     }
 
@@ -2076,6 +2088,7 @@
       // Show errors on page 1
       const contactName = shadowRoot?.getElementById('gg-contact-name').value.trim();
       const contactEmail = shadowRoot?.getElementById('gg-contact-email').value.trim();
+      const contactPhone = shadowRoot?.getElementById('gg-contact-phone').value.trim();
       const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
       const companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
       const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
@@ -2086,6 +2099,9 @@
       }
       if (!contactEmail || !contactEmail.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
         shadowRoot?.getElementById('gg-contact-email').classList.add('error');
+      }
+      if (!contactPhone || !/\d/.test(contactPhone)) {
+        shadowRoot?.getElementById('gg-contact-phone').classList.add('error');
       }
       if (!companyName) {
         shadowRoot?.getElementById('gg-company-name').classList.add('error');
@@ -2159,6 +2175,7 @@
     // Get all field values from both pages
     const contactName = shadowRoot?.getElementById('gg-contact-name').value.trim();
     const contactEmail = shadowRoot?.getElementById('gg-contact-email').value.trim();
+    const contactPhone = shadowRoot?.getElementById('gg-contact-phone').value.trim();
     const companyName = shadowRoot?.getElementById('gg-company-name').value.trim();
     let companyWebsite = shadowRoot?.getElementById('gg-company-website').value.trim();
     const noWebsite = shadowRoot?.getElementById('gg-no-website').checked;
@@ -2193,6 +2210,7 @@
     formData = {
       contact_name: contactName,
       email: contactEmail,
+      phone: contactPhone,
       company_name: companyName,
       company_website: companyWebsite,
       province: province, // Always required from form (page 2)
@@ -2278,6 +2296,7 @@
     const page1Fields = [
       shadowRoot?.getElementById('gg-contact-name'),
       shadowRoot?.getElementById('gg-contact-email'),
+      shadowRoot?.getElementById('gg-contact-phone'),
       shadowRoot?.getElementById('gg-company-name'),
       shadowRoot?.getElementById('gg-company-website')
     ];

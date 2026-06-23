@@ -103,6 +103,7 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
   const prospectData = {
     contact_name: formData.contact_name,
     email: formData.email,
+    phone: formData.phone,
     company_name: formData.company_name,
     company_website: formData.company_website,
     province: formData.province,
@@ -413,6 +414,7 @@ export async function handleLeadGenInit(req, res) {
     const {
       contact_name,
       email,
+      phone,
       company_name,
       company_website,
       _fax,
@@ -460,6 +462,13 @@ export async function handleLeadGenInit(req, res) {
       });
     }
 
+    // Phone validation (required; must contain at least one digit)
+    if (!phone || !/\d/.test(phone)) {
+      return res.status(400).json({
+        error: 'Missing required field: phone'
+      });
+    }
+
     // Validate new required fields from page 2
     if (!province || !revenue_range || !employee_count || !hiring_plans) {
       return res.status(400).json({
@@ -502,6 +511,7 @@ export async function handleLeadGenInit(req, res) {
     const formData = {
       contact_name,
       email,
+      phone,
       company_name,
       company_website: company_website || null,
       province: province || null,
