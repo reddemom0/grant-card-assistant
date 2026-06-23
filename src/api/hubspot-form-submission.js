@@ -220,12 +220,22 @@ export function buildFormFields(sessionData, agentInput) {
 export async function submitLeadGenForm(sessionData, agentInput, axiosLib = null) {
   const fields = buildFormFields(sessionData, agentInput);
 
+  // Server-derived client IP (from getClientIp at init time, stored in
+  // prospect_data.ipAddress). Included in the Forms context so HubSpot's form
+  // analytics get the end-user IP rather than the Railway egress IP. The
+  // 'unknown' getClientIp fallback is treated as absent and omitted — sending a
+  // non-IP would degrade analytics. Pre-deploy sessions have no ipAddress and
+  // simply omit it (same as current state — no regression).
+  const pd = sessionData.prospect_data || {};
+  const ipAddress = (pd.ipAddress && pd.ipAddress !== 'unknown') ? pd.ipAddress : null;
+
   const payload = {
     submittedAt: Date.now(),
     fields,
     context: {
       pageUri: sessionData.referrer_url || 'https://granted.ca/get-started/',
-      pageName: 'AI Grant Calculator Chat'
+      pageName: 'AI Grant Calculator Chat',
+      ...(ipAddress ? { ipAddress } : {})
     },
     legalConsentOptions: {
       consent: {

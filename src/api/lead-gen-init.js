@@ -104,6 +104,7 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
     contact_name: formData.contact_name,
     email: formData.email,
     phone: formData.phone,
+    ipAddress, // server-derived client IP (getClientIp); submitted in HubSpot Forms context
     company_name: formData.company_name,
     company_website: formData.company_website,
     province: formData.province,
