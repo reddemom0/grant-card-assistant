@@ -84,6 +84,72 @@ const FALLBACK_MAX_TOKENS = 16000;
 const FALLBACK_THINKING_BUDGET = 10000;
 
 /**
+ * Apply rolling prompt-cache breakpoints to the message history.
+ *
+ * Returns a NEW array; only the marked messages (and their last content block)
+ * are cloned, everything else is shared by reference. The input `messages` is
+ * never mutated — so cache_control never leaks into DB persistence, and stale
+ * breakpoints never accumulate across agentic-loop iterations (we recompute
+ * fresh each call).
+ *
+ * Placement (≤2 breakpoints, keeping us within Anthropic's 4-breakpoint limit
+ * once the system breakpoint is counted):
+ *  - The TAIL (last message) — caches the just-finished turn so the next loop
+ *    iteration / conversation turn reads it instead of re-billing it.
+ *  - One INTERMEDIATE checkpoint at the deepest earlier message boundary still
+ *    within the API's 20-CONTENT-BLOCK cache lookback window. A single
+ *    parallel-tool-use iteration can add ~25 blocks (many tool_use +
+ *    tool_result), so a message-count anchor would fall outside that window and
+ *    silently miss — spacing by block count keeps the prior entry reachable.
+ *
+ * @param {Array} messages - The assembled messages array (history + current turn)
+ * @param {number} everyN - cacheEveryNMessages; small-history floor only
+ * @returns {Array} messages with cache_control applied to the chosen blocks
+ */
+function withMessageCacheBreakpoints(messages, everyN) {
+  const n = messages.length;
+  if (n === 0) return messages;
+
+  const blockCount = (m) => Array.isArray(m.content) ? m.content.length : 1;
+
+  const targets = new Set();
+  targets.add(n - 1); // tail: caches the just-finished turn for the next iteration
+
+  // Intermediate breakpoint: the DEEPEST earlier message boundary still within
+  // the API's 20-content-block cache lookback window. Placing it as deep as
+  // possible — but still reachable — maximizes the cached prefix while keeping
+  // the prior entry findable, so the agentic loop reads history incrementally
+  // instead of re-billing it. (A single iteration that adds >20 blocks — heavy
+  // parallel tool use — can exceed the window; that's an inherent API limit, so
+  // that one iteration pays uncached and the chain resumes on the next turn.)
+  let gap = 0;
+  let intermediate = -1;
+  for (let k = n - 2; k >= 0; k--) {
+    gap += blockCount(messages[k + 1]);
+    if (gap > 20) break;
+    intermediate = k;
+  }
+  if (intermediate >= 1) {
+    targets.add(intermediate);
+  } else if (n - 1 >= everyN) {
+    // Small-history / oversized-tail floor: anchor a stable point ~everyN
+    // messages back so short conversations still amortize, rather than marking
+    // index 0 (barely more than the system breakpoint already covers).
+    // everyN = COST_SETTINGS.cacheEveryNMessages — finally wired.
+    targets.add(n - 1 - everyN);
+  }
+
+  return messages.map((m, i) => {
+    if (!targets.has(i)) return m; // unchanged reference — no mutation
+    const content = typeof m.content === 'string'
+      ? [{ type: 'text', text: m.content, cache_control: { type: 'ephemeral' } }]
+      : m.content.map((b, j) =>
+          j === m.content.length - 1 ? { ...b, cache_control: { type: 'ephemeral' } } : b);
+    return { ...m, content };
+  });
+}
+
+/**
  * Main agent execution function
  * @param {Object} params - Execution parameters
  * @param {string} params.agentType - Type of agent to run
@@ -390,16 +456,20 @@ export async function runAgent({
     // Build messages array
     // ============================================================================
 
-    // IMPORTANT: Do NOT add cache_control to historical messages
-    // Anthropic's API only allows cache_control on:
-    // 1. System prompt blocks (already applied above)
-    // 2. Static tool arrays (enabled via curated tool sets)
-    // 3. Current user message content blocks (not historical ones)
-    //
-    // Caching is achieved through:
-    // - Cached system prompt (largest component)
-    // - Static tools array (reused across calls)
-    // - NOT through historical message caching
+    // CACHING NOTE: The cached prefix is built bottom-up via Anthropic's render
+    // order (tools -> system -> messages):
+    // 1. The tools array is cached transitively — it renders BEFORE the system
+    //    blocks, so the cache_control on systemBlocks[0] (below) already caches
+    //    the whole tools array + base prompt as one prefix. Tools do NOT need
+    //    their own breakpoint.
+    // 2. systemBlocks[0] (base prompt) carries a 1h breakpoint; the dynamic
+    //    system blocks (summary/memories/learning) sit after it and are uncached.
+    // 3. The message history below now carries ROLLING cache_control breakpoints,
+    //    applied at the apiParams build site via withMessageCacheBreakpoints().
+    //    This is what lets the agentic loop and multi-turn history amortize
+    //    instead of re-billing the full uncached history every iteration.
+    // The `messages` array itself stays unmarked here — breakpoints are applied
+    // to a cloned copy at request time so cache_control never leaks into the DB.
 
     let messages = [
       ...history,
@@ -451,7 +521,11 @@ export async function runAgent({
         {
           type: 'text',
           text: baseAgentPrompt,
-          cache_control: { type: 'ephemeral' }  // ✅ CACHED (reused across conversations)
+          // ✅ CACHED (reused across conversations). 1h TTL: this small, highly
+          // stable prefix (base prompt + the tools that render before it) should
+          // survive Oracle's >5min think-gaps between turns. 1h needs no beta
+          // header on the first-party API.
+          cache_control: { type: 'ephemeral', ttl: '1h' }
         }
       ];
 
@@ -517,7 +591,10 @@ export async function runAgent({
         // System prompt blocks (with proper cache separation)
         system: systemBlocks,
 
-        messages,
+        // Rolling cache breakpoints applied to a cloned copy (original `messages`
+        // stays unmarked — the loop keeps pushing into it, and DB persistence
+        // reads the originals).
+        messages: withMessageCacheBreakpoints(messages, COST_SETTINGS.cacheEveryNMessages),
         tools: tools,
 
         // Enable streaming
