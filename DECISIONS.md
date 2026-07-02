@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-07-02 — Added strategy-consulting skill (internal edition of GetGrantedAI strategic consulting v3)
+**What:** New Oracle-loadable skill `strategy-consulting` with 7 sub-skills (overview, DISCOVERY, SIZING, SEQUENCING, CONVERSATIONS, RED_FLAGS, TIMING), ported from `docs/reference/getgrantedai-strategic-consulting-skill-v3.md` and reframed for the internal consulting team.
+**Why:** Oracle is being positioned as the internal company strategist (landing-page redesign prep); the v3 doc held the consultant-thinking playbook but was client-facing and only live in gg3-ai-service. Internal edition inverts the program-name-secrecy rule, drops §10 program mechanics (points to granted-insights/grants instead), and strips hardcoded pricing/coupons.
+**Impact:** New `.claude/skills/strategy-consulting/` (7 files); `src/tools/load-skill.js` (SKILL_PATHS); `src/tools/definitions.js` (enums + LOAD_SKILL_TOOL description). No tool-subset changes — skill teaches only tools already in Oracle's loadout. Source doc untouched.
+
 ## 2026-06-09 — Section 5 (Program Details) voice fix — two-cause
 **What:** Two independent edits (commit 43b5d4b5, railway-migration): added a standalone `## Reviewing or Correcting an Existing Card` section to grant-card-generator.md — placed outside Alternate Modes so it doesn't inherit line 43's "no skill load" — that forces a `grant-card-writing` load (OVERVIEW + type) before any section rewrite; and added a "bullets only — no prose, no bold sub-headers" rule plus a third worked bad/good example to OVERVIEW.md's Section 5 block.
 **Why:** Souad's Program Details kept rendering as prose paragraphs under bold sub-headers (e.g. BC Wood) despite the June 3 centralization, from two independent causes — (1) no review/correction workflow existed, so card-correction requests never triggered a skill load (zero-load path); (2) the Section 5 rule banned fragment bullets and bold-label pairs but not prose-under-sub-headers, so even a loaded skill let the shape through. Fixing only one would leave the other live; both confirmed by read-only investigation before editing.

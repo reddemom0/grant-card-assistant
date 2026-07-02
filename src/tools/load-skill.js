@@ -91,6 +91,15 @@ const SKILL_PATHS = {
     RD_CAPEX: '.claude/skills/granted-insights/RD_CAPEX.md',
     REPAYABLE_FUNDING: '.claude/skills/granted-insights/REPAYABLE_FUNDING.md',
     EXEMPLAR: '.claude/skills/granted-insights/EXEMPLAR.md'
+  },
+  'strategy-consulting': {
+    overview: '.claude/skills/strategy-consulting/SKILL.md',
+    DISCOVERY: '.claude/skills/strategy-consulting/DISCOVERY.md',
+    SIZING: '.claude/skills/strategy-consulting/SIZING.md',
+    SEQUENCING: '.claude/skills/strategy-consulting/SEQUENCING.md',
+    CONVERSATIONS: '.claude/skills/strategy-consulting/CONVERSATIONS.md',
+    RED_FLAGS: '.claude/skills/strategy-consulting/RED_FLAGS.md',
+    TIMING: '.claude/skills/strategy-consulting/TIMING.md'
   }
 };
 
