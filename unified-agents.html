@@ -154,6 +154,94 @@
             font-weight: 500;
         }
 
+        /* ── Oracle Kanban board ─────────────────────────────────────────── */
+        /* Oracle needs room for 8 columns; other agents keep the 800px container. */
+        .welcome-container.kanban-mode {
+            max-width: min(1500px, 96vw);
+        }
+
+        .oracle-kanban {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            padding-bottom: 1rem;
+            overflow-x: auto;
+            text-align: left;
+            scroll-snap-type: x proximity;
+            /* Fade tiles at the scroll edges to signal there's more sideways. */
+            -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+                    mask-image: linear-gradient(90deg, transparent 0, #000 24px, #000 calc(100% - 24px), transparent 100%);
+        }
+        .oracle-kanban::-webkit-scrollbar { height: 8px; }
+        .oracle-kanban::-webkit-scrollbar-track { background: transparent; }
+        .oracle-kanban::-webkit-scrollbar-thumb {
+            background: rgba(54, 202, 250, 0.3);
+            border-radius: 4px;
+        }
+        .oracle-kanban::-webkit-scrollbar-thumb:hover { background: rgba(54, 202, 250, 0.5); }
+
+        .kanban-column {
+            flex: 0 0 260px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            scroll-snap-align: start;
+        }
+
+        .kanban-column-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--primary-cyan);
+            padding: 0 0.25rem 0.4rem;
+            margin-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border);
+        }
+        .kanban-column-header span {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        /* Inside a column, tiles fill the column width and the title can wrap. */
+        .kanban-column .welcome-prompt { padding: 1rem; }
+        .kanban-column .welcome-prompt-title { font-size: 0.9rem; }
+
+        .oracle-dropzone {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            max-width: 640px;
+            margin: 2rem auto 0;
+            padding: 1.25rem 1.5rem;
+            border: 2px dashed var(--border);
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(54, 202, 250, 0.02) 0%, rgba(38, 196, 182, 0.015) 100%);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .oracle-dropzone:hover {
+            border-color: rgba(54, 202, 250, 0.4);
+            color: var(--text-primary);
+        }
+        .oracle-dropzone.dragover {
+            border-color: var(--primary-cyan);
+            background: rgba(54, 202, 250, 0.06);
+            box-shadow: 0 0 0 1px rgba(54, 202, 250, 0.15) inset, 0 8px 24px rgba(54, 202, 250, 0.15);
+        }
+        .oracle-dropzone-icon { font-size: 1.1rem; }
+        .oracle-dropzone-text { font-weight: 600; font-size: 0.95rem; }
+        .oracle-dropzone-sub { font-size: 0.8rem; opacity: 0.7; }
+
         /* Chat container */
         .chat-wrapper {
             display: flex;
@@ -958,10 +1046,54 @@
                 name: 'Team Oracle',
                 subtitle: 'Your internal knowledge expert',
                 icon: '<path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />',
-                prompts: [
-                    { title: 'Company Info', description: 'Tell me about GetGranted', prompt: 'Tell me about GetGranted - what we do and how we help clients' },
-                    { title: 'Grant Programs', description: 'What grants do we specialize in?', prompt: 'What grant programs does GetGranted specialize in?' },
-                    { title: 'Internal Resources', description: 'Find internal documentation', prompt: 'Where can I find our internal process documentation?' }
+                // Kanban-style grouped tiles. Clicking a tile sends `instruction` to Oracle as a
+                // HIDDEN user message (see sendOracleTile / sendMessage opts.hidden) — Oracle's reply
+                // is the first thing shown. `description` is the visible one-line hint on the tile.
+                groups: [
+                    { title: 'Client Work', tiles: [
+                        { title: 'Prep me for a client meeting', description: 'Pull HubSpot + Granola history and frame the prep', instruction: "The user clicked 'Prep me for a client meeting.' Ask which client and what kind of meeting. Once they answer, pull the company's HubSpot history and any recent Granola meetings with them, then call load_skill with skill_name='strategy-consulting', sub_skill='DISCOVERY' for prep framing." },
+                        { title: 'Match a client to best-fit programs', description: 'Find best-fit programs from the GetGranted database', instruction: "The user clicked 'Match a client to best-fit programs.' Ask which client (or ask them to describe the business if not in HubSpot). Then call load_skill with skill_name='strategy-consulting', sub_skill='SEQUENCING' and search the GetGranted database for candidate programs." },
+                        { title: 'Run an eligibility check', description: "Check a client against a program's gates", instruction: "The user clicked 'Run an eligibility check.' Ask which client and which program. Then call load_skill with skill_name='strategy-consulting', sub_skill='DISCOVERY' (eligibility gates) and fetch the program's details from GetGranted to run the check." },
+                        { title: 'Review a grant on GetGranted', description: "Summarize a program's status and deadlines", instruction: "The user clicked 'Review a grant on GetGranted.' Ask which program. Then fetch its full card via search_getgranted and summarize status, deadlines, and key details." }
+                    ]},
+                    { title: 'Strategy Consulting', tiles: [
+                        { title: 'Prep me for a discovery call', description: 'Build a prep brief by client type', instruction: "The user clicked 'Prep me for a discovery call.' Ask what type of client (industry, size, anything known). Then call load_skill with skill_name='strategy-consulting', sub_skill='DISCOVERY' and build a prep brief." },
+                        { title: 'Build a grant roadmap for a client', description: 'Sequence the right grants over time', instruction: "The user clicked 'Build a grant roadmap.' Ask which client and their current goals. Then call load_skill with skill_name='strategy-consulting', sub_skill='SEQUENCING' and build a sequenced roadmap." },
+                        { title: 'Red-flag screen a prospect', description: 'Screen a prospect for deal-breakers', instruction: "The user clicked 'Red-flag screen a prospect.' Ask which company or for a description. Then call load_skill with skill_name='strategy-consulting', sub_skill='RED_FLAGS' and screen them." },
+                        { title: 'Which service tier fits this client?', description: 'Right-size the engagement', instruction: "The user clicked 'Which service tier fits this client?' Ask about the client (revenue, initiatives, sophistication). Then call load_skill with skill_name='strategy-consulting', sub_skill='SIZING' and recommend a tier." },
+                        { title: 'Create a complete lead from scratch', description: 'Research, create, enrich, qualify in one go', instruction: "The user clicked 'Create a complete lead from scratch.' Ask for the company name (and website if they have it). Then call load_skill with skill_name='sales', sub_skill='lead_farming' plus load_skill with skill_name='strategy-consulting', sub_skill='RED_FLAGS' to screen the prospect as you go, and run the full lead-creation workflow." }
+                    ]},
+                    { title: 'Grant Intelligence', tiles: [
+                        { title: 'Search the GetGranted database', description: 'Find programs by industry, purpose, keyword', instruction: "The user clicked 'Search the GetGranted database.' Ask what they're looking for (industry, purpose, keywords). Then search and present results." },
+                        { title: 'Search the Federal awarded funding database', description: 'Query federal awarded funding records', instruction: "The user clicked 'Search the Federal awarded funding database.' Ask what they want to know (industry, program, region, recipient). Then query the federal dataset." },
+                        { title: 'Generate Granted Insights', description: 'Full strategist read on a program', instruction: "The user clicked 'Generate Granted Insights.' Ask which program. Then call load_skill with skill_name='granted-insights', sub_skill='OVERVIEW' and generate the full insights." },
+                        { title: 'Check for Recent Grant Updates through Visual Ping', description: 'VisualPing alerts by priority', instruction: "The user clicked 'Check for Recent Grant Updates.' Pull current VisualPing alerts immediately and present them by priority. No question needed." }
+                    ]},
+                    { title: 'CRM & Deals', tiles: [
+                        { title: 'Create a HubSpot deal', description: 'Guided deal creation with the right fields', instruction: "The user clicked 'Create a HubSpot deal.' Call load_skill with skill_name='hubspot', sub_skill='DEAL_CREATION' first, then ask which company and pipeline." },
+                        { title: 'Get HubSpot company record details', description: 'Pull and summarize a company record', instruction: "The user clicked 'Get HubSpot company record details.' Ask which company. Then pull the record and summarize." },
+                        { title: 'Check our program success stats', description: 'Win rates and outcomes by program', instruction: "The user clicked 'Check our program success stats.' Ask which program (or offer overall stats). Then run get_program_stats." },
+                        { title: 'Find recent client wins', description: 'Surface recent won deals', instruction: "The user clicked 'Find recent client wins.' Ask if they want a specific program or industry, or just the latest. Then run search_recent_wins." }
+                    ]},
+                    { title: 'Marketing Desk', tiles: [
+                        { title: "Draft this week's Grant Blast", description: 'Pick the program and draft the blast', instruction: "The user clicked 'Draft this week's Grant Blast.' Call load_skill with skill_name='granted-marketing', sub_skill='overview', scan VisualPing alerts and upcoming deadlines, and suggest the best program candidate before drafting." },
+                        { title: 'Suggest what to write this week', description: 'Weekly marketing digest', instruction: "The user clicked 'Suggest what to write this week.' Call load_skill with skill_name='granted-marketing', sub_skill='overview' and run the weekly marketing digest. No question needed." },
+                        { title: 'Draft an email or LinkedIn post', description: 'Email or LinkedIn, your topic', instruction: "The user clicked 'Draft an email or LinkedIn post.' Ask which type and topic (list the main options briefly). Then call load_skill with skill_name='granted-marketing', sub_skill='overview' and draft." },
+                        { title: 'Turn a client win into a success story', description: 'Draft a case study from a win', instruction: "The user clicked 'Turn a client win into a success story.' Ask which client, or offer to surface candidates from recent won deals. Then call load_skill with skill_name='granted-marketing', sub_skill='overview' and draft." }
+                    ]},
+                    { title: 'Meetings & Calls', tiles: [
+                        { title: 'Process Staff Meeting Notes', description: 'Recap and populate the staff meeting sheet', instruction: "The user clicked 'Process Staff Meeting Notes.' Call load_skill with skill_name='staff-meeting-recap', sub_skill='overview' and ask which meeting (default: most recent staff meeting in Granola)." },
+                        { title: 'Review one of my recent meetings', description: 'Review a recent Granola meeting', instruction: "The user clicked 'Review one of my recent meetings.' List their recent Granola meetings and ask which one to review." }
+                    ]},
+                    { title: 'Granted Processes', tiles: [
+                        { title: 'Review training/onboarding processes', description: 'Search training + onboarding docs', instruction: "The user clicked 'Review training/onboarding processes.' Ask which process or role they're interested in. Then search the internal KB and Drive." },
+                        { title: 'Review company policies', description: 'Look up a company policy', instruction: "The user clicked 'Review company policies.' Ask which policy. Then search the internal KB and Drive." },
+                        { title: 'Review Grant Processes and Workflows', description: 'Find a grant process or workflow', instruction: "The user clicked 'Review Grant Processes and Workflows.' Ask which program or workflow. Then search the internal KB." }
+                    ]},
+                    { title: 'Deep Search', tiles: [
+                        { title: 'Search for archived info (Google Docs / Dropbox)', description: 'Search Google Docs and Dropbox', instruction: "The user clicked 'Search for archived info.' Ask what they're looking for. Then search Drive and Dropbox and offer to open the doc." },
+                        { title: 'Look up program details', description: 'KB + GetGranted program lookup', instruction: "The user clicked 'Look up program details.' Ask which program. Then search the internal KB and GetGranted and summarize." }
+                    ]}
                 ]
             },
             'grant-cards': {
@@ -1326,6 +1458,50 @@
             const agent = AGENTS[currentAgent];
             const welcomeScreen = document.getElementById('welcome-screen');
 
+            // Oracle (and any future agent with a `groups` config) gets a Kanban board of grouped
+            // action tiles + a visible drop zone. All other agents keep the classic 3-tile grid.
+            const isKanban = Array.isArray(agent.groups);
+            welcomeScreen.classList.toggle('kanban-mode', isKanban);
+
+            let bodyHTML;
+            if (isKanban) {
+                // Tiles cascade on a diagonal wave (columnIndex*0.06 + tileIndex*0.045s).
+                const columns = agent.groups.map((group, gi) => `
+                    <div class="kanban-column">
+                        <div class="kanban-column-header">
+                            ${escapeHtmlSimple(group.title)}
+                            <span>${group.tiles.length}</span>
+                        </div>
+                        ${group.tiles.map((tile, ti) => `
+                            <div class="welcome-prompt" style="animation-delay:${(gi * 0.06 + ti * 0.045).toFixed(3)}s"
+                                 onclick="sendOracleTile(${gi}, ${ti})">
+                                <div class="welcome-prompt-title">${escapeHtmlSimple(tile.title)}</div>
+                                <div class="welcome-prompt-description">${escapeHtmlSimple(tile.description)}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `).join('');
+                bodyHTML = `
+                    <div class="oracle-kanban">${columns}</div>
+                    <div id="oracle-dropzone" class="oracle-dropzone" onclick="document.getElementById('file-input').click()">
+                        <span class="oracle-dropzone-icon">📎</span>
+                        <span class="oracle-dropzone-text">Drop a document to get started</span>
+                        <span class="oracle-dropzone-sub">or click to browse</span>
+                    </div>
+                `;
+            } else {
+                bodyHTML = `
+                    <div class="welcome-prompts">
+                        ${agent.prompts.map(p => `
+                            <div class="welcome-prompt" onclick="sendPrompt('${p.prompt.replace(/'/g, "\\'")}')">
+                                <div class="welcome-prompt-title">${p.title}</div>
+                                <div class="welcome-prompt-description">${p.description}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
             welcomeScreen.innerHTML = `
                 <div class="welcome-icon">
                     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -1334,22 +1510,39 @@
                 </div>
                 <h1 class="welcome-title">${agent.name}</h1>
                 <p class="welcome-subtitle">${agent.subtitle}</p>
-                <div class="welcome-prompts">
-                    ${agent.prompts.map(p => `
-                        <div class="welcome-prompt" onclick="sendPrompt('${p.prompt.replace(/'/g, "\\'")}')">
-                            <div class="welcome-prompt-title">${p.title}</div>
-                            <div class="welcome-prompt-description">${p.description}</div>
-                        </div>
-                    `).join('')}
-                </div>
+                ${bodyHTML}
                 <div id="granola-card-slot"></div>
             `;
+
+            // Wire the visible drop zone (Kanban only). The global document-level drop handler
+            // (setupDragAndDrop) still works too; this adds a self-highlighting visible target.
+            if (isKanban) setupOracleDropzone();
 
             // Update page title
             document.getElementById('page-title').textContent = `${agent.name} - Granted AI`;
 
             // Re-populate Granola card from cached state (no fetch on re-render)
             updateGranolaCard();
+        }
+
+        // Drop-zone affordance on the Oracle welcome screen. Mirrors the global drop handler:
+        // dropped files are appended to selectedFiles and shown as chips in the (always-visible)
+        // chat input — identical to attaching via the paperclip button.
+        function setupOracleDropzone() {
+            const zone = document.getElementById('oracle-dropzone');
+            if (!zone) return;
+            const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+            zone.addEventListener('dragenter', (e) => { stop(e); zone.classList.add('dragover'); });
+            zone.addEventListener('dragover', (e) => { stop(e); zone.classList.add('dragover'); });
+            zone.addEventListener('dragleave', (e) => { stop(e); zone.classList.remove('dragover'); });
+            zone.addEventListener('drop', (e) => {
+                stop(e); // stopPropagation prevents the document-level handler double-counting
+                zone.classList.remove('dragover');
+                if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    selectedFiles = [...selectedFiles, ...Array.from(e.dataTransfer.files)];
+                    renderSelectedFiles();
+                }
+            });
         }
 
         // Switch agent
@@ -1597,6 +1790,16 @@
             await sendMessage(prompt, []);
         };
 
+        // Oracle Kanban tile → send the tile's instruction as a HIDDEN user message.
+        // The instruction never renders in chat (opts.hidden); Oracle's reply is the first
+        // visible message. Tiles are referenced by group/tile index to avoid escaping the
+        // long, quote-heavy instruction strings in inline onclick handlers.
+        window.sendOracleTile = async function(gi, ti) {
+            const group = AGENTS.oracle.groups && AGENTS.oracle.groups[gi];
+            const tile = group && group.tiles[ti];
+            if (tile) await sendMessage(tile.instruction, [], { hidden: true });
+        };
+
         // Convert file to base64
         function fileToBase64(file) {
             return new Promise((resolve, reject) => {
@@ -1611,7 +1814,9 @@
         }
 
         // Send message to API
-        async function sendMessage(message, files = []) {
+        // opts.hidden: send `message` to the backend but do NOT render it as a user bubble
+        // (used by Oracle Kanban tiles so the instruction stays invisible).
+        async function sendMessage(message, files = [], opts = {}) {
             // Show chat screen (keep welcome visible - it will scroll up)
             const welcomeScreen = document.getElementById('welcome-screen');
             const chatScreen = document.getElementById('chat-screen');
@@ -1622,8 +1827,11 @@
                 chatScreen.classList.remove('hidden');
             }
 
-            // Add user message to UI with files
-            await addMessageToUI('user', message, files);
+            // Add user message to UI with files — unless this is a hidden instruction
+            // (Oracle Kanban tile), in which case Oracle's reply is the first visible message.
+            if (!opts.hidden) {
+                await addMessageToUI('user', message, files);
+            }
 
             // Show thinking indicator
             console.log('[SEND_MSG] About to add thinking indicator');
