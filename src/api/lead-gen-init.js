@@ -115,6 +115,7 @@ async function createLeadGenSessionWithFormData(ipAddress, formData) {
     training_budget: formData.training_budget,
     expansion_budget: formData.expansion_budget,
     planned_activities: formData.planned_activities,
+    referral_source: formData.referral_source,
     marketing_opt_in: formData.marketing_opt_in || 'false'
   };
 

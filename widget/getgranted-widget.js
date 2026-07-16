@@ -211,6 +211,14 @@
     "$100K+"
   ];
 
+  const REFERRAL_OPTIONS = [
+    "Google search",
+    "LinkedIn",
+    "Referred by a friend or colleague",
+    "Event or webinar",
+    "Other"
+  ];
+
   let config = { ...DEFAULT_CONFIG };
   let sessionId = null;
   let isOpen = false;
@@ -1665,6 +1673,13 @@
           </div>
 
           <div class="gg-form-field">
+            <label for="gg-referral-source">How did you hear about us?</label>
+            <select id="gg-referral-source">
+              ${createDropdownOptions(REFERRAL_OPTIONS)}
+            </select>
+          </div>
+
+          <div class="gg-form-field">
             <label class="gg-form-checkbox">
               <input type="checkbox" id="gg-marketing-opt-in" />
               <span>Yes, I want to receive grant updates, newsletters, and event invites from Granted.</span>
@@ -2192,6 +2207,7 @@
     const expansion = shadowRoot?.getElementById('gg-expansion').value;
     const plannedActivities = shadowRoot?.getElementById('gg-planned-activities').value.trim();
     const marketingOptIn = shadowRoot?.getElementById('gg-marketing-opt-in').checked;
+    const referralSource = shadowRoot?.getElementById('gg-referral-source').value;
 
     // If "no website" is checked, set website to null
     if (noWebsite) {
@@ -2222,6 +2238,7 @@
       expansion_budget: expansion || null,
       planned_activities: plannedActivities || null,
       marketing_opt_in: marketingOptIn ? 'true' : 'false',
+      referral_source: referralSource || '',
       _fax: honeypot // Hidden field for bot detection (fax field to avoid autofill)
     };
 

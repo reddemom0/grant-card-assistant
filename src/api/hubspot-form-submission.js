@@ -121,6 +121,7 @@ export function buildFormFields(sessionData, agentInput) {
   const expansionBudg  = pd.expansion_budget  || null;
   const plannedActiv   = pd.planned_activities || null;
   const province       = pd.province         || input.province     || null;
+  const referralSource = pd.referral_source  || null;
 
   // Agent inputs (only present when called via save_lead_data, not inactivity timeout)
   const priorGrantExp = input.prior_grant_experience || pd.prior_grant_experience || null;
@@ -148,6 +149,7 @@ export function buildFormFields(sessionData, agentInput) {
     { name: 'website',                                                                           value: website }, // null when "no website" checked → omitted
     { name: 'industry_contact',                                                                  value: industry ? mapIndustry(industry) : null },
     { name: 'how_did_you_hear_about_us_',                                                        value: 'Other' }, // submission_source covers attribution more precisely
+    { name: 'who_referred_you_',                                                                 value: referralSource || null },
     { name: 'have_you_applied_for_grants_before_',                                               value: priorGrantExperienceToYesNo(priorGrantExp) },
     { name: 'is_your_organization_for_profit_or_non_profit_',                                    value: isForProfit(industry) },
     { name: 'has_your_business_existed_for_a_year_',                                             value: hasBusinessExistedForAYear(revenueRange, employeeCount) },
