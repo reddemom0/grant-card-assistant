@@ -872,7 +872,7 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
 
 <p><a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">Access the GetGranted database</a></p>
 
-<p>We're also launching an upgraded version (GetGranted 2.0 Lite) with real-time matching and alerts for $55/month. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
+<p>We're also launching an upgraded version (GetGranted 2.0 Lite) with real-time matching and alerts. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
     `;
     // No bookingCTA for Regular Get Granted. Both lead-in AND URL absent
     // (closes the Small Point dangling-text bug at the source).

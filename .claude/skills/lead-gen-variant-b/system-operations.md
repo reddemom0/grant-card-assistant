@@ -123,7 +123,7 @@ BOOKING LINK LANGUAGE — non-assumption: The email must NOT assume the prospect
 
 GrantedPro / GrantedPro Waitlist — applies when EITHER (a) revenue $5M+, OR (b) revenue $2.5M – $5M AND estimate $30K+:
 - PRIMARY CTA: Booking link — this is how Pro starts. Emit the literal sentinel `{{BOOKING_LINK}}` in the email body where the URL should appear; the system substitutes it with the industry-routed consultant URL. Frame as a "30-minute discovery call". Never hardcode a URL. Never use any bracket placeholder.
-- Pricing context (if relevant in the email): GrantedPro is $5,000/year + 20% success fee on approved grants. Never call this "custom pricing."
+- Pricing: do not state any price or fee in the email — cost is discussed on the discovery call.
 - SECONDARY: GrantedPro service page (https://granted.ca/grantedpro/) — for information only, not as "get started"
 - GetGranted 2.0: Do NOT mention (these prospects need consultant, not self-serve)
 
