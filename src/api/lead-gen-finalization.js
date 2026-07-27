@@ -24,10 +24,39 @@ import {
   patchAIContactProperties
 } from './hubspot-form-submission.js';
 import { sendEmail, wrapInBrandedTemplate } from '../email/sendEmail.js';
-import { notifyTeamOfLead } from '../services/lead-notification.js';
+import { notifyTeamOfLead, notifyTeamOfUpgrade } from '../services/lead-notification.js';
 import { getBookingLink, NATALIE_INTRO_LINK, substituteBookingLink, BookingLinkRoutingError } from './booking-link-routing.js';
 
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
+
+/**
+ * Build the retrying axios client for the HubSpot CRM API. Shared by
+ * finalizeLeadGenConversation and the upgrade-send side effects in
+ * sendLeadGenEmail so both paths get identical retry behavior.
+ */
+async function createHubSpotClient() {
+  const axios = (await import('axios')).default;
+  const axiosRetry = (await import('axios-retry')).default;
+
+  const client = axios.create({
+    baseURL: 'https://api.hubapi.com',
+    headers: {
+      Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+      'Content-Type': 'application/json'
+    },
+    timeout: 10000
+  });
+
+  axiosRetry(client, {
+    retries: 3,
+    retryDelay: axiosRetry.exponentialDelay,
+    retryCondition: (err) =>
+      axiosRetry.isNetworkOrIdempotentRequestError(err) ||
+      err.response?.status === 429
+  });
+
+  return client;
+}
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -975,10 +1004,25 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
   const session = sessionResult.rows[0];
   const prospectData = session.prospect_data || {};
 
-  // Check if email already sent
+  // Check if email already sent — with one exception: when the only prior
+  // send was a cron fallback and a tailored agent body now exists, allow
+  // exactly one "upgrade" send to supersede it. Sends that predate the
+  // email_sent_kind marker are deliberately NOT eligible (no surprise emails
+  // to stale leads).
+  let isUpgrade = false;
   if (prospectData.email_sent_at) {
-    console.log(`ℹ️  Email already sent at ${prospectData.email_sent_at} — skipping duplicate send`);
-    return { success: false, error: 'Email already sent', alreadySent: true, sentAt: prospectData.email_sent_at };
+    const upgradeEligible =
+      prospectData.email_sent_kind === 'fallback' &&
+      !prospectData.email_upgraded_at &&
+      !!prospectData.email_summary_body;
+
+    if (!upgradeEligible) {
+      console.log(`ℹ️  Email already sent at ${prospectData.email_sent_at} — skipping duplicate send`);
+      return { success: false, error: 'Email already sent', alreadySent: true, sentAt: prospectData.email_sent_at };
+    }
+
+    isUpgrade = true;
+    console.log(`📧 Upgrade send: fallback delivered at ${prospectData.email_sent_at}, tailored summary now available — superseding once`);
   }
 
   // Check conditions
@@ -1022,8 +1066,10 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
 
   // Get email body or generate fallback
   let emailBodyHtml = prospectData.email_summary_body;
+  let emailKind = 'agent';
 
   if (!emailBodyHtml) {
+    emailKind = 'fallback';
     console.log('⚠️  No email_summary_body from agent — generating fallback email');
 
     // Load enriched session data for accurate estimate
@@ -1084,6 +1130,12 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
     console.log(`  🎨 Converted markdown to HTML in email body`);
   }
 
+  // Upgrade sends open with a fixed acknowledgment of the earlier fallback
+  // email. Template text — never model-generated.
+  if (isUpgrade) {
+    emailBodyHtml = `<p>Following up on my earlier note — now that we've talked through your project in more detail, here's what I found.</p>\n` + emailBodyHtml;
+  }
+
   // Booking link substitution (sentinel-driven + defensive URL rewrite).
   // See substituteBookingLink in booking-link-routing.js for the full contract.
   // Hard-fails (BookingLinkRoutingError) when routing data required by the
@@ -1142,19 +1194,65 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
 
     console.log(`✅ Email summary sent to ${session.contact_email} — Message ID: ${emailResult.messageId}`);
 
-    // Mark email as sent in database
+    // Mark email as sent in database. First sends record when + which kind;
+    // upgrade sends keep the original email_sent_at, flip the kind to 'agent',
+    // and stamp email_upgraded_at — the hard one-upgrade-per-session cap.
+    const sentMarker = isUpgrade
+      ? { email_upgraded_at: new Date().toISOString(), email_sent_kind: 'agent' }
+      : { email_sent_at: new Date().toISOString(), email_sent_kind: emailKind };
+
     await query(
       `UPDATE lead_gen_conversations
        SET prospect_data = prospect_data || $1::jsonb,
            updated_at = NOW()
        WHERE session_id = $2`,
-      [JSON.stringify({ email_sent_at: new Date().toISOString() }), sessionId]
+      [JSON.stringify(sentMarker), sessionId]
     );
 
-    console.log(`✅ Marked email as sent in database (email_sent_at stored in prospect_data)`);
+    console.log(`✅ Marked email as sent in database (${isUpgrade ? 'email_upgraded_at' : `email_sent_at, kind=${emailKind}`} stored in prospect_data)`);
+
+    // Upgrade-only side effects. Both non-blocking — an upgrade email that
+    // reached the prospect must never be reported as failed because a
+    // notification or CRM write hiccuped.
+    if (isUpgrade) {
+      try {
+        await notifyTeamOfUpgrade({ session, prospectData });
+        console.log(`✅ Internal upgrade notification sent`);
+      } catch (err) {
+        console.warn('⚠️  Upgrade notification failed (non-blocking):', err.message);
+      }
+
+      try {
+        const hubspotClient = await createHubSpotClient();
+        const findResult = await findContactByEmailWithRetry(session.contact_email, hubspotClient);
+        if (findResult.success) {
+          // best_fit_product is the STORED value from finalization — tiering is
+          // never recomputed on this path. marketingOptIn omitted on purpose so
+          // the upgrade PATCH can't downgrade an existing opt-in.
+          const patchResult = await patchAIContactProperties(
+            findResult.contact.id,
+            {
+              bestFitProduct: prospectData.best_fit_product || null,
+              emailSummaryBody: prospectData.email_summary_body
+            },
+            hubspotClient
+          );
+          if (patchResult.success) {
+            console.log(`✅ Upgrade PATCH: email_summary_body + best_fit_product written to contact ${findResult.contact.id}`);
+          } else {
+            console.warn(`⚠️  Upgrade PATCH failed (non-blocking): ${patchResult.error}`);
+          }
+        } else {
+          console.warn(`⚠️  Upgrade PATCH skipped — could not resolve contact by email: ${findResult.error}`);
+        }
+      } catch (err) {
+        console.warn('⚠️  Upgrade HubSpot write failed (non-blocking):', err.message);
+      }
+    }
 
     return {
       success: true,
+      upgraded: isUpgrade,
       recipient: session.contact_email,
       messageId: emailResult.messageId,
       sentAt: new Date().toISOString()
@@ -1290,25 +1388,7 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
   // 3. Create HubSpot client
   // -------------------------------------------------------------------------
 
-  const axios = (await import('axios')).default;
-  const axiosRetry = (await import('axios-retry')).default;
-
-  const hubspotClient = axios.create({
-    baseURL: 'https://api.hubapi.com',
-    headers: {
-      Authorization: `Bearer ${HUBSPOT_TOKEN}`,
-      'Content-Type': 'application/json'
-    },
-    timeout: 10000
-  });
-
-  axiosRetry(hubspotClient, {
-    retries: 3,
-    retryDelay: axiosRetry.exponentialDelay,
-    retryCondition: (err) =>
-      axiosRetry.isNetworkOrIdempotentRequestError(err) ||
-      err.response?.status === 429
-  });
+  const hubspotClient = await createHubSpotClient();
 
   const results = { form: null, contact: null, company: null, note: null };
 

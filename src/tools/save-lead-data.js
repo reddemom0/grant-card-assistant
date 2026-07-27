@@ -151,10 +151,13 @@ export async function saveLeadData(input, conversationId) {
       // Planned activities from form + agent assessment
       planned_activities:     input.planned_activities     || null,
       activity_assessment:    input.activity_assessment    || null,
-      // Email summary body from agent (for email sending)
-      email_summary_body:     input.email_summary_body     || null,
       // CTA selected (stored in both prospect_data and top-level for finalization)
-      cta_selected:           input.cta_selected           || null
+      cta_selected:           input.cta_selected           || null,
+      // Email summary body from agent (for email sending). Included ONLY when
+      // provided — the JSONB || merge replaces keys, so writing an explicit
+      // null here would wipe a body stored by an earlier save_lead_data call
+      // (and with it, upgrade-send eligibility).
+      ...(input.email_summary_body ? { email_summary_body: input.email_summary_body } : {})
     };
 
     await query(
@@ -212,20 +215,40 @@ export async function saveLeadData(input, conversationId) {
     const { sendLeadGenEmail } = await import('../api/lead-gen-finalization.js');
     const emailResult = await sendLeadGenEmail(conversationId);
 
-    if (emailResult.success) {
+    // Real email outcome, surfaced top-level so the model can be truthful:
+    //   'upgraded'     — tailored summary superseded an earlier fallback send
+    //   'sent'         — first email delivered
+    //   'already_sent' — suppressed by duplicate guard, nothing new delivered
+    //   'not_sent'     — not requested, or the send failed
+    let emailOutcome;
+    if (emailResult.success && emailResult.upgraded) {
+      emailOutcome = 'upgraded';
+      console.log(`✅ Upgrade email sent via save_lead_data — Message ID: ${emailResult.messageId}`);
+    } else if (emailResult.success) {
+      emailOutcome = 'sent';
       console.log(`✅ Email sent successfully via save_lead_data — Message ID: ${emailResult.messageId}`);
     } else if (emailResult.alreadySent) {
+      emailOutcome = 'already_sent';
       console.log(`ℹ️  Email already sent at ${emailResult.sentAt} — skipping duplicate`);
     } else {
+      emailOutcome = 'not_sent';
       console.log(`ℹ️  Email not sent: ${emailResult.error}`);
     }
+
+    const emailStatusLine = {
+      upgraded:     'Email summary sent (upgraded — supersedes the earlier automatic email).',
+      sent:         'Email summary sent.',
+      already_sent: 'Email summary NOT sent — one was already delivered to this prospect earlier. Do not tell the prospect a new email was sent.',
+      not_sent:     `Email summary NOT sent (${emailResult.error || 'not requested'}). Do not tell the prospect an email was sent.`
+    }[emailOutcome];
 
     // Return success regardless of email send result (non-blocking)
     return {
       success: true,
-      message: result.success
-        ? `Lead data saved and synced to HubSpot.`
-        : `Lead data saved. HubSpot: ${result.error || 'already exists'}`,
+      email_outcome: emailOutcome,
+      message: (result.success
+        ? `Lead data saved and synced to HubSpot. `
+        : `Lead data saved. HubSpot: ${result.error || 'already exists'}. `) + emailStatusLine,
       finalization: result,
       email: emailResult
     };

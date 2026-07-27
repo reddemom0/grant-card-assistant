@@ -103,6 +103,45 @@ export async function notifyTeamOfLead({
   }
 }
 
+/**
+ * Notify internal team that a tailored summary superseded an earlier fallback
+ * email (upgrade send). This is an EXISTING lead — not a new one — so the
+ * NOTIFY_TIERS filter is deliberately not applied: upgrade sends are rare and
+ * always worth seeing. Adapter errors bubble to the caller, which wraps this
+ * call non-blocking.
+ *
+ * @param {Object} opts
+ * @param {Object} opts.session — full lead_gen_conversations row
+ * @param {Object} opts.prospectData — session.prospect_data
+ */
+export async function notifyTeamOfUpgrade({ session, prospectData }) {
+  const enabledChannels = (process.env.NOTIFY_CHANNELS || 'email')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+
+  const payload = buildNotificationPayload({
+    sessionId: session?.session_id,
+    trigger: 'summary_upgrade',
+    session,
+    prospectData,
+    enrichedSession: null,
+    companyId: null,
+    contactId: null,
+    results: null,
+    tier: resolveLeadTier(prospectData)
+  });
+  payload.isUpgrade = true;
+
+  for (const channel of enabledChannels) {
+    const adapter = adapters[channel];
+    if (!adapter) {
+      console.warn(`⚠️  Unknown notification channel: "${channel}" — skipping`);
+      continue;
+    }
+    await adapter(payload);
+    console.log(`✅ Upgrade notification sent via ${channel} for ${prospectData?.company_name || session?.session_id}`);
+  }
+}
+
 // ============================================================================
 // Payload builder
 // ============================================================================
@@ -174,6 +213,9 @@ function buildSubject(payload) {
   const tierTag = (payload.tier || 'cool').toUpperCase();
   const company = payload.companyName || 'Unknown Company';
   const funding = payload.estimatedFunding || 'TBD';
+  if (payload.isUpgrade) {
+    return `[UPGRADE] Tailored summary sent: ${company} — ${funding}`;
+  }
   return `[${tierTag}] New lead: ${company} — ${funding}`;
 }
 
@@ -191,7 +233,9 @@ function buildEmailHtml(p) {
 
   const triggerLabel = p.trigger === 'contact_captured'
     ? 'Contact captured (save_lead_data)'
-    : 'Inactivity timeout (cron backup)';
+    : p.trigger === 'summary_upgrade'
+      ? 'Upgrade send (tailored summary superseded fallback email)'
+      : 'Inactivity timeout (cron backup)';
 
   // Build links
   const appBase = process.env.RAILWAY_PUBLIC_DOMAIN
@@ -221,6 +265,12 @@ function buildEmailHtml(p) {
     <span style="display:inline-block;background:${tc.color};color:#fff;font-weight:700;font-size:14px;padding:4px 12px;border-radius:4px;letter-spacing:0.5px;">${tc.badge}</span>
     <span style="margin-left:12px;font-size:18px;font-weight:600;color:#111827;">${escHtml(p.companyName || 'Unknown Company')}</span>
   </div>
+
+  ${p.isUpgrade ? `
+  <!-- Upgrade banner -->
+  <div style="background:#eff6ff;padding:12px 24px;border-bottom:1px solid #bfdbfe;font-size:13px;color:#1d4ed8;">
+    <strong>Upgrade — existing lead, not a new one.</strong> This prospect previously received the generic fallback email; their tailored funding summary has now been sent. No new HubSpot records were created.
+  </div>` : ''}
 
   <!-- Main content -->
   <div style="padding:24px;">

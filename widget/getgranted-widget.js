@@ -221,6 +221,7 @@
 
   let config = { ...DEFAULT_CONFIG };
   let sessionId = null;
+  let lastEmailOutcome = null; // 'sent' | 'upgraded' | 'already_sent' | 'not_sent' — from save_lead_data tool_result SSE
   let isOpen = false;
   let shadowRoot = null;
   let messagesContainer = null;
@@ -1940,6 +1941,12 @@
             pendingText = '';
           }
 
+          // save_lead_data result — capture the real email outcome so the
+          // summary button can render the truth instead of asserting success
+          if (parsed.type === 'tool_result' && parsed.toolName === 'save_lead_data') {
+            lastEmailOutcome = parsed.result?.email_outcome || null;
+          }
+
           // Done event — flush pending text as the final message
           if (parsed.type === 'done') {
             if (pendingText) {
@@ -2628,13 +2635,25 @@
         trackEvent('cta_clicked', { cta_type: 'email_summary' });
 
         try {
-          // Send system message (hidden from UI)
+          // Send system message (hidden from UI). The stream parser captures
+          // the real send outcome from the save_lead_data tool_result event.
+          lastEmailOutcome = null;
           await sendMessage('[SYSTEM: User requested email summary]', true);
 
-          // Update button to "sent" state
-          summaryButton.classList.add('sent');
-          summaryButton.textContent = '✓ Summary sent!';
-          summaryButton.disabled = true;
+          // Render the actual outcome, not an assumption
+          if (lastEmailOutcome === 'sent' || lastEmailOutcome === 'upgraded') {
+            summaryButton.classList.add('sent');
+            summaryButton.textContent = '✓ Summary sent!';
+            summaryButton.disabled = true;
+          } else if (lastEmailOutcome === 'already_sent') {
+            summaryButton.classList.add('sent');
+            summaryButton.textContent = '✓ Already sent — check your inbox';
+            summaryButton.disabled = true;
+          } else {
+            // 'not_sent' or no save_lead_data call observed this turn
+            summaryButton.disabled = false;
+            summaryButton.textContent = '📧 Try again';
+          }
 
         } catch (error) {
           console.error('Summary request failed:', error);
