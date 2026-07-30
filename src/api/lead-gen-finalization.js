@@ -968,23 +968,64 @@ function getResourceLink(tier) {
 // ============================================================================
 
 /**
+ * Has this session recorded an actual click of the widget's summary button?
+ *
+ * This is the only signal in the system that reflects an OBSERVED user action.
+ * cta_selected, by contrast, is the agent's inference of intent. The row is
+ * written by handleLeadGenEvent (src/api/lead-gen-event.js) from the widget's
+ * trackEvent('cta_clicked', { cta_type: 'email_summary' }) beacon.
+ *
+ * Fails CLOSED on a DB error: an unreadable events table must not authorize a
+ * send. The inactivity cron remains the backstop, so the cost of a false
+ * negative is a delayed email, never a lost one.
+ */
+async function hasSummaryClick(sessionId) {
+  try {
+    const result = await query(
+      `SELECT 1 FROM lead_gen_events
+       WHERE session_id = $1
+         AND event_type = 'cta_clicked'
+         AND event_data->>'cta_type' = 'email_summary'
+       LIMIT 1`,
+      [sessionId]
+    );
+    return result.rowCount > 0;
+  } catch (err) {
+    console.warn(`⚠️  Could not read lead_gen_events for session ${sessionId} — treating as no click: ${err.message}`);
+    return false;
+  }
+}
+
+/**
  * Send email summary for a lead-gen session
  *
- * This function is INDEPENDENT of finalization - it can be called multiple times
- * and will only send if:
- * 1. cta_selected includes 'email', OR
- * 2. agent set email_summary_body, OR
- * 3. caller passed { forceGenerate: true } (used by finalize for inactivity_timeout)
- * AND
- * 4. contact_email exists
- * 5. Email hasn't been sent yet (checks prospect_data.email_sent_at)
+ * This function is INDEPENDENT of finalization - it can be called multiple times.
+ *
+ * AUTHORIZATION vs CONTENT — these are deliberately separate concerns:
+ *
+ *   Authorization (may we send at all?) requires ONE of:
+ *     1. A recorded summary-button click in lead_gen_events, OR
+ *     2. cta_selected === 'email_summary' exactly, OR
+ *     3. caller passed { forceGenerate: true } (the inactivity cron)
+ *
+ *   Content (what do we send?) comes from prospect_data.email_summary_body when
+ *   present, else generateFallbackEmail.
+ *
+ * email_summary_body is NOT authorization. It used to be, which meant the body
+ * the prompt mandates on the first save_lead_data call triggered an immediate
+ * unrequested send — 68% of sends over a 60-day sample had no click anywhere in
+ * the session, some arriving before the prospect clicked. A stored body now
+ * simply waits: either the prospect asks for it, or the cron delivers it at
+ * inactivity timeout (still the tailored body, not a generic one).
+ *
+ * Also requires: contact_email exists, and no prior send (see the upgrade
+ * exception around prospect_data.email_sent_at).
  *
  * @param {string} sessionId - Session ID
  * @param {Object} [options]
- * @param {boolean} [options.forceGenerate=false] - When true, skip the
- *   "not requested" early-return and generate a fallback body inline. Used by
- *   finalizeLeadGenConversation for inactivity_timeout (these leads need an
- *   email but never set cta_selected or email_summary_body themselves).
+ * @param {boolean} [options.forceGenerate=false] - Cron authorization. Set by
+ *   finalizeLeadGenConversation for inactivity_timeout, where no click or CTA
+ *   will ever arrive but the lead still needs their summary.
  * @returns {Object} Email send result
  */
 export async function sendLeadGenEmail(sessionId, options = {}) {
@@ -1025,31 +1066,48 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
     console.log(`📧 Upgrade send: fallback delivered at ${prospectData.email_sent_at}, tailored summary now available — superseding once`);
   }
 
-  // Check conditions
-  console.log(`📧 Checking email conditions — cta_selected: "${prospectData.cta_selected}", has_contact_email: ${!!session.contact_email}, has_email_body: ${!!prospectData.email_summary_body}`);
-
-  // Send email if EITHER:
-  // 1. Explicit request (cta_selected includes 'email'), OR
-  // 2. Agent prepared email body (indicates intent to send on timeout/finalization)
-  const hasExplicitRequest = prospectData.cta_selected && prospectData.cta_selected.includes('email');
+  // ---------------------------------------------------------------------------
+  // AUTHORIZATION — is a send permitted at all?
+  //
+  // Strict equality on cta_selected, not .includes('email'): the field is free
+  // text from the agent and at least two sessions hold malformed blobs where a
+  // closing tag and subsequent parameters were swallowed into the value. A
+  // substring match would treat that corruption as consent. Anything that is
+  // not exactly the known value is not authorization.
+  // ---------------------------------------------------------------------------
   const hasEmailBody = !!prospectData.email_summary_body;
+  const hasExplicitCta = prospectData.cta_selected === 'email_summary';
+  const hasRecordedClick = await hasSummaryClick(sessionId);
 
-  if (!hasExplicitRequest && !hasEmailBody && !forceGenerate) {
-    // Warn loudly: a caller that hits this path WITHOUT forceGenerate=true is
-    // likely a regression of the cron-finalization fix. The contract is:
-    // anyone finalizing an inactive lead must opt in to fallback generation
-    // via forceGenerate, or the lead will silently receive no email. This
-    // catches future call sites that forget the flag.
-    console.warn(
-      `[SEND-LEAD-GEN-EMAIL-SKIPPED] session=${sessionId} — no explicit request, no agent body, forceGenerate=false. ` +
-      `If this session needs an email (e.g. inactivity_timeout finalization), the caller must pass { forceGenerate: true }. ` +
-      `Otherwise this is correct and expected (e.g. mid-conversation save_lead_data without an email CTA).`
+  console.log(
+    `📧 Checking email authorization — click_recorded: ${hasRecordedClick}, ` +
+    `cta_selected: "${prospectData.cta_selected}", has_contact_email: ${!!session.contact_email}, ` +
+    `has_email_body: ${hasEmailBody}, forceGenerate: ${forceGenerate}`
+  );
+
+  // Precedence is deliberate: an observed click is the truest reason, then the
+  // agent's assertion, then the cron. Recorded on the send marker for diagnosis.
+  const sendReason = hasRecordedClick ? 'click'
+    : hasExplicitCta ? 'cta_selected'
+    : forceGenerate ? 'cron'
+    : null;
+
+  if (!sendReason) {
+    // Expected and correct on the first save_lead_data of a session: the agent
+    // has written the body but the prospect has not asked for it. The body is
+    // stored, not discarded — the cron will deliver it at inactivity timeout if
+    // no click arrives first. has_body is logged because "body present but
+    // unauthorized" is the interesting case to grep for.
+    console.log(
+      `[SEND-LEAD-GEN-EMAIL-UNAUTHORIZED] session=${sessionId} — no recorded click, ` +
+      `cta_selected="${prospectData.cta_selected}", forceGenerate=false, has_body=${hasEmailBody}. ` +
+      `Not sending now; the inactivity cron will deliver the stored body if the prospect never asks.`
     );
-    return { success: false, error: 'Email not requested' };
+    return { success: false, error: 'Email not authorized', notAuthorized: true, hasBody: hasEmailBody };
   }
 
-  if (hasEmailBody && !hasExplicitRequest) {
-    console.log(`📧 Email body prepared by agent but no explicit button click — sending via timeout/finalization path`);
+  if (sendReason === 'cron' && hasEmailBody) {
+    console.log(`📧 Inactivity timeout — delivering the agent's stored tailored body (no click was ever recorded)`);
   }
 
   if (!session.contact_email) {
@@ -1163,6 +1221,27 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
         console.warn(`[BOOKING-LINK-LEAK] Inline meetings.hubspot.com URL survived sentinel substitution for null-link tier. best_fit_product=${prospectData.best_fit_product}, session=${sessionId}`);
       }
     }
+
+    // Two prospect-facing leaks that previously had NO detection at all.
+    //
+    // 1. A surviving sentinel. substituteBookingLink only strips it via
+    //    CTA_PARAGRAPH_RE, which requires a literal <p>...</p> wrapper. A
+    //    sentinel emitted bare, or inside <li>/<div>, or as an href, is
+    //    returned untouched and ships as "{{BOOKING_LINK}}".
+    // 2. A bracket placeholder the model invented instead of the sentinel.
+    //    Nothing in the codebase strips or rewrites these; 15 sessions shipped
+    //    one, and a delivered copy was confirmed in a recipient's inbox.
+    //
+    // Log only — do not rewrite. A partial repair here would be guesswork about
+    // the surrounding copy; the fix belongs in the prompt. This exists so the
+    // next occurrence is greppable instead of silent.
+    if (/\{\{BOOKING_LINK\}\}/.test(emailBodyHtml)) {
+      console.warn(`[BOOKING-LINK-LEAK] Sentinel survived substitution and will ship verbatim — likely not wrapped in its own <p>. session=${sessionId}, best_fit_product=${prospectData.best_fit_product}`);
+    }
+    const bracketPlaceholder = emailBodyHtml.match(/\[[^\]\n]{0,80}?(?:booking|inserted by system|system will insert)[^\]\n]{0,80}?\]/i);
+    if (bracketPlaceholder) {
+      console.warn(`[BOOKING-LINK-LEAK] Bracket placeholder will ship verbatim: ${JSON.stringify(bracketPlaceholder[0])}. session=${sessionId}, best_fit_product=${prospectData.best_fit_product}`);
+    }
   } catch (err) {
     if (err instanceof BookingLinkRoutingError) {
       console.error(
@@ -1197,9 +1276,13 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
     // Mark email as sent in database. First sends record when + which kind;
     // upgrade sends keep the original email_sent_at, flip the kind to 'agent',
     // and stamp email_upgraded_at — the hard one-upgrade-per-session cap.
+    //
+    // email_send_reason records WHY the send was authorized ('click' |
+    // 'cta_selected' | 'cron'). Without it the only way to tell an asked-for
+    // send from a cron delivery is to cross-reference lead_gen_events by hand.
     const sentMarker = isUpgrade
-      ? { email_upgraded_at: new Date().toISOString(), email_sent_kind: 'agent' }
-      : { email_sent_at: new Date().toISOString(), email_sent_kind: emailKind };
+      ? { email_upgraded_at: new Date().toISOString(), email_sent_kind: 'agent', email_send_reason: sendReason }
+      : { email_sent_at: new Date().toISOString(), email_sent_kind: emailKind, email_send_reason: sendReason };
 
     await query(
       `UPDATE lead_gen_conversations
@@ -1209,7 +1292,7 @@ export async function sendLeadGenEmail(sessionId, options = {}) {
       [JSON.stringify(sentMarker), sessionId]
     );
 
-    console.log(`✅ Marked email as sent in database (${isUpgrade ? 'email_upgraded_at' : `email_sent_at, kind=${emailKind}`} stored in prospect_data)`);
+    console.log(`✅ Marked email as sent in database (${isUpgrade ? 'email_upgraded_at' : `email_sent_at, kind=${emailKind}`}, reason=${sendReason} stored in prospect_data)`);
 
     // Upgrade-only side effects. Both non-blocking — an upgrade email that
     // reached the prospect must never be reported as failed because a
@@ -1731,9 +1814,114 @@ export async function finalizeInactiveSessions(inactivityMinutes = 5, batchSize 
 
     console.log(`\n✅ Finalization complete: ${results.finalized} finalized, ${results.errors} errors, ${results.processed} total\n`);
 
+    results.summariesDelivered = await deliverPendingSummaries(inactivityMinutes, batchSize);
+
     return results;
   } catch (err) {
     console.error('❌ Failed to query inactive sessions:', err.message);
     throw err;
+  }
+}
+
+/**
+ * Deliver stored summaries for sessions the finalization sweep can no longer reach.
+ *
+ * WHY THIS EXISTS — the two sweeps cover disjoint sets:
+ *
+ * finalizeInactiveSessions selects `finalized = FALSE`. But any session where the
+ * agent called save_lead_data was finalized at that moment (trigger
+ * 'contact_captured'), because finalizeLeadGenConversation claims the row by
+ * setting finalized = TRUE. Those sessions are therefore invisible to that sweep
+ * forever.
+ *
+ * That was harmless while a stored email_summary_body authorized its own
+ * immediate send. Now that authorization requires a click, a CTA, or the cron,
+ * a prospect who never clicks would otherwise have a finished summary sitting in
+ * prospect_data that nothing is left to deliver. This sweep is that delivery.
+ *
+ * Deliberately narrow on three axes:
+ *
+ *  1. Only sessions that already have a tailored body. Leads with no stored body
+ *     are untouched — generating a fallback for them is the existing sweep's job,
+ *     and doing it here would start emailing book_call leads who are not
+ *     supposed to receive one.
+ *  2. Only sessions never sent to.
+ *  3. Only RECENT activity (see STALE_SUMMARY_CUTOFF_HOURS). Without this floor
+ *     the first run would mail every historically undelivered body at once — 30
+ *     sessions dating to February and March when this was written. A prospect
+ *     who chatted four months ago must not receive a surprise summary today.
+ *     This matches the "no surprise emails to stale leads" rule the upgrade
+ *     guard already enforces.
+ */
+const STALE_SUMMARY_CUTOFF_HOURS = 24;
+
+async function deliverPendingSummaries(inactivityMinutes = 5, batchSize = 50) {
+  try {
+    // Anything past the cutoff will never be delivered. That is the intended
+    // design, but it must not be silent — a rising count here, or a `newest`
+    // timestamp that is only just over the cutoff, means summaries were
+    // stranded by an outage rather than by age.
+    const stale = await query(
+      `SELECT count(*)::int AS n, max(last_activity_at) AS newest
+       FROM lead_gen_conversations
+       WHERE finalized = TRUE
+         AND last_activity_at <= NOW() - INTERVAL '${STALE_SUMMARY_CUTOFF_HOURS} hours'
+         AND contact_email IS NOT NULL
+         AND prospect_data->>'email_summary_body' IS NOT NULL
+         AND prospect_data->>'email_sent_at' IS NULL`
+    );
+    if (stale.rows[0].n > 0) {
+      const newest = stale.rows[0].newest;
+      console.warn(
+        `[PENDING-SUMMARY-STALE] ${stale.rows[0].n} session(s) hold an undelivered summary older than ` +
+        `${STALE_SUMMARY_CUTOFF_HOURS}h and will never be sent — newest went quiet at ` +
+        `${newest?.toISOString?.() ?? newest}. Expected for genuinely old leads; if that timestamp is ` +
+        `close to the cutoff, the cron was likely down and those prospects lost their summary.`
+      );
+    }
+
+    const pending = await query(
+      `SELECT session_id, contact_email, prospect_data
+       FROM lead_gen_conversations
+       WHERE finalized = TRUE
+         AND last_activity_at < NOW() - INTERVAL '${inactivityMinutes} minutes'
+         AND last_activity_at > NOW() - INTERVAL '${STALE_SUMMARY_CUTOFF_HOURS} hours'
+         AND contact_email IS NOT NULL
+         AND prospect_data->>'email_summary_body' IS NOT NULL
+         AND prospect_data->>'email_sent_at' IS NULL
+       ORDER BY last_activity_at ASC
+       LIMIT $1`,
+      [batchSize]
+    );
+
+    if (pending.rows.length === 0) {
+      console.log('✓ No pending summaries awaiting delivery');
+      return 0;
+    }
+
+    console.log(`📧 ${pending.rows.length} finalized session(s) have an undelivered summary — sending now`);
+
+    let delivered = 0;
+    for (const session of pending.rows) {
+      try {
+        const result = await sendLeadGenEmail(session.session_id, { forceGenerate: true });
+        if (result.success) {
+          delivered++;
+          console.log(`✅ Pending summary delivered to ${session.contact_email} (session ${session.session_id})`);
+        } else {
+          console.warn(`⚠️  Pending summary not delivered for ${session.session_id} — ${result.error}`);
+        }
+      } catch (err) {
+        console.error(`❌ Error delivering pending summary for ${session.session_id}:`, err.message);
+      }
+    }
+
+    console.log(`📧 Pending-summary sweep complete: ${delivered}/${pending.rows.length} delivered\n`);
+    return delivered;
+  } catch (err) {
+    // Never let this sweep break the finalization cron — the finalization work
+    // above has already succeeded by the time we get here.
+    console.error('❌ Pending-summary sweep failed:', err.message);
+    return 0;
   }
 }

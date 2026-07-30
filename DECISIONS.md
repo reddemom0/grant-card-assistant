@@ -12,6 +12,68 @@ Format:
 
 ---
 
+## 2026-07-30 — Lead-gen email authorization + Starter booking policy
+
+**Email send authorization.** `hasEmailBody` was a sufficient condition
+to send. The prompt mandates writing `email_summary_body` on the first
+`save_lead_data` call, so the email authorized itself and sent on turn
+one, unrequested — then burned the one-send-per-session lock, blocking
+the prospect's actual request and rendering "Try again" in the widget.
+131 of 194 sends over 60 days had no click anywhere in the session.
+
+Authorization is now: recorded click in `lead_gen_events`, OR
+`cta_selected === 'email_summary'` (strict — malformed blob values must
+not authorize), OR `forceGenerate` (cron). `hasEmailBody` is content
+source only.
+
+`deliverPendingSummaries()` added. Without it the gate would be a
+regression: `finalizeInactiveSessions` selects `WHERE finalized = FALSE`,
+but any session calling `save_lead_data` is finalized at that instant,
+so deferred summaries would have been stranded permanently rather than
+delivered late. 24h recency floor prevents a first-run blast to stale
+leads (verified backlog 30 → 0).
+
+**Starter booking policy.** Per product owner: Granted Starter gets no
+call booking. Enforced server-side via `NO_LINK_PRODUCTS` in
+`booking-link-routing.js` — the single chokepoint covering agent email,
+chat, cron fallback email, and HubSpot note. Prompt is advisory; this
+is not. Thirteen prompt locations offering Starter a call removed (ten
+Starter-specific, three tier-agnostic that reached Starter: the pricing
+deflection and two suggested-question chips).
+
+Starter CTA: `granted.ca/granted-starter` (explainer) then
+`app.getgranted.ca` (signup).
+
+**Product decisions — tier gate (implementation pending):**
+1. Revenue/employee/industry gate is a *precondition* for offering a
+   call, not a replacement for the estimate ladder. Estimate size still
+   decides which product is recommended.
+2. Leads clearing neither bar are Starter. No third bucket.
+3. Form revenue buckets unchanged. `$2.5M – $5M` assigned wholesale as
+   Pro-eligible.
+4. Business age criterion dropped — not collected, and the existing
+   proxy (`is_incorporated_1yr`) is the revenue dropdown relabeled.
+5. Exception industries: 34 of 81 form values (see
+   `PRO_EXCEPTION_INDUSTRIES` — constant not yet created; the validated
+   list is pending implementation).
+
+**Known gaps, deferred:** funding figures in the email are model-authored
+and don't match the deterministic baseline; HubSpot form 400s on every
+website-less lead; empty chat bubbles from tool-narration discard;
+Nonprofit still resolves to a booking link via `getBookingLink`
+fallthrough.
+
+**Impact:** `src/api/lead-gen-finalization.js` (authorization gate,
+`hasSummaryClick`, `email_send_reason` marker, two `[BOOKING-LINK-LEAK]`
+detectors, `deliverPendingSummaries` + `[PENDING-SUMMARY-STALE]` log),
+`src/api/booking-link-routing.js` (`NO_LINK_PRODUCTS`),
+`.claude/skills/lead-gen-variant-b/{system-operations,client-communication}.md`,
+`scripts/smoke-booking-link.js` (two Starter assertions inverted, Pro Lite
+control case added — 57/57). Blocked on the tier gate:
+`employee_count` is clobbered by `save-lead-data.js:139` writing agent
+free text to the form's key (32% of tool-firing sessions), and no test in
+the repo imports `lead-gen-finalization.js`. Uncommitted at time of logging.
+
 ## 2026-07-27 — Lead-gen upgrade send: one tailored summary may supersede a fallback-only send
 **What:** When the only prior email on a session was a cron fallback, exactly one later tailored summary supersedes it — once per session, trigger-agnostic (widget button and natural agent finalization both funnel through `saveLeadData → sendLeadGenEmail`). Send kind tracked as JSONB keys in `prospect_data` (`email_sent_kind: 'fallback'|'agent'`, `email_upgraded_at` = the hard cap). No re-tiering on upgrade — HubSpot PATCH writes the stored `best_fit_product` and tailored `email_summary_body` only. Sends predating the kind marker are deliberately NOT upgrade-eligible (no surprise emails to stale leads). `save_lead_data` now returns a truthful top-level `email_outcome` (`sent`/`upgraded`/`already_sent`/`not_sent`) and the widget renders from it instead of asserting "✓ Summary sent!".
 **Why:** Two intentional features collided. The inactivity cron (Feb 19, `39aa70d8`) plus fallback-on-timeout (Mar 31, `0a6842a5`, driven by 9/9 walk-away users receiving zero emails) spent the one-send budget on a generic template; the duplicate-send guard (Mar 10, `de2afdcd`/`044a4399`), built to enable the summary button, then blocked the tailored summary that button exists to deliver. Production since Feb 19: 137 cron sends, 0 tailored; 8 prospects kept talking after their send; 3 pressed the button and were told it sent when it hadn't. Both original features stay — the fix is the interaction.

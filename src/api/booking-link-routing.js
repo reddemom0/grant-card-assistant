@@ -45,7 +45,17 @@ export class BookingLinkRoutingError extends Error {
   }
 }
 
-const NO_LINK_PRODUCTS = new Set(['Get Granted', 'Not a Fit']);
+// 'Granted Starter' is here by product policy, not by accident: Starter is a
+// self-serve tier and must never be offered a call. Prospects are directed to
+// granted.ca/granted-starter instead. Enforcing it here rather than in the
+// prompt alone means a model slip is stripped rather than delivered — the
+// prompt is advisory, this is not.
+//
+// NOTE: 'Nonprofit' still falls through to the Natalie link below, even though
+// the prompt tells non-profits they get no call. That mismatch predates this
+// change and is left alone deliberately — whether Nonprofit should be call-
+// eligible is an open product question, not something to settle in passing.
+const NO_LINK_PRODUCTS = new Set(['Get Granted', 'Not a Fit', 'Granted Starter']);
 // Note: 'Waitlist' is included for completeness. computeBestFitProduct
 // never returns it — Waitlist is set via HubSpot manual edit or workflows
 // only. This branch fires when those external sources route a lead through

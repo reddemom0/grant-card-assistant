@@ -57,9 +57,11 @@ const cases = [
 
   // ─── natalie-intro tier ──────────────────────────────────────────────────
   {
-    name: 'Granted Starter → Natalie',
+    // Starter is self-serve by product policy — no call, ever. It previously
+    // routed to Natalie; that was the policy violation this asserts against.
+    name: 'Granted Starter → no link (self-serve tier)',
     input: { best_fit_product: 'Granted Starter', industry: 'Accounting' },
-    expect: { link: NATALIE_INTRO_LINK, source: 'natalie-intro', consultantName: null }
+    expect: { link: null, source: 'no-link', consultantName: null }
   },
   {
     name: 'Granted Pro Lite → Natalie',
@@ -161,9 +163,19 @@ const subCases = [
 
   // ─── sentinel substitution (natalie-intro tier) ──────────────────────────
   {
-    name: 'Starter + Accounting + sentinel → Natalie URL (defensive)',
+    // Enforcement, not just prompt guidance: if the model slips and emits a
+    // sentinel for Starter anyway, the paragraph is stripped rather than
+    // rendered into a bookable link.
+    name: 'Starter + sentinel <p> stripped (self-serve tier, email mode)',
     text: '<p>{{BOOKING_LINK}}</p>',
     routing: { best_fit_product: 'Granted Starter', industry: 'Accounting' },
+    opts: { mode: 'email' },
+    expect: ''
+  },
+  {
+    name: 'Granted Pro Lite + sentinel → Natalie URL (still call-eligible)',
+    text: '<p>{{BOOKING_LINK}}</p>',
+    routing: { best_fit_product: 'Granted Pro Lite', industry: 'Accounting' },
     opts: { mode: 'email' },
     expect: `<p>${NATALIE_INTRO_LINK}</p>`
   },
