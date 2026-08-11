@@ -3,6 +3,9 @@ node_modules
 .DS_Store
 dist
 !mcp-servers/gdrive/dist
+
+# Regenerable inventory outputs (already covered by `dist` above; explicit for clarity)
+dist/inventory/
 .vercel
 .memories
 *.log
