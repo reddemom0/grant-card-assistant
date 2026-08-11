@@ -1,0 +1,75 @@
+{
+  "version": 1,
+  "description": "Hand-reviewed corrections to the canonical client list produced by the two AI classification passes. These are human decisions, not model output: they override whatever canonical_name the model assigned to the listed raw folder names. Applied mechanically by the client-list build so they survive any re-run of the pipeline.",
+  "matching": "raw_names are matched on the normalized key produced by normalizeName() in scripts/grants-lib.mjs (trim, strip trailing whitespace and .,;:_-*, collapse internal whitespace, lowercase). The strings below are the folder names exactly as they appear in Dropbox.",
+  "corrections": [
+    {
+      "canonical_name": "Level Ground Trading",
+      "raw_names": [
+        "Level Ground",
+        "Level Ground Coffee",
+        "Level Ground Trading",
+        "Level Ground - Sales Admin",
+        "Level Ground Trading - submitted"
+      ],
+      "source": "hand review 2026-08-11",
+      "note": "The model split these across two canonical companies ('Level Ground' and 'Level Ground Trading'). One company."
+    },
+    {
+      "canonical_name": "Office of McFarlane Biggar Architects + Designers",
+      "raw_names": [
+        "Office of McFarlane",
+        "Office of Mcfarlane (OMB)",
+        "Office of Mcfarlane Biggar Architects + Designers",
+        "office of mcfarlane biggar architects designers"
+      ],
+      "source": "hand review 2026-08-11",
+      "note": "Short form and full firm name were treated as two companies."
+    },
+    {
+      "canonical_name": "Vegpro",
+      "raw_names": [
+        "Vegpro",
+        "Vegpro: Salad Etc",
+        "Salad Etc!",
+        "Salad Etc! (Vegpro)"
+      ],
+      "source": "hand review 2026-08-11",
+      "note": "Salad Etc is a Vegpro brand; the model kept them as separate companies."
+    },
+    {
+      "canonical_name": "Clarus",
+      "raw_names": [
+        "Clarus",
+        "Clarus - oneoff",
+        "Clarus Electrical",
+        "Clarus Eletrical",
+        "Clarus Electric",
+        "Clarus Electric Corp",
+        "Clarus Electronic"
+      ],
+      "source": "hand review 2026-08-11",
+      "note": "'Clarus' and 'Clarus Electrical' are the same company. Extended 2026-08-11 to include 'Clarus Electric' and its spelling variants 'Clarus Electric Corp' (the registered entity name, which HubSpot also carries) and 'Clarus Electronic' (apparent typo). Seven raw folder names, previously spread across five model-assigned canonicals."
+    },
+    {
+      "canonical_name": "TEC",
+      "raw_names": [
+        "TEC",
+        "TEC (One-Off)",
+        "Stenberg (TEC)",
+        "TEC - Stenberg College"
+      ],
+      "source": "hand review 2026-08-11",
+      "note": "The Stenberg-labelled folders belong to TEC; the model created a separate 'Stenberg College'."
+    },
+    {
+      "canonical_name": "Pearl",
+      "raw_names": [
+        "Pearl",
+        "Superprem Industries Ltd (DBA Pearl)"
+      ],
+      "source": "hand review 2026-08-11",
+      "note": "Canonical deliberately flipped away from the legal name. Nearly every file sits under 'Pearl' and the GCs know the client as Pearl; 'Superprem Industries Ltd' is the registered entity behind it."
+    }
+  ]
+}
