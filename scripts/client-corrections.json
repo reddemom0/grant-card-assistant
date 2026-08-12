@@ -70,6 +70,1029 @@
       ],
       "source": "hand review 2026-08-11",
       "note": "Canonical deliberately flipped away from the legal name. Nearly every file sits under 'Pearl' and the GCs know the client as Pearl; 'Superprem Industries Ltd' is the registered entity behind it."
+    },
+    {
+      "canonical_name": "Nightingale Electrical",
+      "raw_names": [
+        "Nightingale Electrical",
+        "Nightingale Electrical Ltd"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Nightingale Electrical\" (328), \"Nightingale Electrical Ltd\" (16)."
+    },
+    {
+      "canonical_name": "Carmanah Technologies",
+      "raw_names": [
+        "Carmanah",
+        "Carmanah Technologies Corp"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Carmanah Technologies\" (272), \"Carmanah Technologies Corp\" (8)."
+    },
+    {
+      "canonical_name": "Fernie Brewing",
+      "raw_names": [
+        "Fernie Brewing 2016",
+        "Fernie Brewing",
+        "Fernie Brewing Co.",
+        "Fernie Brewing Company"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"Fernie Brewing\" (264), \"Fernie Brewing Co.\" (4), \"Fernie Brewing Company\" (1)."
+    },
+    {
+      "canonical_name": "PHL Capital",
+      "raw_names": [
+        "PHL Capital",
+        "PHL Capital Corp",
+        "PHL Capital Co"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"PHL Capital\" (230), \"PHL Capital Corp\" (24), \"PHL Capital Co\" (15)."
+    },
+    {
+      "canonical_name": "Taymor Industries",
+      "raw_names": [
+        "Taymor Industries",
+        "Taymor Industries Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Taymor Industries\" (164), \"Taymor Industries Ltd.\" (103)."
+    },
+    {
+      "canonical_name": "The Acorn",
+      "raw_names": [
+        "The Acorn",
+        "The Acorn-Abandoned",
+        "Acorn"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"The Acorn\" (146), \"Acorn\" (113)."
+    },
+    {
+      "canonical_name": "Mayne",
+      "raw_names": [
+        "Mayne Inc",
+        "Mayne"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Mayne Inc.\" (210), \"Mayne\" (23)."
+    },
+    {
+      "canonical_name": "Modern Purair",
+      "raw_names": [
+        "Modern Purair",
+        "Modern PURAIR Headquarters",
+        "Moder PurAir",
+        "Modern PURAIR Inc"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Modern Purair\" (221), \"Modern PURAIR Inc\" (8)."
+    },
+    {
+      "canonical_name": "Fine Choice Foods",
+      "raw_names": [
+        "Fine Choice Foods",
+        "Fine Choice Foods Ltd"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Fine Choice Foods\" (196), \"Fine Choice Foods Ltd\" (4)."
+    },
+    {
+      "canonical_name": "Mak Physiotherapist",
+      "raw_names": [
+        "Mak Physiotherapist Co.",
+        "Mak Physiotherapist",
+        "Mak Physiotherapist Corp"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"Mak Physiotherapist Co.\" (100), \"Mak Physiotherapist\" (57), \"Mak Physiotherapist Corp.\" (36)."
+    },
+    {
+      "canonical_name": "The Artona Group",
+      "raw_names": [
+        "The Artona Group",
+        "Artona Group"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"The Artona Group\" (114), \"Artona Group\" (61)."
+    },
+    {
+      "canonical_name": "Capital City News / Overstory Media",
+      "raw_names": [
+        "Capital City News:Overstory Media",
+        "Capital City News (Overstory Media)"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Capital City News / Overstory Media\" (156), \"Capital City News (Overstory Media)\" (3)."
+    },
+    {
+      "canonical_name": "Maven Consulting",
+      "raw_names": [
+        "Maven Consulting",
+        "Maven Consulting Limited"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Maven Consulting\" (145), \"Maven Consulting Limited\" (5)."
+    },
+    {
+      "canonical_name": "Grace & Stella",
+      "raw_names": [
+        "Grace & Stella",
+        "Grace&Stella",
+        "Grace and Stella"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Grace & Stella\" (117), \"Grace and Stella\" (14)."
+    },
+    {
+      "canonical_name": "The Answer Company",
+      "raw_names": [
+        "The Answer Company",
+        "The Answer Co",
+        "Answer Co."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"The Answer Company\" (92), \"The Answer Co\" (25), \"Answer Co.\" (11)."
+    },
+    {
+      "canonical_name": "The Cheerful Pelvis",
+      "raw_names": [
+        "The Cheerful Pelvis",
+        "Cheerful Pelvis"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"The Cheerful Pelvis\" (112), \"Cheerful Pelvis\" (13)."
+    },
+    {
+      "canonical_name": "Metropolitan Fine Printers",
+      "raw_names": [
+        "Metropolitan Fine Printers",
+        "Metropolitan Fine Printers Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Metropolitan Fine Printers\" (88), \"Metropolitan Fine Printers Inc.\" (23)."
+    },
+    {
+      "canonical_name": "A & B Dental",
+      "raw_names": [
+        "A & B Dental",
+        "A&B Dental"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"A & B Dental\" (62), \"A&B Dental\" (49)."
+    },
+    {
+      "canonical_name": "NGX Interactive",
+      "raw_names": [
+        "NGX Interactive",
+        "NGX Interactive Inc"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"NGX Interactive\" (104), \"NGX Interactive Inc\" (1)."
+    },
+    {
+      "canonical_name": "Simpli Assets",
+      "raw_names": [
+        "Simpli Assets",
+        "Simpli Assets Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Simpli Assets\" (67), \"Simpli Assets Ltd.\" (30)."
+    },
+    {
+      "canonical_name": "Mellenger Interactive",
+      "raw_names": [
+        "Mellenger Interactive Ltd.",
+        "Mellenger Interactive",
+        "Mellenger Interactive Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"Mellenger Interactive Ltd.\" (66), \"Mellenger Interactive\" (17), \"Mellenger Interactive Inc.\" (4)."
+    },
+    {
+      "canonical_name": "Tenisci Piva",
+      "raw_names": [
+        "Tenisci Piva",
+        "Tenisci Piva LLP"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Tenisci Piva\" (75), \"Tenisci Piva LLP\" (10)."
+    },
+    {
+      "canonical_name": "Keystone Environmental",
+      "raw_names": [
+        "Keystone Environmental",
+        "Keystone Environmental Ltd"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Keystone Environmental\" (63), \"Keystone Environmental Ltd\" (22)."
+    },
+    {
+      "canonical_name": "Meitou",
+      "raw_names": [
+        "Meitou",
+        "Meitou Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Meitou\" (52), \"Meitou Inc.\" (30)."
+    },
+    {
+      "canonical_name": "The Arbor",
+      "raw_names": [
+        "The Arbor",
+        "The Arbor-Abandoned",
+        "Arbor"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"The Arbor\" (50), \"Arbor\" (31)."
+    },
+    {
+      "canonical_name": "Belleisle Fishing Co. Ltd.",
+      "raw_names": [
+        "Belleisle Fishing Co. Ltd.",
+        "Belleisle Fishing Co."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Belleisle Fishing Co. Ltd.\" (66), \"Belleisle Fishing Co.\" (8)."
+    },
+    {
+      "canonical_name": "Wind Sun Sky Entertainment",
+      "raw_names": [
+        "Wind Sun Sky Entertainment",
+        "Wind Sun Sky Ent. Inc",
+        "Wind Sun Sky Entertainment Co."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"Wind Sun Sky Entertainment\" (58), \"Wind Sun Sky Entertainment Inc.\" (13), \"Wind Sun Sky Entertainment Co.\" (3)."
+    },
+    {
+      "canonical_name": "Northam Law",
+      "raw_names": [
+        "Northam Law Corporation",
+        "Northam Law"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Northam Law Corporation\" (51), \"Northam Law\" (15)."
+    },
+    {
+      "canonical_name": "Vitae Apparel",
+      "raw_names": [
+        "Vitae Apparel",
+        "Vitae Apparel Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Vitae Apparel\" (38), \"Vitae Apparel Inc.\" (27)."
+    },
+    {
+      "canonical_name": "Stas Holdings",
+      "raw_names": [
+        "Stas Holdings",
+        "Stas Holdings Inc. (holds Final Touch)"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Stas Holdings\" (38), \"Stas Holdings Inc.\" (25)."
+    },
+    {
+      "canonical_name": "Remedi Wellness and Spa Ltd.",
+      "raw_names": [
+        "Remedi Wellness and Spa Ltd.",
+        "Remedi Wellness & Spa Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Remedi Wellness and Spa Ltd.\" (59), \"Remedi Wellness & Spa Ltd.\" (2)."
+    },
+    {
+      "canonical_name": "Premium Fence",
+      "raw_names": [
+        "Premium Fence",
+        "Premium Fence:Concept House:Kurt",
+        "Preimum Fence",
+        "Premium Fence Co.",
+        "Premium Fence Company"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"Premium Fence\" (29), \"Premium Fence Co.\" (24), \"Premium Fence Company\" (7)."
+    },
+    {
+      "canonical_name": "PG Group Management",
+      "raw_names": [
+        "PGGROUP Management LTD",
+        "PGGroup Management"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"PG Group Management Ltd\" (37), \"PG Group Management\" (21)."
+    },
+    {
+      "canonical_name": "CH Robinson",
+      "raw_names": [
+        "CH Robinson",
+        "C.H. Robinson"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"CH Robinson\" (54), \"C.H. Robinson\" (2)."
+    },
+    {
+      "canonical_name": "Andrea Rodman Interiors",
+      "raw_names": [
+        "Andrea Rodman Interiors",
+        "Andrea Rodman Interiors Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Andrea Rodman Interiors\" (53), \"Andrea Rodman Interiors Inc.\" (1)."
+    },
+    {
+      "canonical_name": "Invoke Media",
+      "raw_names": [
+        "Invoke Media",
+        "Invoke Media Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Invoke Media\" (49), \"Invoke Media Inc.\" (5)."
+    },
+    {
+      "canonical_name": "Director's Guild",
+      "raw_names": [
+        "Director's Guild",
+        "Directors Guild"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Director's Guild\" (47), \"Directors Guild\" (7)."
+    },
+    {
+      "canonical_name": "Cartems",
+      "raw_names": [
+        "Cartems",
+        "Cartem's"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Cartems\" (39), \"Cartem's\" (11)."
+    },
+    {
+      "canonical_name": "Clir Renewables",
+      "raw_names": [
+        "Clir Renewables",
+        "Clir Renewables Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Clir Renewables\" (48), \"Clir Renewables Inc.\" (1)."
+    },
+    {
+      "canonical_name": "Primex Manufacturing",
+      "raw_names": [
+        "Primex Manufacturing",
+        "Primex Manufacturing Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Primex Manufacturing\" (30), \"Primex Manufacturing Ltd.\" (18)."
+    },
+    {
+      "canonical_name": "Colony Construction",
+      "raw_names": [
+        "Colony Construction",
+        "Colony Construction Corporation"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Colony Construction\" (39), \"Colony Construction Corporation\" (8)."
+    },
+    {
+      "canonical_name": "PS&CO",
+      "raw_names": [
+        "PS&CO",
+        "PS & CO",
+        "PSandCo"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"PS&CO\" (30), \"PS & CO\" (17)."
+    },
+    {
+      "canonical_name": "Multi-Power",
+      "raw_names": [
+        "Multi-Power",
+        "Multi Power"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Multi-Power\" (40), \"Multi Power\" (5)."
+    },
+    {
+      "canonical_name": "Mubarak Restaurant",
+      "raw_names": [
+        "Mubarak Restaurant",
+        "Mubarak Restaurant Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Mubarak Restaurant\" (42), \"Mubarak Restaurant Ltd.\" (2)."
+    },
+    {
+      "canonical_name": "Hook & Ladder",
+      "raw_names": [
+        "Hook & Ladder",
+        "Hook and Ladder"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Hook & Ladder\" (34), \"Hook and Ladder\" (9)."
+    },
+    {
+      "canonical_name": "TW Hawes",
+      "raw_names": [
+        "TW Hawes Inc",
+        "TW Hawes"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"TW Hawes Inc\" (28), \"TW Hawes\" (14)."
+    },
+    {
+      "canonical_name": "Wakefield Productions",
+      "raw_names": [
+        "Wakefield Productions Inc.",
+        "Wakefield Productions"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Wakefield Productions Inc.\" (32), \"Wakefield Productions\" (9)."
+    },
+    {
+      "canonical_name": "Northam Beverages",
+      "raw_names": [
+        "Northam Beverages",
+        "Northam Beverages Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Northam Beverages\" (26), \"Northam Beverages Ltd.\" (15)."
+    },
+    {
+      "canonical_name": "Myro Sales",
+      "raw_names": [
+        "Myro Sales Inc.",
+        "Myro Sales"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Myro Sales Inc.\" (20), \"Myro Sales\" (19)."
+    },
+    {
+      "canonical_name": "Kerrisdale Group",
+      "raw_names": [
+        "Kerrisdale Group",
+        "The Kerrisdale Group"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Kerrisdale Group\" (38), \"The Kerrisdale Group\" (1)."
+    },
+    {
+      "canonical_name": "Workshop Vegetarian",
+      "raw_names": [
+        "Workshop Vegetarian",
+        "The Workshop Vegetarian",
+        "The Workshop Vegetarian Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 3 canonical entries differing only by legal suffix, punctuation, or spacing: \"Workshop Vegetarian\" (27), \"The Workshop Vegetarian\" (8), \"The Workshop Vegetarian Ltd.\" (3)."
+    },
+    {
+      "canonical_name": "Refrigerative Supply",
+      "raw_names": [
+        "Refrigerative Supply",
+        "Refrigerative Supply Limited"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Refrigerative Supply\" (21), \"Refrigerative Supply Limited\" (16)."
+    },
+    {
+      "canonical_name": "Pivot and Pilot",
+      "raw_names": [
+        "Pivot and Pilot",
+        "Pivot & Pilot"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Pivot and Pilot\" (33), \"Pivot & Pilot\" (4)."
+    },
+    {
+      "canonical_name": "Key Marketing",
+      "raw_names": [
+        "Key Marketing",
+        "Key Marketing Ltd"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Key Marketing\" (33), \"Key Marketing Ltd\" (0)."
+    },
+    {
+      "canonical_name": "Great Canadian Landscaping",
+      "raw_names": [
+        "Great Canadian Landscaping Company",
+        "Great Canadian Landscaping"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Great Canadian Landscaping Company\" (29), \"Great Canadian Landscaping\" (4)."
+    },
+    {
+      "canonical_name": "OVOU",
+      "raw_names": [
+        "OVOU",
+        "Ovou Inc"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"OVOU\" (29), \"Ovou Inc\" (3)."
+    },
+    {
+      "canonical_name": "Bells & Whistles",
+      "raw_names": [
+        "Bells & Whistles",
+        "Bells and Whistles"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Bells & Whistles\" (25), \"Bells and Whistles\" (6)."
+    },
+    {
+      "canonical_name": "SISU",
+      "raw_names": [
+        "SISU",
+        "Sisu Inc"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"SISU\" (21), \"Sisu Inc\" (9)."
+    },
+    {
+      "canonical_name": "MountainBerry Landscaping",
+      "raw_names": [
+        "MountainBerry Landscaping",
+        "Mountainberry Landscaping Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"MountainBerry Landscaping\" (24), \"Mountainberry Landscaping Ltd.\" (2)."
+    },
+    {
+      "canonical_name": "Scoli Clinic",
+      "raw_names": [
+        "Scoli Clinic",
+        "The Scoli Clinic"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Scoli Clinic\" (26), \"The Scoli Clinic\" (0)."
+    },
+    {
+      "canonical_name": "Beacon Collective",
+      "raw_names": [
+        "Beacon Collective",
+        "The Beacon Collective"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Beacon Collective\" (21), \"The Beacon Collective\" (5)."
+    },
+    {
+      "canonical_name": "Jaeny Baik Media",
+      "raw_names": [
+        "Jaeny Baik Media",
+        "Jaeny Baik Media Inc"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Jaeny Baik Media\" (18), \"Jaeny Baik Media Inc.\" (7)."
+    },
+    {
+      "canonical_name": "Zhao & Associates",
+      "raw_names": [
+        "Zhao & Associates",
+        "Zhao and Associates"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Zhao & Associates\" (16), \"Zhao and Associates\" (9)."
+    },
+    {
+      "canonical_name": "Legacy Family Office at Assante Financial Management",
+      "raw_names": [
+        "Legacy Family Office at Assante Financial Management Ltd.",
+        "Legacy Family Office at Assante Financial Management"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Legacy Family Office at Assante Financial Management Ltd.\" (19), \"Legacy Family Office at Assante Financial Management\" (4)."
+    },
+    {
+      "canonical_name": "PrairieCoast Equipment",
+      "raw_names": [
+        "PrairieCoast Equipment",
+        "PrairieCoast Equipment Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"PrairieCoast Equipment\" (16), \"PrairieCoast Equipment Inc.\" (6)."
+    },
+    {
+      "canonical_name": "DentX Solutions Inc",
+      "raw_names": [
+        "DentX Solutions Inc (QC)",
+        "DentX Solutions Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"DentX Solutions Inc\" (15), \"DentX Solutions Inc.\" (7)."
+    },
+    {
+      "canonical_name": "Brix and Mortar",
+      "raw_names": [
+        "Brix and Mortar",
+        "Brix & Mortar"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Brix and Mortar\" (19), \"Brix & Mortar\" (1)."
+    },
+    {
+      "canonical_name": "Satya Organics",
+      "raw_names": [
+        "Satya Organics Inc",
+        "Satya Organics"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Satya Organics Inc.\" (14), \"Satya Organics\" (5)."
+    },
+    {
+      "canonical_name": "Moonshine Mama's",
+      "raw_names": [
+        "Moonshine Mama's",
+        "Moonshine Mamas"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Moonshine Mama's\" (11), \"Moonshine Mamas\" (8)."
+    },
+    {
+      "canonical_name": "Smash & Tess",
+      "raw_names": [
+        "Smash & Tess",
+        "Smash and Tess"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Smash & Tess\" (11), \"Smash and Tess\" (8)."
+    },
+    {
+      "canonical_name": "Keith Jack",
+      "raw_names": [
+        "Keith Jack",
+        "Keith Jack Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Keith Jack\" (16), \"Keith Jack Inc.\" (2)."
+    },
+    {
+      "canonical_name": "Mendoza Physiotherapist",
+      "raw_names": [
+        "Mendoza Phisiotherpist",
+        "Mendoza Physiotherapist Co."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Mendoza Physiotherapist\" (9), \"Mendoza Physiotherapist Co.\" (9)."
+    },
+    {
+      "canonical_name": "Kindred Studio",
+      "raw_names": [
+        "Kindred Studio",
+        "The Kindred Studio"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Kindred Studio\" (9), \"The Kindred Studio\" (9)."
+    },
+    {
+      "canonical_name": "Dynamix Agitators",
+      "raw_names": [
+        "Dynamix Agitators",
+        "Dynamix Agitators Inc"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Dynamix Agitators\" (13), \"Dynamix Agitators Inc\" (3)."
+    },
+    {
+      "canonical_name": "Enginuity Consulting",
+      "raw_names": [
+        "Enginuity Consulting",
+        "Enginuity Consulting Ltd."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Enginuity Consulting\" (7), \"Enginuity Consulting Ltd.\" (7)."
+    },
+    {
+      "canonical_name": "Blume / Ellebox",
+      "raw_names": [
+        "Blume : Ellebox",
+        "Blume-Ellebox"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Blume / Ellebox\" (10), \"Blume-Ellebox\" (3)."
+    },
+    {
+      "canonical_name": "Victory Square Technologies",
+      "raw_names": [
+        "Victory Square Technologies",
+        "Victory Square Technologies Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Victory Square Technologies\" (7), \"Victory Square Technologies Inc.\" (4)."
+    },
+    {
+      "canonical_name": "The Woods Spirit Company",
+      "raw_names": [
+        "The Woods Spirit Company",
+        "Woods Spirit Company"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"The Woods Spirit Company\" (9), \"Woods Spirit Company\" (2)."
+    },
+    {
+      "canonical_name": "E3 Eco Group",
+      "raw_names": [
+        "E3 Eco Group",
+        "E3 Eco Group Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"E3 Eco Group\" (5), \"E3 Eco Group Inc.\" (5)."
+    },
+    {
+      "canonical_name": "AJK Consulting",
+      "raw_names": [
+        "AJK Consulting Inc",
+        "AJK Consulting"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"AJK Consulting Inc\" (9), \"AJK Consulting\" (1)."
+    },
+    {
+      "canonical_name": "Urbane Luxury Services",
+      "raw_names": [
+        "Urbane Luxury Services",
+        "Urbane Luxury Services Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Urbane Luxury Services\" (6), \"Urbane Luxury Services Inc.\" (4)."
+    },
+    {
+      "canonical_name": "BC Food and Beverage",
+      "raw_names": [
+        "BC Food And Beverage",
+        "BC Food & Beverage"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"BC Food and Beverage\" (7), \"BC Food & Beverage\" (1)."
+    },
+    {
+      "canonical_name": "HRx Technology",
+      "raw_names": [
+        "HRx Technology Inc",
+        "HRx Technology"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"HRx Technology Inc.\" (5), \"HRx Technology\" (1)."
+    },
+    {
+      "canonical_name": "Clementine Natural Health",
+      "raw_names": [
+        "Clementine (1)",
+        "Clementine Natural Health Inc",
+        "Clementine Natural Health"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Clementine Natural Health Inc\" (4), \"Clementine Natural Health\" (1)."
+    },
+    {
+      "canonical_name": "Sand and Sea Design",
+      "raw_names": [
+        "Sand and Sea Design Company",
+        "Sand and Sea Design"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Sand and Sea Design Company\" (4), \"Sand and Sea Design\" (1)."
+    },
+    {
+      "canonical_name": "Dominion NewEnergy",
+      "raw_names": [
+        "Dominion NewEnergy",
+        "Dominion Newenergy Inc."
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Dominion NewEnergy\" (3), \"Dominion Newenergy Inc.\" (2)."
+    },
+    {
+      "canonical_name": "Practical Coaching",
+      "raw_names": [
+        "Practical Coaching",
+        "Practical Coaching Ltd"
+      ],
+      "source": "tier 1 split audit 2026-08-11",
+      "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Practical Coaching\" (2), \"Practical Coaching Ltd\" (1)."
     }
-  ]
+  ],
+  "deferred": {
+    "description": "Canonical pairs that differ ONLY by \"Group\" or \"Holdings\". Not merged: a Group or Holdings entity may be a legally distinct company, so merging would be a business assertion rather than a spelling fix. Pending confirmation from Nat or a GC. These files still migrate — they simply land as separate client folders.",
+    "source": "tier 1 split audit 2026-08-11",
+    "pairs": [
+      {
+        "names": [
+          "AME",
+          "AME Group"
+        ],
+        "files": [
+          256,
+          112
+        ],
+        "total_files": 368,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Strategex",
+          "Strategex Group"
+        ],
+        "files": [
+          325,
+          4
+        ],
+        "total_files": 329,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Trotman Auto Group",
+          "Trotman Auto"
+        ],
+        "files": [
+          76,
+          70
+        ],
+        "total_files": 146,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Artona Group",
+          "Artona"
+        ],
+        "files": [
+          61,
+          54
+        ],
+        "total_files": 115,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Capital City News",
+          "Capital City News Group Ltd."
+        ],
+        "files": [
+          64,
+          47
+        ],
+        "total_files": 111,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Smile Innovations Group",
+          "Smile Innovations"
+        ],
+        "files": [
+          103,
+          7
+        ],
+        "total_files": 110,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Horizon Contracting",
+          "Horizon Contracting Group"
+        ],
+        "files": [
+          51,
+          7
+        ],
+        "total_files": 58,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Maven",
+          "Maven Group"
+        ],
+        "files": [
+          30,
+          14
+        ],
+        "total_files": 44,
+        "reason": "differs only by Group/Holdings, and bare \"maven\" must not absorb a named sibling — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Mount Pleasant Dental",
+          "Mount Pleasant Dental Group"
+        ],
+        "files": [
+          28,
+          9
+        ],
+        "total_files": 37,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "E3 Eco",
+          "E3 Eco Group"
+        ],
+        "files": [
+          30,
+          5
+        ],
+        "total_files": 35,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "E3 Eco",
+          "E3 Eco Group Inc."
+        ],
+        "files": [
+          30,
+          5
+        ],
+        "total_files": 35,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Global Alignment Group",
+          "Global Alignment"
+        ],
+        "files": [
+          30,
+          0
+        ],
+        "total_files": 30,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Kerry Vega Group",
+          "Kerry Vega"
+        ],
+        "files": [
+          15,
+          1
+        ],
+        "total_files": 16,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Northam Group",
+          "Northam"
+        ],
+        "files": [
+          12,
+          1
+        ],
+        "total_files": 13,
+        "reason": "differs only by Group/Holdings, and bare \"northam\" must not absorb a named sibling — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Notaco",
+          "Notaco Holdings"
+        ],
+        "files": [
+          10,
+          2
+        ],
+        "total_files": 12,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Kids Physio",
+          "Kids Physio Group"
+        ],
+        "files": [
+          7,
+          1
+        ],
+        "total_files": 8,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Noel Asmar Group",
+          "Noel Asmar"
+        ],
+        "files": [
+          5,
+          2
+        ],
+        "total_files": 7,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
+          "Kitchen Table Group",
+          "Kitchen Table"
+        ],
+        "files": [
+          3,
+          1
+        ],
+        "total_files": 4,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      }
+    ]
+  }
 }

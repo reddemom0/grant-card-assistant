@@ -1,6 +1,6 @@
 # Final Client List
 
-**Generated:** 2026-08-11T20:29:52.979Z
+**Generated:** 2026-08-12T01:53:55.149Z
 **Inputs:** `dist/inventory/resolved-final.csv`, `scripts/client-corrections.json`
 **Output:** `dist/inventory/clients-final.csv` (gitignored — regenerable)
 **Method:** mechanical. No API call of any kind. The six corrections are hand-review decisions applied as data.
@@ -11,12 +11,12 @@ This is the list the pilot runs against.
 
 | | |
 |---|---|
-| **Canonical companies** | **1,847** |
+| **Canonical companies** | **1,752** |
 | Raw client folder names behind them | 1,962 |
 | Files under client names | 70,725 (93.1% of the tree) |
-| Companies with >1 raw folder name | 88 |
-| Live | 1,063 companies, 57,866 files |
-| Archive-only | 760 companies, 12,859 files |
+| Companies with >1 raw folder name | 167 |
+| Live | 1,005 companies, 58,078 files |
+| Archive-only | 725 companies, 12,647 files |
 
 ---
 
@@ -24,7 +24,7 @@ This is the list the pilot runs against.
 
 Recorded in `scripts/client-corrections.json` (version-controlled) so they survive any re-run of the pipeline. Each is matched on the normalized folder-name key, so they keep applying even if file counts shift.
 
-Canonical company count: **1,855 → 1,847** (−8; the six corrections collapsed 14 model-assigned canonicals into 6).
+Canonical company count: **1,855 → 1,752** (−103; the six corrections collapsed 199 model-assigned canonicals into 93).
 
 | # | Canonical after correction | Raw folder names merged | Files | Was |
 |---|---|---|---|---|
@@ -34,6 +34,93 @@ Canonical company count: **1,855 → 1,847** (−8; the six corrections collapse
 | 4 | **Clarus** | `Clarus Electric` (277)<br>`Clarus` (193)<br>`Clarus Electrical` (49)<br>`Clarus Electric Corp` (26)<br>`Clarus Electronic` (8)<br>`Clarus Eletrical` (2)<br>`Clarus - oneoff` (1) | **556** | `Clarus`, `Clarus Electrical`, `Clarus Electric`, `Clarus Electric Corp`, `Clarus Electronic` |
 | 5 | **TEC** | `TEC (One-Off)` (143)<br>`TEC` (68)<br>`Stenberg (TEC)` (26)<br>`TEC - Stenberg College` (20) | **257** | `TEC`, `Stenberg College` |
 | 6 | **Pearl** | `Pearl` (366)<br>`Superprem Industries Ltd (DBA Pearl)` (1) | **367** | `Superprem Industries Ltd` |
+| 7 | **Nightingale Electrical** | `Nightingale Electrical` (328)<br>`Nightingale Electrical Ltd` (16) | **344** | `Nightingale Electrical`, `Nightingale Electrical Ltd` |
+| 8 | **Carmanah Technologies** | `Carmanah` (272)<br>`Carmanah Technologies Corp` (8) | **280** | `Carmanah Technologies`, `Carmanah Technologies Corp` |
+| 9 | **Fernie Brewing** | `Fernie Brewing 2016` (245)<br>`Fernie Brewing` (19)<br>`Fernie Brewing Co.` (4)<br>`Fernie Brewing Company` (1) | **269** | `Fernie Brewing`, `Fernie Brewing Co.`, `Fernie Brewing Company` |
+| 10 | **PHL Capital** | `PHL Capital` (230)<br>`PHL Capital Corp` (24)<br>`PHL Capital Co` (15) | **269** | `PHL Capital`, `PHL Capital Corp`, `PHL Capital Co` |
+| 11 | **Taymor Industries** | `Taymor Industries` (164)<br>`Taymor Industries Ltd.` (103) | **267** | `Taymor Industries`, `Taymor Industries Ltd.` |
+| 12 | **The Acorn** | `The Acorn` (142)<br>`Acorn` (113)<br>`The Acorn-Abandoned` (4) | **259** | `The Acorn`, `Acorn` |
+| 13 | **Mayne** | `Mayne Inc` (210)<br>`Mayne` (23) | **233** | `Mayne Inc.`, `Mayne` |
+| 14 | **Modern Purair** | `Modern Purair` (209)<br>`Modern PURAIR Headquarters` (9)<br>`Modern PURAIR Inc` (8)<br>`Moder PurAir` (3) | **229** | `Modern Purair`, `Modern PURAIR`, `Modern PurAir`, `Modern PURAIR Inc` |
+| 15 | **Fine Choice Foods** | `Fine Choice Foods` (196)<br>`Fine Choice Foods Ltd` (4) | **200** | `Fine Choice Foods`, `Fine Choice Foods Ltd` |
+| 16 | **Mak Physiotherapist** | `Mak Physiotherapist Co.` (100)<br>`Mak Physiotherapist` (57)<br>`Mak Physiotherapist Corp` (36) | **193** | `Mak Physiotherapist Co.`, `Mak Physiotherapist`, `Mak Physiotherapist Corp.` |
+| 17 | **The Artona Group** | `The Artona Group` (114)<br>`Artona Group` (61) | **175** | `The Artona Group`, `Artona Group` |
+| 18 | **Capital City News / Overstory Media** | `Capital City News:Overstory Media` (156)<br>`Capital City News (Overstory Media)` (3) | **159** | `Capital City News / Overstory Media`, `Capital City News (Overstory Media)` |
+| 19 | **Maven Consulting** | `Maven Consulting` (145)<br>`Maven Consulting Limited` (5) | **150** | `Maven Consulting`, `Maven Consulting Limited` |
+| 20 | **Grace & Stella** | `Grace & Stella` (107)<br>`Grace and Stella` (14)<br>`Grace&Stella` (10) | **131** | `Grace & Stella`, `Grace and Stella` |
+| 21 | **The Answer Company** | `The Answer Company` (92)<br>`The Answer Co` (25)<br>`Answer Co.` (11) | **128** | `The Answer Company`, `The Answer Co`, `Answer Co.` |
+| 22 | **The Cheerful Pelvis** | `The Cheerful Pelvis` (112)<br>`Cheerful Pelvis` (13) | **125** | `The Cheerful Pelvis`, `Cheerful Pelvis` |
+| 23 | **Metropolitan Fine Printers** | `Metropolitan Fine Printers` (88)<br>`Metropolitan Fine Printers Inc.` (23) | **111** | `Metropolitan Fine Printers`, `Metropolitan Fine Printers Inc.` |
+| 24 | **A & B Dental** | `A & B Dental` (62)<br>`A&B Dental` (49) | **111** | `A & B Dental`, `A&B Dental` |
+| 25 | **NGX Interactive** | `NGX Interactive` (104)<br>`NGX Interactive Inc` (1) | **105** | `NGX Interactive`, `NGX Interactive Inc` |
+| 26 | **Simpli Assets** | `Simpli Assets` (67)<br>`Simpli Assets Ltd.` (30) | **97** | `Simpli Assets`, `Simpli Assets Ltd.` |
+| 27 | **Mellenger Interactive** | `Mellenger Interactive Ltd.` (66)<br>`Mellenger Interactive` (17)<br>`Mellenger Interactive Inc.` (4) | **87** | `Mellenger Interactive Ltd.`, `Mellenger Interactive`, `Mellenger Interactive Inc.` |
+| 28 | **Tenisci Piva** | `Tenisci Piva` (75)<br>`Tenisci Piva LLP` (10) | **85** | `Tenisci Piva`, `Tenisci Piva LLP` |
+| 29 | **Keystone Environmental** | `Keystone Environmental` (63)<br>`Keystone Environmental Ltd` (22) | **85** | `Keystone Environmental`, `Keystone Environmental Ltd` |
+| 30 | **Meitou** | `Meitou` (52)<br>`Meitou Inc.` (30) | **82** | `Meitou`, `Meitou Inc.` |
+| 31 | **The Arbor** | `The Arbor` (45)<br>`Arbor` (31)<br>`The Arbor-Abandoned` (5) | **81** | `The Arbor`, `Arbor` |
+| 32 | **Belleisle Fishing Co. Ltd.** | `Belleisle Fishing Co. Ltd.` (66)<br>`Belleisle Fishing Co.` (8) | **74** | `Belleisle Fishing Co. Ltd.`, `Belleisle Fishing Co.` |
+| 33 | **Wind Sun Sky Entertainment** | `Wind Sun Sky Entertainment` (58)<br>`Wind Sun Sky Ent. Inc` (13)<br>`Wind Sun Sky Entertainment Co.` (3) | **74** | `Wind Sun Sky Entertainment`, `Wind Sun Sky Entertainment Inc.`, `Wind Sun Sky Entertainment Co.` |
+| 34 | **Northam Law** | `Northam Law Corporation` (51)<br>`Northam Law` (15) | **66** | `Northam Law Corporation`, `Northam Law` |
+| 35 | **Vitae Apparel** | `Vitae Apparel` (38)<br>`Vitae Apparel Inc.` (27) | **65** | `Vitae Apparel`, `Vitae Apparel Inc.` |
+| 36 | **Stas Holdings** | `Stas Holdings` (38)<br>`Stas Holdings Inc. (holds Final Touch)` (25) | **63** | `Stas Holdings`, `Stas Holdings Inc.` |
+| 37 | **Remedi Wellness and Spa Ltd.** | `Remedi Wellness and Spa Ltd.` (59)<br>`Remedi Wellness & Spa Ltd.` (2) | **61** | `Remedi Wellness and Spa Ltd.`, `Remedi Wellness & Spa Ltd.` |
+| 38 | **Premium Fence** | `Premium Fence` (28)<br>`Premium Fence Co.` (24)<br>`Premium Fence Company` (7)<br>`Premium Fence:Concept House:Kurt` (1)<br>`Preimum Fence` (0) | **60** | `Premium Fence`, `Premium Fence Co.`, `Premium Fence Company` |
+| 39 | **PG Group Management** | `PGGROUP Management LTD` (37)<br>`PGGroup Management` (21) | **58** | `PG Group Management Ltd`, `PG Group Management` |
+| 40 | **CH Robinson** | `CH Robinson` (54)<br>`C.H. Robinson` (2) | **56** | `CH Robinson`, `C.H. Robinson` |
+| 41 | **Andrea Rodman Interiors** | `Andrea Rodman Interiors` (53)<br>`Andrea Rodman Interiors Inc.` (1) | **54** | `Andrea Rodman Interiors`, `Andrea Rodman Interiors Inc.` |
+| 42 | **Invoke Media** | `Invoke Media` (49)<br>`Invoke Media Inc.` (5) | **54** | `Invoke Media`, `Invoke Media Inc.` |
+| 43 | **Director's Guild** | `Director's Guild` (47)<br>`Directors Guild` (7) | **54** | `Director's Guild`, `Directors Guild` |
+| 44 | **Cartems** | `Cartems` (39)<br>`Cartem's` (11) | **50** | `Cartems`, `Cartem's` |
+| 45 | **Clir Renewables** | `Clir Renewables` (48)<br>`Clir Renewables Inc.` (1) | **49** | `Clir Renewables`, `Clir Renewables Inc.` |
+| 46 | **Primex Manufacturing** | `Primex Manufacturing` (30)<br>`Primex Manufacturing Ltd.` (18) | **48** | `Primex Manufacturing`, `Primex Manufacturing Ltd.` |
+| 47 | **Colony Construction** | `Colony Construction` (39)<br>`Colony Construction Corporation` (8) | **47** | `Colony Construction`, `Colony Construction Corporation` |
+| 48 | **PS&CO** | `PS&CO` (30)<br>`PS & CO` (15)<br>`PSandCo` (2) | **47** | `PS&CO`, `PS & CO`, `PS & Co` |
+| 49 | **Multi-Power** | `Multi-Power` (40)<br>`Multi Power` (5) | **45** | `Multi-Power`, `Multi Power` |
+| 50 | **Mubarak Restaurant** | `Mubarak Restaurant` (42)<br>`Mubarak Restaurant Ltd.` (2) | **44** | `Mubarak Restaurant`, `Mubarak Restaurant Ltd.` |
+| 51 | **Hook & Ladder** | `Hook & Ladder` (34)<br>`Hook and Ladder` (9) | **43** | `Hook & Ladder`, `Hook and Ladder` |
+| 52 | **TW Hawes** | `TW Hawes Inc` (28)<br>`TW Hawes` (14) | **42** | `TW Hawes Inc`, `TW Hawes` |
+| 53 | **Wakefield Productions** | `Wakefield Productions Inc.` (32)<br>`Wakefield Productions` (9) | **41** | `Wakefield Productions Inc.`, `Wakefield Productions` |
+| 54 | **Northam Beverages** | `Northam Beverages` (26)<br>`Northam Beverages Ltd.` (15) | **41** | `Northam Beverages`, `Northam Beverages Ltd.` |
+| 55 | **Myro Sales** | `Myro Sales Inc.` (20)<br>`Myro Sales` (19) | **39** | `Myro Sales Inc.`, `Myro Sales` |
+| 56 | **Kerrisdale Group** | `Kerrisdale Group` (38)<br>`The Kerrisdale Group` (1) | **39** | `Kerrisdale Group`, `The Kerrisdale Group` |
+| 57 | **Workshop Vegetarian** | `Workshop Vegetarian` (27)<br>`The Workshop Vegetarian` (8)<br>`The Workshop Vegetarian Ltd.` (3) | **38** | `Workshop Vegetarian`, `The Workshop Vegetarian`, `The Workshop Vegetarian Ltd.` |
+| 58 | **Refrigerative Supply** | `Refrigerative Supply` (21)<br>`Refrigerative Supply Limited` (16) | **37** | `Refrigerative Supply`, `Refrigerative Supply Limited` |
+| 59 | **Pivot and Pilot** | `Pivot and Pilot` (33)<br>`Pivot & Pilot` (4) | **37** | `Pivot and Pilot`, `Pivot & Pilot` |
+| 60 | **Key Marketing** | `Key Marketing` (33)<br>`Key Marketing Ltd` (0) | **33** | `Key Marketing`, `Key Marketing Ltd` |
+| 61 | **Great Canadian Landscaping** | `Great Canadian Landscaping Company` (29)<br>`Great Canadian Landscaping` (4) | **33** | `Great Canadian Landscaping Company`, `Great Canadian Landscaping` |
+| 62 | **OVOU** | `OVOU` (29)<br>`Ovou Inc` (3) | **32** | `OVOU`, `Ovou Inc` |
+| 63 | **Bells & Whistles** | `Bells & Whistles` (25)<br>`Bells and Whistles` (6) | **31** | `Bells & Whistles`, `Bells and Whistles` |
+| 64 | **SISU** | `SISU` (21)<br>`Sisu Inc` (9) | **30** | `SISU`, `Sisu Inc` |
+| 65 | **MountainBerry Landscaping** | `MountainBerry Landscaping` (24)<br>`Mountainberry Landscaping Ltd.` (2) | **26** | `MountainBerry Landscaping`, `Mountainberry Landscaping Ltd.` |
+| 66 | **Scoli Clinic** | `Scoli Clinic` (26)<br>`The Scoli Clinic` (0) | **26** | `Scoli Clinic`, `The Scoli Clinic` |
+| 67 | **Beacon Collective** | `Beacon Collective` (21)<br>`The Beacon Collective` (5) | **26** | `Beacon Collective`, `The Beacon Collective` |
+| 68 | **Jaeny Baik Media** | `Jaeny Baik Media` (18)<br>`Jaeny Baik Media Inc` (7) | **25** | `Jaeny Baik Media`, `Jaeny Baik Media Inc.` |
+| 69 | **Zhao & Associates** | `Zhao & Associates` (16)<br>`Zhao and Associates` (9) | **25** | `Zhao & Associates`, `Zhao and Associates` |
+| 70 | **Legacy Family Office at Assante Financial Management** | `Legacy Family Office at Assante Financial Management Ltd.` (19)<br>`Legacy Family Office at Assante Financial Management` (4) | **23** | `Legacy Family Office at Assante Financial Management Ltd.`, `Legacy Family Office at Assante Financial Management` |
+| 71 | **PrairieCoast Equipment** | `PrairieCoast Equipment` (16)<br>`PrairieCoast Equipment Inc.` (6) | **22** | `PrairieCoast Equipment`, `PrairieCoast Equipment Inc.` |
+| 72 | **DentX Solutions Inc** | `DentX Solutions Inc (QC)` (15)<br>`DentX Solutions Inc.` (7) | **22** | `DentX Solutions Inc`, `DentX Solutions Inc.` |
+| 73 | **Brix and Mortar** | `Brix and Mortar` (19)<br>`Brix & Mortar` (1) | **20** | `Brix and Mortar`, `Brix & Mortar` |
+| 74 | **Satya Organics** | `Satya Organics Inc` (14)<br>`Satya Organics` (5) | **19** | `Satya Organics Inc.`, `Satya Organics` |
+| 75 | **Moonshine Mama's** | `Moonshine Mama's` (11)<br>`Moonshine Mamas` (8) | **19** | `Moonshine Mama's`, `Moonshine Mamas` |
+| 76 | **Smash & Tess** | `Smash & Tess` (11)<br>`Smash and Tess` (8) | **19** | `Smash & Tess`, `Smash and Tess` |
+| 77 | **Keith Jack** | `Keith Jack` (16)<br>`Keith Jack Inc.` (2) | **18** | `Keith Jack`, `Keith Jack Inc.` |
+| 78 | **Mendoza Physiotherapist** | `Mendoza Phisiotherpist` (9)<br>`Mendoza Physiotherapist Co.` (9) | **18** | `Mendoza Physiotherapist`, `Mendoza Physiotherapist Co.` |
+| 79 | **Kindred Studio** | `Kindred Studio` (9)<br>`The Kindred Studio` (9) | **18** | `Kindred Studio`, `The Kindred Studio` |
+| 80 | **Dynamix Agitators** | `Dynamix Agitators` (13)<br>`Dynamix Agitators Inc` (3) | **16** | `Dynamix Agitators`, `Dynamix Agitators Inc` |
+| 81 | **Enginuity Consulting** | `Enginuity Consulting` (7)<br>`Enginuity Consulting Ltd.` (7) | **14** | `Enginuity Consulting`, `Enginuity Consulting Ltd.` |
+| 82 | **Blume / Ellebox** | `Blume : Ellebox` (10)<br>`Blume-Ellebox` (3) | **13** | `Blume / Ellebox`, `Blume-Ellebox` |
+| 83 | **Victory Square Technologies** | `Victory Square Technologies` (7)<br>`Victory Square Technologies Inc.` (4) | **11** | `Victory Square Technologies`, `Victory Square Technologies Inc.` |
+| 84 | **The Woods Spirit Company** | `The Woods Spirit Company` (9)<br>`Woods Spirit Company` (2) | **11** | `The Woods Spirit Company`, `Woods Spirit Company` |
+| 85 | **E3 Eco Group** | `E3 Eco Group` (5)<br>`E3 Eco Group Inc.` (5) | **10** | `E3 Eco Group`, `E3 Eco Group Inc.` |
+| 86 | **AJK Consulting** | `AJK Consulting Inc` (9)<br>`AJK Consulting` (1) | **10** | `AJK Consulting Inc`, `AJK Consulting` |
+| 87 | **Urbane Luxury Services** | `Urbane Luxury Services` (6)<br>`Urbane Luxury Services Inc.` (4) | **10** | `Urbane Luxury Services`, `Urbane Luxury Services Inc.` |
+| 88 | **BC Food and Beverage** | `BC Food And Beverage` (7)<br>`BC Food & Beverage` (1) | **8** | `BC Food and Beverage`, `BC Food & Beverage` |
+| 89 | **HRx Technology** | `HRx Technology Inc` (5)<br>`HRx Technology` (1) | **6** | `HRx Technology Inc.`, `HRx Technology` |
+| 90 | **Clementine Natural Health** | `Clementine (1)` (3)<br>`Clementine Natural Health Inc` (1)<br>`Clementine Natural Health` (1) | **5** | `Clementine Natural Health Inc`, `Clementine Natural Health` |
+| 91 | **Sand and Sea Design** | `Sand and Sea Design Company` (4)<br>`Sand and Sea Design` (1) | **5** | `Sand and Sea Design Company`, `Sand and Sea Design` |
+| 92 | **Dominion NewEnergy** | `Dominion NewEnergy` (3)<br>`Dominion Newenergy Inc.` (2) | **5** | `Dominion NewEnergy`, `Dominion Newenergy Inc.` |
+| 93 | **Practical Coaching** | `Practical Coaching` (2)<br>`Practical Coaching Ltd` (1) | **3** | `Practical Coaching`, `Practical Coaching Ltd` |
 
 All 23 raw folder names resolved cleanly; every one was already labelled `client`. No correction was partially applied.
 
@@ -109,17 +196,17 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 
 ---
 
-## Live vs archive-only (`client_modified`, 2020-08-11 cutoff)
+## Live vs archive-only (`client_modified`, 2020-08-12 cutoff)
 
 `server_modified` is **not** used: 40,390 files share the single date 2024-07-23 from a bulk Dropbox event, which reports nearly everything as recent regardless of real content age.
 
 | Group | Companies | % | Files | % of client files |
 |---|---|---|---|---|
-| **Live** (a file within 6 years) | 1,063 | 57.6% | 57,866 | 81.8% |
-| **Archive-only** | 760 | 41.1% | 12,859 | 18.2% |
-| No dated files | 24 | 1.3% | 0 | 0% |
+| **Live** (a file within 6 years) | 1,005 | 57.4% | 58,078 | 82.1% |
+| **Archive-only** | 725 | 41.4% | 12,647 | 17.9% |
+| No dated files | 22 | 1.3% | 0 | 0% |
 
-41.1% of companies are archive-only but hold only 18.2% of the files — the tail is old and light.
+41.4% of companies are archive-only but hold only 17.9% of the files — the tail is old and light.
 
 ---
 
@@ -152,8 +239,8 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 | Twin Lions | 2 | 5 | 393 | live |
 | Pearl ✎ | 2 | 13 | 367 | live |
 | Taymor | 2 | 7 | 348 | live |
+| Nightingale Electrical ✎ | 2 | 7 | 344 | live |
 | ICMS | 1 | 10 | 337 | live |
-| Nightingale Electrical | 1 | 7 | 328 | live |
 | Strategex | 1 | 8 | 325 | live |
 | Gunn Consultants | 2 | 14 | 324 | live |
 | Herschel Supply Co. | 1 | 1 | 312 | archive_only |
@@ -163,10 +250,10 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 | Nightingale | 1 | 4 | 291 | live |
 | Coastal Church | 1 | 5 | 288 | live |
 | Coast Spas | 1 | 7 | 285 | live |
+| Carmanah Technologies ✎ | 2 | 1 | 280 | archive_only |
 | Solaris | 1 | 12 | 275 | live |
 | TQ Construction | 2 | 3 | 275 | live |
 | Overstory Media Group | 4 | 4 | 273 | live |
-| Carmanah Technologies | 1 | 1 | 272 | archive_only |
 
 ✎ = hand-corrected. Full list in `dist/inventory/clients-final.csv`.
 
@@ -175,7 +262,7 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 ## Reproducing
 
 ```bash
-node <scratchpad>/build-final-clients.mjs
+node scripts/build-final-clients.mjs
 ```
 
 Reads `dist/inventory/resolved-final.csv` and `scripts/client-corrections.json`, writes two files, makes no network call. To change a merge decision, edit the JSON and re-run — nothing needs re-classifying.
