@@ -14,6 +14,53 @@ import { query } from '../database/connection.js';
 
 const router = Router();
 
+// Only Granted staff may sign in. The `hd` parameter on the consent URL is a
+// convenience hint only — Google does not enforce it and a user can strip it —
+// so the real gate is the server-side domain check in /auth-callback below.
+const ALLOWED_EMAIL_DOMAIN = 'granted.ca';
+
+/** Escape untrusted text before interpolating into an HTML response. */
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Verify a Google profile belongs to the allowed domain.
+ *
+ * Exported for testing.
+ *
+ * Requires EXACTLY one '@' and an exact domain match. Both matter:
+ *   - `endsWith`/`includes` would admit `evilgranted.ca` and `granted.ca.attacker.com`
+ *   - taking the domain after the LAST '@' would admit `attacker@evil.com@granted.ca`
+ *
+ * @param {Object} userInfo - profile from oauth2.userinfo.get()
+ * @returns {{ok: boolean, email: string, reason: string|null}}
+ */
+export function checkAllowedDomain(userInfo) {
+  const email = (userInfo?.email || '').trim().toLowerCase();
+
+  const parts = email.split('@');
+  if (parts.length !== 2 || !parts[0] || !parts[1]) {
+    return { ok: false, email, reason: 'missing or malformed email on Google profile' };
+  }
+
+  // Google only asserts ownership of verified addresses.
+  if (userInfo.verified_email !== true) {
+    return { ok: false, email, reason: 'email not verified by Google' };
+  }
+
+  if (parts[1] !== ALLOWED_EMAIL_DOMAIN) {
+    return { ok: false, email, reason: `domain '${parts[1]}' is not ${ALLOWED_EMAIL_DOMAIN}` };
+  }
+
+  return { ok: true, email, reason: null };
+}
+
 /**
  * POST /api/logout
  * Clears the session cookie
@@ -82,13 +129,17 @@ router.get('/auth-google', (req, res) => {
   console.log('   scope:', scopes);
   console.log('   access_type:', 'offline');
   console.log('   prompt:', 'consent'); // Changed to 'consent' to force refresh token
+  console.log('   hd:', ALLOWED_EMAIL_DOMAIN);
 
+  // hd pre-filters the account chooser to the Granted domain. It is a UX hint,
+  // NOT the security control — /auth-callback re-checks the domain server-side.
   const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
     `client_id=${encodeURIComponent(clientId)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `response_type=code&` +
     `scope=${encodeURIComponent(scopes)}&` +
     `access_type=offline&` +
+    `hd=${encodeURIComponent(ALLOWED_EMAIL_DOMAIN)}&` +
     `prompt=consent`;
 
   console.log('🔵 Full OAuth URL:', googleAuthUrl);
@@ -178,6 +229,30 @@ router.get('/auth-callback', async (req, res) => {
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const { data: userInfo } = await oauth2.userinfo.get();
     console.log('✅ Got user info:', { id: userInfo.id, email: userInfo.email, name: userInfo.name });
+
+    // ========================================================================
+    // DOMAIN GATE — the real access control for signup.
+    // Runs BEFORE the upsert so a rejected account never gets a users row,
+    // and therefore never gets a session.
+    // ========================================================================
+    const domainCheck = checkAllowedDomain(userInfo);
+    if (!domainCheck.ok) {
+      console.warn(`🚫 Sign-in rejected for '${domainCheck.email || '(unknown)'}': ${domainCheck.reason}`);
+      return res.status(403).setHeader('Content-Type', 'text/html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Access Denied</title></head>
+      <body>
+        <h1>Access Denied</h1>
+        <p>The Granted AI Hub is restricted to <strong>@${ALLOWED_EMAIL_DOMAIN}</strong> accounts.</p>
+        <p>You signed in as <strong>${escapeHtml(domainCheck.email) || 'an unrecognized account'}</strong>, which is not eligible.</p>
+        <p>If you are Granted staff, sign in with your @${ALLOWED_EMAIL_DOMAIN} Google account.</p>
+        <p><a href="/api/auth-google">Try a different account</a></p>
+      </body>
+      </html>
+    `);
+    }
+    console.log(`✅ Domain check passed for ${domainCheck.email}`);
 
     // Create or update user in database with OAuth tokens
     console.log('🔵 Creating/updating user in database with OAuth tokens...');

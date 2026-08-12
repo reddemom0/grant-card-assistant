@@ -7,7 +7,12 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { runAgent } from '../claude/client.js';
-import { createConversation, getConversation } from '../database/messages.js';
+import {
+  createConversation,
+  getConversation,
+  getConversationForUser,
+  getConversationMessagesForUser
+} from '../database/messages.js';
 import { isValidAgentType, getAvailableAgents } from '../agents/load-agents.js';
 import { generateAndSaveTitle } from '../utils/conversation-titles.js';
 import { filesAPI } from '../anthropic-client.js';
@@ -32,8 +37,19 @@ export async function handleChatRequest(req, res) {
       attachments = []
     } = req.body;
 
-    // Get userId from authenticated user (set by middleware), not from request body
-    const userId = req.user?.id || null;
+    // Get userId from authenticated user (set by middleware), not from request body.
+    // authenticateUser is non-rejecting (it sets req.user = null and calls next()
+    // on a missing/expired/invalid JWT), so this handler must reject explicitly.
+    // Without this guard, an expired session silently creates a conversation with
+    // user_id = NULL that its owner can then never reach through a scoped read.
+    const userId = req.user?.id;
+
+    if (!userId) {
+      console.log('❌ Rejecting unauthenticated chat request');
+      return res.status(401).json({
+        error: 'Unauthorized: Please log in'
+      });
+    }
 
     // ============================================================================
     // 1. Validate required fields
@@ -77,9 +93,8 @@ export async function handleChatRequest(req, res) {
     let convId = conversationId;
     let isNewConversation = false;
 
-    // Get userId from authenticated user (set by middleware)
-    // If no user is authenticated, use null (anonymous)
-    const effectiveUserId = req.user?.id || null;
+    // Guaranteed non-null by the authentication guard above.
+    const effectiveUserId = userId;
 
     if (!convId) {
       // Create new conversation
@@ -97,10 +112,22 @@ export async function handleChatRequest(req, res) {
         console.error('Failed to generate smart title:', err);
       });
     } else {
-      // Check if conversation exists, create if it doesn't
-      const conversation = await getConversation(convId);
+      // Check if conversation exists AND belongs to this user.
+      const conversation = await getConversationForUser(convId, effectiveUserId);
 
       if (!conversation) {
+        // Either it doesn't exist, or it belongs to someone else. Distinguish
+        // the two with a single unscoped lookup so we never append to another
+        // user's conversation and never create a duplicate of an existing id.
+        const existing = await getConversation(convId);
+
+        if (existing) {
+          console.warn(`🚫 User ${effectiveUserId} attempted to write to conversation ${convId} owned by ${existing.user_id}`);
+          return res.status(403).json({
+            error: 'Forbidden: You do not have access to this conversation'
+          });
+        }
+
         // Conversation ID provided but doesn't exist - create it
         console.log(`📝 Creating new conversation with provided ID: ${convId}`);
         const placeholderTitle = `New ${agentType} Chat`;
@@ -323,27 +350,31 @@ export async function handleGetConversation(req, res) {
 
     console.log(`\n🔍 Loading conversation: ${id} for user ${userId}`);
 
-    const conversation = await getConversation(id);
+    // authenticateUser is non-rejecting, so guard explicitly — same pattern as
+    // handleListConversations below.
+    if (!userId) {
+      console.log('❌ No userId found in session');
+      return res.status(401).json({
+        error: 'Unauthorized: Please log in'
+      });
+    }
 
+    const conversation = await getConversationForUser(id, userId);
+
+    // Return 404 for both "does not exist" and "belongs to another user" so the
+    // response does not confirm the existence of other users' conversations.
     if (!conversation) {
-      console.log(`❌ Conversation not found: ${id}`);
+      console.log(`❌ Conversation not found or not accessible: ${id}`);
       return res.status(404).json({ error: 'Conversation not found' });
     }
 
-    // Get conversation's user_id (Postgres returns snake_case)
-    const conversationUserId = conversation.user_id || conversation.userId;
-
-    console.log(`🔍 Conversation belongs to user: ${conversationUserId} (type: ${typeof conversationUserId})`);
-    console.log(`🔍 Current user: ${userId} (type: ${typeof userId})`);
-
-    // Allow any authenticated user to view conversations (for sharing)
-    // No authorization check - if you have the link and are logged in, you can view it
-    console.log(`✅ Allowing access to conversation ${id} for user ${userId} (sharing enabled)`);
-
-
     // Load messages for this conversation
-    const { getConversationMessages } = await import('../database/messages.js');
-    const messages = await getConversationMessages(id);
+    const messages = await getConversationMessagesForUser(id, userId);
+
+    if (messages === null) {
+      console.log(`❌ Messages not accessible for conversation: ${id}`);
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
 
     console.log(`✅ Loaded conversation ${id} with ${messages.length} messages`);
 
@@ -414,11 +445,15 @@ export async function handleListConversations(req, res) {
 export async function handleDeleteConversation(req, res) {
   try {
     const { id } = req.params;
-    const { userId } = req.body;
+
+    // Authorization must come from the verified session, never from the request
+    // body — a client-supplied userId let any caller delete any conversation by
+    // guessing a sequential SERIAL id.
+    const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(400).json({
-        error: 'Missing required field: userId'
+      return res.status(401).json({
+        error: 'Unauthorized: Please log in'
       });
     }
 
@@ -431,6 +466,16 @@ export async function handleDeleteConversation(req, res) {
     });
   } catch (error) {
     console.error('Delete conversation error:', error);
+
+    // Map authorization/not-found failures to their real status codes instead
+    // of leaking them as 500s.
+    if (error.message?.startsWith('Unauthorized')) {
+      return res.status(403).json({ error: 'Forbidden: You do not have access to this conversation' });
+    }
+    if (error.message === 'Conversation not found') {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
     res.status(500).json({ error: error.message });
   }
 }

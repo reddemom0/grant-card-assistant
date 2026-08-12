@@ -118,6 +118,13 @@ function pruneLeadingOrphans(messages) {
   return [];
 }
 
+/**
+ * @security SYSTEM-ONLY — does NOT enforce ownership.
+ * Do not call from request handlers. Use getConversationMessagesForUser()
+ * anywhere a verified session exists. Legitimate callers are system paths with
+ * no user context: the agent loop history load (src/claude/client.js), CLI
+ * scripts, and unit tests.
+ */
 export async function getConversationMessages(conversationId, maxMessages = 60) {
   try {
     // Retrieve the most recent N messages
@@ -224,6 +231,13 @@ export async function getConversationMessages(conversationId, maxMessages = 60) 
 
 /**
  * Get conversation metadata
+ *
+ * @security SYSTEM-ONLY — does NOT enforce ownership.
+ * Do not call from request handlers. Use getConversationForUser() anywhere a
+ * verified session exists. Legitimate callers are system paths with no user
+ * context: createConversation()'s unique-violation retry, deleteConversation()'s
+ * ownership lookup (which enforces in JS), CLI scripts, and unit tests.
+ *
  * @param {string} conversationId - UUID of the conversation
  * @returns {Promise<Object|null>} Conversation metadata or null
  */
@@ -254,6 +268,97 @@ export async function getConversation(conversationId) {
     console.error('❌ Error retrieving conversation:', error);
     throw error;
   }
+}
+
+/**
+ * Normalize a user id to a positive integer, or throw.
+ * users.id is a Postgres SERIAL, but ids arrive from JSON as either number or
+ * string. Callers must never be able to bypass a check by passing null.
+ * @param {*} userId
+ * @param {string} fnName - for the error message
+ * @returns {number}
+ */
+function requireUserId(userId, fnName) {
+  if (userId === null || userId === undefined || userId === '') {
+    throw new Error(`${fnName} requires a userId from the verified session`);
+  }
+  const normalized = Number(userId);
+  if (!Number.isInteger(normalized)) {
+    throw new Error(`${fnName} received a non-integer userId: ${JSON.stringify(userId)}`);
+  }
+  return normalized;
+}
+
+/**
+ * Get conversation metadata, scoped to the requesting user.
+ *
+ * Mirrors the ownership pattern in listConversations() but for a single row.
+ * Conversations with a NULL owner are grandfathered in: ~1,084 rows lost their
+ * owner to migration 004 (UUID -> INTEGER USING NULL) and to the fail-open auth
+ * middleware, and their true owner is not recoverable from the data. Excluding
+ * them would strand 574 staff conversations that still hold messages.
+ *
+ * @param {string} conversationId - UUID of the conversation
+ * @param {number|string} userId - id from the VERIFIED session (req.user.id)
+ * @returns {Promise<Object|null>} Conversation metadata, or null if it does not
+ *   exist or belongs to another user
+ */
+export async function getConversationForUser(conversationId, userId) {
+  const ownerId = requireUserId(userId, 'getConversationForUser');
+
+  try {
+    const result = await query(
+      `SELECT c.*,
+              COUNT(m.id) as message_count,
+              MAX(m.created_at) as last_message_at
+       FROM conversations c
+       LEFT JOIN messages m ON m.conversation_id = c.id
+       WHERE c.id = $1
+         AND (c.user_id = $2 OR c.user_id IS NULL)
+       GROUP BY c.id`,
+      [conversationId, ownerId]
+    );
+
+    if (result.rows.length === 0) {
+      console.log(`❌ Conversation not found or not owned by user ${ownerId}: ${conversationId}`);
+      return null;
+    }
+
+    return result.rows[0];
+  } catch (error) {
+    console.error('❌ Error retrieving conversation for user:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get conversation messages, scoped to the requesting user.
+ *
+ * Verifies ownership first, then delegates to getConversationMessages() so the
+ * content post-processing (JSON parse, block filtering, orphan pruning) has a
+ * single implementation.
+ *
+ * @param {string} conversationId - UUID of the conversation
+ * @param {number|string} userId - id from the VERIFIED session (req.user.id)
+ * @param {number} maxMessages - maximum messages to retrieve
+ * @returns {Promise<Array|null>} Messages, or null if the conversation does not
+ *   exist or belongs to another user
+ */
+export async function getConversationMessagesForUser(conversationId, userId, maxMessages = 60) {
+  const ownerId = requireUserId(userId, 'getConversationMessagesForUser');
+
+  const owned = await query(
+    `SELECT 1 FROM conversations
+     WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)`,
+    [conversationId, ownerId]
+  );
+
+  if (owned.rows.length === 0) {
+    console.log(`❌ Messages denied — conversation ${conversationId} not owned by user ${ownerId}`);
+    return null;
+  }
+
+  return getConversationMessages(conversationId, maxMessages);
 }
 
 /**
@@ -345,15 +450,32 @@ export async function listConversations(userId, agentType = null, limit = 50) {
  * @returns {Promise<boolean>} True if deleted
  */
 export async function deleteConversation(conversationId, userId) {
+  // Throws on null/undefined/non-integer rather than letting a missing id
+  // slip through the comparison below.
+  const requesterId = requireUserId(userId, 'deleteConversation');
+
   try {
-    // First verify ownership
+    // First verify ownership. getConversation() is unscoped by design here —
+    // the JS comparison below is the enforcement point.
     const conversation = await getConversation(conversationId);
 
     if (!conversation) {
       throw new Error('Conversation not found');
     }
 
-    if (conversation.user_id !== userId) {
+    // Compare as numbers: user_id comes back from pg as an INTEGER while the
+    // requester id may arrive as a JSON string. A strict !== between "5" and 5
+    // would reject the legitimate owner.
+    const ownerId = conversation.user_id === null ? null : Number(conversation.user_id);
+
+    // Deliberate asymmetry with reads: NULL-owner conversations are READABLE
+    // (grandfathered) but never deletable, because deletion is irreversible and
+    // we are actively preserving those rows until ownership can be restored.
+    if (ownerId === null) {
+      throw new Error('Unauthorized: Conversation has no recorded owner and cannot be deleted');
+    }
+
+    if (ownerId !== requesterId) {
       throw new Error('Unauthorized: User does not own this conversation');
     }
 
