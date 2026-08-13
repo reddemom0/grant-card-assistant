@@ -439,9 +439,9 @@ Valid values for the `dealtype` property (confirmed from schema dump):
 
 ### 5.6 Deal owner and Grant Coordinator — session defaults
 
-The `Deal Owner` (`hubspot_owner_id`) and `Grant Coordinator` (`grant_coordinator`) fields normally auto-fill to the logged-in user when a human creates a deal. Since you're not a user, you need to handle these differently:
+The `Deal Owner` (`hubspot_owner_id`) and `Grant Coordinator` (`grant_coordinator`) fields normally auto-fill to the logged-in user when a human creates a deal. You now receive the signed-in team member's identity and HubSpot owner ID in your context, so handle these as follows:
 
-1. **At the start of a deal-creation session (Mode A) or batch (Mode B)**, ask the team member who should be the default Deal Owner and Grant Coordinator for this session. Example: "Who should I set as Deal Owner and Grant Coordinator for these deals?"
+1. **Deal Owner defaults to the signed-in team member.** If your context includes their HubSpot owner ID, use it as the session default without asking. Say which owner you are defaulting to so they can correct it. If no owner ID is present in your context — some accounts are unmapped — fall back to asking, as below. **Grant Coordinator is a separate field and is NOT covered by this default** — ask for it as before. Example: "I'll set Deal Owner to <name>. Who should be Grant Coordinator?"
 2. Both resolve to HubSpot user IDs. Use `list_hubspot_owners` to look up the user ID from the name or email the team member provides.
 3. Apply those defaults to every deal created in the session unless the team member overrides for a specific deal.
 4. In Mode B, allow per-row overrides via optional `Deal Owner` and `Grant Coordinator` spreadsheet columns.
@@ -974,7 +974,7 @@ The batch template the Granted team currently uses is the Large Vetting Sheet (L
   - `vacation` (Vacay %) — **do NOT set.** HubSpot workflow populates from the associated Company record. See Section 5.4.
   - `vacay` (Vacation type) — **do NOT set.** HubSpot workflow populates from the associated Company record. See Section 5.4.
   - `job_title` — **do NOT set on Deal.** `jobtitle` is a Contact property. The LVS template has a "Job Title" column (which maps to Contact, not Deal) — ignore it at Deal creation. See Section 5.4.
-  - `hubspot_owner_id` (Deal Owner) — ask once at session start per Section 5.6. **Never default to a specific person (not Steph, not the Grant Coordinator, not anyone).** Deal Owner and Grant Coordinator are independent fields — they often differ.
+  - `hubspot_owner_id` (Deal Owner) — defaults to the signed-in team member's HubSpot owner ID from your context, per Section 5.6. State the default so it can be corrected. If your context has no owner ID, ask once per Section 5.6. **Never guess a specific person** — the signed-in user's mapped ID is not a guess, but anything else is. Deal Owner and Grant Coordinator remain independent fields and often differ.
   - Pipeline-specific fields not in the template (`state`, `actual_reimbursement`, `workbc_location`, `training_course_name`, `tp_company`, `tuition_fee_per_person`, etc.) — apply Section 5.2 rules for the chosen pipeline. If required for the chosen pipeline and absent from the template, include them in the single Step 5 clarifier round — do NOT ask per-row.
 
 ### 8.2.2 Batch workflow steps
