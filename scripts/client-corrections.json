@@ -1123,6 +1123,84 @@
       ],
       "source": "strategy reports review 2026-08-12",
       "note": "One company written three ways: the Grants canonicals \"New World Tech\" and \"New World Technologies\", plus the Strategy Reports folder \"New World Technology\". \"New World Technologies (Rad Torque)\" is deliberately EXCLUDED — the parenthetical suggests a distinct entity; it is recorded in the deferred block."
+    },
+    {
+      "canonical_name": "Keystone Environmental",
+      "raw_names": [
+        "Keystone Environmental",
+        "Keystone Environmental Ltd",
+        "Keystone"
+      ],
+      "source": "stem merge 2026-08-13",
+      "note": "Stem \"Keystone\" (900 files) and full name \"Keystone Environmental\" (85 files) are one company. The stem prefixes no canonical other than this one, so there is no competing claim. Surfaced by the live/archived split, where the two landed on opposite sides."
+    },
+    {
+      "canonical_name": "Taymor Industries",
+      "raw_names": [
+        "Taymor Industries",
+        "Taymor Industries Ltd.",
+        "Taymor",
+        "Taymor (1)"
+      ],
+      "source": "stem merge 2026-08-13",
+      "note": "Stem \"Taymor\" (348 files) and full name \"Taymor Industries\" (267 files) are one company. The stem prefixes no canonical other than this one, so there is no competing claim. Surfaced by the live/archived split, where the two landed on opposite sides."
+    },
+    {
+      "canonical_name": "Debrand Services Inc.",
+      "raw_names": [
+        "Debrand Services Inc.",
+        "Debrand"
+      ],
+      "source": "stem merge 2026-08-13",
+      "note": "Stem \"Debrand\" (263 files) and full name \"Debrand Services Inc.\" (43 files) are one company. The stem prefixes no canonical other than this one, so there is no competing claim. Surfaced by the live/archived split, where the two landed on opposite sides."
+    },
+    {
+      "canonical_name": "Regehr Contracting Ltd",
+      "raw_names": [
+        "Regehr Contracting Ltd.",
+        "Regehr"
+      ],
+      "source": "stem merge 2026-08-13",
+      "note": "Stem \"Regehr\" (205 files) and full name \"Regehr Contracting Ltd\" (55 files) are one company. The stem prefixes no canonical other than this one, so there is no competing claim. Surfaced by the live/archived split, where the two landed on opposite sides."
+    },
+    {
+      "canonical_name": "ClearDent",
+      "raw_names": [
+        "ClearDent",
+        "Prococious Technology Inc. (DBA ClearDent)"
+      ],
+      "source": "client identity 2026-08-13",
+      "note": "One company, two canonicals. A single HubSpot record covers it — \"Prococious Technology Inc. (DBA ClearDent)\", active, domain cleardent.com — so the legal entity and the DBA are the same business. Canonical is \"ClearDent\": that is what the GCs call it and where the 501 files sit. \"Precocious\" vs \"Prococious\" is a typo in one source, not a second company."
+    },
+    {
+      "canonical_name": "Nightingale Electrical",
+      "raw_names": [
+        "Nightingale Electrical",
+        "Nightingale Electrical Ltd",
+        "Nightingale Electric",
+        "Nightingale"
+      ],
+      "source": "client identity 2026-08-13",
+      "note": "One company written three ways. \"Nightingale Electrical\" (344) and \"Nightingale Electric\" (16) are one character apart and both matched the same active HubSpot company; the bare stem \"Nightingale\" (291) prefixes no canonical other than these two. Merged in two stages: the two full names first, then the stem into the result."
+    },
+    {
+      "canonical_name": "Blume",
+      "raw_names": [
+        "Blume",
+        "Blume (Ellebox)",
+        "Blume : Ellebox",
+        "Blume-Ellebox"
+      ],
+      "source": "client identity 2026-08-13",
+      "note": "Same DBA-wrapper shape as ClearDent. The active HubSpot record \"Blume\" carries Legal Business Name \"ElleBoxCo Inc.\" and domain blume.com, so ElleBoxCo is the legal entity and Blume the operating name. The canonical \"Blume\" already absorbs the raw folder \"Blume (Ellebox)\", and no standalone \"Ellebox\" canonical exists anywhere in the tree. Canonical is \"Blume\"."
+    },
+    {
+      "canonical_name": "Blume",
+      "raw_names": [
+        "Elleboxco (Blume)"
+      ],
+      "source": "blume knock-on 2026-08-13",
+      "note": "Last remaining Blume variant. HubSpot's active record carries Legal Business Name \"ElleBoxCo Inc.\" with domain blume.com, so ElleBoxCo is the legal entity and Blume the operating name — the same evidence that merged \"Blume / Ellebox\". Folds into the existing \"Blume\" correction from client identity 2026-08-13."
     }
   ],
   "deferred": {

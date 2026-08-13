@@ -36,7 +36,12 @@ const JOINT = new Map([
   ['taimuri:capstone', ['Taimuri', 'Capstone']],
   ['admin slayer:spring planning', ['Admin Slayer', 'Spring Planning']],
   ['madison builders:e2 + associates', ['Madison Builders', 'E2+ Associates']],
-  ['blume : ellebox', ['Blume', 'Ellebox']],
+  // REMOVED 2026-08-13: 'blume : ellebox' was a provisional colon-triage call
+  // that read the folder as two clients. It is one company — HubSpot's active
+  // record carries Legal Business Name "ElleBoxCo Inc." with domain blume.com,
+  // so ElleBoxCo is the legal entity and Blume the operating name. All four
+  // Blume raw folder names now resolve to the single canonical "Blume"
+  // (326 files). Leaving the entry here would dual-file one company's folder.
   ['pure+:nineteen02 kombucha', ['Pure+', 'Nineteen02 Kombucha']],
   ['capital city:overstory', ['Capital City', 'Overstory']],
   ['premium fence:concept house:kurt', ['Premium Fence', 'Concept House']],

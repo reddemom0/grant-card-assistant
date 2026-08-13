@@ -1,6 +1,6 @@
 # Final Client List
 
-**Generated:** 2026-08-13T17:24:22.265Z
+**Generated:** 2026-08-13T18:37:17.389Z
 **Inputs:** `dist/inventory/resolved-final.csv`, `scripts/client-corrections.json`
 **Output:** `dist/inventory/clients-final.csv` (gitignored — regenerable)
 **Method:** mechanical. No API call of any kind. The six corrections are hand-review decisions applied as data.
@@ -11,12 +11,12 @@ This is the list the pilot runs against.
 
 | | |
 |---|---|
-| **Canonical companies** | **1,749** |
+| **Canonical companies** | **1,740** |
 | Raw client folder names behind them | 1,962 |
 | Files under client names | 70,725 (93.1% of the tree) |
-| Companies with >1 raw folder name | 170 |
-| Live | 1,000 companies, 58,051 files |
-| Archive-only | 727 companies, 12,674 files |
+| Companies with >1 raw folder name | 171 |
+| Live | 992 companies, 58,064 files |
+| Archive-only | 726 companies, 12,661 files |
 
 ---
 
@@ -24,7 +24,7 @@ This is the list the pilot runs against.
 
 Recorded in `scripts/client-corrections.json` (version-controlled) so they survive any re-run of the pipeline. Each is matched on the normalized folder-name key, so they keep applying even if file counts shift.
 
-Canonical company count: **1,855 → 1,749** (−106; the six corrections collapsed 224 model-assigned canonicals into 115).
+Canonical company count: **1,855 → 1,740** (−115; the six corrections collapsed 244 model-assigned canonicals into 123).
 
 | # | Canonical after correction | Raw folder names merged | Files | Was |
 |---|---|---|---|---|
@@ -143,6 +143,14 @@ Canonical company count: **1,855 → 1,749** (−106; the six corrections collap
 | 113 | **Clearmind International Institute** | `Clearmind` (74)<br>`Clearmind International Institute` (15) | **89** | `Clearmind`, `Clearmind International Institute` |
 | 114 | **Abilities Rehabilitation** | `Abilities Rehabilitation` (18)<br>`Abilities Rehab` (10) | **28** | `Abilities Rehab`, `Abilities Rehabilitation` |
 | 115 | **New World Technologies** | `New World Tech` (18)<br>`New World Technologies` (3) | **21** | `New World Tech`, `New World Technologies` |
+| 116 | **Keystone Environmental** | `Keystone` (900)<br>`Keystone Environmental` (63)<br>`Keystone Environmental Ltd` (22) | **985** | `Keystone Environmental`, `Keystone Environmental Ltd`, `Keystone` |
+| 117 | **Taymor Industries** | `Taymor` (346)<br>`Taymor Industries` (164)<br>`Taymor Industries Ltd.` (103)<br>`Taymor (1)` (2) | **615** | `Taymor Industries`, `Taymor Industries Ltd.`, `Taymor` |
+| 118 | **Debrand Services Inc.** | `Debrand` (263)<br>`Debrand Services Inc.` (43) | **306** | `Debrand Services Inc.`, `Debrand` |
+| 119 | **Regehr Contracting Ltd** | `Regehr` (205)<br>`Regehr Contracting Ltd.` (55) | **260** | `Regehr Contracting Ltd`, `Regehr` |
+| 120 | **ClearDent** | `ClearDent` (501)<br>`Prococious Technology Inc. (DBA ClearDent)` (2) | **503** | `ClearDent`, `Precocious Technology Inc. (DBA ClearDent)` |
+| 121 | **Nightingale Electrical** | `Nightingale Electrical` (328)<br>`Nightingale` (291)<br>`Nightingale Electrical Ltd` (16)<br>`Nightingale Electric` (16) | **651** | `Nightingale Electrical`, `Nightingale Electrical Ltd`, `Nightingale Electric`, `Nightingale` |
+| 122 | **Blume** | `Blume` (306)<br>`Blume : Ellebox` (10)<br>`Blume (Ellebox)` (3)<br>`Blume-Ellebox` (3) | **322** | `Blume`, `Blume / Ellebox`, `Blume-Ellebox` |
+| 123 | **Blume** | `Elleboxco (Blume)` (4) | **4** | `Elleboxco (Blume)` |
 
 All 23 raw folder names resolved cleanly; every one was already labelled `client`. No correction was partially applied.
 
@@ -224,11 +232,11 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 
 | Group | Companies | % | Files | % of client files |
 |---|---|---|---|---|
-| **Live** (a file within 6 years) | 1,000 | 57.2% | 58,051 | 82.1% |
-| **Archive-only** | 727 | 41.6% | 12,674 | 17.9% |
+| **Live** (a file within 6 years) | 992 | 57.0% | 58,064 | 82.1% |
+| **Archive-only** | 726 | 41.7% | 12,661 | 17.9% |
 | No dated files | 22 | 1.3% | 0 | 0% |
 
-41.6% of companies are archive-only but hold only 17.9% of the files — the tail is old and light.
+41.7% of companies are archive-only but hold only 17.9% of the files — the tail is old and light.
 
 ---
 
@@ -238,21 +246,23 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 |---|---|---|---|---|
 | Kirmac | 1 | 5 | 1,299 | live |
 | Caliber | 3 | 9 | 1,185 | live |
-| Keystone | 1 | 22 | 900 | live |
+| Keystone Environmental ✎ | 3 | 22 | 985 | live |
 | Spare Labs | 2 | 19 | 802 | live |
 | Horizon | 2 | 7 | 780 | live |
 | Left Coast Naturals | 2 | 5 | 724 | live |
 | Level Ground Trading ✎ | 5 | 13 | 706 | live |
 | Trotman | 1 | 3 | 664 | live |
+| Nightingale Electrical ✎ | 4 | 7 | 651 | live |
 | SAAM Towage | 1 | 9 | 651 | live |
 | Musora | 1 | 12 | 631 | live |
 | Ledcor | 1 | 3 | 621 | live |
+| Taymor Industries ✎ | 4 | 7 | 615 | live |
 | Fresh Prep | 1 | 14 | 590 | live |
 | Clarus ✎ | 7 | 8 | 556 | live |
 | Native Shoes | 1 | 16 | 521 | live |
 | Bittered Sling | 2 | 1 | 507 | archive_only |
+| ClearDent ✎ | 2 | 15 | 503 | live |
 | ProCogia | 1 | 24 | 502 | live |
-| ClearDent | 1 | 15 | 501 | live |
 | Clir | 1 | 16 | 485 | live |
 | Houston Landscapes | 1 | 6 | 463 | live |
 | Creator Co | 1 | 20 | 443 | live |
@@ -260,16 +270,14 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 | Intercity Packers | 1 | 1 | 421 | archive_only |
 | Twin Lions | 2 | 5 | 393 | live |
 | Pearl ✎ | 2 | 13 | 367 | live |
-| Taymor | 2 | 7 | 348 | live |
-| Nightingale Electrical ✎ | 2 | 7 | 344 | live |
 | ICMS | 1 | 10 | 337 | live |
+| Blume ✎ | 5 | 13 | 326 | live |
 | Strategex | 1 | 8 | 325 | live |
 | Gunn Consultants | 2 | 14 | 324 | live |
 | Herschel Supply Co. | 1 | 1 | 312 | archive_only |
-| Blume | 2 | 13 | 309 | live |
 | Primex | 1 | 4 | 308 | live |
+| Debrand Services Inc. ✎ | 2 | 13 | 306 | live |
 | Major Tom | 1 | 14 | 304 | live |
-| Nightingale | 1 | 4 | 291 | live |
 | Coastal Church | 1 | 5 | 288 | live |
 | Coast Spas | 1 | 7 | 285 | live |
 | Carmanah Technologies ✎ | 2 | 1 | 280 | archive_only |

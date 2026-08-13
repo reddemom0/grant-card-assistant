@@ -1,6 +1,6 @@
 # CanExport Pilot — Phase 1
 
-**Generated:** 2026-08-11T21:52:34.261Z
+**Generated:** 2026-08-13T18:38:34.223Z
 **Inputs:** `dist/inventory/grants-inventory.csv`, `dist/inventory/clients-final.csv`, `dist/inventory/resolved-final.csv`
 **Output:** `dist/inventory/canexport-mapping.csv` (gitignored — regenerable)
 **Nothing was copied, renamed, or moved.** This is a proposal for review.
@@ -123,7 +123,7 @@ The 15 widest spreads:
 | Hatchways | 4 | 2020–2023 | 2020:5, 2021:31, 2022:7, 2023:1 |
 | Spare Labs | 3 | 2020–2022 | 2020:38, 2021:10, 2022:8 |
 | Fatso Peanut Butter | 3 | 2019–2022 | 2019:6, 2020:35, 2022:5 |
-| Clearmind | 3 | 2021–2023 | 2021:18, 2022:14, 2023:2 |
+| Clearmind International Institute | 3 | 2021–2023 | 2021:18, 2022:14, 2023:2 |
 | ProCogia | 3 | 2021–2023 | 2021:19, 2022:7, 2023:4 |
 | RTOWN | 3 | 2020–2022 | 2020:5, 2021:18, 2022:4 |
 | Paintillio | 3 | 2021–2023 | 2021:15, 2022:9, 2023:3 |
@@ -265,12 +265,12 @@ Preserving the sub-path is what makes that true, and the difference is measurabl
 
 | Route | Prior run | This run | Change |
 |---|---|---|---|
-| sort | 0 | 1,259 | +1259 |
-| program | 0 | 128 | +128 |
-| archive | 0 | 87 | +87 |
-| review | 0 | 45 | +45 |
+| sort | 1,259 | 1,259 | none |
+| program | 128 | 128 | none |
+| archive | 87 | 87 | none |
+| review | 45 | 45 | none |
 
-**The split changed, as intended by Part B.** The new `program` route took 128 rows, and `review` fell by -45 — the same files, re-routed. `sort` and `archive` are untouched. Conservation check: 128 moved out of review, review dropped by -45 — **they do not match — investigate**.
+**Unchanged.** Only the destination string was rewritten; the routing rules and the client list are identical.
 
 ---
 
@@ -280,8 +280,8 @@ First five `sort` rows, verbatim from the CSV:
 
 ```
 /Granted Team Folder/SALES/Grants/CanExport/Clients/Clearmind/2022 Application/Claims/Claim #3/Clearmind Claim #3.xlsx
-  -> Clearmind/CanExport/2022/2022 Application/Claims/Claim #3/Clearmind Claim #3.xlsx
-     client=Clearmind | year=2022 | high | client match high confidence
+  -> Clearmind International Institute/CanExport/2022/2022 Application/Claims/Claim #3/Clearmind Claim #3.xlsx
+     client=Clearmind International Institute | year=2022 | high | client match high confidence
 /Granted Team Folder/SALES/Grants/CanExport/Clients/Capstone Canada/2023/Interview : Budget/chat.txt
   -> Capstone Canada/CanExport/2023/Interview - Budget/chat.txt
      client=Capstone Canada | year=2023 | high | client match high confidence
