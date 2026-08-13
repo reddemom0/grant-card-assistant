@@ -51,6 +51,9 @@ import {
   handleDeleteConversation
 } from './src/api/chat.js';
 
+// Google Chat adapter for Oracle (verifies Google-signed tokens itself)
+import { handleGoogleChatEvent } from './src/api/chat-google.js';
+
 // Lead-gen chatbot (public — no auth)
 import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js';
 import { handleLeadGenInit } from './src/api/lead-gen-init.js';
@@ -406,6 +409,11 @@ app.get('/api/test-email', authenticateUser, requireAuth, testEmailHandler);
 
 // Main chat endpoint (SSE streaming) - with authentication
 app.post('/api/chat', authenticateUser, handleChatRequest);
+
+// Google Chat adapter for Oracle. Deliberately NOT behind authenticateUser:
+// Chat authenticates with its own Google-signed bearer token, verified inside
+// the handler before any side effect. Runs the same agent loop as /api/chat.
+app.post('/api/chat/google', handleGoogleChatEvent);
 
 // Conversation management - with authentication
 app.get('/api/conversations/:id', authenticateUser, handleGetConversation);
@@ -1259,6 +1267,15 @@ async function startServer() {
       console.error('🚨 HUBSPOT_WORKFLOW_TOKEN is NOT SET — /api/hubspot-webhook will reject ALL requests, including real HubSpot workflow events. Lead enrichment is disabled until this is configured.');
     } else {
       console.log('✅ HubSpot webhook token configured');
+    }
+
+    // The Google Chat adapter verifies inbound requests against this audience
+    // (the app's HTTP endpoint URL). Unset means the endpoint fails closed and
+    // rejects every Chat event, so say so rather than failing silently.
+    if (!process.env.GOOGLE_CHAT_AUDIENCE) {
+      console.warn('⚠️  GOOGLE_CHAT_AUDIENCE is not set — /api/chat/google will reject ALL requests. Set it to the Chat app\'s configured HTTP endpoint URL.');
+    } else {
+      console.log('✅ Google Chat adapter configured');
     }
 
     // Log test mode status

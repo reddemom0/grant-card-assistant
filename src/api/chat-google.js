@@ -1,0 +1,365 @@
+/**
+ * Google Chat adapter for Oracle
+ *
+ * A thin transport. Chat event in -> resolve identity -> run the SAME agent
+ * loop the Hub uses -> post the reply back into the space. Oracle's prompt,
+ * tools and behaviour are untouched; nothing here is Chat-specific except
+ * verification, identity resolution and text formatting.
+ *
+ * Precedent: src/api/hubspot-webhook.js drives internal-oracle headlessly with
+ * `res: null`. Every SSE emitter in the agent loop is null-guarded, so the loop
+ * runs identically without an HTTP response object.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO
+ * - No streaming or progressive message edits (decided against for Phase 1).
+ * - No change to POST /api/chat or to the agent loop itself.
+ */
+
+import { google } from 'googleapis';
+import { v5 as uuidv5 } from 'uuid';
+import crypto from 'crypto';
+import { runAgent } from '../claude/client.js';
+import { createConversation } from '../database/messages.js';
+import { query } from '../database/connection.js';
+
+// Google signs every inbound Chat request with this service account.
+const CHAT_ISSUER = 'chat@system.gserviceaccount.com';
+
+// Chat's API caps a message at 32,000 bytes, but the Chat UI truncates display
+// around 4,096 characters. Split well under the display limit so nothing is
+// hidden from the reader.
+const MAX_CHUNK_CHARS = 3500;
+
+// Reused across requests; holds Google's cached signing certs.
+const oauthClient = new google.auth.OAuth2();
+
+/**
+ * Verify the request genuinely came from Google Chat.
+ *
+ * We use the "HTTP endpoint URL" audience mode, so the bearer is an OIDC ID
+ * token whose `aud` is our exact endpoint URL. That binds the token to this
+ * endpoint — a token minted for a different Chat app in the same Cloud project
+ * cannot be replayed here.
+ *
+ * @param {import('express').Request} req
+ * @returns {Promise<{ok: boolean, reason: string|null}>} reason never contains the token
+ */
+async function verifyChatRequest(req) {
+  const audience = process.env.GOOGLE_CHAT_AUDIENCE;
+
+  // Fail closed when unconfigured, rather than defaulting to allow.
+  if (typeof audience !== 'string' || audience.length === 0) {
+    return { ok: false, reason: 'GOOGLE_CHAT_AUDIENCE not configured' };
+  }
+
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return { ok: false, reason: 'missing bearer token' };
+  }
+
+  const idToken = header.slice('Bearer '.length).trim();
+  if (!idToken) {
+    return { ok: false, reason: 'empty bearer token' };
+  }
+
+  try {
+    const ticket = await oauthClient.verifyIdToken({ idToken, audience });
+    const payload = ticket.getPayload();
+
+    if (payload?.email_verified !== true || payload?.email !== CHAT_ISSUER) {
+      return { ok: false, reason: 'token not issued by Google Chat' };
+    }
+    return { ok: true, reason: null };
+  } catch (err) {
+    // Signature, audience, and expiry failures all land here.
+    return { ok: false, reason: `token verification failed: ${err.message}` };
+  }
+}
+
+/**
+ * Resolve the Chat sender to a Hub user. Exported for testing.
+ * @param {string} email
+ * @returns {Promise<Object|null>} users row, or null when unknown/inactive
+ */
+export async function resolveUser(email) {
+  if (!email) return null;
+  const r = await query(
+    `SELECT id, email, name, is_active, google_refresh_token
+     FROM users
+     WHERE LOWER(email) = LOWER($1) AND is_active = true`,
+    [email.trim()]
+  );
+  return r.rows[0] || null;
+}
+
+/**
+ * Map a Chat thread to a stable Oracle conversation UUID. Exported for testing.
+ *
+ * Deterministic (uuid v5) rather than stored in a mapping table: the same
+ * thread always yields the same UUID, and createConversation is idempotent, so
+ * no extra table and no migration are needed.
+ *
+ * Falls back to the space when a thread is absent, which makes a DM one
+ * continuous conversation.
+ *
+ * @param {Object} event
+ * @returns {{conversationId: string, key: string}}
+ */
+export function conversationIdForEvent(event) {
+  const key = event?.message?.thread?.name || event?.space?.name;
+  if (!key) throw new Error('Chat event has neither thread.name nor space.name');
+  return { conversationId: uuidv5(key, uuidv5.URL), key };
+}
+
+/**
+ * Convert Oracle's markdown to what Chat actually renders.
+ *
+ * Chat supports *bold*, _italic_, ~strike~, `code`, ``` blocks, bullets and
+ * block quotes, and links as <url|text>. It does NOT support # headings,
+ * tables, or numbered lists.
+ *
+ * @param {string} md
+ * @returns {string}
+ */
+export function markdownToChat(md) {
+  if (!md) return '';
+  const lines = md.split('\n');
+  const out = [];
+  let inCodeFence = false;
+
+  for (const line of lines) {
+    if (/^\s*```/.test(line)) {
+      inCodeFence = !inCodeFence;
+      out.push(line);
+      continue;
+    }
+    // Never rewrite inside a fenced code block.
+    if (inCodeFence) {
+      out.push(line);
+      continue;
+    }
+
+    let s = line;
+    // '### Heading' -> '*Heading*' (Chat has no heading syntax)
+    s = s.replace(/^\s*#{1,6}\s+(.*?)\s*$/, (_m, t) => `*${t}*`);
+    // Markdown links -> Chat link syntax
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<$2|$1>');
+    // '**bold**' -> '*bold*'. Chat reads a single asterisk as bold; a double
+    // asterisk renders literally.
+    s = s.replace(/\*\*([^*]+)\*\*/g, '*$1*');
+    out.push(s);
+  }
+
+  return out.join('\n').trim();
+}
+
+/**
+ * Split text into chunks Chat will display in full, preferring paragraph
+ * boundaries so nothing is cut mid-sentence.
+ * @param {string} text
+ * @param {number} limit
+ * @returns {string[]}
+ */
+export function splitForChat(text, limit = MAX_CHUNK_CHARS) {
+  if (!text) return [];
+  if (text.length <= limit) return [text];
+
+  const chunks = [];
+  let current = '';
+
+  for (const para of text.split('\n\n')) {
+    // A single paragraph longer than the limit has to be hard-split.
+    if (para.length > limit) {
+      if (current) { chunks.push(current); current = ''; }
+      for (let i = 0; i < para.length; i += limit) {
+        chunks.push(para.slice(i, i + limit));
+      }
+      continue;
+    }
+    if ((current ? current.length + 2 : 0) + para.length > limit) {
+      chunks.push(current);
+      current = para;
+    } else {
+      current = current ? `${current}\n\n${para}` : para;
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks;
+}
+
+/**
+ * Build an authenticated Chat API client.
+ *
+ * Uses GOOGLE_SERVICE_ACCOUNT_KEY with the chat.bot scope. That service account
+ * must also be the one the Chat app is configured with, or posts are rejected.
+ */
+function createChatClient() {
+  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+  if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not configured');
+
+  const auth = new google.auth.GoogleAuth({
+    credentials: JSON.parse(raw),
+    scopes: ['https://www.googleapis.com/auth/chat.bot']
+  });
+  return google.chat({ version: 'v1', auth });
+}
+
+/**
+ * Post one or more messages back into the originating thread.
+ * @param {Object} event - the original Chat event
+ * @param {string} text - already converted to Chat formatting
+ */
+async function postToChat(event, text) {
+  const chat = createChatClient();
+  const parent = event.space.name;
+  const threadName = event?.message?.thread?.name;
+
+  for (const chunk of splitForChat(text)) {
+    await chat.spaces.messages.create({
+      parent,
+      // Keep the reply in the originating thread; start a new one if that
+      // thread has gone away.
+      messageReplyOption: 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD',
+      requestBody: {
+        text: chunk,
+        ...(threadName ? { thread: { name: threadName } } : {})
+      }
+    });
+  }
+}
+
+/**
+ * Post a reply, swallowing errors so a post-back failure cannot crash the
+ * background task. This is the ONE place where the user may get silence, so it
+ * logs loudly.
+ */
+async function safePost(event, text) {
+  try {
+    await postToChat(event, text);
+  } catch (err) {
+    console.error('❌ Google Chat post-back FAILED — user received nothing:', err.message);
+  }
+}
+
+/**
+ * Run Oracle and post the result. Runs after the HTTP ack, so it must never
+ * throw into the void: every path ends in a message to the user.
+ */
+async function runOracleAndReply(event, user, conversationId, messageText) {
+  try {
+    await createConversation(
+      conversationId,
+      user.id,
+      'internal-oracle',
+      `Chat: ${messageText.slice(0, 60)}`
+    );
+
+    const result = await runAgent({
+      agentType: 'internal-oracle',
+      message: messageText,
+      conversationId,
+      userId: user.id,
+      sessionId: crypto.randomUUID(),
+      res: null // headless — same pattern as src/api/hubspot-webhook.js
+    });
+
+    if (!result?.success) {
+      await safePost(event, `Something went wrong: ${result?.error || 'unknown error'}`);
+      return;
+    }
+
+    // accumulatedText is computed inside the loop but never returned
+    // (client.js), so extract the text blocks here.
+    const text = (result.response?.content || [])
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim();
+
+    if (!text) {
+      await safePost(event, "I finished, but didn't produce a text reply. Try rephrasing?");
+      return;
+    }
+
+    await safePost(event, markdownToChat(text));
+  } catch (err) {
+    console.error('❌ Oracle run failed for Chat event:', err);
+    await safePost(event, `Something went wrong while I was working on that: ${err.message}`);
+  }
+}
+
+/**
+ * POST /api/chat/google
+ */
+export async function handleGoogleChatEvent(req, res) {
+  // ==========================================================================
+  // VERIFICATION — first action, before any side effect. A rejected request
+  // creates no conversation row and makes no Anthropic call.
+  // ==========================================================================
+  const auth = await verifyChatRequest(req);
+  if (!auth.ok) {
+    console.error(`❌ Google Chat request rejected: ${auth.reason}`);
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const event = req.body || {};
+
+  // Only respond to messages from humans. Ignoring BOT senders prevents loops.
+  if (event.type !== 'MESSAGE' || event?.message?.sender?.type === 'BOT') {
+    return res.status(200).json({});
+  }
+
+  const senderEmail = event?.message?.sender?.email;
+  const messageText = (event?.message?.argumentText || event?.message?.text || '').trim();
+
+  if (!messageText) {
+    return res.status(200).json({ text: 'Send me a question and I\'ll take a look.' });
+  }
+
+  let user;
+  try {
+    user = await resolveUser(senderEmail);
+  } catch (err) {
+    console.error('❌ Chat identity lookup failed:', err.message);
+    return res.status(200).json({ text: 'I could not verify your account just now. Try again shortly.' });
+  }
+
+  // Unknown or deactivated — same message either way, so we do not disclose
+  // whether an account exists.
+  if (!user) {
+    return res.status(200).json({
+      text: `I don't recognize ${senderEmail || 'this account'}. Sign in at the Granted AI Hub first, then message me again.`
+    });
+  }
+
+  // Defensive: a users row can currently only exist if the OAuth login stored
+  // tokens, so this should be unreachable. Kept so that a future account
+  // created another way degrades into a clear instruction rather than tool
+  // failures mid-answer.
+  if (!user.google_refresh_token) {
+    const hubUrl = process.env.PUBLIC_URL || 'https://grant-card-assistant-production.up.railway.app';
+    return res.status(200).json({
+      text: `Your account isn't fully connected yet. Sign in once at ${hubUrl}/login, then message me again.`
+    });
+  }
+
+  let conversationId;
+  try {
+    ({ conversationId } = conversationIdForEvent(event));
+  } catch (err) {
+    console.error('❌ Could not derive conversation id:', err.message);
+    return res.status(200).json({ text: 'I could not work out which conversation this belongs to.' });
+  }
+
+  // ==========================================================================
+  // ACK NOW, WORK LATER. Chat times out long before Oracle finishes, so return
+  // an empty 200 (which posts nothing) and continue in the background.
+  // ==========================================================================
+  res.status(200).json({});
+
+  runOracleAndReply(event, user, conversationId, messageText).catch(err => {
+    console.error('❌ Unhandled error in background Chat task:', err);
+  });
+}
+
+export default { handleGoogleChatEvent };
