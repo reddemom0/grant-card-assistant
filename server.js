@@ -82,35 +82,46 @@ const PORT = process.env.PORT || 3000;
 // MIDDLEWARE
 // ============================================================================
 
-// CORS configuration for widget embedding on granted.ca
+// CORS configuration for widget embedding on granted.ca.
+//
+// SECURITY: this previously called callback(null, true) in BOTH branches, so
+// `isAllowed` was computed and then ignored. Combined with credentials: true,
+// the cors package reflects the caller's Origin verbatim and adds
+// Access-Control-Allow-Credentials — i.e. any site on the internet could make
+// credentialed cross-origin requests using a logged-in staff member's cookie.
+//
+// The matching was also too loose to keep as-is:
+//   - startsWith() is a PREFIX match — 'https://granted.ca.evil.com' passed
+//   - includes('.railway.app') matches anywhere — 'https://evil.com/.railway.app' passed
+// Both are replaced with exact equality.
+const ALLOWED_ORIGINS = new Set([
+  'https://granted.ca',                                    // widget embed
+  'https://www.granted.ca',                                // widget embed
+  'https://grant-card-assistant-production.up.railway.app', // this app
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173'
+]);
+
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    // Also allow null for local file testing
-    if (!origin || origin === 'null') {
+    // No Origin header at all: non-browser client (curl, server-to-server,
+    // health checks). CORS does not apply to these, so allow. Note this is
+    // NOT the same as the literal string 'null', which is what sandboxed
+    // iframes and data: URLs send — that is denied below.
+    if (!origin) {
       return callback(null, true);
     }
 
-    // Allowed origins for widget embedding
-    const allowedOrigins = [
-      'https://granted.ca',
-      'https://www.granted.ca',
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:5173'
-    ];
-
-    // Check if origin matches allowed domains or Railway deployment URL
-    const isAllowed = allowedOrigins.some(allowed => origin.startsWith(allowed)) ||
-                     origin.includes('.railway.app') ||
-                     origin.includes('.up.railway.app');
-
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Allow all origins for now (can tighten later)
+    if (ALLOWED_ORIGINS.has(origin)) {
+      return callback(null, true);
     }
+
+    // Deny. Passing false (not an Error) omits the CORS headers and lets the
+    // request continue, so the browser blocks it without a 500 in our logs.
+    console.warn(`🚫 CORS: denied origin ${origin}`);
+    return callback(null, false);
   },
   credentials: true
 };
@@ -138,12 +149,15 @@ app.use((req, res, next) => {
 // ============================================================================
 
 // Migration endpoint (temporary, for Railway deployment)
+// Session required IN ADDITION to the existing ?secret= check. Both of these
+// execute arbitrary SQL from migrations/, so a leaked secret alone must not
+// be sufficient.
 import { runMigrationEndpoint } from './run-migration-endpoint.js';
-app.get('/run-migration', runMigrationEndpoint);
+app.get('/run-migration', authenticateUser, requireAuth, runMigrationEndpoint);
 
 // Database admin endpoint (diagnostics and migrations)
 import { dbAdminEndpoint } from './db-admin-endpoint.js';
-app.get('/db-admin', dbAdminEndpoint);
+app.get('/db-admin', authenticateUser, requireAuth, dbAdminEndpoint);
 
 // Import grants endpoint (for GetGranted database sync)
 import { importGrantsEndpoint } from './import-grants-endpoint.js';
@@ -157,26 +171,19 @@ import { searchGrantsEndpoint } from './search-grants-endpoint.js';
 app.get('/search-grants', authenticateUser, requireAuth, searchGrantsEndpoint);
 
 // Batch retag endpoint — re-tags all grants with updated eligibility fields
-app.get('/batch-retag-grants', async (req, res) => {
+app.get('/batch-retag-grants', authenticateUser, requireAuth, async (req, res) => {
   try {
     const receivedSecret = req.query.secret?.trim();
     const expectedSecret = process.env.JWT_SECRET?.trim();
 
-    console.log('🔐 Auth debug:');
-    console.log('   Received:', receivedSecret ? `${receivedSecret.substring(0, 8)}...` : 'null');
-    console.log('   Expected:', expectedSecret ? `${expectedSecret.substring(0, 8)}...` : 'null');
-    console.log('   Match:', receivedSecret === expectedSecret);
-
-    if (receivedSecret !== expectedSecret) {
-      return res.status(401).json({
-        error: 'Unauthorized',
-        debug: {
-          receivedPrefix: receivedSecret ? receivedSecret.substring(0, 8) : 'null',
-          expectedPrefix: expectedSecret ? expectedSecret.substring(0, 8) : 'null',
-          receivedLength: receivedSecret ? receivedSecret.length : 0,
-          expectedLength: expectedSecret ? expectedSecret.length : 0
-        }
-      });
+    // Fail closed when the secret is not configured, rather than comparing
+    // two undefined values and passing.
+    if (!expectedSecret || receivedSecret !== expectedSecret) {
+      // Deliberately opaque: this previously returned receivedPrefix,
+      // expectedPrefix and expectedLength of JWT_SECRET in the response body,
+      // which is a shape oracle for the secret itself.
+      console.warn('🚫 /batch-retag-grants rejected: invalid or missing secret');
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     const { tagGrant } = await import('./src/services/grant-tagger.js');
@@ -233,7 +240,7 @@ app.get('/batch-retag-grants', async (req, res) => {
 });
 
 // Generate embeddings endpoint — re-embeds all currently_accepting grants with full text
-app.get('/generate-embeddings', async (req, res) => {
+app.get('/generate-embeddings', authenticateUser, requireAuth, async (req, res) => {
   try {
     // Simple secret-based auth for one-time operations (trim to handle whitespace)
     const receivedSecret = req.query.secret?.trim();
@@ -386,16 +393,16 @@ app.post('/api/lead-gen/chat', handleLeadGenChat);
 app.post('/api/lead-gen/event', handleLeadGenEvent);
 
 // Analytics endpoint — authenticated team members only
-app.get('/api/lead-gen/analytics', authenticateUser, handleLeadGenAnalytics);
+app.get('/api/lead-gen/analytics', authenticateUser, requireAuth, handleLeadGenAnalytics);
 
 // Admin endpoints for lead-gen dashboard — authenticated team members only
-app.get('/api/admin/lead-gen-conversations', authenticateUser, handleListLeadGenConversations);
-app.get('/api/admin/lead-gen-messages/:sessionId', authenticateUser, handleGetLeadGenMessages);
-app.get('/api/admin/lead-gen-stats', authenticateUser, handleLeadGenStats);
-app.delete('/api/admin/lead-gen-conversations/:sessionId', authenticateUser, handleDeleteLeadGenConversation);
+app.get('/api/admin/lead-gen-conversations', authenticateUser, requireAuth, handleListLeadGenConversations);
+app.get('/api/admin/lead-gen-messages/:sessionId', authenticateUser, requireAuth, handleGetLeadGenMessages);
+app.get('/api/admin/lead-gen-stats', authenticateUser, requireAuth, handleLeadGenStats);
+app.delete('/api/admin/lead-gen-conversations/:sessionId', authenticateUser, requireAuth, handleDeleteLeadGenConversation);
 
 // Test endpoint for email debugging (temporary - remove after email confirmed working)
-app.get('/api/test-email', testEmailHandler);
+app.get('/api/test-email', authenticateUser, requireAuth, testEmailHandler);
 
 // Main chat endpoint (SSE streaming) - with authentication
 app.post('/api/chat', authenticateUser, handleChatRequest);
@@ -407,9 +414,9 @@ app.delete('/api/conversations/:id', authenticateUser, handleDeleteConversation)
 
 // Feedback system - with authentication
 app.post('/api/feedback', authenticateUser, feedbackHandler);
-app.get('/api/feedback', authenticateUser, feedbackHandler);
+app.get('/api/feedback', authenticateUser, requireAuth, feedbackHandler);
 app.post('/api/feedback-note', authenticateUser, feedbackNoteHandler);
-app.get('/api/feedback-note', authenticateUser, feedbackNoteHandler);
+app.get('/api/feedback-note', authenticateUser, requireAuth, feedbackNoteHandler);
 
 // Feedback metrics (non-admin) - with authentication
 app.get('/api/feedback-metrics', authenticateUser, feedbackMetricsHandler);
@@ -440,7 +447,7 @@ app.use('/api/auth/granola', granolaAuthRouter);
 app.use('/api/admin', authenticateUser, adminRouter);
 
 // Agent metadata
-app.get('/api/agents', async (req, res) => {
+app.get('/api/agents', authenticateUser, requireAuth, async (req, res) => {
   try {
     const { getAgentMetadata } = await import('./src/agents/load-agents.js');
     const agents = getAgentMetadata();
@@ -460,7 +467,7 @@ app.get('/api/agents', async (req, res) => {
 import hubspotService from './services/hubspot-service.js';
 
 // HubSpot status check
-app.get('/api/hubspot/status', authenticateUser, async (req, res) => {
+app.get('/api/hubspot/status', authenticateUser, requireAuth, async (req, res) => {
   try {
     const isConfigured = hubspotService.isConfigured();
 
@@ -481,7 +488,7 @@ app.get('/api/hubspot/status', authenticateUser, async (req, res) => {
 });
 
 // Search contacts by email
-app.get('/api/hubspot/contacts/search', authenticateUser, async (req, res) => {
+app.get('/api/hubspot/contacts/search', authenticateUser, requireAuth, async (req, res) => {
   try {
     const { email } = req.query;
 
@@ -522,7 +529,7 @@ app.get('/api/hubspot/contacts/search', authenticateUser, async (req, res) => {
 });
 
 // Get contact by ID
-app.get('/api/hubspot/contacts/:contactId', authenticateUser, async (req, res) => {
+app.get('/api/hubspot/contacts/:contactId', authenticateUser, requireAuth, async (req, res) => {
   try {
     const { contactId } = req.params;
 
@@ -550,7 +557,7 @@ app.get('/api/hubspot/contacts/:contactId', authenticateUser, async (req, res) =
 });
 
 // Get recent contacts
-app.get('/api/hubspot/contacts/recent', authenticateUser, async (req, res) => {
+app.get('/api/hubspot/contacts/recent', authenticateUser, requireAuth, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 10;
 
@@ -585,7 +592,7 @@ app.get('/api/hubspot/contacts/recent', authenticateUser, async (req, res) => {
 });
 
 // Search companies
-app.get('/api/hubspot/companies/search', authenticateUser, async (req, res) => {
+app.get('/api/hubspot/companies/search', authenticateUser, requireAuth, async (req, res) => {
   try {
     const { q } = req.query;
 
@@ -622,7 +629,7 @@ app.get('/api/hubspot/companies/search', authenticateUser, async (req, res) => {
 });
 
 // Search deals
-app.get('/api/hubspot/deals/search', authenticateUser, async (req, res) => {
+app.get('/api/hubspot/deals/search', authenticateUser, requireAuth, async (req, res) => {
   try {
     const { q } = req.query;
 
@@ -659,7 +666,7 @@ app.get('/api/hubspot/deals/search', authenticateUser, async (req, res) => {
 });
 
 // Get deals for a contact
-app.get('/api/hubspot/contacts/:contactId/deals', authenticateUser, async (req, res) => {
+app.get('/api/hubspot/contacts/:contactId/deals', authenticateUser, requireAuth, async (req, res) => {
   try {
     const { contactId } = req.params;
 
@@ -707,7 +714,7 @@ app.post('/api/hubspot-webhook', hubspotWebhookHandler.handleHubSpotWebhook);
 app.get('/api/hubspot-webhook', hubspotWebhookHandler.verifyHubSpotWebhook);
 
 // Get recent alerts (authenticated - for Oracle and admin dashboard)
-app.get('/api/visualping/alerts', authenticateUser, async (req, res) => {
+app.get('/api/visualping/alerts', authenticateUser, requireAuth, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 20;
     const priority = req.query.priority || null;
@@ -728,7 +735,7 @@ app.get('/api/visualping/alerts', authenticateUser, async (req, res) => {
 });
 
 // Get alert statistics (authenticated)
-app.get('/api/visualping/stats', authenticateUser, async (req, res) => {
+app.get('/api/visualping/stats', authenticateUser, requireAuth, async (req, res) => {
   try {
     const stats = await visualPingHandler.getAlertStats();
 
@@ -828,16 +835,34 @@ app.get('/agent-quality', (req, res) => {
   res.sendFile('agent-quality.html', { root: '.' });
 });
 
+// Gate for HTML page routes. requireAuth returns a JSON 401, which renders as
+// a raw blob in a browser, so pages redirect to /login instead — matching the
+// client-side behaviour in public/js/agent-interface.js:145-155.
+//
+// NOTE: this is currently authentication-only. These are administrative pages
+// and should require the admin role, but every users.role value is literally
+// '"user"' (quoted, from the column default `'"user"'::text`), so requireAdmin
+// would 403 all 11 accounts. Switch these to requireAdmin once that data is
+// repaired.
+function requirePageAuth(req, res, next) {
+  if (!req.user) {
+    return res.redirect('/login');
+  }
+  next();
+}
+
 // Deprecated — redirect to the unified lead-gen dashboard
-app.get('/admin-lead-gen', authenticateUser, (req, res) => {
+app.get('/admin-lead-gen', authenticateUser, requirePageAuth, (req, res) => {
   res.redirect(301, '/admin/conversations');
 });
 
-app.get('/admin/conversations', authenticateUser, (req, res) => {
+app.get('/admin/conversations', authenticateUser, requirePageAuth, (req, res) => {
   res.sendFile('admin-conversations.html', { root: '.' });
 });
 
-app.get('/admin*', (req, res) => {
+// Previously had NO middleware at all, which made gating the two routes above
+// cosmetic — the admin shell was served to anyone.
+app.get('/admin*', authenticateUser, requirePageAuth, (req, res) => {
   res.sendFile('admin.html', { root: '.' });
 });
 
@@ -1175,19 +1200,30 @@ async function startServer() {
     // ========================================================================
     // CRON JOB: Lead-gen inactivity finalization
     // ========================================================================
-    // Run every 10 minutes to finalize abandoned conversations
-    cron.schedule('*/10 * * * *', async () => {
-      console.log('\n🔄 Running scheduled lead-gen finalization...');
-      try {
-        const { finalizeInactiveSessions } = await import('./src/api/lead-gen-finalization.js');
-        const result = await finalizeInactiveSessions(5, 50);
-        console.log(`✅ Finalization complete: ${result.finalized} sessions finalized, ${result.errors} errors`);
-      } catch (err) {
-        console.error('❌ Scheduled finalization failed:', err.message);
-      }
-    });
+    // Run every 10 minutes to finalize abandoned conversations.
+    //
+    // This registers on EVERY boot, including local dev runs, and fires on the
+    // wall-clock 10-minute boundary — not 10 minutes after startup. When it
+    // runs it sends email via Gmail and writes to HubSpot, so local testing
+    // needs a way to opt out. Set LEAD_GEN_FINALIZATION_DISABLED=true.
+    const finalizationDisabled = process.env.LEAD_GEN_FINALIZATION_DISABLED === 'true';
 
-    console.log('⏰ Cron job scheduled: Lead-gen finalization every 10 minutes');
+    if (finalizationDisabled) {
+      console.log('⏸️  Lead-gen finalization cron DISABLED (LEAD_GEN_FINALIZATION_DISABLED=true)');
+    } else {
+      cron.schedule('*/10 * * * *', async () => {
+        console.log('\n🔄 Running scheduled lead-gen finalization...');
+        try {
+          const { finalizeInactiveSessions } = await import('./src/api/lead-gen-finalization.js');
+          const result = await finalizeInactiveSessions(5, 50);
+          console.log(`✅ Finalization complete: ${result.finalized} sessions finalized, ${result.errors} errors`);
+        } catch (err) {
+          console.error('❌ Scheduled finalization failed:', err.message);
+        }
+      });
+
+      console.log('⏰ Cron job scheduled: Lead-gen finalization every 10 minutes');
+    }
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';

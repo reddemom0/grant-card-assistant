@@ -18,6 +18,24 @@ export default async function handler(req, res) {
     });
   }
 
+  // Authentication is not authorization. This handler previously performed no
+  // authorization at all: `?userId=` returned any user's profile and activity,
+  // and several actions return the whole staff roster including email
+  // addresses. The helpers below scope those.
+  //
+  // NOTE: isRosterViewer() should be an admin check. It is not one yet because
+  // every users.role value is literally '"user"' — quoted — from the column
+  // default `'"user"'::text`, so `role === 'admin'` is never true for anyone.
+  // Once that data is repaired, tighten isRosterViewer to isAdmin and the
+  // roster-wide actions become admin-only with no other change here.
+  const isAdmin = req.user.role === 'admin';
+
+  /** Roster-wide views: every authenticated staff member, for now. */
+  const isRosterViewer = () => Boolean(req.user);
+
+  /** Per-user drill-down: yourself, or an admin. */
+  const canViewUser = (targetUserId) => isAdmin || req.user.id === targetUserId;
+
   try {
     if (req.method === 'GET') {
       const { action, days } = req.query;
@@ -30,19 +48,33 @@ export default async function handler(req, res) {
         case 'agent-stats':
           return await getAgentStats(req, res, daysInt);
 
+        // Roster-wide: returns every user's identity (id, name, email,
+        // picture) and per-person metrics. Cannot be self-scoped without
+        // breaking the dashboard, so it is gated instead.
         case 'user-activity':
+          if (!isRosterViewer()) {
+            return res.status(403).json({ error: 'Forbidden' });
+          }
           return await getUserActivity(req, res, daysInt);
 
         case 'trends':
           return await getUsageTrends(req, res, daysInt);
 
+        // Roster-wide (per-person adoption metrics).
         case 'team-adoption':
+          if (!isRosterViewer()) {
+            return res.status(403).json({ error: 'Forbidden' });
+          }
           return await getTeamAdoptionDashboard(req, res, daysInt);
 
         case 'productivity-impact':
           return await getProductivityMetrics(req, res, daysInt);
 
+        // Roster-wide (top users and users-needing-support, incl. email).
         case 'individual-performance':
+          if (!isRosterViewer()) {
+            return res.status(403).json({ error: 'Forbidden' });
+          }
           return await getIndividualPerformance(req, res, daysInt);
 
         case 'user-details':
@@ -55,6 +87,13 @@ export default async function handler(req, res) {
           if (isNaN(daysInt) || daysInt < 1) {
             console.error('❌ Invalid days parameter:', { days: req.query.days, daysInt });
             return res.status(400).json({ error: 'Invalid days parameter' });
+          }
+          // IDOR fix: previously any authenticated user could read any other
+          // user's name, activity volume, agent mix and recent conversation
+          // IDs by incrementing this SERIAL id.
+          if (!canViewUser(parseInt(userId))) {
+            console.warn(`🚫 user-details denied: user ${req.user.id} requested ${userId}`);
+            return res.status(403).json({ error: 'Forbidden' });
           }
           return await getUserDetails(req, res, parseInt(userId), daysInt);
 
