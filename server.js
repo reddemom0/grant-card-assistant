@@ -1272,8 +1272,18 @@ async function startServer() {
     // The Google Chat adapter verifies inbound requests against this audience
     // (the app's HTTP endpoint URL). Unset means the endpoint fails closed and
     // rejects every Chat event, so say so rather than failing silently.
-    if (!process.env.GOOGLE_CHAT_AUDIENCE) {
-      console.warn('⚠️  GOOGLE_CHAT_AUDIENCE is not set — /api/chat/google will reject ALL requests. Set it to the Chat app\'s configured HTTP endpoint URL.');
+    // Both are required and the endpoint fails closed without either.
+    // GOOGLE_CHAT_ISSUER_EMAIL is deployment-specific: this app is a Workspace
+    // add-on, so requests are signed by the add-on deployment's own service
+    // account, NOT chat@system.gserviceaccount.com. Find it under Google
+    // Workspace Marketplace SDK -> HTTP Deployments -> Authorization Resource.
+    const chatMisconfig = [
+      !process.env.GOOGLE_CHAT_AUDIENCE && 'GOOGLE_CHAT_AUDIENCE (the Chat app\'s HTTP endpoint URL)',
+      !process.env.GOOGLE_CHAT_ISSUER_EMAIL && 'GOOGLE_CHAT_ISSUER_EMAIL (the add-on deployment\'s service account)'
+    ].filter(Boolean);
+
+    if (chatMisconfig.length > 0) {
+      console.warn(`⚠️  Google Chat adapter NOT configured — /api/chat/google will reject ALL requests. Missing: ${chatMisconfig.join(', ')}.`);
     } else {
       console.log('✅ Google Chat adapter configured');
     }

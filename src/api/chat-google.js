@@ -22,8 +22,25 @@ import { runAgent } from '../claude/client.js';
 import { createConversation } from '../database/messages.js';
 import { query } from '../database/connection.js';
 
-// Google signs every inbound Chat request with this service account.
-const CHAT_ISSUER = 'chat@system.gserviceaccount.com';
+// Which service account signs inbound requests depends on how the Chat app is
+// built, and the two Google docs disagree:
+//
+//   - A CLASSIC Chat app is signed by chat@system.gserviceaccount.com, which is
+//     what developers.google.com/workspace/chat/verify-requests-from-chat
+//     documents as universal.
+//   - A Chat app built as a GOOGLE WORKSPACE ADD-ON is signed by that add-on
+//     DEPLOYMENT's own service account — see
+//     developers.google.com/workspace/add-ons/guides/alternate-runtimes, which
+//     verifies `payload.email === SERVICE_ACCOUNT_EMAIL`.
+//
+// This app is a Workspace add-on, so the issuer is deployment-specific and
+// cannot be a constant. Find it in the Cloud console under Google Workspace
+// Marketplace SDK -> HTTP Deployments -> Authorization Resource.
+//
+// The AUDIENCE check is unchanged and still the endpoint URL: when this was
+// misconfigured the failure was an email-claim mismatch, not a verifyIdToken
+// throw, which proves the signature and audience were already validating.
+const CHAT_ISSUER_EMAIL = () => process.env.GOOGLE_CHAT_ISSUER_EMAIL;
 
 // Chat's API caps a message at 32,000 bytes, but the Chat UI truncates display
 // around 4,096 characters. Split well under the display limit so nothing is
@@ -46,10 +63,16 @@ const oauthClient = new google.auth.OAuth2();
  */
 async function verifyChatRequest(req) {
   const audience = process.env.GOOGLE_CHAT_AUDIENCE;
+  const expectedIssuer = CHAT_ISSUER_EMAIL();
 
-  // Fail closed when unconfigured, rather than defaulting to allow.
+  // Fail closed when unconfigured, rather than defaulting to allow. Both values
+  // are required: without the issuer we would have to accept any Google-signed
+  // token carrying our audience, which is a weaker check, not an equivalent one.
   if (typeof audience !== 'string' || audience.length === 0) {
     return { ok: false, reason: 'GOOGLE_CHAT_AUDIENCE not configured' };
+  }
+  if (typeof expectedIssuer !== 'string' || expectedIssuer.length === 0) {
+    return { ok: false, reason: 'GOOGLE_CHAT_ISSUER_EMAIL not configured' };
   }
 
   const header = req.headers.authorization;
@@ -66,8 +89,16 @@ async function verifyChatRequest(req) {
     const ticket = await oauthClient.verifyIdToken({ idToken, audience });
     const payload = ticket.getPayload();
 
-    if (payload?.email_verified !== true || payload?.email !== CHAT_ISSUER) {
-      return { ok: false, reason: 'token not issued by Google Chat' };
+    // Exact match, still requiring a verified email — only the expected value
+    // moved from a hardcoded constant to configuration.
+    if (payload?.email_verified !== true || payload?.email !== expectedIssuer) {
+      // Log the received issuer so a future misconfiguration is diagnosable
+      // without another deploy. Safe: reaching this line means the token was
+      // Google-signed AND carried our audience, so an attacker cannot get an
+      // arbitrary value logged here. A service account email is an identifier,
+      // not a secret, and no part of the token is logged.
+      console.error(`❌ Chat token issuer mismatch — expected ${expectedIssuer}, got ${payload?.email || '(none)'} (email_verified: ${payload?.email_verified})`);
+      return { ok: false, reason: 'token not issued by the expected service account' };
     }
     return { ok: true, reason: null };
   } catch (err) {
