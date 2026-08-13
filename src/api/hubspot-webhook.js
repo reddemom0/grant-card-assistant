@@ -505,23 +505,6 @@ export async function handleHubSpotWebhook(req, res) {
   console.log('📡 HubSpot webhook received');
   console.log('='.repeat(80));
 
-  // ==========================================================================
-  // TEMPORARY DIAGNOSTIC — REMOVE AFTER SIGNATURE VERSION IS CONFIRMED
-  // --------------------------------------------------------------------------
-  // Determines which signature headers this legacy private app actually emits,
-  // so we implement the right verification scheme. HubSpot's docs conflict:
-  // the v3 changelog says v3 was added for OAuth apps, the legacy-private-app
-  // doc mentions only X-HubSpot-Signature, and a community report shows a
-  // private app sending both. Header NAMES only — signature values are not
-  // logged. Delete this block once the answer is recorded.
-  // ==========================================================================
-  console.log('🔎 [TEMP] x-hubspot-* headers present:',
-    Object.keys(req.headers).filter(h => h.startsWith('x-hubspot')));
-  console.log('🔎 [TEMP] x-hubspot-signature-version:',
-    req.headers['x-hubspot-signature-version'] ?? '(absent)');
-  console.log('🔎 [TEMP] has v3 header:', Boolean(req.headers['x-hubspot-signature-v3']),
-    '| has request-timestamp:', Boolean(req.headers['x-hubspot-request-timestamp']));
-
   try {
     // Verify signature if configured
     const signature = req.headers['x-hubspot-signature'];
