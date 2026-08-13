@@ -119,7 +119,16 @@ router.get('/auth-google', (req, res) => {
     'email',
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/documents',
-    'https://www.googleapis.com/auth/spreadsheets'
+    'https://www.googleapis.com/auth/spreadsheets',
+    // Calendar. `calendar.events` covers reading, creating and modifying events
+    // — and per the events.insert reference it is also sufficient for attaching
+    // a Google Meet link (conferenceDataVersion=1 is a request parameter, not a
+    // scope). Deliberately NOT the broader `calendar` scope, which would also
+    // permit deleting entire calendars.
+    'https://www.googleapis.com/auth/calendar.events',
+    // freebusy.query does NOT accept calendar.events, so this is required
+    // separately to check colleagues' availability.
+    'https://www.googleapis.com/auth/calendar.freebusy'
   ].join(' ');
 
   console.log('🔵 OAuth Parameters:');

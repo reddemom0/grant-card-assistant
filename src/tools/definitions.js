@@ -2137,6 +2137,96 @@ export const GOOGLE_DOCS_TOOLS = [
 // Implementations live in src/tools/google-sheets.js.
 // ============================================================================
 
+/**
+ * Google Calendar tools — per-user delegated OAuth.
+ *
+ * DELIBERATELY a standalone const, NOT part of ORACLE_TOOLS and NOT part of
+ * ALL_TOOLS. ORACLE_TOOLS is spread into ALL_TOOLS, which the orchestrator
+ * receives — adding Calendar there would silently give the orchestrator write
+ * access to people's calendars. Referenced explicitly in the internal-oracle
+ * case of getToolsForAgent() and nowhere else.
+ *
+ * create/update carry a `confirmed` property because CONFIRMATION_POLICY in
+ * src/tools/executor.js refuses those calls without it when attendees are
+ * involved.
+ */
+export const GOOGLE_CALENDAR_TOOLS = [
+  {
+    name: 'list_calendar_events',
+    description: 'List the signed-in user\'s OWN upcoming or past calendar events. Use when they ask what is on their calendar, whether they are free, or to find a specific meeting. Reads only their own calendar — to see when a COLLEAGUE is busy use check_calendar_availability instead.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        time_min: { type: 'string', description: 'Start of the window, RFC3339 (e.g. "2026-08-14T00:00:00Z"). Defaults to now.' },
+        time_max: { type: 'string', description: 'End of the window, RFC3339. Optional.' },
+        query: { type: 'string', description: 'Optional free-text search across event fields.' },
+        max_results: { type: 'number', description: 'Maximum events to return (default 20, cap 50).' }
+      },
+      required: []
+    }
+  },
+  {
+    name: 'check_calendar_availability',
+    description: 'Check when one or more people are BUSY, using the signed-in user\'s own access. Returns busy time blocks only — never event titles or details. Works for colleagues who have never connected to Oracle, subject to Workspace sharing settings. Calendars that cannot be seen are returned in calendars_unavailable; that is normal, report it per person and continue with the rest.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        emails: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Calendar addresses to check, usually work email addresses. Include the user themselves if their own availability matters. Max 50.'
+        },
+        time_min: { type: 'string', description: 'Start of the window, RFC3339. Required.' },
+        time_max: { type: 'string', description: 'End of the window, RFC3339. Required.' }
+      },
+      required: ['emails', 'time_min', 'time_max']
+    }
+  },
+  {
+    name: 'create_calendar_event',
+    description: 'Create an event on the signed-in user\'s calendar. IF attendees are included this invites real people and sends them email — you MUST show the user exactly what you are about to create and get an explicit yes, then call again with confirmed: true. An event with no attendees affects only them and needs no confirmation.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Event title.' },
+        start: { type: 'string', description: 'Start time, RFC3339 with offset (e.g. "2026-08-20T14:00:00-07:00").' },
+        end: { type: 'string', description: 'End time, RFC3339 with offset.' },
+        attendees: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Email addresses to invite. Including anyone here REQUIRES confirmation.'
+        },
+        description: { type: 'string', description: 'Optional event description.' },
+        location: { type: 'string', description: 'Optional location.' },
+        add_meet_link: { type: 'boolean', description: 'Attach a Google Meet link. Default false.' },
+        send_updates: { type: 'string', enum: ['all', 'externalOnly', 'none'], description: 'Who gets an email notification. Default "all" when there are attendees.' },
+        confirmed: { type: 'boolean', description: 'Set true ONLY after the user has explicitly approved the exact event. Required when attendees are present.' }
+      },
+      required: ['title', 'start', 'end']
+    }
+  },
+  {
+    name: 'update_calendar_event',
+    description: 'Modify an existing event on the signed-in user\'s calendar — change the time, title, location, attendees, or set status to "cancelled". If the event involves other people (either already, or because you are adding them) you MUST show the user the change and get an explicit yes, then call again with confirmed: true. Use event_id from list_calendar_events.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        event_id: { type: 'string', description: 'Event ID, from list_calendar_events.' },
+        title: { type: 'string', description: 'New title.' },
+        start: { type: 'string', description: 'New start time, RFC3339 with offset.' },
+        end: { type: 'string', description: 'New end time, RFC3339 with offset.' },
+        attendees: { type: 'array', items: { type: 'string' }, description: 'Replacement attendee list. Setting this REQUIRES confirmation.' },
+        description: { type: 'string', description: 'New description.' },
+        location: { type: 'string', description: 'New location.' },
+        status: { type: 'string', enum: ['confirmed', 'tentative', 'cancelled'], description: 'Set "cancelled" to cancel the event — this notifies attendees.' },
+        send_updates: { type: 'string', enum: ['all', 'externalOnly', 'none'], description: 'Who gets an email notification. Default "all" when attendees exist.' },
+        confirmed: { type: 'boolean', description: 'Set true ONLY after the user has explicitly approved the change. Required when the event has attendees.' }
+      },
+      required: ['event_id']
+    }
+  }
+];
+
 export const GOOGLE_SHEETS_READWRITE_TOOLS = [
   {
     name: 'read_sheet_range',
@@ -2602,8 +2692,14 @@ export function getToolsForAgent(agentType) {
       // LOAD_SKILL_TOOL: uses the shared definition (not a per-agent copy) so Oracle can load
       // hubspot/DEAL_CREATION and any future skills without enum drift.
       const oracleBaseTools = [...SERVER_TOOLS, ...MEMORY_TOOLS]; // No ANTHROPIC_MEMORY_TOOL
-      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleBaseTools.length + 1 + ORACLE_TOOLS.length + GOOGLE_DRIVE_TOOLS.length + DROPBOX_TOOLS.length + coreHubSpotTools.length + GRANOLA_TOOLS.length + GOOGLE_SHEETS_READWRITE_TOOLS.length} tools, filesystem memory excluded)`);
-      return [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS];
+      // GOOGLE_CALENDAR_TOOLS is referenced HERE and only here — deliberately not
+      // in ORACLE_TOOLS, which is spread into ALL_TOOLS and would hand Calendar
+      // write access to the orchestrator.
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS];
+      // Count derived from the actual array rather than hand-summed, so it
+      // cannot drift out of sync with what is returned.
+      console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);
+      return oracleTools;
 
     case 'getgranted-ai':
       // GetGrantedAI needs: base tools + GetGrantedAI-specific tools (no HubSpot, no Google Drive)
