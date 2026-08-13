@@ -18,23 +18,61 @@ const recentEnrichments = new Map(); // Map<companyId, timestamp>
 const DEDUPE_WINDOW_MS = 60000; // 60 seconds
 
 /**
- * Verify HubSpot webhook signature (optional but recommended)
- * @param {string} signature - X-HubSpot-Signature header
- * @param {string} requestBody - Raw request body
- * @returns {boolean} - Whether signature is valid
+ * Authenticate an inbound webhook by shared token in the query string.
+ *
+ * WHY A QUERY-STRING TOKEN, AND NOT A SIGNATURE
+ * ---------------------------------------------
+ * Two different senders POST to this endpoint:
+ *
+ *   1. The HubSpot app's webhook subscription, which DOES send signatures
+ *      (x-hubspot-signature v1 plus x-hubspot-signature-v3 and
+ *      x-hubspot-request-timestamp). A previous, broken HMAC check rejected
+ *      every one of these with 401, silently, for as long as it existed.
+ *
+ *   2. A HubSpot *workflow* action ("Oracle Insight - Auto Enrichment"),
+ *      which sends NO signature headers at all — only x-hubspot-correlation-id,
+ *      x-hubspot-origin-hublet and x-hubspot-timeout-millis. Its events carry
+ *      changeSource: "WORKFLOW". This unsigned path is the one that has
+ *      actually driven every enrichment to date.
+ *
+ * Because the real traffic is unsigned, signature verification alone would not
+ * secure this endpoint — it would reject the sender we depend on while
+ * protecting one we don't currently use. A workflow action's only configurable
+ * field is its URL, so a shared token in the query string is the mechanism
+ * available. Proper v3 signature verification for sender (1) is DEFERRED to
+ * its own task.
+ *
+ * CAVEAT: query strings can appear in upstream proxy/edge access logs. Our own
+ * logging excludes them (the request logger and 404 handler use req.path, which
+ * omits the query), but Railway's edge logs are outside our control.
+ *
+ * @param {import('express').Request} req
+ * @returns {{ok: boolean, reason: string|null}} reason never contains the token
  */
-function verifyHubSpotSignature(signature, requestBody) {
-  if (!process.env.HUBSPOT_WEBHOOK_SECRET) {
-    console.warn('⚠️  HUBSPOT_WEBHOOK_SECRET not set - skipping signature verification');
-    return true;
+function verifyWorkflowToken(req) {
+  const expected = process.env.HUBSPOT_WORKFLOW_TOKEN;
+
+  // Fail closed: an unconfigured token rejects everything rather than
+  // defaulting to allow, which is how the previous check failed open.
+  if (typeof expected !== 'string' || expected.length === 0) {
+    return { ok: false, reason: 'HUBSPOT_WORKFLOW_TOKEN not configured' };
   }
 
-  const expectedSignature = crypto
-    .createHmac('sha256', process.env.HUBSPOT_WEBHOOK_SECRET)
-    .update(requestBody)
-    .digest('hex');
+  const provided = req.query?.token;
+  if (typeof provided !== 'string' || provided.length === 0) {
+    return { ok: false, reason: 'missing token' };
+  }
 
-  return signature === expectedSignature;
+  // Compare SHA-256 digests rather than the raw strings: timingSafeEqual
+  // throws on length mismatch, and a length pre-check would leak the secret's
+  // length. Digests are always 32 bytes, so the comparison is constant-time
+  // and length-independent.
+  const providedDigest = crypto.createHash('sha256').update(provided, 'utf8').digest();
+  const expectedDigest = crypto.createHash('sha256').update(expected, 'utf8').digest();
+
+  return crypto.timingSafeEqual(providedDigest, expectedDigest)
+    ? { ok: true, reason: null }
+    : { ok: false, reason: 'invalid token' };
 }
 
 /**
@@ -505,18 +543,21 @@ export async function handleHubSpotWebhook(req, res) {
   console.log('📡 HubSpot webhook received');
   console.log('='.repeat(80));
 
+  // ==========================================================================
+  // AUTHENTICATION — must stay the FIRST thing this handler does.
+  // Everything below it has side effects: the 200 ack, createConversation(),
+  // and a full Oracle agent loop with HubSpot WRITE tools. Rejecting here means
+  // an unauthenticated request creates no conversation row and makes no
+  // Anthropic call. Do not move this below the ack.
+  // ==========================================================================
+  const auth = verifyWorkflowToken(req);
+  if (!auth.ok) {
+    // Log the reason only — never the provided or expected token value.
+    console.error(`❌ HubSpot webhook rejected: ${auth.reason}`);
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   try {
-    // Verify signature if configured
-    const signature = req.headers['x-hubspot-signature'];
-    const rawBody = JSON.stringify(req.body);
-
-    if (signature && !verifyHubSpotSignature(signature, rawBody)) {
-      console.error('❌ Invalid HubSpot webhook signature');
-      return res.status(401).json({
-        error: 'Invalid signature'
-      });
-    }
-
     let payload = req.body;
     console.log('📦 Payload:', JSON.stringify(payload, null, 2));
 

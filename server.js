@@ -1251,6 +1251,16 @@ async function startServer() {
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';
     console.log(`🧪 Lead-gen A/B testing: VARIANT ${leadGenVariant.toUpperCase()}`);
 
+    // The HubSpot webhook authenticates via a shared token in its URL, set on
+    // the "Oracle Insight - Auto Enrichment" workflow action in HubSpot. Without
+    // it configured here the endpoint fails closed and rejects every event, so
+    // say so loudly rather than letting enrichment silently stop.
+    if (!process.env.HUBSPOT_WORKFLOW_TOKEN) {
+      console.error('🚨 HUBSPOT_WORKFLOW_TOKEN is NOT SET — /api/hubspot-webhook will reject ALL requests, including real HubSpot workflow events. Lead enrichment is disabled until this is configured.');
+    } else {
+      console.log('✅ HubSpot webhook token configured');
+    }
+
     // Log test mode status
     const testMode = process.env.LEAD_GEN_TEST_MODE === 'true';
     if (testMode) {

@@ -269,13 +269,33 @@ router.get('/auth-callback', async (req, res) => {
          google_refresh_token = COALESCE($6, users.google_refresh_token),
          google_token_expiry = $7,
          updated_at = CURRENT_TIMESTAMP
-       RETURNING id, email, name, picture`,
+       RETURNING id, email, name, picture, is_active`,
       [userInfo.id, userInfo.email, userInfo.name, userInfo.picture, tokens.access_token, tokens.refresh_token, tokenExpiry]
     );
 
     const user = userResult.rows[0];
     console.log('✅ User created/updated:', { id: user.id, email: user.email });
     console.log('✅ Stored OAuth tokens (refresh_token present:', !!tokens.refresh_token, ')');
+
+    // ========================================================================
+    // DEACTIVATED ACCOUNT GATE — runs BEFORE the JWT is signed, so a
+    // deactivated user cannot mint a new session even with a valid Google
+    // login and a granted.ca address.
+    // ========================================================================
+    if (user.is_active === false) {
+      console.warn(`🚫 Login rejected for deactivated account: ${user.email} (ID: ${user.id})`);
+      return res.status(403).setHeader('Content-Type', 'text/html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Account Deactivated</title></head>
+      <body>
+        <h1>Account Deactivated</h1>
+        <p>The account <strong>${escapeHtml(user.email)}</strong> is no longer active.</p>
+        <p>If you believe this is a mistake, contact your administrator.</p>
+      </body>
+      </html>
+    `);
+    }
 
     // Create JWT token with picture included
     console.log('🔵 Creating JWT token...');

@@ -59,6 +59,16 @@ export async function authenticateUser(req, res, next) {
 
     const user = result.rows[0];
 
+    // Deactivated accounts are treated as anonymous, which kills any existing
+    // session immediately: every gated route then 401s via requireAuth. Setting
+    // req.user = null rather than returning 401 here preserves this
+    // middleware's non-rejecting contract, which handlers depend on.
+    if (user.is_active === false) {
+      console.warn(`🚫 Rejecting deactivated account: ${user.email} (ID: ${user.id})`);
+      req.user = null;
+      return next();
+    }
+
     // Attach user info to request with role
     req.user = {
       id: user.id,
