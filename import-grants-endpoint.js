@@ -114,23 +114,19 @@ function classifyGrant(grant) {
 
 export async function importGrantsEndpoint(req, res) {
   try {
-    const { secret } = req.query;
-
-    // Security check - use JWT_SECRET (trim to handle whitespace)
+    // Security check - use JWT_SECRET. Both sides are trimmed: the original
+    // "JWT_SECRET newline issue" that led to this check being disabled was a
+    // trailing newline on the env var, not a reason to run unauthenticated.
+    // This endpoint runs `DELETE FROM grants` — it must never be open.
+    const secret = (req.query.secret || '').trim();
     const expectedSecret = process.env.JWT_SECRET?.trim();
-    console.log('🔐 Auth check:', {
-      provided: secret?.substring(0, 10) + '...',
-      expected: expectedSecret?.substring(0, 10) + '...',
-      providedLength: secret?.length,
-      expectedLength: expectedSecret?.length,
-      match: secret === expectedSecret
-    });
 
-    // TEMPORARY: Skip auth check to unblock import
-    // TODO: Fix JWT_SECRET newline issue
-    // if (secret !== expectedSecret) {
-    //   return res.status(401).json({ error: 'Unauthorized' });
-    // }
+    // Fail closed if the secret is not configured, rather than comparing
+    // two undefined values and passing.
+    if (!expectedSecret || secret !== expectedSecret) {
+      console.warn('🚫 /import-grants rejected: invalid or missing secret');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
 
     console.log('📥 Starting GetGranted import...');
 

@@ -4,10 +4,14 @@
  * Allows Oracle to search Granted Consulting's GetGranted database
  * for grant opportunities matching client criteria.
  *
- * Uses database API endpoint (synced daily at 2 AM PT from GetGranted).
+ * Queries the grants table in-process (synced daily at 2 AM PT from GetGranted).
  */
 
 import Redis from 'ioredis';
+// Called directly rather than via HTTP. This previously fetched the public
+// /search-grants endpoint on the production host — an unauthenticated call from
+// the server to itself, which broke as soon as that route required a session.
+import { searchGrants } from '../../scripts/create-search-function.js';
 
 // Initialize Redis with proper error handling for invalid/missing config
 let redis = null;
@@ -28,10 +32,20 @@ try {
   redis = null;
 }
 
-const SEARCH_ENDPOINT_URL = process.env.RAILWAY_STATIC_URL
-  ? `https://${process.env.RAILWAY_STATIC_URL}/search-grants`
-  : 'https://grant-card-assistant-production.up.railway.app/search-grants';
 const CACHE_TTL = 3600; // Cache results for 1 hour
+
+/**
+ * Reproduce the normalization the /search-grants HTTP endpoint performed on
+ * query params (join on ',' then split and trim), so that a keyword containing
+ * a comma behaves exactly as it did before this became an in-process call.
+ * @param {string[]} values
+ * @returns {string[]}
+ */
+function normalizeCsv(values) {
+  return values.length > 0
+    ? values.join(',').split(',').map(v => v.trim()).filter(Boolean)
+    : [];
+}
 
 /**
  * Search GetGranted database
@@ -101,31 +115,15 @@ export async function searchGetGranted(input) {
       console.log(`   🔄 Cache bypassed - forcing fresh search`);
     }
 
-    // Build query parameters for search endpoint
-    const params = new URLSearchParams();
-
-    // Map purposes to grant types
-    if (purposes.length > 0) {
-      params.append('grantTypes', purposes.join(','));
-    }
-
-    // Add regions
-    if (regions.length > 0) {
-      params.append('regions', regions.join(','));
-    }
-
-    // Add industries
-    if (industries.length > 0) {
-      params.append('industries', industries.join(','));
-    }
-
-    // Include inactive grants if include_inactive is true OR active_only is false
-    if (include_inactive || !active_only) {
-      params.append('includeInactive', 'true');
-    }
-
-    // Set max results
-    params.append('maxResults', limit.toString());
+    // Build search criteria (same shape the /search-grants endpoint assembled
+    // from its query string before calling searchGrants).
+    const searchCriteria = {
+      grantTypes: normalizeCsv(purposes),
+      regions: normalizeCsv(regions),
+      industries: normalizeCsv(industries),
+      includeInactive: Boolean(include_inactive || !active_only),
+      maxResults: limit
+    };
 
     // Build keywords from query and additional filters
     const keywords = [];
@@ -144,19 +142,11 @@ export async function searchGetGranted(input) {
       keywords.push(...owner_demographics);
     }
 
-    if (keywords.length > 0) {
-      params.append('keywords', keywords.join(','));
-    }
+    searchCriteria.keywords = normalizeCsv(keywords);
 
-    // Call database search endpoint
-    console.log(`   🌐 Fetching from database: ${SEARCH_ENDPOINT_URL}?${params.toString()}`);
-    const response = await fetch(`${SEARCH_ENDPOINT_URL}?${params.toString()}`);
-
-    if (!response.ok) {
-      throw new Error(`Database search failed: ${response.status} ${response.statusText}`);
-    }
-
-    const searchResults = await response.json();
+    // Query the database directly (no HTTP round-trip to ourselves)
+    console.log(`   🔎 Searching grants database:`, searchCriteria);
+    const searchResults = await searchGrants(searchCriteria);
     console.log(`   ✅ Found ${searchResults.total} grants in database`);
 
     // Format results to match expected output structure
@@ -208,28 +198,21 @@ export async function searchGetGranted(input) {
     if (grants.length === 0 && industries.length > 0) {
       console.log(`   ⚠️ Zero results with industries filter [${industries.join(', ')}] - retrying without industries`);
 
-      // Retry without industries filter
-      const retryParams = new URLSearchParams();
+      // Retry with the industries filter dropped. The endpoint used to omit the
+      // param entirely, which it then parsed back into an empty array.
+      const retryCriteria = {
+        grantTypes: normalizeCsv(purposes),
+        regions: normalizeCsv(regions),
+        industries: [],
+        includeInactive: Boolean(include_inactive || !active_only),
+        maxResults: limit,
+        keywords: normalizeCsv(keywords)
+      };
 
-      if (purposes.length > 0) {
-        retryParams.append('grantTypes', purposes.join(','));
-      }
-      if (regions.length > 0) {
-        retryParams.append('regions', regions.join(','));
-      }
-      if (include_inactive || !active_only) {
-        retryParams.append('includeInactive', 'true');
-      }
-      retryParams.append('maxResults', limit.toString());
-      if (keywords.length > 0) {
-        retryParams.append('keywords', keywords.join(','));
-      }
+      console.log(`   🔄 Retry search (industries dropped):`, retryCriteria);
+      const retryResults = await searchGrants(retryCriteria);
 
-      console.log(`   🔄 Retry search: ${SEARCH_ENDPOINT_URL}?${retryParams.toString()}`);
-      const retryResponse = await fetch(`${SEARCH_ENDPOINT_URL}?${retryParams.toString()}`);
-
-      if (retryResponse.ok) {
-        const retryResults = await retryResponse.json();
+      if (retryResults?.grants) {
         console.log(`   ✅ Retry found ${retryResults.total} grants without industries filter`);
 
         // Format retry results

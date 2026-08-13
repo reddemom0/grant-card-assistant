@@ -147,11 +147,14 @@ app.get('/db-admin', dbAdminEndpoint);
 
 // Import grants endpoint (for GetGranted database sync)
 import { importGrantsEndpoint } from './import-grants-endpoint.js';
-app.get('/import-grants', importGrantsEndpoint);
+// Destructive (DELETE FROM grants) — requires BOTH a session and the secret.
+app.get('/import-grants', authenticateUser, requireAuth, importGrantsEndpoint);
 
 // Search grants endpoint (for Oracle to query GetGranted database)
 import { searchGrantsEndpoint } from './search-grants-endpoint.js';
-app.get('/search-grants', searchGrantsEndpoint);
+// Exposes the curated grants table. Oracle/lead-gen no longer reach this over
+// HTTP — src/tools/getgranted-search.js calls searchGrants() in-process.
+app.get('/search-grants', authenticateUser, requireAuth, searchGrantsEndpoint);
 
 // Batch retag endpoint — re-tags all grants with updated eligibility fields
 app.get('/batch-retag-grants', async (req, res) => {
@@ -842,16 +845,31 @@ app.get('/login', (req, res) => {
   res.sendFile('login.html', { root: '.' });
 });
 
-// Serve root - let static middleware serve index.html (it will handle auth check)
-// app.get('/', (req, res) => {
-//   res.redirect('/oracle/new');
-// });
+// Serve the landing page. This used to be handled implicitly by
+// express.static('.'); now that the static mount is scoped to /public and
+// /widget, `/` needs an explicit route or the bare domain 404s.
+app.get('/', (req, res) => {
+  res.sendFile('index.html', { root: '.' });
+});
 
 // ============================================================================
 // STATIC FILES
 // ============================================================================
 
-app.use(express.static('.'));
+// SECURITY: this was previously `express.static('.')`, which served the entire
+// repository root. The dotfile filter only inspects the LAST path segment, so
+// `/.env` was blocked but `/.git/config`, `/.git/HEAD` and therefore
+// `/.git/objects/**` were served — the full repo history, plus /server.js,
+// /src/**, /data/** and /.claude/**.
+//
+// Only two directories are genuinely public:
+//   public/ — css, js and images referenced by the served HTML pages
+//   widget/ — the lead-capture widget embedded on granted.ca
+//             (see widget/DEPLOYMENT.md)
+// Everything else is now unreachable over HTTP.
+const staticOptions = { dotfiles: 'deny', index: false, redirect: false };
+app.use('/public', express.static('public', staticOptions));
+app.use('/widget', express.static('widget', staticOptions));
 
 // ============================================================================
 // ERROR HANDLING
