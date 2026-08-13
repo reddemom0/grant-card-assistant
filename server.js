@@ -835,15 +835,11 @@ app.get('/agent-quality', (req, res) => {
   res.sendFile('agent-quality.html', { root: '.' });
 });
 
-// Gate for HTML page routes. requireAuth returns a JSON 401, which renders as
-// a raw blob in a browser, so pages redirect to /login instead — matching the
-// client-side behaviour in public/js/agent-interface.js:145-155.
-//
-// NOTE: this is currently authentication-only. These are administrative pages
-// and should require the admin role, but every users.role value is literally
-// '"user"' (quoted, from the column default `'"user"'::text`), so requireAdmin
-// would 403 all 11 accounts. Switch these to requireAdmin once that data is
-// repaired.
+// Gates for HTML page routes. requireAuth/requireAdmin return JSON, which
+// renders as a raw blob in a browser, so these redirect or send HTML instead —
+// matching the client-side behaviour in public/js/agent-interface.js:145-155.
+
+/** Any authenticated Granted staff member. */
 function requirePageAuth(req, res, next) {
   if (!req.user) {
     return res.redirect('/login');
@@ -851,7 +847,32 @@ function requirePageAuth(req, res, next) {
   next();
 }
 
-// Deprecated — redirect to the unified lead-gen dashboard
+/** Admin only. Used for the general admin dashboard. */
+function requirePageAdmin(req, res, next) {
+  if (!req.user) {
+    return res.redirect('/login');
+  }
+  if (req.user.role !== 'admin') {
+    // Already signed in, so redirecting to /login would loop.
+    console.warn(`🚫 Admin page denied for ${req.user.email} (role: ${req.user.role})`);
+    return res.status(403).setHeader('Content-Type', 'text/html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Access Denied</title></head>
+      <body>
+        <h1>Access Denied</h1>
+        <p>This page is restricted to administrators.</p>
+        <p><a href="/oracle/new">Return to the AI Hub</a></p>
+      </body>
+      </html>
+    `);
+  }
+  next();
+}
+
+// Lead-gen dashboards stay at STAFF level, not admin: marketing@granted.ca
+// needs to read prospect conversations without holding the admin role.
+// Do not tighten these to requirePageAdmin.
 app.get('/admin-lead-gen', authenticateUser, requirePageAuth, (req, res) => {
   res.redirect(301, '/admin/conversations');
 });
@@ -860,9 +881,10 @@ app.get('/admin/conversations', authenticateUser, requirePageAuth, (req, res) =>
   res.sendFile('admin-conversations.html', { root: '.' });
 });
 
-// Previously had NO middleware at all, which made gating the two routes above
-// cosmetic — the admin shell was served to anyone.
-app.get('/admin*', authenticateUser, requirePageAuth, (req, res) => {
+// The general admin dashboard. Previously had NO middleware at all; now admin
+// only, which is possible because migration 022 repaired the quote-wrapped
+// users.role values that made requireAdmin reject every account.
+app.get('/admin*', authenticateUser, requirePageAdmin, (req, res) => {
   res.sendFile('admin.html', { root: '.' });
 });
 

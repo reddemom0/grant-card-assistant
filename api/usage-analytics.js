@@ -23,14 +23,16 @@ export default async function handler(req, res) {
   // and several actions return the whole staff roster including email
   // addresses. The helpers below scope those.
   //
-  // NOTE: isRosterViewer() should be an admin check. It is not one yet because
-  // every users.role value is literally '"user"' — quoted — from the column
-  // default `'"user"'::text`, so `role === 'admin'` is never true for anyone.
-  // Once that data is repaired, tighten isRosterViewer to isAdmin and the
-  // roster-wide actions become admin-only with no other change here.
+  // NOTE: isRosterViewer() is DELIBERATELY staff-level, not admin. The role
+  // data that previously blocked admin gating was repaired by migration 022,
+  // so tightening this is now technically possible — but /usage and
+  // /usage-analytics are served to all staff and call `team-adoption`, and no
+  // page in this app handles a 403, so non-admins would get silently blank
+  // panels rather than an error. Left at staff level as a considered choice.
+  // Tighten to isAdmin only alongside gating those two page routes.
   const isAdmin = req.user.role === 'admin';
 
-  /** Roster-wide views: every authenticated staff member, for now. */
+  /** Roster-wide views: any authenticated Granted staff member. */
   const isRosterViewer = () => Boolean(req.user);
 
   /** Per-user drill-down: yourself, or an admin. */
