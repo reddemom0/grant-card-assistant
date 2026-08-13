@@ -5,6 +5,9 @@
 import multer from 'multer';
 import { filesAPI, getMimeType, getContentBlockType } from '../src/anthropic-client.js';
 import * as db from '../src/database-service.js';
+// Owner-scoped read from src/database/messages.js — deliberately NOT
+// db.getConversation (src/database-service.js), which applies no user filter.
+import { getConversationForUser } from '../src/database/messages.js';
 
 // Configure multer for memory storage (files kept in RAM for upload)
 const storage = multer.memoryStorage();
@@ -30,11 +33,19 @@ const upload = multer({
  */
 export async function uploadFiles(req, res) {
   try {
-    const { conversationId, userId } = req.body;
+    const { conversationId } = req.body;
 
-    if (!conversationId || !userId) {
+    // Identity comes from the verified session, never the request body. The
+    // previous version read userId from req.body and passed it to
+    // db.ensureUser(), whose first parameter is googleId — so an unauthenticated
+    // caller could INSERT an arbitrary row into users, bypassing the OAuth
+    // domain gate in src/api/auth.js. req.user.id is already a verified users
+    // row, so no ensureUser call is needed.
+    const userId = req.user.id;
+
+    if (!conversationId) {
       return res.status(400).json({
-        error: 'Missing required fields: conversationId, userId'
+        error: 'Missing required field: conversationId'
       });
     }
 
@@ -44,10 +55,16 @@ export async function uploadFiles(req, res) {
       });
     }
 
-    console.log(`📤 Uploading ${req.files.length} file(s) for conversation ${conversationId}`);
+    // Reject before spending an Anthropic upload on a conversation the caller
+    // does not own.
+    const ownedConversation = await getConversationForUser(conversationId, userId);
+    if (!ownedConversation) {
+      return res.status(404).json({
+        error: 'Conversation not found'
+      });
+    }
 
-    // Ensure user exists
-    const user = await db.ensureUser(userId);
+    console.log(`📤 Uploading ${req.files.length} file(s) for conversation ${conversationId}`);
 
     // Upload each file to Anthropic
     const uploadedFiles = [];
@@ -97,7 +114,7 @@ export async function uploadFiles(req, res) {
     // Store file references in conversation context
     if (uploadedFiles.length > 0) {
       try {
-        const conversation = await db.getConversation(conversationId);
+        const conversation = ownedConversation;
         if (conversation) {
           // Add files to conversation metadata
           const existingFiles = conversation.file_context?.files || [];
@@ -139,18 +156,18 @@ export async function listFiles(req, res) {
   try {
     const { conversationId } = req.query;
 
+    // conversationId is now REQUIRED. This previously fell through to
+    // filesAPI.list(), which returns every file in the Anthropic account —
+    // an enumeration primitive that made the download route far more dangerous.
     if (!conversationId) {
-      // List all files from Anthropic API
-      const files = await filesAPI.list();
-      return res.json({
-        success: true,
-        files,
-        count: files.length
+      return res.status(400).json({
+        error: 'Missing required query parameter: conversationId'
       });
     }
 
-    // Get files for specific conversation
-    const conversation = await db.getConversation(conversationId);
+    // Get files for specific conversation, scoped to the caller.
+    // 404 (not 403) so the response never confirms another user's conversation.
+    const conversation = await getConversationForUser(conversationId, req.user.id);
     if (!conversation) {
       return res.status(404).json({
         error: 'Conversation not found'
@@ -224,7 +241,7 @@ export async function deleteFile(req, res) {
     // Remove from conversation context if conversationId provided
     if (conversationId) {
       try {
-        const conversation = await db.getConversation(conversationId);
+        const conversation = await getConversationForUser(conversationId, req.user.id);
         if (conversation && conversation.file_context?.files) {
           const updatedFiles = conversation.file_context.files.filter(
             f => f.file_id !== fileId

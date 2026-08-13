@@ -63,7 +63,7 @@ import testEmailHandler from './api/test-email.js';
 // Authentication
 import authRouter from './src/api/auth.js';
 import granolaAuthRouter from './src/api/granola-auth.js';
-import { authenticateUser } from './src/middleware/auth.js';
+import { authenticateUser, requireAuth } from './src/middleware/auth.js';
 
 // Admin
 import adminRouter from './src/api/admin.js';
@@ -745,21 +745,30 @@ app.get('/api/visualping/stats', authenticateUser, async (req, res) => {
 // FILES API ENDPOINTS
 // ============================================================================
 
-app.post('/api/files', filesHandler.uploadMiddleware, filesHandler.uploadFiles);
-app.get('/api/files', filesHandler.listFiles);
-app.get('/api/files/:fileId', filesHandler.getFileMetadata);
-app.get('/api/files/:fileId/download', filesHandler.downloadFile);
-app.delete('/api/files/:fileId', filesHandler.deleteFile);
+// These routes proxy the Anthropic Files API (list/metadata/download/delete by
+// file id). They were previously registered with no middleware at all, which
+// made every file in the Anthropic account listable and downloadable by anyone.
+// authenticateUser only POPULATES req.user (it calls next() with req.user = null
+// on a missing/invalid JWT) — requireAuth is what actually returns 401.
+app.post('/api/files', authenticateUser, requireAuth, filesHandler.uploadMiddleware, filesHandler.uploadFiles);
+app.get('/api/files', authenticateUser, requireAuth, filesHandler.listFiles);
+app.get('/api/files/:fileId', authenticateUser, requireAuth, filesHandler.getFileMetadata);
+app.get('/api/files/:fileId/download', authenticateUser, requireAuth, filesHandler.downloadFile);
+app.delete('/api/files/:fileId', authenticateUser, requireAuth, filesHandler.deleteFile);
 
 // ============================================================================
 // PDF PROCESSING ENDPOINTS
 // ============================================================================
 
-app.post('/api/pdf/process', pdfHandler.uploadMiddleware, pdfHandler.processPDF);
-app.post('/api/pdf/upload-and-process', pdfHandler.uploadMiddleware, pdfHandler.uploadAndProcess);
-app.post('/api/pdf/batch', pdfHandler.createBatch);
-app.get('/api/pdf/batch/:batchId', pdfHandler.getBatchStatus);
-app.get('/api/pdf/batch/:batchId/results', pdfHandler.getBatchResults);
+// Same treatment as the Files API routes above: these bill the Anthropic account
+// and read batch results by id, and were previously unauthenticated.
+// pdf-handler.js performs no database access, so there is no conversation to
+// owner-scope here — gating is the whole fix.
+app.post('/api/pdf/process', authenticateUser, requireAuth, pdfHandler.uploadMiddleware, pdfHandler.processPDF);
+app.post('/api/pdf/upload-and-process', authenticateUser, requireAuth, pdfHandler.uploadMiddleware, pdfHandler.uploadAndProcess);
+app.post('/api/pdf/batch', authenticateUser, requireAuth, pdfHandler.createBatch);
+app.get('/api/pdf/batch/:batchId', authenticateUser, requireAuth, pdfHandler.getBatchStatus);
+app.get('/api/pdf/batch/:batchId/results', authenticateUser, requireAuth, pdfHandler.getBatchResults);
 
 // ============================================================================
 // HTML PAGE ROUTES (Clean URLs)
