@@ -97,7 +97,20 @@ async function withRetry(label, fn, attempts = 6) {
       return await fn();
     } catch (err) {
       const status = err.status ?? 0;
-      const retryable = status === 429 || (status >= 500 && status < 600) || err.code === 'ECONNRESET';
+      // `fetch` THROWS on transport failure rather than returning a status,
+      // and Node puts the real code on err.cause.code, not err.code — so the
+      // old `err.code === 'ECONNRESET'` test never fired for a genuine network
+      // error. One ENOTFOUND killed the Drive restructure at 65 of 90 folders.
+      // A 30-hour copy will hit this, so treat transport failures as retryable.
+      const netCode = err.cause?.code ?? err.code;
+      const TRANSIENT = new Set([
+        'ECONNRESET', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNREFUSED', 'EAI_AGAIN',
+        'EPIPE', 'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_CONNECT_TIMEOUT',
+        'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_SOCKET',
+      ]);
+      const transport = TRANSIENT.has(netCode)
+        || (err.name === 'TypeError' && /fetch failed/i.test(err.message ?? ''));
+      const retryable = status === 429 || (status >= 500 && status < 600) || transport;
       if (!retryable || i === attempts) throw err;
       const ra = Number(err.retryAfter || 0) * 1000;
       const wait = ra || delay;
@@ -349,23 +362,55 @@ const DRIVE = {
 
   async stat(fileId) {
     const res = await withRetry('stat', () =>
-      this.api(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,size,mimeType,parents,driveId&${ALL_DRIVES}`)
+      this.api(`https://www.googleapis.com/drive/v3/files/${fileId}?fields=id,name,size,mimeType,parents,driveId,trashed&${ALL_DRIVES}`)
     );
     return res.json();
   },
 };
 
 // ---------------------------------------------------------------- ledger
-const ledger = new Map();   // source path -> entry
+/**
+ * Ledger identity: source + drive_file_id, NOT source + destination.
+ *
+ * A destination is a PATH, and paths move. Merging two canonical clients
+ * renames a folder and every ledger row beneath it goes stale — which happened
+ * twice on 2026-08-13 (the Clients/ prefix, then four canonical renames). Each
+ * time, a resumed copy believed 1,259 already-copied files still needed
+ * copying. A Drive file id is assigned at upload and never changes when the
+ * file is renamed or re-parented, so it survives any reshuffle of the tree.
+ *
+ * Dual-filing is preserved. One source copied to two destinations produces two
+ * uploads and therefore two distinct ids, so the two entries remain separate
+ * rows. No id is ever reused (verified across all 1,468 current rows).
+ *
+ * A FAILED entry has no drive_file_id, so it cannot use that identity; it is
+ * keyed on source + route + a sequence number. That is enough because a failed
+ * entry never suppresses a retry — the todo filter keeps any row without a
+ * resolving verified entry. Failed rows exist for reporting and --clear-failed.
+ */
+const SEP = '\u0000';
+const ledger = new Map();            // key -> entry
+const verifiedBySource = new Map();  // source -> [verified entries]
+let failedSeq = 0;
+
+function ledgerKey(e) {
+  return (e.status === 'verified' && e.drive_file_id)
+    ? `${e.source}${SEP}${e.drive_file_id}`
+    : `${e.source}${SEP}failed${SEP}${e.route}${SEP}${failedSeq++}`;
+}
+function indexEntry(e) {
+  ledger.set(ledgerKey(e), e);
+  if (e.status === 'verified' && e.drive_file_id) {
+    if (!verifiedBySource.has(e.source)) verifiedBySource.set(e.source, []);
+    verifiedBySource.get(e.source).push(e);
+  }
+}
 async function loadLedger() {
   try {
     const text = await fsp.readFile(LEDGER, 'utf8');
     for (const line of text.split('\n')) {
       if (!line.trim()) continue;
-      const e = JSON.parse(line);
-      // A destination is keyed per row, not per source: dual-filed sources
-      // legitimately have two destinations.
-      ledger.set(`${e.source} ${e.destination}`, e);
+      indexEntry(JSON.parse(line));
     }
   } catch { /* no ledger yet */ }
 }
@@ -376,7 +421,28 @@ async function appendLedger(entry) {
     ledgerStream = fs.createWriteStream(LEDGER, { flags: 'a' });
   }
   ledgerStream.write(JSON.stringify(entry) + '\n');
-  ledger.set(`${entry.source} ${entry.destination}`, entry);
+  indexEntry(entry);
+}
+
+/**
+ * Is this Drive file still present and untrashed? Only a 404 counts as gone —
+ * anything else (network, 5xx, auth) is "unknown" and must NOT be read as
+ * missing, or a transient Drive outage would look like 1,468 lost files and
+ * trigger a full re-copy.
+ */
+const resolveCache = new Map();
+async function resolvesInDrive(id) {
+  if (resolveCache.has(id)) return resolveCache.get(id);
+  const p = (async () => {
+    try {
+      const f = await DRIVE.stat(id);
+      return f && !f.trashed ? 'present' : 'gone';
+    } catch (err) {
+      return err.status === 404 ? 'gone' : 'unknown';
+    }
+  })();
+  resolveCache.set(id, p);
+  return p;
 }
 
 /**
@@ -491,9 +557,43 @@ if (DRY_RUN) {
 await loadLedger();
 log(`ledger: ${ledger.size} entries already recorded`);
 
+// Confirm every verified id still resolves. Path plays no part in this.
+const verifiedIds = [...new Set([...verifiedBySource.values()].flat().map((e) => e.drive_file_id))];
+log(`checking ${verifiedIds.length} verified Drive ids still resolve...`);
+const present = new Set();
+let unknown = 0, gone = 0;
+for (let i = 0; i < verifiedIds.length; i += 25) {
+  const batch = verifiedIds.slice(i, i + 25);
+  const states = await Promise.all(batch.map((id) => resolvesInDrive(id)));
+  batch.forEach((id, j) => {
+    if (states[j] === 'present') present.add(id);
+    else if (states[j] === 'gone') gone += 1;
+    else unknown += 1;
+  });
+}
+log(`  present ${present.size}, gone ${gone}, unknown ${unknown}`);
+// Safety valve: if Drive could not answer for a meaningful slice, stop rather
+// than re-copying files that are probably fine.
+if (unknown > Math.max(5, verifiedIds.length * 0.02)) {
+  log(`ABORT: ${unknown} ids could not be checked. Refusing to re-copy on incomplete information.`);
+  process.exit(1);
+}
+
+/**
+ * A source is satisfied by as many resolving verified entries as it has copy
+ * rows. Counting rather than path-matching is what keeps dual-filing correct:
+ * a source with two destinations needs two surviving uploads.
+ */
+const satisfied = new Map();
+for (const [src, es] of verifiedBySource) {
+  satisfied.set(src, es.filter((e) => present.has(e.drive_file_id)).length);
+}
+const consumed = new Map();
 const todo = rows.filter((r) => {
-  const e = ledger.get(`${r.src} ${r.dest}`);
-  return !e || e.status !== 'verified';
+  const have = satisfied.get(r.src) ?? 0;
+  const used = consumed.get(r.src) ?? 0;
+  if (used < have) { consumed.set(r.src, used + 1); return false; }
+  return true;
 });
 log(`to copy: ${todo.length} (${rows.length - todo.length} already verified)`);
 
@@ -578,6 +678,7 @@ async function copyOne(r) {
 
     await appendLedger({
       source: r.src, destination: r.dest, drive_file_id: stat.id,
+      client: r.client,
       source_size: size, uploaded_size: uploaded, mime_type: stat.mimeType,
       route: r.route, status: 'verified', timestamp: new Date().toISOString(),
     });
@@ -587,6 +688,7 @@ async function copyOne(r) {
     if (err.fatal) throw err;
     await appendLedger({
       source: r.src, destination: r.dest, drive_file_id: null,
+      client: r.client,
       source_size: null, uploaded_size: null, mime_type: null,
       route: r.route, status: 'failed', error: err.message,
       timestamp: new Date().toISOString(),
