@@ -27,6 +27,32 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
+ * Tools that refuse to run without an explicit `confirmed: true`.
+ *
+ * Each entry is a predicate over the tool input returning a human-readable
+ * REASON string when confirmation is required, or null when it is not. This
+ * lets a single tool be gated only in its risky shape — a calendar event with
+ * no attendees affects nobody but the user and runs straight through.
+ *
+ * Enforced in executeToolCall() below, before dispatch, so a refused call never
+ * constructs a client or reaches any external API.
+ *
+ * Registering a new tool here is the whole integration: add a predicate, and
+ * add `confirmed` to that tool's input_schema in definitions.js so the model
+ * can actually pass it.
+ */
+const CONFIRMATION_POLICY = {
+  create_calendar_event: (input) =>
+    Array.isArray(input?.attendees) && input.attendees.length > 0
+      ? 'it invites other people'
+      : null,
+  update_calendar_event: (input) =>
+    Array.isArray(input?.attendees) && input.attendees.length > 0
+      ? 'it changes who is invited'
+      : null
+};
+
+/**
  * Parse JSON string parameters that Claude sometimes sends as strings
  * @param {any} value - Value that might be a JSON string
  * @returns {any} Parsed value or original value
@@ -122,6 +148,39 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
     };
   }
 
+  // ==========================================================================
+  // CONFIRMATION GATE
+  // --------------------------------------------------------------------------
+  // Pre-dispatch policy check, in the same position and of the same shape as
+  // isServerTool() above. A registered tool refuses to run unless the caller
+  // passes confirmed: true. The predicate receives the tool input, so a tool can
+  // be risky only in some shapes — a solo calendar event is not gated, the same
+  // tool with attendees is.
+  //
+  // Generic by design; Calendar is its only registered consumer today. HubSpot
+  // deliberately unchanged.
+  //
+  // TWO LIMITS, both deliberate:
+  //  1. This is a forcing function, not a security boundary. A model could set
+  //     confirmed: true on the first call. What this guarantees is that the
+  //     naive path FAILS and the refusal says what to do — strictly better than
+  //     a prompt-only rail, but not unbypassable.
+  //  2. The predicate only sees the input, so it cannot know that an existing
+  //     event already has attendees. update_calendar_event therefore repeats the
+  //     check in src/tools/google-calendar.js after fetching the event.
+  // ==========================================================================
+  const reason = CONFIRMATION_POLICY[toolName]?.(input);
+  if (reason && input?.confirmed !== true) {
+    console.warn(`🛑 ${toolName} refused: not confirmed (${reason})`);
+    return {
+      success: false,
+      // Distinct machine-readable flag so this is not confusable with a
+      // generic failure.
+      requires_confirmation: true,
+      error: `Refused: ${toolName} was not confirmed. This action affects other people because ${reason}. Show the user exactly what you intend to do — who, when, title, and whether a Meet link is included — and get an explicit yes. Then call this tool again with confirmed: true.`
+    };
+  }
+
   try {
     let result;
 
@@ -153,8 +212,14 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             try {
               const { query: dbQuery } = await import('../database/connection.js');
 
-              // Normalize employee_count vs employees
-              const fieldName = input.key === 'employees' ? 'employee_count' : input.key;
+              // Headcount stated in conversation routes to employee_count_stated,
+              // never to employee_count. That key is reserved for the widget form's
+              // bucket, which the Pro call-eligibility gate reads — see the note in
+              // src/tools/save-lead-data.js. Without this remap, memory_store is a
+              // second path to the same clobber.
+              const fieldName = (input.key === 'employees' || input.key === 'employee_count')
+                ? 'employee_count_stated'
+                : input.key;
 
               // JSONB merge: preserve existing fields, add/update this field
               await dbQuery(
@@ -890,6 +955,31 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       case 'append_sheet_row':
         result = await googleSheets.appendSheetRow(userId, input);
         break;
+
+      // ============================================================================
+      // GOOGLE CALENDAR (per-user delegated OAuth)
+      // Writes with attendees are gated by CONFIRMATION_POLICY above.
+      // ============================================================================
+      case 'list_calendar_events': {
+        const googleCalendar = await import('./google-calendar.js');
+        result = await googleCalendar.listCalendarEvents(userId, input);
+        break;
+      }
+      case 'check_calendar_availability': {
+        const googleCalendar = await import('./google-calendar.js');
+        result = await googleCalendar.checkCalendarAvailability(userId, input);
+        break;
+      }
+      case 'create_calendar_event': {
+        const googleCalendar = await import('./google-calendar.js');
+        result = await googleCalendar.createCalendarEvent(userId, input);
+        break;
+      }
+      case 'update_calendar_event': {
+        const googleCalendar = await import('./google-calendar.js');
+        result = await googleCalendar.updateCalendarEvent(userId, input);
+        break;
+      }
 
       case 'create_advanced_document':
         result = await createAdvancedDocumentTool(input, {
