@@ -1,6 +1,6 @@
 # Final Client List
 
-**Generated:** 2026-08-12T01:53:55.149Z
+**Generated:** 2026-08-13T17:24:22.265Z
 **Inputs:** `dist/inventory/resolved-final.csv`, `scripts/client-corrections.json`
 **Output:** `dist/inventory/clients-final.csv` (gitignored — regenerable)
 **Method:** mechanical. No API call of any kind. The six corrections are hand-review decisions applied as data.
@@ -11,12 +11,12 @@ This is the list the pilot runs against.
 
 | | |
 |---|---|
-| **Canonical companies** | **1,752** |
+| **Canonical companies** | **1,749** |
 | Raw client folder names behind them | 1,962 |
 | Files under client names | 70,725 (93.1% of the tree) |
-| Companies with >1 raw folder name | 167 |
-| Live | 1,005 companies, 58,078 files |
-| Archive-only | 725 companies, 12,647 files |
+| Companies with >1 raw folder name | 170 |
+| Live | 1,000 companies, 58,051 files |
+| Archive-only | 727 companies, 12,674 files |
 
 ---
 
@@ -24,7 +24,7 @@ This is the list the pilot runs against.
 
 Recorded in `scripts/client-corrections.json` (version-controlled) so they survive any re-run of the pipeline. Each is matched on the normalized folder-name key, so they keep applying even if file counts shift.
 
-Canonical company count: **1,855 → 1,752** (−103; the six corrections collapsed 199 model-assigned canonicals into 93).
+Canonical company count: **1,855 → 1,749** (−106; the six corrections collapsed 224 model-assigned canonicals into 115).
 
 | # | Canonical after correction | Raw folder names merged | Files | Was |
 |---|---|---|---|---|
@@ -121,6 +121,28 @@ Canonical company count: **1,855 → 1,752** (−103; the six corrections collap
 | 91 | **Sand and Sea Design** | `Sand and Sea Design Company` (4)<br>`Sand and Sea Design` (1) | **5** | `Sand and Sea Design Company`, `Sand and Sea Design` |
 | 92 | **Dominion NewEnergy** | `Dominion NewEnergy` (3)<br>`Dominion Newenergy Inc.` (2) | **5** | `Dominion NewEnergy`, `Dominion Newenergy Inc.` |
 | 93 | **Practical Coaching** | `Practical Coaching` (2)<br>`Practical Coaching Ltd` (1) | **3** | `Practical Coaching`, `Practical Coaching Ltd` |
+| 94 | **Chen's Enterprise** | `Chens Enterprise` (23) | **23** | `Chen's Enterprise` |
+| 95 | **E2+ Associates** | `E2+ Associates` (31)<br>`E2+Associates` (9) | **40** | `E2+ Associates` |
+| 96 | **Spark Kombucha** | `Spark Kombuxha` (21)<br>`Spark Kombucha` (8) | **29** | `Spark Kombucha` |
+| 97 | **Support Bench** | `Support Bench` (69) | **69** | `Support Bench` |
+| 98 | **Vancouver Island Brewing** | `Vancouver Island Brewing (VIB)` (59)<br>`Vancouver Island Brewing` (3)<br>`Vancouver Island Brewing - KPU` (2) | **64** | `Vancouver Island Brewing` |
+| 99 | **Arts & Labour** | `Arts & Labour` (104)<br>`Arts&Labour` (3) | **107** | `Arts & Labour` |
+| 100 | **Corporate Finance Institute** | `CFI (Corporate Finance Institute)` (65)<br>`Corporate Finance Institude` (31)<br>`Corporate Finance Institute` (22) | **118** | `Corporate Finance Institute` |
+| 101 | **Dooly** | `Dooly` (34) | **34** | `Dooly` |
+| 102 | **Ethony** | `Ethony` (46) | **46** | `Ethony` |
+| 103 | **GameOn** | `GameOn` (82) | **82** | `GameOn` |
+| 104 | **Loren Nancke** | `Loren Nancke` (33) | **33** | `Loren Nancke` |
+| 105 | **Satisfai** | `Satisfai` (37) | **37** | `Satisfai` |
+| 106 | **Simplex** | `Simplex` (3) | **3** | `Simplex` |
+| 107 | **SupportingLines** | `SupportingLines` (8) | **8** | `SupportingLines` |
+| 108 | **Tamwood** | `Tamwood` (11) | **11** | `Tamwood` |
+| 109 | **Unbounce** | `Unbounce` (2) | **2** | `Unbounce` |
+| 110 | **Videre** | `Videre` (13) | **13** | `Videre` |
+| 111 | **ALL Movement (House of A La Ligne)** | `ALL Movement (House of A La Ligne)` (39) | **39** | `ALL Movement (House of A La Ligne)` |
+| 112 | **DEVA Training & Staffing** | `DEVA Training & Staffing` (4) | **4** | `DEVA Training & Staffing` |
+| 113 | **Clearmind International Institute** | `Clearmind` (74)<br>`Clearmind International Institute` (15) | **89** | `Clearmind`, `Clearmind International Institute` |
+| 114 | **Abilities Rehabilitation** | `Abilities Rehabilitation` (18)<br>`Abilities Rehab` (10) | **28** | `Abilities Rehab`, `Abilities Rehabilitation` |
+| 115 | **New World Technologies** | `New World Tech` (18)<br>`New World Technologies` (3) | **21** | `New World Tech`, `New World Technologies` |
 
 All 23 raw folder names resolved cleanly; every one was already labelled `client`. No correction was partially applied.
 
@@ -196,17 +218,17 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 
 ---
 
-## Live vs archive-only (`client_modified`, 2020-08-12 cutoff)
+## Live vs archive-only (`client_modified`, 2020-08-13 cutoff)
 
 `server_modified` is **not** used: 40,390 files share the single date 2024-07-23 from a bulk Dropbox event, which reports nearly everything as recent regardless of real content age.
 
 | Group | Companies | % | Files | % of client files |
 |---|---|---|---|---|
-| **Live** (a file within 6 years) | 1,005 | 57.4% | 58,078 | 82.1% |
-| **Archive-only** | 725 | 41.4% | 12,647 | 17.9% |
+| **Live** (a file within 6 years) | 1,000 | 57.2% | 58,051 | 82.1% |
+| **Archive-only** | 727 | 41.6% | 12,674 | 17.9% |
 | No dated files | 22 | 1.3% | 0 | 0% |
 
-41.4% of companies are archive-only but hold only 17.9% of the files — the tail is old and light.
+41.6% of companies are archive-only but hold only 17.9% of the files — the tail is old and light.
 
 ---
 

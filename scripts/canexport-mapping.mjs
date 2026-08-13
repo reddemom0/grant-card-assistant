@@ -40,6 +40,22 @@ const JOINT = new Map([
   ['pure+:nineteen02 kombucha', ['Pure+', 'Nineteen02 Kombucha']],
   ['capital city:overstory', ['Capital City', 'Overstory']],
   ['premium fence:concept house:kurt', ['Premium Fence', 'Concept House']],
+
+  // --- added by the Strategy Reports review, 2026-08-12 ----------------------
+  // docs/inventory/strategy-reports-merges.md. Same dual-file treatment.
+  //
+  // Grants tree — reachable by this script, which walks grants-inventory.csv.
+  // Listed in docs/inventory/colon-triage.md group B but never added here.
+  ['healthy hooch:functional beverage group', ['Healthy Hooch', 'Functional Beverage Group']],
+  //
+  // Strategy Reports tree — SALES/*Annual Strategic Meetings/Client Strategy
+  // Meeting Reports. This script only walks Grants, so these two are INERT
+  // here; they are recorded so joint handling has one list to read when the
+  // Strategy tree is migrated. "Admin Slayer - Spring Planning" is the same
+  // client pair as the Grants folder "admin slayer:spring planning" above,
+  // spelled with a hyphen instead of a colon.
+  ['admin slayer - spring planning', ['Admin Slayer', 'Spring Planning']],
+  ['cf canada & ap insurance', ['CF Canada Financial', 'AP Insurance']],
 ]);
 
 const log = (...a) => console.error(...a);

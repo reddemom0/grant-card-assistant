@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Hand-reviewed corrections to the canonical client list produced by the two AI classification passes. These are human decisions, not model output: they override whatever canonical_name the model assigned to the listed raw folder names. Applied mechanically by the client-list build so they survive any re-run of the pipeline.",
-  "matching": "raw_names are matched on the normalized key produced by normalizeName() in scripts/grants-lib.mjs (trim, strip trailing whitespace and .,;:_-*, collapse internal whitespace, lowercase). The strings below are the folder names exactly as they appear in Dropbox.",
+  "matching": "raw_names are matched on the normalized key produced by normalizeName() in scripts/grants-lib.mjs (trim, strip trailing whitespace and .,;:_-*, collapse internal whitespace, lowercase). The strings below are the folder names exactly as they appear in Dropbox. strategy_folders lists folder names from SALES/*Annual Strategic Meetings/Client Strategy Meeting Reports. Those folders are not part of dist/inventory/resolved-final.csv, so they are kept OUT of raw_names — listing them there would make build-final-clients.mjs report them as \"not found in resolved list\". They record the same human decision and become live when the Strategy Reports tree is folded into the universe.",
   "corrections": [
     {
       "canonical_name": "Level Ground Trading",
@@ -871,6 +871,258 @@
       ],
       "source": "tier 1 split audit 2026-08-11",
       "note": "Merged 2 canonical entries differing only by legal suffix, punctuation, or spacing: \"Practical Coaching\" (2), \"Practical Coaching Ltd\" (1)."
+    },
+    {
+      "canonical_name": "Chen's Enterprise",
+      "raw_names": [
+        "Chens Enterprise"
+      ],
+      "strategy_folders": [
+        "Chens Enterprises"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Chens Enterprises\" is the same company as \"Chen's Enterprise\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "E2+ Associates",
+      "raw_names": [
+        "E2+ Associates",
+        "E2+Associates"
+      ],
+      "strategy_folders": [
+        "E2 + Associates"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"E2 + Associates\" is the same company as \"E2+ Associates\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Spark Kombucha",
+      "raw_names": [
+        "Spark Kombuxha",
+        "Spark Kombucha"
+      ],
+      "strategy_folders": [
+        "Spark Kombuxha"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Spark Kombuxha\" is the same company as \"Spark Kombucha\". The name also appears in the Grants tree."
+    },
+    {
+      "canonical_name": "Support Bench",
+      "raw_names": [
+        "Support Bench"
+      ],
+      "strategy_folders": [
+        "SupportBench"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"SupportBench\" is the same company as \"Support Bench\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Vancouver Island Brewing",
+      "raw_names": [
+        "Vancouver Island Brewing (VIB)",
+        "Vancouver Island Brewing",
+        "Vancouver Island Brewing - KPU"
+      ],
+      "strategy_folders": [
+        "Vancouver Isl Brewery"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Vancouver Isl Brewery\" is the same company as \"Vancouver Island Brewing\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Arts & Labour",
+      "raw_names": [
+        "Arts & Labour",
+        "Arts&Labour"
+      ],
+      "strategy_folders": [
+        "Arts & Labour Artisans"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Arts & Labour Artisans\" is the same company as \"Arts & Labour\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Corporate Finance Institute",
+      "raw_names": [
+        "CFI (Corporate Finance Institute)",
+        "Corporate Finance Institude",
+        "Corporate Finance Institute"
+      ],
+      "strategy_folders": [
+        "Corporate Finance Institute (CFI Education)"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Corporate Finance Institute (CFI Education)\" is the same company as \"Corporate Finance Institute\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Dooly",
+      "raw_names": [
+        "Dooly"
+      ],
+      "strategy_folders": [
+        "Dooly Research Ltd."
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Dooly Research Ltd.\" is the same company as \"Dooly\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Ethony",
+      "raw_names": [
+        "Ethony"
+      ],
+      "strategy_folders": [
+        "Ethony Enterprises"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Ethony Enterprises\" is the same company as \"Ethony\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "GameOn",
+      "raw_names": [
+        "GameOn"
+      ],
+      "strategy_folders": [
+        "Gameon Entertainment Technologies"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Gameon Entertainment Technologies\" is the same company as \"GameOn\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Loren Nancke",
+      "raw_names": [
+        "Loren Nancke"
+      ],
+      "strategy_folders": [
+        "Loren Nancke & Company"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Loren Nancke & Company\" is the same company as \"Loren Nancke\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Satisfai",
+      "raw_names": [
+        "Satisfai"
+      ],
+      "strategy_folders": [
+        "Satisfai Health"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Satisfai Health\" is the same company as \"Satisfai\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Simplex",
+      "raw_names": [
+        "Simplex"
+      ],
+      "strategy_folders": [
+        "Simplex Services Inc."
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Simplex Services Inc.\" is the same company as \"Simplex\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "SupportingLines",
+      "raw_names": [
+        "SupportingLines"
+      ],
+      "strategy_folders": [
+        "SupportingLines Institute"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"SupportingLines Institute\" is the same company as \"SupportingLines\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Tamwood",
+      "raw_names": [
+        "Tamwood"
+      ],
+      "strategy_folders": [
+        "Tamwood International College"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Tamwood International College\" is the same company as \"Tamwood\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Unbounce",
+      "raw_names": [
+        "Unbounce"
+      ],
+      "strategy_folders": [
+        "Unbounce Marketing Solutions Inc"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Unbounce Marketing Solutions Inc\" is the same company as \"Unbounce\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Videre",
+      "raw_names": [
+        "Videre"
+      ],
+      "strategy_folders": [
+        "Videre Financiers"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"Videre Financiers\" is the same company as \"Videre\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "ALL Movement (House of A La Ligne)",
+      "raw_names": [
+        "ALL Movement (House of A La Ligne)"
+      ],
+      "strategy_folders": [
+        "House of A La Ligne"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"House of A La Ligne\" is the same company as \"ALL Movement (House of A La Ligne)\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "DEVA Training & Staffing",
+      "raw_names": [
+        "DEVA Training & Staffing"
+      ],
+      "strategy_folders": [
+        "DEVA Training & Staff Solutions"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "Strategy Reports folder \"DEVA Training & Staff Solutions\" is the same company as \"DEVA Training & Staffing\". The Strategy folder name does not appear in the Grants tree, so this correction pins the canonical and records the mapping for the Strategy Reports migration."
+    },
+    {
+      "canonical_name": "Clearmind International Institute",
+      "raw_names": [
+        "Clearmind",
+        "Clearmind International Institute"
+      ],
+      "strategy_folders": [
+        "Clearmind International"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "One company written three ways. The Strategy Reports folder \"Clearmind International\" sits between the two Grants canonicals \"Clearmind\" and \"Clearmind International Institute\"; all three are the same organisation. Chris chose the full institute name as canonical."
+    },
+    {
+      "canonical_name": "Abilities Rehabilitation",
+      "raw_names": [
+        "Abilities Rehab",
+        "Abilities Rehabilitation"
+      ],
+      "strategy_folders": [
+        "Abilities Neurological Rehabilitation"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "One company written three ways: the Grants canonicals \"Abilities Rehab\" and \"Abilities Rehabilitation\", plus the Strategy Reports folder \"Abilities Neurological Rehabilitation\". Chris chose \"Abilities Rehabilitation\" as canonical."
+    },
+    {
+      "canonical_name": "New World Technologies",
+      "raw_names": [
+        "New World Tech",
+        "New World Technologies"
+      ],
+      "strategy_folders": [
+        "New World Technology"
+      ],
+      "source": "strategy reports review 2026-08-12",
+      "note": "One company written three ways: the Grants canonicals \"New World Tech\" and \"New World Technologies\", plus the Strategy Reports folder \"New World Technology\". \"New World Technologies (Rad Torque)\" is deliberately EXCLUDED — the parenthetical suggests a distinct entity; it is recorded in the deferred block."
     }
   ],
   "deferred": {
@@ -911,18 +1163,6 @@
           70
         ],
         "total_files": 146,
-        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
-      },
-      {
-        "names": [
-          "Artona Group",
-          "Artona"
-        ],
-        "files": [
-          61,
-          54
-        ],
-        "total_files": 115,
         "reason": "differs only by Group/Holdings — may be a distinct legal entity"
       },
       {
@@ -975,6 +1215,18 @@
       },
       {
         "names": [
+          "E3 Eco",
+          "E3 Eco Group"
+        ],
+        "files": [
+          30,
+          10
+        ],
+        "total_files": 40,
+        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
+      },
+      {
+        "names": [
           "Mount Pleasant Dental",
           "Mount Pleasant Dental Group"
         ],
@@ -983,30 +1235,6 @@
           9
         ],
         "total_files": 37,
-        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
-      },
-      {
-        "names": [
-          "E3 Eco",
-          "E3 Eco Group"
-        ],
-        "files": [
-          30,
-          5
-        ],
-        "total_files": 35,
-        "reason": "differs only by Group/Holdings — may be a distinct legal entity"
-      },
-      {
-        "names": [
-          "E3 Eco",
-          "E3 Eco Group Inc."
-        ],
-        "files": [
-          30,
-          5
-        ],
-        "total_files": 35,
         "reason": "differs only by Group/Holdings — may be a distinct legal entity"
       },
       {
@@ -1093,6 +1321,37 @@
         "total_files": 4,
         "reason": "differs only by Group/Holdings — may be a distinct legal entity"
       }
-    ]
+    ],
+    "strategy_reports": {
+      "description": "Strategy Reports candidates that were NOT merged. Each needs a business answer, not a spelling fix.",
+      "source": "strategy reports review 2026-08-12",
+      "pairs": [
+        {
+          "names": [
+            "Linetest Collective",
+            "Linetest TV"
+          ],
+          "files": [
+            1,
+            12
+          ],
+          "total_files": 13,
+          "reason": "Shared stem \"Linetest\", then the names diverge. A collective and a TV arm may be different divisions of one business or two separate entities. Not a spelling difference, so not merged."
+        },
+        {
+          "names": [
+            "New World Technologies",
+            "New World Technologies (Rad Torque)"
+          ],
+          "files": [
+            3,
+            8
+          ],
+          "total_files": 11,
+          "reason": "Excluded from the New World Technologies merge on purpose. The parenthetical \"(Rad Torque)\" suggests a distinct entity or brand rather than a spelling variant."
+        }
+      ],
+      "note": "Sibling sub-blocks of `deferred` are preserved across re-runs. scripts/apply-tier1-merges.mjs previously reassigned the whole `deferred` object and dropped this block; it now merges into the existing object and rewrites only the description/source/pairs keys it owns."
+    }
   }
 }

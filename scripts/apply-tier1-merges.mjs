@@ -201,7 +201,19 @@ for (const m of merges) {
 }
 
 // ---------------------------------------------------------------- Step 6: deferred section
+// MERGE into the existing deferred object; never reassign it. Other passes add
+// their own sub-blocks alongside this one — deferred.strategy_reports comes
+// from the Strategy Reports review — and a wholesale `doc.deferred = {...}`
+// silently dropped them on every re-run. Only the three keys this script owns
+// (description, source, pairs) are rewritten; every sibling key is preserved.
+const priorDeferred = (doc.deferred && typeof doc.deferred === 'object' && !Array.isArray(doc.deferred))
+  ? doc.deferred
+  : {};
+const carried = Object.keys(priorDeferred).filter((k) => !['description', 'source', 'pairs'].includes(k));
+if (carried.length) log(`deferred: carrying forward ${carried.length} sibling block(s): ${carried.join(', ')}`);
+
 doc.deferred = {
+  ...priorDeferred,
   description: 'Canonical pairs that differ ONLY by "Group" or "Holdings". Not merged: a Group or Holdings entity may be a legally distinct company, so merging would be a business assertion rather than a spelling fix. Pending confirmation from Nat or a GC. These files still migrate — they simply land as separate client folders.',
   source: SOURCE,
   pairs: DEFERRED.map((p) => ({
