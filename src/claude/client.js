@@ -20,10 +20,10 @@ import { BookingLinkRoutingError } from '../api/booking-link-routing.js';
 import { getQueryConfig, getQueryConfigForModel, logConfigDecision } from './query-classifier.js';
 import {
   getMaxTurnsForAgent,
-  calculateRequestCost,
   shouldWarnAboutCost,
   COST_SETTINGS
 } from '../config/cost-settings.js';
+import { logAPICost } from '../utils/cost-logger.js';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -227,6 +227,34 @@ export async function runAgent({
       console.log(`✓ Injected learned patterns from feedback into system prompt`);
     } else {
       console.log(`✓ No learned patterns available yet (feedback learning will run as feedback is collected)`);
+    }
+
+    // ============================================================================
+    // 2.55. Load signed-in user identity (USER-SPECIFIC - NOT CACHEABLE)
+    // ============================================================================
+    // Gives the agent the identity of the person it is talking to, including
+    // their HubSpot owner ID, so it can attribute actions instead of asking who
+    // the user is. See migrations/023_add_hubspot_owner_id.sql.
+    //
+    // Skipped entirely when userId is null (the HubSpot webhook, CLI scripts,
+    // lead-gen), so those callers behave exactly as before.
+    let userIdentity = null;
+    if (userId) {
+      try {
+        const { query } = await import('../database/connection.js');
+        const r = await query(
+          'SELECT name, email, hubspot_owner_id FROM users WHERE id = $1',
+          [userId]
+        );
+        if (r.rows.length > 0) {
+          userIdentity = r.rows[0];
+          console.log(`👤 Identity: ${userIdentity.email} (HubSpot owner: ${userIdentity.hubspot_owner_id || 'unmapped'})`);
+        }
+      } catch (err) {
+        // Never fail the turn over identity — degrade to the previous behaviour
+        // where the agent asks who the user is.
+        console.warn('⚠️  Could not load user identity:', err.message);
+      }
     }
 
     // ============================================================================
@@ -572,6 +600,27 @@ export async function runAgent({
         console.log(`🔍 DEBUG: Strategic context injected into system prompt (${strategicContext.length} chars)`);
       }
 
+      // Add signed-in user identity (if resolved) - NOT CACHED
+      // Placed after the cached base prompt so it never invalidates the 1h
+      // prefix, matching how summary/memories/learning-memory are handled.
+      if (userIdentity) {
+        const ownerLine = userIdentity.hubspot_owner_id
+          ? `Their HubSpot owner ID is ${userIdentity.hubspot_owner_id}. When a HubSpot record needs an owner and the user has not named someone else, default to this ID and say which owner you are using so they can correct it.`
+          : `This account has no HubSpot owner ID on file, so you cannot default a record owner for them — ask who the owner should be.`;
+
+        systemBlocks.push({
+          type: 'text',
+          text: [
+            '## Signed-in user',
+            '',
+            `You are assisting ${userIdentity.name || 'a Granted team member'} (${userIdentity.email}).`,
+            ownerLine,
+            '',
+            'This is the person you are talking to. Do not ask them who they are.'
+          ].join('\n')  // ❌ NOT CACHED (user-specific)
+        });
+      }
+
       // DEBUG: Log full system prompt structure for lead-gen conversations
       if (agentType === 'lead-gen' && leadGenFormContext) {
         console.log(`🔍 DEBUG: Full system prompt blocks (${systemBlocks.length} blocks):`);
@@ -682,17 +731,13 @@ export async function runAgent({
 
       if (fullResponse.usage) {
         const usage = fullResponse.usage;
-        const cost = calculateRequestCost(usage, MODEL);
-
-        // Log token usage for monitoring
-        console.log(`📊 Token usage: {`,
-          `input: ${usage.input_tokens || 0},`,
-          `output: ${usage.output_tokens || 0},`,
-          `cache_creation: ${usage.cache_creation_input_tokens || 0},`,
-          `cache_read: ${usage.cache_read_input_tokens || 0}`,
-        `}`);
-
-        console.log(`💰 Request cost: $${cost.toFixed(4)}`);
+        const cost = logAPICost({
+          usage,
+          model: MODEL,
+          source: 'agent-loop',
+          agentType,
+          conversationId
+        });
 
         // Warn if cost is unusually high
         if (shouldWarnAboutCost(cost)) {
@@ -707,15 +752,6 @@ export async function runAgent({
           } catch (callbackError) {
             console.error('⚠️  Cost callback error:', callbackError.message);
           }
-        }
-
-        // Calculate cache hit rate for this request
-        const totalInput = (usage.input_tokens || 0) +
-                          (usage.cache_creation_input_tokens || 0) +
-                          (usage.cache_read_input_tokens || 0);
-        if (totalInput > 0 && usage.cache_read_input_tokens) {
-          const cacheHitRate = (usage.cache_read_input_tokens / totalInput) * 100;
-          console.log(`📈 Cache hit rate: ${cacheHitRate.toFixed(1)}%`);
         }
       }
 
