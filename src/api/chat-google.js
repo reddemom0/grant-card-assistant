@@ -124,6 +124,101 @@ export async function resolveUser(email) {
 }
 
 /**
+ * Normalize a Chat event into one shape, whichever wire format arrived.
+ * Exported for testing.
+ *
+ * TWO PAYLOAD SHAPES EXIST and they are not compatible:
+ *
+ *   Classic Chat app:
+ *     { type: 'MESSAGE', message: {...}, space: {...} }
+ *
+ *   Google Workspace add-on (what this app is deployed as):
+ *     { chat: { messagePayload: { message: {...}, space: {...} } } }
+ *
+ * The add-on shape has NO top-level `type` — the interaction is identified by
+ * which container is present (messagePayload, addedToSpacePayload,
+ * buttonClickedPayload...). Reading the classic shape against an add-on payload
+ * silently yields undefined everywhere, which is exactly how this broke the
+ * first time. Both are handled so a config change cannot break it again.
+ *
+ * Field preference: `thread.name` and `space.name` are Chat API resource names
+ * (`spaces/X/threads/Y`) and are what the API needs to post a reply.
+ * `threadKey`/`displayName` are weaker identifiers documented for the add-on
+ * shape, used only as a fallback.
+ *
+ * @param {Object} body - raw req.body
+ * @returns {Object} normalized descriptor; `eventType` is null when unrecognized
+ */
+export function normalizeChatEvent(body) {
+  const base = {
+    shape: 'unrecognized',
+    eventType: null,
+    container: null,
+    message: null,
+    space: null,
+    senderEmail: null,
+    senderType: null,
+    text: '',
+    threadId: null,
+    threadIsResourceName: false,
+    spaceId: null,
+    spaceIsResourceName: false
+  };
+
+  if (!body || typeof body !== 'object') return base;
+
+  let shape = null;
+  let payload = null;
+  let eventType = null;
+  let container = null;
+
+  if (body.chat && typeof body.chat === 'object') {
+    shape = 'workspace-addon';
+    // Find the *Payload container; its name identifies the interaction.
+    container = Object.keys(body.chat).find(k => k.endsWith('Payload')) || null;
+    if (container) {
+      payload = body.chat[container];
+      eventType = container === 'messagePayload'
+        ? 'MESSAGE'
+        : container.replace(/Payload$/, '');
+    }
+  } else if (typeof body.type === 'string') {
+    shape = 'classic';
+    eventType = body.type;
+    payload = body;
+    container = 'type';
+  }
+
+  if (!payload) {
+    return { ...base, shape: shape || 'unrecognized', container, eventType };
+  }
+
+  const message = payload.message || null;
+  const space = payload.space || null;
+
+  // Prefer resource names; fall back to the add-on's weaker identifiers.
+  const threadId = message?.thread?.name || message?.thread?.threadKey || null;
+  const spaceId = space?.name || space?.displayName || null;
+
+  return {
+    shape,
+    eventType,
+    container,
+    message,
+    space,
+    senderEmail: message?.sender?.email || null,
+    senderType: message?.sender?.type || null,
+    // argumentText has the app's @mention stripped; in a space `text` still
+    // contains the app name.
+    text: (message?.argumentText || message?.text || '').trim(),
+    threadId,
+    threadIsResourceName: Boolean(message?.thread?.name),
+    spaceId,
+    spaceIsResourceName: Boolean(space?.name)
+  };
+}
+
+/**
  * Map a Chat thread to a stable Oracle conversation UUID. Exported for testing.
  *
  * Deterministic (uuid v5) rather than stored in a mapping table: the same
@@ -133,12 +228,12 @@ export async function resolveUser(email) {
  * Falls back to the space when a thread is absent, which makes a DM one
  * continuous conversation.
  *
- * @param {Object} event
+ * @param {Object} evt - a normalizeChatEvent() result
  * @returns {{conversationId: string, key: string}}
  */
-export function conversationIdForEvent(event) {
-  const key = event?.message?.thread?.name || event?.space?.name;
-  if (!key) throw new Error('Chat event has neither thread.name nor space.name');
+export function conversationIdForEvent(evt) {
+  const key = evt?.threadId || evt?.spaceId;
+  if (!key) throw new Error('Chat event carries neither a thread nor a space identifier');
   return { conversationId: uuidv5(key, uuidv5.URL), key };
 }
 
@@ -240,20 +335,29 @@ function createChatClient() {
  * @param {Object} event - the original Chat event
  * @param {string} text - already converted to Chat formatting
  */
-async function postToChat(event, text) {
+async function postToChat(evt, text) {
   const chat = createChatClient();
-  const parent = event.space.name;
-  const threadName = event?.message?.thread?.name;
 
-  for (const chunk of splitForChat(text)) {
+  // The API needs a resource name (`spaces/XXX`). If only a displayName came
+  // through, the create call will fail — say so up front so the cause is
+  // obvious in the log rather than buried in a Google API error.
+  if (!evt.spaceIsResourceName) {
+    console.warn(`⚠️  Posting with a non-resource-name space identifier ("${evt.spaceId}") — the Chat API expects "spaces/XXX" and will likely reject this.`);
+  }
+
+  const chunks = splitForChat(text);
+  console.log(`📤 Posting ${chunks.length} message(s) to ${evt.spaceId}`);
+
+  for (const chunk of chunks) {
     await chat.spaces.messages.create({
-      parent,
+      parent: evt.spaceId,
       // Keep the reply in the originating thread; start a new one if that
       // thread has gone away.
       messageReplyOption: 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD',
       requestBody: {
         text: chunk,
-        ...(threadName ? { thread: { name: threadName } } : {})
+        // Only a real resource name is valid here; threadKey is not.
+        ...(evt.threadIsResourceName ? { thread: { name: evt.threadId } } : {})
       }
     });
   }
@@ -264,9 +368,10 @@ async function postToChat(event, text) {
  * background task. This is the ONE place where the user may get silence, so it
  * logs loudly.
  */
-async function safePost(event, text) {
+async function safePost(evt, text) {
   try {
-    await postToChat(event, text);
+    await postToChat(evt, text);
+    console.log('✅ Chat reply delivered');
   } catch (err) {
     console.error('❌ Google Chat post-back FAILED — user received nothing:', err.message);
   }
@@ -276,7 +381,12 @@ async function safePost(event, text) {
  * Run Oracle and post the result. Runs after the HTTP ack, so it must never
  * throw into the void: every path ends in a message to the user.
  */
-async function runOracleAndReply(event, user, conversationId, messageText) {
+async function runOracleAndReply(evt, user, conversationId, messageText) {
+  const startedAt = Date.now();
+  // START MARKER. An ack with no matching "finished"/"failed" line means the
+  // process died mid-run — otherwise silence here is impossible.
+  console.log(`▶️  Chat background task START — user ${user.id}, conversation ${conversationId}`);
+
   try {
     await createConversation(
       conversationId,
@@ -295,7 +405,8 @@ async function runOracleAndReply(event, user, conversationId, messageText) {
     });
 
     if (!result?.success) {
-      await safePost(event, `Something went wrong: ${result?.error || 'unknown error'}`);
+      console.error(`❌ Agent returned failure: ${result?.error || 'unknown error'}`);
+      await safePost(evt, `Something went wrong: ${result?.error || 'unknown error'}`);
       return;
     }
 
@@ -308,14 +419,18 @@ async function runOracleAndReply(event, user, conversationId, messageText) {
       .trim();
 
     if (!text) {
-      await safePost(event, "I finished, but didn't produce a text reply. Try rephrasing?");
+      console.warn('⚠️  Agent produced no text blocks');
+      await safePost(evt, "I finished, but didn't produce a text reply. Try rephrasing?");
       return;
     }
 
-    await safePost(event, markdownToChat(text));
+    await safePost(evt, markdownToChat(text));
   } catch (err) {
     console.error('❌ Oracle run failed for Chat event:', err);
-    await safePost(event, `Something went wrong while I was working on that: ${err.message}`);
+    await safePost(evt, `Something went wrong while I was working on that: ${err.message}`);
+  } finally {
+    // COMPLETION MARKER — always runs, including on every early return above.
+    console.log(`⏹️  Chat background task END — conversation ${conversationId} (${Date.now() - startedAt}ms)`);
   }
 }
 
@@ -333,17 +448,33 @@ export async function handleGoogleChatEvent(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const event = req.body || {};
+  const evt = normalizeChatEvent(req.body);
 
-  // Only respond to messages from humans. Ignoring BOT senders prevents loops.
-  if (event.type !== 'MESSAGE' || event?.message?.sender?.type === 'BOT') {
+  // SHAPE LOG — the single most useful line when this endpoint misbehaves.
+  // A payload-shape change is what silently broke this before.
+  console.log(`📥 Chat event — shape: ${evt.shape}, container: ${evt.container || 'none'}, type: ${evt.eventType || 'unknown'}`);
+
+  if (evt.shape === 'unrecognized' || !evt.eventType) {
+    // Top-level KEYS only — never the body, which carries message content.
+    console.warn(`⚠️  Unrecognized Chat payload — ignoring. Top-level keys: [${Object.keys(req.body || {}).join(', ')}]`);
     return res.status(200).json({});
   }
 
-  const senderEmail = event?.message?.sender?.email;
-  const messageText = (event?.message?.argumentText || event?.message?.text || '').trim();
+  // Only respond to messages from humans. Ignoring BOT senders prevents loops.
+  if (evt.eventType !== 'MESSAGE') {
+    console.log(`↩️  Ignoring: event type is "${evt.eventType}", not MESSAGE`);
+    return res.status(200).json({});
+  }
+  if (evt.senderType === 'BOT') {
+    console.log('↩️  Ignoring: sender is a BOT (loop prevention)');
+    return res.status(200).json({});
+  }
+
+  const senderEmail = evt.senderEmail;
+  const messageText = evt.text;
 
   if (!messageText) {
+    console.log('↩️  Ignoring: message carried no text');
     return res.status(200).json({ text: 'Send me a question and I\'ll take a look.' });
   }
 
@@ -358,6 +489,7 @@ export async function handleGoogleChatEvent(req, res) {
   // Unknown or deactivated — same message either way, so we do not disclose
   // whether an account exists.
   if (!user) {
+    console.log(`↩️  Ignoring: sender "${senderEmail || '(no email)'}" is not a known active user`);
     return res.status(200).json({
       text: `I don't recognize ${senderEmail || 'this account'}. Sign in at the Granted AI Hub first, then message me again.`
     });
@@ -368,6 +500,7 @@ export async function handleGoogleChatEvent(req, res) {
   // created another way degrades into a clear instruction rather than tool
   // failures mid-answer.
   if (!user.google_refresh_token) {
+    console.log(`↩️  Ignoring: user ${user.id} has no stored Google tokens`);
     const hubUrl = process.env.PUBLIC_URL || 'https://grant-card-assistant-production.up.railway.app';
     return res.status(200).json({
       text: `Your account isn't fully connected yet. Sign in once at ${hubUrl}/login, then message me again.`
@@ -376,11 +509,13 @@ export async function handleGoogleChatEvent(req, res) {
 
   let conversationId;
   try {
-    ({ conversationId } = conversationIdForEvent(event));
+    ({ conversationId } = conversationIdForEvent(evt));
   } catch (err) {
     console.error('❌ Could not derive conversation id:', err.message);
     return res.status(200).json({ text: 'I could not work out which conversation this belongs to.' });
   }
+
+  console.log(`✅ Accepted — user ${user.id} (${user.email}), thread ${evt.threadId || '(none)'}, conversation ${conversationId}`);
 
   // ==========================================================================
   // ACK NOW, WORK LATER. Chat times out long before Oracle finishes, so return
@@ -388,7 +523,7 @@ export async function handleGoogleChatEvent(req, res) {
   // ==========================================================================
   res.status(200).json({});
 
-  runOracleAndReply(event, user, conversationId, messageText).catch(err => {
+  runOracleAndReply(evt, user, conversationId, messageText).catch(err => {
     console.error('❌ Unhandled error in background Chat task:', err);
   });
 }
