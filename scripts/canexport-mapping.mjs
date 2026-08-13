@@ -11,6 +11,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { loadRows, parseCsv, isBatchName, normalizeName } from './grants-lib.mjs';
+import { mapFiles, makeResolveNodes } from './mapping-lib.mjs';
 
 const INVENTORY = 'dist/inventory/grants-inventory.csv';
 const CLIENTS = 'dist/inventory/clients-final.csv';
@@ -148,19 +149,7 @@ log(`\nSTEP 3 — ${canexportPrograms.length} CanExport program folders, ${CE_TO
 for (const p of canexportPrograms) log(`  ${String(p.files).padStart(6)}  ${p.name}`);
 
 // ---------------------------------------------------------------- attribution
-function resolveNodes(programKey) {
-  const out = [];
-  const stack = (childrenByParent.get(programKey) ?? []).map((c) => ({ ...c, skips: 0 }));
-  while (stack.length) {
-    const node = stack.pop();
-    if (isBatchName(node.name) && node.skips < MAX_SKIP) {
-      for (const c of childrenByParent.get(node.key) ?? []) stack.push({ ...c, skips: node.skips + 1 });
-    } else {
-      out.push({ name: node.name, key: node.key });
-    }
-  }
-  return out;
-}
+const resolveNodes = makeResolveNodes(childrenByParent, MAX_SKIP);
 const nodeByKey = new Map();
 for (const p of canexportPrograms) {
   for (const n of resolveNodes(p.key)) nodeByKey.set(n.key, { name: n.name, program: p.name });
@@ -171,200 +160,18 @@ log(`  ${ceFiles.length} files under CanExport programs`);
 
 // ---------------------------------------------------------------- Step 4/5
 // ---------------------------------------------------------------- Step 2
-/**
- * Sanitize a FOLDER path segment for Drive. Filenames are never passed through
- * this — only directory segments. The colon is the macOS encoding of a typed
- * '/', so ' - ' preserves the visual break without creating a path separator.
- */
-const folderRenames = new Map(); // old -> new
-function sanitizeSegment(seg) {
-  const clean = seg.replace(/\s*:\s*/g, ' - ').replace(/\s+/g, ' ').trim();
-  if (clean !== seg) folderRenames.set(seg, clean);
-  return clean;
-}
-const sanitizePath = (segs) => segs.map(sanitizeSegment).join('/');
-
-/** Conservative filename cleanup. NOT applied — phase 3 input only. */
-function cleanFilename(name) {
-  const ext = path.extname(name);
-  let base = ext ? name.slice(0, -ext.length) : name;
-  base = base
-    .replace(/:/g, ' - ')          // colon is a typed '/' on macOS; ' - ' is safe in Drive
-    .replace(/[\\|<>"?*]/g, '-')   // characters awkward across filesystems
-    .replace(/^[\s*_-]+/, '')      // leading decoration (*, _, -)
-    .replace(/\s+/g, ' ')
-    .replace(/[\s.]+$/, '')        // trailing dots/spaces
-    .trim();
-  if (!base) base = 'untitled';
-  return base + ext.toLowerCase();
-}
-
-const relOf = (f) => f.segs.join('/');
-const yearOf = (f) => (f.cm ? f.cm.slice(0, 4) : null);
-
-const out = [];
-const stats = {
-  sort: { files: 0, bytes: 0 }, program: { files: 0, bytes: 0 },
-  archive: { files: 0, bytes: 0 }, review: { files: 0, bytes: 0 },
-};
-const reviewReasons = new Map();
-const programTops = new Map();
-const noYear = [];
-const audit = [];          // Part A: per-file year provenance
-let dualFiled = 0;
-let yearCollapsed = 0;
-let yearMoved = 0, yearRecovered = 0, yearConfirmed = 0;
-const FIRST_SEG_YEAR = /(?:^|[^0-9])((?:19|20)\d{2})(?![0-9])/;
-
-for (const f of ceFiles) {
-  const folderSegs = f.segs.slice(0, -1);
-  let node = null;
-  let nodeDepth = 0;
-  for (let k = 1; k <= folderSegs.length; k++) {
-    const hit = nodeByKey.get(folderSegs.slice(0, k).join('/'));
-    if (hit) { node = hit; nodeDepth = k; break; }
-  }
-  const cmYear = yearOf(f);
-
-  // Everything BELOW the client folder carries over unchanged; everything
-  // above it is discarded. This is the reorganization.
-  let subSegs = node ? folderSegs.slice(nodeDepth) : [];
-  // Part A works off the ORIGINAL sub-path, before the year collapse, so
-  // agreement between folder-year and client_modified is measured honestly.
-  audit.push({
-    path: f.path,
-    program: f.program,
-    derivedYear: cmYear,
-    nodeName: node ? node.name : null,
-    subOrig: subSegs.slice(),
-    belowProgram: folderSegs.slice(1),
-  });
-
-  // Year source: the FIRST segment of the client's sub-path when it carries a
-  // year, otherwise client_modified. Only the first segment counts — a year
-  // deeper in the path (e.g. Reporting/Trip 1 - Nov 2018/) does NOT override,
-  // because it describes something inside the cycle, not the cycle itself.
-  let year = cmYear;
-  let yearSource = cmYear ? 'client_modified' : 'none';
-  if (subSegs.length) {
-    const m = subSegs[0].match(FIRST_SEG_YEAR);
-    if (m) {
-      year = m[1];
-      yearSource = 'folder';
-      if (cmYear && m[1] !== cmYear) yearMoved += 1;
-      else if (!cmYear) yearRecovered += 1;
-      else yearConfirmed += 1;
-    }
-  }
-
-  // Collapse a leading sub-path segment that is EXACTLY the year, so
-  // Client/Program/2023/2023/X/ becomes Client/Program/2023/X/. Exact string
-  // match only — '2023-24', '2023 Application' and the like are left alone.
-  if (year && subSegs.length && subSegs[0] === year) {
-    subSegs = subSegs.slice(1);
-    yearCollapsed += 1;
-  }
-  const sub = subSegs.length ? sanitizePath(subSegs) : '';
-  if (!year) noYear.push(f);
-  const proposed = cleanFilename(f.name);
-  const src = f.path;
-
-  // --- no attributed client -------------------------------------------------
-  if (!node) {
-    out.push({
-      src, client: '', program: f.program, year: year ?? '',
-      dest: `Review/${sanitizePath(folderSegs)}${folderSegs.length ? '/' : ''}${f.name}`,
-      proposed, route: 'review', confidence: 'low', yearSource,
-      reason: 'no client folder above this file',
-    });
-    reviewReasons.set('no attributed client', (reviewReasons.get('no attributed client') ?? 0) + 1);
-    continue;
-  }
-
-  const nkey = normalizeName(node.name);
-  const status = nameStatus.get(nkey);
-  const canon = rawToCanon.get(nkey);
-  const joint = JOINT.get(nkey);
-
-  // --- joint-client folder: dual-file, one row per client -------------------
-  if (joint) {
-    dualFiled += 1;
-    for (const who of joint) {
-      out.push({
-        src, client: who, program: f.program, year: year ?? '',
-        dest: `Review/${sanitizeSegment(who)}/${sanitizeSegment(f.program)}/${year ?? 'unknown-year'}${sub ? '/' + sub : ''}/${f.name}`,
-        proposed, route: 'review', confidence: 'low', yearSource,
-        reason: `joint-client folder "${node.name}" — dual-filed pending split decision`,
-      });
-    }
-    reviewReasons.set('joint-client folder (dual-filed)', (reviewReasons.get('joint-client folder (dual-filed)') ?? 0) + 1);
-    continue;
-  }
-
-  // --- never judged ---------------------------------------------------------
-  if (!status || status.status === 'UNCLASSIFIED') {
-    out.push({
-      src, client: node.name, program: f.program, year: year ?? '',
-      dest: `Review/${sanitizePath(folderSegs)}/${f.name}`, proposed, route: 'review', confidence: 'low', yearSource,
-      reason: `folder "${node.name}" was never classified`,
-    });
-    reviewReasons.set('unjudged folder name', (reviewReasons.get('unjudged folder name') ?? 0) + 1);
-    continue;
-  }
-
-  // --- program-level material ----------------------------------------------
-  // The top folder under the program is labelled internal or doctype, so this
-  // belongs to the grant program itself rather than to any client. The label
-  // comes from the classification, not from a hardcoded folder list.
-  if (status.label === 'internal' || status.label === 'doctype') {
-    const belowProgram = folderSegs.slice(1);
-    out.push({
-      src, client: '', program: f.program, year: year ?? '',
-      dest: `Programs/${sanitizeSegment(f.program)}${belowProgram.length ? '/' + sanitizePath(belowProgram) : ''}/${f.name}`,
-      proposed, route: 'program', yearSource,
-      confidence: status.confidence === 'high' ? 'high' : 'medium',
-      reason: `program-level material — top folder "${node.name}" is labelled ${status.label}`,
-    });
-    programTops.set(node.name, (programTops.get(node.name) ?? 0) + 1);
-    continue;
-  }
-
-  // --- judged, but not a client --------------------------------------------
-  if (status.label !== 'client' || !canon) {
-    out.push({
-      src, client: '', program: f.program, year: year ?? '',
-      dest: `Review/${sanitizePath(folderSegs)}/${f.name}`, proposed, route: 'review', confidence: 'low', yearSource,
-      reason: `folder "${node.name}" is labelled ${status.label}, not a client`,
-    });
-    reviewReasons.set(`non-client folder (${status.label})`, (reviewReasons.get(`non-client folder (${status.label})`) ?? 0) + 1);
-    continue;
-  }
-
-  // --- archive-only client: mirror the Dropbox path exactly -----------------
-  if (canon.retention === 'archive_only') {
-    out.push({
-      src, client: canon.canonical, program: f.program, year: year ?? '',
-      dest: `Archive/${sanitizePath(folderSegs)}/${f.name}`, proposed, route: 'archive', yearSource,
-      confidence: status.confidence === 'high' ? 'high' : 'medium',
-      reason: `client has no file newer than ${CUTOFF_ISO.slice(0, 10)} — mirrored, not reorganized`,
-    });
-    continue;
-  }
-
-  // --- sort -----------------------------------------------------------------
-  const conf = !year ? 'medium' : (status.confidence === 'high' ? 'high' : 'medium');
-  out.push({
-    src, client: canon.canonical, program: f.program, year: year ?? '',
-    // Clients/ prefix added 2026-08-13 to match the completed Drive
-    // restructure, which moved all 90 client folders under a Clients/ root.
-    // Programs/ and Archive/ deliberately stay at the Shared Drive root —
-    // the restructure left them there.
-    dest: `${CLIENTS_ROOT}/${sanitizeSegment(canon.canonical)}/${sanitizeSegment(f.program)}/${year ?? 'unknown-year'}${sub ? '/' + sub : ''}/${f.name}`,
-    proposed, route: 'sort', confidence: conf, yearSource,
-    reason: !year ? 'no client_modified date; year unresolved'
-      : (status.confidence === 'high' ? 'client match high confidence' : `client match ${status.confidence} confidence`),
-  });
-}
+// The routing rules live in scripts/mapping-lib.mjs so this pass and the
+// full-corpus pass cannot drift. This file keeps only the CanExport report.
+const mapped = mapFiles({
+  files: ceFiles, nodeByKey, nameStatus, rawToCanon,
+  joint: JOINT, cutoffIso: CUTOFF_ISO, clientsRoot: CLIENTS_ROOT,
+});
+const {
+  out, stats, reviewReasons, programTops, noYear, audit, folderRenames,
+  sanitizeSegment, sanitizePath,
+} = mapped;
+const { dualFiled, yearCollapsed, yearMoved, yearRecovered, yearConfirmed } = mapped.counters;
+const cleanFilenameUnused = null;
 
 for (const r of out) {
   const f = ceFiles.find((x) => x.path === r.src);
