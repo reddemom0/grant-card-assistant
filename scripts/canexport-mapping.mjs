@@ -18,6 +18,13 @@ const RESOLVED = 'dist/inventory/resolved-final.csv';
 const CSV_OUT = 'dist/inventory/canexport-mapping.csv';
 const MD_OUT = 'docs/inventory/canexport-pilot.md';
 
+/**
+ * Destination root for client folders. The Drive restructure of 2026-08-13
+ * moved all 90 client folders under this, and left Programs/ and Archive/ at
+ * the Shared Drive root — so only the `sort` route carries this prefix.
+ */
+const CLIENTS_ROOT = 'Clients';
+
 const MAX_SKIP = 8;
 const RETENTION_YEARS = 6;
 const now = new Date();
@@ -348,7 +355,11 @@ for (const f of ceFiles) {
   const conf = !year ? 'medium' : (status.confidence === 'high' ? 'high' : 'medium');
   out.push({
     src, client: canon.canonical, program: f.program, year: year ?? '',
-    dest: `${sanitizeSegment(canon.canonical)}/${sanitizeSegment(f.program)}/${year ?? 'unknown-year'}${sub ? '/' + sub : ''}/${f.name}`,
+    // Clients/ prefix added 2026-08-13 to match the completed Drive
+    // restructure, which moved all 90 client folders under a Clients/ root.
+    // Programs/ and Archive/ deliberately stay at the Shared Drive root —
+    // the restructure left them there.
+    dest: `${CLIENTS_ROOT}/${sanitizeSegment(canon.canonical)}/${sanitizeSegment(f.program)}/${year ?? 'unknown-year'}${sub ? '/' + sub : ''}/${f.name}`,
     proposed, route: 'sort', confidence: conf, yearSource,
     reason: !year ? 'no client_modified date; year unresolved'
       : (status.confidence === 'high' ? 'client match high confidence' : `client match ${status.confidence} confidence`),
