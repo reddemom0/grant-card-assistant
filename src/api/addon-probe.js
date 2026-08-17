@@ -105,24 +105,36 @@ function resolveSleepSeconds(req) {
   return Math.min(n, MAX_SLEEP_SECONDS);
 }
 
-/** The trivial card that proves a response was accepted. */
+/**
+ * The trivial card that proves a response was accepted.
+ *
+ * SHAPE: the body IS the RenderActions message — it begins with `action`, with
+ * NO top-level `renderActions` wrapper. Verified against the Node.js
+ * alternate-runtimes quickstart, which is this exact configuration.
+ *
+ * The wrapper was the first attempt and Google rejected it with:
+ *   "Cannot find field: renderActions in message
+ *    google.apps.card.v1.RenderActions"
+ * i.e. the body is already parsed as RenderActions, so wrapping it nests one
+ * level too deep. Note that the `renderActions.action.navigations[]` shape seen
+ * in some examples belongs to the Apps Script / framework-helper path, not to a
+ * self-hosted HTTP endpoint.
+ */
 function probeCard(seconds) {
   return {
-    renderActions: {
-      action: {
-        navigations: [{
-          pushCard: {
-            header: { title: 'Oracle timeout probe' },
-            sections: [{
-              widgets: [{
-                textParagraph: {
-                  text: `Responded after <b>${seconds.toFixed(1)}s</b>. If you can read this, Google waited that long.`
-                }
-              }]
+    action: {
+      navigations: [{
+        pushCard: {
+          header: { title: 'Oracle timeout probe' },
+          sections: [{
+            widgets: [{
+              textParagraph: {
+                text: `Responded after <b>${seconds.toFixed(1)}s</b>. If you can read this, Google waited that long.`
+              }
             }]
-          }
-        }]
-      }
+          }]
+        }
+      }]
     }
   };
 }
