@@ -53,6 +53,9 @@ import {
 
 // Google Chat adapter for Oracle (verifies Google-signed tokens itself)
 import { handleGoogleChatEvent } from './src/api/chat-google.js';
+// TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
+// the number is known — see src/api/addon-probe.js.
+import { handleAddonProbe } from './src/api/addon-probe.js';
 
 // Lead-gen chatbot (public — no auth)
 import { handleLeadGenChat, handleLeadGenAnalytics } from './src/api/lead-gen.js';
@@ -414,6 +417,11 @@ app.post('/api/chat', authenticateUser, handleChatRequest);
 // Chat authenticates with its own Google-signed bearer token, verified inside
 // the handler before any side effect. Runs the same agent loop as /api/chat.
 app.post('/api/chat/google', handleGoogleChatEvent);
+
+// TEMPORARY probe: measures how long Google waits for a self-hosted add-on
+// endpoint. Verifies the caller like the Chat route above, then sleeps. Calls no
+// Oracle tool, reads no data, writes nothing. Delete once the number is known.
+app.post('/api/addon/probe', handleAddonProbe);
 
 // Conversation management - with authentication
 app.get('/api/conversations/:id', authenticateUser, handleGetConversation);
