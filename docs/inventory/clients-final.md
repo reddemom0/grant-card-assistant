@@ -1,6 +1,6 @@
 # Final Client List
 
-**Generated:** 2026-08-13T18:37:17.389Z
+**Generated:** 2026-08-17T16:29:45.278Z
 **Inputs:** `dist/inventory/resolved-final.csv`, `scripts/client-corrections.json`
 **Output:** `dist/inventory/clients-final.csv` (gitignored — regenerable)
 **Method:** mechanical. No API call of any kind. The six corrections are hand-review decisions applied as data.
@@ -11,12 +11,12 @@ This is the list the pilot runs against.
 
 | | |
 |---|---|
-| **Canonical companies** | **1,740** |
+| **Canonical companies** | **1,766** |
 | Raw client folder names behind them | 1,962 |
 | Files under client names | 70,725 (93.1% of the tree) |
-| Companies with >1 raw folder name | 171 |
-| Live | 992 companies, 58,064 files |
-| Archive-only | 726 companies, 12,661 files |
+| Companies with >1 raw folder name | 178 |
+| Live | 999 companies, 58,167 files |
+| Archive-only | 745 companies, 13,308 files |
 
 ---
 
@@ -24,7 +24,7 @@ This is the list the pilot runs against.
 
 Recorded in `scripts/client-corrections.json` (version-controlled) so they survive any re-run of the pipeline. Each is matched on the normalized folder-name key, so they keep applying even if file counts shift.
 
-Canonical company count: **1,855 → 1,740** (−115; the six corrections collapsed 244 model-assigned canonicals into 123).
+Canonical company count: **1,855 → 1,766** (−89; the six corrections collapsed 280 model-assigned canonicals into 159).
 
 | # | Canonical after correction | Raw folder names merged | Files | Was |
 |---|---|---|---|---|
@@ -151,6 +151,42 @@ Canonical company count: **1,855 → 1,740** (−115; the six corrections collap
 | 121 | **Nightingale Electrical** | `Nightingale Electrical` (328)<br>`Nightingale` (291)<br>`Nightingale Electrical Ltd` (16)<br>`Nightingale Electric` (16) | **651** | `Nightingale Electrical`, `Nightingale Electrical Ltd`, `Nightingale Electric`, `Nightingale` |
 | 122 | **Blume** | `Blume` (306)<br>`Blume : Ellebox` (10)<br>`Blume (Ellebox)` (3)<br>`Blume-Ellebox` (3) | **322** | `Blume`, `Blume / Ellebox`, `Blume-Ellebox` |
 | 123 | **Blume** | `Elleboxco (Blume)` (4) | **4** | `Elleboxco (Blume)` |
+| 124 | **The Tyee** | `The Tyee 2nd Sub` (39) | **39** | `null` |
+| 125 | **Graycon** | `Graycon Group` (25) | **25** | `null` |
+| 126 | **505-JUNK** | `505 Junk` (14) | **14** | `null` |
+| 127 | **Hatchways.io** | `Hatchways.io - APPROVED` (13) | **13** | `null` |
+| 128 | **More Than Just Feed** | `More Than Just Feed (1)` (10) | **10** | `null` |
+| 129 | **Mine & Yours** | `Mine and Yours` (2) | **2** | `null` |
+| 130 | **Black Tie Property** | `Black Tie Properties` (2) | **2** | `null` |
+| 131 | **Key Marketing** | `Key Marketing - no moving forward` (1) | **1** | `null` |
+| 132 | **Pure+** | `Pure +` (2) | **2** | `null` |
+| 133 | **Blume** | `ElleBox` (10) | **10** | `null` |
+| 134 | **Nilex** | `Nilex` (130) | **130** | `null` |
+| 135 | **Bromwich Smith** | `Bromwich Smith` (113) | **113** | `null` |
+| 136 | **Solo Traveler** | `Solo Traveler` (67) | **67** | `null` |
+| 137 | **CHRIS COLLINS** | `CHRIS COLLINS` (51) | **51** | `null` |
+| 138 | **Grah-Ter Constuction Inc.** | `Grah-Ter Constuction Inc._closed` (41) | **41** | `null` |
+| 139 | **Whissell** | `Whissell` (38) | **38** | `null` |
+| 140 | **J Ennis Fabrics** | `J Ennis Fabrics` (22) | **22** | `null` |
+| 141 | **AVL** | `AVL` (20) | **20** | `null` |
+| 142 | **Executive Academy** | `Executive Academy` (15) | **15** | `null` |
+| 143 | **Ferus** | `Ferus` (15) | **15** | `null` |
+| 144 | **Legend Distlling** | `Buy Local BC - Legend Distlling` (14) | **14** | `null` |
+| 145 | **ACM** | `ACM` (14) | **14** | `null` |
+| 146 | **Consumer Genius** | `Consumer Genius` (12) | **12** | `null` |
+| 147 | **MealShare** | `MealShare` (10) | **10** | `null` |
+| 148 | **Peace River Bible Institute** | `Peace River Bible Institute` (10) | **10** | `null` |
+| 149 | **CIA** | `CIA` (8) | **8** | `null` |
+| 150 | **Surrey604** | `Surrey604 (Abandoned)` (7) | **7** | `null` |
+| 151 | **AssetPlus** | `AssetPlus` (7) | **7** | `null` |
+| 152 | **Hot Neon** | `Hot Neon` (7) | **7** | `null` |
+| 153 | **Kick Ass** | `Kick Ass` (6) | **6** | `null` |
+| 154 | **AY Tech** | `AY Tech` (6) | **6** | `null` |
+| 155 | **Kettera** | `Kettera` (6) | **6** | `null` |
+| 156 | **Aly Armstrong** | `Aly Armstrong` (5) | **5** | `null` |
+| 157 | **Pacific Blasting** | `Pacific Blasting` (4) | **4** | `null` |
+| 158 | **DH1 Development Ltd** | `DH1 Development Ltd` (2) | **2** | `null` |
+| 159 | **TO ADD A REPRESENTATIVE** | `TO ADD A REPRESENTATIVE` (2) | **2** | `null` |
 
 All 23 raw folder names resolved cleanly; every one was already labelled `client`. No correction was partially applied.
 
@@ -226,17 +262,17 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 
 ---
 
-## Live vs archive-only (`client_modified`, 2020-08-13 cutoff)
+## Live vs archive-only (`client_modified`, 2020-08-17 cutoff)
 
 `server_modified` is **not** used: 40,390 files share the single date 2024-07-23 from a bulk Dropbox event, which reports nearly everything as recent regardless of real content age.
 
 | Group | Companies | % | Files | % of client files |
 |---|---|---|---|---|
-| **Live** (a file within 6 years) | 992 | 57.0% | 58,064 | 82.1% |
-| **Archive-only** | 726 | 41.7% | 12,661 | 17.9% |
-| No dated files | 22 | 1.3% | 0 | 0% |
+| **Live** (a file within 6 years) | 999 | 56.6% | 58,167 | 81.4% |
+| **Archive-only** | 745 | 42.2% | 13,308 | 18.6% |
+| No dated files | 22 | 1.2% | 0 | 0% |
 
-41.7% of companies are archive-only but hold only 17.9% of the files — the tail is old and light.
+42.2% of companies are archive-only but hold only 18.6% of the files — the tail is old and light.
 
 ---
 
@@ -271,7 +307,7 @@ Both the unattributed files and the unjudged names go to the review sheet. Neith
 | Twin Lions | 2 | 5 | 393 | live |
 | Pearl ✎ | 2 | 13 | 367 | live |
 | ICMS | 1 | 10 | 337 | live |
-| Blume ✎ | 5 | 13 | 326 | live |
+| Blume ✎ | 6 | 13 | 336 | live |
 | Strategex | 1 | 8 | 325 | live |
 | Gunn Consultants | 2 | 14 | 324 | live |
 | Herschel Supply Co. | 1 | 1 | 312 | archive_only |

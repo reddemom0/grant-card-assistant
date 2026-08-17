@@ -1,6 +1,6 @@
 # Client Status — Live vs Archived
 
-**Inputs:** `dist/inventory/clients-final.csv` (1,740 canonical clients), HubSpot companies via `scripts/fetch-hubspot-company-status.mjs`
+**Inputs:** `dist/inventory/clients-final.csv` (1,766 canonical clients), HubSpot companies via `scripts/fetch-hubspot-company-status.mjs`
 **HubSpot access:** read-only. One endpoint, `GET /crm/v3/objects/companies`, plus `GET /crm/v3/properties/companies` for the schema. No POST, PATCH, PUT or DELETE.
 **HubSpot is a status authority only.** No canonical name was renamed, replaced, or overridden by a HubSpot name.
 **Archived here means "not currently engaged."** It is not the 6-year retention line, which governs deletion and is phase 4.
@@ -9,12 +9,12 @@
 
 | Status | Clients | Share | Files | Size |
 |---|---|---|---|---|
-| **Live** | 46 | 2.6% | 6,136 | 3.46 GB |
-| Archived — matched, not active | 1172 | 67.4% | 42,761 | 30.31 GB |
-| Archived — unmatched-default | 522 | 30.0% | 21,828 | 20.04 GB |
-| **Total** | **1740** | | **70,725** | **53.82 GB** |
+| **Live** | 46 | 2.6% | 6,156 | 3.48 GB |
+| Archived — matched, not active | 1190 | 67.4% | 43,261 | 30.61 GB |
+| Archived — unmatched-default | 530 | 30.0% | 22,058 | 20.11 GB |
+| **Total** | **1766** | | **71,475** | **54.19 GB** |
 
-Archived total: **1694** clients, 64,589 files.
+Archived total: **1720** clients, 65,319 files.
 
 > ⚠️ **Read the Live number with the Step 1 caveat in mind.** Only 96 of 13,806 HubSpot companies carry `active = true`. A small Live set is what the data says, not a matching failure.
 
@@ -59,17 +59,11 @@ Now every rule runs, all candidates are collected per client, and the choice is 
 
 **0 clients changed status** since the previous run: 0 into Live, 0 out of Live, 0 newly matched but still archived.
 
-**1 canonicals from the previous run no longer exist** — folded into another canonical by the merges recorded in this pass, not lost. Their files moved with them, which is why the client count falls by 1 while the file total holds.
-
-| Merged-away canonical | Was |
-|---|---|
-| Elleboxco (Blume) | Archived (unmatched-default) |
-
 ### The two known cases
 
 | Case | Status | Matched to | Rule | Evidence |
 |---|---|---|---|---|
-| Blume (326 files) | **Live** ✅ | Blume | `exact string` | HubSpot name matches the canonical exactly |
+| Blume (336 files) | **Live** ✅ | Blume | `exact string` | HubSpot name matches the canonical exactly |
 | Divert Millwork (3 files) | **Live** ✅ | DML Architectural | `legal-name field` | Legal Business Name "Divert Millwork Ltd." reduces to "divert millwork" |
 
 - **Blume** — HubSpot holds two records, `"Blume"` (inactive, `opportunity`) and `"Blume "` with a trailing space (active, `customer`). Trimming (below) collapses them into one exact-string bucket; preferring active then picks the right one.
@@ -129,21 +123,21 @@ Every company with `extra6` populated now contributes a **second searchable entr
 
 | Tier | Clients | Share |
 |---|---|---|
-| Exact string on canonical name | 515 | 29.6% |
-| Recovered by fuzzy rules | 703 | 40.4% |
-| Still unmatched | 522 | 30.0% |
-| **Total** | **1740** | |
+| Exact string on canonical name | 523 | 29.6% |
+| Recovered by fuzzy rules | 713 | 40.4% |
+| Still unmatched | 530 | 30.0% |
+| **Total** | **1766** | |
 
-Step 3 alone matched **515**. The fuzzy pass recovered **703** more, taking coverage from 29.6% to **70.0%**.
+Step 3 alone matched **523**. The fuzzy pass recovered **713** more, taking coverage from 29.6% to **70.0%**.
 
 ### What each rule recovered
 
 | Rule | Recovered | What it catches |
 |---|---|---|
-| `containment` | 269 | One name sits intact inside the other — usually a DBA or legal entity wrapper |
-| `legal suffix stripped` | 230 | `Ltd` / `Inc` / `Corp` / `Co` present on one side only |
-| `normalized` | 73 | Case, punctuation, `&` vs `and`, leading `The` |
-| `edit distance 1` | 44 | One character apart, scaled to name length |
+| `containment` | 272 | One name sits intact inside the other — usually a DBA or legal entity wrapper |
+| `legal suffix stripped` | 235 | `Ltd` / `Inc` / `Corp` / `Co` present on one side only |
+| `normalized` | 74 | Case, punctuation, `&` vs `and`, leading `The` |
+| `edit distance 1` | 45 | One character apart, scaled to name length |
 | `legal-name field` | 35 | Matches HubSpot's `extra6` Legal Business Name rather than its display name |
 | `token-wise` | 23 | Same token count, tokens differ by abbreviation, small edit, or shared root |
 | `edit distance 2` | 15 | Two characters apart on a name long enough to allow it |
@@ -174,7 +168,7 @@ Step 3 alone matched **515**. The fuzzy pass recovered **703** more, taking cove
 | Regehr Contracting Ltd | 260 | Regehr Contracting Ltd. | normalized | both reduce to "regehr contracting ltd" |
 | AME Consulting | 253 | AME Consulting Group | legal suffix stripped | both reduce to "ame consulting" |
 
-**204 clients matched more than one HubSpot company.** Where that happened the active record wins, so an ambiguous match can only push a client toward Live, never toward Archived. Erring that way is deliberate: wrongly archiving a current client is the expensive mistake.
+**208 clients matched more than one HubSpot company.** Where that happened the active record wins, so an ambiguous match can only push a client toward Live, never toward Archived. Erring that way is deliberate: wrongly archiving a current client is the expensive mistake.
 
 ---
 
@@ -182,9 +176,9 @@ Step 3 alone matched **515**. The fuzzy pass recovered **703** more, taking cove
 
 | Rule | Status | Clients | Files | Size |
 |---|---|---|---|---|
-| matched and `active = true` | **Live** | 46 | 6,136 | 3.46 GB |
-| matched and not active | Archived | 1172 | 42,761 | 30.31 GB |
-| unmatched | Archived (`unmatched-default`) | 522 | 21,828 | 20.04 GB |
+| matched and `active = true` | **Live** | 46 | 6,156 | 3.48 GB |
+| matched and not active | Archived | 1190 | 43,261 | 30.61 GB |
+| unmatched | Archived (`unmatched-default`) | 530 | 22,058 | 20.11 GB |
 
 **30.0% of all clients are archived by default rather than by evidence.** That is the weakest part of this split and Step 7 lists the ones it costs most.
 
@@ -350,7 +344,7 @@ Recorded in `scripts/client-corrections.json` under source `client identity 2026
 |---|---|---|---|
 | **ClearDent** | `ClearDent (501)`, `Precocious Technology Inc. (DBA ClearDent) (2)` | 503 | **Live** ✅ |
 | **Nightingale Electrical** | `Nightingale Electrical (344)`, `Nightingale Electric (16)`, `Nightingale (291)` | 651 | **Live** ✅ |
-| **Blume** | `Blume (309)`, `Blume / Ellebox (13)` | 326 | **Live** ✅ |
+| **Blume** | `Blume (309)`, `Blume / Ellebox (13)` | 336 | **Live** ✅ |
 
 - **ClearDent** — One HubSpot record covers both — "Prococious Technology Inc. (DBA ClearDent)", active, domain `cleardent.com`. Canonical kept as **ClearDent**: that is what the GCs call it and where the files are. `Precocious` vs `Prococious` is a typo in one source, not a second company.
 - **Nightingale Electrical** — Merged in two stages as instructed: the two full names first (one character apart, both matched the same active HubSpot company), then the bare stem into the result. No canonical other than these three begins with "Nightingale".
@@ -376,7 +370,7 @@ That is not alarming on its face: most of the unmatched ones are lifecycle `lead
 
 ### The 2-token containment guard, retained
 
-`Blume` is **Live** with 326 files across 5 raw folder names. Every Blume variant now resolves to this one canonical — no fragment left on the Archived side.
+`Blume` is **Live** with 336 files across 6 raw folder names. Every Blume variant now resolves to this one canonical — no fragment left on the Archived side.
 
 The guard requiring **two or more tokens** in a containment match stays in place. It exists because single-token containment matched `Spring` inside `Admin Slayer - Spring Planning`; relaxing it would reintroduce `Icon` inside `Micon Products` and `home` inside `Lux Quality Homes`. The Step 4 list above is how single-token cases get surfaced instead — detection without letting them match automatically.
 
@@ -390,7 +384,7 @@ The guard requiring **two or more tokens** in a containment match stays in place
 
 ## Output
 
-`dist/inventory/client-status.csv` — one row per canonical client, 1740 rows, sorted by file count. Columns: canonical_name, status, reason, match_tier, match_rule, hubspot_id, hubspot_name, hubspot_active, product_type, lifecycle, files, bytes, ambiguous_candidates, evidence.
+`dist/inventory/client-status.csv` — one row per canonical client, 1766 rows, sorted by file count. Columns: canonical_name, status, reason, match_tier, match_rule, hubspot_id, hubspot_name, hubspot_active, product_type, lifecycle, files, bytes, ambiguous_candidates, evidence.
 
 ## Reproducing
 

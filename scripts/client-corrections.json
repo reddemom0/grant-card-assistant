@@ -1201,6 +1201,330 @@
       ],
       "source": "blume knock-on 2026-08-13",
       "note": "Last remaining Blume variant. HubSpot's active record carries Legal Business Name \"ElleBoxCo Inc.\" with domain blume.com, so ElleBoxCo is the legal entity and Blume the operating name — the same evidence that merged \"Blume / Ellebox\". Folds into the existing \"Blume\" correction from client identity 2026-08-13."
+    },
+    {
+      "canonical_name": "The Tyee",
+      "raw_names": [
+        "The Tyee 2nd Sub"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. \"2nd Sub\" is a submission-round marker, not part of the name."
+    },
+    {
+      "canonical_name": "Graycon",
+      "raw_names": [
+        "Graycon Group"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. Matches the existing canonical once the legal suffix is stripped."
+    },
+    {
+      "canonical_name": "505-JUNK",
+      "raw_names": [
+        "505 Junk"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. Same company, hyphenation only."
+    },
+    {
+      "canonical_name": "Hatchways.io",
+      "raw_names": [
+        "Hatchways.io - APPROVED"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. \"- APPROVED\" is a disposition marker. Matches the existing canonical exactly once stripped."
+    },
+    {
+      "canonical_name": "More Than Just Feed",
+      "raw_names": [
+        "More Than Just Feed (1)"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. A duplicated-folder marker, not part of the name."
+    },
+    {
+      "canonical_name": "Mine & Yours",
+      "raw_names": [
+        "Mine and Yours"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. \"and\" versus \"&\" only."
+    },
+    {
+      "canonical_name": "Black Tie Property",
+      "raw_names": [
+        "Black Tie Properties"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. Plural versus singular of the same name."
+    },
+    {
+      "canonical_name": "Key Marketing",
+      "raw_names": [
+        "Key Marketing - no moving forward"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. \"- no moving forward\" is a disposition marker, same shape as \"Horizon - not eligible\"."
+    },
+    {
+      "canonical_name": "Pure+",
+      "raw_names": [
+        "Pure +"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. Spacing only. The folder's own files read \"PurePlus\" and \"Pure+\"."
+    },
+    {
+      "canonical_name": "Blume",
+      "raw_names": [
+        "ElleBox"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). Merges into an existing canonical rather than creating a new one. ElleBoxCo Inc. is the legal entity behind Blume — the same HubSpot legal-name evidence that merged \"Blume / Ellebox\" and \"Elleboxco (Blume)\" into this canonical."
+    },
+    {
+      "canonical_name": "Nilex",
+      "raw_names": [
+        "Nilex"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Bromwich Smith",
+      "raw_names": [
+        "Bromwich Smith"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Solo Traveler",
+      "raw_names": [
+        "Solo Traveler"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "CHRIS COLLINS",
+      "raw_names": [
+        "CHRIS COLLINS"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Grah-Ter Constuction Inc.",
+      "raw_names": [
+        "Grah-Ter Constuction Inc._closed"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals. Name stripped \"_closed\". Spelling left exactly as the folder has it."
+    },
+    {
+      "canonical_name": "Whissell",
+      "raw_names": [
+        "Whissell"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "J Ennis Fabrics",
+      "raw_names": [
+        "J Ennis Fabrics"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "AVL",
+      "raw_names": [
+        "AVL"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Executive Academy",
+      "raw_names": [
+        "Executive Academy"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Ferus",
+      "raw_names": [
+        "Ferus"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Legend Distlling",
+      "raw_names": [
+        "Buy Local BC - Legend Distlling"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals. Name stripped the \"Buy Local BC - \" program prefix. Spelling left exactly as the folder has it."
+    },
+    {
+      "canonical_name": "ACM",
+      "raw_names": [
+        "ACM"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Consumer Genius",
+      "raw_names": [
+        "Consumer Genius"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "MealShare",
+      "raw_names": [
+        "MealShare"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Peace River Bible Institute",
+      "raw_names": [
+        "Peace River Bible Institute"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "CIA",
+      "raw_names": [
+        "CIA"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Surrey604",
+      "raw_names": [
+        "Surrey604 (Abandoned)"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals. Name stripped \"(Abandoned)\". Spelling left exactly as the folder has it."
+    },
+    {
+      "canonical_name": "AssetPlus",
+      "raw_names": [
+        "AssetPlus"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Hot Neon",
+      "raw_names": [
+        "Hot Neon"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Kick Ass",
+      "raw_names": [
+        "Kick Ass"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "AY Tech",
+      "raw_names": [
+        "AY Tech"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Kettera",
+      "raw_names": [
+        "Kettera"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Aly Armstrong",
+      "raw_names": [
+        "Aly Armstrong"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "Pacific Blasting",
+      "raw_names": [
+        "Pacific Blasting"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "DH1 Development Ltd",
+      "raw_names": [
+        "DH1 Development Ltd"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
+    },
+    {
+      "canonical_name": "TO ADD A REPRESENTATIVE",
+      "raw_names": [
+        "TO ADD A REPRESENTATIVE"
+      ],
+      "source": "class 2 routing 2026-08-17",
+      "asserts_client": true,
+      "note": "Class 2 (never classified). New canonical: the folder names a company and holds its files, the same evidence standard behind the existing canonicals."
     }
   ],
   "deferred": {

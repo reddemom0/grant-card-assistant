@@ -57,13 +57,23 @@ for (const r of rows) { const c = canonOf(r); if (c) beforeCanon.add(c.toLowerCa
 const override = new Map(); // key -> canonical
 const applied = [];
 const problems = [];
+let asserted = 0;
 for (const c of corrections.corrections) {
   const members = [];
   for (const raw of c.raw_names) {
     const k = normalizeName(raw);
     const r = byKey.get(k);
     if (!r) { problems.push({ correction: c.canonical_name, raw, issue: 'not found in resolved list' }); continue; }
-    if (r.label !== 'client') { problems.push({ correction: c.canonical_name, raw, issue: `label is '${r.label}', not client` }); continue; }
+    // A correction carrying `asserts_client` is a human stating that this
+    // folder names a client, overriding a missing or non-client label from the
+    // classification pass. Everything else still has to satisfy the guard —
+    // the point of it is to catch corrections written against the wrong name,
+    // not to override a deliberate human decision.
+    if (r.label !== 'client' && !c.asserts_client) {
+      problems.push({ correction: c.canonical_name, raw, issue: `label is '${r.label}', not client` });
+      continue;
+    }
+    if (c.asserts_client && r.label !== 'client') { r.assertedClient = true; asserted += 1; }
     override.set(k, c.canonical_name);
     members.push(r);
   }
@@ -81,12 +91,12 @@ for (const r of rows) {
   const o = override.get(r.key);
   if (o) { r.correctedCanonical = o; r.corrected = true; }
 }
-const finalCanonOf = (r) => (r.label === 'client' ? (r.correctedCanonical || r.canonical || r.name).trim() : null);
+const finalCanonOf = (r) => ((r.label === 'client' || r.assertedClient) ? (r.correctedCanonical || r.canonical || r.name).trim() : null);
 
 const afterCanon = new Set();
 for (const r of rows) { const c = finalCanonOf(r); if (c) afterCanon.add(c.toLowerCase()); }
 
-log(`canonical companies: ${beforeCanon.size} -> ${afterCanon.size}`);
+log(`canonical companies: ${beforeCanon.size} -> ${afterCanon.size}${asserted ? ` (${asserted} names asserted as clients by hand correction)` : ''}`);
 if (problems.length) log(`PROBLEMS: ${JSON.stringify(problems)}`);
 
 // ---------------------------------------------------------------- Step 3: colon audit

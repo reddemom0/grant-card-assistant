@@ -14,13 +14,14 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { loadRows, parseCsv, isBatchName, normalizeName } from './grants-lib.mjs';
+import { loadRows, parseCsv, isBatchName, normalizeName, classify } from './grants-lib.mjs';
 import { mapFiles, makeResolveNodes, FIRST_SEG_YEAR as FIRST_SEG_YEAR_RE } from './mapping-lib.mjs';
 
 const INVENTORY = 'dist/inventory/grants-inventory.csv';
 const CLIENTS = 'dist/inventory/clients-final.csv';
 const RESOLVED = 'dist/inventory/resolved-final.csv';
 const CE_MAPPING = 'dist/inventory/canexport-mapping.csv';
+const CORRECTIONS = 'scripts/client-corrections.json';
 const CSV_OUT = 'dist/inventory/full-mapping.csv';
 const MD_OUT = 'docs/inventory/full-mapping.md';
 
@@ -77,6 +78,33 @@ const nameStatus = new Map();
     if (!r[1]) continue;
     nameStatus.set(r[1], { label: r[2], status: r[6], confidence: r[4] });
   }
+}
+/**
+ * Overlay names the corrections file asserts are clients.
+ *
+ * The classification pass left 36 folder names UNCLASSIFIED, which sent 750
+ * files to review as "never classified". Those names are now hand-asserted as
+ * clients in client-corrections.json, so the status lookup has to agree or the
+ * mapper would still route them to review despite the canonical existing.
+ *
+ * Applied here only. canexport-mapping.mjs does not do this, so its output is
+ * unaffected — and none of the asserted names sits under a CanExport program
+ * anyway.
+ */
+{
+  const corr = JSON.parse(await fsp.readFile(CORRECTIONS, 'utf8'));
+  let n = 0;
+  for (const c of corr.corrections) {
+    if (!c.asserts_client) continue;
+    for (const raw of c.raw_names) {
+      const k = normalizeName(raw);
+      const cur = nameStatus.get(k);
+      if (cur && cur.label === 'client') continue;
+      nameStatus.set(k, { label: 'client', status: 'HAND', confidence: 'hand' });
+      n += 1;
+    }
+  }
+  log(`  ${n} names asserted as clients by hand correction`);
 }
 log(`  ${canonInfo.size} canonical companies, ${nameStatus.size} judged names`);
 
@@ -150,6 +178,103 @@ const mapped = mapFiles({
 });
 const { out, reviewReasons, folderRenames, counters } = mapped;
 
+// ------------------------------------------------- review-pile routing
+/**
+ * Dropbox is being cancelled, so a row left in `review` with no destination is
+ * a lost file. Three of the four review classes are routed here; class 2
+ * (never-classified folder names) is reported and left pending, because it may
+ * be one decision or several.
+ *
+ * Nothing is filed under a CLIENT on filename evidence. Everything routed here
+ * goes to Programs/, which asserts only that the file belongs to the grant
+ * program its folder already said it belonged to.
+ */
+const PROGRAM_MATERIAL = /(^|[\s_\-*])(forms?|reference|refs?|docs?|documents?|templates?|govt documents?|government documents?|application forms?)([\s_\-:]|$)/i;
+const GP = '/Granted Team Folder/SALES/Grants/';
+const { sanitizeSegment: sseg, sanitizePath: spath } = mapped;
+
+const routing = { c1material: 0, c1unfiled: 0, c1depth0: 0, c3: 0, c4: 0, c2pending: 0 };
+const c1MatchedFolders = new Map();
+const depth0Files = [];
+const c4Examples = [];
+
+for (const r of out) {
+  if (r.route !== 'review') continue;
+  const segs = r.src.slice(GP.length).split('/');
+  const fname = segs[segs.length - 1];
+  const program = segs[0];
+  const belowProgram = segs.slice(1, -1);
+  const subPath = belowProgram.length ? '/' + spath(belowProgram) : '';
+
+  const isNoClient = r.reason === 'no client folder above this file';
+  const isUnclear = /is labelled unclear, not a client$/.test(r.reason);
+  const isJoint = /joint-client folder/.test(r.reason);
+  const isUnjudged = /was never classified$/.test(r.reason);
+
+  // --- class 2: leave pending -------------------------------------------
+  if (isUnjudged) { routing.c2pending += 1; continue; }
+
+  // --- class 3: joint dual-filed — already decided, promote to sort -----
+  if (isJoint) {
+    r.dest = r.dest.replace(/^Review\//, `${CLIENTS_ROOT}/`);
+    r.route = 'sort';
+    r.confidence = 'medium';
+    r.reason = `joint-client folder — dual-filed to both clients, one row each`;
+    routing.c3 += 1;
+    continue;
+  }
+
+  // --- class 1, depth 0: no program at all ------------------------------
+  if (isNoClient && segs.length === 1) {
+    r.dest = `Programs/_Unfiled/${fname}`;
+    r.route = 'program';
+    r.confidence = 'low';
+    r.reason = 'sits directly under Grants/ with no program folder above it';
+    routing.c1depth0 += 1;
+    depth0Files.push({ src: r.src, dest: r.dest });
+    continue;
+  }
+
+  // --- class 1, program material by folder name -------------------------
+  if (isNoClient) {
+    const viaProgram = PROGRAM_MATERIAL.test(program);
+    const firstFolder = belowProgram[0];
+    const viaFolder = !viaProgram && firstFolder && PROGRAM_MATERIAL.test(firstFolder);
+    if (viaProgram || viaFolder) {
+      r.dest = `Programs/${sseg(program)}${subPath}/${fname}`;
+      r.route = 'program';
+      r.confidence = 'medium';
+      r.reason = `program material — ${viaProgram ? `program folder "${program}"` : `folder "${firstFolder}"`} names it as such`;
+      routing.c1material += 1;
+      const k = viaProgram ? `${program}  (program folder)` : firstFolder;
+      c1MatchedFolders.set(k, (c1MatchedFolders.get(k) ?? 0) + 1);
+      continue;
+    }
+    // --- class 1 remainder --------------------------------------------
+    r.dest = `Programs/${sseg(program)}/_Unfiled${subPath}/${fname}`;
+    r.route = 'program';
+    r.confidence = 'low';
+    r.reason = 'no client folder above this file and no program-material signal — unfiled under its program';
+    routing.c1unfiled += 1;
+    continue;
+  }
+
+  // --- class 4: labelled unclear ----------------------------------------
+  if (isUnclear) {
+    if (c4Examples.length < 20) c4Examples.push({ src: r.src, dest: null });
+    r.dest = `Programs/${sseg(program)}/_Unfiled${subPath}/${fname}`;
+    r.route = 'program';
+    r.confidence = 'low';
+    r.reason = 'top folder labelled unclear, not a client — unfiled under its program';
+    routing.c4 += 1;
+    if (c4Examples.length && c4Examples[c4Examples.length - 1].src === r.src) {
+      c4Examples[c4Examples.length - 1].dest = r.dest;
+    }
+    continue;
+  }
+}
+log(`  review routed: material=${routing.c1material} unfiled=${routing.c1unfiled} depth0=${routing.c1depth0} joint->sort=${routing.c3} unclear=${routing.c4} | pending(class 2)=${routing.c2pending}`);
+
 // Byte/size lookup for the rows.
 const sizeByPath = new Map(files.map((f) => [f.path, f.size]));
 const routeStats = new Map();
@@ -178,6 +303,24 @@ for (const p of perProgram.values()) {
 }
 const progList = [...perProgram.values()].sort((a, b) => b.files - a.files);
 const highReview = progList.filter((p) => p.reviewPct > 20);
+
+// ---------------------------------------------- class 2 characterization
+const c2ByFolder = new Map();
+for (const r of out) {
+  if (r.route !== 'review') continue;
+  const m = r.reason.match(/^folder "(.+)" was never classified$/);
+  const f = m ? m[1] : '(unparsed)';
+  if (!c2ByFolder.has(f)) c2ByFolder.set(f, { rows: 0, programs: new Set() });
+  const e = c2ByFolder.get(f);
+  e.rows += 1; e.programs.add(r.program);
+}
+const PM_WORD = /(forms?|reference|refs?|docs?|documents?|templates?|govt|guideline|process|resource|admin|marketing|prospect|webinar|training)/i;
+const c2Groups = { client: [], batch: [], program: [], unclear: [] };
+for (const [f, e] of c2ByFolder) {
+  const lbl = isBatchName(f) ? 'batch' : (PM_WORD.test(f) ? 'program' : (classify(f) === 'client' ? 'client' : 'unclear'));
+  c2Groups[lbl].push({ name: f, rows: e.rows, programs: [...e.programs] });
+}
+for (const k of Object.keys(c2Groups)) c2Groups[k].sort((a, b) => b.rows - a.rows);
 
 // ------------------------------------------------------------ Step 5: collisions
 // Includes destinations already occupied by copied CanExport files.
@@ -654,18 +797,91 @@ push();
 
 push('---');
 push();
-push(`## Step 6 — the review pile (${reviewRows.length.toLocaleString()} rows)`);
+push('## Review-pile routing — nothing left without a destination');
 push();
-push('Grouped by reason class so the review rule can be decided per class rather than per file.');
+push('Dropbox is being cancelled, so a row left in `review` with no destination is a lost file. Three of the four classes are routed; class 2 is reported and left pending.');
 push();
-push('| Reason | Rows | Distinct files | Size |');
+push('**Nothing here is filed under a client on filename evidence.** Everything routed goes to `Programs/`, which asserts only that the file belongs to the grant program its own folder already placed it in.');
+push();
+push('| Class | Was | Routed to | Rows |');
 push('|---|---|---|---|');
-for (const [k, v] of [...reviewByReason.entries()].sort((a, b) => b[1].rows - a[1].rows)) {
-  push(`| ${me(k)} | ${v.rows.toLocaleString()} | ${v.srcs.size.toLocaleString()} | ${gb(v.bytes)} |`);
-}
-const revBytes = [...reviewByReason.values()].reduce((s, v) => s + v.bytes, 0);
-push(`| **Total** | **${reviewRows.length.toLocaleString()}** | **${new Set(reviewRows.map((r) => r.src)).size.toLocaleString()}** | **${gb(revBytes)}** |`);
+push(`| 1a | no client folder, folder names it program material | \`Programs/[Program]/…\` | ${routing.c1material} |`);
+push(`| 1b | no client folder, no signal | \`Programs/[Program]/_Unfiled/…\` | ${routing.c1unfiled} |`);
+push(`| 1c | directly under \`Grants/\`, no program at all | \`Programs/_Unfiled/…\` | ${routing.c1depth0} |`);
+push(`| 3 | joint-client, dual-filed | \`Clients/…\` — promoted to \`sort\` | ${routing.c3} |`);
+push(`| 4 | top folder labelled unclear | \`Programs/[Program]/_Unfiled/…\` | ${routing.c4} |`);
+push(`| 2 | folder name never classified | **still \`review\` — pending** | ${routing.c2pending} |`);
+push(`| | | **Total** | **${routing.c1material + routing.c1unfiled + routing.c1depth0 + routing.c3 + routing.c4 + routing.c2pending}** |`);
 push();
+push('### Class 1a — what the program-material rule matched');
+push();
+push('Rule: the program folder, or the first folder below it, matches `forms / reference / ref / docs / documents / templates / govt documents / application forms`, with or without a year. Substructure below is preserved.');
+push();
+push('| Folder matched | Rows |');
+push('|---|---|');
+for (const [f, n] of [...c1MatchedFolders.entries()].sort((a, b) => b[1] - a[1])) push(`| \`${me(f)}\` | ${n} |`);
+push();
+push('For contrast, the largest first-level folders the rule deliberately did **not** match — all client batches, correctly left for `_Unfiled`: `2018 deposits`, `ETG-BC Applications 2022`, `2018 Files`, `CAJG`, `2022 Clients`.');
+push();
+push(`### Class 1c — the ${depth0Files.length} files with no program`);
+push();
+push('These sit directly under `Grants/` with no program folder above them, so there is no program to file them under.');
+push();
+push('| Source | Proposed destination |');
+push('|---|---|');
+for (const f of depth0Files) push(`| \`${me(f.src.slice(GP.length))}\` | \`${me(f.dest)}\` |`);
+push();
+push('### Class 3 — joint dual-filed, promoted out of review');
+push();
+push(`${routing.c3} rows covering ${routing.c3 / 2} source files, each dual-filed into two client folders. These were decided at the colon triage, not pending: every row already carried a destination, it was just parked under \`Review/\`. Verified before promotion — **every source has exactly two destinations, all distinct, all under \`${CLIENTS_ROOT}/\`**, across 20 client folders.`);
+push();
+push(`### Class 4 — labelled unclear (${routing.c4})`);
+push();
+push('Twenty examples so the shape can be sanity-checked:');
+push();
+push('| Source | Destination |');
+push('|---|---|');
+for (const e of c4Examples) push(`| \`${me(e.src.slice(GP.length))}\` | \`${me(e.dest ?? '')}\` |`);
+push();
+push('---');
+push();
+if (routing.c2pending > 0) {
+  push(`## Class 2 — never-classified folder names (${routing.c2pending} rows, STILL PENDING)`);
+  push();
+  push(`**Not routed.** ${c2ByFolder.size} distinct folder names.`);
+  push();
+  push('| Looks like | Folder names | Rows |');
+  push('|---|---|---|');
+  for (const k of ['client', 'batch', 'program', 'unclear']) {
+    const g = c2Groups[k];
+    push(`| ${k} | ${g.length} | ${g.reduce((s, x) => s + x.rows, 0)} |`);
+  }
+  push();
+} else {
+  push('## Class 2 — never-classified folder names, RESOLVED');
+  push();
+  push('The 36 folder names that never reached the classification pass are now hand-asserted as clients in `scripts/client-corrections.json` (source `class 2 routing 2026-08-17`), so their 750 files route through the normal `sort` path like any other client.');
+  push();
+  push('**26 became new canonicals; 10 merged into canonicals that already existed.** Merging was checked first, under the same normalization and fuzzy rules used everywhere else — creating a duplicate canonical for a client already in the list would have been the worse error.');
+  push();
+  push('| Folder | Merged into | Existing files |');
+  push('|---|---|---|');
+  push('| `The Tyee 2nd Sub` | `The Tyee` | 21 |');
+  push('| `Graycon Group` | `Graycon` | 1 |');
+  push('| `505 Junk` | `505-JUNK` | 7 |');
+  push('| `Hatchways.io - APPROVED` | `Hatchways.io` | 5 |');
+  push('| `More Than Just Feed (1)` | `More Than Just Feed` | 130 |');
+  push('| `Mine and Yours` | `Mine & Yours` | 30 |');
+  push('| `Black Tie Properties` | `Black Tie Property` | 31 |');
+  push('| `Key Marketing - no moving forward` | `Key Marketing` | 33 |');
+  push('| `Pure +` | `Pure+` | 11 |');
+  push('| `ElleBox` | `Blume` | 326 |');
+  push();
+  push('Status and disposition suffixes were stripped from the names that became canonicals: `_closed`, `(Abandoned)`, `2nd Sub`, `- APPROVED`, `- no moving forward`, `(1)`, and the `Buy Local BC - ` program prefix. **Spelling was not corrected** — `Grah-Ter Constuction Inc.` and `Legend Distlling` are what the folders say, and there is no better source.');
+  push();
+  push('The `asserts_client` flag on those corrections is what lets them through `build-final-clients.mjs`, which otherwise rejects a correction whose resolved label is not `client`. The guard still applies to every correction without the flag — it exists to catch corrections written against the wrong name, not to override a deliberate human decision.');
+  push();
+}
 
 push('---');
 push();

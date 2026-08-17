@@ -8,10 +8,10 @@
 
 | | Rows | Distinct files | Size |
 |---|---|---|---|
-| sort | 56,481 | 56,481 | 25.92 GB |
-| program | 3,146 | 3,146 | 3.80 GB |
+| sort | 57,087 | 56,784 | 26.02 GB |
+| program | 4,365 | 4,365 | 6.38 GB |
 | archive | 12,574 | 12,574 | 10.72 GB |
-| review | 2,575 | 2,272 | 3.05 GB |
+| review | 750 | 750 | 0.38 GB |
 | **Total** | **74,776** | **74,473** | **43.45 GB** |
 
 Across **307 programs**. CanExport (2 programs, already mapped and copied) is excluded.
@@ -30,406 +30,280 @@ Across **307 programs**. CanExport (2 programs, already mapped and copied) is ex
 
 | Program | Files | Size | sort | program | archive | review | review % |
 |---|---|---|---|---|---|---|---|
-| ETG (Employer Training Grant) | 29,489 | 16.37 GB | 17,724 | 1,774 | 9,082 | 955 | 3.2% |
-| WorkBC Wage Subsidy | 15,406 | 3.22 GB | 15,059 | 71 | 0 | 487 | 3.1% |
-| BuyBC | 1,984 | 3.54 GB | 634 | 198 | 1,107 | 45 | 2.3% |
+| ETG (Employer Training Grant) | 29,489 | 16.37 GB | 17,816 | 2,107 | 9,082 | 530 | 1.8% |
+| WorkBC Wage Subsidy | 15,406 | 3.22 GB | 15,481 | 136 | 0 | 0 | 0.0% |
+| BuyBC | 1,984 | 3.54 GB | 634 | 229 | 1,107 | 14 | 0.7% |
 | Magnet SWPP | 1,899 | 0.59 GB | 1,890 | 8 | 1 | 0 | 0.0% |
-| Career Launcher Internships (inc DS4Y DT) | 1,628 | 0.37 GB | 1,280 | 50 | 265 | 33 | 2.0% |
-| Mon Avenir | 1,247 | 0.46 GB | 1,199 | 4 | 0 | 44 | 3.5% |
-| DS4Y - VCN | 1,166 | 0.24 GB | 1,064 | 6 | 44 | 96 | 7.9% |
-| WIL Digital | 1,101 | 0.22 GB | 1,092 | 2 | 4 | 3 | 0.3% |
-| GYW (Youth Hiring Subsidy) | 929 | 0.41 GB | 563 | 245 | 82 | 41 | 4.4% |
-| DS4Y - LHL | 925 | 0.14 GB | 877 | 47 | 0 | 1 | 0.1% |
-| DS4Y - Pinnguaq | 886 | 0.32 GB | 853 | 32 | 0 | 1 | 0.1% |
-| Talent Opportunities | 834 | 0.42 GB | 826 | 6 | 0 | 2 | 0.2% |
-| CPF | 807 | 0.71 GB | 0 | 26 | 622 | 159 | 19.7% |
-| Career Ready (ITAC Technation) | 763 | 0.14 GB | 752 | 0 | 7 | 4 | 0.5% |
-| Innovate BC - ISI | 743 | 0.20 GB | 712 | 4 | 19 | 8 | 1.1% |
-| YESP | 604 | 0.30 GB | 569 | 16 | 11 | 8 | 1.3% |
-| DS4Y - ICNJ | 552 | 0.22 GB | 545 | 5 | 0 | 2 | 0.4% |
-| PSYIP (Grad Hiring Subsidy) | 498 | 0.20 GB | 60 | 42 | 316 | 80 | 16.1% |
-| Green Jobs | 471 | 0.16 GB | 405 | 54 | 5 | 7 | 1.5% |
+| Career Launcher Internships (inc DS4Y DT) | 1,628 | 0.37 GB | 1,280 | 64 | 265 | 19 | 1.2% |
+| Mon Avenir | 1,247 | 0.46 GB | 1,199 | 48 | 0 | 0 | 0.0% |
+| DS4Y - VCN | 1,166 | 0.24 GB | 1,152 | 14 | 44 | 0 | 0.0% |
+| WIL Digital | 1,101 | 0.22 GB | 1,092 | 5 | 4 | 0 | 0.0% |
+| GYW (Youth Hiring Subsidy) | 929 | 0.41 GB | 567 | 282 | 82 | 0 | 0.0% |
+| DS4Y - LHL | 925 | 0.14 GB | 877 | 48 | 0 | 0 | 0.0% |
+| DS4Y - Pinnguaq | 886 | 0.32 GB | 853 | 33 | 0 | 0 | 0.0% |
+| Talent Opportunities | 834 | 0.42 GB | 826 | 8 | 0 | 0 | 0.0% |
+| CPF | 807 | 0.71 GB | 0 | 72 | 622 | 113 | 14.0% |
+| Career Ready (ITAC Technation) | 763 | 0.14 GB | 752 | 4 | 7 | 0 | 0.0% |
+| Innovate BC - ISI | 743 | 0.20 GB | 712 | 12 | 19 | 0 | 0.0% |
+| YESP | 604 | 0.30 GB | 569 | 24 | 11 | 0 | 0.0% |
+| DS4Y - ICNJ | 552 | 0.22 GB | 545 | 7 | 0 | 0 | 0.0% |
+| PSYIP (Grad Hiring Subsidy) | 498 | 0.20 GB | 60 | 48 | 316 | 74 | 14.9% |
+| Green Jobs | 471 | 0.16 GB | 405 | 61 | 5 | 0 | 0.0% |
 | Alberta Jobs Now | 462 | 0.08 GB | 461 | 1 | 0 | 0 | 0.0% |
-| AgriMarketing | 443 | 0.55 GB | 398 | 14 | 24 | 7 | 1.6% |
-| Get BC Working | 418 | 0.13 GB | 407 | 0 | 0 | 11 | 2.6% |
-| DS4Y - Innovate BC | 417 | 0.06 GB | 391 | 22 | 2 | 2 | 0.5% |
-| Venture for Canada | 403 | 0.16 GB | 396 | 5 | 0 | 2 | 0.5% |
-| Trucking HR SWSP | 381 | 0.07 GB | 380 | 0 | 0 | 1 | 0.3% |
+| AgriMarketing | 443 | 0.55 GB | 398 | 21 | 24 | 0 | 0.0% |
+| Get BC Working | 418 | 0.13 GB | 407 | 11 | 0 | 0 | 0.0% |
+| DS4Y - Innovate BC | 417 | 0.06 GB | 391 | 24 | 2 | 0 | 0.0% |
+| Venture for Canada | 403 | 0.16 GB | 396 | 7 | 0 | 0 | 0.0% |
+| Trucking HR SWSP | 381 | 0.07 GB | 380 | 1 | 0 | 0 | 0.0% |
 | Workplace Accessbility Grant | 360 | 0.16 GB | 360 | 0 | 0 | 0 | 0.0% |
 | Opportunities Fund Program - BCA | 346 | 0.09 GB | 338 | 8 | 0 | 0 | 0.0% |
 | Science Horizons - BioTalent | 328 | 0.12 GB | 320 | 8 | 0 | 0 | 0.0% |
-| Food Processors (Career Focus) | 324 | 0.16 GB | 72 | 10 | 224 | 18 | 5.6% |
+| Food Processors (Career Focus) | 324 | 0.16 GB | 72 | 28 | 224 | 0 | 0.0% |
 | UNAC-Green Corps-STIP | 317 | 0.12 GB | 315 | 2 | 0 | 0 | 0.0% |
-| Food Processing SWPP | 291 | 0.10 GB | 239 | 4 | 0 | 48 | 16.5% |
-| Canada Summer Jobs | 289 | 0.29 GB | 178 | 12 | 62 | 37 | 12.8% |
-| iAdvance Pathways | 289 | 0.12 GB | 281 | 5 | 0 | 3 | 1.0% |
+| Food Processing SWPP | 291 | 0.10 GB | 239 | 52 | 0 | 0 | 0.0% |
+| Canada Summer Jobs | 289 | 0.29 GB | 178 | 49 | 62 | 0 | 0.0% |
+| iAdvance Pathways | 289 | 0.12 GB | 281 | 8 | 0 | 0 | 0.0% |
 | Discovering Potential | 288 | 0.07 GB | 283 | 5 | 0 | 0 | 0.0% |
 | Welcoming Newcomers | 287 | 0.05 GB | 287 | 0 | 0 | 0 | 0.0% |
 | Agri-talent | 280 | 0.11 GB | 276 | 4 | 0 | 0 | 0.0% |
-| LNG Grant | 274 | 0.05 GB | 76 | 24 | 170 | 4 | 1.5% |
-| DSYIP | 272 | 0.16 GB | 44 | 9 | 200 | 19 | 7.0% |
-| Career Starter (Biotalent) | 269 | 0.10 GB | 264 | 4 | 0 | 1 | 0.4% |
+| LNG Grant | 274 | 0.05 GB | 76 | 28 | 170 | 0 | 0.0% |
+| DSYIP | 272 | 0.16 GB | 44 | 28 | 200 | 0 | 0.0% |
+| Career Starter (Biotalent) | 269 | 0.10 GB | 264 | 5 | 0 | 0 | 0.0% |
 | Skilled Newcomer Bio-Economy | 258 | 0.10 GB | 250 | 8 | 0 | 0 | 0.0% |
 | BioTalent SWPP | 245 | 0.14 GB | 239 | 6 | 0 | 0 | 0.0% |
-| CVP | 239 | 0.41 GB | 234 | 0 | 0 | 5 | 2.1% |
-| Women Entrepreneur Fund | 236 | 0.28 GB | 10 | 147 | 74 | 5 | 2.1% |
+| CVP | 239 | 0.41 GB | 234 | 5 | 0 | 0 | 0.0% |
+| Women Entrepreneur Fund | 236 | 0.28 GB | 10 | 152 | 74 | 0 | 0.0% |
 | Eco-Canada CO-OP | 210 | 0.07 GB | 210 | 0 | 0 | 0 | 0.0% |
-| BCASMDP (Agri-Food Market Development Program) | 200 | 0.67 GB | 175 | 18 | 1 | 6 | 3.0% |
-| ECO Canada-YNR:STIP | 199 | 0.06 GB | 198 | 0 | 0 | 1 | 0.5% |
+| BCASMDP (Agri-Food Market Development Program) | 200 | 0.67 GB | 175 | 24 | 1 | 0 | 0.0% |
+| ECO Canada-YNR:STIP | 199 | 0.06 GB | 198 | 1 | 0 | 0 | 0.0% |
 | Destination Trade | 185 | 0.03 GB | 184 | 1 | 0 | 0 | 0.0% |
 | Workers in Transition | 180 | 0.03 GB | 180 | 0 | 0 | 0 | 0.0% |
-| WILWorks SWPP | 152 | 0.05 GB | 145 | 6 | 0 | 1 | 0.7% |
+| WILWorks SWPP | 152 | 0.05 GB | 145 | 7 | 0 | 0 | 0.0% |
 | Creative Employment Options | 149 | 0.03 GB | 148 | 1 | 0 | 0 | 0.0% |
 | Trucking HR SWPP | 143 | 0.03 GB | 143 | 0 | 0 | 0 | 0.0% |
 | ECO Canada - Science Horizons | 127 | 0.05 GB | 127 | 0 | 0 | 0 | 0.0% |
-| Investment Readiness | 115 | 0.15 GB | 40 | 3 | 60 | 12 | 10.4% |
+| Investment Readiness | 115 | 0.15 GB | 40 | 15 | 60 | 0 | 0.0% |
 | DS4Y - 2023 | 111 | 0.03 GB | 111 | 0 | 0 | 0 | 0.0% |
 | BC Maritime Industries Infrastructure Modernization and Expansion Grant Program | 111 | 0.07 GB | 111 | 0 | 0 | 0 | 0.0% |
 | Eco Canada - Environmental Jobs Growth | 109 | 0.03 GB | 109 | 0 | 0 | 0 | 0.0% |
-| BC Recovery | 96 | 0.23 GB | 43 | 47 | 0 | 6 | 6.3% |
-| Agri-Export (BC) | 95 | 0.05 GB | 73 | 7 | 7 | 8 | 8.4% |
-| Green Shipping | 84 | 0.72 GB | 81 | 0 | 0 | 3 | 3.6% |
+| BC Recovery | 96 | 0.23 GB | 43 | 53 | 0 | 0 | 0.0% |
+| Agri-Export (BC) | 95 | 0.05 GB | 73 | 15 | 7 | 0 | 0.0% |
+| Green Shipping | 84 | 0.72 GB | 81 | 3 | 0 | 0 | 0.0% |
 | Opportunities Fund Program - STRIDES - ODG | 80 | 0.02 GB | 79 | 1 | 0 | 0 | 0.0% |
-| ECO Canada-DS4Y | 76 | 0.03 GB | 74 | 0 | 0 | 2 | 2.6% |
+| ECO Canada-DS4Y | 76 | 0.03 GB | 74 | 2 | 0 | 0 | 0.0% |
 | DS4Y - PCPI | 75 | 0.02 GB | 59 | 16 | 0 | 0 | 0.0% |
 | EPF | 71 | 0.02 GB | 71 | 0 | 0 | 0 | 0.0% |
-| Accelerated Manufacturing Grant | 70 | 0.85 GB | 63 | 0 | 0 | 7 | 10.0% |
+| Accelerated Manufacturing Grant | 70 | 0.85 GB | 63 | 7 | 0 | 0 | 0.0% |
 | Science Horizons - Clean Foundations | 67 | 0.03 GB | 35 | 8 | 24 | 0 | 0.0% |
-| Biotech Grant (Career Focus) | 64 | 0.04 GB | 8 | 6 | 45 | 5 | 7.8% |
+| Biotech Grant (Career Focus) | 64 | 0.04 GB | 8 | 11 | 45 | 0 | 0.0% |
 | Eco Canada - Employability Pathways | 64 | 0.01 GB | 64 | 0 | 0 | 0 | 0.0% |
-| AgriFoods - Green Jobs Initiative | 63 | 0.03 GB | 29 | 8 | 25 | 1 | 1.6% |
+| AgriFoods - Green Jobs Initiative | 63 | 0.03 GB | 29 | 9 | 25 | 0 | 0.0% |
 | Trucking HR - EWSY | 62 | 0.01 GB | 57 | 5 | 0 | 0 | 0.0% |
-| ICTC (Career Focus) ⚠️ | 61 | 0.02 GB | 24 | 16 | 6 | 15 | 24.6% |
+| ICTC (Career Focus) | 61 | 0.02 GB | 24 | 31 | 6 | 0 | 0.0% |
 | Propel SWPP | 59 | 0.09 GB | 58 | 1 | 0 | 0 | 0.0% |
-| Agri-Assurance SME | 58 | 0.11 GB | 44 | 5 | 0 | 9 | 15.5% |
+| Agri-Assurance SME | 58 | 0.11 GB | 44 | 14 | 0 | 0 | 0.0% |
 | Competitiveness Consulting Rebate | 54 | 0.03 GB | 54 | 0 | 0 | 0 | 0.0% |
-| Securing Small Business Rebate Program | 50 | 0.03 GB | 48 | 0 | 0 | 2 | 4.0% |
-| BSP ⚠️ | 49 | 0.21 GB | 13 | 24 | 0 | 12 | 24.5% |
-| Creative Export | 46 | 0.53 GB | 35 | 3 | 0 | 8 | 17.4% |
+| Securing Small Business Rebate Program | 50 | 0.03 GB | 48 | 2 | 0 | 0 | 0.0% |
+| BSP | 49 | 0.21 GB | 13 | 36 | 0 | 0 | 0.0% |
+| Creative Export | 46 | 0.53 GB | 35 | 11 | 0 | 0 | 0.0% |
 | DS4Y - BioTalent | 46 | 0.01 GB | 42 | 4 | 0 | 0 | 0.0% |
 | Digital Lift | 45 | 0.01 GB | 44 | 1 | 0 | 0 | 0.0% |
-| WES | 44 | 0.45 GB | 42 | 0 | 0 | 2 | 4.5% |
+| WES | 44 | 0.45 GB | 42 | 2 | 0 | 0 | 0.0% |
 | EAF | 44 | 0.17 GB | 44 | 0 | 0 | 0 | 0.0% |
 | Eco-Canada S&T Internship | 43 | 0.01 GB | 43 | 0 | 0 | 0 | 0.0% |
 | WorkXP | 40 | 0.04 GB | 39 | 1 | 0 | 0 | 0.0% |
-| WIL Internship | 39 | 0.01 GB | 2 | 2 | 29 | 6 | 15.4% |
+| WIL Internship | 39 | 0.01 GB | 2 | 8 | 29 | 0 | 0.0% |
 | COJG | 38 | 0.04 GB | 36 | 2 | 0 | 0 | 0.0% |
-| CLAC | 38 | 0.01 GB | 36 | 0 | 0 | 2 | 5.3% |
+| CLAC | 38 | 0.01 GB | 36 | 2 | 0 | 0 | 0.0% |
 | Biotalent STIP - Green Jobs | 36 | 0.01 GB | 34 | 2 | 0 | 0 | 0.0% |
 | Employment Services | 30 | 0.01 GB | 28 | 2 | 0 | 0 | 0.0% |
-| SWPP AgriTalent | 28 | 0.01 GB | 27 | 0 | 0 | 1 | 3.6% |
+| SWPP AgriTalent | 28 | 0.01 GB | 27 | 1 | 0 | 0 | 0.0% |
 | Mitacs BSI - KPU | 27 | 0.01 GB | 24 | 3 | 0 | 0 | 0.0% |
-| Manufacturing Jobs Fund ⚠️ | 26 | 0.04 GB | 20 | 0 | 0 | 6 | 23.1% |
+| Manufacturing Jobs Fund | 26 | 0.04 GB | 20 | 6 | 0 | 0 | 0.0% |
 | Empowering Futures | 25 | 0.00 GB | 22 | 1 | 2 | 0 | 0.0% |
 | Mitacs - UBC | 24 | 0.01 GB | 24 | 0 | 0 | 0 | 0.0% |
-| BCAFE | 24 | 0.67 GB | 22 | 0 | 0 | 2 | 8.3% |
+| BCAFE | 24 | 0.67 GB | 22 | 2 | 0 | 0 | 0.0% |
 | YBBE | 23 | 0.00 GB | 20 | 3 | 0 | 0 | 0.0% |
 | BCCAF (Climate Agri Solutions) | 23 | 0.02 GB | 23 | 0 | 0 | 0 | 0.0% |
-| Food Processing Growth Fund | 23 | 0.11 GB | 22 | 0 | 0 | 1 | 4.3% |
+| Food Processing Growth Fund | 23 | 0.11 GB | 22 | 1 | 0 | 0 | 0.0% |
 | Eco Canada Internship | 20 | 0.02 GB | 18 | 0 | 2 | 0 | 0.0% |
 | Experience Matters | 20 | 0.01 GB | 18 | 0 | 2 | 0 | 0.0% |
 | Incentives in Trades - Career Launcher | 20 | 0.01 GB | 20 | 0 | 0 | 0 | 0.0% |
 | Lighthouse Labs Wage Subsidy | 19 | 0.00 GB | 19 | 0 | 0 | 0 | 0.0% |
-| z_Career Focus (Post Secondary)_dormat ⚠️ | 19 | 0.01 GB | 0 | 4 | 4 | 11 | 57.9% |
+| z_Career Focus (Post Secondary)_dormat | 19 | 0.01 GB | 0 | 15 | 4 | 0 | 0.0% |
 | DS4Y - IMAA | 19 | 0.00 GB | 18 | 1 | 0 | 0 | 0.0% |
 | Innovate BC - BC Tech Co-Op Grants Program | 18 | 0.00 GB | 8 | 0 | 10 | 0 | 0.0% |
-| AgriInnovation ⚠️ | 17 | 0.04 GB | 5 | 2 | 1 | 9 | 52.9% |
-| Innovation Booster ⚠️ | 16 | 0.14 GB | 5 | 0 | 0 | 11 | 68.8% |
-| Digital Adoption Program ⚠️ | 16 | 0.01 GB | 0 | 6 | 0 | 10 | 62.5% |
+| AgriInnovation | 17 | 0.04 GB | 5 | 11 | 1 | 0 | 0.0% |
+| Innovation Booster | 16 | 0.14 GB | 5 | 11 | 0 | 0 | 0.0% |
+| Digital Adoption Program | 16 | 0.01 GB | 0 | 16 | 0 | 0 | 0.0% |
 | DigitalWorks (Pinnguaq) | 16 | 0.01 GB | 16 | 0 | 0 | 0 | 0.0% |
 | Work To Grow | 15 | 0.00 GB | 15 | 0 | 0 | 0 | 0.0% |
-| I.D.E.A. Fund | 14 | 0.02 GB | 12 | 0 | 0 | 2 | 14.3% |
-| BC Food Safety ⚠️ | 13 | 0.02 GB | 2 | 2 | 2 | 7 | 53.8% |
+| I.D.E.A. Fund | 14 | 0.02 GB | 12 | 2 | 0 | 0 | 0.0% |
+| BC Food Safety | 13 | 0.02 GB | 2 | 9 | 2 | 0 | 0.0% |
 | Post Farm Food Safety (PFFS) | 13 | 0.00 GB | 0 | 0 | 13 | 0 | 0.0% |
 | Youth Job Connection | 13 | 0.01 GB | 13 | 0 | 0 | 0 | 0.0% |
 | Gearing Up SWPP | 13 | 0.01 GB | 13 | 0 | 0 | 0 | 0.0% |
-| Food Safety | 13 | 0.07 GB | 11 | 0 | 0 | 2 | 15.4% |
+| Food Safety | 13 | 0.07 GB | 11 | 2 | 0 | 0 | 0.0% |
 | Greenworks Pinnguaq | 13 | 0.00 GB | 13 | 0 | 0 | 0 | 0.0% |
 | Opportunities Fund - Biotalent | 13 | 0.00 GB | 0 | 13 | 0 | 0 | 0.0% |
-| Apparel (Career Focus) ⚠️ | 12 | 0.00 GB | 0 | 4 | 5 | 3 | 25.0% |
-| CBBIF ⚠️ | 12 | 0.21 GB | 5 | 3 | 0 | 4 | 33.3% |
-| Food Storage, Distribution and Retail Program | 12 | 0.69 GB | 10 | 1 | 0 | 1 | 8.3% |
-| *Job description templates ⚠️ | 11 | 0.00 GB | 0 | 0 | 0 | 11 | 100.0% |
+| Apparel (Career Focus) | 12 | 0.00 GB | 0 | 7 | 5 | 0 | 0.0% |
+| CBBIF | 12 | 0.21 GB | 5 | 7 | 0 | 0 | 0.0% |
+| Food Storage, Distribution and Retail Program | 12 | 0.69 GB | 10 | 2 | 0 | 0 | 0.0% |
+| *Job description templates | 11 | 0.00 GB | 0 | 11 | 0 | 0 | 0.0% |
 | CAP Value-Added | 11 | 0.27 GB | 11 | 0 | 0 | 0 | 0.0% |
-| Good Spark | 11 | 0.55 GB | 10 | 0 | 0 | 1 | 9.1% |
-| Canadian Mining CMWP | 11 | 0.00 GB | 10 | 0 | 0 | 1 | 9.1% |
-| WAGE Funding ⚠️ | 11 | 1.45 GB | 0 | 0 | 0 | 11 | 100.0% |
+| Good Spark | 11 | 0.55 GB | 10 | 1 | 0 | 0 | 0.0% |
+| Canadian Mining CMWP | 11 | 0.00 GB | 10 | 1 | 0 | 0 | 0.0% |
+| WAGE Funding | 11 | 1.45 GB | 0 | 11 | 0 | 0 | 0.0% |
 | MiTacs | 10 | 0.01 GB | 9 | 1 | 0 | 0 | 0.0% |
 | Environmental Foreign Talent Development Program (EFTD) | 10 | 0.00 GB | 10 | 0 | 0 | 0 | 0.0% |
 | BC Innovator Skills - BC-ISI | 9 | 0.00 GB | 9 | 0 | 0 | 0 | 0.0% |
 | COIL | 9 | 0.14 GB | 9 | 0 | 0 | 0 | 0.0% |
 | Housing Supply Challenge | 9 | 0.57 GB | 9 | 0 | 0 | 0 | 0.0% |
 | Building Green Program | 9 | 0.00 GB | 9 | 0 | 0 | 0 | 0.0% |
-| Bowman (Career Focus) ⚠️ | 8 | 0.00 GB | 0 | 0 | 6 | 2 | 25.0% |
-| Hiring Resources ⚠️ | 8 | 0.00 GB | 0 | 0 | 0 | 8 | 100.0% |
-| Co-operative Education Incentive ⚠️ | 8 | 0.00 GB | 0 | 0 | 0 | 8 | 100.0% |
-| CIF CleanBC Industry Fund ⚠️ | 8 | 0.01 GB | 0 | 6 | 0 | 2 | 25.0% |
-| Canada Alberta Productivity Grant | 8 | 0.00 GB | 7 | 0 | 0 | 1 | 12.5% |
-| On-Farm Value-Added Program ⚠️ | 7 | 0.01 GB | 0 | 0 | 0 | 7 | 100.0% |
-| Integrated Marketplace_ Early-Stage Demonstration Call | 7 | 0.00 GB | 0 | 6 | 0 | 1 | 14.3% |
-| z_Sent Grant Summaries ⚠️ | 6 | 0.00 GB | 0 | 0 | 0 | 6 | 100.0% |
+| Bowman (Career Focus) | 8 | 0.00 GB | 0 | 2 | 6 | 0 | 0.0% |
+| Hiring Resources | 8 | 0.00 GB | 0 | 8 | 0 | 0 | 0.0% |
+| Co-operative Education Incentive | 8 | 0.00 GB | 0 | 8 | 0 | 0 | 0.0% |
+| CIF CleanBC Industry Fund | 8 | 0.01 GB | 0 | 8 | 0 | 0 | 0.0% |
+| Canada Alberta Productivity Grant | 8 | 0.00 GB | 7 | 1 | 0 | 0 | 0.0% |
+| On-Farm Value-Added Program | 7 | 0.01 GB | 0 | 7 | 0 | 0 | 0.0% |
+| Integrated Marketplace_ Early-Stage Demonstration Call | 7 | 0.00 GB | 0 | 7 | 0 | 0 | 0.0% |
+| z_Sent Grant Summaries | 6 | 0.00 GB | 0 | 6 | 0 | 0 | 0.0% |
 | **Job Descriptions Pending | 6 | 0.00 GB | 6 | 0 | 0 | 0 | 0.0% |
 | Infuse Student Work Placement Program | 6 | 0.00 GB | 6 | 0 | 0 | 0 | 0.0% |
 | WilWorks Skilled Trades | 6 | 0.00 GB | 6 | 0 | 0 | 0 | 0.0% |
-| Agriculture Labour Task Force Grant ⚠️ | 6 | 0.01 GB | 0 | 0 | 0 | 6 | 100.0% |
-| Regional Defence Initiative- BC ⚠️ | 6 | 0.01 GB | 0 | 1 | 0 | 5 | 83.3% |
-| Alberta Innovates - Entrepreneur Incubator Program ⚠️ | 5 | 0.00 GB | 0 | 0 | 0 | 5 | 100.0% |
+| Agriculture Labour Task Force Grant | 6 | 0.01 GB | 0 | 6 | 0 | 0 | 0.0% |
+| Regional Defence Initiative- BC | 6 | 0.01 GB | 0 | 6 | 0 | 0 | 0.0% |
+| Alberta Innovates - Entrepreneur Incubator Program | 5 | 0.00 GB | 0 | 5 | 0 | 0 | 0.0% |
 | Columbia Basin | 5 | 0.00 GB | 5 | 0 | 0 | 0 | 0.0% |
 | Hiring Grant Fall 2018 | 5 | 0.00 GB | 0 | 0 | 5 | 0 | 0.0% |
-| B Collective ⚠️ | 5 | 0.00 GB | 0 | 0 | 0 | 5 | 100.0% |
+| B Collective | 5 | 0.00 GB | 0 | 5 | 0 | 0 | 0.0% |
 | RELAY-Green Careers | 5 | 0.00 GB | 0 | 5 | 0 | 0 | 0.0% |
-| Interim Applications for time-limited funding under Section 8 and 9 of the Indigenous Languages Act ⚠️ | 5 | 0.00 GB | 0 | 0 | 0 | 5 | 100.0% |
-| Horizon AI - Tech Commercialization Stream ⚠️ | 5 | 0.01 GB | 0 | 0 | 0 | 5 | 100.0% |
+| Interim Applications for time-limited funding under Section 8 and 9 of the Indigenous Languages Act | 5 | 0.00 GB | 0 | 5 | 0 | 0 | 0.0% |
+| Horizon AI - Tech Commercialization Stream | 5 | 0.01 GB | 0 | 5 | 0 | 0 | 0.0% |
 | Scale AI | 5 | 0.00 GB | 5 | 0 | 0 | 0 | 0.0% |
 | Invest North – Grow | 5 | 0.00 GB | 5 | 0 | 0 | 0 | 0.0% |
-| graduate to opportunity ⚠️ | 5 | 0.00 GB | 0 | 0 | 0 | 5 | 100.0% |
-| Apartment Construction Loan Program: Standard Rental Housing ⚠️ | 5 | 0.00 GB | 0 | 0 | 0 | 5 | 100.0% |
+| graduate to opportunity | 5 | 0.00 GB | 0 | 5 | 0 | 0 | 0.0% |
+| Apartment Construction Loan Program: Standard Rental Housing | 5 | 0.00 GB | 0 | 5 | 0 | 0 | 0.0% |
 | CareerLaunch: Workplace Training | 5 | 0.00 GB | 5 | 0 | 0 | 0 | 0.0% |
-| ICE FUnd ⚠️ | 5 | 0.03 GB | 0 | 0 | 0 | 5 | 100.0% |
+| ICE FUnd | 5 | 0.03 GB | 0 | 5 | 0 | 0 | 0.0% |
 | BC Basin | 4 | 0.00 GB | 0 | 0 | 4 | 0 | 0.0% |
-| Marketing Grant Summaries ⚠️ | 4 | 0.00 GB | 0 | 0 | 0 | 4 | 100.0% |
-| Strategic Innovation Fund ⚠️ | 4 | 0.00 GB | 0 | 0 | 0 | 4 | 100.0% |
+| Marketing Grant Summaries | 4 | 0.00 GB | 0 | 4 | 0 | 0 | 0.0% |
+| Strategic Innovation Fund | 4 | 0.00 GB | 0 | 4 | 0 | 0 | 0.0% |
 | Greening Government | 4 | 0.29 GB | 4 | 0 | 0 | 0 | 0.0% |
 | Canada - Sasketchewan Job Grant | 4 | 0.00 GB | 4 | 0 | 0 | 0 | 0.0% |
 | Accelerating Digital Career for Youth | 4 | 0.00 GB | 4 | 0 | 0 | 0 | 0.0% |
 | Digital Marketing Skills Experience (DMSE) | 4 | 0.00 GB | 4 | 0 | 0 | 0 | 0.0% |
 | Pinnguaq Digital Works | 4 | 0.00 GB | 4 | 0 | 0 | 0 | 0.0% |
-| Workplace Innovation and Productivity Skills Incentive (WIPSI) ⚠️ | 4 | 0.00 GB | 0 | 0 | 0 | 4 | 100.0% |
-| Future Ready Program ⚠️ | 4 | 0.00 GB | 0 | 0 | 0 | 4 | 100.0% |
-| RDII ⚠️ | 4 | 0.00 GB | 0 | 0 | 0 | 4 | 100.0% |
+| Workplace Innovation and Productivity Skills Incentive (WIPSI) | 4 | 0.00 GB | 0 | 4 | 0 | 0 | 0.0% |
+| Future Ready Program | 4 | 0.00 GB | 0 | 4 | 0 | 0 | 0.0% |
+| RDII | 4 | 0.00 GB | 0 | 4 | 0 | 0 | 0.0% |
 | Alberta Innovates | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
-| Environment (CF) ⚠️ | 3 | 0.00 GB | 0 | 0 | 0 | 3 | 100.0% |
-| Work Sharing Program ⚠️ | 3 | 0.00 GB | 0 | 0 | 0 | 3 | 100.0% |
-| FRRF ⚠️ | 3 | 0.00 GB | 0 | 0 | 0 | 3 | 100.0% |
+| Environment (CF) | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
+| Work Sharing Program | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
+| FRRF | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
 | Access to Talent | 3 | 0.00 GB | 3 | 0 | 0 | 0 | 0.0% |
-| Advanced Manufacturing - NGen ⚠️ | 3 | 0.03 GB | 0 | 0 | 0 | 3 | 100.0% |
+| Advanced Manufacturing - NGen | 3 | 0.03 GB | 0 | 3 | 0 | 0 | 0.0% |
 | Career Ready with CTMA | 3 | 0.00 GB | 3 | 0 | 0 | 0 | 0.0% |
-| CleanBC Plastics Action Fund ⚠️ | 3 | 0.00 GB | 0 | 0 | 0 | 3 | 100.0% |
+| CleanBC Plastics Action Fund | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
 | Industry Commercialization Associates Program | 3 | 0.00 GB | 3 | 0 | 0 | 0 | 0.0% |
-| CleanBC Custom Program ⚠️ | 3 | 0.00 GB | 0 | 0 | 0 | 3 | 100.0% |
-| Strategic Energy Management for Industry (SEMI) ⚠️ | 3 | 0.00 GB | 0 | 0 | 0 | 3 | 100.0% |
-| Tailings Technology Challenge ⚠️ | 3 | 0.00 GB | 0 | 0 | 0 | 3 | 100.0% |
+| CleanBC Custom Program | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
+| Strategic Energy Management for Industry (SEMI) | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
+| Tailings Technology Challenge | 3 | 0.00 GB | 0 | 3 | 0 | 0 | 0.0% |
 | International Student (ISI) Co-op Hiring Grant | 3 | 0.00 GB | 3 | 0 | 0 | 0 | 0.0% |
 | FuturePath | 3 | 0.00 GB | 3 | 0 | 0 | 0 | 0.0% |
 | Jobs Growth Fund | 2 | 0.63 GB | 0 | 2 | 0 | 0 | 0.0% |
-| Apprenticeship Service Program - Eco Canada ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| BC Wood Marketing and Business Development ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| BC Lean for Food Processors ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Horizon AI - Global Advantage Stream ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Alberta Innovates - Agri-Food and Bio-Industrial Innovation ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| GradWorks: Employer Incentive Program ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Industry Commercialization Associates Program - Alberta Innovates ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Industry R&D Associates Program - Alberta Innovates ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Early Childhood Educator Training Wage Program ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| INVEST North Program - Grow Stream ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Workplace Education Initiative ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Alberta Digital Traction Program ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| First Peoples Economic Growth Fund ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Project Development Fund ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| TACC Business Equity Program (BEP) ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Tech2Farm ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Call for Industrial Decarbonization (NorthX) ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Energy Innovation Program_Artificial Intelligence for Canadian Energy Innovation ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Ontario Food Technology Pilot (OFTP) ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Expanded Energy Management Program ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Circular Food Innovators Fund ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Beneficial Management Practices Program- Fuel & Energy ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Capital Retrofit_AB_2026 ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Women in Climate_North X ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Farm Solar Grants - BC ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| GCCC Tree Planting ⚠️ | 2 | 0.00 GB | 0 | 0 | 0 | 2 | 100.0% |
-| Alberta STEP ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| BC FoodWorks ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Build in Canada Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| EI Wage Subsidy ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Facebook Small Biz Grant ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Foodworks ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Getting your company 'Granted'.eml ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Grant Summary Template.docx ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Job Creation Incentive Program_incomplete ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
+| Apprenticeship Service Program - Eco Canada | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| BC Wood Marketing and Business Development | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| BC Lean for Food Processors | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Horizon AI - Global Advantage Stream | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Alberta Innovates - Agri-Food and Bio-Industrial Innovation | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| GradWorks: Employer Incentive Program | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Industry Commercialization Associates Program - Alberta Innovates | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Industry R&D Associates Program - Alberta Innovates | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Early Childhood Educator Training Wage Program | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| INVEST North Program - Grow Stream | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Workplace Education Initiative | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Alberta Digital Traction Program | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| First Peoples Economic Growth Fund | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Project Development Fund | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| TACC Business Equity Program (BEP) | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Tech2Farm | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Call for Industrial Decarbonization (NorthX) | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Energy Innovation Program_Artificial Intelligence for Canadian Energy Innovation | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Ontario Food Technology Pilot (OFTP) | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Expanded Energy Management Program | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Circular Food Innovators Fund | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Beneficial Management Practices Program- Fuel & Energy | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Capital Retrofit_AB_2026 | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Women in Climate_North X | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Farm Solar Grants - BC | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| GCCC Tree Planting | 2 | 0.00 GB | 0 | 2 | 0 | 0 | 0.0% |
+| Alberta STEP | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| BC FoodWorks | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Build in Canada Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| EI Wage Subsidy | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Facebook Small Biz Grant | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Foodworks | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Getting your company 'Granted'.eml | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Grant Summary Template.docx | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Job Creation Incentive Program_incomplete | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
 | FACTAP | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
 | Alberta Innovates - Digital Traction | 1 | 0.05 GB | 1 | 0 | 0 | 0 | 0.0% |
-| Clir Renewables - Research Project ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Business Case Template  2022 (2).docx ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Grant Planner Template ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Tourism Fund ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Agritech Innovation Fund - Controlled Environment Agriculture ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
+| Clir Renewables - Research Project | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Business Case Template  2022 (2).docx | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Grant Planner Template | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Tourism Fund | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Agritech Innovation Fund - Controlled Environment Agriculture | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
 | EnMax Amplifier Fund | 1 | 0.00 GB | 1 | 0 | 0 | 0 | 0.0% |
 | Industry R&D Associates | 1 | 0.00 GB | 1 | 0 | 0 | 0 | 0.0% |
-| Cultural Human Resources Council Student Work Placement Program (CHRC SWPP) ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Digital Skills For Youth (DS4Y) - Communautique ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Digital Skills for Youth (DS4Y) - Eco Canada [Waitlist] ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Employ PEI ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Food Futures ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| JobsNL Wage Subsidy Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| START ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Youth Internship Incentive Program (YIIP) ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Creating, Knowing, Sharing: Small Scale Activities ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| The Shift Fund ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| AccelerateIP ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Accelerating Agricultural Innovations 2.0 ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Alberta Export Expansion Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Alberta Innovates - Voucher ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Artificial Intelligence - Protein Industries Canada ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Canadian Agricultural Loans Act program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Clean Resources - Alberta Innovates ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Development and Commercialization Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Digital Modernization and Adoption Program - DCC ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Heavy-Duty Vehicle Efficiency Program - Rebate ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| International Technology Partnership Program (ITP) ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Life Sciences Innovation Fund ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Market Entry Development Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Micro Voucher Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Product Demonstration Program - Alberta Innovates ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Rhyze Up! ⚠️ | 1 | 0.03 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Sustainable Growth and Adoption Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Technology Demonstration Program - DCC ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| ABCMI SAAM Towage - Milestone 2.zip ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Access to Opportunities ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| ISSP ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Untitled.rtf ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
+| Cultural Human Resources Council Student Work Placement Program (CHRC SWPP) | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Digital Skills For Youth (DS4Y) - Communautique | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Digital Skills for Youth (DS4Y) - Eco Canada [Waitlist] | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Employ PEI | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Food Futures | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| JobsNL Wage Subsidy Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| START | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Youth Internship Incentive Program (YIIP) | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Creating, Knowing, Sharing: Small Scale Activities | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| The Shift Fund | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| AccelerateIP | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Accelerating Agricultural Innovations 2.0 | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Alberta Export Expansion Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Alberta Innovates - Voucher | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Artificial Intelligence - Protein Industries Canada | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Canadian Agricultural Loans Act program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Clean Resources - Alberta Innovates | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Development and Commercialization Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Digital Modernization and Adoption Program - DCC | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Heavy-Duty Vehicle Efficiency Program - Rebate | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| International Technology Partnership Program (ITP) | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Life Sciences Innovation Fund | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Market Entry Development Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Micro Voucher Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Product Demonstration Program - Alberta Innovates | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Rhyze Up! | 1 | 0.03 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Sustainable Growth and Adoption Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Technology Demonstration Program - DCC | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| ABCMI SAAM Towage - Milestone 2.zip | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Access to Opportunities | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| ISSP | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Untitled.rtf | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
 | Career Launch | 1 | 0.00 GB | 1 | 0 | 0 | 0 | 0.0% |
-| Equity and Emerging Development_Creative BC ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Go-To-Market Microgrant ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Innovate BC Microgrant - Commercialization ⚠️ | 1 | 0.01 GB | 0 | 0 | 0 | 1 | 100.0% |
-| TNS_DCMP_Program_Guidelines_2026to2027_FINAL_optimized.pdf ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| 23SHI.EN.Wrap Around Services.2.pdf ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| export travel trade Program ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| International Technology Pilot and Demonstration ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| Eurostar Call for Proposal ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| PROCESSOR PRODUCTIVITY PROGRAM (PPP) - BC ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| OJG ⚠️ | 1 | 0.00 GB | 0 | 0 | 0 | 1 | 100.0% |
-| ISED - Business Succession Planning ⚠️ | 1 | 0.01 GB | 0 | 0 | 0 | 1 | 100.0% |
+| Equity and Emerging Development_Creative BC | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Go-To-Market Microgrant | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Innovate BC Microgrant - Commercialization | 1 | 0.01 GB | 0 | 1 | 0 | 0 | 0.0% |
+| TNS_DCMP_Program_Guidelines_2026to2027_FINAL_optimized.pdf | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| 23SHI.EN.Wrap Around Services.2.pdf | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| export travel trade Program | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| International Technology Pilot and Demonstration | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| Eurostar Call for Proposal | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| PROCESSOR PRODUCTIVITY PROGRAM (PPP) - BC | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| OJG | 1 | 0.00 GB | 0 | 1 | 0 | 0 | 0.0% |
+| ISED - Business Succession Planning | 1 | 0.01 GB | 0 | 1 | 0 | 0 | 0.0% |
 
-### ⚠️ Programs where review exceeds 20% (123)
+### ⚠️ Programs where review exceeds 20% (0)
 
-These are structurally unlike CanExport and should be looked at before copying.
-
-| Program | Files | review % | Dominant reason |
-|---|---|---|---|
-| ICTC (Career Focus) | 61 | **24.6%** | no attributed client (15) |
-| BSP | 49 | **24.5%** | no attributed client (12) |
-| Manufacturing Jobs Fund | 26 | **23.1%** | no attributed client (6) |
-| z_Career Focus (Post Secondary)_dormat | 19 | **57.9%** | no attributed client (11) |
-| AgriInnovation | 17 | **52.9%** | no attributed client (9) |
-| Innovation Booster | 16 | **68.8%** | no attributed client (11) |
-| Digital Adoption Program | 16 | **62.5%** | no attributed client (10) |
-| BC Food Safety | 13 | **53.8%** | no attributed client (7) |
-| Apparel (Career Focus) | 12 | **25.0%** | no attributed client (3) |
-| CBBIF | 12 | **33.3%** | no attributed client (4) |
-| *Job description templates | 11 | **100.0%** | no attributed client (11) |
-| WAGE Funding | 11 | **100.0%** | no attributed client (11) |
-| Bowman (Career Focus) | 8 | **25.0%** | no attributed client (2) |
-| Hiring Resources | 8 | **100.0%** | no attributed client (8) |
-| Co-operative Education Incentive | 8 | **100.0%** | no attributed client (8) |
-| CIF CleanBC Industry Fund | 8 | **25.0%** | no attributed client (2) |
-| On-Farm Value-Added Program | 7 | **100.0%** | no attributed client (7) |
-| z_Sent Grant Summaries | 6 | **100.0%** | no attributed client (6) |
-| Agriculture Labour Task Force Grant | 6 | **100.0%** | no attributed client (6) |
-| Regional Defence Initiative- BC | 6 | **83.3%** | no attributed client (5) |
-| Alberta Innovates - Entrepreneur Incubator Program | 5 | **100.0%** | no attributed client (5) |
-| B Collective | 5 | **100.0%** | no attributed client (5) |
-| Interim Applications for time-limited funding under Section 8 and 9 of the Indigenous Languages Act | 5 | **100.0%** | no attributed client (5) |
-| Horizon AI - Tech Commercialization Stream | 5 | **100.0%** | no attributed client (5) |
-| graduate to opportunity | 5 | **100.0%** | no attributed client (5) |
-| Apartment Construction Loan Program: Standard Rental Housing | 5 | **100.0%** | no attributed client (5) |
-| ICE FUnd | 5 | **100.0%** | no attributed client (5) |
-| Marketing Grant Summaries | 4 | **100.0%** | no attributed client (4) |
-| Strategic Innovation Fund | 4 | **100.0%** | no attributed client (4) |
-| Workplace Innovation and Productivity Skills Incentive (WIPSI) | 4 | **100.0%** | no attributed client (4) |
-| Future Ready Program | 4 | **100.0%** | no attributed client (4) |
-| RDII | 4 | **100.0%** | no attributed client (4) |
-| Environment (CF) | 3 | **100.0%** | no attributed client (3) |
-| Work Sharing Program | 3 | **100.0%** | no attributed client (3) |
-| FRRF | 3 | **100.0%** | no attributed client (3) |
-| Advanced Manufacturing - NGen | 3 | **100.0%** | no attributed client (3) |
-| CleanBC Plastics Action Fund | 3 | **100.0%** | no attributed client (3) |
-| CleanBC Custom Program | 3 | **100.0%** | no attributed client (3) |
-| Strategic Energy Management for Industry (SEMI) | 3 | **100.0%** | no attributed client (3) |
-| Tailings Technology Challenge | 3 | **100.0%** | no attributed client (3) |
-| Apprenticeship Service Program - Eco Canada | 2 | **100.0%** | no attributed client (2) |
-| BC Wood Marketing and Business Development | 2 | **100.0%** | no attributed client (2) |
-| BC Lean for Food Processors | 2 | **100.0%** | no attributed client (2) |
-| Horizon AI - Global Advantage Stream | 2 | **100.0%** | no attributed client (2) |
-| Alberta Innovates - Agri-Food and Bio-Industrial Innovation | 2 | **100.0%** | no attributed client (2) |
-| GradWorks: Employer Incentive Program | 2 | **100.0%** | no attributed client (2) |
-| Industry Commercialization Associates Program - Alberta Innovates | 2 | **100.0%** | no attributed client (2) |
-| Industry R&D Associates Program - Alberta Innovates | 2 | **100.0%** | no attributed client (2) |
-| Early Childhood Educator Training Wage Program | 2 | **100.0%** | no attributed client (2) |
-| INVEST North Program - Grow Stream | 2 | **100.0%** | no attributed client (2) |
-| Workplace Education Initiative | 2 | **100.0%** | no attributed client (2) |
-| Alberta Digital Traction Program | 2 | **100.0%** | no attributed client (2) |
-| First Peoples Economic Growth Fund | 2 | **100.0%** | no attributed client (2) |
-| Project Development Fund | 2 | **100.0%** | no attributed client (2) |
-| TACC Business Equity Program (BEP) | 2 | **100.0%** | no attributed client (2) |
-| Tech2Farm | 2 | **100.0%** | no attributed client (2) |
-| Call for Industrial Decarbonization (NorthX) | 2 | **100.0%** | no attributed client (2) |
-| Energy Innovation Program_Artificial Intelligence for Canadian Energy Innovation | 2 | **100.0%** | no attributed client (2) |
-| Ontario Food Technology Pilot (OFTP) | 2 | **100.0%** | no attributed client (2) |
-| Expanded Energy Management Program | 2 | **100.0%** | no attributed client (2) |
-| Circular Food Innovators Fund | 2 | **100.0%** | no attributed client (2) |
-| Beneficial Management Practices Program- Fuel & Energy | 2 | **100.0%** | no attributed client (2) |
-| Capital Retrofit_AB_2026 | 2 | **100.0%** | no attributed client (2) |
-| Women in Climate_North X | 2 | **100.0%** | no attributed client (2) |
-| Farm Solar Grants - BC | 2 | **100.0%** | no attributed client (2) |
-| GCCC Tree Planting | 2 | **100.0%** | no attributed client (2) |
-| Alberta STEP | 1 | **100.0%** | no attributed client (1) |
-| BC FoodWorks | 1 | **100.0%** | no attributed client (1) |
-| Build in Canada Program | 1 | **100.0%** | no attributed client (1) |
-| EI Wage Subsidy | 1 | **100.0%** | no attributed client (1) |
-| Facebook Small Biz Grant | 1 | **100.0%** | no attributed client (1) |
-| Foodworks | 1 | **100.0%** | no attributed client (1) |
-| Getting your company 'Granted'.eml | 1 | **100.0%** | no attributed client (1) |
-| Grant Summary Template.docx | 1 | **100.0%** | no attributed client (1) |
-| Job Creation Incentive Program_incomplete | 1 | **100.0%** | no attributed client (1) |
-| Clir Renewables - Research Project | 1 | **100.0%** | no attributed client (1) |
-| Business Case Template  2022 (2).docx | 1 | **100.0%** | no attributed client (1) |
-| Grant Planner Template | 1 | **100.0%** | no attributed client (1) |
-| Tourism Fund | 1 | **100.0%** | no attributed client (1) |
-| Agritech Innovation Fund - Controlled Environment Agriculture | 1 | **100.0%** | no attributed client (1) |
-| Cultural Human Resources Council Student Work Placement Program (CHRC SWPP) | 1 | **100.0%** | no attributed client (1) |
-| Digital Skills For Youth (DS4Y) - Communautique | 1 | **100.0%** | no attributed client (1) |
-| Digital Skills for Youth (DS4Y) - Eco Canada [Waitlist] | 1 | **100.0%** | no attributed client (1) |
-| Employ PEI | 1 | **100.0%** | no attributed client (1) |
-| Food Futures | 1 | **100.0%** | no attributed client (1) |
-| JobsNL Wage Subsidy Program | 1 | **100.0%** | no attributed client (1) |
-| START | 1 | **100.0%** | no attributed client (1) |
-| Youth Internship Incentive Program (YIIP) | 1 | **100.0%** | no attributed client (1) |
-| Creating, Knowing, Sharing: Small Scale Activities | 1 | **100.0%** | no attributed client (1) |
-| The Shift Fund | 1 | **100.0%** | no attributed client (1) |
-| AccelerateIP | 1 | **100.0%** | no attributed client (1) |
-| Accelerating Agricultural Innovations 2.0 | 1 | **100.0%** | no attributed client (1) |
-| Alberta Export Expansion Program | 1 | **100.0%** | no attributed client (1) |
-| Alberta Innovates - Voucher | 1 | **100.0%** | no attributed client (1) |
-| Artificial Intelligence - Protein Industries Canada | 1 | **100.0%** | no attributed client (1) |
-| Canadian Agricultural Loans Act program | 1 | **100.0%** | no attributed client (1) |
-| Clean Resources - Alberta Innovates | 1 | **100.0%** | no attributed client (1) |
-| Development and Commercialization Program | 1 | **100.0%** | no attributed client (1) |
-| Digital Modernization and Adoption Program - DCC | 1 | **100.0%** | no attributed client (1) |
-| Heavy-Duty Vehicle Efficiency Program - Rebate | 1 | **100.0%** | no attributed client (1) |
-| International Technology Partnership Program (ITP) | 1 | **100.0%** | no attributed client (1) |
-| Life Sciences Innovation Fund | 1 | **100.0%** | no attributed client (1) |
-| Market Entry Development Program | 1 | **100.0%** | no attributed client (1) |
-| Micro Voucher Program | 1 | **100.0%** | no attributed client (1) |
-| Product Demonstration Program - Alberta Innovates | 1 | **100.0%** | no attributed client (1) |
-| Rhyze Up! | 1 | **100.0%** | no attributed client (1) |
-| Sustainable Growth and Adoption Program | 1 | **100.0%** | no attributed client (1) |
-| Technology Demonstration Program - DCC | 1 | **100.0%** | no attributed client (1) |
-| ABCMI SAAM Towage - Milestone 2.zip | 1 | **100.0%** | no attributed client (1) |
-| Access to Opportunities | 1 | **100.0%** | no attributed client (1) |
-| ISSP | 1 | **100.0%** | no attributed client (1) |
-| Untitled.rtf | 1 | **100.0%** | no attributed client (1) |
-| Equity and Emerging Development_Creative BC | 1 | **100.0%** | no attributed client (1) |
-| Go-To-Market Microgrant | 1 | **100.0%** | no attributed client (1) |
-| Innovate BC Microgrant - Commercialization | 1 | **100.0%** | no attributed client (1) |
-| TNS_DCMP_Program_Guidelines_2026to2027_FINAL_optimized.pdf | 1 | **100.0%** | no attributed client (1) |
-| 23SHI.EN.Wrap Around Services.2.pdf | 1 | **100.0%** | no attributed client (1) |
-| export travel trade Program | 1 | **100.0%** | no attributed client (1) |
-| International Technology Pilot and Demonstration | 1 | **100.0%** | no attributed client (1) |
-| Eurostar Call for Proposal | 1 | **100.0%** | no attributed client (1) |
-| PROCESSOR PRODUCTIVITY PROGRAM (PPP) - BC | 1 | **100.0%** | no attributed client (1) |
-| OJG | 1 | **100.0%** | no attributed client (1) |
-| ISED - Business Succession Planning | 1 | **100.0%** | no attributed client (1) |
+_None._
 
 ---
 
@@ -757,17 +631,14 @@ Suffixing both groups treats all 139 the same way and needs no identity judgemen
 
 ---
 
-## Step 6 — the review pile (2,575 rows)
+## Step 6 — the review pile (750 rows)
 
 Grouped by reason class so the review rule can be decided per class rather than per file.
 
 | Reason | Rows | Distinct files | Size |
 |---|---|---|---|
-| no client folder above this file | 983 | 983 | 2.44 GB |
 | folder name was never classified | 750 | 750 | 0.38 GB |
-| joint-client folder (dual-filed) | 606 | 303 | 0.05 GB |
-| folder labelled unclear, not a client | 236 | 236 | 0.13 GB |
-| **Total** | **2,575** | **2,272** | **3.00 GB** |
+| **Total** | **750** | **750** | **0.38 GB** |
 
 ---
 
@@ -805,17 +676,17 @@ Each row: how many distinct cohort folders the sources came from, and how many d
 
 | Program | sort files | Source cohort folders | Distinct years now | Cycles separate? |
 |---|---|---|---|---|
-| ETG (Employer Training Grant) | 17,366 | 21 | 15 | **115 still collide** |
-| WorkBC Wage Subsidy | 15,059 | 5 | 5 | yes ✅ |
+| ETG (Employer Training Grant) | 17,458 | 21 | 15 | **115 still collide** |
+| WorkBC Wage Subsidy | 15,481 | 5 | 5 | yes ✅ |
 | Career Launcher Internships (inc DS4Y DT) | 1,206 | 10 | 7 | **14 still collide** |
-| DS4Y - VCN | 1,064 | 4 | 4 | yes ✅ |
+| DS4Y - VCN | 1,152 | 4 | 4 | yes ✅ |
 | DS4Y - LHL | 877 | 6 | 6 | yes ✅ |
 | DS4Y - Pinnguaq | 853 | 6 | 6 | yes ✅ |
 | Innovate BC - ISI | 712 | 4 | 4 | yes ✅ |
 | BuyBC | 634 | 6 | 7 | yes ✅ |
 | Mon Avenir | 622 | 6 | 4 | **2 still collide** |
 | YESP | 569 | 8 | 8 | yes ✅ |
-| GYW (Youth Hiring Subsidy) | 563 | 17 | 9 | **8 still collide** |
+| GYW (Youth Hiring Subsidy) | 567 | 17 | 9 | **8 still collide** |
 | Magnet SWPP | 527 | 14 | 6 | yes ✅ |
 | Alberta Jobs Now | 461 | 2 | 2 | yes ✅ |
 | AgriMarketing | 398 | 3 | 3 | yes ✅ |
@@ -834,13 +705,13 @@ Each row: how many distinct cohort folders the sources came from, and how many d
 
 | Route | Files | Size |
 |---|---|---|
-| sort | 56,481 | 25.92 GB |
-| program | 3,146 | 3.80 GB |
+| sort | 56,784 | 26.02 GB |
+| program | 4,365 | 6.38 GB |
 | archive | 12,574 | 10.72 GB |
-| **Copyable total** | **72,201** | **40.44 GB** |
-| review (not copied) | 2,272 | 3.00 GB |
+| **Copyable total** | **73,723** | **43.07 GB** |
+| review (not copied) | 750 | 0.38 GB |
 
-**Estimated runtime: 38h 46m.** Extrapolated from the pilot's observed throughput — 1,468 files / 4.05 GB in 47m18s, i.e. 1.93s per file or 1.5 MB/s, whichever binds. Here the binding constraint is **per-file overhead**.
+**Estimated runtime: 39h 35m.** Extrapolated from the pilot's observed throughput — 1,468 files / 4.05 GB in 47m18s, i.e. 1.93s per file or 1.5 MB/s, whichever binds. Here the binding constraint is **per-file overhead**.
 
 That figure assumes the pilot's conditions hold at 40× the volume. It excludes retries, rate limiting beyond what the pilot saw, and the review pile.
 
@@ -852,7 +723,7 @@ That figure assumes the pilot's conditions hold at 40× the volume. It excludes 
 - **Year precedence:** first sub-path segment below the client, then a year on a level discarded between program and client, then `client_modified`. Where discarded levels nest and disagree, the innermost wins — that happened on **13,503** rows.
 - 54,822 rows take their year from a discarded batch level; of those 17,173 disagreed with `client_modified` and 0 recovered a year it lacked.
 - 866 rows had a leading sub-path segment equal to the year collapsed away; 830 took a first-sub-segment year that disagreed with `client_modified`, 0 recovered a year that `client_modified` lacked.
-- 325 distinct folder names were sanitized (colon → ` - `). Filenames are never sanitized on the copy path.
+- 334 distinct folder names were sanitized (colon → ` - `). Filenames are never sanitized on the copy path.
 - Nothing here is applied. `dist/inventory/full-mapping.csv` is a proposal for review.
 
 ## Reproducing
