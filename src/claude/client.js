@@ -549,11 +549,16 @@ export async function runAgent({
         {
           type: 'text',
           text: baseAgentPrompt,
-          // ✅ CACHED (reused across conversations). 1h TTL: this small, highly
-          // stable prefix (base prompt + the tools that render before it) should
-          // survive Oracle's >5min think-gaps between turns. 1h needs no beta
-          // header on the first-party API.
-          cache_control: { type: 'ephemeral', ttl: '1h' }
+          // ✅ CACHED (reused across conversations): base prompt + the tools
+          // that render before it, as one prefix.
+          //
+          // 5m (the default), NOT 1h. The 1h TTL bills writes at 2x base
+          // against 1.25x for 5m, and July's billing showed it wasn't earning
+          // that premium: prefix writes ran at roughly one per conversation
+          // regardless of TTL, and 47% of Oracle's conversation gaps exceed an
+          // hour anyway, so the longer window rescued fewer than half the
+          // cases it was paying for.
+          cache_control: { type: 'ephemeral' }
         }
       ];
 
@@ -736,7 +741,15 @@ export async function runAgent({
           model: MODEL,
           source: 'agent-loop',
           agentType,
-          conversationId
+          conversationId,
+          // Both were already in scope and simply weren't passed, which left
+          // api_cost_events.user_id permanently NULL — no call site anywhere
+          // supplies user identity. This is the only path that can, so
+          // per-user cost attribution depends on these two lines.
+          // userIdentity is null when the lookup failed or the caller is
+          // unauthenticated (lead-gen); userId is null for lead-gen by design.
+          userId,
+          userEmail: userIdentity?.email || null
         });
 
         // Warn if cost is unusually high

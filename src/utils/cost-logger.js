@@ -6,6 +6,7 @@
  */
 
 import { calculateRequestCost } from '../config/cost-settings.js';
+import { recordCostEvent } from '../database/api-cost-events.js';
 
 /**
  * Log an API request cost with full context
@@ -55,6 +56,29 @@ export function logAPICost({ usage, model, source, agentType, conversationId, us
     const cacheHitRate = (usage.cache_read_input_tokens / totalInput) * 100;
     console.log(`   💾 Cache Hit Rate: ${cacheHitRate.toFixed(1)}%`);
   }
+
+  // Persist the call. FIRE-AND-FORGET, deliberately:
+  //  - this function is synchronous and its callers do not await it, so the
+  //    insert must not be awaited either or the contract changes;
+  //  - the stdout logging above has already happened, so a database outage
+  //    costs the row, not the record;
+  //  - the .catch() below is what guarantees a failed write can never surface
+  //    as an error in a user's turn.
+  // Matches the established pattern (src/api/lead-gen.js:148,
+  // src/tools/executor.js:663, src/middleware/admin.js:130).
+  recordCostEvent({
+    source,
+    model,
+    agentType,
+    conversationId,
+    userId,
+    userEmail,
+    usage,
+    costUsd: cost,
+    metadata
+  }).catch(err =>
+    console.warn(`⚠️  [Cost Logger] persist failed (non-fatal): ${err.message}`)
+  );
 
   // Return cost for potential aggregation
   return cost;
