@@ -238,11 +238,16 @@ export function conversationIdForEvent(evt) {
 }
 
 /**
- * Convert Oracle's markdown to what Chat actually renders.
+ * Normalize markdown headings for Google Chat.
  *
- * Chat supports *bold*, _italic_, ~strike~, `code`, ``` blocks, bullets and
- * block quotes, and links as <url|text>. It does NOT support # headings,
- * tables, or numbered lists.
+ * Messages are posted with markupSyntax: MARKUP_SYNTAX_MARKDOWN, so Chat
+ * parses **bold**, *italic*, ~~strike~~, `code`, ``` blocks, bullets,
+ * numbered lists, block quotes and [text](url) itself. Headings are the one
+ * markdown element it does not implement, so they are rewritten to bold here.
+ *
+ * Note the bold marker is '**', not '*'. Under native markdown a single
+ * asterisk is ITALIC — the legacy Chat syntax this function used to emit
+ * would silently change every heading's weight.
  *
  * @param {string} md
  * @returns {string}
@@ -259,21 +264,15 @@ export function markdownToChat(md) {
       out.push(line);
       continue;
     }
-    // Never rewrite inside a fenced code block.
+    // Never rewrite inside a fenced code block — a shell snippet's '# comment'
+    // is a comment, not a heading.
     if (inCodeFence) {
       out.push(line);
       continue;
     }
 
-    let s = line;
-    // '### Heading' -> '*Heading*' (Chat has no heading syntax)
-    s = s.replace(/^\s*#{1,6}\s+(.*?)\s*$/, (_m, t) => `*${t}*`);
-    // Markdown links -> Chat link syntax
-    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<$2|$1>');
-    // '**bold**' -> '*bold*'. Chat reads a single asterisk as bold; a double
-    // asterisk renders literally.
-    s = s.replace(/\*\*([^*]+)\*\*/g, '*$1*');
-    out.push(s);
+    // '### Heading' -> '**Heading**' (Chat markdown has no heading syntax)
+    out.push(line.replace(/^\s*#{1,6}\s+(.*?)\s*$/, (_m, t) => `**${t}**`));
   }
 
   return out.join('\n').trim();
@@ -356,6 +355,11 @@ async function postToChat(evt, text) {
       messageReplyOption: 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD',
       requestBody: {
         text: chunk,
+        // Parse the body as standard Markdown rather than Chat's legacy syntax
+        // (GA 2026-08-07). Without this, '**bold**' renders as literal
+        // asterisks — the failure is silent, so if formatting ever looks wrong
+        // in Chat, check this field first.
+        markupSyntax: 'MARKUP_SYNTAX_MARKDOWN',
         // Only a real resource name is valid here; threadKey is not.
         ...(evt.threadIsResourceName ? { thread: { name: evt.threadId } } : {})
       }
