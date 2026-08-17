@@ -25,7 +25,8 @@ const CORRECTIONS = 'scripts/client-corrections.json';
 const CSV_OUT = 'dist/inventory/full-mapping.csv';
 const MD_OUT = 'docs/inventory/full-mapping.md';
 
-const CLIENTS_ROOT = 'Clients';
+const CLIENTS_ROOT = 'All Clients';
+const ARCHIVE_ROOT = 'Old Files';
 const MAX_SKIP = 8;
 const RETENTION_YEARS = 6;
 const cutoff = new Date();
@@ -152,7 +153,7 @@ function nodeIndexFor(progs) {
   const ceFiles = allFiles.filter((f) => cePrograms.some((p) => p.name === f.program));
   const { out: ceOut } = mapFiles({
     files: ceFiles, nodeByKey: ceNodes, nameStatus, rawToCanon,
-    joint: JOINT, cutoffIso: CUTOFF_ISO, clientsRoot: CLIENTS_ROOT,
+    joint: JOINT, cutoffIso: CUTOFF_ISO, clientsRoot: CLIENTS_ROOT, archiveRoot: ARCHIVE_ROOT,
   });
   let header = null; const committed = [];
   for (const r of parseCsv(await fsp.readFile(CE_MAPPING, 'utf8'))) {
@@ -174,7 +175,7 @@ log(`\nmapping ${files.length} files across ${otherPrograms.length} programs...`
 
 const mapped = mapFiles({
   files, nodeByKey, nameStatus, rawToCanon,
-  joint: JOINT, cutoffIso: CUTOFF_ISO, clientsRoot: CLIENTS_ROOT,
+  joint: JOINT, cutoffIso: CUTOFF_ISO, clientsRoot: CLIENTS_ROOT, archiveRoot: ARCHIVE_ROOT,
 });
 const { out, reviewReasons, folderRenames, counters } = mapped;
 

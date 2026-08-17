@@ -71,7 +71,7 @@ export function makeResolveNodes(childrenByParent, MAX_SKIP = 8) {
  */
 export function mapFiles({
   files, nodeByKey, nameStatus, rawToCanon,
-  joint = new Map(), cutoffIso, clientsRoot = 'Clients',
+  joint = new Map(), cutoffIso, clientsRoot = 'Clients', archiveRoot = 'Archive',
 }) {
   const folderRenames = new Map(); // old -> new
 
@@ -266,7 +266,7 @@ export function mapFiles({
     if (canon.retention === 'archive_only') {
       out.push({
         src, client: canon.canonical, program: f.program, year: year ?? '',
-        dest: `Archive/${sanitizePath(folderSegs)}/${f.name}`, proposed, route: 'archive', yearSource,
+        dest: `${archiveRoot}/${sanitizePath(folderSegs)}/${f.name}`, proposed, route: 'archive', yearSource,
         confidence: status.confidence === 'high' ? 'high' : 'medium',
         reason: `client has no file newer than ${cutoffIso.slice(0, 10)} — mirrored, not reorganized`,
       });

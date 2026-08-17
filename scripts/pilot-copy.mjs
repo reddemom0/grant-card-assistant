@@ -459,6 +459,92 @@ async function clearFailed() {
   console.log(JSON.stringify({ cleared_failed: dropped, kept_verified: kept.length, ledger: LEDGER }, null, 2));
 }
 
+// ------------------------------------------------------------ Live shortcuts
+/**
+ * Live-client shortcuts, created as part of the copy rather than by a separate
+ * pass. drive-restructure.mjs made them for the 90 pilot folders; at full
+ * corpus scale there is no separate restructure step, so the copy has to do it.
+ *
+ * Idempotent on three levels: the ledger records every shortcut created, the
+ * in-process set guards against two workers racing on the same client, and
+ * Drive itself is checked for an existing shortcut before one is made. A
+ * re-run creates nothing.
+ */
+const CLIENTS_ROOT = process.env.PILOT_CLIENTS_ROOT || 'All Clients';
+const LIVE_ROOT = process.env.PILOT_LIVE_ROOT || 'Live Clients';
+const liveClients = new Set();
+const shortcutDone = new Set();
+const shortcutInFlight = new Map();
+let liveRootId = null;
+
+async function loadLiveClients() {
+  try {
+    const text = await fsp.readFile('dist/inventory/client-status.csv', 'utf8');
+    let header = null;
+    for (const r of parseCsv(text)) {
+      if (!header) { header = r; continue; }
+      if (!r[0]) continue;
+      if (r[1] === 'Live') liveClients.add(r[0]);
+    }
+  } catch { /* no status file — no shortcuts */ }
+  for (const e of ledger.values()) {
+    if (e.action === 'shortcut' && e.status === 'verified') shortcutDone.add(e.client);
+  }
+  log(`live clients: ${liveClients.size}, shortcuts already recorded: ${shortcutDone.size}`);
+}
+
+async function ensureLiveShortcut(clientName, folderId) {
+  if (!liveClients.has(clientName)) return null;
+  if (shortcutDone.has(clientName)) return null;
+  if (shortcutInFlight.has(clientName)) return shortcutInFlight.get(clientName);
+
+  const p = (async () => {
+    if (!liveRootId) {
+      const existing = await DRIVE.findFolder(LIVE_ROOT, DEST_ROOT);
+      liveRootId = existing ?? await DRIVE.createFolder(LIVE_ROOT, DEST_ROOT);
+    }
+    // Ask Drive too: a shortcut may exist from the restructure pass, which
+    // predates this ledger.
+    const q = [
+      `name = '${clientName.replace(/'/g, "\\'")}'`,
+      `'${liveRootId}' in parents`,
+      `mimeType = 'application/vnd.google-apps.shortcut'`,
+      'trashed = false',
+    ].join(' and ');
+    const found = await withRetry('shortcut-find', () => DRIVE.api(
+      `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id)&${ALL_DRIVES_LIST}&corpora=drive&driveId=${DRIVE_ID}`
+    ).then((r) => r.json()));
+    if ((found.files ?? []).length) {
+      shortcutDone.add(clientName);
+      return found.files[0].id;
+    }
+    const res = await withRetry('shortcut-create', () => DRIVE.api(
+      `https://www.googleapis.com/drive/v3/files?${ALL_DRIVES}&fields=id,name`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: clientName,
+          mimeType: 'application/vnd.google-apps.shortcut',
+          parents: [liveRootId],
+          shortcutDetails: { targetId: folderId },
+        }),
+      }
+    ).then((r) => r.json()));
+    shortcutDone.add(clientName);
+    await appendLedger({
+      action: 'shortcut', client: clientName, source: `«shortcut»${clientName}`,
+      destination: `${LIVE_ROOT}/${clientName}`, drive_file_id: res.id,
+      target_id: folderId, route: 'shortcut', status: 'verified',
+      timestamp: new Date().toISOString(),
+    });
+    log(`  ↳ Live shortcut: ${LIVE_ROOT}/${clientName}`);
+    return res.id;
+  })();
+  shortcutInFlight.set(clientName, p);
+  return p;
+}
+
 // ---------------------------------------------------------------- folder cache
 const folderCache = new Map();   // 'A/B/C' -> Promise<driveId>
 /**
@@ -479,7 +565,12 @@ function ensureFolder(segments) {
       const p = (async () => {
         const parent = await parentPromise;
         const existing = await DRIVE.findFolder(seg, parent);
-        return existing ?? DRIVE.createFolder(seg, parent);
+        const id = existing ?? await DRIVE.createFolder(seg, parent);
+        // A client folder has just been resolved directly under the clients
+        // root. If that client is Live, wire its shortcut now — this is the
+        // only moment we know the folder's id without a second lookup.
+        if (key === `${CLIENTS_ROOT}/${seg}`) await ensureLiveShortcut(seg, id);
+        return id;
       })();
       folderCache.set(key, p);
       chain = p;
@@ -556,6 +647,7 @@ if (DRY_RUN) {
 // ---------------------------------------------------------------- copy
 await loadLedger();
 log(`ledger: ${ledger.size} entries already recorded`);
+await loadLiveClients();
 
 // Confirm every verified id still resolves. Path plays no part in this.
 const verifiedIds = [...new Set([...verifiedBySource.values()].flat().map((e) => e.drive_file_id))];

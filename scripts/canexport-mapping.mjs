@@ -24,7 +24,13 @@ const MD_OUT = 'docs/inventory/canexport-pilot.md';
  * moved all 90 client folders under this, and left Programs/ and Archive/ at
  * the Shared Drive root — so only the `sort` route carries this prefix.
  */
-const CLIENTS_ROOT = 'Clients';
+const CLIENTS_ROOT = 'All Clients';
+/**
+ * The out-of-retention FILE mirror. Renamed from "Archive" on 2026-08-17:
+ * "archived" also describes a CLIENT status, so one word carried two meanings
+ * at the same level of the tree.
+ */
+const ARCHIVE_ROOT = 'Old Files';
 
 const MAX_SKIP = 8;
 const RETENTION_YEARS = 6;
@@ -164,7 +170,7 @@ log(`  ${ceFiles.length} files under CanExport programs`);
 // full-corpus pass cannot drift. This file keeps only the CanExport report.
 const mapped = mapFiles({
   files: ceFiles, nodeByKey, nameStatus, rawToCanon,
-  joint: JOINT, cutoffIso: CUTOFF_ISO, clientsRoot: CLIENTS_ROOT,
+  joint: JOINT, cutoffIso: CUTOFF_ISO, clientsRoot: CLIENTS_ROOT, archiveRoot: ARCHIVE_ROOT,
 });
 const {
   out, stats, reviewReasons, programTops, noYear, audit, folderRenames,
