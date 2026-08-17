@@ -738,7 +738,29 @@ async function uploadLogo(driveClient, logoPath) {
  * @param {string} parentFolderId - Optional folder ID to place document in (takes precedence over folderName)
  * @returns {Promise<Object>} Result with document link
  */
-export async function createGoogleDoc(title, content, folderName = null, userId = null, logoPath = null, parentFolderId = null) {
+/**
+ * Create a Google Doc from markdown content.
+ *
+ * SHARING: documents are PRIVATE by default — they live in the creating user's
+ * Drive under their own OAuth and inherit their normal permissions. Pass
+ * shareWithLink = true only when the document is genuinely going to someone
+ * outside Granted, and note that even then it grants READER, never writer.
+ *
+ * This used to grant `role:'writer', type:'anyone'` unconditionally on every
+ * document, i.e. anyone with the link could edit. That was an unexamined
+ * default from the original scaffold (commit ddcba384) with no recorded
+ * rationale, and it is wrong for an agent creating client-named material whose
+ * links get pasted into chat.
+ *
+ * @param {string} title
+ * @param {string} content - markdown
+ * @param {string|null} folderName - legacy; prefer parentFolderId
+ * @param {number|null} userId - required for per-user OAuth
+ * @param {string|null} logoPath - unreachable from the tool (executor passes null)
+ * @param {string|null} parentFolderId
+ * @param {boolean} shareWithLink - opt in to anyone-with-link READ access
+ */
+export async function createGoogleDoc(title, content, folderName = null, userId = null, logoPath = null, parentFolderId = null, shareWithLink = false) {
   try {
     console.log(`📄 Creating Google Doc: ${title}`);
 
@@ -1023,15 +1045,29 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
     console.log(`   Document styles applied`);
 
 
-    // Make the document accessible to anyone with the link
-    await driveClient.permissions.create({
-      fileId: documentId,
-      requestBody: {
-        role: 'writer',
-        type: 'anyone'
+    // PRIVATE BY DEFAULT. No permissions call at all unless the caller opts in,
+    // in which case the grant is READER — nothing here ever grants write access
+    // to anyone with the link.
+    //
+    // Isolated try/catch on purpose: this runs after the document already
+    // exists, so a sharing failure must not make the whole call report failure
+    // and strand a document the user can't see referenced anywhere.
+    if (shareWithLink) {
+      try {
+        await driveClient.permissions.create({
+          fileId: documentId,
+          requestBody: {
+            role: 'reader',
+            type: 'anyone'
+          }
+        });
+        console.log(`   Link sharing enabled (anyone with link can VIEW)`);
+      } catch (shareError) {
+        console.warn(`   ⚠️ Document created but link sharing failed: ${shareError.message}`);
       }
-    });
-    console.log(`   Document sharing enabled`);
+    } else {
+      console.log(`   Document is private to the creating user`);
+    }
 
     const docUrl = `https://docs.google.com/document/d/${documentId}/edit`;
 
@@ -1040,7 +1076,10 @@ export async function createGoogleDoc(title, content, folderName = null, userId 
       documentId: documentId,
       url: docUrl,
       title: title,
-      message: `✅ Successfully created Google Doc: "${title}"`
+      // Explicit so the model can describe access accurately instead of
+      // assuming a document is shareable.
+      sharing: shareWithLink ? 'anyone-with-link-can-view' : 'private',
+      message: `✅ Successfully created Google Doc: "${title}"${shareWithLink ? ' (anyone with the link can view)' : ' (private to you)'}`
     };
 
   } catch (error) {

@@ -996,7 +996,10 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           null,  // folderName - not used when parentFolderId is provided
           userId,
           null,  // logoPath - default branding
-          input.parentFolderId || null
+          input.parentFolderId || null,
+          // Private unless the caller explicitly opts in. Anything other than
+          // a literal true keeps the document private.
+          input.share_with_link === true
         );
         break;
 

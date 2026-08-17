@@ -18,7 +18,9 @@
 - Target markets identified
 - Basic project plan (can be as simple as "attend trade show in Germany + run ads")
 
-**Output**: Google Doc created in client's project folder using `create_google_doc` tool
+**Output**: Google Doc created in client's project folder using `create_google_doc` tool with `share_with_link: true`
+
+> Documents are private by default. This guide is a client deliverable, so it is one of the few cases that needs `share_with_link: true` — that grants view access to anyone with the link (never edit). Omit it and the client will get a permissions error.
 
 ---
 
@@ -402,7 +404,7 @@ You:
    - Category C (Marketing): ✓ Fill out for LinkedIn ads
    - Skip categories D-H (not applicable)
    - Include compliance checklist
-4. Call create_google_doc with title "Budget Building Guide - Acme Manufacturing", content (full markdown), and parentFolderId
+4. Call create_google_doc with title "Budget Building Guide - Acme Manufacturing", content (full markdown), parentFolderId, and `share_with_link: true`
 5. Provide link to client
 </generation_process>
 

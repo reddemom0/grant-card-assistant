@@ -2125,6 +2125,10 @@ export const GOOGLE_DOCS_TOOLS = [
         parentFolderId: {
           type: 'string',
           description: 'Optional: Google Drive folder ID to create the document in (from create_google_drive_folder). If not provided, creates in user\'s root Drive.'
+        },
+        share_with_link: {
+          type: 'boolean',
+          description: 'Optional, defaults to false. When false the document is PRIVATE to the person who requested it — the normal case. Set true ONLY when the document is deliberately going to someone outside Granted (e.g. a client deliverable), which makes it readable by anyone who has the link. It never grants edit access.'
         }
       },
       required: ['title', 'content']
@@ -2695,7 +2699,14 @@ export function getToolsForAgent(agentType) {
       // GOOGLE_CALENDAR_TOOLS is referenced HERE and only here — deliberately not
       // in ORACLE_TOOLS, which is spread into ALL_TOOLS and would hand Calendar
       // write access to the orchestrator.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS];
+      // Docs: create-and-write ONLY. Deliberately a filtered subset rather than
+      // spreading GOOGLE_DOCS_TOOLS, which also carries create_google_drive_folder,
+      // copy_template_file (CanExport-specific, and likely blocked by the narrow
+      // drive.file scope) and create_advanced_document (closed enum of consulting
+      // templates — the model cannot supply its own content). Oracle needs none
+      // of those. Editing existing documents is Phase 2.
+      const oracleDocsTools = GOOGLE_DOCS_TOOLS.filter(t => t.name === 'create_google_doc');
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);
