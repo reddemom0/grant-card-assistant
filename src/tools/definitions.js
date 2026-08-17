@@ -2231,6 +2231,89 @@ export const GOOGLE_CALENDAR_TOOLS = [
   }
 ];
 
+/**
+ * Google Docs EDITING tools — read structure, insert, replace a section.
+ *
+ * Standalone const, like GOOGLE_CALENDAR_TOOLS above: referenced ONLY in the
+ * internal-oracle case of getToolsForAgent(). Deliberately NOT part of
+ * GOOGLE_DOCS_TOOLS, which is spread into ALL_TOOLS and would hand document
+ * mutation to the orchestrator.
+ *
+ * replace_google_doc_section carries a `confirmed` property because
+ * CONFIRMATION_POLICY in src/tools/executor.js refuses it without one.
+ */
+export const GOOGLE_DOCS_EDIT_TOOLS = [
+  {
+    name: 'read_google_doc_outline',
+    description: 'Read the heading structure of an existing Google Doc: its title, a revision_id, and every heading with its level, length and a short preview. ALWAYS call this before editing a document — the other Docs editing tools require the revision_id it returns, and you need the exact heading text to target a section. Does NOT return the document body; use read_google_drive_file for that. A document with no structural headings returns an empty list, which means its sections cannot be addressed by name.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        document_id: {
+          type: 'string',
+          description: 'Google Doc ID (the long string in the document URL).'
+        }
+      },
+      required: ['document_id']
+    }
+  },
+  {
+    name: 'insert_into_google_doc',
+    description: 'Insert markdown content into an existing Google Doc, either at the end or relative to a heading. Purely additive — never removes anything. Requires a revision_id from read_google_doc_outline; if the document changed since you read it the edit is refused and nothing is written, in which case read the outline again and retry. Markdown tables are refused: write that content as short paragraphs or a bulleted list instead.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        document_id: { type: 'string', description: 'Google Doc ID.' },
+        content: {
+          type: 'string',
+          description: 'Markdown to insert. Supports ## and ### headings, - bullets, **bold**, *italic*, and checkboxes. Must NOT contain a | pipe table.'
+        },
+        position: {
+          type: 'string',
+          enum: ['end', 'before_heading', 'after_heading'],
+          description: 'Where to insert. "end" appends to the document; the other two are relative to heading_text.'
+        },
+        heading_text: {
+          type: 'string',
+          description: 'Exact heading text to position against. Required when position is before_heading or after_heading. If it matches more than one heading the call is refused and the candidates are returned.'
+        },
+        revision_id: {
+          type: 'string',
+          description: 'revision_id from read_google_doc_outline. Guards against overwriting somebody else\'s concurrent edit.'
+        }
+      },
+      required: ['document_id', 'content', 'position', 'revision_id']
+    }
+  },
+  {
+    name: 'replace_google_doc_section',
+    description: 'Replace the body beneath a heading in an existing Google Doc. The heading itself is kept. DESTRUCTIVE: the section runs to the next heading of the same or higher level, so replacing a ## section also replaces any ### subsections inside it — check section_length from read_google_doc_outline to see how much will be removed. Refuses if the heading is not found (it will never append instead), if the heading is ambiguous, if the revision is stale, or if the content contains a markdown table.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        document_id: { type: 'string', description: 'Google Doc ID.' },
+        heading_text: {
+          type: 'string',
+          description: 'Exact text of the heading whose section should be replaced.'
+        },
+        content: {
+          type: 'string',
+          description: 'Markdown to put beneath the heading. Must NOT contain a | pipe table.'
+        },
+        revision_id: {
+          type: 'string',
+          description: 'revision_id from read_google_doc_outline.'
+        },
+        confirmed: {
+          type: 'boolean',
+          description: 'Set true only after telling the user what will be removed (use section_length from the outline) and getting their agreement. The call is refused without it.'
+        }
+      },
+      required: ['document_id', 'heading_text', 'content', 'revision_id']
+    }
+  }
+];
+
 export const GOOGLE_SHEETS_READWRITE_TOOLS = [
   {
     name: 'read_sheet_range',
@@ -2706,7 +2789,11 @@ export function getToolsForAgent(agentType) {
       // templates — the model cannot supply its own content). Oracle needs none
       // of those. Editing existing documents is Phase 2.
       const oracleDocsTools = GOOGLE_DOCS_TOOLS.filter(t => t.name === 'create_google_doc');
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools];
+      // GOOGLE_DOCS_EDIT_TOOLS is referenced HERE and only here — same reason as
+      // GOOGLE_CALENDAR_TOOLS above. Keeping it out of GOOGLE_DOCS_TOOLS (which
+      // ALL_TOOLS spreads) is what stops the orchestrator gaining the ability to
+      // rewrite documents.
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);

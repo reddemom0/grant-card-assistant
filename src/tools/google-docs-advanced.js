@@ -832,6 +832,32 @@ export function markdownToGrantedDocsRequests(content, startIndex = 1) {
 
       // Make it blue, bold, and larger
       requests.push({
+        updateParagraphStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length
+          },
+          paragraphStyle: {
+            // Real structural heading. read_google_doc_outline
+            // (google-docs-edit.js) locates sections by namedStyleType — without
+            // it, content inserted by the edit tools would be invisible to any
+            // later outline read.
+            namedStyleType: 'HEADING_2',
+            spaceAbove: {
+              magnitude: 12,
+              unit: 'PT'
+            },
+            spaceBelow: {
+              magnitude: 6,
+              unit: 'PT'
+            }
+          },
+          fields: 'namedStyleType,spaceAbove,spaceBelow'
+        }
+      });
+
+      // Character styling AFTER the named style, so the brand look wins.
+      requests.push({
         updateTextStyle: {
           range: {
             startIndex: startIndex,
@@ -849,27 +875,6 @@ export function markdownToGrantedDocsRequests(content, startIndex = 1) {
         }
       });
 
-      // Add spacing after header
-      requests.push({
-        updateParagraphStyle: {
-          range: {
-            startIndex: startIndex,
-            endIndex: startIndex + text.length
-          },
-          paragraphStyle: {
-            spaceAbove: {
-              magnitude: 12,
-              unit: 'PT'
-            },
-            spaceBelow: {
-              magnitude: 6,
-              unit: 'PT'
-            }
-          },
-          fields: 'spaceAbove,spaceBelow'
-        }
-      });
-
       currentIndex += text.length;
       i++;
     }
@@ -882,6 +887,20 @@ export function markdownToGrantedDocsRequests(content, startIndex = 1) {
         insertText: {
           location: { index: currentIndex },
           text: text
+        }
+      });
+
+      // HEADING_3 first — see the '## ' branch above for why order matters.
+      requests.push({
+        updateParagraphStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length
+          },
+          paragraphStyle: {
+            namedStyleType: 'HEADING_3'
+          },
+          fields: 'namedStyleType'
         }
       });
 

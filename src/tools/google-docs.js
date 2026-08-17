@@ -238,7 +238,36 @@ function markdownToDocsRequests(content) {
         }
       });
 
-      // Make it blue, bold, and larger
+      // HEADING_2 + spacing. This MUST come before the updateTextStyle below:
+      // a named style carries its own formatting, so applying it second would
+      // overwrite Granted's blue/bold/size with the stock heading look.
+      //
+      // namedStyleType is what makes this a real structural heading rather than
+      // a bold line. Without it read_google_doc_outline (google-docs-edit.js)
+      // cannot see the document's sections at all.
+      requests.push({
+        updateParagraphStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length
+          },
+          paragraphStyle: {
+            namedStyleType: 'HEADING_2',
+            spaceAbove: {
+              magnitude: 12,
+              unit: 'PT'
+            },
+            spaceBelow: {
+              magnitude: 6,
+              unit: 'PT'
+            }
+          },
+          fields: 'namedStyleType,spaceAbove,spaceBelow'
+        }
+      });
+
+      // Make it blue, bold, and larger (character styling wins over the
+      // named style because it is applied after it).
       requests.push({
         updateTextStyle: {
           range: {
@@ -259,27 +288,6 @@ function markdownToDocsRequests(content) {
         }
       });
 
-      // Add spacing after header
-      requests.push({
-        updateParagraphStyle: {
-          range: {
-            startIndex: startIndex,
-            endIndex: startIndex + text.length
-          },
-          paragraphStyle: {
-            spaceAbove: {
-              magnitude: 12,
-              unit: 'PT'
-            },
-            spaceBelow: {
-              magnitude: 6,
-              unit: 'PT'
-            }
-          },
-          fields: 'spaceAbove,spaceBelow'
-        }
-      });
-
       currentIndex += text.length;
     }
     // Subsection (### ) - Bold, regular size
@@ -293,6 +301,21 @@ function markdownToDocsRequests(content) {
         insertText: {
           location: { index: currentIndex },
           text: text
+        }
+      });
+
+      // HEADING_3 before the character styling — see the '## ' branch above for
+      // why the order matters and why namedStyleType is required.
+      requests.push({
+        updateParagraphStyle: {
+          range: {
+            startIndex: startIndex,
+            endIndex: startIndex + text.length
+          },
+          paragraphStyle: {
+            namedStyleType: 'HEADING_3'
+          },
+          fields: 'namedStyleType'
         }
       });
 

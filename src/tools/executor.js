@@ -49,7 +49,15 @@ const CONFIRMATION_POLICY = {
   update_calendar_event: (input) =>
     Array.isArray(input?.attendees) && input.attendees.length > 0
       ? 'it changes who is invited'
-      : null
+      : null,
+
+  // Unconditional, unlike the calendar entries above. Those gate on a visible
+  // input signal (attendees present). Here there is none: the amount of content
+  // destroyed depends on the document's structure, not on anything in the call,
+  // so "replace the Budget section" could remove two lines or ten pages and the
+  // input looks identical either way. read_google_doc_outline reports
+  // section_length precisely so that extent can be stated before confirming.
+  replace_google_doc_section: () => 'it deletes the existing content under that heading'
 };
 
 /**
@@ -988,6 +996,26 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           agentType
         });
         break;
+
+      // Docs EDITING (google-docs-edit.js). Dynamic import: this module is only
+      // reachable from internal-oracle, so the other agents never pay for it.
+      case 'read_google_doc_outline': {
+        const { readGoogleDocOutline } = await import('./google-docs-edit.js');
+        result = await readGoogleDocOutline(input, userId);
+        break;
+      }
+
+      case 'insert_into_google_doc': {
+        const { insertIntoGoogleDoc } = await import('./google-docs-edit.js');
+        result = await insertIntoGoogleDoc(input, userId);
+        break;
+      }
+
+      case 'replace_google_doc_section': {
+        const { replaceGoogleDocSection } = await import('./google-docs-edit.js');
+        result = await replaceGoogleDocSection(input, userId);
+        break;
+      }
 
       case 'create_google_doc':
         result = await googleDocs.createGoogleDoc(
