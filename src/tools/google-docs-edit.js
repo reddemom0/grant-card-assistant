@@ -152,6 +152,57 @@ export function findHeadings(headings, headingText) {
     .filter(h => h.text.trim().toLowerCase() === want);
 }
 
+/**
+ * Force inserted content to body style unless it asks to be a heading.
+ *
+ * WHY: Docs gives inserted text the paragraph style of the paragraph it lands
+ * in. Every insertion point these tools use sits against a heading — a replace
+ * inserts at heading.endIndex, and insert's three positions are all adjacent to
+ * one — so raw converter output inherits HEADING_2/3 and the whole new section
+ * renders as a heading. Observed in production: replacing a section under a
+ * Heading 2 produced body text styled as Heading 2.
+ *
+ * The converter never sets NORMAL_TEXT explicitly (it only styles the lines it
+ * recognises as headings), so nothing was resetting the inherited style.
+ *
+ * HOW: insert everything, blanket the inserted span with NORMAL_TEXT, then
+ * re-apply the converter's own heading and bullet styling on top. Ordering
+ * matters — batchUpdate applies requests in sequence, so the blanket must land
+ * after the text exists and before the styles that override it.
+ *
+ * `fields: 'namedStyleType'` is deliberately narrow: it resets the named style
+ * and nothing else, leaving spacing, alignment and list membership alone.
+ *
+ * @param {Array} requests - output of markdownToGrantedDocsRequests
+ * @param {number} startIndex - index the content was rendered from
+ * @returns {Array} reordered requests, safe to send as one batch
+ */
+export function withBodyStyleReset(requests, startIndex) {
+  // UTF-16 code units, matching Docs — see the module header on why .length is
+  // correct here and spread/Array.from would not be.
+  const insertedLength = requests.reduce(
+    (n, r) => n + (r.insertText?.text?.length || 0), 0
+  );
+  if (insertedLength === 0) return requests;
+
+  // Styles that must survive the reset, so they are re-applied after it.
+  const isHeadingStyle = (r) => Boolean(r.updateParagraphStyle?.paragraphStyle?.namedStyleType);
+  const isBullets = (r) => Boolean(r.createParagraphBullets);
+
+  const base = requests.filter(r => !isHeadingStyle(r) && !isBullets(r));
+  const deferred = requests.filter(r => isHeadingStyle(r) || isBullets(r));
+
+  const reset = {
+    updateParagraphStyle: {
+      range: { startIndex, endIndex: startIndex + insertedLength },
+      paragraphStyle: { namedStyleType: 'NORMAL_TEXT' },
+      fields: 'namedStyleType'
+    }
+  };
+
+  return [...base, reset, ...deferred];
+}
+
 function ambiguityError(matches, headingText) {
   return {
     success: false,
@@ -285,7 +336,12 @@ export async function insertIntoGoogleDoc(
     insertAt = position === 'before_heading' ? h.startIndex : h.endIndex;
   }
 
-  const requests = markdownToGrantedDocsRequests(String(content), insertAt);
+  // Same inherited-heading-style problem as replace: every position here is
+  // adjacent to a heading paragraph.
+  const requests = withBodyStyleReset(
+    markdownToGrantedDocsRequests(String(content), insertAt),
+    insertAt
+  );
   if (requests.length === 0) return { success: false, error: 'content produced no document changes.' };
 
   try {
@@ -361,7 +417,12 @@ export async function replaceGoogleDocSection(
       deleteContentRange: { range: { startIndex: range.startIndex, endIndex: range.endIndex } }
     });
   }
-  requests.push(...markdownToGrantedDocsRequests(String(content), range.startIndex));
+  // The inserted body must be reset to NORMAL_TEXT: it lands immediately after
+  // the heading paragraph and would otherwise inherit HEADING_2/3.
+  requests.push(...withBodyStyleReset(
+    markdownToGrantedDocsRequests(String(content), range.startIndex),
+    range.startIndex
+  ));
 
   try {
     const res = await docs.documents.batchUpdate({
