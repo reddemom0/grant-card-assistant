@@ -22,6 +22,13 @@ import { isBatchName, normalizeName } from './grants-lib.mjs';
 export const FIRST_SEG_YEAR = /(?:^|[^0-9])((?:19|20)\d{2})(?![0-9])/;
 
 /**
+ * Plausible grant-cycle window. A four-digit number outside this range in a
+ * folder name below the client is a course code or a product name, not a year.
+ */
+export const YEAR_MIN = 2013;
+export const YEAR_MAX = 2027;
+
+/**
  * Never use server_modified: 40,390 files share a single bulk-event date of
  * 2024-07-23, which would date most of the corpus to the same wrong day.
  */
@@ -101,6 +108,7 @@ export function mapFiles({
   let yearCollapsed = 0;
   let yearMoved = 0, yearRecovered = 0, yearConfirmed = 0;
   let batchUsed = 0, batchCompeting = 0, batchMoved = 0, batchRecovered = 0;
+  let subSegImplausible = 0, subSegContradicts = 0;
 
   for (const f of files) {
     const folderSegs = f.segs.slice(0, -1);
@@ -165,17 +173,45 @@ export function mapFiles({
       yearSource = 'batch';
       batchUsed += 1;
     }
-    // The first sub-path segment still outranks a batch level: it sits below
-    // the client and is the more specific statement.
+    /**
+     * The first sub-path segment still outranks a batch level — it sits below
+     * the client and is the more specific statement — but only if it survives
+     * two tests, added 2026-08-17 after the ETG sample copy.
+     *
+     * FIRST_SEG_YEAR matches any four digits that look like a year, and folder
+     * names below a client are full of numbers that are not years: product
+     * names ("Advanced NMEA 2000 Installer"), course codes ("BLDT 2031",
+     * "ACAP 2003"), and dates inside a cycle ("ERP implementation part 2
+     * (January 2023)" filed under the 2022 intake). Each of those was being
+     * read as the grant year.
+     *
+     *   1. PLAUSIBLE — inside 2013-2027. Granted has no grant cycles outside
+     *      that window, so 1970, 2000, 2003 and 2031 are certainly not years.
+     *   2. DOES NOT CONTRADICT — if a cohort folder above the client already
+     *      states a year, a different year below the client loses. The cohort
+     *      folder names the intake; a subfolder names a course.
+     *
+     * Fail either test and the segment is ignored: the batch year stands, or
+     * client_modified if there is none. The folder itself is untouched and
+     * stays in the substructure either way.
+     */
     if (subSegs.length) {
       const m = subSegs[0].match(FIRST_SEG_YEAR);
       if (m) {
-        if (batchYear) batchUsed -= 1;
-        year = m[1];
-        yearSource = 'folder';
-        if (cmYear && m[1] !== cmYear) yearMoved += 1;
-        else if (!cmYear) yearRecovered += 1;
-        else yearConfirmed += 1;
+        const y = Number(m[1]);
+        const plausible = y >= YEAR_MIN && y <= YEAR_MAX;
+        const contradicts = Boolean(batchYear) && m[1] !== batchYear;
+        if (plausible && !contradicts) {
+          if (batchYear) batchUsed -= 1;
+          year = m[1];
+          yearSource = 'folder';
+          if (cmYear && m[1] !== cmYear) yearMoved += 1;
+          else if (!cmYear) yearRecovered += 1;
+          else yearConfirmed += 1;
+        } else {
+          if (!plausible) subSegImplausible += 1;
+          if (contradicts) subSegContradicts += 1;
+        }
       }
     }
 
@@ -294,6 +330,64 @@ export function mapFiles({
     counters: {
       dualFiled, yearCollapsed, yearMoved, yearRecovered, yearConfirmed,
       batchUsed, batchCompeting, batchMoved, batchRecovered,
+      subSegImplausible, subSegContradicts,
     },
   };
+}
+
+/**
+ * Case-fold destination FOLDER paths so that two Dropbox folders differing
+ * only in capitalization map to ONE destination folder.
+ *
+ * Why: Drive's `name =` folder query is case-insensitive, so at copy time the
+ * copier merges case-variant folders — whichever spelling is created first
+ * wins and every later variant lands inside it. The 2026-08-17/18 ETG copy
+ * created 15 such merges (157 files whose Drive path differs from the mapping
+ * only in case). Rather than fight Drive, the mapping adopts its behavior:
+ *
+ *   RULE — first-created wins. Where a folder already exists in Drive, its
+ *   spelling is canonical (pass Drive's folder list in `driveFolders`,
+ *   shallow-first). Where it does not yet exist, the spelling of the first
+ *   mapping row that references the folder is canonical — which is exactly
+ *   the spelling the copier will create when it reaches that row.
+ *
+ * Filenames are NOT folded: Drive stores same-name files side by side, and
+ * two files differing only in name case are distinct files. Only directory
+ * segments fold. Rows routed `review` have no destination and are skipped.
+ *
+ * Folding runs BEFORE collision detection, so two same-named files from two
+ * case-variant folders become an exact destination collision and take the
+ * standard suffix rule.
+ */
+export function foldDestinationCase(rows, driveFolders = []) {
+  const canon = new Map();   // lowercased folder path -> canonical spelling
+  const register = (folderPath) => {
+    const segs = folderPath.split('/');
+    let low = '', can = '';
+    for (const seg of segs) {
+      low = low ? `${low}/${seg.toLowerCase()}` : seg.toLowerCase();
+      if (!canon.has(low)) canon.set(low, can ? `${can}/${seg}` : seg);
+      can = canon.get(low);
+    }
+    return can;
+  };
+  for (const p of driveFolders) register(p);   // Drive spellings are the reference
+
+  let changed = 0;
+  const changes = [];
+  const variantGroups = new Set();
+  for (const r of rows) {
+    if (r.route === 'review') continue;
+    const segs = r.dest.split('/');
+    const fname = segs.pop();
+    if (!segs.length) continue;
+    const folded = register(segs.join('/'));
+    if (folded !== segs.join('/')) {
+      variantGroups.add(segs.join('/').toLowerCase());
+      changes.push({ src: r.src, from: r.dest, to: `${folded}/${fname}` });
+      r.dest = `${folded}/${fname}`;
+      changed += 1;
+    }
+  }
+  return { changed, changes, variantGroups: variantGroups.size };
 }

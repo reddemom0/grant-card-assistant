@@ -8,10 +8,10 @@
 
 | | Rows | Distinct files | Size |
 |---|---|---|---|
-| sort | 57,087 | 56,784 | 26.02 GB |
+| sort | 57,190 | 56,887 | 26.09 GB |
 | program | 4,365 | 4,365 | 6.38 GB |
-| archive | 12,574 | 12,574 | 10.72 GB |
-| review | 750 | 750 | 0.38 GB |
+| archive | 13,221 | 13,221 | 11.02 GB |
+| review | 0 | 0 | 0.00 GB |
 | **Total** | **74,776** | **74,473** | **43.45 GB** |
 
 Across **307 programs**. CanExport (2 programs, already mapped and copied) is excluded.
@@ -30,11 +30,11 @@ Across **307 programs**. CanExport (2 programs, already mapped and copied) is ex
 
 | Program | Files | Size | sort | program | archive | review | review % |
 |---|---|---|---|---|---|---|---|
-| ETG (Employer Training Grant) | 29,489 | 16.37 GB | 17,816 | 2,107 | 9,082 | 530 | 1.8% |
+| ETG (Employer Training Grant) | 29,489 | 16.37 GB | 17,890 | 2,107 | 9,538 | 0 | 0.0% |
 | WorkBC Wage Subsidy | 15,406 | 3.22 GB | 15,481 | 136 | 0 | 0 | 0.0% |
-| BuyBC | 1,984 | 3.54 GB | 634 | 229 | 1,107 | 14 | 0.7% |
+| BuyBC | 1,984 | 3.54 GB | 634 | 229 | 1,121 | 0 | 0.0% |
 | Magnet SWPP | 1,899 | 0.59 GB | 1,890 | 8 | 1 | 0 | 0.0% |
-| Career Launcher Internships (inc DS4Y DT) | 1,628 | 0.37 GB | 1,280 | 64 | 265 | 19 | 1.2% |
+| Career Launcher Internships (inc DS4Y DT) | 1,628 | 0.37 GB | 1,299 | 64 | 265 | 0 | 0.0% |
 | Mon Avenir | 1,247 | 0.46 GB | 1,199 | 48 | 0 | 0 | 0.0% |
 | DS4Y - VCN | 1,166 | 0.24 GB | 1,152 | 14 | 44 | 0 | 0.0% |
 | WIL Digital | 1,101 | 0.22 GB | 1,092 | 5 | 4 | 0 | 0.0% |
@@ -42,12 +42,12 @@ Across **307 programs**. CanExport (2 programs, already mapped and copied) is ex
 | DS4Y - LHL | 925 | 0.14 GB | 877 | 48 | 0 | 0 | 0.0% |
 | DS4Y - Pinnguaq | 886 | 0.32 GB | 853 | 33 | 0 | 0 | 0.0% |
 | Talent Opportunities | 834 | 0.42 GB | 826 | 8 | 0 | 0 | 0.0% |
-| CPF | 807 | 0.71 GB | 0 | 72 | 622 | 113 | 14.0% |
+| CPF | 807 | 0.71 GB | 0 | 72 | 735 | 0 | 0.0% |
 | Career Ready (ITAC Technation) | 763 | 0.14 GB | 752 | 4 | 7 | 0 | 0.0% |
 | Innovate BC - ISI | 743 | 0.20 GB | 712 | 12 | 19 | 0 | 0.0% |
 | YESP | 604 | 0.30 GB | 569 | 24 | 11 | 0 | 0.0% |
 | DS4Y - ICNJ | 552 | 0.22 GB | 545 | 7 | 0 | 0 | 0.0% |
-| PSYIP (Grad Hiring Subsidy) | 498 | 0.20 GB | 60 | 48 | 316 | 74 | 14.9% |
+| PSYIP (Grad Hiring Subsidy) | 498 | 0.20 GB | 70 | 48 | 380 | 0 | 0.0% |
 | Green Jobs | 471 | 0.16 GB | 405 | 61 | 5 | 0 | 0.0% |
 | Alberta Jobs Now | 462 | 0.08 GB | 461 | 1 | 0 | 0 | 0.0% |
 | AgriMarketing | 443 | 0.55 GB | 398 | 21 | 24 | 0 | 0.0% |
@@ -421,9 +421,13 @@ resolveNodes() skips batch folders to reach the client beneath, but in these pro
 
 ---
 
+## Case-folding
+
+Two Dropbox folders differing only in capitalization map to ONE destination folder — Drive merges them anyway (its folder lookup is case-insensitive), so the mapping adopts the merge instead of fighting it. Where the folder already exists in Drive, Drive's spelling is canonical (first-created wins, loaded from `dist/inventory/drive-folders.txt`, 10,124 folders); otherwise the first mapping row's spelling is, which is what the copier will create. This run folded **157 rows** across **23 variant folder paths**. Filenames are never folded — Drive stores same-name files side by side.
+
 ## Step 5 — collision check
 
-Every non-review destination in this mapping, checked against each other **and** against the 1,474 destinations already occupied by copied CanExport files.
+Every non-review destination in this mapping, checked against each other **and** against the 1,474 destinations already occupied by copied CanExport files. Runs after case-folding, so two same-named files from case-variant folders surface here and take the suffix rule.
 
 ## 139 collisions found — **all resolved, zero remain**
 
@@ -489,156 +493,255 @@ Suffixing both groups treats all 139 the same way and needs no identity judgemen
 
 | Group | Program | Was (colliding destination) | Now |
 |---|---|---|---|
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Aksah Kapoor - Mechanical Designer/Akash Kapoor AME Vetting candidate General copy.docx` | `Akash Kapoor AME Vetting candidate General copy (Clean Tech Stream).docx`<br>`Akash Kapoor AME Vetting candidate General copy (Natural Resources Stream).docx` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Aksah Kapoor - Mechanical Designer/Resume-AkashKapoor.pdf` | `Resume-AkashKapoor (Clean Tech Stream).pdf`<br>`Resume-AkashKapoor (Natural Resources Stream).pdf` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Aksah Kapoor - Mechanical Designer/Schedule A - Designer.docx` | `Schedule A - Designer (Clean Tech Stream).docx`<br>`Schedule A - Designer (Natural Resources Stream).docx` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Johann Barnard - Mechanical Designer/Johann Barnard EIT.pdf` | `Johann Barnard EIT (Clean Tech Stream).pdf`<br>`Johann Barnard EIT (Natural Resources Stream).pdf` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Johann Barnard - Mechanical Designer/Johannes Barnard AME Vetting candidate General copy.docx` | `Johannes Barnard AME Vetting candidate General copy (Clean Tech Stream).docx`<br>`Johannes Barnard AME Vetting candidate General copy (Natural Resources Stream).docx` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Johann Barnard - Mechanical Designer/Schedule A - Designer.docx` | `Schedule A - Designer (Clean Tech Stream).docx`<br>`Schedule A - Designer (Natural Resources Stream).docx` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Fabutek/Career Launcher Internships (inc DS4Y DT)/2024/Jeff_Clarke-Janzen_2024.04.25.pdf` | `Jeff_Clarke-Janzen_2024.04.25 (Clean Tech Stream).pdf`<br>`Jeff_Clarke-Janzen_2024.04.25 (Natural Resources Stream).pdf` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Fabutek/Career Launcher Internships (inc DS4Y DT)/2024/Vetting - CDD - Jeff - Fabutek.pdf` | `Vetting - CDD - Jeff - Fabutek (Clean Tech Stream - Fabutek (Unicode Encoding Conflict)).pdf`<br>`Vetting - CDD - Jeff - Fabutek (Clean Tech Stream - Fabutek).pdf`<br>`Vetting - CDD - Jeff - Fabutek (Natural Resources Stream - Fabutek).pdf` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2023/Kharazm Khaledi - Environmental Engineer/*Vetting File as of June 23.xlsm` | `*Vetting File as of June 23 (Clean Tech Stream).xlsm`<br>`*Vetting File as of June 23 (Impact Stream).xlsm` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2023/Kharazm Khaledi - Environmental Engineer/KHALEDI (06.29.23).pdf` | `KHALEDI (06.29.23) (Clean Tech Stream).pdf`<br>`KHALEDI (06.29.23) (Impact Stream).pdf` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2023/Kharazm Khaledi - Environmental Engineer/Phase 1 -  Contaminated Sites.doc` | `Phase 1 -  Contaminated Sites (Clean Tech Stream).doc`<br>`Phase 1 -  Contaminated Sites (Impact Stream).doc` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2024/Paul Quin Yeung - GIS - CAD Specialist/CAD GIS Specialist Job Description.docx` | `CAD GIS Specialist Job Description (Natural Resources Stream).docx`<br>`CAD GIS Specialist Job Description (Clean Tech Stream).docx` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2024/Paul Quin Yeung - GIS - CAD Specialist/Paul Quin Yeung Keystone VETTING FILE AS OF 9.14 (w DS4Y and ELECTRICAL) copy.xlsm` | `Paul Quin Yeung Keystone VETTING FILE AS OF 9.14 (w DS4Y and ELECTRICAL) copy (Natural Resources Stream).xlsm`<br>`Paul Quin Yeung Keystone VETTING FILE AS OF 9.14 (w DS4Y and ELECTRICAL) copy (Clean Tech Stream).xlsm` |
-| **A** | Career Launcher Internships (inc DS4Y DT) | `Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2024/Paul Quin Yeung - GIS - CAD Specialist/Resume Paul Quin Yeung.pdf` | `Resume Paul Quin Yeung (Natural Resources Stream).pdf`<br>`Resume Paul Quin Yeung (Clean Tech Stream).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Atkinson Landscaping/ETG (Employer Training Grant)/2021/Atkinson Landscaping BL 2021.pdf` | `Atkinson Landscaping BL 2021 (ETG-BC Applications 2021).pdf`<br>`Atkinson Landscaping BL 2021 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Atkinson Landscaping/ETG (Employer Training Grant)/2021/Blueprint/Danny Kerr Resume.pdf` | `Danny Kerr Resume (ETG-BC Applications 2021).pdf`<br>`Danny Kerr Resume (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Atkinson Landscaping/ETG (Employer Training Grant)/2021/Blueprint/ETG-Business-Case-Atkinson Landscaping-Blueprint.pdf` | `ETG-Business-Case-Atkinson Landscaping-Blueprint (ETG-BC Applications 2021).pdf`<br>`ETG-Business-Case-Atkinson Landscaping-Blueprint (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Badinotti/ETG (Employer Training Grant)/2021/2021 BC ETG Training Planner - Badinotti Apr 6.xlsx` | `2021 BC ETG Training Planner - Badinotti Apr 6 (ETG-BC Applications 2021).xlsx`<br>`2021 BC ETG Training Planner - Badinotti Apr 6 (ETG-BC Applications 2021x).xlsx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2019/Business License/Business License Upload.pdf` | `Business License Upload (ETG-BC Applications 2019).pdf`<br>`Business License Upload (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2019/Business License/Reference/57369497242__1323C984-73F4-4BD9-8130-8FF4550C31D9.jpeg` | `57369497242__1323C984-73F4-4BD9-8130-8FF4550C31D9 (ETG-BC Applications 2019).jpeg`<br>`57369497242__1323C984-73F4-4BD9-8130-8FF4550C31D9 (ETG-BC Applications 2019x).jpeg` |
-| **A** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2019/Business License/Reference/57369506522__36B18DB8-BAA2-4878-ACAD-BFAD982199D1.jpeg` | `57369506522__36B18DB8-BAA2-4878-ACAD-BFAD982199D1 (ETG-BC Applications 2019).jpeg`<br>`57369506522__36B18DB8-BAA2-4878-ACAD-BFAD982199D1 (ETG-BC Applications 2019x).jpeg` |
-| **A** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/Richard Hyams - Erickson Coaching Instructor .docx` | `Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019).docx`<br>`Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019x).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/Richard Hyams - Erickson Coaching Instructor .pdf` | `Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019).pdf`<br>`Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/The Art of Science and Coaching Outline .docx` | `The Art of Science and Coaching Outline  (ETG-BC Applications 2019).docx`<br>`The Art of Science and Coaching Outline  (ETG-BC Applications 2019x).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/The Art of Science and Coaching Outline .pdf` | `The Art of Science and Coaching Outline  (ETG-BC Applications 2019).pdf`<br>`The Art of Science and Coaching Outline  (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Blume/ETG (Employer Training Grant)/2020/Digital Marketing 2/Maggie Lin.pdf` | `Maggie Lin (ETG-BC Applications 2020x).pdf`<br>`Maggie Lin (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Caliber/ETG (Employer Training Grant)/2020/Certificate in Leadership Fundamentals/Caliber Business Case.pdf` | `Caliber Business Case (ETG-BC Applications 2020x).pdf`<br>`Caliber Business Case (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Caliber/ETG (Employer Training Grant)/2020/Certificate in Leadership Fundamentals/Certificate in Leadership Fundamentals.pdf` | `Certificate in Leadership Fundamentals (ETG-BC Applications 2020x).pdf`<br>`Certificate in Leadership Fundamentals (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Caliber/ETG (Employer Training Grant)/2020/Certificate in Leadership Fundamentals/Instructor Biography - Trevor Throness.pdf` | `Instructor Biography - Trevor Throness (ETG-BC Applications 2020x).pdf`<br>`Instructor Biography - Trevor Throness (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/GPR 2021 x 20 people - ETG Bus Case Info.pdf` | `GPR 2021 x 20 people - ETG Bus Case Info (ETG-BC Applications 2021).pdf`<br>`GPR 2021 x 20 people - ETG Bus Case Info (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Instructors.pdf` | `Instructors (Old Folders - ETG-BC Applications 2020x).pdf`<br>`Instructors (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`Instructors (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Occupational First Aid L3 Training Guide August 2018.pdf` | `Occupational First Aid L3 Training Guide August 2018 (ETG-BC Applications 2020x).pdf`<br>`Occupational First Aid L3 Training Guide August 2018 (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Occupational First Aid Level 3-converted.docx` | `Occupational First Aid Level 3-converted (ETG-BC Applications 2020x).docx`<br>`Occupational First Aid Level 3-converted (ETG-BC Applications 2020xx).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/CH Robinson/ETG (Employer Training Grant)/2019/INSTRUCTORS BIO Casey Miller.pdf` | `INSTRUCTORS BIO Casey Miller (CJG-BC Applications 2020 and prior).pdf`<br>`INSTRUCTORS BIO Casey Miller (CAJG).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Clarus/ETG (Employer Training Grant)/2019/Business License/Business License Upload.pdf` | `Business License Upload (ETG-BC Applications 2019).pdf`<br>`Business License Upload (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Coromandel Properties/ETG (Employer Training Grant)/2021/Coromandel Properties Ltd-Business Licence-2021.pdf` | `Coromandel Properties Ltd-Business Licence-2021 (ETG-BC Applications 2021).pdf`<br>`Coromandel Properties Ltd-Business Licence-2021 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/04 - Invoice Vancouver 2019-2020.pdf` | `04 - Invoice Vancouver 2019-2020 (Old Folders).pdf`<br>`04 - Invoice Vancouver 2019-2020 (CJG-BC Applications 2020 and prior).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/07 - Pre-Admission Info 2020.pdf` | `07 - Pre-Admission Info 2020 (Old Folders).pdf`<br>`07 - Pre-Admission Info 2020 (CJG-BC Applications 2020 and prior).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/CEO - Study Program Vancouver 2020-2025.pdf` | `CEO - Study Program Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020x).pdf`<br>`CEO - Study Program Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`CEO - Study Program Vancouver 2020-2025 (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/CEO Course Costs Vancouver 2020-2025.pdf` | `CEO Course Costs Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020x).pdf`<br>`CEO Course Costs Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`CEO Course Costs Vancouver 2020-2025 (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/CEO Course Dates - Schedule Vancouver 1V 2020-21.pdf` | `CEO Course Dates - Schedule Vancouver 1V 2020-21 (Old Folders - ETG-BC Applications 2020x).pdf`<br>`CEO Course Dates - Schedule Vancouver 1V 2020-21 (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`CEO Course Dates - Schedule Vancouver 1V 2020-21 (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Horizon/ETG (Employer Training Grant)/2017/Info/Leveraging Training Grants-Best Practices.pdf` | `Leveraging Training Grants-Best Practices (CJG-BC Applications 2017x (Sept 2017 onwards)).pdf`<br>`Leveraging Training Grants-Best Practices (CJG-BC Applications 2017xx (Jan 2018 onwards)).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Humanity Financial/ETG (Employer Training Grant)/2021/Business Licence/2021-03-26 HFM 2021 Business Licence.pdf` | `2021-03-26 HFM 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`2021-03-26 HFM 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Humanity Financial/ETG (Employer Training Grant)/2021/Business Licence/Humanity Financial - Busines Licence -2020.pdf` | `Humanity Financial - Busines Licence -2020 (ETG-BC Applications 2021).pdf`<br>`Humanity Financial - Busines Licence -2020 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Keirton/ETG (Employer Training Grant)/2020/Keirton Inc Incorporation Certificate.pdf` | `Keirton Inc Incorporation Certificate (ETG-BC Applications 2020x).pdf`<br>`Keirton Inc Incorporation Certificate (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Keirton/ETG (Employer Training Grant)/2020/Keirton Inc Name Change.pdf` | `Keirton Inc Name Change (ETG-BC Applications 2020x).pdf`<br>`Keirton Inc Name Change (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Bringing-Purpose-to-Life.pdf` | `Bringing-Purpose-to-Life (ETG-BC Applications 2019).pdf`<br>`Bringing-Purpose-to-Life (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Business License/Scanned from a Xerox Multifunction Device.pdf` | `Scanned from a Xerox Multifunction Device (ETG-BC Applications 2019).pdf`<br>`Scanned from a Xerox Multifunction Device (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Co-Creating-Accountability-.pdf` | `Co-Creating-Accountability- (ETG-BC Applications 2019).pdf`<br>`Co-Creating-Accountability- (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Metaskills-for-Effective-Team-Building.pdf` | `Metaskills-for-Effective-Team-Building (ETG-BC Applications 2019).pdf`<br>`Metaskills-for-Effective-Team-Building (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/What-is-My-Leadership-Impact.pdf` | `What-is-My-Leadership-Impact (ETG-BC Applications 2019).pdf`<br>`What-is-My-Leadership-Impact (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Kirmac/ETG (Employer Training Grant)/2020/Business Licenses - 2020.pdf` | `Business Licenses - 2020 (ETG-BC Applications 2020x).pdf`<br>`Business Licenses - 2020 (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Kirmac/ETG (Employer Training Grant)/2020/ST045L01 - Aluminum GMA (MIG) Welding/Marcus Yeo.pdf` | `Marcus Yeo (ETG-BC Applications 2020x).pdf`<br>`Marcus Yeo (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/LBN/ETG (Employer Training Grant)/2020/Getting to 80/instructor bios.pdf.pdf` | `instructor bios.pdf (ETG-BC Applications 2020x).pdf`<br>`instructor bios.pdf (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/LBN/ETG (Employer Training Grant)/2020/Getting to 80/LBN-Gto80-training package-Sep2020.pdf` | `LBN-Gto80-training package-Sep2020 (ETG-BC Applications 2020x).pdf`<br>`LBN-Gto80-training package-Sep2020 (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Life Beyond Limits Counselling/ETG (Employer Training Grant)/2019/Cindi Bio.pdf` | `Cindi Bio (ETG-BC Applications 2019).pdf`<br>`Cindi Bio (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Life Beyond Limits Counselling/ETG (Employer Training Grant)/2019/Small Business Marketing Program- 2018.pdf` | `Small Business Marketing Program- 2018 (ETG-BC Applications 2019).pdf`<br>`Small Business Marketing Program- 2018 (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/business licence upload.pdf` | `business licence upload (ETG-BC Applications 2020x).pdf`<br>`business licence upload (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/Cultivate Advisors/26317.pdf` | `26317 (ETG-BC Applications 2020x).pdf`<br>`26317 (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/Cultivate Advisors/Course - Sales Training.pdf` | `Course - Sales Training (ETG-BC Applications 2020x).pdf`<br>`Course - Sales Training (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/Cultivate Advisors/Trainer Profile.pdf` | `Trainer Profile (ETG-BC Applications 2020x).pdf`<br>`Trainer Profile (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Mayne/ETG (Employer Training Grant)/2021/Mayne Coatings Abbortsford - 2021 Business Licence.pdf` | `Mayne Coatings Abbortsford - 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`Mayne Coatings Abbortsford - 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Mayne/ETG (Employer Training Grant)/2021/Mayne Coatings Langley - 2021 Business Licence.pdf` | `Mayne Coatings Langley - 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`Mayne Coatings Langley - 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Native Shoes/ETG (Employer Training Grant)/2020/Leading Self Workshops - 3 Fold/CGJ Resume - One Page - 2020.pdf` | `CGJ Resume - One Page - 2020 (ETG-BC Applications 2020x).pdf`<br>`CGJ Resume - One Page - 2020 (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Native Shoes/ETG (Employer Training Grant)/2020/Leading Self Workshops - 3 Fold/Fall 2020 Leading Self Series - Level 2 - Core Copy.pdf` | `Fall 2020 Leading Self Series - Level 2 - Core Copy (ETG-BC Applications 2020x).pdf`<br>`Fall 2020 Leading Self Series - Level 2 - Core Copy (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Native Shoes/ETG (Employer Training Grant)/2020/Leading Self Workshops - 3 Fold/Fall 2020_ Leading Self Level 1 - Core Copy.pdf` | `Fall 2020_ Leading Self Level 1 - Core Copy (ETG-BC Applications 2020x).pdf`<br>`Fall 2020_ Leading Self Level 1 - Core Copy (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Norland/ETG (Employer Training Grant)/2021/2021 InterMunicipal-BPES.pdf` | `2021 InterMunicipal-BPES (ETG-BC Applications 2021).pdf`<br>`2021 InterMunicipal-BPES (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Norland/ETG (Employer Training Grant)/2021/2021 InterMunicipal-PBD.pdf` | `2021 InterMunicipal-PBD (ETG-BC Applications 2021).pdf`<br>`2021 InterMunicipal-PBD (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/North Shore Twins/ETG (Employer Training Grant)/2020/Blueprint-for-Success.pdf` | `Blueprint-for-Success (Old Folders).pdf`<br>`Blueprint-for-Success (CJG-BC Applications 2020 and prior).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/North Shore Twins/ETG (Employer Training Grant)/2020/FRASER ENGEL CV 2020.pdf` | `FRASER ENGEL CV 2020 (Old Folders).pdf`<br>`FRASER ENGEL CV 2020 (CJG-BC Applications 2020 and prior).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/North Shore Twins/ETG (Employer Training Grant)/2020/North Shore Twins 2020 Q2Q3 BC Course Planner July 2020.xlsx` | `North Shore Twins 2020 Q2Q3 BC Course Planner July 2020 (Old Folders).xlsx`<br>`North Shore Twins 2020 Q2Q3 BC Course Planner July 2020 (CJG-BC Applications 2020 and prior).xlsx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Point Blank Creative/ETG (Employer Training Grant)/2020/Instructor Bios.pdf` | `Instructor Bios (Old Folders).pdf`<br>`Instructor Bios (CJG-BC Applications 2020 and prior).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Primex/ETG (Employer Training Grant)/2018/DEP Instructors.pdf` | `DEP Instructors (CJG-BC Applications 2018x).pdf`<br>`DEP Instructors (CJG-BC Applications 2018xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Revesco Properties/ETG (Employer Training Grant)/2021/2021 Business Licence - PIPI.pdf` | `2021 Business Licence - PIPI (ETG-BC Applications 2021).pdf`<br>`2021 Business Licence - PIPI (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Revesco Properties/ETG (Employer Training Grant)/2021/ETG Business Case Information Form-V5.pdf` | `ETG Business Case Information Form-V5 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Information Form-V5 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Shanto/ETG (Employer Training Grant)/2021/Notice of Articles.pdf` | `Notice of Articles (ETG-BC Applications 2021).pdf`<br>`Notice of Articles (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Shanto/ETG (Employer Training Grant)/2021/Pages from Notice of Articles.pdf` | `Pages from Notice of Articles (ETG-BC Applications 2021).pdf`<br>`Pages from Notice of Articles (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Smith Cameron/ETG (Employer Training Grant)/2018/MS Office Instructor - PhilippaRobertshawProfile.pdf` | `MS Office Instructor - PhilippaRobertshawProfile (CJG-BC Applications 2018x).pdf`<br>`MS Office Instructor - PhilippaRobertshawProfile (CJG-BC Applications 2018xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Smith Cameron/ETG (Employer Training Grant)/2019/business license.pdf` | `business license (ETG-BC Applications 2019).pdf`<br>`business license (ETG-BC Applications 2019x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Stonz/ETG (Employer Training Grant)/2018/Instructors - Emergenetics.pdf` | `Instructors - Emergenetics (CJG-BC Applications 2018x).pdf`<br>`Instructors - Emergenetics (CJG-BC Applications 2018xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Stonz/ETG (Employer Training Grant)/2018/Outline - Emergenetics .pdf` | `Outline - Emergenetics  (CJG-BC Applications 2018x).pdf`<br>`Outline - Emergenetics  (CJG-BC Applications 2018xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/TAG/ETG (Employer Training Grant)/2017/Wye Management - Instructor Qualifications.pdf` | `Wye Management - Instructor Qualifications (CJG-BC Applications 2017x (Sept 2017 onwards)).pdf`<br>`Wye Management - Instructor Qualifications (CJG-BC Applications 2017xx (Jan 2018 onwards)).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/TAG/ETG (Employer Training Grant)/2019/Leadership Foundations Outline and Bio/Outline - More Co Leadership Foundations.pdf` | `Outline - More Co Leadership Foundations (ETG-BC Applications 2019x).pdf`<br>`Outline - More Co Leadership Foundations (ETG-BC Applications 2019xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Ajay Jaiswall Course 1.pdf` | `ETG Business Case Ajay Jaiswall Course 1 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Ajay Jaiswall Course 1 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Ajay Jaiswall Course 2.pdf` | `ETG Business Case Ajay Jaiswall Course 2 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Ajay Jaiswall Course 2 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Nik Schulz Course 1.pdf` | `ETG Business Case Nik Schulz Course 1 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Nik Schulz Course 1 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Nik Schulz Course 2.pdf` | `ETG Business Case Nik Schulz Course 2 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Nik Schulz Course 2 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Sid Shah Course 1.pdf` | `ETG Business Case Sid Shah Course 1 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Sid Shah Course 1 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Sid Shah Course 2.pdf` | `ETG Business Case Sid Shah Course 2 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Sid Shah Course 2 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/Taymor_Working Proposal_Updated_Aug 3 2021.pptx` | `Taymor_Working Proposal_Updated_Aug 3 2021 (CJG MANITOBA).pptx`<br>`Taymor_Working Proposal_Updated_Aug 3 2021 (CAJG).pptx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Taymor Industries/ETG (Employer Training Grant)/2021/Teneo Training Participant Lists Oct 2021-2.xlsx` | `Teneo Training Participant Lists Oct 2021-2 (CJG MANITOBA).xlsx`<br>`Teneo Training Participant Lists Oct 2021-2 (CAJG).xlsx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Terry Hawes/ETG (Employer Training Grant)/2020/New Administrative Law/Raj Anand.pdf` | `Raj Anand (ETG-BC Applications 2020x).pdf`<br>`Raj Anand (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/20201117_BUSINESS LICENCE BUS-0028082.pdf` | `20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020x).pdf`<br>`20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/20201117_BUSINESS LICENCE BUS-0028082.pdf` | `20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020x).pdf`<br>`20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/Business Builder Academy.pdf` | `Business Builder Academy (ETG-BC Applications 2020x).pdf`<br>`Business Builder Academy (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/ETG Business Case - Vela Wealth.docx` | `ETG Business Case - Vela Wealth (ETG-BC Applications 2020x).docx`<br>`ETG Business Case - Vela Wealth (ETG-BC Applications 2020xx).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/Norm Trainor.pdf` | `Norm Trainor (ETG-BC Applications 2020x).pdf`<br>`Norm Trainor (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/Business Builder Academy.docx` | `Business Builder Academy (ETG-BC Applications 2020x).docx`<br>`Business Builder Academy (ETG-BC Applications 2020xx).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/Business Builder Academy.pdf` | `Business Builder Academy (ETG-BC Applications 2020x).pdf`<br>`Business Builder Academy (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/ETG Business Case - Vela Wealth.docx` | `ETG Business Case - Vela Wealth (ETG-BC Applications 2020x).docx`<br>`ETG Business Case - Vela Wealth (ETG-BC Applications 2020xx).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/Norm Trainor.pdf` | `Norm Trainor (Old Folders - ETG-BC Applications 2020x).pdf`<br>`Norm Trainor (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`Norm Trainor (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business License Payment receipt.pdf` | `Business License Payment receipt (ETG-BC Applications 2020x).pdf`<br>`Business License Payment receipt (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vela Wealth/ETG (Employer Training Grant)/2020/ETG Business Case - Vela Wealth.docx` | `ETG Business Case - Vela Wealth (ETG-BC Applications 2020x).docx`<br>`ETG Business Case - Vela Wealth (ETG-BC Applications 2020xx).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vorum/ETG (Employer Training Grant)/2020/Kathy Andrews_Resume 2020.docx` | `Kathy Andrews_Resume 2020 (Old Folders).docx`<br>`Kathy Andrews_Resume 2020 (CJG-BC Applications 2020 and prior).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vorum/ETG (Employer Training Grant)/2021/Business Licence 2021.pdf` | `Business Licence 2021 (ETG-BC Applications 2021).pdf`<br>`Business Licence 2021 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vorum/ETG (Employer Training Grant)/2021/ETG Business Case Information Form-V5.pdf` | `ETG Business Case Information Form-V5 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Information Form-V5 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vorum/ETG (Employer Training Grant)/2021/Facilitator Bio.pdf` | `Facilitator Bio (ETG-BC Applications 2021).pdf`<br>`Facilitator Bio (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Vorum/ETG (Employer Training Grant)/2021/Kathy Andrews_Resume 2020.pdf` | `Kathy Andrews_Resume 2020 (ETG-BC Applications 2021).pdf`<br>`Kathy Andrews_Resume 2020 (ETG-BC Applications 2021x).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Wakefield/ETG (Employer Training Grant)/2020/15-Week Online Screenplay Story & Structure Workshop Overview/15 Week Screen Writing Course.docx` | `15 Week Screen Writing Course (ETG-BC Applications 2020x).docx`<br>`15 Week Screen Writing Course (ETG-BC Applications 2020xx).docx` |
-| **A** | ETG (Employer Training Grant) | `Clients/Wakefield/ETG (Employer Training Grant)/2020/15-Week Online Screenplay Story & Structure Workshop Overview/15 Week Screen Writing Course.pdf` | `15 Week Screen Writing Course (ETG-BC Applications 2020x).pdf`<br>`15 Week Screen Writing Course (ETG-BC Applications 2020xx).pdf` |
-| **A** | ETG (Employer Training Grant) | `Clients/Wakefield/ETG (Employer Training Grant)/2020/15-Week Online Screenplay Story & Structure Workshop Overview/Hal Cantor.pdf` | `Hal Cantor (ETG-BC Applications 2020x).pdf`<br>`Hal Cantor (ETG-BC Applications 2020xx).pdf` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Colm Topkins/Artona Photographer Job Description (1).docx` | `Artona Photographer Job Description (1) (2022 Q2).docx`<br>`Artona Photographer Job Description (1) (2022 Q3).docx` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Colm Topkins/Colm Topkins.pdf` | `Colm Topkins (2022 Q2).pdf`<br>`Colm Topkins (2022 Q3).pdf` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Felipe/Artona Photographer Job Description (1).docx` | `Artona Photographer Job Description (1) (2022 Q2).docx`<br>`Artona Photographer Job Description (1) (2022 Q3).docx` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Felipe/Felipe De Souza.pdf` | `Felipe De Souza (2022 Q2).pdf`<br>`Felipe De Souza (2022 Q3).pdf` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Felipe/GYW Employer Application.docx` | `GYW Employer Application (2022 Q2).docx`<br>`GYW Employer Application (2022 Q3).docx` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/King Saturno/Artona Photographer Job Description.docx` | `Artona Photographer Job Description (2022 Q2).docx`<br>`Artona Photographer Job Description (2022 Q3).docx` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/King Saturno/GYW Employer Application - King Saturno.docx` | `GYW Employer Application - King Saturno (2022 Q2).docx`<br>`GYW Employer Application - King Saturno (2022 Q3).docx` |
-| **A** | GYW (Youth Hiring Subsidy) | `Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/King Saturno/King Saturno.pdf` | `King Saturno (2022 Q2).pdf`<br>`King Saturno (2022 Q3).pdf` |
-| **A** | Mon Avenir | `Clients/Urban Block Media/Mon Avenir/2021/Stefan Tarnawsky Resume.pdf` | `Stefan Tarnawsky Resume (2021).pdf`<br>`Stefan Tarnawsky Resume (Urban Block Media).pdf` |
-| **A** | Mon Avenir | `Clients/Urban Block Media/Mon Avenir/2021/Virtual Event Production Assistant.pdf` | `Virtual Event Production Assistant (2021).pdf`<br>`Virtual Event Production Assistant (Urban Block Media).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2018/Syllabus - Prosci Change Management Certification Program.docx` | `Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018x).docx`<br>`Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018xx).docx` |
-| **B** | ETG (Employer Training Grant) | `Clients/Bellrock/ETG (Employer Training Grant)/2018/Syllabus - Prosci Change Management Certification Program.pdf` | `Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018x).pdf`<br>`Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018xx).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Blume/ETG (Employer Training Grant)/2020/Digital Marketing 2/Digital Marketing Certificate Course.docx` | `Digital Marketing Certificate Course (ETG-BC Applications 2020x).docx`<br>`Digital Marketing Certificate Course (ETG-BC Applications 2020xx).docx` |
-| **B** | ETG (Employer Training Grant) | `Clients/Blume/ETG (Employer Training Grant)/2020/Digital Marketing 2/Digital Marketing Certificate Course.pdf` | `Digital Marketing Certificate Course (ETG-BC Applications 2020x).pdf`<br>`Digital Marketing Certificate Course (ETG-BC Applications 2020xx).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS.docx` | `1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021).docx`<br>`1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021x).docx` |
-| **B** | ETG (Employer Training Grant) | `Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS.pdf` | `1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021).pdf`<br>`1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021x).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/ETG-Business-Case-Leadership Fundamentals - GPR.pdf` | `ETG-Business-Case-Leadership Fundamentals - GPR (ETG-BC Applications 2021).pdf`<br>`ETG-Business-Case-Leadership Fundamentals - GPR (ETG-BC Applications 2021x).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Occupational First Aid Level 3-converted.pdf` | `Occupational First Aid Level 3-converted (Old Folders - ETG-BC Applications 2020x).pdf`<br>`Occupational First Aid Level 3-converted (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`Occupational First Aid Level 3-converted (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Horizon/ETG (Employer Training Grant)/2017/Info/CPA-Module-Key-Dates-2017-FINAL-V4_0412.pdf` | `CPA-Module-Key-Dates-2017-FINAL-V4_0412 (CJG-BC Applications 2017x (Sept 2017 onwards)).pdf`<br>`CPA-Module-Key-Dates-2017-FINAL-V4_0412 (CJG-BC Applications 2017xx (Jan 2018 onwards)).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Kirmac/ETG (Employer Training Grant)/2020/ST045L01 - Aluminum GMA (MIG) Welding/ST045L01 - Aluminum GMA (MIG) Welding.docx` | `ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020x).docx`<br>`ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020xx).docx` |
-| **B** | ETG (Employer Training Grant) | `Clients/Kirmac/ETG (Employer Training Grant)/2020/ST045L01 - Aluminum GMA (MIG) Welding/ST045L01 - Aluminum GMA (MIG) Welding.pdf` | `ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020x).pdf`<br>`ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020xx).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Mind Over Learning/ETG (Employer Training Grant)/2021/MOL 2021 Business Licence.pdf` | `MOL 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`MOL 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Smith Cameron/ETG (Employer Training Grant)/2016/Reim/Employer Reimbursement Verification Form 16_17.docx` | `Employer Reimbursement Verification Form 16_17 (CJG-BC Applications 2016 Intake (April onwards) - Submitted).docx`<br>`Employer Reimbursement Verification Form 16_17 (CJG-BC Applications 2016xx (Q1 2017)).docx` |
-| **B** | ETG (Employer Training Grant) | `Clients/Terry Hawes/ETG (Employer Training Grant)/2020/Graduate Legal Studies/Intro to Graduate Legal Studies.pdf` | `Intro to Graduate Legal Studies (Old Folders).pdf`<br>`Intro to Graduate Legal Studies (CJG-BC Applications 2020 and prior).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/Terry Hawes/ETG (Employer Training Grant)/2020/New Administrative Law/"New" Administrative Law.docx` | `"New" Administrative Law (ETG-BC Applications 2020x).docx`<br>`"New" Administrative Law (ETG-BC Applications 2020xx).docx` |
-| **B** | ETG (Employer Training Grant) | `Clients/Terry Hawes/ETG (Employer Training Grant)/2020/New Administrative Law/"New" Administrative Law.pdf` | `"New" Administrative Law (ETG-BC Applications 2020x).pdf`<br>`"New" Administrative Law (ETG-BC Applications 2020xx).pdf` |
-| **B** | ETG (Employer Training Grant) | `Clients/TPD/ETG (Employer Training Grant)/2016/TPD Submission Status - Sept 23 2016.xlsx` | `TPD Submission Status - Sept 23 2016 (CJG-BC Applications 2016 Intake (April onwards) - Submitted).xlsx`<br>`TPD Submission Status - Sept 23 2016 (CJG-BC Applications 2016x (October onwards)).xlsx` |
-| **B** | ETG (Employer Training Grant) | `Clients/Vorum/ETG (Employer Training Grant)/2020/Kathy Andrews_Resume 2020.pdf` | `Kathy Andrews_Resume 2020 (Old Folders).pdf`<br>`Kathy Andrews_Resume 2020 (CJG-BC Applications 2020 and prior).pdf` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Aksah Kapoor - Mechanical Designer/Akash Kapoor AME Vetting candidate General copy.docx` | `Akash Kapoor AME Vetting candidate General copy (Clean Tech Stream).docx`<br>`Akash Kapoor AME Vetting candidate General copy (Natural Resources Stream).docx` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Aksah Kapoor - Mechanical Designer/Resume-AkashKapoor.pdf` | `Resume-AkashKapoor (Clean Tech Stream).pdf`<br>`Resume-AkashKapoor (Natural Resources Stream).pdf` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Aksah Kapoor - Mechanical Designer/Schedule A - Designer.docx` | `Schedule A - Designer (Clean Tech Stream).docx`<br>`Schedule A - Designer (Natural Resources Stream).docx` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Johann Barnard - Mechanical Designer/Johann Barnard EIT.pdf` | `Johann Barnard EIT (Clean Tech Stream).pdf`<br>`Johann Barnard EIT (Natural Resources Stream).pdf` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Johann Barnard - Mechanical Designer/Johannes Barnard AME Vetting candidate General copy.docx` | `Johannes Barnard AME Vetting candidate General copy (Clean Tech Stream).docx`<br>`Johannes Barnard AME Vetting candidate General copy (Natural Resources Stream).docx` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/AME/Career Launcher Internships (inc DS4Y DT)/2023/Johann Barnard - Mechanical Designer/Schedule A - Designer.docx` | `Schedule A - Designer (Clean Tech Stream).docx`<br>`Schedule A - Designer (Natural Resources Stream).docx` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Fabutek/Career Launcher Internships (inc DS4Y DT)/2024/Jeff_Clarke-Janzen_2024.04.25.pdf` | `Jeff_Clarke-Janzen_2024.04.25 (Clean Tech Stream).pdf`<br>`Jeff_Clarke-Janzen_2024.04.25 (Natural Resources Stream).pdf` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Fabutek/Career Launcher Internships (inc DS4Y DT)/2024/Vetting - CDD - Jeff - Fabutek.pdf` | `Vetting - CDD - Jeff - Fabutek (Clean Tech Stream - Fabutek (Unicode Encoding Conflict)).pdf`<br>`Vetting - CDD - Jeff - Fabutek (Clean Tech Stream - Fabutek).pdf`<br>`Vetting - CDD - Jeff - Fabutek (Natural Resources Stream - Fabutek).pdf` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2023/Kharazm Khaledi - Environmental Engineer/*Vetting File as of June 23.xlsm` | `*Vetting File as of June 23 (Clean Tech Stream).xlsm`<br>`*Vetting File as of June 23 (Impact Stream).xlsm` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2023/Kharazm Khaledi - Environmental Engineer/KHALEDI (06.29.23).pdf` | `KHALEDI (06.29.23) (Clean Tech Stream).pdf`<br>`KHALEDI (06.29.23) (Impact Stream).pdf` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2023/Kharazm Khaledi - Environmental Engineer/Phase 1 -  Contaminated Sites.doc` | `Phase 1 -  Contaminated Sites (Clean Tech Stream).doc`<br>`Phase 1 -  Contaminated Sites (Impact Stream).doc` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2024/Paul Quin Yeung - GIS - CAD Specialist/CAD GIS Specialist Job Description.docx` | `CAD GIS Specialist Job Description (Natural Resources Stream).docx`<br>`CAD GIS Specialist Job Description (Clean Tech Stream).docx` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2024/Paul Quin Yeung - GIS - CAD Specialist/Paul Quin Yeung Keystone VETTING FILE AS OF 9.14 (w DS4Y and ELECTRICAL) copy.xlsm` | `Paul Quin Yeung Keystone VETTING FILE AS OF 9.14 (w DS4Y and ELECTRICAL) copy (Natural Resources Stream).xlsm`<br>`Paul Quin Yeung Keystone VETTING FILE AS OF 9.14 (w DS4Y and ELECTRICAL) copy (Clean Tech Stream).xlsm` |
+| **A** | Career Launcher Internships (inc DS4Y DT) | `All Clients/Keystone Environmental/Career Launcher Internships (inc DS4Y DT)/2024/Paul Quin Yeung - GIS - CAD Specialist/Resume Paul Quin Yeung.pdf` | `Resume Paul Quin Yeung (Natural Resources Stream).pdf`<br>`Resume Paul Quin Yeung (Clean Tech Stream).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Atkinson Landscaping/ETG (Employer Training Grant)/2021/Atkinson Landscaping BL 2021.pdf` | `Atkinson Landscaping BL 2021 (ETG-BC Applications 2021).pdf`<br>`Atkinson Landscaping BL 2021 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Atkinson Landscaping/ETG (Employer Training Grant)/2021/Blueprint/Danny Kerr Resume.pdf` | `Danny Kerr Resume (ETG-BC Applications 2021).pdf`<br>`Danny Kerr Resume (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Atkinson Landscaping/ETG (Employer Training Grant)/2021/Blueprint/ETG-Business-Case-Atkinson Landscaping-Blueprint.pdf` | `ETG-Business-Case-Atkinson Landscaping-Blueprint (ETG-BC Applications 2021).pdf`<br>`ETG-Business-Case-Atkinson Landscaping-Blueprint (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Badinotti/ETG (Employer Training Grant)/2021/2021 BC ETG Training Planner - Badinotti Apr 6.xlsx` | `2021 BC ETG Training Planner - Badinotti Apr 6 (ETG-BC Applications 2021).xlsx`<br>`2021 BC ETG Training Planner - Badinotti Apr 6 (ETG-BC Applications 2021x).xlsx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2019/Business License/Business License Upload.pdf` | `Business License Upload (ETG-BC Applications 2019).pdf`<br>`Business License Upload (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2019/Business License/Reference/57369497242__1323C984-73F4-4BD9-8130-8FF4550C31D9.jpeg` | `57369497242__1323C984-73F4-4BD9-8130-8FF4550C31D9 (ETG-BC Applications 2019).jpeg`<br>`57369497242__1323C984-73F4-4BD9-8130-8FF4550C31D9 (ETG-BC Applications 2019x).jpeg` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2019/Business License/Reference/57369506522__36B18DB8-BAA2-4878-ACAD-BFAD982199D1.jpeg` | `57369506522__36B18DB8-BAA2-4878-ACAD-BFAD982199D1 (ETG-BC Applications 2019).jpeg`<br>`57369506522__36B18DB8-BAA2-4878-ACAD-BFAD982199D1 (ETG-BC Applications 2019x).jpeg` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/Richard Hyams - Erickson Coaching Instructor .docx` | `Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019).docx`<br>`Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019x).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/Richard Hyams - Erickson Coaching Instructor .pdf` | `Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019).pdf`<br>`Richard Hyams - Erickson Coaching Instructor  (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/The Art of Science and Coaching Outline .docx` | `The Art of Science and Coaching Outline  (ETG-BC Applications 2019).docx`<br>`The Art of Science and Coaching Outline  (ETG-BC Applications 2019x).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2019/Erickson/The Art of Science and Coaching Outline .pdf` | `The Art of Science and Coaching Outline  (ETG-BC Applications 2019).pdf`<br>`The Art of Science and Coaching Outline  (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Blume/ETG (Employer Training Grant)/2020/Digital Marketing 2/Maggie Lin.pdf` | `Maggie Lin (ETG-BC Applications 2020x).pdf`<br>`Maggie Lin (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Caliber/ETG (Employer Training Grant)/2020/Certificate in Leadership Fundamentals/Caliber Business Case.pdf` | `Caliber Business Case (ETG-BC Applications 2020x).pdf`<br>`Caliber Business Case (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Caliber/ETG (Employer Training Grant)/2020/Certificate in Leadership Fundamentals/Certificate in Leadership Fundamentals.pdf` | `Certificate in Leadership Fundamentals (ETG-BC Applications 2020x).pdf`<br>`Certificate in Leadership Fundamentals (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Caliber/ETG (Employer Training Grant)/2020/Certificate in Leadership Fundamentals/Instructor Biography - Trevor Throness.pdf` | `Instructor Biography - Trevor Throness (ETG-BC Applications 2020x).pdf`<br>`Instructor Biography - Trevor Throness (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/GPR 2021 x 20 people - ETG Bus Case Info.pdf` | `GPR 2021 x 20 people - ETG Bus Case Info (ETG-BC Applications 2021).pdf`<br>`GPR 2021 x 20 people - ETG Bus Case Info (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Instructors.pdf` | `Instructors (Old Folders - ETG-BC Applications 2020x).pdf`<br>`Instructors (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`Instructors (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Occupational First Aid L3 Training Guide August 2018.pdf` | `Occupational First Aid L3 Training Guide August 2018 (ETG-BC Applications 2020x).pdf`<br>`Occupational First Aid L3 Training Guide August 2018 (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Occupational First Aid Level 3-converted.docx` | `Occupational First Aid Level 3-converted (ETG-BC Applications 2020x).docx`<br>`Occupational First Aid Level 3-converted (ETG-BC Applications 2020xx).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/CH Robinson/ETG (Employer Training Grant)/2019/INSTRUCTORS BIO Casey Miller.pdf` | `INSTRUCTORS BIO Casey Miller (CJG-BC Applications 2020 and prior).pdf`<br>`INSTRUCTORS BIO Casey Miller (CAJG).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Clarus/ETG (Employer Training Grant)/2019/Business License/Business License Upload.pdf` | `Business License Upload (ETG-BC Applications 2019).pdf`<br>`Business License Upload (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Coromandel Properties/ETG (Employer Training Grant)/2021/Coromandel Properties Ltd-Business Licence-2021.pdf` | `Coromandel Properties Ltd-Business Licence-2021 (ETG-BC Applications 2021).pdf`<br>`Coromandel Properties Ltd-Business Licence-2021 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/04 - Invoice Vancouver 2019-2020.pdf` | `04 - Invoice Vancouver 2019-2020 (Old Folders).pdf`<br>`04 - Invoice Vancouver 2019-2020 (CJG-BC Applications 2020 and prior).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/07 - Pre-Admission Info 2020.pdf` | `07 - Pre-Admission Info 2020 (Old Folders).pdf`<br>`07 - Pre-Admission Info 2020 (CJG-BC Applications 2020 and prior).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/CEO - Study Program Vancouver 2020-2025.pdf` | `CEO - Study Program Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020x).pdf`<br>`CEO - Study Program Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`CEO - Study Program Vancouver 2020-2025 (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/CEO Course Costs Vancouver 2020-2025.pdf` | `CEO Course Costs Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020x).pdf`<br>`CEO Course Costs Vancouver 2020-2025 (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`CEO Course Costs Vancouver 2020-2025 (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Enhanced Performance/ETG (Employer Training Grant)/2020/CEO Course Dates - Schedule Vancouver 1V 2020-21.pdf` | `CEO Course Dates - Schedule Vancouver 1V 2020-21 (Old Folders - ETG-BC Applications 2020x).pdf`<br>`CEO Course Dates - Schedule Vancouver 1V 2020-21 (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`CEO Course Dates - Schedule Vancouver 1V 2020-21 (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Horizon/ETG (Employer Training Grant)/2017/Info/Leveraging Training Grants-Best Practices.pdf` | `Leveraging Training Grants-Best Practices (CJG-BC Applications 2017x (Sept 2017 onwards)).pdf`<br>`Leveraging Training Grants-Best Practices (CJG-BC Applications 2017xx (Jan 2018 onwards)).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Humanity Financial/ETG (Employer Training Grant)/2021/Business Licence/2021-03-26 HFM 2021 Business Licence.pdf` | `2021-03-26 HFM 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`2021-03-26 HFM 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Humanity Financial/ETG (Employer Training Grant)/2021/Business Licence/Humanity Financial - Busines Licence -2020.pdf` | `Humanity Financial - Busines Licence -2020 (ETG-BC Applications 2021).pdf`<br>`Humanity Financial - Busines Licence -2020 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Keirton/ETG (Employer Training Grant)/2020/Keirton Inc Incorporation Certificate.pdf` | `Keirton Inc Incorporation Certificate (ETG-BC Applications 2020x).pdf`<br>`Keirton Inc Incorporation Certificate (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Keirton/ETG (Employer Training Grant)/2020/Keirton Inc Name Change.pdf` | `Keirton Inc Name Change (ETG-BC Applications 2020x).pdf`<br>`Keirton Inc Name Change (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Bringing-Purpose-to-Life.pdf` | `Bringing-Purpose-to-Life (ETG-BC Applications 2019).pdf`<br>`Bringing-Purpose-to-Life (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Business License/Scanned from a Xerox Multifunction Device.pdf` | `Scanned from a Xerox Multifunction Device (ETG-BC Applications 2019).pdf`<br>`Scanned from a Xerox Multifunction Device (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Co-Creating-Accountability-.pdf` | `Co-Creating-Accountability- (ETG-BC Applications 2019).pdf`<br>`Co-Creating-Accountability- (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/Metaskills-for-Effective-Team-Building.pdf` | `Metaskills-for-Effective-Team-Building (ETG-BC Applications 2019).pdf`<br>`Metaskills-for-Effective-Team-Building (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Kerrisdale Lumber/ETG (Employer Training Grant)/2019/What-is-My-Leadership-Impact.pdf` | `What-is-My-Leadership-Impact (ETG-BC Applications 2019).pdf`<br>`What-is-My-Leadership-Impact (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Kirmac/ETG (Employer Training Grant)/2020/Business Licenses - 2020.pdf` | `Business Licenses - 2020 (ETG-BC Applications 2020x).pdf`<br>`Business Licenses - 2020 (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Kirmac/ETG (Employer Training Grant)/2020/ST045L01 - Aluminum GMA (MIG) Welding/Marcus Yeo.pdf` | `Marcus Yeo (ETG-BC Applications 2020x).pdf`<br>`Marcus Yeo (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/LBN/ETG (Employer Training Grant)/2020/Getting to 80/instructor bios.pdf.pdf` | `instructor bios.pdf (ETG-BC Applications 2020x).pdf`<br>`instructor bios.pdf (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/LBN/ETG (Employer Training Grant)/2020/Getting to 80/LBN-Gto80-training package-Sep2020.pdf` | `LBN-Gto80-training package-Sep2020 (ETG-BC Applications 2020x).pdf`<br>`LBN-Gto80-training package-Sep2020 (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Life Beyond Limits Counselling/ETG (Employer Training Grant)/2019/Cindi Bio.pdf` | `Cindi Bio (ETG-BC Applications 2019).pdf`<br>`Cindi Bio (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Life Beyond Limits Counselling/ETG (Employer Training Grant)/2019/Small Business Marketing Program- 2018.pdf` | `Small Business Marketing Program- 2018 (ETG-BC Applications 2019).pdf`<br>`Small Business Marketing Program- 2018 (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/business licence upload.pdf` | `business licence upload (ETG-BC Applications 2020x).pdf`<br>`business licence upload (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/Cultivate Advisors/26317.pdf` | `26317 (ETG-BC Applications 2020x).pdf`<br>`26317 (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/Cultivate Advisors/Course - Sales Training.pdf` | `Course - Sales Training (ETG-BC Applications 2020x).pdf`<br>`Course - Sales Training (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Longevity Graphics/ETG (Employer Training Grant)/2020/Cultivate Advisors/Trainer Profile.pdf` | `Trainer Profile (ETG-BC Applications 2020x).pdf`<br>`Trainer Profile (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Mayne/ETG (Employer Training Grant)/2021/Mayne Coatings Abbortsford - 2021 Business Licence.pdf` | `Mayne Coatings Abbortsford - 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`Mayne Coatings Abbortsford - 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Mayne/ETG (Employer Training Grant)/2021/Mayne Coatings Langley - 2021 Business Licence.pdf` | `Mayne Coatings Langley - 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`Mayne Coatings Langley - 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Native Shoes/ETG (Employer Training Grant)/2020/Leading Self Workshops - 3 Fold/CGJ Resume - One Page - 2020.pdf` | `CGJ Resume - One Page - 2020 (ETG-BC Applications 2020x).pdf`<br>`CGJ Resume - One Page - 2020 (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Native Shoes/ETG (Employer Training Grant)/2020/Leading Self Workshops - 3 Fold/Fall 2020 Leading Self Series - Level 2 - Core Copy.pdf` | `Fall 2020 Leading Self Series - Level 2 - Core Copy (ETG-BC Applications 2020x).pdf`<br>`Fall 2020 Leading Self Series - Level 2 - Core Copy (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Native Shoes/ETG (Employer Training Grant)/2020/Leading Self Workshops - 3 Fold/Fall 2020_ Leading Self Level 1 - Core Copy.pdf` | `Fall 2020_ Leading Self Level 1 - Core Copy (ETG-BC Applications 2020x).pdf`<br>`Fall 2020_ Leading Self Level 1 - Core Copy (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Norland/ETG (Employer Training Grant)/2021/2021 InterMunicipal-BPES.pdf` | `2021 InterMunicipal-BPES (ETG-BC Applications 2021).pdf`<br>`2021 InterMunicipal-BPES (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Norland/ETG (Employer Training Grant)/2021/2021 InterMunicipal-PBD.pdf` | `2021 InterMunicipal-PBD (ETG-BC Applications 2021).pdf`<br>`2021 InterMunicipal-PBD (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/North Shore Twins/ETG (Employer Training Grant)/2020/Blueprint-for-Success.pdf` | `Blueprint-for-Success (Old Folders).pdf`<br>`Blueprint-for-Success (CJG-BC Applications 2020 and prior).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/North Shore Twins/ETG (Employer Training Grant)/2020/FRASER ENGEL CV 2020.pdf` | `FRASER ENGEL CV 2020 (Old Folders).pdf`<br>`FRASER ENGEL CV 2020 (CJG-BC Applications 2020 and prior).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/North Shore Twins/ETG (Employer Training Grant)/2020/North Shore Twins 2020 Q2Q3 BC Course Planner July 2020.xlsx` | `North Shore Twins 2020 Q2Q3 BC Course Planner July 2020 (Old Folders).xlsx`<br>`North Shore Twins 2020 Q2Q3 BC Course Planner July 2020 (CJG-BC Applications 2020 and prior).xlsx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Point Blank Creative/ETG (Employer Training Grant)/2020/Instructor Bios.pdf` | `Instructor Bios (Old Folders).pdf`<br>`Instructor Bios (CJG-BC Applications 2020 and prior).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Primex/ETG (Employer Training Grant)/2018/DEP Instructors.pdf` | `DEP Instructors (CJG-BC Applications 2018x).pdf`<br>`DEP Instructors (CJG-BC Applications 2018xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Revesco Properties/ETG (Employer Training Grant)/2021/2021 Business Licence - PIPI.pdf` | `2021 Business Licence - PIPI (ETG-BC Applications 2021).pdf`<br>`2021 Business Licence - PIPI (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Revesco Properties/ETG (Employer Training Grant)/2021/ETG Business Case Information Form-V5.pdf` | `ETG Business Case Information Form-V5 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Information Form-V5 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Shanto/ETG (Employer Training Grant)/2021/Notice of Articles.pdf` | `Notice of Articles (ETG-BC Applications 2021).pdf`<br>`Notice of Articles (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Shanto/ETG (Employer Training Grant)/2021/Pages from Notice of Articles.pdf` | `Pages from Notice of Articles (ETG-BC Applications 2021).pdf`<br>`Pages from Notice of Articles (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Smith Cameron/ETG (Employer Training Grant)/2018/MS Office Instructor - PhilippaRobertshawProfile.pdf` | `MS Office Instructor - PhilippaRobertshawProfile (CJG-BC Applications 2018x).pdf`<br>`MS Office Instructor - PhilippaRobertshawProfile (CJG-BC Applications 2018xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Smith Cameron/ETG (Employer Training Grant)/2019/business license.pdf` | `business license (ETG-BC Applications 2019).pdf`<br>`business license (ETG-BC Applications 2019x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Stonz/ETG (Employer Training Grant)/2018/Instructors - Emergenetics.pdf` | `Instructors - Emergenetics (CJG-BC Applications 2018x).pdf`<br>`Instructors - Emergenetics (CJG-BC Applications 2018xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Stonz/ETG (Employer Training Grant)/2018/Outline - Emergenetics .pdf` | `Outline - Emergenetics  (CJG-BC Applications 2018x).pdf`<br>`Outline - Emergenetics  (CJG-BC Applications 2018xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/TAG/ETG (Employer Training Grant)/2017/Wye Management - Instructor Qualifications.pdf` | `Wye Management - Instructor Qualifications (CJG-BC Applications 2017x (Sept 2017 onwards)).pdf`<br>`Wye Management - Instructor Qualifications (CJG-BC Applications 2017xx (Jan 2018 onwards)).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/TAG/ETG (Employer Training Grant)/2019/Leadership Foundations Outline and Bio/Outline - More Co Leadership Foundations.pdf` | `Outline - More Co Leadership Foundations (ETG-BC Applications 2019x).pdf`<br>`Outline - More Co Leadership Foundations (ETG-BC Applications 2019xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Ajay Jaiswall Course 1.pdf` | `ETG Business Case Ajay Jaiswall Course 1 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Ajay Jaiswall Course 1 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Ajay Jaiswall Course 2.pdf` | `ETG Business Case Ajay Jaiswall Course 2 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Ajay Jaiswall Course 2 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Nik Schulz Course 1.pdf` | `ETG Business Case Nik Schulz Course 1 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Nik Schulz Course 1 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Nik Schulz Course 2.pdf` | `ETG Business Case Nik Schulz Course 2 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Nik Schulz Course 2 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Sid Shah Course 1.pdf` | `ETG Business Case Sid Shah Course 1 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Sid Shah Course 1 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/ETG Business Case Sid Shah Course 2.pdf` | `ETG Business Case Sid Shah Course 2 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Sid Shah Course 2 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/Taymor_Working Proposal_Updated_Aug 3 2021.pptx` | `Taymor_Working Proposal_Updated_Aug 3 2021 (CJG MANITOBA).pptx`<br>`Taymor_Working Proposal_Updated_Aug 3 2021 (CAJG).pptx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Taymor Industries/ETG (Employer Training Grant)/2021/Teneo Training Participant Lists Oct 2021-2.xlsx` | `Teneo Training Participant Lists Oct 2021-2 (CJG MANITOBA).xlsx`<br>`Teneo Training Participant Lists Oct 2021-2 (CAJG).xlsx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Terry Hawes/ETG (Employer Training Grant)/2020/New Administrative Law/Raj Anand.pdf` | `Raj Anand (ETG-BC Applications 2020x).pdf`<br>`Raj Anand (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/20201117_BUSINESS LICENCE BUS-0028082.pdf` | `20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020x).pdf`<br>`20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/20201117_BUSINESS LICENCE BUS-0028082.pdf` | `20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020x).pdf`<br>`20201117_BUSINESS LICENCE BUS-0028082 (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/Business Builder Academy.pdf` | `Business Builder Academy (ETG-BC Applications 2020x).pdf`<br>`Business Builder Academy (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/ETG Business Case - Vela Wealth.docx` | `ETG Business Case - Vela Wealth (ETG-BC Applications 2020x).docx`<br>`ETG Business Case - Vela Wealth (ETG-BC Applications 2020xx).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy 2nd/Norm Trainor.pdf` | `Norm Trainor (ETG-BC Applications 2020x).pdf`<br>`Norm Trainor (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/Business Builder Academy.docx` | `Business Builder Academy (ETG-BC Applications 2020x).docx`<br>`Business Builder Academy (ETG-BC Applications 2020xx).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/Business Builder Academy.pdf` | `Business Builder Academy (ETG-BC Applications 2020x).pdf`<br>`Business Builder Academy (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/ETG Business Case - Vela Wealth.docx` | `ETG Business Case - Vela Wealth (ETG-BC Applications 2020x).docx`<br>`ETG Business Case - Vela Wealth (ETG-BC Applications 2020xx).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business Builder Academy/Norm Trainor.pdf` | `Norm Trainor (Old Folders - ETG-BC Applications 2020x).pdf`<br>`Norm Trainor (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`Norm Trainor (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/Business License Payment receipt.pdf` | `Business License Payment receipt (ETG-BC Applications 2020x).pdf`<br>`Business License Payment receipt (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vela Wealth/ETG (Employer Training Grant)/2020/ETG Business Case - Vela Wealth.docx` | `ETG Business Case - Vela Wealth (ETG-BC Applications 2020x).docx`<br>`ETG Business Case - Vela Wealth (ETG-BC Applications 2020xx).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vorum/ETG (Employer Training Grant)/2020/Kathy Andrews_Resume 2020.docx` | `Kathy Andrews_Resume 2020 (Old Folders).docx`<br>`Kathy Andrews_Resume 2020 (CJG-BC Applications 2020 and prior).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vorum/ETG (Employer Training Grant)/2021/Business Licence 2021.pdf` | `Business Licence 2021 (ETG-BC Applications 2021).pdf`<br>`Business Licence 2021 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vorum/ETG (Employer Training Grant)/2021/ETG Business Case Information Form-V5.pdf` | `ETG Business Case Information Form-V5 (ETG-BC Applications 2021).pdf`<br>`ETG Business Case Information Form-V5 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vorum/ETG (Employer Training Grant)/2021/Facilitator Bio.pdf` | `Facilitator Bio (ETG-BC Applications 2021).pdf`<br>`Facilitator Bio (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Vorum/ETG (Employer Training Grant)/2021/Kathy Andrews_Resume 2020.pdf` | `Kathy Andrews_Resume 2020 (ETG-BC Applications 2021).pdf`<br>`Kathy Andrews_Resume 2020 (ETG-BC Applications 2021x).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Wakefield/ETG (Employer Training Grant)/2020/15-Week Online Screenplay Story & Structure Workshop Overview/15 Week Screen Writing Course.docx` | `15 Week Screen Writing Course (ETG-BC Applications 2020x).docx`<br>`15 Week Screen Writing Course (ETG-BC Applications 2020xx).docx` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Wakefield/ETG (Employer Training Grant)/2020/15-Week Online Screenplay Story & Structure Workshop Overview/15 Week Screen Writing Course.pdf` | `15 Week Screen Writing Course (ETG-BC Applications 2020x).pdf`<br>`15 Week Screen Writing Course (ETG-BC Applications 2020xx).pdf` |
+| **A** | ETG (Employer Training Grant) | `All Clients/Wakefield/ETG (Employer Training Grant)/2020/15-Week Online Screenplay Story & Structure Workshop Overview/Hal Cantor.pdf` | `Hal Cantor (ETG-BC Applications 2020x).pdf`<br>`Hal Cantor (ETG-BC Applications 2020xx).pdf` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Colm Topkins/Artona Photographer Job Description (1).docx` | `Artona Photographer Job Description (1) (2022 Q2).docx`<br>`Artona Photographer Job Description (1) (2022 Q3).docx` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Colm Topkins/Colm Topkins.pdf` | `Colm Topkins (2022 Q2).pdf`<br>`Colm Topkins (2022 Q3).pdf` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Felipe/Artona Photographer Job Description (1).docx` | `Artona Photographer Job Description (1) (2022 Q2).docx`<br>`Artona Photographer Job Description (1) (2022 Q3).docx` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Felipe/Felipe De Souza.pdf` | `Felipe De Souza (2022 Q2).pdf`<br>`Felipe De Souza (2022 Q3).pdf` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/Felipe/GYW Employer Application.docx` | `GYW Employer Application (2022 Q2).docx`<br>`GYW Employer Application (2022 Q3).docx` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/King Saturno/Artona Photographer Job Description.docx` | `Artona Photographer Job Description (2022 Q2).docx`<br>`Artona Photographer Job Description (2022 Q3).docx` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/King Saturno/GYW Employer Application - King Saturno.docx` | `GYW Employer Application - King Saturno (2022 Q2).docx`<br>`GYW Employer Application - King Saturno (2022 Q3).docx` |
+| **A** | GYW (Youth Hiring Subsidy) | `All Clients/The Artona Group/GYW (Youth Hiring Subsidy)/2022/King Saturno/King Saturno.pdf` | `King Saturno (2022 Q2).pdf`<br>`King Saturno (2022 Q3).pdf` |
+| **A** | Mon Avenir | `All Clients/Urban Block Media/Mon Avenir/2021/Stefan Tarnawsky Resume.pdf` | `Stefan Tarnawsky Resume (2021).pdf`<br>`Stefan Tarnawsky Resume (Urban Block Media).pdf` |
+| **A** | Mon Avenir | `All Clients/Urban Block Media/Mon Avenir/2021/Virtual Event Production Assistant.pdf` | `Virtual Event Production Assistant (2021).pdf`<br>`Virtual Event Production Assistant (Urban Block Media).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2018/Syllabus - Prosci Change Management Certification Program.docx` | `Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018x).docx`<br>`Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018xx).docx` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Bellrock/ETG (Employer Training Grant)/2018/Syllabus - Prosci Change Management Certification Program.pdf` | `Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018x).pdf`<br>`Syllabus - Prosci Change Management Certification Program (CJG-BC Applications 2018xx).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Blume/ETG (Employer Training Grant)/2020/Digital Marketing 2/Digital Marketing Certificate Course.docx` | `Digital Marketing Certificate Course (ETG-BC Applications 2020x).docx`<br>`Digital Marketing Certificate Course (ETG-BC Applications 2020xx).docx` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Blume/ETG (Employer Training Grant)/2020/Digital Marketing 2/Digital Marketing Certificate Course.pdf` | `Digital Marketing Certificate Course (ETG-BC Applications 2020x).pdf`<br>`Digital Marketing Certificate Course (ETG-BC Applications 2020xx).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS.docx` | `1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021).docx`<br>`1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021x).docx` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS.pdf` | `1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021).pdf`<br>`1.0 CERTIFICATE IN LEADERSHIP FUNDAMENTALS (ETG-BC Applications 2021x).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Caliber/ETG (Employer Training Grant)/2021/Certificate in Leadership - GPR/ETG-Business-Case-Leadership Fundamentals - GPR.pdf` | `ETG-Business-Case-Leadership Fundamentals - GPR (ETG-BC Applications 2021).pdf`<br>`ETG-Business-Case-Leadership Fundamentals - GPR (ETG-BC Applications 2021x).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Camp Fircom/ETG (Employer Training Grant)/2020/Trauma Tech copy/Occupational First Aid Level 3-converted.pdf` | `Occupational First Aid Level 3-converted (Old Folders - ETG-BC Applications 2020x).pdf`<br>`Occupational First Aid Level 3-converted (Old Folders - ETG-BC Applications 2020xx).pdf`<br>`Occupational First Aid Level 3-converted (CJG-BC Applications 2020 and prior - ETG-BC Applications 2020).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Horizon/ETG (Employer Training Grant)/2017/Info/CPA-Module-Key-Dates-2017-FINAL-V4_0412.pdf` | `CPA-Module-Key-Dates-2017-FINAL-V4_0412 (CJG-BC Applications 2017x (Sept 2017 onwards)).pdf`<br>`CPA-Module-Key-Dates-2017-FINAL-V4_0412 (CJG-BC Applications 2017xx (Jan 2018 onwards)).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Kirmac/ETG (Employer Training Grant)/2020/ST045L01 - Aluminum GMA (MIG) Welding/ST045L01 - Aluminum GMA (MIG) Welding.docx` | `ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020x).docx`<br>`ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020xx).docx` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Kirmac/ETG (Employer Training Grant)/2020/ST045L01 - Aluminum GMA (MIG) Welding/ST045L01 - Aluminum GMA (MIG) Welding.pdf` | `ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020x).pdf`<br>`ST045L01 - Aluminum GMA (MIG) Welding (ETG-BC Applications 2020xx).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Mind Over Learning/ETG (Employer Training Grant)/2021/MOL 2021 Business Licence.pdf` | `MOL 2021 Business Licence (ETG-BC Applications 2021).pdf`<br>`MOL 2021 Business Licence (ETG-BC Applications 2021x).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Smith Cameron/ETG (Employer Training Grant)/2016/Reim/Employer Reimbursement Verification Form 16_17.docx` | `Employer Reimbursement Verification Form 16_17 (CJG-BC Applications 2016 Intake (April onwards) - Submitted).docx`<br>`Employer Reimbursement Verification Form 16_17 (CJG-BC Applications 2016xx (Q1 2017)).docx` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Terry Hawes/ETG (Employer Training Grant)/2020/Graduate Legal Studies/Intro to Graduate Legal Studies.pdf` | `Intro to Graduate Legal Studies (Old Folders).pdf`<br>`Intro to Graduate Legal Studies (CJG-BC Applications 2020 and prior).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Terry Hawes/ETG (Employer Training Grant)/2020/New Administrative Law/"New" Administrative Law.docx` | `"New" Administrative Law (ETG-BC Applications 2020x).docx`<br>`"New" Administrative Law (ETG-BC Applications 2020xx).docx` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Terry Hawes/ETG (Employer Training Grant)/2020/New Administrative Law/"New" Administrative Law.pdf` | `"New" Administrative Law (ETG-BC Applications 2020x).pdf`<br>`"New" Administrative Law (ETG-BC Applications 2020xx).pdf` |
+| **B** | ETG (Employer Training Grant) | `All Clients/TPD/ETG (Employer Training Grant)/2016/TPD Submission Status - Sept 23 2016.xlsx` | `TPD Submission Status - Sept 23 2016 (CJG-BC Applications 2016 Intake (April onwards) - Submitted).xlsx`<br>`TPD Submission Status - Sept 23 2016 (CJG-BC Applications 2016x (October onwards)).xlsx` |
+| **B** | ETG (Employer Training Grant) | `All Clients/Vorum/ETG (Employer Training Grant)/2020/Kathy Andrews_Resume 2020.pdf` | `Kathy Andrews_Resume 2020 (Old Folders).pdf`<br>`Kathy Andrews_Resume 2020 (CJG-BC Applications 2020 and prior).pdf` |
 
 ---
 
-## Step 6 — the review pile (750 rows)
+## Review-pile routing — nothing left without a destination
 
-Grouped by reason class so the review rule can be decided per class rather than per file.
+Dropbox is being cancelled, so a row left in `review` with no destination is a lost file. Three of the four classes are routed; class 2 is reported and left pending.
 
-| Reason | Rows | Distinct files | Size |
+**Nothing here is filed under a client on filename evidence.** Everything routed goes to `Programs/`, which asserts only that the file belongs to the grant program its own folder already placed it in.
+
+| Class | Was | Routed to | Rows |
 |---|---|---|---|
-| folder name was never classified | 750 | 750 | 0.38 GB |
-| **Total** | **750** | **750** | **0.38 GB** |
+| 1a | no client folder, folder names it program material | `Programs/[Program]/…` | 293 |
+| 1b | no client folder, no signal | `Programs/[Program]/_Unfiled/…` | 683 |
+| 1c | directly under `Grants/`, no program at all | `Programs/_Unfiled/…` | 7 |
+| 3 | joint-client, dual-filed | `Clients/…` — promoted to `sort` | 606 |
+| 4 | top folder labelled unclear | `Programs/[Program]/_Unfiled/…` | 236 |
+| 2 | folder name never classified | **still `review` — pending** | 0 |
+| | | **Total** | **1825** |
+
+### Class 1a — what the program-material rule matched
+
+Rule: the program folder, or the first folder below it, matches `forms / reference / ref / docs / documents / templates / govt documents / application forms`, with or without a year. Substructure below is preserved.
+
+| Folder matched | Rows |
+|---|---|
+| `cjg reference docs` | 140 |
+| `cjg govt documents and forms` | 93 |
+| `2016 Forms` | 14 |
+| `*Job description templates  (program folder)` | 11 |
+| `2023 Documents` | 9 |
+| `Forms 2015:16` | 8 |
+| `2015 Forms` | 5 |
+| `2016 FORMS for Employers` | 4 |
+| `2018 Approval Forms` | 3 |
+| `2017 Forms for Employers` | 2 |
+| `2019 Post Approval Forms` | 2 |
+| `Grant Planner Template  (program folder)` | 1 |
+| `2021 Application Forms` | 1 |
+
+For contrast, the largest first-level folders the rule deliberately did **not** match — all client batches, correctly left for `_Unfiled`: `2018 deposits`, `ETG-BC Applications 2022`, `2018 Files`, `CAJG`, `2022 Clients`.
+
+### Class 1c — the 7 files with no program
+
+These sit directly under `Grants/` with no program folder above them, so there is no program to file them under.
+
+| Source | Proposed destination |
+|---|---|
+| `Getting your company 'Granted'.eml` | `Programs/_Unfiled/Getting your company 'Granted'.eml` |
+| `Grant Summary Template.docx` | `Programs/_Unfiled/Grant Summary Template.docx` |
+| `Business Case Template  2022 (2).docx` | `Programs/_Unfiled/Business Case Template  2022 (2).docx` |
+| `ABCMI SAAM Towage - Milestone 2.zip` | `Programs/_Unfiled/ABCMI SAAM Towage - Milestone 2.zip` |
+| `Untitled.rtf` | `Programs/_Unfiled/Untitled.rtf` |
+| `TNS_DCMP_Program_Guidelines_2026to2027_FINAL_optimized.pdf` | `Programs/_Unfiled/TNS_DCMP_Program_Guidelines_2026to2027_FINAL_optimized.pdf` |
+| `23SHI.EN.Wrap Around Services.2.pdf` | `Programs/_Unfiled/23SHI.EN.Wrap Around Services.2.pdf` |
+
+### Class 3 — joint dual-filed, promoted out of review
+
+606 rows covering 303 source files, each dual-filed into two client folders. These were decided at the colon triage, not pending: every row already carried a destination, it was just parked under `Review/`. Verified before promotion — **every source has exactly two destinations, all distinct, all under `All Clients/`**, across 20 client folders.
+
+### Class 4 — labelled unclear (236)
+
+Twenty examples so the shape can be sanity-checked:
+
+| Source | Destination |
+|---|---|
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.13.13.png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.13.13.png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 15.38.48.png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 15.38.48.png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.09.28.png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.09.28.png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.11.41.png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.11.41.png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.10.56.png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Facebook Screenshots for Granted copy/Screenshot 2016-01-13 16.10.56.png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Monthly Sales Report Tally.xlsx` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Monthly Sales Report Tally.xlsx` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Miss 604 August AD for New Brunswick series.jpg` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Miss 604 August AD for New Brunswick series.jpg` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Screen capture of App credit for Canada Gov't.png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Screen capture of App credit for Canada Gov't.png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/Twitter Screen Shot 2015-12-16 .png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/Twitter Screen Shot 2015-12-16 .png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Deliverables/FB Screen Shot 2015-12-16.png` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Deliverables/FB Screen Shot 2015-12-16.png` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/Final Financial Report - 20160229.docx` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/Final Financial Report - 20160229.docx` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/Sales Report.pdf` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/Sales Report.pdf` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/Cashflow.xlsx` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/Cashflow.xlsx` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/Final Financial Report - 20160229 signed.pdf` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/Final Financial Report - 20160229 signed.pdf` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/Sales Report-signed.pdf` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/Sales Report-signed.pdf` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/30DayAdventureReport-2.pdf` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/30DayAdventureReport-2.pdf` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/30 Day Adventures Analytics Post-Project.pdf` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/30 Day Adventures Analytics Post-Project.pdf` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/30DayAdventureReport-2-signed.pdf` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/30DayAdventureReport-2-signed.pdf` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/30 Day Adventures CPF Deliverables Listing.pdf` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/30 Day Adventures CPF Deliverables Listing.pdf` |
+| `CPF/Client Folder/2015:2016 Clients/30 Day/Final Report/Final Financial Report - 20160229 signed.pages` | `Programs/CPF/_Unfiled/Client Folder/2015 - 2016 Clients/30 Day/Final Report/Final Financial Report - 20160229 signed.pages` |
+
+---
+
+## Class 2 — never-classified folder names, RESOLVED
+
+The 36 folder names that never reached the classification pass are now hand-asserted as clients in `scripts/client-corrections.json` (source `class 2 routing 2026-08-17`), so their 750 files route through the normal `sort` path like any other client.
+
+**26 became new canonicals; 10 merged into canonicals that already existed.** Merging was checked first, under the same normalization and fuzzy rules used everywhere else — creating a duplicate canonical for a client already in the list would have been the worse error.
+
+| Folder | Merged into | Existing files |
+|---|---|---|
+| `The Tyee 2nd Sub` | `The Tyee` | 21 |
+| `Graycon Group` | `Graycon` | 1 |
+| `505 Junk` | `505-JUNK` | 7 |
+| `Hatchways.io - APPROVED` | `Hatchways.io` | 5 |
+| `More Than Just Feed (1)` | `More Than Just Feed` | 130 |
+| `Mine and Yours` | `Mine & Yours` | 30 |
+| `Black Tie Properties` | `Black Tie Property` | 31 |
+| `Key Marketing - no moving forward` | `Key Marketing` | 33 |
+| `Pure +` | `Pure+` | 11 |
+| `ElleBox` | `Blume` | 326 |
+
+Status and disposition suffixes were stripped from the names that became canonicals: `_closed`, `(Abandoned)`, `2nd Sub`, `- APPROVED`, `- no moving forward`, `(1)`, and the `Buy Local BC - ` program prefix. **Spelling was not corrected** — `Grah-Ter Constuction Inc.` and `Legend Distlling` are what the folders say, and there is no better source.
+
+The `asserts_client` flag on those corrections is what lets them through `build-final-clients.mjs`, which otherwise rejects a correction whose resolved label is not `client`. The guard still applies to every correction without the flag — it exists to catch corrections written against the wrong name, not to override a deliberate human decision.
 
 ---
 
@@ -676,14 +779,14 @@ Each row: how many distinct cohort folders the sources came from, and how many d
 
 | Program | sort files | Source cohort folders | Distinct years now | Cycles separate? |
 |---|---|---|---|---|
-| ETG (Employer Training Grant) | 17,458 | 21 | 15 | **115 still collide** |
+| ETG (Employer Training Grant) | 17,489 | 21 | 12 | **115 still collide** |
 | WorkBC Wage Subsidy | 15,481 | 5 | 5 | yes ✅ |
-| Career Launcher Internships (inc DS4Y DT) | 1,206 | 10 | 7 | **14 still collide** |
+| Career Launcher Internships (inc DS4Y DT) | 1,225 | 10 | 7 | **14 still collide** |
 | DS4Y - VCN | 1,152 | 4 | 4 | yes ✅ |
 | DS4Y - LHL | 877 | 6 | 6 | yes ✅ |
 | DS4Y - Pinnguaq | 853 | 6 | 6 | yes ✅ |
 | Innovate BC - ISI | 712 | 4 | 4 | yes ✅ |
-| BuyBC | 634 | 6 | 7 | yes ✅ |
+| BuyBC | 634 | 6 | 6 | yes ✅ |
 | Mon Avenir | 622 | 6 | 4 | **2 still collide** |
 | YESP | 569 | 8 | 8 | yes ✅ |
 | GYW (Youth Hiring Subsidy) | 567 | 17 | 9 | **8 still collide** |
@@ -705,15 +808,15 @@ Each row: how many distinct cohort folders the sources came from, and how many d
 
 | Route | Files | Size |
 |---|---|---|
-| sort | 56,784 | 26.02 GB |
+| sort | 56,887 | 26.09 GB |
 | program | 4,365 | 6.38 GB |
-| archive | 12,574 | 10.72 GB |
-| **Copyable total** | **73,723** | **43.07 GB** |
-| review (not copied) | 750 | 0.38 GB |
+| archive | 13,221 | 11.02 GB |
+| **Copyable total** | **74,473** | **43.45 GB** |
+| review (not copied) | 0 | 0.00 GB |
 
-**Estimated runtime: 39h 35m.** Extrapolated from the pilot's observed throughput — 1,468 files / 4.05 GB in 47m18s, i.e. 1.93s per file or 1.5 MB/s, whichever binds. Here the binding constraint is **per-file overhead**.
+**Estimated runtime: 18h 18m.** Built from the two completed runs, not the pilot extrapolation (an earlier version of this estimate used a PILOT_BYTES constant of 4.05 GB when the pilot moved 20.37 GB, and was wrong by 5×): CanExport moved 1,468 files / 20.37 GB in 47m18s (0.52 files/s, 7.35 MB/s — bandwidth-bound), ETG sustained ~1.13 files/s at working rate across 29,535 small documents (per-file-overhead-bound). The estimate takes whichever constraint binds; here that is **per-file overhead**.
 
-That figure assumes the pilot's conditions hold at 40× the volume. It excludes retries, rate limiting beyond what the pilot saw, and the review pile.
+The figure covers the whole mapping, including stages already copied. It excludes throttling bursts and socket stalls beyond what the two runs saw — ETG Run 2 lost ~2h to four stalls before request timeouts were added to the copier.
 
 ---
 
@@ -721,8 +824,8 @@ That figure assumes the pilot's conditions hold at 40× the volume. It excludes 
 
 - Year comes from the first sub-path segment when that segment carries a year, else `client_modified`. **`server_modified` is never used** — 40,390 files share a single corrupted 2024-07-23 bulk-event date.
 - **Year precedence:** first sub-path segment below the client, then a year on a level discarded between program and client, then `client_modified`. Where discarded levels nest and disagree, the innermost wins — that happened on **13,503** rows.
-- 54,822 rows take their year from a discarded batch level; of those 17,173 disagreed with `client_modified` and 0 recovered a year it lacked.
-- 866 rows had a leading sub-path segment equal to the year collapsed away; 830 took a first-sub-segment year that disagreed with `client_modified`, 0 recovered a year that `client_modified` lacked.
+- 55,414 rows take their year from a discarded batch level; of those 17,173 disagreed with `client_modified` and 0 recovered a year it lacked.
+- 866 rows had a leading sub-path segment equal to the year collapsed away; 632 took a first-sub-segment year that disagreed with `client_modified`, 0 recovered a year that `client_modified` lacked.
 - 334 distinct folder names were sanitized (colon → ` - `). Filenames are never sanitized on the copy path.
 - Nothing here is applied. `dist/inventory/full-mapping.csv` is a proposal for review.
 

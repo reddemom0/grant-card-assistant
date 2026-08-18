@@ -285,10 +285,32 @@ filenames beneath differ. It reaches deeper than the two folders above —
 `…/_Unfiled/cjg-manitoba applications all intakes/Castle Team/` vs `castle team/`,
 `…/cjg-bc/Z_OLD/` vs `z_old/`, `…/2019/Reim/` vs `reim/`.
 
-Arguably the better outcome — two casings of one folder merged — but it is a
-divergence from the mapping, and any path-comparing reconciliation will keep
-flagging these 157. **Still undecided:** accept it and normalise the mapping's
-case, or make `ensureFolder` case-sensitive so both variants survive.
+Arguably the better outcome — two casings of one folder merged — but it was a
+divergence from the mapping, and any path-comparing reconciliation kept
+flagging these 157.
+
+**Resolved 2026-08-18: the merges are accepted and the mapping folds to
+Drive's spelling.** The rule — first-created wins — now lives in
+`foldDestinationCase()` in `scripts/mapping-lib.mjs`, applied corpus-wide by
+`full-mapping.mjs` before collision detection. Where a folder already exists in
+Drive its spelling is canonical (loaded from
+`reconcile-drive.mjs --folders-only`); where it does not, the first mapping
+row's spelling is — which is exactly what the copier will create. Filenames
+never fold.
+
+The full set was 15 variant groups, all ETG, all already in Drive; the
+un-copied ~45,000 files contribute **zero** further groups, and folding created
+**zero** new file-level collisions (the 285 suffixed rows are unchanged). In 5
+of the 15 groups Drive kept the marginally rarer spelling (`reim`×2, `Reim`,
+`Alberta`, `BC` — margins of 1–17 files, nothing ugly); flagged here, adopted
+per the rule, since renaming Drive folders is off the table. The 157
+already-copied ledger rows were re-cased to match (backup:
+`copy-ledger.jsonl.bak-2026-08-18`), and the todo count did not move — the
+ledger is keyed on `drive_file_id`, so the rewrite is cosmetic.
+
+Post-fold reconciliation against live Dropbox: **29,535 of 29,535 present at
+the exact mapped path, case-only variance 0, absent 0, size mismatches 0,
+extras 0.**
 
 ---
 

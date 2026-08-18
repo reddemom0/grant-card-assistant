@@ -15,7 +15,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { loadRows, parseCsv, isBatchName, normalizeName, classify } from './grants-lib.mjs';
-import { mapFiles, makeResolveNodes, FIRST_SEG_YEAR as FIRST_SEG_YEAR_RE } from './mapping-lib.mjs';
+import { mapFiles, makeResolveNodes, foldDestinationCase, FIRST_SEG_YEAR as FIRST_SEG_YEAR_RE } from './mapping-lib.mjs';
 
 const INVENTORY = 'dist/inventory/grants-inventory.csv';
 const CLIENTS = 'dist/inventory/clients-final.csv';
@@ -34,7 +34,20 @@ cutoff.setFullYear(cutoff.getFullYear() - RETENTION_YEARS);
 const CUTOFF_ISO = cutoff.toISOString();
 
 /** Observed pilot throughput: 1,468 files / 4.05 GB in 47m18s. */
-const PILOT_FILES = 1468, PILOT_BYTES = 4.05 * 1024 ** 3, PILOT_SECONDS = 47 * 60 + 18;
+/**
+ * Throughput from the two completed copy runs (2026-08-18). An earlier
+ * PILOT_BYTES constant here said 4.05 GB when the pilot actually moved
+ * 20.37 GB, understating byte throughput 5× and publishing a runtime estimate
+ * that was wrong by the same factor.
+ *   CanExport pilot: 1,468 files / 20.37 GB in 47m18s — 0.52 files/s,
+ *                    7.35 MB/s. A handful of large videos: bandwidth-bound.
+ *   ETG:             29,535 files / ~16.4 GB — ~1.13 files/s at working rate
+ *                    (Run 1, and Run 2 between its socket stalls). Tens of
+ *                    thousands of small documents: per-file-overhead-bound.
+ * The estimate takes whichever constraint binds.
+ */
+const ETG_FILES_PER_SEC = 1.13;
+const CE_MB_PER_SEC = 7.35;
 
 const log = (...a) => console.error(...a);
 
@@ -275,6 +288,22 @@ for (const r of out) {
   }
 }
 log(`  review routed: material=${routing.c1material} unfiled=${routing.c1unfiled} depth0=${routing.c1depth0} joint->sort=${routing.c3} unclear=${routing.c4} | pending(class 2)=${routing.c2pending}`);
+
+// ------------------------------------------------------------- case-folding
+/**
+ * Fold case-variant destination folders onto one spelling (2026-08-18).
+ * Drive's spellings — dumped by `reconcile-drive.mjs --folders-only` — are the
+ * reference, because Drive already merged the variants at copy time and Drive
+ * is not to be renamed. Regenerate the dump after any copy stage that creates
+ * folders; without it the fold still runs, first-mapping-row-wins, which is
+ * what the copier produces anyway.
+ */
+const DRIVE_FOLDERS_FILE = 'dist/inventory/drive-folders.txt';
+const driveFolders = (await fsp.readFile(DRIVE_FOLDERS_FILE, 'utf8').catch(() => ''))
+  .split('\n').filter(Boolean);
+if (!driveFolders.length) log(`  WARNING: ${DRIVE_FOLDERS_FILE} absent — case-folding falls back to first-mapping-row-wins`);
+const folded = foldDestinationCase(out, driveFolders);
+log(`  case-folded ${folded.changed} rows across ${folded.variantGroups} variant folder paths (drive folders loaded: ${driveFolders.length})`);
 
 // Byte/size lookup for the rows.
 const sizeByPath = new Map(files.map((f) => [f.path, f.size]));
@@ -607,9 +636,14 @@ const dupRedundantBytes = dupGroups.reduce((s, g) => s + g[0].size * (g.length -
 const copyRows = out.filter((r) => r.route !== 'review');
 const copyFiles = new Set(copyRows.map((r) => r.src));
 const copyBytes = [...copyFiles].reduce((s, p) => s + (sizeByPath.get(p) ?? 0), 0);
-const secByFile = PILOT_SECONDS / PILOT_FILES;
-const secByByte = PILOT_SECONDS / PILOT_BYTES;
-const etaSec = Math.max(copyFiles.size * secByFile, copyBytes * secByByte);
+// Referenced by the MD's volume table. Was accidentally dropped when the
+// review pile went to zero, which crashed every regeneration at the MD stage
+// (after the CSV write, so the CSV stayed fresh while the MD went stale).
+const revBytes = [...new Set(reviewRows.map((r) => r.src))]
+  .reduce((s, p) => s + (sizeByPath.get(p) ?? 0), 0);
+const etaByFiles = copyFiles.size / ETG_FILES_PER_SEC;
+const etaByBytes = copyBytes / (CE_MB_PER_SEC * 1024 ** 2);
+const etaSec = Math.max(etaByFiles, etaByBytes);
 const fmtDur = (s) => `${Math.floor(s / 3600)}h ${Math.round((s % 3600) / 60)}m`;
 
 // ---------------------------------------------------------------- CSV
@@ -713,9 +747,13 @@ for (const s of shapes) {
 
 push('---');
 push();
+push('## Case-folding');
+push();
+push(`Two Dropbox folders differing only in capitalization map to ONE destination folder — Drive merges them anyway (its folder lookup is case-insensitive), so the mapping adopts the merge instead of fighting it. Where the folder already exists in Drive, Drive's spelling is canonical (first-created wins, loaded from \`${DRIVE_FOLDERS_FILE}\`, ${driveFolders.length.toLocaleString()} folders); otherwise the first mapping row's spelling is, which is what the copier will create. This run folded **${folded.changed} rows** across **${folded.variantGroups} variant folder paths**. Filenames are never folded — Drive stores same-name files side by side.`);
+push();
 push('## Step 5 — collision check');
 push();
-push(`Every non-review destination in this mapping, checked against each other **and** against the ${ceOccupied.toLocaleString()} destinations already occupied by copied CanExport files.`);
+push(`Every non-review destination in this mapping, checked against each other **and** against the ${ceOccupied.toLocaleString()} destinations already occupied by copied CanExport files. Runs after case-folding, so two same-named files from case-variant folders surface here and take the suffix rule.`);
 push();
 if (!collisions.length) {
   push('**Zero collisions.** No two source files map to the same destination path, and nothing here would overwrite a file already in Drive.');
@@ -958,9 +996,9 @@ for (const k of ['sort', 'program', 'archive']) {
 push(`| **Copyable total** | **${copyFiles.size.toLocaleString()}** | **${gb(copyBytes)}** |`);
 push(`| review (not copied) | ${new Set(reviewRows.map((r) => r.src)).size.toLocaleString()} | ${gb(revBytes)} |`);
 push();
-push(`**Estimated runtime: ${fmtDur(etaSec)}.** Extrapolated from the pilot's observed throughput — ${PILOT_FILES.toLocaleString()} files / ${(PILOT_BYTES / 1024 ** 3).toFixed(2)} GB in ${Math.floor(PILOT_SECONDS / 60)}m${PILOT_SECONDS % 60}s, i.e. ${secByFile.toFixed(2)}s per file or ${(1 / secByByte / 1024 ** 2).toFixed(1)} MB/s, whichever binds. Here the binding constraint is **${copyFiles.size * secByFile > copyBytes * secByByte ? 'per-file overhead' : 'bandwidth'}**.`);
+push(`**Estimated runtime: ${fmtDur(etaSec)}.** Built from the two completed runs, not the pilot extrapolation (an earlier version of this estimate used a PILOT_BYTES constant of 4.05 GB when the pilot moved 20.37 GB, and was wrong by 5×): CanExport moved 1,468 files / 20.37 GB in 47m18s (0.52 files/s, 7.35 MB/s — bandwidth-bound), ETG sustained ~1.13 files/s at working rate across 29,535 small documents (per-file-overhead-bound). The estimate takes whichever constraint binds; here that is **${etaByFiles > etaByBytes ? 'per-file overhead' : 'bandwidth'}**.`);
 push();
-push('That figure assumes the pilot\'s conditions hold at 40× the volume. It excludes retries, rate limiting beyond what the pilot saw, and the review pile.');
+push('The figure covers the whole mapping, including stages already copied. It excludes throttling bursts and socket stalls beyond what the two runs saw — ETG Run 2 lost ~2h to four stalls before request timeouts were added to the copier.');
 push();
 
 push('---');
