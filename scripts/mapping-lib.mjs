@@ -11,7 +11,7 @@
  * The four routes:
  *   sort     Clients/[Client]/[Program]/[Year]/<substructure>/filename
  *   program  Programs/[Program]/<substructure>/filename
- *   archive  Archive/<Dropbox path mirrored>/filename
+ *   archive  Old Files/<Dropbox path mirrored>/filename
  *   review   no committed destination — a human decides
  */
 
@@ -27,6 +27,25 @@ export const FIRST_SEG_YEAR = /(?:^|[^0-9])((?:19|20)\d{2})(?![0-9])/;
  */
 export const YEAR_MIN = 2013;
 export const YEAR_MAX = 2027;
+
+/**
+ * Shared Drive top-level roots. Single source of truth — both mapping passes
+ * import these rather than declaring their own literals, so a rename is one
+ * edit here and a regeneration, not a hunt through two scripts.
+ *
+ * Renamed 2026-08-18: "All Clients" → "Clients", "Live Clients" → "Current
+ * Clients". "All Clients" beside "Live Clients" read as two populations of
+ * clients rather than a set and a view of it. Files live exactly once under
+ * CLIENTS_ROOT; CURRENT_ROOT holds only shortcuts, so "Current Clients" now
+ * reads as what it is — a view onto "Clients".
+ *
+ * The copier takes the same names via PILOT_CLIENTS_ROOT / PILOT_LIVE_ROOT,
+ * defaulting to these values.
+ */
+export const CLIENTS_ROOT = 'Clients';
+export const CURRENT_ROOT = 'Current Clients';
+export const ARCHIVE_ROOT = 'Old Files';
+export const PROGRAMS_ROOT = 'Programs';
 
 /**
  * Never use server_modified: 40,390 files share a single bulk-event date of

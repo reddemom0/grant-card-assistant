@@ -1,6 +1,6 @@
 # CanExport Pilot — Phase 1
 
-**Generated:** 2026-08-17T17:58:50.127Z
+**Generated:** 2026-08-18T21:24:49.815Z
 **Inputs:** `dist/inventory/grants-inventory.csv`, `dist/inventory/clients-final.csv`, `dist/inventory/resolved-final.csv`
 **Output:** `dist/inventory/canexport-mapping.csv` (gitignored — regenerable)
 **Nothing was copied, renamed, or moved.** This is a proposal for review.
@@ -60,16 +60,16 @@ Destination depth: **max 11**, average 6.1 segments.
 The ten deepest destinations:
 
 ```
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Dec/Amazon.com 12.07.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.ca 11.13.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.ca 11.27.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.com 11.09.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.com 11.23.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.ca 10.30.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.com 10.26.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.ca 10.16.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.com 10.12.2020.pdf
-(11) All Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Sept/Amazon.ca 09.18.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Dec/Amazon.com 12.07.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.ca 11.13.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.ca 11.27.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.com 11.09.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Nov/Amazon.com 11.23.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.ca 10.30.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.com 10.26.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.ca 10.16.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Oct/Amazon.com 10.12.2020.pdf
+(11) Clients/Fatso Peanut Butter/CanExport/2020/2020 project/Claim #1/Invoices to submit/Contractor Fees (Category C - D - E)/Amazon/Sept/Amazon.ca 09.18.2020.pdf
 ```
 
 ### Folder-name sanitization
@@ -280,19 +280,19 @@ First five `sort` rows, verbatim from the CSV:
 
 ```
 /Granted Team Folder/SALES/Grants/CanExport/Clients/Clearmind/2022 Application/Claims/Claim #3/Clearmind Claim #3.xlsx
-  -> All Clients/Clearmind International Institute/CanExport/2022/2022 Application/Claims/Claim #3/Clearmind Claim #3.xlsx
+  -> Clients/Clearmind International Institute/CanExport/2022/2022 Application/Claims/Claim #3/Clearmind Claim #3.xlsx
      client=Clearmind International Institute | year=2022 | high | client match high confidence
 /Granted Team Folder/SALES/Grants/CanExport/Clients/Capstone Canada/2023/Interview : Budget/chat.txt
-  -> All Clients/Capstone Canada/CanExport/2023/Interview - Budget/chat.txt
+  -> Clients/Capstone Canada/CanExport/2023/Interview - Budget/chat.txt
      client=Capstone Canada | year=2023 | high | client match high confidence
 /Granted Team Folder/SALES/Grants/CanExport/Clients/Capstone Canada/2023/Interview : Budget/recording.conf
-  -> All Clients/Capstone Canada/CanExport/2023/Interview - Budget/recording.conf
+  -> Clients/Capstone Canada/CanExport/2023/Interview - Budget/recording.conf
      client=Capstone Canada | year=2023 | high | client match high confidence
 /Granted Team Folder/SALES/Grants/CanExport/Clients/Capstone Canada/2023/Interview : Budget/audio1768696769.m4a
-  -> All Clients/Capstone Canada/CanExport/2023/Interview - Budget/audio1768696769.m4a
+  -> Clients/Capstone Canada/CanExport/2023/Interview - Budget/audio1768696769.m4a
      client=Capstone Canada | year=2023 | high | client match high confidence
 /Granted Team Folder/SALES/Grants/CanExport/Clients/Capstone Canada/2023/Interview : Budget/video1768696769.mp4
-  -> All Clients/Capstone Canada/CanExport/2023/Interview - Budget/video1768696769.mp4
+  -> Clients/Capstone Canada/CanExport/2023/Interview - Budget/video1768696769.mp4
      client=Capstone Canada | year=2023 | high | client match high confidence
 ```
 

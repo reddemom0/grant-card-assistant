@@ -11,7 +11,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { loadRows, parseCsv, isBatchName, normalizeName } from './grants-lib.mjs';
-import { mapFiles, makeResolveNodes } from './mapping-lib.mjs';
+import { mapFiles, makeResolveNodes, CLIENTS_ROOT, ARCHIVE_ROOT } from './mapping-lib.mjs';
 
 const INVENTORY = 'dist/inventory/grants-inventory.csv';
 const CLIENTS = 'dist/inventory/clients-final.csv';
@@ -24,13 +24,11 @@ const MD_OUT = 'docs/inventory/canexport-pilot.md';
  * moved all 90 client folders under this, and left Programs/ and Archive/ at
  * the Shared Drive root — so only the `sort` route carries this prefix.
  */
-const CLIENTS_ROOT = 'All Clients';
 /**
  * The out-of-retention FILE mirror. Renamed from "Archive" on 2026-08-17:
  * "archived" also describes a CLIENT status, so one word carried two meanings
  * at the same level of the tree.
  */
-const ARCHIVE_ROOT = 'Old Files';
 
 const MAX_SKIP = 8;
 const RETENTION_YEARS = 6;

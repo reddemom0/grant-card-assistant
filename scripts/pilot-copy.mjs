@@ -591,8 +591,12 @@ async function clearFailed() {
  * Drive itself is checked for an existing shortcut before one is made. A
  * re-run creates nothing.
  */
-const CLIENTS_ROOT = process.env.PILOT_CLIENTS_ROOT || 'All Clients';
-const LIVE_ROOT = process.env.PILOT_LIVE_ROOT || 'Live Clients';
+// Roots renamed in Drive 2026-08-18 ("All Clients" → "Clients", "Live Clients"
+// → "Current Clients"). These defaults must match, or the next copy would
+// create a second top-level tree beside the real one. Canonical declarations
+// live in mapping-lib.mjs; repeated here because this script is standalone.
+const CLIENTS_ROOT = process.env.PILOT_CLIENTS_ROOT || 'Clients';
+const LIVE_ROOT = process.env.PILOT_LIVE_ROOT || 'Current Clients';
 const liveClients = new Set();
 const shortcutDone = new Set();
 const shortcutInFlight = new Map();

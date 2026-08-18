@@ -29,6 +29,12 @@
  * The union of all --mapping sheets defines what is allowed to be in Drive
  * (the "extra files" check). --program restricts the presence/size checks to
  * that program's rows of the first sheet.
+ *
+ *   --folders-only <path>   list Drive, write every folder path (one per line,
+ *                           shallow-first) to <path>, and exit. No Dropbox
+ *                           call, no comparison. Feeds the case-folding pass
+ *                           in full-mapping.mjs: Drive's spellings are the
+ *                           reference where case-variant folders were merged.
  */
 import fsp from 'node:fs/promises';
 import crypto from 'node:crypto';
@@ -43,6 +49,10 @@ for (let i = 0; i < argv.length; i++) {
 if (!MAPPINGS.length) MAPPINGS.push('dist/inventory/full-mapping.csv');
 const ONLY_PROGRAM = (() => {
   const i = argv.indexOf('--program');
+  return i >= 0 ? argv[i + 1] : null;
+})();
+const FOLDERS_ONLY = (() => {
+  const i = argv.indexOf('--folders-only');
   return i >= 0 ? argv[i + 1] : null;
 })();
 
@@ -129,15 +139,25 @@ let folderCount = 0;
     return p;
   }
   let orphans = 0;
+  const folderPaths = [];
   for (const f of items) {
     const p = pathOf(f.id);
     if (p === null) { orphans += 1; continue; }
-    if (f.mimeType === FOLDER) folderCount += 1;
+    if (f.mimeType === FOLDER) { folderCount += 1; folderPaths.push(p); }
     else if (f.mimeType === 'application/vnd.google-apps.shortcut') shortcuts.push({ path: p, target: f.shortcutDetails?.targetId });
     else drive.set(p, { id: f.id, size: Number(f.size ?? 0), mimeType: f.mimeType });
   }
   if (orphans) log(`  ${orphans} items unreachable from the drive root`);
   log(`drive: ${drive.size} files, ${folderCount} folders, ${shortcuts.length} shortcuts`);
+
+  if (FOLDERS_ONLY) {
+    // Shallow-first so a consumer registering spellings sees parents before
+    // children.
+    folderPaths.sort((a, b) => a.split('/').length - b.split('/').length || a.localeCompare(b));
+    await fsp.writeFile(FOLDERS_ONLY, folderPaths.join('\n') + '\n');
+    log(`wrote ${folderPaths.length} folder paths to ${FOLDERS_ONLY}`);
+    process.exit(0);
+  }
 }
 
 // -------------------------------------------------- Dropbox live listing

@@ -15,7 +15,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { loadRows, parseCsv, isBatchName, normalizeName, classify } from './grants-lib.mjs';
-import { mapFiles, makeResolveNodes, foldDestinationCase, FIRST_SEG_YEAR as FIRST_SEG_YEAR_RE } from './mapping-lib.mjs';
+import { mapFiles, makeResolveNodes, foldDestinationCase, CLIENTS_ROOT, ARCHIVE_ROOT, FIRST_SEG_YEAR as FIRST_SEG_YEAR_RE } from './mapping-lib.mjs';
 
 const INVENTORY = 'dist/inventory/grants-inventory.csv';
 const CLIENTS = 'dist/inventory/clients-final.csv';
@@ -25,15 +25,12 @@ const CORRECTIONS = 'scripts/client-corrections.json';
 const CSV_OUT = 'dist/inventory/full-mapping.csv';
 const MD_OUT = 'docs/inventory/full-mapping.md';
 
-const CLIENTS_ROOT = 'All Clients';
-const ARCHIVE_ROOT = 'Old Files';
 const MAX_SKIP = 8;
 const RETENTION_YEARS = 6;
 const cutoff = new Date();
 cutoff.setFullYear(cutoff.getFullYear() - RETENTION_YEARS);
 const CUTOFF_ISO = cutoff.toISOString();
 
-/** Observed pilot throughput: 1,468 files / 4.05 GB in 47m18s. */
 /**
  * Throughput from the two completed copy runs (2026-08-18). An earlier
  * PILOT_BYTES constant here said 4.05 GB when the pilot actually moved
