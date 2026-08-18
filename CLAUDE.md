@@ -2,41 +2,50 @@
 
 Orientation for Claude Code. Keep this file tight. Every line earns its place.
 
+**Never cite line numbers in this file or in any doc you write.** Name the file and the
+symbol. Anchors rot within days; a stale anchor sends the next session into unrelated code.
+
 ## What this repo is
 
-Internal AI platform for Granted Consulting. Hosts multiple specialized Claude-API agents behind a single Express server with a shared HTML chat UI. Each agent is purpose-built for a specific consulting workflow.
+Internal AI platform for Granted Consulting. Multiple specialized Claude-API agents behind
+one Express server with a shared HTML chat UI, plus one public agent.
 
-Sister repo (separate): **getgranted-prototype** — the client-facing GG 2.0 prototype (Next.js, PostgreSQL, different architecture). Do not reference or modify it from here.
+## Where current state lives
 
-## Stack
+This file describes structure. Current state lives in per-product blueprints — read the one
+for what you are working on before you touch anything.
 
-- Node.js 22.x (ESM)
-- Express 4
-- Anthropic SDK (`@anthropic-ai/sdk`) + Claude Agent SDK
-- PostgreSQL via `pg` (Railway)
-- Upstash Redis + ioredis
-- HubSpot SDK, Google APIs (Drive/Docs/Sheets/Gmail), Dropbox, Voyage AI
-- Frontend: vanilla HTML/CSS/JS — no build step
+| Product | Blueprint |
+|---|---|
+| Oracle + Hub agents | `docs/oracle.md` |
+| Lead-gen agent | `docs/lead-gen.md` |
+
+The matching engine, tagger, and GetGranted chat agent live in the sibling repo
+`gg3-ai-service`, with their own blueprints. `gg3-ai-api-backend` is Jason's — gateway and
+grants data; PRs only, never push.
+
+Anything in `docs/` not listed above is historical unless a blueprint vouches for it.
+Several files there describe systems that no longer exist — the blueprints name which.
 
 ## Deployment
 
-**Railway.** Not Vercel. The Vercel migration happened in fall 2025. Production deploys from the `railway-migration` branch (NOT `main`). Any Vercel references in code, comments, or docs are stale — ignore them. The `.vercelignore` file contains `*` to disable Vercel explicitly.
+**Railway, not Vercel.** Production deploys from `railway-migration`, **not `main`**. Any
+Vercel reference in code, comments, or docs is stale. `.vercelignore` contains `*`.
 
-- Production branch: `railway-migration`
-- Deployment config: `railway.json`, `nixpacks.toml`, `Procfile` (all point to `node server.js`)
-- Cron jobs: defined in `railway-cron.json`
+Pushing to `railway-migration` deploys to production. Commit locally, push explicitly.
 
-### `RUN_MODE=sync`
-
-`server.js` short-circuits at line 16 when `RUN_MODE=sync` is set: it executes `scripts/sync-getgranted-database.js` once and exits. This is NOT a persistent cron runner — it's a one-shot DB sync. Railway cron invokes the process with this env var.
+`RUN_MODE=sync` short-circuits `server.js` into a one-shot DB sync and exits. Not a
+persistent cron runner.
 
 ## Agents
 
-The hub hosts these agents. Each has a prompt file in `.claude/agents/` and a tool loadout in the `getToolsForAgent` switch in `src/tools/definitions.js` (line 2047).
+Eleven agent types, dispatched by the `getToolsForAgent` switch in `src/tools/definitions.js`.
+Prompts are flat files in `.claude/agents/` loaded by `loadAgentPrompt` in
+`src/agents/load-agents.js`.
 
-| Agent | Frontend route | Backend agentType |
-|-------|----------------|-------------------|
-| Oracle (internal knowledge assistant) | `/oracle` | `internal-oracle` |
+| Agent | Route | agentType |
+|---|---|---|
+| Oracle | `/oracle` | `internal-oracle` |
 | Grant card generator | `/grant-cards` | `grant-card-generator` |
 | ETG writer | `/etg-writer` | `etg-writer` |
 | BCAFE writer | `/bcafe-writer` | `bcafe-writer` |
@@ -44,164 +53,104 @@ The hub hosts these agents. Each has a prompt file in `.claude/agents/` and a to
 | CanExport claims | `/canexport-claims` | `canexport-claims` |
 | CanExport writer | `/canexport-writer` | `canexport-writer` |
 | Readiness strategist | `/readiness-strategist` | `readiness-strategist` |
-| Lead-gen (public chatbot) | `/lead-gen` | `lead-gen` |
-| Orchestrator | (no UI route) | `orchestrator` |
-| GetGranted AI | (no UI route) | `getgranted-ai` |
+| Lead-gen (public) | `/lead-gen` | `lead-gen` |
+| Orchestrator | — | `orchestrator` |
+| GetGranted AI | — | `getgranted-ai` |
 
-Two URL aliases exist (URL slug ≠ backend agentType): `oracle → internal-oracle` and `grant-cards → grant-card-generator`. All other mappings are identity.
-
-### Lead-gen A/B variants
-
-The lead-gen agent has two prompt variants selected by `LEAD_GEN_VARIANT` env var (A or B):
-- **Variant A** (default): loads `.claude/agents/lead-gen.md` or `lead-gen-variant-a.md`
-- **Variant B**: concatenates three files in `.claude/skills/lead-gen-variant-b/` at prompt-load time (NOT via `load_skill` — this is a prompt-load pattern, not a runtime-loadable skill)
-
-For how agents are structured and added, see `.claude/agents/CLAUDE.md` (created as part of Session 2B).
+Two URL slugs differ from their agentType (`oracle`, `grant-cards`); the rest are identity.
+See `.claude/agents/CLAUDE.md` for how agents are structured and added.
 
 ## Request paths
 
-Two distinct paths. They are NOT interchangeable.
+**Three paths run agents. They are not interchangeable.**
 
-### Authenticated agents (`POST /api/chat`)
+1. **`POST /api/chat`** — authenticated, SSE streaming. All agents except lead-gen.
+   `handleChatRequest` in `src/api/chat.js` → `runAgent` in `src/claude/client.js` →
+   `src/tools/executor.js`. Stores to the `messages` table.
+2. **`POST /api/chat/google`** — the Google Chat adapter. Google OIDC verified, acks
+   immediately, runs Oracle headlessly (`res: null`). `src/api/chat-google.js`. **Changes to
+   `chat.js` or `client.js` affect this path.** See `docs/oracle.md`.
+3. **`POST /api/lead-gen/*`** — public, unauthenticated, restricted tools, separate HTML and
+   widget. Stores to `lead_gen_conversations`. See `docs/lead-gen.md`.
 
-All agents except lead-gen go through this path:
-
-- **Frontend**: `unified-agents.html` → routes via `AGENT_TYPE_MAP` at line 843
-- **Backend**: `server.js` → `src/api/chat.js#handleChatRequest` (line 22) → `src/claude/client.js#runAgent` (line 99) → `src/tools/executor.js`
-- **Tool schemas**: `src/tools/definitions.js` (the `getToolsForAgent` switch at line 2047)
-- **Storage**: `messages` table (standard schema — see `src/database/messages.js`)
-
-### Public lead-gen (`POST /api/lead-gen/*`)
-
-Separate world with its own:
-- HTML: `lead-gen.html` (standalone, separate from unified-agents)
-- Endpoints: `/api/lead-gen/chat`, `/api/lead-gen/init`, `/api/lead-gen/event`
-- No authentication (public widget on granted.ca)
-- Restricted tool set (no HubSpot writes, no `web_fetch`, no file memory)
-- Storage: `lead_gen_conversations` table with JSONB messages column (migration `011_lead_gen_conversations.sql`)
+`POST /api/hubspot-webhook` also drives Oracle headlessly. `POST /api/addon/probe` does not
+reach an agent — it is a disposable timeout probe.
 
 ## Skills
 
-Skills are runtime-loadable content modules that agents invoke via the `load_skill` tool. Currently **10 registered skills**: `sales`, `research`, `grants`, `canexport-writer`, `bcafe-writer`, `hubspot`, `granted-marketing`, `staff-meeting-recap`, `grant-card-writing`, `grant-card-tagging`.
+Twelve registered skills, loaded at runtime via the `load_skill` tool. Any agent can load
+any skill — there is no gating by agent type or role.
 
-**Critical: skills have FIVE registration touchpoints.** Missing any one causes silent drift:
-1. Folder + files on disk under `.claude/skills/{skill-name}/`
-2. `SKILL_PATHS` mapping in `src/tools/load-skill.js`
-3. `skill_name` + `sub_skill` enums in `src/tools/definitions.js` (the `LOAD_SKILL_TOOL` definition)
-4. `LOAD_SKILL_TOOL.description` (advertises the skill to the model)
-5. Tool subset (e.g., `coreHubSpotTools` at `definitions.js:2056`) if the skill teaches tools with restricted access
+**Skills have five registration touchpoints. Missing one causes silent drift:**
+1. Folder + files on disk under `.claude/skills/{name}/`
+2. `SKILL_PATHS` in `src/tools/load-skill.js`
+3. `skill_name` + `sub_skill` enums in `src/tools/definitions.js`
+4. `LOAD_SKILL_TOOL.description`
+5. Tool subset (e.g. `coreHubSpotTools`) if the skill teaches restricted tools
 
-The enum is a model hint, not server-enforced. Server validation happens at `SKILL_PATHS` lookup. But drift between layers creates confusion.
+`hubspot/DEAL_CREATION` is the reference implementation — correctly wired at all five.
 
-For the full pattern and how to add new skills, see `.claude/skills/CLAUDE.md` (created as part of Session 2B).
+Known drift: `research/company_intelligence` is registered at points 2–4 but
+`.claude/skills/research-consultant/` does not exist on disk, so the call throws.
 
-The `hubspot/DEAL_CREATION` skill is the reference implementation — it has all 5 registration points correctly wired.
+See `.claude/skills/CLAUDE.md` for the full pattern.
 
-## Tool registration
+## Tools
 
-Tools follow a split pattern: schemas and implementations live in different files.
-- **Schemas**: defined inline or as constants in `src/tools/definitions.js`
-- **Implementations**: `src/tools/{tool-area}.js` (e.g., `hubspot.js`, `google-drive.js`, `oracle-search.js`)
-- **Executor dispatch**: `src/tools/executor.js`
+Schemas and implementations are split: schemas in `src/tools/definitions.js`,
+implementations in `src/tools/{area}.js`, dispatch through `src/tools/executor.js`.
 
-**Gotcha: two HubSpot layers coexist.**
-- `services/hubspot-service.js` (root, older) — used only by `server.js:454` for direct Express routes
-- `src/tools/hubspot.js` (newer) — used by agent tool calls via `src/api/lead-gen-finalization.js`, `src/api/hubspot-webhook.js`, tests, scripts
+**Two HubSpot layers coexist.** `services/hubspot-service.js` (root, older) backs the direct
+Express routes in `server.js`. `src/tools/hubspot.js` (newer) backs agent tool calls. **Fixes
+in one do not propagate to the other.**
 
-Bug fixes in one do NOT propagate to the other. For more, see `src/tools/CLAUDE.md` (created as part of Session 2B).
+**Duplicate module trap.** `src/agents/load-agents.js` is live. `src/load-agents.js` is dead —
+imported only by a root test file. Same class of trap as the HubSpot split.
+
+**`api/` is mostly dead.** Only about half its files are imported by `server.js`.
+`api/auth-callback.js` and `api/auth-google.js` are superseded by `src/api/auth.js` — editing
+them has no effect. Verify a file has an importer before changing it.
+
+See `src/tools/CLAUDE.md`.
+
+## Storage
+
+- **Standard agents** → `messages` table, one row per message
+- **Lead-gen** → `lead_gen_conversations`, JSONB `messages` column
+
+`src/database/messages.js` handles both. Cross-agent tooling must handle both.
+
+## Memory
+
+Two systems:
+- **`ANTHROPIC_MEMORY_TOOL`** → `.memories/` on disk, cross-conversation
+- **`MEMORY_TOOLS`** (`memory_store`, `memory_recall`, `memory_list`) → Postgres,
+  per-conversation
+
+Oracle and lead-gen both opt **out** of `ANTHROPIC_MEMORY_TOOL`. Check the tool loadout per
+agent before changing memory behaviour.
+
+`memories/` (no leading dot) is a third, separate location. Not the same as `.memories/`.
 
 ## Environment variables
 
-A subset of env vars is in `.env.example`. The full set is only in code. Critical ones:
-
-- **AI**: `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`
-- **DB**: `DATABASE_URL`, `POSTGRES_URL`
-- **Redis**: `REDIS_URL`, `REDIS_PUBLIC_URL`
-- **HubSpot**: `HUBSPOT_ACCESS_TOKEN`, `HUBSPOT_WEBHOOK_SECRET`
-- **Google OAuth + service account**: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_DRIVE_REFRESH_TOKEN`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `GOOGLE_DRIVE_FOLDER_ID`, `GMAIL_REFRESH_TOKEN`
-- **Dropbox**: `DROPBOX_ACCESS_TOKEN`, `DROPBOX_REFRESH_TOKEN`, plus team/namespace IDs
-- **Auth**: `JWT_SECRET`
-- **Runtime**: `NODE_ENV`, `PORT`, `RUN_MODE` (when `sync`, server runs DB sync script and exits)
-- **Lead-gen**: `LEAD_GEN_VARIANT` (A/B), `LEAD_GEN_TEST_MODE`
-
-Never commit credentials. `.claude/settings.local.json` uses `${VAR}` placeholders, not literal secrets.
-
-## Repo layout
-
-```
-.claude/
-  agents/              agent prompt files (.md) — see .claude/agents/CLAUDE.md
-  skills/              runtime-loadable skills — see .claude/skills/CLAUDE.md
-  commands/            Claude Code slash commands (investigate, ship-check, log-decision)
-  settings.local.json  local permission allow-rules (credential-safe, redacted)
-
-api/                   route handlers (legacy Vercel-style, still wired — feedback, pdf, files, auth-callback)
-docs/
-  archive/2025-2026/   historical sprint/planning docs — reference only
-  reference/           skill source material (strategic consulting skill v3, program intelligence)
-
-knowledge-base/        reference content consumed by agents (canexport-claims, canexport-writer)
-memories/              memory storage (purpose distinct from .memories/ — see below)
-.memories/             filesystem storage for ANTHROPIC_MEMORY_TOOL
-migrations/            SQL migrations (~35 files)
-public/                static assets served by Express
-scripts/               ops scripts (embeddings, migrations, diagnostics, sync)
-src/
-  agents/              prompt loader (load-agents.js) — NOT per-agent folders; agents are flat files
-  api/                 route handlers (chat.js, auth.js, admin.js, lead-gen*.js)
-  claude/              Claude API client, streaming, query classifier
-  database/            DB connection + query modules (messages.js handles both conversation stores)
-  email/               sendEmail.js (Gmail REST API, bypasses Railway SMTP block)
-  feedback/, feedback-learning/  feedback capture + analysis
-  middleware/          Express middleware (auth)
-  services/            cross-cutting services (analytics, grant search, lead-notification)
-  tools/               tool definitions + implementations — see src/tools/CLAUDE.md
-  utils/               shared utilities
-
-tests/                 test suite + fixtures
-server.js              main Express app entry point
-unified-agents.html    shared chat UI for all authenticated agents
-lead-gen.html          standalone public lead-gen UI
-```
-
-## Storage: two conversation stores
-
-Agents store messages in two different places depending on which request path they use:
-- **Standard agents** (`/api/chat`): `messages` table — normalized schema, one row per message
-- **Lead-gen agents** (`/api/lead-gen/*`): `lead_gen_conversations` table with JSONB `messages` column
-
-Any cross-agent tooling (diagnostics, analytics, admin views) needs to handle both paths.
-
-## Memory layers
-
-Two distinct memory systems coexist:
-- **`ANTHROPIC_MEMORY_TOOL`** → writes to `.memories/` on disk, cross-conversation (`definitions.js:29`)
-- **`MEMORY_TOOLS`** (`memory_store`, `memory_recall`, `memory_list`) → writes to PostgreSQL, per-conversation (`definitions.js:42-76`)
-
-Oracle explicitly opts OUT of `ANTHROPIC_MEMORY_TOOL` (see `definitions.js:2099-2103`: *"EXCLUDE filesystem-based ANTHROPIC_MEMORY_TOOL (.memories/) - wastes iteration checking empty directory"*). Other agents vary. If modifying memory behavior, check the tool loadout for each affected agent.
-
-The `memories/` directory (no leading dot) is a separate storage location — its purpose is not documented in code. Not the same as `.memories/`.
+Full set exists only in code; `.env.example` is a subset. Some production values —
+including `LEAD_GEN_VARIANT` — are set in the Railway dashboard and appear in no committed
+file. Never commit credentials; `.claude/settings.local.json` uses `${VAR}` placeholders.
 
 ## Working in this repo
 
-- Use Plan mode (Shift+Tab) for any task touching more than one file.
-- Delegate exploration to the `researcher` subagent — read-only, separate context window, preserves main session tokens. Or use `/investigate`.
-- Use `/ship-check` before committing (will gracefully skip missing quality gates).
-- Update `DECISIONS.md` for non-obvious architectural choices. Use `/log-decision`. Entries go at the top. File will be created on first use.
-- Don't modify `CLAUDE.md` or sub-CLAUDE.md files casually — propose updates and let the user approve.
-- No `git add -A`. Stage specific files intentionally.
-- Commit locally, push explicitly. Auto-deploy is wired to `railway-migration`; pushing = deploying.
+- **Use Plan mode (Shift+Tab) for any task touching more than one file.**
+- **Never `git add -A`. Stage named files only.**
+- Delegate exploration to the `researcher` subagent or `/investigate` — read-only, separate
+  context, preserves session tokens.
+- Slash commands: `/add-agent`, `/add-skill`, `/add-tool`, `/investigate`,
+  `/inspect-conversation`, `/ship-check`, `/log-decision`.
+- Run `/ship-check` before committing; it skips missing gates.
+- Log non-obvious architectural choices in `DECISIONS.md` via `/log-decision`. Newest first.
+- Propose changes to `CLAUDE.md` and sub-CLAUDE.md files; don't edit them unasked.
 
 ## Quality checks
 
-This repo uses JavaScript (not TypeScript), so no typecheck script. Test suite: `npm test` (or `tests/run-tests.js` with mode args). ESLint not configured at repo level. `/ship-check` will skip what doesn't exist.
-
-## Recent context
-
-See `DECISIONS.md` (created on first use of `/log-decision`) for the last 5-10 architectural decisions. For older context or implementation history, see `docs/archive/2025-2026/`.
-
-## Dormant / intentionally removed
-
-- `config/` directory — removed in April 2026 Session 1 cleanup (previously held `agent-sdk-config.js`)
-- `api/agent-sdk-handler.js`, `test-gdrive-mcp.js` — removed (same cleanup, dead Agent SDK path)
-- `api/` folder as a whole is labeled "legacy" in `server.js` comments but is still in the hot path — individual files like `feedback.js`, `pdf-handler.js`, `auth-callback.js` are actively required.
+JavaScript, not TypeScript — no typecheck. Tests: `npm test` (runs `tests/run-tests.cjs`).
+ESLint not configured.
