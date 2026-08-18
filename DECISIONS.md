@@ -12,6 +12,89 @@ Format:
 
 ---
 
+## 2026-08-18 — Shared Drive roots renamed: Clients / Current Clients
+
+**What:** `All Clients` → `Clients`, `Live Clients` → `Current Clients`, renamed
+in place via `files.update` on `name` (folder IDs and parents unchanged). Mapping
+and copy ledger migrated to match.
+**Why:** "All Clients" beside "Live Clients" read as two populations of clients
+rather than a set and a view of it. Files live exactly once under `Clients`;
+`Current Clients` holds only shortcuts, so the new name says what it is.
+**Impact:** `scripts/mapping-lib.mjs` (roots exported there now as the single
+source of truth — `CLIENTS_ROOT`, `CURRENT_ROOT`, `ARCHIVE_ROOT`, `PROGRAMS_ROOT`),
+`full-mapping.mjs` and `canexport-mapping.mjs` import them instead of declaring
+literals, `pilot-copy.mjs` defaults updated (a stale default would create a
+second top-level tree on the next copy), `copy-ledger.jsonl` (19,193 destination
+strings rewritten, root segment only; backup
+`copy-ledger.jsonl.bak-2026-08-18-rootrename`). Regenerate
+`dist/inventory/drive-folders.txt` after any root rename — the case-fold reads
+Drive spellings from it and silently falls back if the roots no longer match.
+
+## 2026-08-18 — Conditional tool inclusion must be per-conversation, not per-request
+
+**Status:** Constraint established, not built. Applies to model routing,
+request-conditional tool assembly, and writer-agent consolidation.
+
+**What:** If Oracle's tools array ever becomes conditional, the variant is
+selected once at conversation start and held fixed for the life of the
+conversation. Do not assemble the tool set per request, and do not change it
+mid-conversation.
+
+**Why.** Anthropic renders tools before system, and the single system-side
+`cache_control` sits on `systemBlocks[0]` (`client.js:561`, 5-minute default
+TTL), so the tools array is cached transitively and sits at the *front* of the
+24,529-token cached prefix. Varying tools per request fragments that prefix into
+one cache entry per variant, each paying its own write; changing tools
+mid-conversation invalidates everything behind it and forces a fresh
+~24,529-token write. July billing: cache writes were $104 of a $136 Hub/Oracle
+bill (69%), because writes price at 12.5–20× reads per token. Trimming ~6,000
+tokens of cached *reads* to buy a 24,500-token *write* is a net loss — the naive
+implementation, classify per request and assemble per request, is the losing one.
+
+**What makes it worth doing anyway.** 6,070 tokens (32.0% of the array) are
+dedicated to four specific skills — granted-marketing 2,352, sales-consultant
+1,686, hubspot/DEAL_CREATION 1,022, staff-meeting-recap 1,010. With
+`load_skill`'s registry overhead the skill-attributable share is roughly half the
+array, and a lookup-shaped conversation needs none of it. The seam is already
+clean: all 52 tools are unconditional today, the only call site is
+`getToolsForAgent(agentType)` at `client.js:513`, and every input a conditional
+mechanism needs — user message, `userIdentity`, history, attachments, classifier
+result — is resolved 200+ lines earlier at `client.js:299-309`. No reordering
+required.
+
+**The blocker this shares with model routing.** Both decisions want skill
+identity before the first API call, and both learn it after: `MODEL` is fixed at
+`client.js:305`, outside the agent loop, while skill identity first exists at
+`client.js:903-917` when `load_skill` dispatches — iteration ≥ 1, minimum one
+full Sonnet call after the model was set. This is one blocker, not two. The fix
+is cheap up-front skill-intent classification before the first call, NOT a model
+field bolted onto `SKILL_PATHS` with tools solved separately later; scope them as
+a single piece of work. Consequence for ETG: as things stand, ETG-as-a-skill pays
+one Sonnet call per conversation before it can route itself back to Haiku — a
+cost `etg-writer` does not pay today, since it starts on Haiku. Decide whether
+that floor is acceptable before conversion work begins, not during.
+
+**Superseded.** The prompt audit was framed as the primary cost lever. It targets
+5,589 tokens (22.8% of prefix) against the tools array's 18,940 (77.2%) — roughly
+1/3.4 the leverage, and understated further because Anthropic's per-tool schema
+rendering bills above tiktoken's count. The audit still has behavioural value
+(migration-era "be maximally thorough" instructions make the model do extra work
+per call) but it is no longer the headline structural lever.
+
+**Measurement caveat for anything validated against this.** Oracle conversation
+volume is declining — May 1,383, Jun 1,001, Jul 898, Aug 421 (partial, through
+the 18th) — so a post-change cost drop is not automatically a change effect.
+Compaction also hard-deletes messages (`client.js:387`, `deleteOldMessages`) and
+31 conversations have summaries, so all tool call counts are floors, biased low
+precisely on the longest and most tool-heavy conversations.
+
+**Impact:** No code changed. Constrains future work in `src/claude/client.js`
+(the `client.js:513` tools seam and the `client.js:305` model binding),
+`src/tools/definitions.js` (`getToolsForAgent`), `src/tools/load-skill.js`
+(`SKILL_PATHS`), and the ETG writer-agent conversion. Figures from read-only
+prefix and tool-inventory investigations, 2026-08-18; token counts are
+`cl100k_base` proxies, not Anthropic's tokenizer.
+
 ## 2026-07-30 — Lead-gen email authorization + Starter booking policy
 
 **Email send authorization.** `hasEmailBody` was a sufficient condition
