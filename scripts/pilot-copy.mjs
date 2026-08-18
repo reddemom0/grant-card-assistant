@@ -33,7 +33,21 @@ import crypto from 'node:crypto';
 import { parseCsv } from './grants-lib.mjs';
 import 'dotenv/config';
 
-const MAPPING = 'dist/inventory/canexport-mapping.csv';
+/**
+ * Mapping sheet to execute. Overridable so the full-corpus copy can run in
+ * stages without editing the sheet — the sheet is the contract and this script
+ * makes no independent judgement about destinations.
+ *   --mapping <path>   default dist/inventory/canexport-mapping.csv
+ *   --program <name>   copy only rows whose program column matches exactly
+ */
+const MAPPING = (() => {
+  const i = process.argv.indexOf('--mapping');
+  return i > 0 ? process.argv[i + 1] : 'dist/inventory/canexport-mapping.csv';
+})();
+const ONLY_PROGRAM = (() => {
+  const i = process.argv.indexOf('--program');
+  return i > 0 ? process.argv[i + 1] : null;
+})();
 const LEDGER = 'dist/inventory/copy-ledger.jsonl';
 // Shared Drive. A Shared Drive's ID doubles as the ID of its root folder, so
 // it can be used directly as a parent.
@@ -59,6 +73,25 @@ const LIMIT = (() => {
 
 const log = (...a) => console.error(...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ---------------------------------------------------------------- timeouts
+/**
+ * Node's fetch has NO default timeout: a socket that goes silent mid-request
+ * blocks until the OS gives up. During the 2026-08-17/18 ETG run that happened
+ * four times at 15–20 minutes each — the retry logic never fired because it
+ * only runs after the hang resolves. Every fetch now carries an AbortSignal so
+ * a dead socket costs seconds plus one retry, not twenty minutes.
+ *
+ * Values: token/metadata calls answer in well under a second when healthy, so
+ * 30/60s is generous. Transfers scale with size — a fixed cap would abort a
+ * legitimately slow gigabyte while doing nothing for the small files that
+ * dominate the corpus. Floor 3 min, budget 256 KiB/s, cap 30 min.
+ */
+const T_TOKEN = 30_000;
+const T_META = 60_000;
+const T_DOWNLOAD = 30 * 60_000;   // size unknown before the download starts
+const uploadTimeout = (bytes) =>
+  Math.min(Math.max(180_000, Math.ceil(bytes / (256 * 1024)) * 1000), 30 * 60_000);
 
 // ---------------------------------------------------------------- mime types
 const MIME = {
@@ -109,12 +142,20 @@ async function withRetry(label, fn, attempts = 6) {
         'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_SOCKET',
       ]);
       const transport = TRANSIENT.has(netCode)
-        || (err.name === 'TypeError' && /fetch failed/i.test(err.message ?? ''));
-      const retryable = status === 429 || (status >= 500 && status < 600) || transport;
+        || (err.name === 'TypeError' && /fetch failed/i.test(err.message ?? ''))
+        // AbortSignal.timeout fired — the request hung past its deadline.
+        // Exactly the case the timeouts exist for; always worth a retry.
+        || err.name === 'TimeoutError' || err.name === 'AbortError';
+      // A 403 is retryable only when its reason says throttling. Permission
+      // refusals fail immediately — retrying them just wastes the run.
+      const throttled403 = status === 403
+        && !FATAL_403.has(err.reason)
+        && RETRYABLE_403.has(err.reason);
+      const retryable = status === 429 || (status >= 500 && status < 600) || transport || throttled403;
       if (!retryable || i === attempts) throw err;
       const ra = Number(err.retryAfter || 0) * 1000;
       const wait = ra || delay;
-      log(`    ⏳ ${label}: ${status || err.code}, retry ${i}/${attempts - 1} in ${Math.round(wait / 1000)}s`);
+      log(`    ⏳ ${label}: ${status || err.code}${err.reason ? ` (${err.reason})` : ''}, retry ${i}/${attempts - 1} in ${Math.round(wait / 1000)}s`);
       await sleep(wait);
       delay = Math.min(delay * 2, 32000);
     }
@@ -124,8 +165,40 @@ function httpError(res, body) {
   const e = new Error(`HTTP ${res.status}: ${String(body).slice(0, 200)}`);
   e.status = res.status;
   e.retryAfter = res.headers.get('retry-after');
+  // Keep the machine-readable reason: a 403 can be throttling (retry) or a
+  // permission refusal (fail fast), and only the reason distinguishes them.
+  try {
+    const j = JSON.parse(String(body));
+    e.reason = j?.error?.errors?.[0]?.reason ?? null;
+    e.apiMessage = j?.error?.message ?? null;
+  } catch { e.reason = null; }
   return e;
 }
+
+/**
+ * 403 reasons that mean "slow down", not "you may not do this".
+ *
+ * On 2026-08-17 a 112-second burst of 403s failed 151 ETG uploads that would
+ * have succeeded on retry — 561 files landed successfully in the same folders
+ * minutes later, and the drive was at 226 GB of 30 TB. Treating every 403 as
+ * fatal turned a transient throttle into 151 permanent failures.
+ */
+const RETRYABLE_403 = new Set([
+  'userRateLimitExceeded',
+  'rateLimitExceeded',
+  // Included on evidence, not on Google's default advice: the burst above
+  // reported "The user's Drive storage quota has been exceeded" and
+  // "Service Accounts do not have storage quota", both of which carry this
+  // reason, while the drive was nowhere near full. A genuinely full drive
+  // will still fail — just after the retries are exhausted rather than
+  // immediately. Remove this entry if the pool is ever actually at capacity.
+  'storageQuotaExceeded',
+]);
+/** Permission refusals — never retried, however they are worded. */
+const FATAL_403 = new Set([
+  'insufficientFilePermissions', 'appNotAuthorizedToFile', 'domainPolicy',
+  'forbidden', 'cannotModifyInheritedTeamDrivePermission', 'fileOwnerNotMemberOfTeamDrive',
+]);
 
 /**
  * Dropbox-API-Arg must be ASCII. HTTP headers are ByteStrings, so any character
@@ -153,6 +226,7 @@ const DBX = {
         client_id: process.env.DROPBOX_APP_KEY,
         client_secret: process.env.DROPBOX_APP_SECRET,
       }),
+      signal: AbortSignal.timeout(T_TOKEN),
     });
     if (!res.ok) throw httpError(res, await res.text());
     const d = await res.json();
@@ -178,6 +252,8 @@ const DBX = {
       const res = await fetch('https://content.dropboxapi.com/2/files/download', {
         method: 'POST',
         headers: this.headers({ 'Dropbox-API-Arg': asciiArg({ path: dropboxPath }) }),
+        // Governs the whole request INCLUDING the arrayBuffer() body read below.
+        signal: AbortSignal.timeout(T_DOWNLOAD),
       });
       if (!res.ok) throw httpError(res, await res.text());
       const buf = Buffer.from(await res.arrayBuffer());
@@ -249,6 +325,7 @@ const DRIVE = {
             grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
             assertion: `${unsigned}.${sig}`,
           }),
+          signal: AbortSignal.timeout(T_TOKEN),
         });
         if (!res.ok) throw httpError(res, await res.text());
         const d = await res.json();
@@ -272,6 +349,7 @@ const DRIVE = {
             client_id: process.env.GOOGLE_DRIVE_CLIENT_ID,
             client_secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
           }),
+          signal: AbortSignal.timeout(T_TOKEN),
         });
         if (!res.ok) throw httpError(res, await res.text());
         const d = await res.json();
@@ -289,9 +367,11 @@ const DRIVE = {
 
   async api(url, opts = {}) {
     const token = await this.accessToken();
+    const { timeoutMs, ...rest } = opts;
     const res = await fetch(url, {
-      ...opts,
+      ...rest,
       headers: { Authorization: `Bearer ${token}`, ...(opts.headers || {}) },
+      signal: AbortSignal.timeout(timeoutMs ?? T_META),
     });
     if (!res.ok) throw httpError(res, await res.text());
     return res;
@@ -331,32 +411,73 @@ const DRIVE = {
   /** Resumable upload. Never sets a Google mime type, so nothing is converted. */
   async upload(name, parentId, buffer, mimeType) {
     if (GOOGLE_TYPES.test(mimeType)) throw new Error(`refusing to upload as Google type: ${mimeType}`);
-    const start = await withRetry(`init upload ${name}`, () =>
-      this.api(`https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,mimeType&${ALL_DRIVES}`, {
+    // A resumable session for an empty body computes Content-Range
+    // "bytes 0-(-1)/0", which Drive rejects with 400 "Failed to parse
+    // Content-Range header". 41 files in the corpus are zero bytes. Send them
+    // as a single multipart request instead — no ranges involved.
+    if (buffer.length === 0) return this.uploadEmpty(name, parentId, mimeType);
+    // A 410 on the session PUT means Google discarded the resumable session
+    // server-side (seen once on 2026-08-18: a 500 killed the session, and the
+    // retry of the same URI came back 410 Gone). A dead session URI can never
+    // succeed, so re-PUTting it is pointless — discard it and start a fresh
+    // session. 410 is deliberately NOT in withRetry's retryable set: the inner
+    // retry loop must throw it so this outer loop can mint a new session.
+    const MAX_SESSIONS = 3;
+    for (let attempt = 1; ; attempt++) {
+      const start = await withRetry(`init upload ${name}`, () =>
+        this.api(`https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,name,size,mimeType&${ALL_DRIVES}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json; charset=UTF-8',
+            'X-Upload-Content-Type': mimeType,
+            'X-Upload-Content-Length': String(buffer.length),
+          },
+          body: JSON.stringify({ name, parents: [parentId], mimeType }),
+        })
+      );
+      const session = start.headers.get('location');
+      if (!session) throw new Error('no resumable session URL returned');
+
+      try {
+        const res = await withRetry(`upload ${name}`, async () => {
+          const r = await fetch(session, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': mimeType,
+              'Content-Range': `bytes 0-${buffer.length - 1}/${buffer.length}`,
+            },
+            body: buffer,
+            signal: AbortSignal.timeout(uploadTimeout(buffer.length)),
+          });
+          if (!r.ok) throw httpError(r, await r.text());
+          return r;
+        });
+        return res.json();
+      } catch (err) {
+        if (err.status === 410 && attempt < MAX_SESSIONS) {
+          log(`    ↻ upload ${name}: session gone (410), starting fresh session ${attempt + 1}/${MAX_SESSIONS}`);
+          continue;
+        }
+        throw err;
+      }
+    }
+  },
+
+  /** Single-request upload for zero-byte files. */
+  async uploadEmpty(name, parentId, mimeType) {
+    const boundary = 'granted-empty-boundary';
+    const meta = JSON.stringify({ name, parents: [parentId], mimeType });
+    const body = `--${boundary}\r\n`
+      + `Content-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n`
+      + `--${boundary}\r\nContent-Type: ${mimeType}\r\n\r\n\r\n`
+      + `--${boundary}--`;
+    const res = await withRetry(`upload empty ${name}`, () =>
+      this.api(`https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size,mimeType&${ALL_DRIVES}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=UTF-8',
-          'X-Upload-Content-Type': mimeType,
-          'X-Upload-Content-Length': String(buffer.length),
-        },
-        body: JSON.stringify({ name, parents: [parentId], mimeType }),
+        headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body,
       })
     );
-    const session = start.headers.get('location');
-    if (!session) throw new Error('no resumable session URL returned');
-
-    const res = await withRetry(`upload ${name}`, async () => {
-      const r = await fetch(session, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': mimeType,
-          'Content-Range': `bytes 0-${buffer.length - 1}/${buffer.length}`,
-        },
-        body: buffer,
-      });
-      if (!r.ok) throw httpError(r, await r.text());
-      return r;
-    });
     return res.json();
   },
 
@@ -595,7 +716,9 @@ const rowsAll = [];
     });
   }
 }
-const rows = rowsAll.filter((r) => COPY_ROUTES.has(r.route));
+const rows = rowsAll.filter((r) => COPY_ROUTES.has(r.route)
+  && (!ONLY_PROGRAM || r.program === ONLY_PROGRAM));
+if (ONLY_PROGRAM) log(`program filter: "${ONLY_PROGRAM}" -> ${rows.length} of ${rowsAll.length} rows`);
 const skipped = rowsAll.length - rows.length;
 log(`mapping: ${rowsAll.length} rows, ${rows.length} copyable, ${skipped} skipped (review)`);
 
@@ -705,6 +828,10 @@ function spreadSelect(list, n) {
     (a, b) => b.dest.split('/').length - a.dest.split('/').length || a.dest.localeCompare(b.dest)
   )[0];
   if (deepest) take(deepest);
+  // Guarantee the sample exercises a collision-suffixed filename — that rule
+  // is the newest and the one most worth seeing land correctly.
+  const suffixed = list.find((r) => / \([^)]+\)\.[^.]+$/.test(r.dest.split('/').pop()) && !picked.includes(r));
+  if (suffixed) take(suffixed);
   for (const route of ['sort', 'program', 'archive']) {
     if (picked.length >= n) break;
     if (seenRoute.has(route)) continue;
@@ -757,9 +884,13 @@ function progress(force = false) {
 async function copyOne(r) {
   const segs = r.dest.split('/');
   const fileName = segs.pop();
+  // Declared outside the try so a failure can record WHERE it was aimed. The
+  // 2026-08-17 incident could not be diagnosed from the ledger because the
+  // target parent was never written down.
+  let parentId = null;
   try {
     const { buffer, size } = await DBX.download(r.src);
-    const parentId = await ensureFolder(segs);
+    parentId = await ensureFolder(segs);
     const mimeType = mimeOf(fileName);
     const up = await DRIVE.upload(fileName, parentId, buffer, mimeType);
     const stat = await DRIVE.stat(up.id);
@@ -770,6 +901,7 @@ async function copyOne(r) {
 
     await appendLedger({
       source: r.src, destination: r.dest, drive_file_id: stat.id,
+      parent_folder_id: parentId,
       client: r.client,
       source_size: size, uploaded_size: uploaded, mime_type: stat.mimeType,
       route: r.route, status: 'verified', timestamp: new Date().toISOString(),
@@ -780,9 +912,11 @@ async function copyOne(r) {
     if (err.fatal) throw err;
     await appendLedger({
       source: r.src, destination: r.dest, drive_file_id: null,
+      parent_folder_id: parentId,
       client: r.client,
       source_size: null, uploaded_size: null, mime_type: null,
       route: r.route, status: 'failed', error: err.message,
+      error_reason: err.reason ?? null, http_status: err.status ?? null,
       timestamp: new Date().toISOString(),
     });
     results.failed += 1;

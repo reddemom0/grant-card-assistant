@@ -1,6 +1,6 @@
 # CanExport Pilot — Phase 1
 
-**Generated:** 2026-08-17T16:53:36.185Z
+**Generated:** 2026-08-17T17:58:50.127Z
 **Inputs:** `dist/inventory/grants-inventory.csv`, `dist/inventory/clients-final.csv`, `dist/inventory/resolved-final.csv`
 **Output:** `dist/inventory/canexport-mapping.csv` (gitignored — regenerable)
 **Nothing was copied, renamed, or moved.** This is a proposal for review.
