@@ -203,7 +203,7 @@ const dbxLive = new Map();        // path_lower -> {size, client_modified}
 
 // ------------------------------------------------------------- the contract
 const idx = (h, name) => { const i = h.indexOf(name); if (i < 0) throw new Error(`mapping has no "${name}" column`); return i; };
-const expected = new Map();       // destination -> {src, route}
+const expected = new Map();       // destination -> {src, route, program}
 const allDest = new Set();        // every copyable destination across all sheets
 for (const [n, sheet] of MAPPINGS.entries()) {
   let h = null, iSrc, iProg, iDest, iRoute;
@@ -216,9 +216,10 @@ for (const [n, sheet] of MAPPINGS.entries()) {
     }
     if (!r[iSrc] || !COPY_ROUTES.has(r[iRoute])) continue;
     allDest.add(r[iDest]);
-    // presence/size checks: first sheet only, optionally one program
-    if (n === 0 && (!ONLY_PROGRAM || r[iProg] === ONLY_PROGRAM)) {
-      expected.set(r[iDest], { src: r[iSrc], route: r[iRoute] });
+    // Presence/size checks cover EVERY sheet unless --program narrows them, so
+    // a whole-corpus reconciliation can be done in one pass.
+    if (!ONLY_PROGRAM || r[iProg] === ONLY_PROGRAM) {
+      expected.set(r[iDest], { src: r[iSrc], route: r[iRoute], program: r[iProg] });
     }
   }
 }
@@ -229,15 +230,27 @@ const ci = new Map();
 for (const p of drive.keys()) ci.set(p.toLowerCase(), p);
 
 const missing = [], caseOnly = [], mismatched = [], changedSinceCopy = [], sourceGone = [], googleTypes = [];
+/** Per-program tallies — Step 5 of the full-copy brief asks for these by program. */
+const perProgram = new Map();
+const bump = (prog, key) => {
+  if (!perProgram.has(prog)) {
+    perProgram.set(prog, { expected: 0, present_exact: 0, case_only: 0, absent: 0, size_ok: 0, changed: 0, source_gone: 0 });
+  }
+  perProgram.get(prog)[key] += 1;
+};
 for (const [dest, info] of expected) {
   const d = drive.get(dest) ?? (ci.has(dest.toLowerCase()) ? drive.get(ci.get(dest.toLowerCase())) : null);
   const isCase = !drive.has(dest) && ci.has(dest.toLowerCase());
-  if (!d) { missing.push({ dest, ...info }); continue; }
-  if (isCase) caseOnly.push({ dest, actual: ci.get(dest.toLowerCase()) });
+  const prog = info.program || '(unknown)';
+  bump(prog, 'expected');
+  if (!d) { missing.push({ dest, ...info }); bump(prog, 'absent'); continue; }
+  if (isCase) { caseOnly.push({ dest, actual: ci.get(dest.toLowerCase()) }); bump(prog, 'case_only'); }
+  else bump(prog, 'present_exact');
   if (/^application\/vnd\.google-apps\./.test(d.mimeType)) googleTypes.push({ dest, mimeType: d.mimeType });
 
   const live = dbxLive.get(info.src.toLowerCase());
-  if (!live) { sourceGone.push({ dest, src: info.src, drive_size: d.size }); continue; }
+  if (!live) { sourceGone.push({ dest, src: info.src, drive_size: d.size }); bump(prog, 'source_gone'); continue; }
+  if (live.size === d.size) bump(prog, 'size_ok'); else bump(prog, 'changed');
   if (live.size !== d.size) {
     // Drive disagrees with Dropbox-as-of-now. Either the copy is bad, or the
     // source was edited after it was copied. Only the copier's own read-back
@@ -271,6 +284,7 @@ console.log(JSON.stringify({
   google_type: googleTypes.length,
   extra_in_drive: extra.length,
   by_top_level: byTop,
+  per_program: Object.fromEntries([...perProgram.entries()].sort((a, b) => b[1].expected - a[1].expected)),
   missing_rows: missing.slice(0, 50),
   changed_rows: changedSinceCopy.slice(0, 50),
   source_gone_rows: sourceGone.slice(0, 50),

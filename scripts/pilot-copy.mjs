@@ -31,6 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseCsv } from './grants-lib.mjs';
+import { CLIENTS_ROOT as LIB_CLIENTS_ROOT, CURRENT_ROOT as LIB_CURRENT_ROOT } from './mapping-lib.mjs';
 import 'dotenv/config';
 
 /**
@@ -591,12 +592,12 @@ async function clearFailed() {
  * Drive itself is checked for an existing shortcut before one is made. A
  * re-run creates nothing.
  */
-// Roots renamed in Drive 2026-08-18 ("All Clients" → "Clients", "Live Clients"
-// → "Current Clients"). These defaults must match, or the next copy would
-// create a second top-level tree beside the real one. Canonical declarations
-// live in mapping-lib.mjs; repeated here because this script is standalone.
-const CLIENTS_ROOT = process.env.PILOT_CLIENTS_ROOT || 'Clients';
-const LIVE_ROOT = process.env.PILOT_LIVE_ROOT || 'Current Clients';
+// Roots come from mapping-lib, the single source of truth — the mapping sheet
+// is generated from those same constants, so a literal here could silently
+// disagree with the destinations being executed and create a second top-level
+// tree beside the real one. Env vars still override for testing.
+const CLIENTS_ROOT = process.env.PILOT_CLIENTS_ROOT || LIB_CLIENTS_ROOT;
+const LIVE_ROOT = process.env.PILOT_LIVE_ROOT || LIB_CURRENT_ROOT;
 const liveClients = new Set();
 const shortcutDone = new Set();
 const shortcutInFlight = new Map();
