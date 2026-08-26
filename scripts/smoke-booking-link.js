@@ -69,14 +69,37 @@ const cases = [
     expect: { link: NATALIE_INTRO_LINK, source: 'natalie-intro', consultantName: null }
   },
   {
-    name: 'Nonprofit → Natalie',
+    // CHANGED from '→ Natalie'. The prompt has always told non-profits they get
+    // no call; this function used to fall through and hand them one anyway.
+    name: 'Nonprofit → no link (prompt always said no call)',
     input: { best_fit_product: 'Nonprofit', industry: 'Charity/Non-Profit' },
-    expect: { link: NATALIE_INTRO_LINK, source: 'natalie-intro', consultantName: null }
+    expect: { link: null, source: 'no-link', consultantName: null }
   },
   {
     name: 'Unknown → Natalie',
     input: { best_fit_product: 'Unknown', industry: 'Other' },
     expect: { link: NATALIE_INTRO_LINK, source: 'natalie-intro', consultantName: null }
+  },
+
+  // ─── product IS the eligibility answer ───────────────────────────────────
+  // These previously passed a separate pro_call_eligible flag. That flag is
+  // gone: computeBestFitProduct promotes every call-worthy lead to 'Granted
+  // Pro', so best_fit_product alone decides. See scripts/smoke-tier-gate.js
+  // for the promotion logic these depend on.
+  {
+    name: 'Pro (promoted by the gate) → industry-routed call',
+    input: { best_fit_product: 'Granted Pro', industry: 'Construction' },
+    expect: { link: RUK_LINK, source: 'industry-routed', consultantName: 'Rukshaar Ali' }
+  },
+  {
+    name: 'Starter → no link, whatever the industry (a call-worthy lead would be Pro)',
+    input: { best_fit_product: 'Granted Starter', industry: 'Construction' },
+    expect: { link: null, source: 'no-link', consultantName: null }
+  },
+  {
+    name: 'Starter + non-exception industry → no link',
+    input: { best_fit_product: 'Granted Starter', industry: 'Accounting' },
+    expect: { link: null, source: 'no-link', consultantName: null }
   },
 
   // ─── no-link tier ────────────────────────────────────────────────────────

@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "09-priority-framework-not-applicable",
+    "title": "BC priority framework — none apply (and ineligibility issues)",
+    "watch": "Does the agent force-fit factors? Does it flag the >$10K cost framing, retreat-style format, and non-BC provider as eligibility issues?",
+    "turns": [
+      "I need to write an ETG business case. Company is MegaCorp Holdings, a 2,000-person financial services firm headquartered in Vancouver. They've previously received ETG funding twice. Trainee is Thomas Wright, thomas@megacorp.com, Senior Vice President. Course is an executive leadership retreat-style program at a private US-based provider. Tuition $12,500. Training May 1 to May 5, 2026."
+    ]
+  },
+  "run": {
+    "conversationId": "37919efe-e378-43f7-b5d2-b1f62bc42d7f",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWDzyvAGnMWDWvnU5nk2\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 591,
+    "capturedAt": "2026-04-28T13:10:49.617Z"
+  },
+  "conversation": {
+    "id": "37919efe-e378-43f7-b5d2-b1f62bc42d7f",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] BC priority framework — none apply (and ineligibility issues)",
+    "created_at": "2026-04-28T11:10:48.961Z",
+    "updated_at": "2026-04-28T11:10:48.961Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

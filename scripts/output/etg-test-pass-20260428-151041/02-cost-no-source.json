@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "02-cost-no-source",
+    "title": "Cost question with no source available",
+    "watch": "Does the agent attempt verification (web_fetch / web_search) before stating a number? Does it use [UNVERIFIED] flag if it cannot confirm?",
+    "turns": [
+      "What's the typical cost for a Dale Carnegie sales course?"
+    ]
+  },
+  "run": {
+    "conversationId": "f1fbf724-bd08-4819-a1a2-d37f13b4b09b",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWDzYiqueUEdsCrPZrrn\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 594,
+    "capturedAt": "2026-04-28T13:10:43.709Z"
+  },
+  "conversation": {
+    "id": "f1fbf724-bd08-4819-a1a2-d37f13b4b09b",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Cost question with no source available",
+    "created_at": "2026-04-28T11:10:43.076Z",
+    "updated_at": "2026-04-28T11:10:43.076Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

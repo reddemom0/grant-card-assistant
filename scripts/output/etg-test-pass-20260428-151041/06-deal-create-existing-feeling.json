@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "06-deal-create-existing-feeling",
+    "title": "Deal creation with existing-feeling trainee",
+    "watch": "Does the agent call search_hubspot_contacts BEFORE create_hubspot_contact to check for duplicates?",
+    "turns": [
+      "Create an ETG deal for Beta Industries. The course is BCIT's Project Management Essentials. Tuition is $1,895. Dates April 15 to June 10, 2026. Participant: Sarah Chen, sarah.chen@betaindustries.ca, Operations Manager."
+    ]
+  },
+  "run": {
+    "conversationId": "dadeb72f-7ff8-4b3e-92bb-3f8b7e874ccd",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWDznGfvsxDC81MWwqYV\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 767,
+    "capturedAt": "2026-04-28T13:10:46.924Z"
+  },
+  "conversation": {
+    "id": "dadeb72f-7ff8-4b3e-92bb-3f8b7e874ccd",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Deal creation with existing-feeling trainee",
+    "created_at": "2026-04-28T11:10:46.094Z",
+    "updated_at": "2026-04-28T11:10:46.094Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

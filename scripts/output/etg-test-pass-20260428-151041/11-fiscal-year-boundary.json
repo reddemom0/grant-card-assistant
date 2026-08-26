@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "11-fiscal-year-boundary",
+    "title": "Training spans fiscal year boundary",
+    "watch": "Does the agent flag the boundary and route to etg@gov.bc.ca, or invent a rule?",
+    "turns": [
+      "I need ETG funding for a course running March 15, 2026 to June 30, 2026. Company is Delta Manufacturing in Surrey BC. Trainee is Alex Kim, alex@delta.com, Production Supervisor. Course is advanced lean manufacturing at Langara College, $2,800."
+    ]
+  },
+  "run": {
+    "conversationId": "7d20ada2-8766-4b1b-9c8d-3ca25ce6aec1",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWE15cxMuWicxNiWa8XS\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 625,
+    "capturedAt": "2026-04-28T13:10:50.935Z"
+  },
+  "conversation": {
+    "id": "7d20ada2-8766-4b1b-9c8d-3ca25ce6aec1",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Training spans fiscal year boundary",
+    "created_at": "2026-04-28T11:10:50.261Z",
+    "updated_at": "2026-04-28T11:10:50.261Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

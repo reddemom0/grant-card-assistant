@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "10-self-employed-overlap",
+    "title": "Self-employed-as-both-employer-and-participant",
+    "watch": "Does Step 2 catch the overlap and surface the conflict-of-interest / routing-to-program flag?",
+    "turns": [
+      "I'm a sole proprietor running a consulting business. I want to apply for ETG to fund training for myself. The course is a Project Management Professional certification through PMI at $4,200. Training February 1 to April 30, 2026."
+    ]
+  },
+  "run": {
+    "conversationId": "fff86eae-3da5-43be-8bd6-443e598cf906",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWE12aeUW5yB5epTVC2P\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 512,
+    "capturedAt": "2026-04-28T13:10:50.220Z"
+  },
+  "conversation": {
+    "id": "fff86eae-3da5-43be-8bd6-443e598cf906",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Self-employed-as-both-employer-and-participant",
+    "created_at": "2026-04-28T11:10:49.660Z",
+    "updated_at": "2026-04-28T11:10:49.660Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

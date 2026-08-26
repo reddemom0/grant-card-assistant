@@ -57,8 +57,22 @@ const FOLDERS_ONLY = (() => {
 })();
 
 const DRIVE_ID = process.env.PILOT_DEST_ROOT || '0AKxoOSs3WbQ0Uk9PVA';
-const GRANTS_PATH = '/granted team folder/sales/grants';
-const COPY_ROUTES = new Set(['sort', 'program', 'archive']);
+/**
+ * Dropbox subtree to enumerate for the live size comparison. Derived from the
+ * mapping sources' common ancestor rather than hardcoded: the grants sheets sit
+ * under SALES/Grants, but the departments sheet spans MARKETING, OPERATIONS and
+ * six more. A hardcoded Grants path silently found zero of them.
+ */
+let DROPBOX_ROOT = process.env.DROPBOX_INVENTORY_ROOT || '';
+/**
+ * Routes that were copied and must therefore be present in Drive. `review` is
+ * excluded — those rows have no destination.
+ *
+ * `mirror` is the departments sheet. Omitting it here silently filters out all
+ * 6,235 department rows and reports a clean reconciliation of nothing, which is
+ * worse than an error. Keep in step with pilot-copy.mjs's COPY_ROUTES.
+ */
+const COPY_ROUTES = new Set(['sort', 'program', 'archive', 'mirror']);
 const T_META = 60_000;
 const log = (...a) => console.error(...a);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -160,6 +174,34 @@ let folderCount = 0;
   }
 }
 
+// ---------------------------------- derive the Dropbox subtree to enumerate
+/**
+ * Pre-scan the sheets' source_path column and walk their deepest common
+ * ancestor. The mapping proper is parsed further down, but the Dropbox walk
+ * happens first and needs to know where to look.
+ */
+if (!DROPBOX_ROOT) {
+  const roots = [];
+  for (const sheet of MAPPINGS) {
+    let h = null, iSrc = -1;
+    for (const r of parseCsv(await fsp.readFile(sheet, 'utf8'))) {
+      if (!h) { h = r; iSrc = h.indexOf('source_path'); continue; }
+      if (iSrc < 0 || !r[iSrc]) continue;
+      roots.push(r[iSrc].split('/').filter(Boolean));
+    }
+  }
+  if (!roots.length) { log('ABORT: no source paths found in any mapping'); process.exit(1); }
+  const common = [];
+  for (let i = 0; ; i++) {
+    const seg = roots[0][i];
+    if (seg === undefined || !roots.every((p) => p[i] === seg)) break;
+    common.push(seg);
+  }
+  // Never walk a single file's full path: stop at the last shared FOLDER level.
+  DROPBOX_ROOT = '/' + common.join('/');
+  log(`dropbox root derived from ${MAPPINGS.length} sheet(s): ${DROPBOX_ROOT}`);
+}
+
 // -------------------------------------------------- Dropbox live listing
 // READ-ONLY: oauth2/token, files/list_folder, files/list_folder/continue.
 const dbxTokRes = await fetch('https://api.dropbox.com/oauth2/token', {
@@ -186,7 +228,7 @@ const dbxLive = new Map();        // path_lower -> {size, client_modified}
     const url = cursor
       ? 'https://api.dropboxapi.com/2/files/list_folder/continue'
       : 'https://api.dropboxapi.com/2/files/list_folder';
-    const body = cursor ? { cursor } : { path: GRANTS_PATH, recursive: true, limit: 2000 };
+    const body = cursor ? { cursor } : { path: DROPBOX_ROOT, recursive: true, limit: 2000 };
     const d = await withRetry(`dropbox list page ${pages}`, async () => {
       const res = await fetch(url, { method: 'POST', headers: dbxHeaders, body: JSON.stringify(body), signal: AbortSignal.timeout(T_META) });
       if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 160)}`);
@@ -198,11 +240,14 @@ const dbxLive = new Map();        // path_lower -> {size, client_modified}
     cursor = d.has_more ? d.cursor : null;
     if (++pages % 20 === 0) log(`  dropbox: page ${pages}, ${dbxLive.size} files`);
   } while (cursor);
-  log(`dropbox live: ${dbxLive.size} files under ${GRANTS_PATH}`);
+  log(`dropbox live: ${dbxLive.size} files under ${DROPBOX_ROOT || '(team folder root)'}`);
 }
 
 // ------------------------------------------------------------- the contract
 const idx = (h, name) => { const i = h.indexOf(name); if (i < 0) throw new Error(`mapping has no "${name}" column`); return i; };
+/** Optional column: first name that exists, or -1. Sheets differ — the grants
+ *  sheet groups by `program`, the departments sheet by `department`. */
+const optIdx = (h, ...names) => { for (const nm of names) { const i = h.indexOf(nm); if (i >= 0) return i; } return -1; };
 const expected = new Map();       // destination -> {src, route, program}
 const allDest = new Set();        // every copyable destination across all sheets
 for (const [n, sheet] of MAPPINGS.entries()) {
@@ -210,7 +255,7 @@ for (const [n, sheet] of MAPPINGS.entries()) {
   for (const r of parseCsv(await fsp.readFile(sheet, 'utf8'))) {
     if (!h) {
       h = r;
-      iSrc = idx(h, 'source_path'); iProg = idx(h, 'program');
+      iSrc = idx(h, 'source_path'); iProg = optIdx(h, 'program', 'department');
       iDest = idx(h, 'destination_path'); iRoute = idx(h, 'route');
       continue;
     }
@@ -218,8 +263,9 @@ for (const [n, sheet] of MAPPINGS.entries()) {
     allDest.add(r[iDest]);
     // Presence/size checks cover EVERY sheet unless --program narrows them, so
     // a whole-corpus reconciliation can be done in one pass.
-    if (!ONLY_PROGRAM || r[iProg] === ONLY_PROGRAM) {
-      expected.set(r[iDest], { src: r[iSrc], route: r[iRoute], program: r[iProg] });
+    const prog = iProg >= 0 ? (r[iProg] || '(unknown)') : '(unknown)';
+    if (!ONLY_PROGRAM || prog === ONLY_PROGRAM) {
+      expected.set(r[iDest], { src: r[iSrc], route: r[iRoute], program: prog });
     }
   }
 }

@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "04-parental-leave-eligibility",
+    "title": "Eligibility question on a less-covered case (parental leave)",
+    "watch": "Does the agent attempt source loading? Does it correctly identify \"employed\" status applies during parental leave, or fabricate a rule?",
+    "turns": [
+      "Can my employee who's currently on parental leave participate in ETG-funded training?"
+    ]
+  },
+  "run": {
+    "conversationId": "f7fb1879-8194-4ab7-8664-4c9cf397ae74",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWDzeufGNca6Wk5svPMb\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 938,
+    "capturedAt": "2026-04-28T13:10:45.413Z"
+  },
+  "conversation": {
+    "id": "f7fb1879-8194-4ab7-8664-4c9cf397ae74",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Eligibility question on a less-covered case (parental leave)",
+    "created_at": "2026-04-28T11:10:44.437Z",
+    "updated_at": "2026-04-28T11:10:44.437Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

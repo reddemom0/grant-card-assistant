@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "05-deal-create-new-trainee",
+    "title": "Deal creation from scratch (new trainee)",
+    "watch": "Pipeline/stage IDs — sourced from a tool call (list_hubspot_owners, deal stages lookup) or hallucinated? Are HubSpot writes guarded by LEAD_GEN_TEST_MODE? Does the agent ask for confirmation before create_hubspot_deal?",
+    "turns": [
+      "Create an ETG deal for Acme Widgets Ltd. The course is Dale Carnegie's Winning with Relationship Selling. Tuition is $2,516.48. Dates September 1 to October 20, 2026. Participant: Test Trainee, testtrainee-newuser@acmewidgets.com, Sales Associate."
+    ]
+  },
+  "run": {
+    "conversationId": "4f166f8a-224a-4fd6-b1e2-f56f9fce7e6e",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWDzio4zdkVbJF7Wpf79\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 549,
+    "capturedAt": "2026-04-28T13:10:46.049Z"
+  },
+  "conversation": {
+    "id": "4f166f8a-224a-4fd6-b1e2-f56f9fce7e6e",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Deal creation from scratch (new trainee)",
+    "created_at": "2026-04-28T11:10:45.463Z",
+    "updated_at": "2026-04-28T11:10:45.463Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

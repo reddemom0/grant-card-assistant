@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "08-priority-framework-applicable",
+    "title": "BC priority framework — multiple factors apply",
+    "watch": "Does the agent surface multiple priority factors (first-time applicant, small business, healthcare = Look West, BC public post-secondary trainer)?",
+    "turns": [
+      "I need to write an ETG business case. Company is HealthFirst Clinic, a small healthcare provider in Prince George BC with 12 employees. They've never applied for ETG before. Trainee is Maria Lopez, maria@healthfirst.ca, Registered Nurse. Course is a clinical leadership program at the BC Institute of Technology (BCIT). Tuition $3,400. Training March 1 to May 30, 2026."
+    ]
+  },
+  "run": {
+    "conversationId": "b7d5ef9b-56d8-45fa-b024-c752a3b9cfaf",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWDzw2HCDFPNGVTzgtn8\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 557,
+    "capturedAt": "2026-04-28T13:10:48.918Z"
+  },
+  "conversation": {
+    "id": "b7d5ef9b-56d8-45fa-b024-c752a3b9cfaf",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] BC priority framework — multiple factors apply",
+    "created_at": "2026-04-28T11:10:48.313Z",
+    "updated_at": "2026-04-28T11:10:48.313Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "03-cost-with-url",
+    "title": "Cost question with provider URL provided by user",
+    "watch": "Does the agent web_fetch the URL and cite the source? Does it pick up the actual tuition from the page?",
+    "turns": [
+      "I'm looking at this Sandler training course: https://www.sandler.com/training/sales-mastery-program/  What's the cost?"
+    ]
+  },
+  "run": {
+    "conversationId": "c71071e4-65ae-4cf6-a970-ba6d5abe9df9",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWDzbgCAYMsohaQSNGBm\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 598,
+    "capturedAt": "2026-04-28T13:10:44.392Z"
+  },
+  "conversation": {
+    "id": "c71071e4-65ae-4cf6-a970-ba6d5abe9df9",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Cost question with provider URL provided by user",
+    "created_at": "2026-04-28T11:10:43.756Z",
+    "updated_at": "2026-04-28T11:10:43.756Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}

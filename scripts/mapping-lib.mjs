@@ -48,6 +48,18 @@ export const ARCHIVE_ROOT = 'Old Files';
 export const PROGRAMS_ROOT = 'Programs';
 
 /**
+ * Departments/ — the non-Grants Dropbox tree, mirrored verbatim.
+ *
+ * Distinct from the four roots above: those are the OUTPUT of routing decisions
+ * (which client, which program, which year). Departments/ applies no routing at
+ * all. Each top-level Dropbox department folder becomes
+ * `Departments/<Folder>/<exact Dropbox substructure>/filename`, preserving odd
+ * casing and prefixes as they are. Reorganizing is a later phase; mirroring
+ * first means nothing has to be re-decided if the structure changes.
+ */
+export const DEPARTMENTS_ROOT = 'Departments';
+
+/**
  * Never use server_modified: 40,390 files share a single bulk-event date of
  * 2024-07-23, which would date most of the corpus to the same wrong day.
  */

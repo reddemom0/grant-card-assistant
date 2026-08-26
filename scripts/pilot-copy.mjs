@@ -60,7 +60,14 @@ const DEST_ROOT = process.env.PILOT_DEST_ROOT || '0AKxoOSs3WbQ0Uk9PVA';
 const ALL_DRIVES = 'supportsAllDrives=true';
 const ALL_DRIVES_LIST = 'supportsAllDrives=true&includeItemsFromAllDrives=true';
 const DRIVE_ID = process.env.PILOT_DRIVE_ID || DEST_ROOT;
-const COPY_ROUTES = new Set(['sort', 'program', 'archive']);   // never 'review'
+/**
+ * Routes whose rows get copied. `review` never is — it has no destination.
+ *
+ * `mirror` is the departments sheet: a verbatim Dropbox mirror under
+ * Departments/, with none of the client/program/year routing applied. It
+ * copies exactly like the others; only the route label differs.
+ */
+const COPY_ROUTES = new Set(['sort', 'program', 'archive', 'mirror']);
 
 const args = process.argv.slice(2);
 const DRY_RUN = args.includes('--dry-run');
@@ -709,15 +716,44 @@ function ensureFolder(segments) {
 if (CLEAR_FAILED) { await clearFailed(); process.exit(0); }
 if (PERMCHECK) { await permCheck(); process.exit(0); }
 
+/**
+ * Read the mapping BY HEADER NAME, not by column position.
+ *
+ * Two sheets are executed by this script and their columns do not line up:
+ *   grants      source_path,client,program,year,year_source,destination_path,…
+ *   departments source_path,department,subpath,destination_path,filename,size,…
+ * Positional reads took `size` as the destination and `extension` as the route,
+ * which would have produced a silent zero-file run rather than an error.
+ * Required columns are asserted; the rest are optional and default to ''.
+ */
 const rowsAll = [];
 {
-  let header = null;
+  let header = null, ix = null;
+  const need = (h, name) => {
+    const i = h.indexOf(name);
+    if (i < 0) throw new Error(`mapping ${MAPPING} has no "${name}" column — found: ${h.join(', ')}`);
+    return i;
+  };
+  const opt = (h, ...names) => { for (const nm of names) { const i = h.indexOf(nm); if (i >= 0) return i; } return -1; };
+  const at = (r, i) => (i >= 0 ? (r[i] ?? '') : '');
   for (const r of parseCsv(await fsp.readFile(MAPPING, 'utf8'))) {
-    if (!header) { header = r; continue; }
-    if (!r[0]) continue;
+    if (!header) {
+      header = r;
+      ix = {
+        src: need(header, 'source_path'), dest: need(header, 'destination_path'), route: need(header, 'route'),
+        client: opt(header, 'client', 'department'), program: opt(header, 'program'),
+        year: opt(header, 'year'), yearSource: opt(header, 'year_source'),
+        proposed: opt(header, 'proposed_filename', 'filename'),
+        confidence: opt(header, 'confidence'), reason: opt(header, 'reason'),
+      };
+      continue;
+    }
+    if (!r[ix.src]) continue;
     rowsAll.push({
-      src: r[0], client: r[1], program: r[2], year: r[3], yearSource: r[4],
-      dest: r[5], proposed: r[6], route: r[7], confidence: r[8], reason: r[9],
+      src: r[ix.src], client: at(r, ix.client), program: at(r, ix.program),
+      year: at(r, ix.year), yearSource: at(r, ix.yearSource),
+      dest: r[ix.dest], proposed: at(r, ix.proposed), route: r[ix.route],
+      confidence: at(r, ix.confidence), reason: at(r, ix.reason),
     });
   }
 }

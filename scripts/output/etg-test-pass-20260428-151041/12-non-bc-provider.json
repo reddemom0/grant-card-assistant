@@ -1,0 +1,37 @@
+{
+  "scenario": {
+    "slug": "12-non-bc-provider",
+    "title": "Non-BC training provider",
+    "watch": "Does the agent flag as exceptional-circumstances case and route to etg@gov.bc.ca for confirmation?",
+    "turns": [
+      "I want to do an ETG application for training delivered by a Toronto-based provider — they offer a specialized course we can't find anywhere in BC. The course is Cybersecurity Risk Management at SecureSkills Toronto, $5,800. Trainee is Priya Patel, priya@epsilon.com, IT Security Lead at Epsilon Tech in Vancouver. Training July 1 to July 31, 2026."
+    ]
+  },
+  "run": {
+    "conversationId": "c4e7b0a3-bc30-4929-b09b-6d42d3906127",
+    "turnsCompleted": 1,
+    "turnErrors": [
+      {
+        "turn": 1,
+        "phase": "runAgent",
+        "error": "401 {\"type\":\"error\",\"error\":{\"type\":\"authentication_error\",\"message\":\"invalid x-api-key\"},\"request_id\":\"req_011CaWE18tQdq8k5fELgvteo\"}"
+      }
+    ],
+    "totalCostUSD": 0,
+    "runtimeMs": 734,
+    "capturedAt": "2026-04-28T13:10:51.761Z"
+  },
+  "conversation": {
+    "id": "c4e7b0a3-bc30-4929-b09b-6d42d3906127",
+    "user_id": null,
+    "agent_type": "etg-writer",
+    "title": "[TEST] Non-BC training provider",
+    "created_at": "2026-04-28T11:10:50.978Z",
+    "updated_at": "2026-04-28T11:10:50.978Z",
+    "workflow_state": {},
+    "workflow_violations": 0,
+    "message_count": "0",
+    "last_message_at": null
+  },
+  "trace": []
+}
