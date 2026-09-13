@@ -1,10 +1,12 @@
 # Delta Pull — Post-Freeze Results
 
 **Dropbox froze:** Fri 2026-09-11 16:00 Pacific · **Walked / copied / reconciled:** 2026-09-13
+**Dropbox cancelled:** 2026-09-15
 **Destination:** Shared Drive `0AKxoOSs3WbQ0Uk9PVA`
 
 Everything added, modified or deleted in Dropbox since the original inventories, diffed against
-the copy ledger, then **genuinely new content only** copied through the existing pipeline.
+the copy ledger, then **genuinely new content only** copied through the existing pipeline — in two
+passes: Part B (333 rows), then a follow-up for the 14 SALES triage-only files.
 
 Dropbox was read-only throughout. Nothing was deleted anywhere.
 
@@ -30,9 +32,16 @@ and Drive's `sha256Checksum` is SHA-256 of the bytes — so the hash of what Dri
 exact without a download. All 79,696 Drive copies checked that way matched. The 2,031 larger copies
 have no Dropbox revision after their copy timestamp, even with an hour's margin. No size differs.
 
-**Every DELETED file is a move.** All 746 match a NEW file — 505 by content hash, 241 by name and
-size. The team re-sorted SALES into `*Keep`, `*Obsolete : Duplicate - Delete` and `*Needs Review`
-(732 files), and reshuffled 14 files inside Grants client folders.
+**Every DELETED file is a move, proven by content.** All 746 match a NEW file. The team re-sorted
+SALES into `*Keep`, `*Obsolete : Duplicate - Delete` and `*Needs Review` (732 files), and reshuffled
+14 files inside Grants client folders.
+
+- **505 (≤ 4 MiB):** Drive's copy of the old path hashes to the new path's `content_hash`.
+- **241 (> 4 MiB, 5.51 GB):** Part A first matched these on name and size only. Because a new file
+  wrongly treated as a move would never be copied, they were then proven from Dropbox's revision
+  history: for every old path, the revision current at copy time predates the ledger's copy stamp,
+  equals the size the copier received, has no later revision, and carries the same `content_hash` as
+  the file now at the new path. **241 of 241 proven.** Drive holds the exact bytes of every move.
 
 NEW therefore splits into 748 moves, 305 files of genuinely new content, 24 inventoried files never
 copied (CanExport `review` rows) and 7 known link stubs.
@@ -53,7 +62,7 @@ copied (CanExport `review` rows) and 7 known link stubs.
 | | Files | Why |
 |---|---|---|
 | Moves | 748 | Drive already holds the content at its pre-triage path |
-| Triage-only new content | 14 | Exists only inside SALES triage folders; mirroring it would build the triage structure in Drive. **Handed to the SALES triage job — see below** |
+| Triage-only new content | 14 | Exists only inside SALES triage folders; mirroring it would build the triage structure in Drive. **Copied in the follow-up pass at each file's pre-triage path — see below** |
 | Link stubs | 10 | `.web` / `.gdoc` pointers with no retrievable content — the 7 known failures, plus the 3 SALES stubs that moved into `*Keep`. Not attempted |
 
 ### Content re-verified against all of Drive first
@@ -199,27 +208,109 @@ verified rows appended, each matching its mapping row's source and destination e
 
 ---
 
+## Follow-up — the 14 SALES triage-only files
+
+Part B held these back: they exist only inside `*Keep` and `*Obsolete : Duplicate - Delete`, and
+mirroring them at their current path would build the triage structure in Drive. With Dropbox cancelled
+on 2026-09-15, they were copied in a second pass. The 3 `.web` stubs in `*Keep` were not attempted.
+
+### Why they looked new
+
+`dropbox-inventory-non-grants.js` walked SALES child by child to skip the Grants tree. **Files sitting
+loose at the SALES root — and at the team-folder root — were collected into `looseTopFiles` and never
+written out.** The August inventory holds zero SALES-root files. All 14 were loose SALES-root files:
+never inventoried, never mapped, never copied. The 2026-08-28 triage moved them into the triage folders,
+where the delta walk found them.
+
+### Step 1 — content re-verified: 14 of 14 new
+
+Against a fresh listing of all 82,888 Drive file items: **no content-hash match for any of the 14**, and
+no name-and-size match either. All are ≤ 4 MiB, so the check is exact. Every file's `content_hash` is
+unchanged since the Part A walk. **Final count: 14. None dropped as a move.**
+
+### Step 2 — destination: the pre-triage path, proven by bytes
+
+A moved Dropbox file leaves a deleted entry at its old path. Listing the SALES root with deleted entries
+included shows all 14 names there, and `files/list_revisions` on each deleted path returns the content
+hash of what it held. **For all 14, the SALES-root entry's revision hash equals the current file's hash**
+— identity proven by bytes, not name. No file's bytes live anywhere else in Dropbox. **Zero ambiguous.**
+
+**Destination: `Departments/SALES/<filename>`** — the pre-triage equivalent, through the departments
+mirror rule unchanged. It is exactly the row that mapping would have produced had the inventory
+recorded these files, and it creates no triage folder. Mirroring at the current path was rejected: it
+would create `Departments/SALES/*Keep/` and `Departments/SALES/*Obsolete - Duplicate - Delete/`.
+
+| From (Dropbox, now) | Pre-triage path | Drive destination |
+|---|---|---|
+| `SALES/*Keep/Client Renewal Battlecards.pptx` | `SALES/Client Renewal Battlecards.pptx` | `Departments/SALES/Client Renewal Battlecards.pptx` |
+| `SALES/*Keep/PocketedVsGranted_presentation.pptx` | `SALES/PocketedVsGranted_presentation.pptx` | `Departments/SALES/PocketedVsGranted_presentation.pptx` |
+| `SALES/*Keep/Service Comparison One-pager for Consulting services (2).png` | `SALES/…(2).png` | `Departments/SALES/Service Comparison One-pager for Consulting services (2).png` |
+| `SALES/*Obsolete : Duplicate - Delete/` + the 11 below | `SALES/<same name>` | `Departments/SALES/<same name>` |
+
+The 11: `Business Case ETG - 2025 Template.docx`, `Checklist when receiving handoffs from Strategy team
+members.docx`, `CustomerTouchPoints.pdf`, `Granted Service Brochure v4-reduced.pdf`, `Jan 2021 to Mar 19
+Annual Clients - GG Status.xlsx`, `NP Expo West 2026 Booth Deta.textClipping`, `NP Expo West 2026 Booth
+Details.pdf`, `Payment Terms - ruks copy.xlsx`, `Payment Terms.xlsx`, `Scenarios on how to hit
+target.pptx`, `strategy meeting slide deck changes.docx`.
+
+### Step 3 — collisions: zero
+
+Checked against every file item in Drive and every copyable destination in all five sheets: 0 exact,
+0 case-only, 0 among the 14.
+
+### Step 4 — the copy
+
+| | |
+|---|---|
+| Attempted / **verified** / failed | 14 / **14** / 0 |
+| Transferred | 5.60 MB in 17s |
+| Retries / 410 restarts | 0 / 0 |
+| Verified-ID guard | 82,843 present, 0 gone, 0 unknown |
+| Size mismatches / Google-type conversions | 0 / 0 |
+| Shortcuts created | 0 (no client folder involved) |
+
+Ledger append-only: 83,029 pre-existing rows byte-identical, 14 appended, each matching its mapping row.
+Pre-run copy: `dist/inventory/delta/copy-ledger.pre-triage.jsonl`.
+
+### The other loose SALES-root files
+
+The SALES root's deleted entries include five more files the triage moved out. Four are safe — their
+bytes are live elsewhere in Dropbox and already in Drive:
+`Rudy-Herr-Resume-Electrical-Apprentice.docx`, `District of Port Edward Grant Consulting Proposal
+2.pdf`, `Discovery Call Deck 2025.pptx`, `Simplified Granted Contract Terms.pdf`.
+
+> ⚠️ **`SALES/Rudy Herr - Vetting File .xlsx` (33 KB, last revised 2024-06-20) exists nowhere.** It is
+> not live anywhere in the walked Dropbox tree and nothing in Drive matches it by content or by name and
+> size. It survives only in Dropbox's deleted-file history, recoverable there until cancellation. When it
+> was deleted is not recorded in the listing. Not copied — outside this brief — but it is the one file
+> found whose only surviving copy disappears with Dropbox.
+
+---
+
 ## Step 6 — reconciliation against live Dropbox, Drive listed directly
+
+Re-run after the follow-up, across all six sheets.
 
 **The ledger was not consulted.** Drive was enumerated with one flat paginated `files.list` and paths
 rebuilt from parent IDs. Dropbox was walked fresh, per in-scope folder — not from the sheets' common
 ancestor, which with the delta sheet's team-root files becomes the team folder and would have listed
 HR. Beyond size, files ≤ 4 MiB were compared by content hash.
 
-| | |
-|---|---|
-| Expected (all five sheets) | **82,818** |
-| **Present at the exact mapped path** | **82,806** |
-| Case-only variance | 0 |
-| Absent | **12** |
-| Size agrees with live Dropbox | **82,060** |
-| Content hash checked / agrees | 80,026 / **80,026** |
-| **Changed since copy** | **0** |
-| Source gone from Dropbox | 746 |
-| Google-type conversions | 0 |
-| Extra files in Drive | 78 |
+| | After Part B | **Final** |
+|---|---|---|
+| Expected (all sheets) | 82,818 | **82,832** |
+| **Present at the exact mapped path** | 82,806 | **82,820** |
+| Case-only variance | 0 | 0 |
+| Absent | 12 | **12** |
+| Size agrees with live Dropbox | 82,060 | **82,074** |
+| Content hash checked / agrees | 80,026 / 80,026 | 80,040 / **80,040** |
+| **Changed since copy** | 0 | **0** |
+| Source gone from Dropbox | 746 | 746 |
+| Google-type conversions | 0 | 0 |
+| Extra files in Drive | 78 | 78 |
 
-82,806 present − 746 source-gone = 82,060 size-agreeing. Every figure closes.
+82,820 present − 746 source-gone = 82,074 size-agreeing. Every figure closes, and every figure that
+moved moved by exactly 14.
 
 ### Per sheet
 
@@ -230,8 +321,9 @@ HR. Beyond size, files ≤ 4 MiB were compared by content hash.
 | departments-mapping | 6,235 | 6,232 | 3 | 5,500 | 4,667 | 0 | 732 |
 | **delta-grants** | **324** | **324** | **0** | **324** | **323** | **0** | **0** |
 | **delta-departments** | **9** | **9** | **0** | **9** | **7** | **0** | **0** |
+| **delta-triage** | **14** | **14** | **0** | **14** | **14** | **0** | **0** |
 
-**All 333 delta rows are present, size-identical and — where checkable — hash-identical to live Dropbox.**
+**All 347 delta rows are present, size-identical and — where checkable — hash-identical to live Dropbox.**
 
 ### The 12 absent are the same 12 as August
 
@@ -261,7 +353,8 @@ locations.
 
 | | |
 |---|---|
-| Files | **82,884** |
+| Files (distinct paths) | **82,898** |
+| File items | 82,902 — see note |
 | Folders | 29,285 |
 | Shortcuts | 43 |
 | Bytes | **88.18 GB** |
@@ -270,7 +363,7 @@ locations.
 |---|---|---|
 | Clients | 58,767 | 43.08 GB |
 | Old Files | 13,308 | 11.27 GB |
-| Departments | 6,319 | 24.20 GB |
+| Departments | 6,333 | 24.21 GB |
 | Programs | 4,490 | 9.62 GB |
 
 | Stage | Files | Bytes |
@@ -279,11 +372,23 @@ locations.
 | ETG | 29,535 | 16.38 GB |
 | Grants final stage | 45,238 | 27.11 GB |
 | Departments | 6,232 | 24.17 GB |
-| **Delta pull** | **333** | **137.35 MB** |
+| **Delta pull — Part B** | **333** | **137.35 MB** |
+| **Delta pull — triage follow-up** | **14** | **5.60 MB** |
 | Created directly in Drive (AI, HR) | 78 | 12.57 MB |
-| **Total in Drive** | **82,884** | **88.18 GB** |
+| **Total in Drive** | **82,898** | **88.18 GB** |
 
-**82,806 of 82,818 mapped files are in the Shared Drive, byte-identical to what Dropbox serves today.**
+**82,820 of 82,832 mapped files are in the Shared Drive, byte-identical to what Dropbox serves today.**
+The 12 that are not are ten link stubs with no content and two files deleted at source before the
+original copy.
+
+> **Note — four same-path duplicates.** Reconciliation keys Drive files by path, so it counts 82,898;
+> Drive holds 82,902 items. Four paths carry two files each. Two pairs are in `Departments/AI`, created
+> directly in Drive. The other two are byte-identical orphan uploads from the original migration —
+> created by the service account on 2026-08-17 (`Old Files/ETG…/PGL/…/1801162 - Receipt May 13.pdf`)
+> and 2026-08-18 (`Clients/Privilege Clothing/Mon Avenir/2023/…/Candidate Vetting_Student
+> Grant_Privilige_Noorie.docx`) — 41 minutes and 20 seconds, respectively, before the ledgered twin —
+> with no ledger row of their own in any ledger or backup. None came from this pass. Every earlier file total, including August's 82,495,
+> is likewise a distinct-path count. Nothing was deleted.
 
 ### What remains in Dropbox
 
@@ -304,40 +409,25 @@ all under `Contracts`, and all are in Drive. **2,279 is a floor, not a total**: 
 descend through OPERATIONS but cannot fully enumerate it. Granting full read access and re-walking is
 the only way to close this.
 
-**3. The SALES triage structure — in Dropbox, not in Drive.**
+**3. The SALES triage structure — in Dropbox, not in Drive.** The folders exist only in Dropbox; **their
+content is now entirely in Drive**, at pre-triage paths.
 
-| Dropbox folder | Files | In Drive? |
+| Dropbox folder | Files | Where the content is in Drive |
 |---|---|---|
-| `SALES/*Obsolete : Duplicate - Delete` | 539 | 528 as moves (at pre-triage paths); **11 exist only in Dropbox** |
-| `SALES/*Keep` | 169 | 163 as moves; **3 exist only in Dropbox**; 3 are stubs with no content |
-| `SALES/*Needs Review` | 39 | All 39 as moves |
+| `SALES/*Obsolete : Duplicate - Delete` | 539 | 528 at their pre-triage subfolders; 11 at `Departments/SALES/` root |
+| `SALES/*Keep` | 169 | 163 at their pre-triage subfolders; 3 at `Departments/SALES/` root; 3 are link stubs with no content |
+| `SALES/*Needs Review` | 39 | All 39 at their pre-triage subfolders |
 
-Drive's `Departments/SALES/` still reflects the pre-triage layout. **The SALES triage job has two parts,
-not one:** move the 730 files Drive already holds, *and copy the 14 below*, which are in Drive nowhere.
-None matches any file in Drive by content.
+Drive's `Departments/SALES/` still reflects the pre-triage layout, and every triage-folder file with
+content has a proven byte-identical counterpart there. **The SALES triage job is now metadata-only:**
+744 Drive files to move into triage folders — the 730 moves plus the 14 root files from the follow-up.
+The list of which Drive file belongs in which triage folder is in `dist/inventory/delta/delta-diff.csv`
+(moves: `probable_move_of`) and `delta-triage-mapping.csv` (the 14).
 
-| File | Size |
-|---|---|
-| `*Keep/Client Renewal Battlecards.pptx` | 371 KB |
-| `*Keep/PocketedVsGranted_presentation.pptx` | 1.50 MB |
-| `*Keep/Service Comparison One-pager for Consulting services (2).png` | 349 KB |
-| `*Obsolete : Duplicate - Delete/Business Case ETG - 2025 Template.docx` | 16 KB |
-| `*Obsolete : Duplicate - Delete/Checklist when receiving handoffs from Strategy team members.docx` | 18 KB |
-| `*Obsolete : Duplicate - Delete/CustomerTouchPoints.pdf` | 26 KB |
-| `*Obsolete : Duplicate - Delete/Granted Service Brochure v4-reduced.pdf` | 2.44 MB |
-| `*Obsolete : Duplicate - Delete/Jan 2021 to Mar 19 Annual Clients - GG Status.xlsx` | 17 KB |
-| `*Obsolete : Duplicate - Delete/NP Expo West 2026 Booth Deta.textClipping` | 291 B |
-| `*Obsolete : Duplicate - Delete/NP Expo West 2026 Booth Details.pdf` | 778 KB |
-| `*Obsolete : Duplicate - Delete/Payment Terms - ruks copy.xlsx` | 26 KB |
-| `*Obsolete : Duplicate - Delete/Payment Terms.xlsx` | 11 KB |
-| `*Obsolete : Duplicate - Delete/Scenarios on how to hit target.pptx` | 65 KB |
-| `*Obsolete : Duplicate - Delete/strategy meeting slide deck changes.docx` | 16 KB |
-
-**If Dropbox is cancelled before that job runs, these 14 files are lost.**
-
-**4. Also staying behind.** 10 link stubs with no content. Trashed files. And two namespace-root folders
-outside the Granted Team Folder — `Strategy Consultants` and `Team Paper Docs` — which no inventory,
-this one included, has ever been scoped to.
+**4. Also staying behind.** 10 link stubs with no content. Trashed files. `SALES/Rudy Herr - Vetting
+File .xlsx`, found only in Dropbox's deleted-file history (see the follow-up). And two namespace-root
+folders outside the Granted Team Folder — `Strategy Consultants` and `Team Paper Docs` — which no
+inventory, this one included, has ever been scoped to.
 
 ---
 
@@ -357,22 +447,33 @@ Recorded, not fixed.
    rewrites every archive reason string. Destinations are unaffected.
 5. **`pilot-copy.mjs --dry-run` reads byte counts from `grants-inventory.csv`**, so files absent from
    the original inventory contribute 0 bytes to the estimate.
+6. **`dropbox-inventory-non-grants.js` never wrote out loose files at the team-folder root or the SALES
+   root.** It collects them into `looseTopFiles` and drops them. That is why the three team-root PDFs
+   and the 14 SALES-root files were missed in August and surfaced only as "new" in the delta.
+7. **Drive reconciliation keys files by path**, in `reconcile-drive.mjs` and `delta-pull-reconcile.mjs`
+   alike, so two files at one path count once. It hid four same-path duplicates, two of them orphan
+   uploads from the August copy runs.
+8. **The copier can leave an orphan upload.** Two byte-identical Drive files from 2026-08-17/18 have no
+   ledger row. An upload that completes on Drive's side but whose response never reaches the copier is
+   retried and uploaded again; only the second is recorded.
 
 ---
 
 ## Verification
 
-- **a. `git status -uall`:** `dist/` absent (gitignored). New and untracked: the four `scripts/delta-pull-*.mjs`
+- **a. `git status -uall`:** `dist/` absent (gitignored). New and untracked: the five `scripts/delta-pull-*.mjs`
   and this file. The 15 pre-existing modified files are checksum-identical to before the work.
-- **b. Zero Dropbox writes, zero deletions anywhere.** Dropbox calls were `oauth2/token`,
-  `users/get_current_account`, `files/list_folder`, `files/list_folder/continue` and `files/download`
-  (`files/list_revisions` is wired in Part A but had zero suspects to resolve, so was never called).
-  Every delta script that touches Drive requests `drive.readonly`; the only Drive writes were the
-  copier's folder creates and uploads. No DELETE, trash or move was issued to either service.
+- **b. Zero Dropbox writes, zero deletions anywhere.** Dropbox calls across every pass were
+  `oauth2/token`, `users/get_current_account`, `files/get_metadata`, `files/list_folder` (including
+  `include_deleted`), `files/list_folder/continue`, `files/list_revisions` and `files/download`. Every
+  delta script that touches Drive requests `drive.readonly`; the only Drive writes were the copier's
+  folder creates and uploads. No DELETE, trash or move was issued to either service — the four
+  same-path duplicates were left in place.
 - **c. Step 6 listed Drive directly.** `delta-pull-reconcile.mjs` reads no ledger file; its report
   records `ledger_consulted: false`.
-- **d. No file from the moves list was copied.** The 333 appended ledger rows share no source with the
-  748 moves, the 14 triage-only files, the 10 stubs or the 746 deleted sources.
+- **d. No moved file was copied.** The 347 ledger rows appended across both passes share no source with
+  the 748 moves, the 10 stubs or the 746 deleted sources; none of the 14 follow-up destinations lies
+  under a triage folder.
 - **Contract files unchanged:** `full-mapping.csv`, `canexport-mapping.csv`, `departments-mapping.csv`,
   `clients-final.csv`, `client-status.csv`, `resolved-final.csv`, both inventories and
   `client-corrections.json` all verified by SHA-256 against a pre-work baseline. Only
@@ -387,10 +488,15 @@ Recorded, not fixed.
 | `delta-pull-mapping.mjs` (run twice — second after a report-only fix), incl. sandboxed `full-mapping.mjs` and `departments-mapping.mjs` | 0, 0 |
 | `pilot-copy.mjs` — grants sheet | **0** |
 | `pilot-copy.mjs` — departments sheet | **0** |
-| `delta-pull-reconcile.mjs` | **0** |
+| `delta-pull-reconcile.mjs` — after Part B | **0** |
+| `delta-pull-triage.mjs` (run twice — second after a report-field fix) | 0, 0 |
+| Large-move revision proof (read-only, scratch) | 0 |
+| `pilot-copy.mjs --dry-run` — triage sheet | 0 |
+| `pilot-copy.mjs` — triage sheet | **0** |
+| `delta-pull-reconcile.mjs` — final | **0** |
 
-The two `pilot-copy.mjs --dry-run` invocations were piped through `tail`, so their exit codes were not
-captured; both printed complete results.
+The two Part B `pilot-copy.mjs --dry-run` invocations were piped through `tail`, so their exit codes
+were not captured; both printed complete results.
 
 ## Reproducing
 
@@ -400,6 +506,8 @@ node scripts/delta-pull-verify.mjs        # content check against all of Drive (
 node scripts/delta-pull-mapping.mjs       # sandboxed pipeline run + collision check (no network)
 node scripts/pilot-copy.mjs --mapping dist/inventory/delta/delta-grants-mapping.csv
 node scripts/pilot-copy.mjs --mapping dist/inventory/delta/delta-departments-mapping.csv
+node scripts/delta-pull-triage.mjs        # the 14: verify, prove pre-triage home, map, collisions (read-only)
+node scripts/pilot-copy.mjs --mapping dist/inventory/delta/delta-triage-mapping.csv
 node scripts/delta-pull-reconcile.mjs     # read-only
 ```
 

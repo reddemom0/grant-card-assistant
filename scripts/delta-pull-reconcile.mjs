@@ -31,7 +31,7 @@ process.chdir('/Users/Chris/grant-card-assistant');
 const DIR = 'dist/inventory/delta';
 const SHEETS = [
   'dist/inventory/full-mapping.csv', 'dist/inventory/canexport-mapping.csv', 'dist/inventory/departments-mapping.csv',
-  `${DIR}/delta-grants-mapping.csv`, `${DIR}/delta-departments-mapping.csv`,
+  `${DIR}/delta-grants-mapping.csv`, `${DIR}/delta-departments-mapping.csv`, `${DIR}/delta-triage-mapping.csv`,
 ];
 const DRIVE_ID = process.env.PILOT_DEST_ROOT || '0AKxoOSs3WbQ0Uk9PVA';
 const TEAM_FOLDER = '/granted team folder';
