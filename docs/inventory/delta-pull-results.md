@@ -274,16 +274,57 @@ Pre-run copy: `dist/inventory/delta/copy-ledger.pre-triage.jsonl`.
 
 ### The other loose SALES-root files
 
-The SALES root's deleted entries include five more files the triage moved out. Four are safe — their
-bytes are live elsewhere in Dropbox and already in Drive:
-`Rudy-Herr-Resume-Electrical-Apprentice.docx`, `District of Port Edward Grant Consulting Proposal
-2.pdf`, `Discovery Call Deck 2025.pptx`, `Simplified Granted Contract Terms.pdf`.
+The SALES root's deleted entries include five more files. Four are safe — their bytes are live
+elsewhere in Dropbox and already in Drive: `Rudy-Herr-Resume-Electrical-Apprentice.docx`, `District of
+Port Edward Grant Consulting Proposal 2.pdf`, `Discovery Call Deck 2025.pptx`, `Simplified Granted
+Contract Terms.pdf`. The fifth is also safe; see below.
 
-> ⚠️ **`SALES/Rudy Herr - Vetting File .xlsx` (33 KB, last revised 2024-06-20) exists nowhere.** It is
-> not live anywhere in the walked Dropbox tree and nothing in Drive matches it by content or by name and
-> size. It survives only in Dropbox's deleted-file history, recoverable there until cancellation. When it
-> was deleted is not recorded in the listing. Not copied — outside this brief — but it is the one file
-> found whose only surviving copy disappears with Dropbox.
+### Correction — `SALES/Rudy Herr - Vetting File .xlsx` is not staying behind
+
+An earlier version of this document said this file "exists nowhere" and was "the one file found whose
+only surviving copy disappears with Dropbox". **That was wrong.** The check behind it matched the
+deleted entry against Drive by content and by name-and-size, not by Dropbox file identity. An edit made
+two minutes after the deletion changed both the size and the hash, so the match was missed.
+
+**Drive holds the document in its current version**, at
+`Clients/Nightingale Electrical/Destination Trade/2024/Electrical Apprentice - Rudy Herr/Rudy Herr - Vetting File .xlsx`
+(Drive ID `11PWyu-JpmaFK7fKXvWIBYbEed-Z8R3IR`, copied 2026-08-19, 33,299 bytes). Its Drive
+`sha256Checksum` derives to Dropbox hash `606b9c6b…d36da5`, **identical to the live Dropbox file**
+at `SALES/Grants/Destination Trade/Nightingale Electrical/Electrical Apprentice - Rudy Herr/`.
+
+The deleted SALES-root entry was not a separate document. It was one stop, ten seconds long, while the
+file was dragged into its client folder. `files/list_revisions` in `id` mode on the live file
+(Dropbox ID `id:ISzPFl-ufmAAAAAAAAKqgw`) returns its whole life, root stop included:
+
+| `server_modified` (UTC) | Path (under `/Granted Team Folder/`) | Bytes | Dropbox hash | Rev |
+|---|---|---|---|---|
+| 2024-05-03 18:50:51 | `sales/Grants/Destination Trade/Nightingale Electrical/` | 33,266 | `a92239d7…3408b7` | `6179132e1fddf3b5b480f` |
+| 2024-05-03 18:51:12 | `Sales/Grants/Destination Trade/Nightingale Electrical/Vetting Files/` | 33,266 | `a92239d7…3408b7` | `61791341f190f3b5b480f` |
+| 2024-05-29 21:46:32 | `SALES/Grants/Destination Trade/Nightingale Electrical/Vetting Files/` | 33,266 | `a92239d7…3408b7` | `016199eaf059c88000000012a69e201` |
+| **2024-06-20 17:44:35** | **`SALES/`** — the deleted root entry | 33,266 | `a92239d7…3408b7` | **`0161b55de41c276000000012a69e201`** |
+| 2024-06-20 17:44:45 | `SALES/Grants/Destination Trade/` | 33,266 | `a92239d7…3408b7` | `0161b55dee0c4b3000000012a69e201` |
+| 2024-06-20 17:44:48 | `SALES/Grants/Destination Trade/Nightingale Electrical/` | 33,266 | `a92239d7…3408b7` | `0161b55df058f33000000012a69e201` |
+| 2024-06-20 17:44:51 | `…/Nightingale Electrical/Electrical Apprentice - Rudy Herr/` | 33,266 | `a92239d7…3408b7` | `0161b55df34c801000000012a69e201` |
+| **2024-06-20 17:46:34** | `…/Electrical Apprentice - Rudy Herr/` — **edited** | **33,299** | **`606b9c6b…d36da5`** | `0161b55e5592378000000012a69e201` |
+| 2024-07-23 18:17:53 | `…/Electrical Apprentice - Rudy Herr/` — current rev, same bytes | 33,299 | `606b9c6b…d36da5` | `61dee2e1e2752c96122c3` |
+
+The root path's own history, from `files/list_revisions` in `path` mode, agrees: one revision
+(`0161b55de41c276000000012a69e201`, 33,266 bytes, `a92239d7…`), `server_deleted` 2024-06-20 17:44:45 —
+the moment the file arrived in `Destination Trade/`. The deletion predates the migration by two years.
+
+**What was actually missing from Drive:** only the bytes of the pre-edit draft (33,266 bytes, content
+last changed on the client 2024-05-02), superseded two minutes after the move. They were downloaded by
+revision ID — read-only — and verified against the revision's size and `content_hash`. **They are saved
+locally, not in Drive**, by decision:
+
+| | |
+|---|---|
+| File | `dist/inventory/delta/recovered/Rudy Herr - Vetting File .xlsx (dropbox rev 0161b55de41c276000000012a69e201)` (gitignored) |
+| Size | 33,266 bytes |
+| Dropbox content hash | `a92239d7ceff67ce5a9199316b232c5e42093866f93486dc3788e81bd33408b7` — matches the revision |
+| SHA-256 | `48c155e4e2942005c446f84909a1ce0e9e1d2145b2b594e4dbcbc07d6a267591` |
+
+No Drive write was made for it, and no ledger row was added.
 
 ---
 
@@ -424,10 +465,11 @@ content has a proven byte-identical counterpart there. **The SALES triage job is
 The list of which Drive file belongs in which triage folder is in `dist/inventory/delta/delta-diff.csv`
 (moves: `probable_move_of`) and `delta-triage-mapping.csv` (the 14).
 
-**4. Also staying behind.** 10 link stubs with no content. Trashed files. `SALES/Rudy Herr - Vetting
-File .xlsx`, found only in Dropbox's deleted-file history (see the follow-up). And two namespace-root
-folders outside the Granted Team Folder — `Strategy Consultants` and `Team Paper Docs` — which no
-inventory, this one included, has ever been scoped to.
+**4. Also staying behind.** 10 link stubs with no content. Trashed files, including deleted revision
+history such as the pre-edit Rudy Herr vetting draft — whose bytes are nonetheless saved locally, and
+whose document is in Drive in its current version (see the correction in the follow-up). And two
+namespace-root folders outside the Granted Team Folder — `Strategy Consultants` and `Team Paper Docs` —
+which no inventory, this one included, has ever been scoped to.
 
 ---
 
