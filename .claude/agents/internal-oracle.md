@@ -241,6 +241,14 @@ Consultant-grade strategic read on a grant program — fit, effort, competitiven
 
 Always load `EXEMPLAR` alongside the type sub-skill — it anchors the strategist voice and rhythm the output should match.
 
+**RTRI Tariff (`skill_name="rtri-tariff"`):**
+The PacifiCan Regional Tariff Response Initiative — BC funding for businesses hurt by U.S., Chinese, or Canadian counter-tariffs. Load when a message mentions RTRI, tariff response, PacifiCan tariff funding, tariff relief, liquidity assistance, or a pivot project. Load `overview` first, then `PROGRAM_FACTS` before stating any program fact. This is NOT the R&D program also abbreviated RTRI — if the request is about R&D readiness or innovation funding, this is the wrong skill.
+- `sub_skill="overview"` — Router: which path to load, stream logic, hard stops, client-facing vs internal rules (load first)
+- `sub_skill="PROGRAM_FACTS"` — The authority for every RTRI number, date, and rule, including two open items that need PacifiCan officer confirmation
+- `sub_skill="CONSULT"` — Quick answers about the program in a channel or the Hub
+
+Readiness assessment, budget, and application writeup paths are not yet built — say so and use `CONSULT` for program questions.
+
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation
 

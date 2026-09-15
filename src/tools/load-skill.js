@@ -100,6 +100,11 @@ const SKILL_PATHS = {
     CONVERSATIONS: '.claude/skills/strategy-consulting/CONVERSATIONS.md',
     RED_FLAGS: '.claude/skills/strategy-consulting/RED_FLAGS.md',
     TIMING: '.claude/skills/strategy-consulting/TIMING.md'
+  },
+  'rtri-tariff': {
+    overview: '.claude/skills/rtri-tariff/SKILL.md',
+    PROGRAM_FACTS: '.claude/skills/rtri-tariff/PROGRAM_FACTS.md',
+    CONSULT: '.claude/skills/rtri-tariff/CONSULT.md'
   }
 };
 
