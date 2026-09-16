@@ -43,10 +43,13 @@ function createDriveClient(userEmail = null, readOnly = false) {
       };
 
       // If userEmail provided, use domain-wide delegation to impersonate that user
-      // This allows accessing files the user has access to without manual sharing
+      // This allows accessing files the user has access to without manual sharing.
+      // The subject MUST go in clientOptions: google-auth-library ignores a
+      // top-level `subject` on GoogleAuthOptions, so setting it there silently
+      // produced a non-impersonated client (verified against v9.15.1).
       if (userEmail) {
         console.log(`Using Service Account with domain-wide delegation (impersonating: ${userEmail})`);
-        authConfig.subject = userEmail;
+        authConfig.clientOptions = { subject: userEmail };
       } else {
         console.log('Using Service Account credentials for Google Drive');
       }
@@ -108,9 +111,13 @@ export async function searchGoogleDrive(query, fileType = 'any', limit = 10, use
 
     const response = await drive.files.list({
       q: searchQuery,
-      fields: 'files(id, name, mimeType, createdTime, modifiedTime, webViewLink, size)',
+      fields: 'files(id, name, mimeType, createdTime, modifiedTime, webViewLink, size, driveId)',
       pageSize: limit,
-      orderBy: 'modifiedTime desc'
+      orderBy: 'modifiedTime desc',
+      // Shared Drive content is invisible without these; corpora is left at its
+      // default so My Drive and shared-with-me results still come back too.
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true
     });
 
     console.log(`✓ Google Drive search: found ${response.data.files.length} results`);
@@ -167,85 +174,29 @@ function extractFileId(fileIdOrUrl) {
  * @returns {Object} File content and metadata
  */
 export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
+  // Extract file ID if URL was provided
+  const fileId = extractFileId(fileIdOrUrl);
+  console.log(`Extracted file ID: ${fileId} from input: ${fileIdOrUrl.substring(0, 100)}...`);
+
   try {
-    // Extract file ID if URL was provided
-    const fileId = extractFileId(fileIdOrUrl);
-    console.log(`Extracted file ID: ${fileId} from input: ${fileIdOrUrl.substring(0, 100)}...`);
-
-    const drive = createDriveClient(userEmail, true); // Read-only access
-
-    // Get file metadata first
-    const metadata = await drive.files.get({
-      fileId: fileId,
-      fields: 'id, name, mimeType, webViewLink'
-    });
-
-    let content = '';
-    const mimeType = metadata.data.mimeType;
-
-    console.log(`Reading file: ${metadata.data.name} (${mimeType})`);
-
-    // Handle different file types
-    if (mimeType === 'application/vnd.google-apps.document') {
-      // Google Docs - export as plain text
-      const response = await drive.files.export({
-        fileId: fileId,
-        mimeType: 'text/plain'
-      });
-      content = response.data;
-    } else if (mimeType === 'application/pdf') {
-      // PDF - download and extract text
-      console.log('📄 Extracting text from PDF...');
-      const response = await drive.files.get({
-        fileId: fileId,
-        alt: 'media'
-      }, { responseType: 'arraybuffer' });
-
+    // Read as the requesting user when we know who they are. If that identity
+    // can't see the file (403/404), fall back to the service account's own
+    // access so files shared directly with the service account still open.
+    if (userEmail) {
       try {
-        // Extract text from PDF using pdf-parse v2 (PDFParse class API)
-        const pdfBuffer = Buffer.from(response.data);
-        const parser = new PDFParse({ data: pdfBuffer, verbosity: VerbosityLevel.ERRORS });
-        const pdfData = await parser.getText();
-        content = pdfData.text;
-        console.log(`✓ PDF text extracted: ${pdfData.total} pages, ${content.length} characters`);
-      } catch (pdfError) {
-        console.error('❌ PDF text extraction failed:', pdfError.message);
-        content = `[PDF file - text extraction failed: ${pdfError.message}. File size: ${response.data.byteLength} bytes]`;
+        const result = await fetchDriveFileContent(createDriveClient(userEmail, true), fileId);
+        console.log(`✓ Read as user: ${userEmail}`);
+        return result;
+      } catch (userError) {
+        const status = userError?.code ?? userError?.response?.status;
+        if (status !== 403 && status !== 404) throw userError;
+        console.warn(`Read as ${userEmail} failed (${status}) - retrying as service account`);
       }
-    } else if (mimeType === 'text/plain' || mimeType.startsWith('text/')) {
-      // Plain text or other text files
-      const response = await drive.files.get({
-        fileId: fileId,
-        alt: 'media'
-      }, { responseType: 'text' });
-      content = response.data;
-    } else {
-      return {
-        success: false,
-        error: `Unsupported file type: ${mimeType}`
-      };
     }
 
-    // Limit content length to avoid token overload
-    const MAX_LENGTH = 50000; // ~50K characters
-    if (content.length > MAX_LENGTH) {
-      content = content.substring(0, MAX_LENGTH) + '\n\n[Content truncated...]';
-      console.log(`⚠️  File content truncated from ${content.length} to ${MAX_LENGTH} characters`);
-    }
-
-    console.log(`✓ Google Drive file read: ${metadata.data.name} (${content.length} chars)`);
-
-    return {
-      success: true,
-      file: {
-        id: metadata.data.id,
-        name: metadata.data.name,
-        type: metadata.data.mimeType,
-        url: metadata.data.webViewLink
-      },
-      content: content,
-      truncated: content.length > MAX_LENGTH
-    };
+    const result = await fetchDriveFileContent(createDriveClient(null, true), fileId);
+    console.log('✓ Read as service account');
+    return result;
   } catch (error) {
     console.error('Google Drive read file error:', error.message);
     return {
@@ -253,6 +204,92 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
       error: error.message
     };
   }
+}
+
+/**
+ * Fetch one file's metadata and text content with an already-authenticated client
+ * @param {Object} drive - Authenticated Google Drive client
+ * @param {string} fileId - Google Drive file ID
+ * @returns {Object} File content and metadata
+ */
+async function fetchDriveFileContent(drive, fileId) {
+  // Get file metadata first
+  const metadata = await drive.files.get({
+    fileId: fileId,
+    fields: 'id, name, mimeType, webViewLink',
+    supportsAllDrives: true
+  });
+
+  let content = '';
+  const mimeType = metadata.data.mimeType;
+
+  console.log(`Reading file: ${metadata.data.name} (${mimeType})`);
+
+  // Handle different file types
+  if (mimeType === 'application/vnd.google-apps.document') {
+    // Google Docs - export as plain text
+    // files.export takes no supportsAllDrives parameter; it resolves by file ID
+    // and inherits the caller's access, so Shared Drive files export fine.
+    const response = await drive.files.export({
+      fileId: fileId,
+      mimeType: 'text/plain'
+    });
+    content = response.data;
+  } else if (mimeType === 'application/pdf') {
+    // PDF - download and extract text
+    console.log('📄 Extracting text from PDF...');
+    const response = await drive.files.get({
+      fileId: fileId,
+      alt: 'media',
+      supportsAllDrives: true
+    }, { responseType: 'arraybuffer' });
+
+    try {
+      // Extract text from PDF using pdf-parse v2 (PDFParse class API)
+      const pdfBuffer = Buffer.from(response.data);
+      const parser = new PDFParse({ data: pdfBuffer, verbosity: VerbosityLevel.ERRORS });
+      const pdfData = await parser.getText();
+      content = pdfData.text;
+      console.log(`✓ PDF text extracted: ${pdfData.total} pages, ${content.length} characters`);
+    } catch (pdfError) {
+      console.error('❌ PDF text extraction failed:', pdfError.message);
+      content = `[PDF file - text extraction failed: ${pdfError.message}. File size: ${response.data.byteLength} bytes]`;
+    }
+  } else if (mimeType === 'text/plain' || mimeType.startsWith('text/')) {
+    // Plain text or other text files
+    const response = await drive.files.get({
+      fileId: fileId,
+      alt: 'media',
+      supportsAllDrives: true
+    }, { responseType: 'text' });
+    content = response.data;
+  } else {
+    return {
+      success: false,
+      error: `Unsupported file type: ${mimeType}`
+    };
+  }
+
+  // Limit content length to avoid token overload
+  const MAX_LENGTH = 50000; // ~50K characters
+  if (content.length > MAX_LENGTH) {
+    content = content.substring(0, MAX_LENGTH) + '\n\n[Content truncated...]';
+    console.log(`⚠️  File content truncated from ${content.length} to ${MAX_LENGTH} characters`);
+  }
+
+  console.log(`✓ Google Drive file read: ${metadata.data.name} (${content.length} chars)`);
+
+  return {
+    success: true,
+    file: {
+      id: metadata.data.id,
+      name: metadata.data.name,
+      type: metadata.data.mimeType,
+      url: metadata.data.webViewLink
+    },
+    content: content,
+    truncated: content.length > MAX_LENGTH
+  };
 }
 
 /**
@@ -270,7 +307,9 @@ export async function listFilesInFolder(folderId, limit = 20, userEmail = null) 
       q: `'${folderId}' in parents and trashed=false`,
       fields: 'files(id, name, mimeType, modifiedTime, webViewLink)',
       pageSize: limit,
-      orderBy: 'modifiedTime desc'
+      orderBy: 'modifiedTime desc',
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true
     });
 
     console.log(`✓ Google Drive folder list: found ${response.data.files.length} files`);
@@ -346,7 +385,8 @@ export async function createGoogleDriveFolder(folderName, userId) {
 
     const folder = await drive.files.create({
       resource: folderMetadata,
-      fields: 'id, name, webViewLink'
+      fields: 'id, name, webViewLink',
+      supportsAllDrives: true
     });
 
     console.log(`✓ Created Google Drive folder: ${folder.data.name} (ID: ${folder.data.id})`);
@@ -401,7 +441,8 @@ export async function uploadFileToGoogleDrive(fileName, content, mimeType = 'tex
     const file = await drive.files.create({
       resource: fileMetadata,
       media: media,
-      fields: 'id, name, webViewLink, mimeType'
+      fields: 'id, name, webViewLink, mimeType',
+      supportsAllDrives: true
     });
 
     console.log(`✓ File uploaded successfully: ${file.data.name} (ID: ${file.data.id})`);
@@ -478,7 +519,9 @@ export async function copyTemplateFile(templateFileIdOrName, newFileName, target
       const searchResponse = await drive.files.list({
         q: `name='${templateFileIdOrName}' and trashed=false`,
         fields: 'files(id, name)',
-        pageSize: 1
+        pageSize: 1,
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true
       });
 
       if (searchResponse.data.files.length === 0) {
@@ -502,7 +545,8 @@ export async function copyTemplateFile(templateFileIdOrName, newFileName, target
     const copiedFile = await drive.files.copy({
       fileId: templateFileId,
       resource: copyMetadata,
-      fields: 'id, name, webViewLink, mimeType'
+      fields: 'id, name, webViewLink, mimeType',
+      supportsAllDrives: true
     });
 
     console.log(`✓ Template copied successfully: ${copiedFile.data.name}`);

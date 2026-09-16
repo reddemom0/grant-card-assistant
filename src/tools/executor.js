@@ -131,10 +131,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
   console.log(`🔧 Executing tool: ${toolName}`);
   console.log(`   Input:`, JSON.stringify(input, null, 2));
 
-  // Get user email for domain-wide delegation (Google Drive search tool)
+  // Get user email for domain-wide delegation (Google Drive search AND read).
+  // Both tools take a userEmail argument; resolving it only for search meant
+  // reads ran as the bare service account, so a file search could find was not
+  // always openable. Explicit allowlist: create_google_drive_folder and
+  // copy_template_file use the user's own OAuth tokens instead and are unaffected.
   // Note: Google Docs creation now uses userId directly with OAuth
+  const DELEGATED_DRIVE_TOOLS = ['search_google_drive', 'read_google_drive_file'];
   let userEmail = null;
-  if (userId && toolName.includes('search_google')) {
+  if (userId && DELEGATED_DRIVE_TOOLS.includes(toolName)) {
     try {
       const { query } = await import('../database/connection.js');
       const result = await query('SELECT email FROM users WHERE id = $1', [userId]);
