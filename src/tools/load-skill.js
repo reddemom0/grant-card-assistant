@@ -106,7 +106,9 @@ const SKILL_PATHS = {
     PROGRAM_FACTS: '.claude/skills/rtri-tariff/PROGRAM_FACTS.md',
     CONSULT: '.claude/skills/rtri-tariff/CONSULT.md',
     READINESS: '.claude/skills/rtri-tariff/READINESS.md',
-    RA_QUESTIONS: '.claude/skills/rtri-tariff/RA_QUESTIONS.md'
+    RA_QUESTIONS: '.claude/skills/rtri-tariff/RA_QUESTIONS.md',
+    WRITEUP: '.claude/skills/rtri-tariff/WRITEUP.md',
+    APPLICATION_FIELDS: '.claude/skills/rtri-tariff/APPLICATION_FIELDS.md'
   }
 };
 

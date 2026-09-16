@@ -13,14 +13,19 @@ counter-tariffs.
 
 ## Load the facts first
 
-`PROGRAM_FACTS` is the authority for every RTRI number, date, and rule.
-Load it before answering anything substantive.
+Two files are authoritative, each for its own ground:
 
-**Never state an RTRI program fact that is not in that file.** If a question
-needs a fact that isn't there, say so plainly and name what would have to be
-confirmed. Do not estimate caps, percentages, dates, or eligibility rules.
+- `PROGRAM_FACTS` — eligibility, caps, dates, and cost rules. Load it before
+  answering anything substantive.
+- `APPLICATION_FIELDS` — the form itself: field prompts, character limits,
+  indicator definitions, and form mechanics.
 
-Two items in that file are unresolved — cost-share percentages and the
+**Never state an RTRI fact that is not in the file that governs it.** If a
+question needs a fact that isn't there, say so plainly and name what would
+have to be confirmed. Do not estimate caps, percentages, dates, eligibility
+rules, or character limits.
+
+Two items in `PROGRAM_FACTS` are unresolved — cost-share percentages and the
 eligibility of training/coaching/mentoring/conference fees. Both need PacifiCan
 officer confirmation. Never answer on either as though it were settled.
 
@@ -33,10 +38,14 @@ officer confirmation. Never answer on either as though it were settled.
 | A quick answer about the program | `CONSULT` |
 | To run a readiness assessment on a client | `READINESS`. It loads `RA_QUESTIONS` itself at its Step 6 |
 | To build or review a project budget | `BUDGET` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
-| To draft application answers | `WRITEUP` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
+| To draft application answers | `WRITEUP`, with `APPLICATION_FIELDS` loaded alongside it |
 
 `RA_QUESTIONS` is not a path. It is the question bank `READINESS` loads at its
 Step 6 — never offer it as a choice or load it on its own.
+
+`APPLICATION_FIELDS` is not a path either. It is the form reference: `WRITEUP`
+drafts from it, and `CONSULT` loads it for form questions — character limits,
+field prompts, indicator definitions. Never offer it as a choice.
 
 If it's ambiguous, ask which — don't guess. Running the wrong path wastes a
 client conversation.

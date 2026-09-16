@@ -4,9 +4,11 @@
 **Funder:** Pacific Economic Development Canada (PacifiCan) — BC delivery
 **Scope of this file:** BC / PacifiCan only. Other regions (PrairiesCan etc.) are out of scope.
 
-> This file is the authority for RTRI numbers, dates, and rules. Do not state a
-> program fact that is not in this file. If a question requires a fact not here,
-> say so and name what would need confirming.
+> This file is the authority for RTRI eligibility, caps, dates, and cost rules.
+> Form details — field prompts, character limits, indicator definitions — are in
+> `APPLICATION_FIELDS`. Do not state a program fact that is not in this file. If
+> a question requires a fact not here, say so and name what would need
+> confirming.
 
 **Sources:** Granted RA (Fiscal 2025/2026); PacifiCan Applicant Guide for
 Businesses (modified 2026-09-14).
@@ -222,26 +224,30 @@ expenditures deemed ineligible or outside RTRI scope.
 
 Submission tab unlocks only when all other tabs are complete.
 
+Character limits for every field are in `APPLICATION_FIELDS`, which is the
+authority for them. They are not repeated here.
+
 | Tab | Contents |
 |---|---|
-| 1. Organization Information | Legal name, address, CRA number, incorporation, FTE count, org summary (500 char) |
-| 2. Project Information | Contacts, project title (90 char), activities (1,000 char), economic benefits (1,000 char), RDA priority, start/end dates |
-| 3. Funding | Project costs table (capital / non-capital), cash flows by fiscal year, funding partners, partnerships (1,200 char) |
-| 4. Benefits | Primary activity, indicator table, indicator detail (3,000 char), Francophone benefit (1,500 char) |
-| 5. Timelines | Full project description (3,000 char), milestone table, timeline comments |
-| 6. Market | Project rationale and RDA involvement (2,000 char) — optional; blank for liquidity-only |
-| 7. Management | Governance (2,000 char), key individuals' qualifications (2,000 char) |
-| 8. Additional Details | Fiscal year end, revenues, most significant risk (1,000 char), tariff impact selection, tariff narrative (2,000 char), support type requested, liquidity questions |
+| 1. Organization Information | Legal name, address, CRA number, incorporation, FTE count, org summary |
+| 2. Project Information | Contacts, project title, activities, economic benefits, RDA priority, start/end dates |
+| 3. Funding | Project costs table (capital / non-capital), cash flows by fiscal year, funding partners, partnerships |
+| 4. Benefits | Primary activity, indicator table, indicator detail, Francophone benefit |
+| 5. Timelines | Full project description, milestone table, timeline comments |
+| 6. Market | Project rationale and RDA involvement — optional; blank for liquidity-only |
+| 7. Management | Governance, key individuals' qualifications |
+| 8. Additional Details | Fiscal year end, revenues, most significant risk, tariff impact selection, tariff narrative, support type requested, liquidity questions |
 | 9. Documents | All uploads |
 | 10. Diversity and Inclusion | Optional; not used for eligibility |
 | 11. Signing Authority | Must have authority to enter a legal agreement |
 
 **Supplemental Form (Annex IV)** — required for businesses with commercial
-projects. Canadian technologies and products (3,000 char); for non-repayable
-requests, economic benefits and supply chain role (3,000 char).
+projects. Canadian technologies and products; for non-repayable requests,
+economic benefits and supply chain role.
 
 **Note:** the Granted RA cites a total writeup length of 24,290 characters plus
-6,000 for the supplementary form. Use the per-field limits above when drafting.
+6,000 for the supplementary form. Use the per-field limits in
+`APPLICATION_FIELDS` when drafting.
 
 ### Indicators (Tab 4)
 
@@ -256,7 +262,7 @@ completion.
 
 **Jobs maintained** excludes contractors, vacant positions, future hires,
 employees elsewhere in Canada or outside Canada, and payroll covered by another
-government program. Must not exceed total Canadian employees reported in Tab 1.
+government program. Must not exceed the FTE count reported in Tab 1.
 
 **Liquidity-only applicants:** focus on the accuracy of "jobs maintained";
 enter "not applicable" for the full project description.
