@@ -777,11 +777,11 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
 
 <p>Thanks for taking the time to share about ${companyName}. I pulled together what makes sense for where your business is right now.</p>
 
-<p>Based on what you shared, you're at an early stage where the paid grant programs we specialize in (which reward established revenue and operating history) aren't the right fit just yet. I'd rather be straight with you about that than point you at funding that isn't realistic today.</p>
+<p>Based on what you've shared, some of our larger programs may not be the best fit right now, but there may be smaller funding opportunities suited to your stage.</p>
 
-<p>That said — here's what is genuinely useful for you right now:</p>
+<p>Here's where to start:</p>
 
-<p><a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">GetGranted Database</a> is your match. It's our grant database where you can track programs as your business grows. You can start watching what's out there today, even pre-revenue — and as you incorporate, hire, and generate revenue, the grants you're eligible for grow with you.</p>
+<p>You can use <a href="https://granted.ca/getgranted/" style="color: #0066cc; font-weight: bold;">GetGranted</a>, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows. It's a good way to start watching what's out there today, even pre-revenue.</p>
 
 <p>We're also launching an upgraded platform soon (GetGranted 2.0 Lite) with smart matching and step-by-step guidance. <a href="https://getgranted.ca/waitlist/" style="color: #0066cc;">Join the waitlist</a> to be first in line.</p>
 
@@ -792,7 +792,7 @@ export function generateFallbackEmail(prospectData, estimatedFunding, firstName 
   <li><a href="https://granted.ca/blog/" style="color: #0066cc;">Granted Blog</a></li>
 </ul>
 
-<p>When your situation changes — incorporation, first revenue, first hire — come back and we'll put together a full funding picture for you. You'll be in a much stronger position then.</p>
+<p>When your situation changes — incorporation, first revenue, first hire — more programs open up, and we'll be glad to help you map out a full funding picture.</p>
 
 <p>Talk soon,<br>The Granted Team</p>
     `.trim();

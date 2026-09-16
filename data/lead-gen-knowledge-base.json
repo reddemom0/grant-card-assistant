@@ -59,8 +59,8 @@
     "question": "Am I too small or too early for grants?",
     "keywords": ["too small", "too early", "startup", "new business", "no revenue", "one person", "sole proprietor", "size", "minimum"],
     "knowledge": "There are grants for businesses of many sizes, but real minimum thresholds exist. Key requirements across most programs: you need to be incorporated (sole proprietorships generally don't qualify), you typically need at least one year of operations in Canada, and you need enough cash flow to cover costs up front since grants are reimbursement-based. Pre-revenue companies face the toughest road because the claim-back model requires spending first. 'Too small' and 'too early' are different things — a company doing $500K with 5 employees can absolutely leverage grants. Student/co-op hiring grants are the lowest barrier to entry. Training grants are next. Market expansion grants typically need higher revenue ($300K+) because projects are larger and matching requirements are higher. For businesses not quite ready, the best move is getting informed now so you're ready to move as soon as you hit those thresholds.",
-    "database_hook": "Be honest based on what the prospect has shared. If they qualify, tell them. If they're pre-revenue or under one year, say so and explain what thresholds to target.",
-    "cta_bridge": "If they qualify: 'You're in a great spot to start — want to book a call and figure out which programs to prioritize?' If not ready: 'You're not far off. A quick call could help you plan your next 6-12 months so you're set up to maximize grants once you're eligible.'"
+    "database_hook": "Base it on what the prospect has shared. If they qualify, tell them. If they're pre-revenue or under one year, lead with the smaller funding opportunities that may suit their stage (student/co-op hiring and training support are the lowest barrier), then point to GetGranted, then mention the thresholds that open up larger programs.",
+    "cta_bridge": "If they qualify: 'You're in a great spot to start — want to book a call and figure out which programs to prioritize?' If not ready: 'Some of our larger programs may not be the best fit right now, but there may be smaller funding opportunities suited to your stage. You can use GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows.'"
   },
   {
     "id": "faq_8",
@@ -191,7 +191,7 @@
     "question": "Do I need to be incorporated?",
     "keywords": ["incorporated", "incorporation", "sole proprietor", "unincorporated", "registered"],
     "knowledge": "For most grant programs, yes. Sole proprietors and unincorporated freelancers generally do not qualify for the majority of business grants. Incorporation is often the first step to grant eligibility. Some hiring and training grants may have flexibility, but market expansion and larger programs almost always require incorporation. If you're not incorporated yet, that's the first threshold to cross before pursuing grants.",
-    "cta_bridge": "Once you're incorporated and operating for about a year, come back and we'll find you some real funding opportunities."
+    "cta_bridge": "There may still be smaller funding opportunities suited to where you are now. You can use GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows — and once you're incorporated, a lot more opens up."
   },
   {
     "id": "faq_24",
@@ -272,5 +272,14 @@
     "keywords": ["getgranted 2.0", "waitlist", "new platform", "mention"],
     "knowledge": "For all prospects recommended GetGranted or Starter (below GrantedPro), always mention GetGranted 2.0 as a secondary note after the primary current-tier recommendation. Example: We're also launching GetGranted 2.0 — join the waitlist at getgranted.ca/waitlist. Always lead with the current available service first.",
     "cta_bridge": "Would you like to hear more about the current services or the upcoming platform?"
+  },
+  {
+    "id": "faq_34",
+    "topic": "tariff_affected_businesses",
+    "question": "Can grants help with tariffs?",
+    "keywords": ["tariffs", "tariff relief", "trade disruption", "us tariffs"],
+    "knowledge": "Yes — tariffs and trade disruption are a grant topic, not just a tax or legal one. Some Canadian funding programs support businesses affected by tariffs: helping them adapt operations, find new markets to reduce reliance on affected trade, or invest in equipment to stay competitive. This is one of the few areas where capital costs like equipment can be eligible. Eligibility varies by region and sector, so a consultant confirms fit before anything is promised.",
+    "database_hook": "Internal guidance only — do not name specific tariff-response programs in chat or email. Describe what the support covers (adapting operations, finding new markets, investing in equipment) and note that eligibility depends on region and sector.",
+    "cta_bridge": "Tariff support depends on your region and sector, and a consultant can confirm what fits. Want to see what else your business might qualify for?"
   }
 ]
