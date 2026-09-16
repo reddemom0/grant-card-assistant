@@ -17,6 +17,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { logAPICost } from './cost-logger.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -195,7 +196,12 @@ Generate a clear, structured summary:`;
   const summaryTokens = estimateTokens([{ content: summary }]);
 
   console.log(`✓ Summary generated: ${summaryTokens.toLocaleString()} tokens`);
-  console.log(`💰 Compaction cost: $${((summaryResponse.usage.input_tokens * 1.0 + summaryResponse.usage.output_tokens * 5.0) / 1_000_000).toFixed(4)}`);
+  logAPICost({
+    usage: summaryResponse.usage,
+    model: COMPACTION_SETTINGS.summaryModel,
+    source: 'conversation-compaction',
+    agentType
+  });
 
   // Calculate savings
   const oldTokens = estimateTokens(messagesToSummarize);

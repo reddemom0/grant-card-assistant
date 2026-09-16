@@ -13,6 +13,7 @@ import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import Anthropic from '@anthropic-ai/sdk';
+import { logAPICost } from '../utils/cost-logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -449,7 +450,11 @@ Only include filters with weight 1 or 2. Be selective - most businesses should h
     const result = JSON.parse(jsonMatch[0]);
 
     console.log('✅ Smart filter mapping:', JSON.stringify(result.smart_filters, null, 2));
-    console.log(`   Cost: ~$${((response.usage.input_tokens / 1000000) * 1.0 + (response.usage.output_tokens / 1000000) * 5.0).toFixed(4)}`);
+    logAPICost({
+      usage: response.usage,
+      model: 'claude-haiku-4-5-20251001',
+      source: 'smart-filter-mapping'
+    });
 
     return result.smart_filters;
 

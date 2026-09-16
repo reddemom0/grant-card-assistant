@@ -4,6 +4,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { logAPICost } from '../utils/cost-logger.js';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -239,6 +240,15 @@ Return ONLY the JSON object. No explanation, no markdown code blocks.`;
         },
       ],
     });
+
+    if (message.usage) {
+      logAPICost({
+        usage: message.usage,
+        model: 'claude-haiku-4-5-20251001',
+        source: 'batch-retag',
+        metadata: { grant: program.grant_name }
+      });
+    }
 
     // Extract text from response
     const responseText = message.content[0].text.trim();

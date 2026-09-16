@@ -9,7 +9,7 @@
 import { VoyageAIClient } from 'voyageai';
 import Anthropic from '@anthropic-ai/sdk';
 import Redis from 'ioredis';
-import { calculateRequestCost } from '../config/cost-settings.js';
+import { logAPICost } from './cost-logger.js';
 import { detectDepartment } from '../tools/oracle-search.js';
 
 const voyage = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
@@ -252,8 +252,12 @@ Your selection:`
 
     // Log cost
     if (response.usage) {
-      const cost = calculateRequestCost(response.usage, 'claude-haiku-4-5-20251001');
-      console.log(`💰 [Vector Search Reranking] Request cost: $${cost.toFixed(4)} (Candidates: ${candidates.length})`);
+      logAPICost({
+        usage: response.usage,
+        model: 'claude-haiku-4-5-20251001',
+        source: 'vector-search-rerank',
+        metadata: { candidates: candidates.length }
+      });
     }
 
     const text = response.content[0].text.trim();
