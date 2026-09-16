@@ -191,3 +191,15 @@ Dropbox-sourced.
 - Oracle prompt advertises 7 of 12 loadable skills
 - Three of eleven users lack a usable HubSpot owner ID
 - Confirmation gate has no meaning on headless surfaces
+- .docx and .xlsx can't be read from Drive — queued 2026-09-16, not built.
+  `fetchDriveFileContent` in `src/tools/google-drive.js` rejects them as unsupported and
+  Oracle declines cleanly. Converting via `files.copy` is ruled out: it needs full `drive`
+  scope, creates files in client folders, and can't run as the service account (no
+  storage quota). Agreed approach: download the bytes and parse in-process, as
+  `src/tools/dropbox.js`, `src/tools/hubspot.js` and `src/api/chat.js` already do.
+  - Stage 1: .docx via `mammoth` (no advisories), with a file size check before
+    download. Office files are zip archives and nothing guards size today.
+  - Stage 2: .xlsx, pending a library decision. SheetJS (`xlsx` 0.18.5) has a high
+    advisory with no npm fix and already parses user uploads in `chat.js`; `exceljs`
+    avoids it but can't read .xls.
+  - Stage 3: clearer declines for .doc, .xls, .pptx, and native Sheets and Slides.

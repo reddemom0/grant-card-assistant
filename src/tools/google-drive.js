@@ -300,7 +300,7 @@ async function fetchDriveFileContent(drive, fileId) {
  * @param {string} folderIdOrUrl - Google Drive folder ID or full folder URL
  * @param {number} limit - Maximum number of results
  * @param {string} userEmail - Optional: User email for domain-wide delegation
- * @returns {Object} List of files
+ * @returns {Object} List of files, with `truncated` true when the folder holds more
  */
 export async function listFilesInFolder(folderIdOrUrl, limit = 20, userEmail = null) {
   try {
@@ -311,18 +311,26 @@ export async function listFilesInFolder(folderIdOrUrl, limit = 20, userEmail = n
 
     const response = await drive.files.list({
       q: `'${folderId}' in parents and trashed=false`,
-      fields: 'files(id, name, mimeType, modifiedTime, webViewLink)',
+      fields: 'nextPageToken, files(id, name, mimeType, modifiedTime, webViewLink)',
       pageSize: limit,
       orderBy: 'modifiedTime desc',
       supportsAllDrives: true,
       includeItemsFromAllDrives: true
     });
 
-    console.log(`✓ Google Drive folder list: found ${response.data.files.length} files`);
+    // A next page token means Drive has more items than it returned. Drive can
+    // also return a short page with a token, so the token is the signal, not
+    // the count. The token itself is not returned: there is no paging to use it.
+    const truncated = Boolean(response.data.nextPageToken);
 
+    console.log(`✓ Google Drive folder list: found ${response.data.files.length} files${truncated ? ' (truncated)' : ''}`);
+
+    // `truncated` sits before `files` so it survives compaction, which keeps
+    // only the first 500 characters of an old tool result.
     return {
       success: true,
       count: response.data.files.length,
+      truncated,
       files: response.data.files.map(file => ({
         id: file.id,
         name: file.name,

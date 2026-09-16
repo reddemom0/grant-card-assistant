@@ -1270,7 +1270,7 @@ export const GOOGLE_DRIVE_TOOLS = [
   },
   {
     name: 'list_files_in_folder',
-    description: 'List the files and subfolders inside a specific Google Drive folder. Accepts either a folder URL (e.g., https://drive.google.com/drive/folders/FOLDER_ID) or just the folder ID. Use this when you already know which folder to look in — if you do not have the folder ID yet, use search_google_drive to find the folder or file first. Returns the most recently modified items up to the limit, with no paging: if the folder holds more items than the limit, the rest are not returned.',
+    description: 'List the files and subfolders inside a specific Google Drive folder. Accepts either a folder URL (e.g., https://drive.google.com/drive/folders/FOLDER_ID) or just the folder ID. Use this when you already know which folder to look in — if you do not have the folder ID yet, use search_google_drive to find the folder or file first. Returns the most recently modified items up to the limit, with no paging. When the result has truncated: true, the folder holds more items than were returned and the listing is partial: never present it as the whole folder. Tell the user it is partial, and offer to narrow the request (for example, search_google_drive for the specific file) or to list again with a higher limit (maximum 1000).',
     input_schema: {
       type: 'object',
       properties: {
@@ -1280,7 +1280,7 @@ export const GOOGLE_DRIVE_TOOLS = [
         },
         limit: {
           type: 'number',
-          description: 'Maximum number of items to return, most recently modified first (default: 20)',
+          description: 'Maximum number of items to return, most recently modified first (default: 20, maximum: 1000)',
           default: 20
         }
       },
