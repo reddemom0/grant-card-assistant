@@ -454,23 +454,46 @@ async function postToChat(evt, text) {
   console.log(`📤 Posting ${chunks.length} message(s) to ${evt.spaceId}`);
 
   for (const chunk of chunks) {
-    await chat.spaces.messages.create({
-      parent: evt.spaceId,
-      // Keep the reply in the originating thread; start a new one if that
-      // thread has gone away.
-      messageReplyOption: 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD',
-      requestBody: {
-        text: chunk,
-        // Parse the body as standard Markdown rather than Chat's legacy syntax
-        // (GA 2026-08-07). Without this, '**bold**' renders as literal
-        // asterisks — the failure is silent, so if formatting ever looks wrong
-        // in Chat, check this field first.
-        markupSyntax: 'MARKUP_SYNTAX_MARKDOWN',
-        // Only a real resource name is valid here; threadKey is not.
-        ...(evt.threadIsResourceName ? { thread: { name: evt.threadId } } : {})
-      }
-    });
+    await chat.spaces.messages.create(buildMessageRequest(evt, chunk));
   }
+}
+
+/**
+ * Build one spaces.messages.create request.
+ *
+ * REPLYING vs STARTING A THREAD. messageReplyOption only makes sense with a
+ * thread to reply into: sent without one, Chat rejects the whole call with
+ * "The request does not specify which message to reply to" — which is exactly
+ * what happened to the first space intro, since an addedToSpace event carries no
+ * message and therefore no thread. So both fields travel together or neither
+ * does, and a post with no thread is simply a new top-level message.
+ *
+ * Exported for tests: the failure is a server-side rejection, invisible until it
+ * happens in a real space.
+ *
+ * @param {Object} evt - a normalizeChatEvent() result
+ * @param {string} chunk - one already-split, already-converted message
+ * @returns {Object} args for chat.spaces.messages.create
+ */
+export function buildMessageRequest(evt, chunk) {
+  // Only a real resource name is valid as a thread; threadKey is not.
+  const inThread = Boolean(evt?.threadIsResourceName && evt?.threadId);
+
+  return {
+    parent: evt?.spaceId,
+    // Keep the reply in the originating thread; start a new one if that thread
+    // has gone away. Omitted entirely when there is no thread.
+    ...(inThread ? { messageReplyOption: 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD' } : {}),
+    requestBody: {
+      text: chunk,
+      // Parse the body as standard Markdown rather than Chat's legacy syntax
+      // (GA 2026-08-07). Without this, '**bold**' renders as literal
+      // asterisks — the failure is silent, so if formatting ever looks wrong
+      // in Chat, check this field first.
+      markupSyntax: 'MARKUP_SYNTAX_MARKDOWN',
+      ...(inThread ? { thread: { name: evt.threadId } } : {})
+    }
+  };
 }
 
 /**
