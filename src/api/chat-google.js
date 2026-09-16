@@ -160,6 +160,7 @@ export function normalizeChatEvent(body) {
     space: null,
     senderEmail: null,
     senderType: null,
+    senderChatId: null,
     text: '',
     hasAttachments: false,
     attachmentCount: 0,
@@ -222,6 +223,11 @@ export function normalizeChatEvent(body) {
     space,
     senderEmail: message?.sender?.email || null,
     senderType: message?.sender?.type || null,
+    // The sender's canonical Chat id (users/NNN). A Chat @mention annotation
+    // carries this and never an email, so it is the only way to recognise a
+    // mention of this person. Learned here and remembered, because the Hub has
+    // no Chat event to learn it from.
+    senderChatId: message?.sender?.name || null,
     // argumentText has the app's @mention stripped; in a space `text` still
     // contains the app name.
     text: (message?.argumentText || message?.text || '').trim(),
@@ -575,7 +581,8 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       chatContext: {
         surface: evt.isDm ? 'chat_dm' : 'chat_space',
         spaceName: evt.spaceIsResourceName ? evt.spaceId : null,
-        spaceDisplayName: evt.spaceDisplayName
+        spaceDisplayName: evt.spaceDisplayName,
+        senderChatId: evt.senderChatId
       }
     });
 

@@ -2311,6 +2311,29 @@ export const CHAT_HISTORY_TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'build_mention_digest',
+    description: 'Build a digest of Chat messages addressed to the person asking — @mentions of them in spaces and group chats, plus messages other people sent them in one-to-one DMs. Use it for "what have I been tagged in?", "what do I still owe people?", or "my action points from Chat". It finds their spaces itself: NEVER ask which spaces to look in. Available only in a direct message or the Hub; in a shared space it is refused, because the digest is personal. Returns threads grouped with who asked, what they said, when, a thread link, and whether the person replied afterwards — you judge what is still open and what the action point is.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        period: {
+          type: 'string',
+          enum: ['today', 'yesterday', 'this_week', 'last_7_days'],
+          description: 'Plain-language window, resolved to real dates in the user\'s timezone. Use this for "yesterday", "today" or "this week" rather than computing dates yourself. Defaults to the last 7 days.'
+        },
+        since: {
+          type: 'string',
+          description: 'ISO-8601 start, when the person gave an explicit date. Overrides period.'
+        },
+        until: {
+          type: 'string',
+          description: 'ISO-8601 end. Overrides period.'
+        }
+      },
+      required: []
+    }
   }
 ];
 

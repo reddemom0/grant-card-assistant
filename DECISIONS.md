@@ -12,6 +12,44 @@ Format:
 
 ---
 
+## 2026-09-16 — Personal Chat digest: on demand, DM-only, and it finds its own spaces
+
+**What:** `build_mention_digest` (`src/tools/mention-digest.js`) answers "what have
+I been tagged in?" by listing the asker's own spaces and returning only what was
+aimed at them: @mentions of them in spaces and group chats, every message from the
+other person in a one-to-one DM. It skips their own messages, @all, and their DM
+with Oracle. Results are grouped by thread with a `replied` flag. Oracle judges
+what is still open; the tool does not.
+**Why the tool discovers spaces:** the request that has to work is "my action
+points from all the mentions I got yesterday" with no follow-up. Asking which
+spaces to check would fail that immediately, so there is no `space` input at all
+and the prompt says never to ask.
+**DM and Hub only.** In a shared space it refuses: a digest of what someone owes
+people is not something to print in a room. Enforced from `chatContext`, like 2.1.
+**The Chat user id problem, and migration 028:** a mention annotation carries the
+canonical `users/NNN` and never an email, and the API returns only canonical names.
+Reading it from memberships would need `chat.memberships.readonly`, which we did
+not take. So the id is learned from `message.sender.name` on any inbound Chat event
+and stored in `users.chat_user_id`. In a DM it comes from the request itself and
+works first time; from the Hub, an unknown id produces "message me once in Google
+Chat" rather than a display-name guess that could attribute one person's mentions
+to another.
+**Timezone lives in code, not in the model:** nothing stores a per-user timezone
+and no current date is injected into the system prompt, so the model cannot resolve
+"yesterday" reliably. The tool takes `period` (today/yesterday/this_week) and
+resolves it in America/Vancouver — the timezone `src/api/lead-gen.js` already
+assumes. A whole local day, not a rolling 24 hours.
+**Caps:** 30 spaces and 500 messages per request, both flagged in the result when
+hit. `Space` carries no `lastActiveTime` in googleapis 128, so "most recently
+active first" is not available without a probe call per space; scanning in API
+order and reporting what was skipped was preferred to doubling the request count.
+**Impact:** `migrations/028_users_chat_user_id.sql`, `src/tools/mention-digest.js`,
+`src/tools/chat-history.js` (four helpers exported; no behaviour change),
+`src/tools/definitions.js`, `src/tools/executor.js`, `src/api/chat-google.js`,
+`.claude/agents/internal-oracle.md` (digest routing, Chat-vs-Granola routing, the
+shared-space offer rule, and a new output rule that ✅ means done — an open item
+gets ☐), `tests/unit/mention-digest.test.js`. Migration 028 must be run by hand.
+
 ## 2026-09-16 — Oracle reads Chat history as the asker, with the surface enforced in code
 
 **What:** New Oracle-only tool `read_chat_space_history` (`src/tools/chat-history.js`)

@@ -36,7 +36,7 @@ export const MESSAGES = {
     'I can only read Chat history for a signed-in person in Chat or the Hub.'
 };
 
-function hubSignInUrl() {
+export function hubSignInUrl() {
   const base = process.env.PUBLIC_URL || 'https://grant-card-assistant-production.up.railway.app';
   return `${base}/login`;
 }
@@ -95,7 +95,7 @@ async function lookupAndBackfillScopes(userId) {
 }
 
 /** Reuses the shape google-sheets.js and google-calendar.js already match on. */
-function isInsufficientScopeError(err) {
+export function isInsufficientScopeError(err) {
   const code = err?.code;
   const msg = String(err?.message ?? '');
   if (code === 403 || code === '403') {
@@ -104,7 +104,7 @@ function isInsufficientScopeError(err) {
   return /ACCESS_TOKEN_SCOPE_INSUFFICIENT/i.test(msg);
 }
 
-function isPermissionError(err) {
+export function isPermissionError(err) {
   const code = err?.code ?? err?.response?.status;
   return code === 403 || code === '403' || code === 404 || code === '404';
 }
@@ -338,7 +338,7 @@ export async function readChatSpaceHistory(input = {}, ctx = {}) {
  * Best-effort permalink. The Chat API exposes no permalink field, so this is
  * built from ids and may not resolve for every space type.
  */
-function threadLink(spaceName, threadName) {
+export function threadLink(spaceName, threadName) {
   const space = String(spaceName || '').split('/')[1];
   const thread = String(threadName || '').split('/')[3];
   if (!space) return null;

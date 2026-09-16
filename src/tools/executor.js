@@ -621,6 +621,19 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
       }
 
+      // Personal Chat digest. Same Oracle-only, context-from-options rule as
+      // read_chat_space_history above.
+      case 'build_mention_digest': {
+        const { buildMentionDigest } = await import('./mention-digest.js');
+        result = await buildMentionDigest(input, {
+          userId,
+          agentType,
+          conversationId,
+          chatContext: options.chatContext || { surface: 'none' }
+        });
+        break;
+      }
+
       case 'list_files_in_folder':
         result = await googleDrive.listFilesInFolder(
           input.folder_id,
