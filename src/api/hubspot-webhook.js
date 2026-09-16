@@ -10,6 +10,7 @@
 
 import { runAgent } from '../claude/client.js';
 import { createConversation } from '../database/messages.js';
+import { query } from '../database/connection.js';
 import { getCompanyById } from '../tools/hubspot.js';
 import crypto from 'crypto';
 
@@ -73,6 +74,74 @@ function verifyWorkflowToken(req) {
   return crypto.timingSafeEqual(providedDigest, expectedDigest)
     ? { ok: true, reason: null }
     : { ok: false, reason: 'invalid token' };
+}
+
+/**
+ * Resolve the account that webhook-triggered Oracle runs act as.
+ *
+ * WHY A DEDICATED ACCOUNT
+ * -----------------------
+ * This used to be a hardcoded userId = 1, a real person. runAgent and the tool
+ * executor treat that ID as the person Oracle is assisting, so every run owned
+ * its conversation as them, billed its API cost to them, told the model to
+ * default HubSpot record owners to their owner ID (which it did), and would
+ * have used their stored Google and Granola sign-ins for Sheets, Calendar,
+ * Docs and Granola tools. Drive calls impersonated them too.
+ *
+ * The account is named by HUBSPOT_WEBHOOK_USER_EMAIL, never in code. Its users
+ * row is created by that account signing in to the app once.
+ *
+ * FAILS CLOSED, like verifyWorkflowToken: an unset variable, a missing or
+ * deactivated row, or a row with a HubSpot owner ID refuses the run. There is
+ * no fallback to any other account. The owner-ID check exists because a
+ * system account must never become the default owner of records.
+ *
+ * @returns {Promise<{ok: true, user: {id: number, email: string}} | {ok: false, reason: string}>}
+ *   reason says what is wrong and what to change
+ */
+export async function resolveWebhookUser() {
+  const email = process.env.HUBSPOT_WEBHOOK_USER_EMAIL?.trim();
+  if (!email) {
+    return {
+      ok: false,
+      reason: 'HUBSPOT_WEBHOOK_USER_EMAIL is not set. Set it to the email of the dedicated Workspace system account the webhook runs as.'
+    };
+  }
+
+  let rows;
+  try {
+    ({ rows } = await query(
+      'SELECT id, email, is_active, hubspot_owner_id FROM users WHERE LOWER(email) = LOWER($1)',
+      [email]
+    ));
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `Could not look up HUBSPOT_WEBHOOK_USER_EMAIL (${email}) in users: ${error.message}`
+    };
+  }
+
+  const user = rows[0];
+  if (!user) {
+    return {
+      ok: false,
+      reason: `No users row for HUBSPOT_WEBHOOK_USER_EMAIL (${email}). Sign in to the app once as that account to create it, or correct the variable.`
+    };
+  }
+  if (user.is_active === false) {
+    return {
+      ok: false,
+      reason: `The account in HUBSPOT_WEBHOOK_USER_EMAIL (${email}) is deactivated. Reactivate it or point the variable at the active system account.`
+    };
+  }
+  if (user.hubspot_owner_id) {
+    return {
+      ok: false,
+      reason: `The account in HUBSPOT_WEBHOOK_USER_EMAIL (${email}) has a HubSpot owner ID, so Oracle would default record owners to it. Point the variable at the system account; if this is the system account, clear its users.hubspot_owner_id.`
+    };
+  }
+
+  return { ok: true, user: { id: user.id, email: user.email } };
 }
 
 /**
@@ -435,9 +504,10 @@ update_hubspot_company({
 /**
  * Trigger Internal Oracle to research and enrich a lead
  * @param {Object} companyInfo - Company information to research
+ * @param {{id: number, email: string}} webhookUser - Account from resolveWebhookUser
  * @returns {Promise<Object>} - Enrichment result
  */
-async function enrichLead(companyInfo) {
+async function enrichLead(companyInfo, webhookUser) {
   try {
     // Check deduplication cache
     const companyId = companyInfo.objectId || companyInfo.companyId;
@@ -490,7 +560,7 @@ async function enrichLead(companyInfo) {
     // Create a system conversation for the automated enrichment
     const conversationId = crypto.randomUUID();
     const agentType = 'internal-oracle';
-    const userId = 1; // System user ID for automated tasks
+    const userId = webhookUser.id; // The system account, never a person
 
     // Create conversation in database
     await createConversation(
@@ -576,6 +646,19 @@ export async function handleHubSpotWebhook(req, res) {
       });
     }
 
+    // Resolve who the runs act as BEFORE acknowledging. After the 200 a failure
+    // is only a log line; before it, HubSpot records a failed webhook call.
+    // Nothing runs as anyone else.
+    const webhookUser = await resolveWebhookUser();
+    if (!webhookUser.ok) {
+      console.error(`❌ HubSpot webhook refused: ${webhookUser.reason}`);
+      return res.status(503).json({
+        error: 'Webhook system account not configured',
+        message: webhookUser.reason
+      });
+    }
+    console.log(`👤 Webhook runs as ${webhookUser.user.email} (user ${webhookUser.user.id})`);
+
     // Respond immediately to HubSpot (don't make them wait)
     res.status(200).json({
       success: true,
@@ -613,7 +696,7 @@ export async function handleHubSpotWebhook(req, res) {
       }
 
       // Process enrichment asynchronously
-      enrichLead(companyInfo)
+      enrichLead(companyInfo, webhookUser.user)
         .then(result => {
           if (result.success) {
             console.log(`✅ Async enrichment completed for event ${index + 1}: ${companyInfo.objectId || companyInfo.companyName}`);
