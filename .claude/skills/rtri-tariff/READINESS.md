@@ -5,8 +5,16 @@ Runs a readiness assessment on a prospective RTRI client, start to finish.
 Load `PROGRAM_FACTS` before beginning. Every eligibility threshold, date, cap,
 and cost rule comes from there. Never state one that isn't in it.
 
-This path is long-form work. It belongs in the Hub, not a Chat channel. If
-someone starts it in Chat, say so and offer the consult path instead.
+---
+
+## Running it in Chat
+
+This path works in a Chat thread. Keep it conversational:
+
+- Ask a few questions per turn, not a long block of them.
+- Keep each reply well inside Chat's length limit.
+- Never put a long document in a chat message. The completed RA goes to a
+  Google Doc (Step 7).
 
 ---
 
@@ -121,12 +129,18 @@ or "a lot."
 
 ### Step 7: Output
 
-Produce the completed RA. State plainly what's still missing and what the
-client needs to supply.
+Write the completed RA to a Google Doc with `create_google_doc`, as markdown.
+That is the document tool to use here, not `create_advanced_document`. Leave
+the Doc private — whoever is running the RA decides when it reaches the
+client. Part One only; nothing from Part Two goes in it.
 
-Tell the user to save it where the next stage can read it. There's no memory
-between sessions — the budget and writeup paths read the saved RA, they don't
-remember this conversation.
+Reply with the link and a short summary of what's still missing and what the
+client needs to supply. Never post the RA itself as chat text. If the Doc
+can't be created, say so with the error rather than pasting the RA instead.
+
+Tell the user to keep the link. There's no memory between sessions — the
+budget and writeup paths read the saved RA, they don't remember this
+conversation.
 
 ---
 
@@ -145,6 +159,15 @@ viable businesses, not grant-dependent ones.
 Close with a feasibility read for the interview stage — what's strong, what's
 weak, what would have to change. The RA says the team assesses feasibility
 together, so this informs that conversation rather than replacing it.
+
+### Output
+
+Write Part Two to its own Google Doc with `create_google_doc`, separate from
+Part One's, and leave it private the same way. Title it as internal so it
+can't be mistaken for the RA. Never add Part Two to the Part One Doc.
+
+Reply with the link and say plainly that this document is internal and not for
+the client.
 
 ---
 

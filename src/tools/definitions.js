@@ -1478,7 +1478,7 @@ Use when simple information retrieval is insufficient and you need specialized e
 - \`overview\` - Router: which path to load, stream logic, hard stops, client-facing vs internal rules (load first)
 - \`PROGRAM_FACTS\` - The authority for every RTRI number, date, and rule: streams, caps, timelines, eligibility, eligible costs, application tabs, required documents, and two open items that need PacifiCan officer confirmation. Load before stating any program fact.
 - \`CONSULT\` - Quick answers about the program for a channel or the Hub
-- \`READINESS\` - Runs a readiness assessment on a client: stream, pre-assessment, eligibility, tariff impact, RA questions, then the internal RA team assessment. Long-form — run it in the Hub, not a Chat channel.
+- \`READINESS\` - Runs a readiness assessment on a client: stream, pre-assessment, eligibility, tariff impact, RA questions, then the internal RA team assessment. Works in Chat; writes the completed RA to a Google Doc.
 - \`RA_QUESTIONS\` - The RA question bank. Not a path of its own: \`READINESS\` loads it at its Step 6. Don't offer it or load it standalone.
 - Budget and application writeup paths are not yet built
 
@@ -1543,7 +1543,7 @@ Use when simple information retrieval is insufficient and you need specialized e
           'DISCOVERY', 'SIZING', 'SEQUENCING', 'CONVERSATIONS', 'RED_FLAGS', 'TIMING',
           'PROGRAM_FACTS', 'CONSULT', 'READINESS', 'RA_QUESTIONS'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), EMAILS (email drafting), LINKEDIN (LinkedIn posts), WEBINARS (webinar planning + monthly rhythm), SUCCESS_STORIES (case study drafting), PARTNERSHIPS (partner outreach), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible). For granted-insights: OVERVIEW (general strategic-insights framework + fallback output format, load first), HIRING/TRAINING/MARKET_EXPANSION/RD_CAPEX/REPAYABLE_FUNDING (type-specific consultant read — fit, effort, competitiveness, watchouts), EXEMPLAR (always load alongside the type sub-skill to anchor strategist voice). For strategy-consulting: overview (skill map + internal boundaries), DISCOVERY (call prep + client-type probes), SIZING (service-tier rightsizing), SEQUENCING (grant roadmap building), CONVERSATIONS (objection/differentiation prep), RED_FLAGS (prospect screening), TIMING (fiscal-year and apply-before-spend strategy). For rtri-tariff: overview (router, load first), PROGRAM_FACTS (authoritative program facts — load before stating any), CONSULT (quick answers), READINESS (client readiness assessment, Hub only), RA_QUESTIONS (question bank loaded by READINESS at its Step 6 — not a standalone path); budget and writeup paths are not yet built.'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), EMAILS (email drafting), LINKEDIN (LinkedIn posts), WEBINARS (webinar planning + monthly rhythm), SUCCESS_STORIES (case study drafting), PARTNERSHIPS (partner outreach), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible). For granted-insights: OVERVIEW (general strategic-insights framework + fallback output format, load first), HIRING/TRAINING/MARKET_EXPANSION/RD_CAPEX/REPAYABLE_FUNDING (type-specific consultant read — fit, effort, competitiveness, watchouts), EXEMPLAR (always load alongside the type sub-skill to anchor strategist voice). For strategy-consulting: overview (skill map + internal boundaries), DISCOVERY (call prep + client-type probes), SIZING (service-tier rightsizing), SEQUENCING (grant roadmap building), CONVERSATIONS (objection/differentiation prep), RED_FLAGS (prospect screening), TIMING (fiscal-year and apply-before-spend strategy). For rtri-tariff: overview (router, load first), PROGRAM_FACTS (authoritative program facts — load before stating any), CONSULT (quick answers), READINESS (client readiness assessment; RA written to a Google Doc), RA_QUESTIONS (question bank loaded by READINESS at its Step 6 — not a standalone path); budget and writeup paths are not yet built.'
       }
     },
     required: ['skill_name', 'sub_skill']
@@ -2181,9 +2181,9 @@ export const GOOGLE_DOCS_TOOLS = [
  * access to people's calendars. Referenced explicitly in the internal-oracle
  * case of getToolsForAgent() and nowhere else.
  *
- * create/update carry a `confirmed` property because CONFIRMATION_POLICY in
- * src/tools/executor.js refuses those calls without it when attendees are
- * involved.
+ * create/update are gated in src/tools/executor.js when other people are
+ * involved: the call is saved as a pending action and runs only after a human
+ * replies "yes". There is no input flag for the model to set.
  */
 export const GOOGLE_CALENDAR_TOOLS = [
   {
@@ -2219,7 +2219,7 @@ export const GOOGLE_CALENDAR_TOOLS = [
   },
   {
     name: 'create_calendar_event',
-    description: 'Create an event on the signed-in user\'s calendar. IF attendees are included this invites real people and sends them email — you MUST show the user exactly what you are about to create and get an explicit yes, then call again with confirmed: true. An event with no attendees affects only them and needs no confirmation.',
+    description: 'Create an event on the signed-in user\'s calendar. IF attendees are included this invites real people and sends them email, so the call is saved rather than run: the system shows the user exactly what will happen and asks them to reply "yes". Propose it once and stop — do not restate the details or call this tool again. An event with no attendees affects only them and runs immediately.',
     input_schema: {
       type: 'object',
       properties: {
@@ -2234,15 +2234,14 @@ export const GOOGLE_CALENDAR_TOOLS = [
         description: { type: 'string', description: 'Optional event description.' },
         location: { type: 'string', description: 'Optional location.' },
         add_meet_link: { type: 'boolean', description: 'Attach a Google Meet link. Default false.' },
-        send_updates: { type: 'string', enum: ['all', 'externalOnly', 'none'], description: 'Who gets an email notification. Default "all" when there are attendees.' },
-        confirmed: { type: 'boolean', description: 'Set true ONLY after the user has explicitly approved the exact event. Required when attendees are present.' }
+        send_updates: { type: 'string', enum: ['all', 'externalOnly', 'none'], description: 'Who gets an email notification. Default "all" when there are attendees.' }
       },
       required: ['title', 'start', 'end']
     }
   },
   {
     name: 'update_calendar_event',
-    description: 'Modify an existing event on the signed-in user\'s calendar — change the time, title, location, attendees, or set status to "cancelled". If the event involves other people (either already, or because you are adding them) you MUST show the user the change and get an explicit yes, then call again with confirmed: true. Use event_id from list_calendar_events.',
+    description: 'Modify an existing event on the signed-in user\'s calendar — change the time, title, location, attendees, or set status to "cancelled". If the event involves other people (either already, or because you are adding them) the call is saved rather than run: the system shows the user the change and asks them to reply "yes". Propose it once and stop. Use event_id from list_calendar_events.',
     input_schema: {
       type: 'object',
       properties: {
@@ -2254,8 +2253,7 @@ export const GOOGLE_CALENDAR_TOOLS = [
         description: { type: 'string', description: 'New description.' },
         location: { type: 'string', description: 'New location.' },
         status: { type: 'string', enum: ['confirmed', 'tentative', 'cancelled'], description: 'Set "cancelled" to cancel the event — this notifies attendees.' },
-        send_updates: { type: 'string', enum: ['all', 'externalOnly', 'none'], description: 'Who gets an email notification. Default "all" when attendees exist.' },
-        confirmed: { type: 'boolean', description: 'Set true ONLY after the user has explicitly approved the change. Required when the event has attendees.' }
+        send_updates: { type: 'string', enum: ['all', 'externalOnly', 'none'], description: 'Who gets an email notification. Default "all" when attendees exist.' }
       },
       required: ['event_id']
     }
@@ -2270,8 +2268,8 @@ export const GOOGLE_CALENDAR_TOOLS = [
  * GOOGLE_DOCS_TOOLS, which is spread into ALL_TOOLS and would hand document
  * mutation to the orchestrator.
  *
- * replace_google_doc_section carries a `confirmed` property because
- * CONFIRMATION_POLICY in src/tools/executor.js refuses it without one.
+ * replace_google_doc_section is gated in src/tools/executor.js: the call is
+ * saved as a pending action and runs only after a human replies "yes".
  */
 export const GOOGLE_DOCS_EDIT_TOOLS = [
   {
@@ -2334,10 +2332,6 @@ export const GOOGLE_DOCS_EDIT_TOOLS = [
         revision_id: {
           type: 'string',
           description: 'revision_id from read_google_doc_outline.'
-        },
-        confirmed: {
-          type: 'boolean',
-          description: 'Set true only after telling the user what will be removed (use section_length from the outline) and getting their agreement. The call is refused without it.'
         }
       },
       required: ['document_id', 'heading_text', 'content', 'revision_id']

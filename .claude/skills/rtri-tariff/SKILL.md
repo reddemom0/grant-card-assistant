@@ -31,7 +31,7 @@ officer confirmation. Never answer on either as though it were settled.
 | The user wants | Load |
 |---|---|
 | A quick answer about the program | `CONSULT` |
-| To run a readiness assessment on a client | `READINESS` — long-form, so run it in the Hub, not a Chat channel. It loads `RA_QUESTIONS` itself at its Step 6 |
+| To run a readiness assessment on a client | `READINESS`. It loads `RA_QUESTIONS` itself at its Step 6 |
 | To build or review a project budget | `BUDGET` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
 | To draft application answers | `WRITEUP` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
 
@@ -116,4 +116,5 @@ warning.
 
 So: do the thinking, then put the complete answer in one closing response. Keep
 channel answers short — well under 3,500 characters. If an answer genuinely
-needs more room, say it belongs in the Hub rather than letting it truncate.
+needs more room, put it in a Google Doc and reply with the link rather than
+letting it truncate.
