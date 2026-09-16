@@ -324,7 +324,9 @@ diversification).
 **Pivot — additional:** project and business plan quality · articulation of
 growth opportunity, not just survival · market demand evidence · clear economic
 benefits for BC and Canada (productivity, market diversification, supply chain,
-value for money) · technology readiness where applicable · incrementality.
+value for money) · technology readiness where applicable · incrementality ·
+inclusive growth, prioritized — opportunities for Indigenous communities, youth,
+newcomers, or rural residents, and Francophone benefit (form; Applicant Guide).
 
 **Liquidity — additional:** demonstrated shortfall caused by tariffs, evidenced
 against a pre-tariff baseline · employment commitment attested · use of funds

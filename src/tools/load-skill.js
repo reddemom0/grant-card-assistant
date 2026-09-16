@@ -104,7 +104,9 @@ const SKILL_PATHS = {
   'rtri-tariff': {
     overview: '.claude/skills/rtri-tariff/SKILL.md',
     PROGRAM_FACTS: '.claude/skills/rtri-tariff/PROGRAM_FACTS.md',
-    CONSULT: '.claude/skills/rtri-tariff/CONSULT.md'
+    CONSULT: '.claude/skills/rtri-tariff/CONSULT.md',
+    READINESS: '.claude/skills/rtri-tariff/READINESS.md',
+    RA_QUESTIONS: '.claude/skills/rtri-tariff/RA_QUESTIONS.md'
   }
 };
 

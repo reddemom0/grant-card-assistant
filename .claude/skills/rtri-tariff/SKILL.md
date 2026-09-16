@@ -31,9 +31,12 @@ officer confirmation. Never answer on either as though it were settled.
 | The user wants | Load |
 |---|---|
 | A quick answer about the program | `CONSULT` |
-| To run a readiness assessment on a client | `READINESS` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
+| To run a readiness assessment on a client | `READINESS` — long-form, so run it in the Hub, not a Chat channel. It loads `RA_QUESTIONS` itself at its Step 6 |
 | To build or review a project budget | `BUDGET` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
 | To draft application answers | `WRITEUP` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
+
+`RA_QUESTIONS` is not a path. It is the question bank `READINESS` loads at its
+Step 6 — never offer it as a choice or load it on its own.
 
 If it's ambiguous, ask which — don't guess. Running the wrong path wastes a
 client conversation.

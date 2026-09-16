@@ -247,7 +247,7 @@ The PacifiCan Regional Tariff Response Initiative — BC funding for businesses 
 - `sub_skill="PROGRAM_FACTS"` — The authority for every RTRI number, date, and rule, including two open items that need PacifiCan officer confirmation
 - `sub_skill="CONSULT"` — Quick answers about the program in a channel or the Hub
 
-Readiness assessment, budget, and application writeup paths are not yet built — say so and use `CONSULT` for program questions.
+The readiness assessment is available as `sub_skill="READINESS"`; it loads `RA_QUESTIONS` itself at its Step 6, so never offer that one on its own. Budget and application writeup paths are not yet built — say so and use `CONSULT` for program questions.
 
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation
