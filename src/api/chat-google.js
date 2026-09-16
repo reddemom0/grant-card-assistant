@@ -160,6 +160,8 @@ export function normalizeChatEvent(body) {
     senderEmail: null,
     senderType: null,
     text: '',
+    hasAttachments: false,
+    attachmentCount: 0,
     threadId: null,
     threadIsResourceName: false,
     spaceId: null,
@@ -197,6 +199,14 @@ export function normalizeChatEvent(body) {
   const message = payload.message || null;
   const space = payload.space || null;
 
+  // PRESENCE ONLY — nothing here reads, downloads or inspects a file. It exists
+  // so the reply can admit the file was ignored instead of answering as if it
+  // had been read. Both wire shapes carry the same `message` object, so one
+  // check covers the add-on and classic forms. Tolerates a single object as
+  // well as a list, since the shape is not verified against a live payload here.
+  const attachments = [message?.attachment, message?.attachedGifs]
+    .flatMap(a => (Array.isArray(a) ? a : a ? [a] : []));
+
   // Prefer resource names; fall back to the add-on's weaker identifiers.
   const threadId = message?.thread?.name || message?.thread?.threadKey || null;
   const spaceId = space?.name || space?.displayName || null;
@@ -212,6 +222,8 @@ export function normalizeChatEvent(body) {
     // argumentText has the app's @mention stripped; in a space `text` still
     // contains the app name.
     text: (message?.argumentText || message?.text || '').trim(),
+    hasAttachments: attachments.length > 0,
+    attachmentCount: attachments.length,
     threadId,
     threadIsResourceName: Boolean(message?.thread?.name),
     spaceId,
@@ -280,8 +292,47 @@ export function markdownToChat(md) {
 }
 
 /**
- * Split text into chunks Chat will display in full, preferring paragraph
- * boundaries so nothing is cut mid-sentence.
+ * Said whenever a Chat message carried a file. Chat attachments are not read at
+ * all (Stage 1), and answering as though the file had been read is the failure
+ * worth avoiding: the user assumes it was.
+ */
+export const SKIPPED_ATTACHMENT_NOTICE =
+  "I can't read files sent in Chat yet, so I answered from your message only. For file review, use the Hub.";
+
+const FENCE_LINE = /^\s*```/;
+const LIST_ITEM = /^\s*([-*+]|\d+[.)])\s+/;
+const FENCE_CLOSE = '```';
+
+/**
+ * Where to cut a chunk that has grown too long, preferring readable seams.
+ *
+ * Returns an index into `lines` to break BEFORE, or -1 to break at the current
+ * line. A blank line is the best seam (paragraph boundary); failing that, the
+ * start of a list item, so a bulleted list never splits mid-item.
+ */
+function preferredBreakIndex(lines) {
+  for (let i = lines.length - 1; i > 0; i--) {
+    if (lines[i].trim() === '') return i;
+  }
+  for (let i = lines.length - 1; i > 0; i--) {
+    if (LIST_ITEM.test(lines[i])) return i;
+  }
+  return -1;
+}
+
+/**
+ * Split text into chunks Chat will display in full.
+ *
+ * Line-based and fence-aware. The old paragraph splitter had no idea what a code
+ * fence was, so a fenced block spanning the limit posted as two messages with one
+ * ``` in each: the first rendered as an unterminated block, the second as literal
+ * backticks. Here, a chunk that has to end inside a fence closes it, and the next
+ * chunk reopens it with the SAME opening line — so ```js stays ```js — and every
+ * chunk is independently balanced.
+ *
+ * Seam preference: blank line, then between list items, then any line end. Only a
+ * single line longer than the limit is cut mid-line.
+ *
  * @param {string} text
  * @param {number} limit
  * @returns {string[]}
@@ -291,25 +342,54 @@ export function splitForChat(text, limit = MAX_CHUNK_CHARS) {
   if (text.length <= limit) return [text];
 
   const chunks = [];
-  let current = '';
+  let current = [];
+  let openFence = null;   // the exact opening line while inside a fence
 
-  for (const para of text.split('\n\n')) {
-    // A single paragraph longer than the limit has to be hard-split.
-    if (para.length > limit) {
-      if (current) { chunks.push(current); current = ''; }
-      for (let i = 0; i < para.length; i += limit) {
-        chunks.push(para.slice(i, i + limit));
+  const lengthOf = (arr) => arr.reduce((n, l) => n + l.length + 1, 0);
+
+  // Close an open fence, emit, and reopen it at the head of the next chunk.
+  const emit = (upto) => {
+    const take = upto === -1 ? current.length : upto;
+    const body = current.slice(0, take);
+    if (!body.length) return false;
+
+    const rest = current.slice(upto === -1 ? take : (current[take]?.trim() === '' ? take + 1 : take));
+    chunks.push(openFence ? [...body, FENCE_CLOSE].join('\n') : body.join('\n'));
+    current = openFence ? [openFence, ...rest] : rest;
+    return true;
+  };
+
+  for (const rawLine of text.split('\n')) {
+    // Reserve room for the fence we may have to close at the end of this chunk.
+    const reserve = openFence ? FENCE_CLOSE.length + 1 : 0;
+    const room = Math.max(1, limit - reserve);
+
+    // A single line longer than a whole chunk is the one case we cut mid-line.
+    const pieces = rawLine.length > room
+      ? rawLine.match(new RegExp(`.{1,${room}}`, 'g')) || [rawLine]
+      : [rawLine];
+
+    for (const piece of pieces) {
+      const cost = piece.length + (current.length ? 1 : 0);
+      if (current.length && lengthOf(current) + cost + reserve > limit) {
+        // Prefer a readable seam, but never hunt for one inside a code block —
+        // there the fence close/reopen is the seam.
+        if (!emit(openFence ? -1 : preferredBreakIndex(current))) emit(-1);
       }
-      continue;
+      current.push(piece);
     }
-    if ((current ? current.length + 2 : 0) + para.length > limit) {
-      chunks.push(current);
-      current = para;
-    } else {
-      current = current ? `${current}\n\n${para}` : para;
+
+    if (FENCE_LINE.test(rawLine)) {
+      openFence = openFence ? null : rawLine;
     }
   }
-  if (current) chunks.push(current);
+
+  if (current.length) {
+    // Never emit a trailing chunk that is only a reopened fence.
+    const tail = current.join('\n');
+    if (tail.trim() !== (openFence || '').trim()) chunks.push(tail);
+  }
+
   return chunks;
 }
 
@@ -369,6 +449,22 @@ async function postToChat(evt, text) {
 }
 
 /**
+ * Prepend the skipped-file notice when the incoming message carried one.
+ *
+ * Prepended, not appended, and added before splitting — so it lands at the top
+ * of the first chunk, where someone who sent a file will actually see it, rather
+ * than at the end of a reply that may be several messages long.
+ *
+ * @param {Object} evt - a normalizeChatEvent() result
+ * @param {string} reply
+ * @returns {string}
+ */
+export function withAttachmentNotice(evt, reply) {
+  if (!evt?.hasAttachments) return reply;
+  return `${SKIPPED_ATTACHMENT_NOTICE}\n\n${reply}`.trim();
+}
+
+/**
  * Post a reply, swallowing errors so a post-back failure cannot crash the
  * background task. This is the ONE place where the user may get silence, so it
  * logs loudly.
@@ -411,7 +507,7 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
     if (confirmation) {
       await saveMessage(conversationId, 'user', messageText);
       await saveMessage(conversationId, 'assistant', confirmation.replyText);
-      await safePost(evt, markdownToChat(confirmation.replyText));
+      await safePost(evt, markdownToChat(withAttachmentNotice(evt, confirmation.replyText)));
       return;
     }
 
@@ -452,7 +548,7 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       return;
     }
 
-    await safePost(evt, markdownToChat(`${text}${notice || ''}`.trim()));
+    await safePost(evt, markdownToChat(withAttachmentNotice(evt, `${text}${notice || ''}`.trim())));
   } catch (err) {
     console.error('❌ Oracle run failed for Chat event:', err);
     await safePost(evt, `Something went wrong while I was working on that: ${err.message}`);
@@ -502,8 +598,16 @@ export async function handleGoogleChatEvent(req, res) {
   const messageText = evt.text;
 
   if (!messageText) {
-    console.log('↩️  Ignoring: message carried no text');
-    return res.status(200).json({ text: 'Send me a question and I\'ll take a look.' });
+    // Log the message's top-level KEYS ONLY — never values, which carry content.
+    // The Chat attachment field name is taken from the API spec and has not been
+    // confirmed against a live payload here; the first real file-only message
+    // settles it, and until then hasAttachments simply stays false.
+    console.log(`↩️  No text. Message keys: [${Object.keys(evt.message || {}).join(', ')}], attachments seen: ${evt.attachmentCount}`);
+    return res.status(200).json({
+      text: evt.hasAttachments
+        ? SKIPPED_ATTACHMENT_NOTICE
+        : 'Send me a question and I\'ll take a look.'
+    });
   }
 
   let user;
