@@ -219,6 +219,7 @@ function buildNoteBody(sessionData, trigger) {
   if (pd.province) lines.push(`Province: ${pd.province}`);
   if (pd.revenue) lines.push(`Revenue: ${pd.revenue}`);
   if (pd.employee_count) lines.push(`Employees: ${pd.employee_count}`);
+  if (pd.employee_count_stated) lines.push(`Employees (stated in conversation): ${pd.employee_count_stated}`);
   if (pd.company_description) lines.push(`About: ${pd.company_description}`);
   if (pd.prior_grant_experience) lines.push(`Prior grant experience: ${pd.prior_grant_experience}`);
 
@@ -406,6 +407,11 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
   }
   if (pd.employee_count) {
     lines.push(`Employees: ${pd.employee_count}`);
+  }
+  // The agent's conversational figure is often more precise than the form bucket
+  // ("8 full-time, 2 part-time" vs "5 – 19"). Shown alongside, never instead of.
+  if (pd.employee_count_stated) {
+    lines.push(`Employees (stated in conversation): ${pd.employee_count_stated}`);
   }
 
   // Company description (Haiku extraction preferred, agent fallback)
@@ -1536,6 +1542,7 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
   enrichedSession.best_fit_product = bestFitProduct;
   enrichedSession.prospect_data = enrichedSession.prospect_data || {};
   enrichedSession.prospect_data.best_fit_product = bestFitProduct;
+
   try {
     await query(
       `UPDATE lead_gen_conversations

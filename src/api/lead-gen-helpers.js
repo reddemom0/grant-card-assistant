@@ -5,6 +5,7 @@
  */
 
 import { query } from '../database/connection.js';
+import { lookupRangeMap } from './hubspot-form-mappings.js';
 
 /**
  * Determine service tier from funding estimate
@@ -113,10 +114,143 @@ export function parseFundingEstimate(fundingStr) {
   return parseInt(match[1].replace(/,/g, ''), 10);
 }
 
-// Form revenue buckets that fall below the $2.5M Pro floor.
-// Prospects in these buckets cap at Granted Starter regardless of estimate.
-// Source of truth: REVENUE_RANGES in widget/getgranted-widget.js:179-185
-const SUB_2_5M_REVENUE_BUCKETS = ['Pre-revenue', 'Under $500K', '$500K – $2.5M'];
+// ============================================================================
+// GRANTEDPRO FIT
+//
+// The firmographic test that defines the Pro category. computeBestFitProduct
+// calls this first: clearing it IS being Pro, and Pro is the only product that
+// carries a booking link. One decision, not two.
+//
+// Reads revenue band, headcount and industry — never the funding estimate. A
+// $1.2M Construction firm with 8 staff is Pro-shaped; a $5M company with 3
+// staff is not, whatever its estimate says.
+// ============================================================================
+
+/**
+ * Industries that qualify for a call at a lower revenue floor.
+ *
+ * Exact-match against the widget's submitted value. Validated byte-identical
+ * against the 81-value INDUSTRIES list in widget/getgranted-widget.js:58-177 —
+ * 34 of 34 matched, no typos, no duplicates. The widget submits via a hidden
+ * input populated only by clicking a dropdown option, so free text cannot
+ * reach this comparison from the browser path.
+ *
+ * Grouped by the policy category each value serves; order is not significant.
+ */
+export const PRO_EXCEPTION_INDUSTRIES = [
+  // Agri-Food / Food Processing
+  'Agriculture - Crop',
+  'Agriculture - Dairy',
+  'Agriculture - Livestock',
+  'Agriculture - Tree Fruit',
+  'Agriculture - Vineyard/Wine',
+  'Food Processing',
+  'Food/Beverage (Manufacturing)',
+  // Construction
+  'Construction',
+  'Construction Supplier',
+  // Manufacturing
+  'Manufacturing',
+  'Apparel/Textiles (Manufacturing)',
+  'Consumer Goods (Manufacturing)',
+  'Electronic (Manufacturing)',
+  'Industrial (Manufacturing)',
+  'Metal (Manufacturing)',
+  'Paper/Print (Manufacturing)',
+  'Plastics (Manufacturing)',
+  'Wood Products (Manufacturing)',
+  // Technology
+  'Technology',
+  'Tech - AI',
+  'Tech - Hardware',
+  'Tech - Software/Web Development',
+  'Computer/Network Security',
+  // Environmental / Clean Tech
+  'Environmental - Green Technologies',
+  'Environmental - Waste Management',
+  // Natural Resources
+  'Forestry',
+  'Mining/Quarrying',
+  'Oil & Gas Extraction',
+  'Fishery',
+  // Advanced manufacturing / applied science
+  'Aviation & Aerospace',
+  'Ship Building & Repair/Maritime Operations',
+  'Healthcare - Manufacturing',
+  'Healthcare - Technology',
+  'Biotechnology'
+];
+
+const PRO_EXCEPTION_INDUSTRY_SET = new Set(PRO_EXCEPTION_INDUSTRIES);
+
+// Ordinal rank for the widget's employee buckets. Comparison is by rank, not by
+// string equality, because historical rows hold dash variants the widget never
+// emitted ("5–19" unspaced, "50-99" hyphenated) — the agent used to overwrite
+// this field. lookupRangeMap normalizes dashes and whitespace on both sides.
+// Source of truth: EMPLOYEE_RANGES in widget/getgranted-widget.js:187-195
+const EMPLOYEE_BUCKET_RANK = {
+  'Just me':   1,
+  '1 – 4':     2,
+  '5 – 19':    3,
+  '20 – 49':   4,
+  '50 – 99':   5,
+  '100 – 499': 6,
+  '500+':      7
+};
+const MIN_EMPLOYEE_RANK = EMPLOYEE_BUCKET_RANK['5 – 19'];
+
+// Revenue buckets, ranked the same way and for the same reason.
+const REVENUE_BUCKET_RANK = {
+  'Pre-revenue':    1,
+  'Under $500K':    2,
+  '$500K – $2.5M':  3,
+  '$2.5M – $5M':    4,
+  '$5M+':           5
+};
+const MAIN_RULE_MIN_REVENUE_RANK      = REVENUE_BUCKET_RANK['$2.5M – $5M'];
+const EXCEPTION_RULE_MIN_REVENUE_RANK = REVENUE_BUCKET_RANK['$500K – $2.5M'];
+
+/**
+ * May this prospect be offered a discovery call?
+ *
+ * Reads ONLY the widget form's fields. Never `revenue` or
+ * `employee_count_stated` — those are agent free text and cannot be ranked.
+ *
+ * Eligible if EITHER:
+ *   (a) revenue ≥ $2.5M – $5M          AND employees ≥ 5 – 19
+ *   (b) industry ∈ PRO_EXCEPTION_INDUSTRIES
+ *       AND revenue ≥ $500K – $2.5M    AND employees ≥ 5 – 19
+ *
+ * Thresholds sit on form-bucket edges, which rounds the stated policy down
+ * (policy said $3M / $2M / 10 staff; buckets give $2.5M / $500K / 5 staff).
+ * Deliberate — a missed conversation costs more than an extra one.
+ *
+ * Returns false when inputs are missing or unrecognised: no data is not
+ * evidence of fitness.
+ *
+ * @param {Object} prospectData - prospect_data JSONB (or an equivalent shape)
+ * @returns {boolean}
+ */
+export function isProCallEligible(prospectData) {
+  const pd = prospectData || {};
+
+  const employeeRank = lookupRangeMap(EMPLOYEE_BUCKET_RANK, pd.employee_count);
+  if (employeeRank === undefined || employeeRank < MIN_EMPLOYEE_RANK) return false;
+
+  const revenueRank = lookupRangeMap(REVENUE_BUCKET_RANK, pd.revenue_range);
+  if (revenueRank === undefined) return false;
+
+  // (a) main rule — revenue alone carries it
+  if (revenueRank >= MAIN_RULE_MIN_REVENUE_RANK) return true;
+
+  // (b) exception industries qualify one bucket lower
+  if (PRO_EXCEPTION_INDUSTRY_SET.has(pd.industry) &&
+      revenueRank >= EXCEPTION_RULE_MIN_REVENUE_RANK) {
+    return true;
+  }
+
+  return false;
+}
 
 /**
  * Compute best_fit_product (the AI's product recommendation) from session +
@@ -125,16 +259,29 @@ const SUB_2_5M_REVENUE_BUCKETS = ['Pre-revenue', 'Under $500K', '$500K – $2.5M
  * Order of precedence:
  *   1. industry === "Charity/Non-Profit" → "Nonprofit" (overrides everything)
  *   2. service_tier === "not_a_fit" OR $0/null estimate → "Get Granted"
- *   3. revenue $5M+ → "Granted Pro" (regardless of estimate magnitude)
- *   4. revenue below $2.5M (Pre-revenue, Under $500K, $500K – $2.5M):
- *        estimate ≥ $15K → "Granted Starter"
- *        estimate < $15K → "Get Granted"
- *   5. revenue $2.5M – $5M (tier ladder by 12-month estimate):
- *        ≥ $30K → "Granted Pro"
- *        $15K-$29K → "Granted Starter"
+ *   3. isProCallEligible → "Granted Pro"  ("GrantedPro Fit": clearing the
+ *        revenue/headcount/industry thresholds IS the Pro category)
+ *   4. otherwise, by 12-month estimate:
+ *        ≥ $15K → "Granted Starter"
  *        < $15K → "Get Granted"
  *
- * "Waitlist" is intentionally NOT a possible output — AI never writes it.
+ * Product and call eligibility are ONE decision. They used to be two: the
+ * estimate ladder picked the product while a separate flag decided the call,
+ * which let a lead be recommended a self-serve product and offered a call at
+ * the same time. "Granted Pro" is now exactly the set of leads that may be
+ * offered a call — getBookingLink needs no other input.
+ *
+ * The old sub-$2.5M cap is gone deliberately. It existed to stop a large
+ * estimate alone from buying a Pro pitch; the firmographic gate does that job
+ * better, and the cap was what blocked a genuinely Pro-shaped smaller company
+ * (a $1.2M Construction firm with 8 staff) from ever reaching a consultant.
+ *
+ * Estimate size does NOT constrain the promotion. parseFundingEstimate reads
+ * only the first number in the string, so "$1.5M–$3M+" parses as 1 — too
+ * fragile to gate a sales conversation on. Firmographics are not.
+ *
+ * "Waitlist" is intentionally NOT a possible output — AI never writes it, and
+ * it is absent from the form-level HubSpot enum for best_fit_product.
  *
  * @param {Object} sessionData - Enriched session (from loadEnrichedSessionData)
  * @param {Object} [agentInput] - The full input object passed to save_lead_data
@@ -159,19 +306,12 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
   const fundingNum = parseFundingEstimate(estimate);
   if (fundingNum === 0) return 'Get Granted';
 
-  const revenueRange = pd.revenue_range || pd.revenue || input.revenue || null;
+  // 3. GrantedPro Fit — firmographics decide, and they outrank the estimate.
+  // Reads the form's own revenue/headcount/industry, not the agent's free text.
+  if (isProCallEligible(pd)) return 'Granted Pro';
 
-  // 3. $5M+ → Pro (regardless of estimate magnitude, as long as not_a_fit gates passed)
-  if (revenueRange === '$5M+') return 'Granted Pro';
-
-  // 4. Sub-$2.5M revenue cap — never routes to Pro on estimate alone
-  if (SUB_2_5M_REVENUE_BUCKETS.includes(revenueRange)) {
-    if (fundingNum !== null && fundingNum >= 15) return 'Granted Starter';
-    return 'Get Granted';
-  }
-
-  // 5. $2.5M – $5M (or unknown revenue): standard estimate ladder
-  if (fundingNum !== null && fundingNum >= 30) return 'Granted Pro';
+  // 4. Below the gate, the estimate decides paid vs free. Pro is unreachable
+  // here by design — a lead that should be Pro cleared the gate above.
   if (fundingNum !== null && fundingNum >= 15) return 'Granted Starter';
   return 'Get Granted';
 }
