@@ -168,6 +168,7 @@ export async function handleListLeadGenConversations(req, res) {
         WHEN '20-49'                    THEN 5
         WHEN '50-99'                    THEN 6
         WHEN '100-499'                  THEN 7
+        WHEN '500+'                     THEN 8
         ELSE 99
       END`,
       best_fit_product: `CASE prospect_data->>'best_fit_product'

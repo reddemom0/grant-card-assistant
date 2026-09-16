@@ -25,6 +25,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { query } from '../database/connection.js';
 import { createConversation } from '../database/messages.js';
 import Anthropic from '@anthropic-ai/sdk';
+import { logAPICost } from '../utils/cost-logger.js';
 import { categorizeProspect } from '../services/grant-categorization.js';
 import { buildProspectDataFromForm } from '../services/build-prospect-data.js';
 import { computeBestFitProduct } from './lead-gen-helpers.js';
@@ -356,6 +357,15 @@ Return ONLY the JSON object, no additional text.`;
         content: extractionPrompt
       }]
     });
+
+    if (extractionResponse.usage) {
+      logAPICost({
+        usage: extractionResponse.usage,
+        model: 'claude-haiku-4-5-20251001',
+        source: 'lead-gen-extraction',
+        metadata: { session: sessionId }
+      });
+    }
 
     const extractedText = extractionResponse.content[0].text.trim();
     console.log(`✓ Haiku extraction complete for session ${sessionId}:`, extractedText);
