@@ -14,6 +14,7 @@ import * as googleSheets from './google-sheets.js';
 import { createAdvancedDocumentTool } from './google-docs-advanced.js';
 import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 import { isServerTool } from './definitions.js';
+import { wrapToolOutput } from '../claude/tool-output.js';
 import {
   GATED_TOOLS,
   requiresConfirmation,
@@ -1178,7 +1179,10 @@ export async function executeToolCalls(toolCalls, conversationId) {
       return {
         type: 'tool_result',
         tool_use_id: toolUseId,
-        content: JSON.stringify(result)
+        // Same untrusted-data envelope as the live path in src/claude/client.js.
+        // This variant currently has no importers; wrapped anyway so it cannot
+        // become an unlabelled hole if something starts using it.
+        content: wrapToolOutput(toolName, result)
       };
     })
   );

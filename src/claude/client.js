@@ -16,6 +16,7 @@ import { getLeadGenFormContext } from '../utils/lead-gen-context.js';
 import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE, applyChatBookingSubstitution } from './streaming.js';
+import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from './tool-output.js';
 import { BookingLinkRoutingError } from '../api/booking-link-routing.js';
 import { getQueryConfig, getQueryConfigForModel, logConfigDecision } from './query-classifier.js';
 import {
@@ -562,6 +563,13 @@ export async function runAgent({
         }
       ];
 
+      // Every agent gets the untrusted-data rule. Appended AFTER block 0 so the
+      // cached prefix stays byte-identical and prompt caching is unaffected.
+      systemBlocks.push({
+        type: 'text',
+        text: UNTRUSTED_DATA_INSTRUCTION
+      });
+
       // Add conversation summary (if present) - NOT CACHED
       // Summary contains condensed history of old messages
       if (summaryForSystem) {
@@ -946,11 +954,13 @@ export async function runAgent({
               });
             }
 
-            // Standard tool result
+            // Standard tool result, wrapped in an untrusted-data envelope so the
+            // model can tell retrieved content from what the team actually said.
+            // Labelling only — nothing is stripped (src/claude/tool-output.js).
             toolResults.push({
               type: 'tool_result',
               tool_use_id: block.id,
-              content: JSON.stringify(result)
+              content: wrapToolOutput(block.name, result)
             });
           }
         }

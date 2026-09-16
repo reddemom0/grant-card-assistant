@@ -14,6 +14,7 @@
 import 'dotenv/config';
 import { query, getPool } from '../src/database/connection.js';
 import { getConversation, getConversationToolTrace } from '../src/database/messages.js';
+import { stripToolOutputWrapper } from '../src/claude/tool-output.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VALID_FORMATS = new Set(['summary', 'trace', 'json']);
@@ -203,8 +204,10 @@ function renderSummary(meta, trace, user, sidecar) {
         if (entry.is_error) errorCount++;
         const idShort = (entry.tool_use_id || '').slice(0, 8);
         const status = entry.is_error ? 'error' : 'ok';
+        // The untrusted-data envelope is for the model; a person reading a trace
+        // should see the content itself. Unwrapped content passes through.
         const contentStr = typeof entry.content === 'string'
-          ? entry.content
+          ? stripToolOutputWrapper(entry.content)
           : JSON.stringify(entry.content);
         const idDisplay = entry.tool_use_id ? `${idShort}..` : '—';
         line = `tool_result: ${idDisplay} [${status}] "${truncate(contentStr, 60)}"`;
