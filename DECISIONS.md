@@ -12,6 +12,45 @@ Format:
 
 ---
 
+## 2026-09-16 — High-risk tool calls are stored and replayed, not re-asked
+
+**What:** `create_hubspot_deal`, `update_hubspot_deal`, both HubSpot merges,
+`replace_google_doc_section` and attendee-bearing calendar writes are no longer
+executed when the model calls them. The exact tool name and input are saved to
+`pending_actions` (migration 025), code writes the plain-language summary the user
+reads, and a message that is *only* a confirmation word runs that saved row without
+calling the model. The `confirmed: true` input flag is gone; the sole path to a
+gated tool is `runPendingAction`, which passes an internal argument validated
+against a live row.
+**Why:** the old gate covered 3 tools and admitted in its own comment that a model
+could set `confirmed: true` itself; HubSpot writes had only prompt text. And the
+user approved the model's *paraphrase* while a separately-built call ran. Storing
+the call makes what is approved and what executes the same object.
+**Exemption (same day):** the HubSpot webhook's system account — the one named by
+`HUBSPOT_WEBHOOK_USER_EMAIL` and resolved by `resolveWebhookUser()` — runs
+`create_hubspot_deal` and `update_hubspot_deal` immediately, logged as a
+`pending_actions` row with status `auto_approved` and reason "webhook system
+account" (migration 026 adds that column). Merges, calendar and doc writes stay
+gated for it. Without this, webhook enrichment could not write deals at all: there
+is no human on that path, so every proposal would expire.
+**Accepted risk:** deal create/update on the webhook path now runs on model output
+with no human check. A prompt injection reaching Oracle through webhook-supplied
+company data (see the unauthenticated VisualPing path noted elsewhere) could
+therefore create or modify a deal. Bounded by: the two tools only, that one
+account only, an audit row per call, and merges still requiring a person. Identity
+is the server-side `userId`, never anything in the message or tool input, so the
+model cannot claim the exemption.
+**Impact:** `migrations/025_create_pending_actions.sql`,
+`migrations/026_pending_actions_auto_approved_reason.sql`, `src/tools/pending-actions.js`,
+`src/api/confirmation.js` (shared by both surfaces), `src/tools/executor.js`,
+`src/tools/definitions.js`, `src/tools/google-calendar.js` (its second attendee check
+moved into the gate, which now reads the event first), `src/claude/client.js` (streams
+the notice), `src/api/chat.js`, `src/api/chat-google.js`, `internal-oracle.md`,
+`hubspot/DEAL_CREATION.md`, `tests/unit/pending-actions.test.js`. **Migration 025 must
+be run by hand** — nothing auto-applies it; until then the gate fails closed and
+gated tools refuse. Headless paths (HubSpot webhook) can no longer write deals: a
+proposal with no human to confirm it simply expires.
+
 ## 2026-08-18 — Shared Drive roots renamed: Clients / Current Clients
 
 **What:** `All Clients` → `Clients`, `Live Clients` → `Current Clients`, renamed

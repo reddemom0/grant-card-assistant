@@ -19,8 +19,9 @@ import { google } from 'googleapis';
 import { v5 as uuidv5 } from 'uuid';
 import crypto from 'crypto';
 import { runAgent } from '../claude/client.js';
-import { createConversation } from '../database/messages.js';
+import { createConversation, saveMessage } from '../database/messages.js';
 import { query } from '../database/connection.js';
+import { tryHandleConfirmation, currentPendingId, proposalNotice } from './confirmation.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -399,6 +400,25 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       `Chat: ${messageText.slice(0, 60)}`
     );
 
+    // CONFIRMATION FIRST. A bare "yes" runs the action the user was shown and
+    // never reaches the model. Anyone in the thread may confirm; whoever sent
+    // this message is recorded as the confirmer.
+    const confirmation = await tryHandleConfirmation({
+      conversationId,
+      userId: user.id,
+      text: messageText
+    });
+    if (confirmation) {
+      await saveMessage(conversationId, 'user', messageText);
+      await saveMessage(conversationId, 'assistant', confirmation.replyText);
+      await safePost(evt, markdownToChat(confirmation.replyText));
+      return;
+    }
+
+    // Anything already pending belongs to an earlier turn — only a NEW proposal
+    // gets a confirmation notice appended below.
+    const pendingBefore = await currentPendingId(conversationId);
+
     const result = await runAgent({
       agentType: 'internal-oracle',
       message: messageText,
@@ -422,13 +442,17 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       .join('')
       .trim();
 
-    if (!text) {
+    // A proposal saved during this turn is described to the user by code, from
+    // the stored action — not by the model, which only knows it was refused.
+    const notice = await proposalNotice(conversationId, pendingBefore);
+
+    if (!text && !notice) {
       console.warn('⚠️  Agent produced no text blocks');
       await safePost(evt, "I finished, but didn't produce a text reply. Try rephrasing?");
       return;
     }
 
-    await safePost(evt, markdownToChat(text));
+    await safePost(evt, markdownToChat(`${text}${notice || ''}`.trim()));
   } catch (err) {
     console.error('❌ Oracle run failed for Chat event:', err);
     await safePost(evt, `Something went wrong while I was working on that: ${err.message}`);

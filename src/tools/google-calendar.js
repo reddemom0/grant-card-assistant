@@ -50,7 +50,7 @@ export function classifyError(err) {
   return { success: false, error: err?.message ?? 'Google Calendar request failed' };
 }
 
-async function getCalendarClient(userId) {
+export async function getCalendarClient(userId) {
   const auth = await getUserOAuth2Client(userId);
   return google.calendar({ version: 'v3', auth });
 }
@@ -221,8 +221,8 @@ export async function checkCalendarAvailability(userId, { emails, time_min, time
 /**
  * Create an event on the user's own calendar.
  *
- * When `attendees` is non-empty this tool is gated by the confirmation policy in
- * executor.js and will never reach here without confirmed: true.
+ * When `attendees` is non-empty this tool is gated in executor.js and will never
+ * reach here unless a human confirmed the saved proposal.
  */
 export async function createCalendarEvent(userId, {
   title, start, end, attendees, description, location, add_meet_link, send_updates
@@ -288,7 +288,7 @@ export async function createCalendarEvent(userId, {
  * people and confirmation was not given.
  */
 export async function updateCalendarEvent(userId, {
-  event_id, title, start, end, attendees, description, location, status, send_updates, confirmed
+  event_id, title, start, end, attendees, description, location, status, send_updates
 } = {}) {
   const guard = requireUserId(userId);
   if (guard) return guard;
@@ -310,14 +310,11 @@ export async function updateCalendarEvent(userId, {
     return classifyError(err);
   }
 
+  // Events that ALREADY have attendees are gated in executor.js, which reads the
+  // event before deciding (see GATED_TOOLS.update_calendar_event). The second
+  // check that used to live here would now be an unsatisfiable refusal, since
+  // there is no longer a confirmed flag for the model to set.
   const existingAttendees = (existing.attendees || []).filter(a => !a.self);
-  if (existingAttendees.length > 0 && confirmed !== true) {
-    return {
-      success: false,
-      requires_confirmation: true,
-      error: `Refused: "${existing.summary || 'this event'}" already has ${existingAttendees.length} other attendee(s), so changing it affects them. Show the user exactly what you intend to change and get an explicit yes, then call again with confirmed: true.`
-    };
-  }
 
   const hasAttendees = Array.isArray(attendees) && attendees.length > 0;
   const willNotify = hasAttendees || existingAttendees.length > 0;

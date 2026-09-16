@@ -933,6 +933,19 @@ export async function runAgent({
               sessionId
             });
 
+            // A gated tool was saved instead of run. The confirmation text is
+            // written by code from the stored action (src/tools/pending-actions.js)
+            // and streamed here, so the user approves the action itself rather
+            // than the model's description of it. Streaming surfaces only: the
+            // headless Chat path closes its own reply and appends the same
+            // summary in src/api/chat-google.js.
+            if (res && result?.awaiting_confirmation && result.summary) {
+              sendSSE(res, {
+                type: 'text_delta',
+                text: `\n\n**Confirm before I run this:**\n${result.summary}\n\nReply "yes" and I'll do exactly that.\n\n`
+              });
+            }
+
             // Standard tool result
             toolResults.push({
               type: 'tool_result',

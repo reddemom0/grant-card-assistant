@@ -14,6 +14,16 @@ import * as googleSheets from './google-sheets.js';
 import { createAdvancedDocumentTool } from './google-docs-advanced.js';
 import { createAdvancedBudgetTool } from './google-sheets-advanced.js';
 import { isServerTool } from './definitions.js';
+import {
+  GATED_TOOLS,
+  requiresConfirmation,
+  summarizeAction,
+  savePendingAction,
+  isAuthorisedExecution,
+  isAutoApproved,
+  recordAutoApproval,
+  recordResult
+} from './pending-actions.js';
 import * as getgrantedTools from './getgranted-tools.js';
 import * as federalGrants from './federal-grants.js';
 import * as programCards from '../utils/program-cards.js';
@@ -26,39 +36,9 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/**
- * Tools that refuse to run without an explicit `confirmed: true`.
- *
- * Each entry is a predicate over the tool input returning a human-readable
- * REASON string when confirmation is required, or null when it is not. This
- * lets a single tool be gated only in its risky shape — a calendar event with
- * no attendees affects nobody but the user and runs straight through.
- *
- * Enforced in executeToolCall() below, before dispatch, so a refused call never
- * constructs a client or reaches any external API.
- *
- * Registering a new tool here is the whole integration: add a predicate, and
- * add `confirmed` to that tool's input_schema in definitions.js so the model
- * can actually pass it.
- */
-const CONFIRMATION_POLICY = {
-  create_calendar_event: (input) =>
-    Array.isArray(input?.attendees) && input.attendees.length > 0
-      ? 'it invites other people'
-      : null,
-  update_calendar_event: (input) =>
-    Array.isArray(input?.attendees) && input.attendees.length > 0
-      ? 'it changes who is invited'
-      : null,
-
-  // Unconditional, unlike the calendar entries above. Those gate on a visible
-  // input signal (attendees present). Here there is none: the amount of content
-  // destroyed depends on the document's structure, not on anything in the call,
-  // so "replace the Budget section" could remove two lines or ten pages and the
-  // input looks identical either way. read_google_doc_outline reports
-  // section_length precisely so that extent can be stated before confirming.
-  replace_google_doc_section: () => 'it deletes the existing content under that heading'
-};
+// The confirmation gate lives in ./pending-actions.js — which tools are gated,
+// how a proposal is stored, and the plain-language summary the user reads.
+// Enforced in executeToolCall() below, before dispatch.
 
 /**
  * Parse JSON string parameters that Claude sometimes sends as strings
@@ -125,9 +105,13 @@ async function buildProspectDataFromSession(conversationId) {
  * @param {string} conversationId - UUID of the conversation
  * @param {number} userId - User ID (for domain-wide delegation)
  * @param {string} agentType - Agent type (for agent-specific tool behavior)
+ * @param {Object} [options] - INTERNAL ONLY. Never built from model output.
+ * @param {string} [options.pendingActionId] - Set by runPendingAction() when a
+ *   human has confirmed a saved proposal. This is a function argument, not a
+ *   tool input, so the model has no way to supply it.
  * @returns {Promise<Object>} Tool execution result
  */
-export async function executeToolCall(toolName, input, conversationId, userId = null, agentType = null) {
+export async function executeToolCall(toolName, input, conversationId, userId = null, agentType = null, options = {}) {
   console.log(`🔧 Executing tool: ${toolName}`);
   console.log(`   Input:`, JSON.stringify(input, null, 2));
 
@@ -164,34 +148,74 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
   // ==========================================================================
   // CONFIRMATION GATE
   // --------------------------------------------------------------------------
-  // Pre-dispatch policy check, in the same position and of the same shape as
-  // isServerTool() above. A registered tool refuses to run unless the caller
-  // passes confirmed: true. The predicate receives the tool input, so a tool can
-  // be risky only in some shapes — a solo calendar event is not gated, the same
-  // tool with attendees is.
+  // Pre-dispatch, in the same position and of the same shape as isServerTool()
+  // above. A gated tool is NOT executed here: the exact call is saved, and the
+  // model is told it awaits a human. Code writes the summary the user reads, and
+  // code runs the saved row when they say yes (src/api/confirmation.js).
   //
-  // Generic by design; Calendar is its only registered consumer today. HubSpot
-  // deliberately unchanged.
+  // The model cannot bypass this. There is no input flag to set — the only exit
+  // is options.pendingActionId, a function argument supplied by
+  // runPendingAction() and validated against a live row below.
   //
-  // TWO LIMITS, both deliberate:
-  //  1. This is a forcing function, not a security boundary. A model could set
-  //     confirmed: true on the first call. What this guarantees is that the
-  //     naive path FAILS and the refusal says what to do — strictly better than
-  //     a prompt-only rail, but not unbypassable.
-  //  2. The predicate only sees the input, so it cannot know that an existing
-  //     event already has attendees. update_calendar_event therefore repeats the
-  //     check in src/tools/google-calendar.js after fetching the event.
+  // FAILS CLOSED. If the gate itself throws (most likely: migration 025 has not
+  // been run yet, so pending_actions does not exist), the tool is refused rather
+  // than executed ungated.
   // ==========================================================================
-  const reason = CONFIRMATION_POLICY[toolName]?.(input);
-  if (reason && input?.confirmed !== true) {
-    console.warn(`🛑 ${toolName} refused: not confirmed (${reason})`);
-    return {
-      success: false,
-      // Distinct machine-readable flag so this is not confusable with a
-      // generic failure.
-      requires_confirmation: true,
-      error: `Refused: ${toolName} was not confirmed. This action affects other people because ${reason}. Show the user exactly what you intend to do — who, when, title, and whether a Meet link is included — and get an explicit yes. Then call this tool again with confirmed: true.`
-    };
+  let autoApproval = null;   // set when the webhook exemption applies, so the
+                             // outcome can be written back to its audit row
+  if (GATED_TOOLS[toolName]) {
+    if (options.pendingActionId) {
+      const authorised = await isAuthorisedExecution(options.pendingActionId).catch(() => false);
+      if (!authorised) {
+        console.error(`🛑 ${toolName} blocked: pendingActionId ${options.pendingActionId} is not a live pending action`);
+        return {
+          success: false,
+          error: 'Refused: this action is no longer awaiting confirmation.'
+        };
+      }
+      console.log(`✅ ${toolName} authorised by confirmed action ${options.pendingActionId}`);
+    } else {
+      try {
+        // The webhook system account runs deal writes unattended. Logged as
+        // 'auto_approved' so the audit trail covers every gated call, whether a
+        // human approved it or the exemption did.
+        if (await isAutoApproved(toolName, userId)) {
+          autoApproval = await recordAutoApproval({
+            conversationId, toolName, input, userId,
+            summary: summarizeAction(toolName, input)
+          });
+        } else if (await requiresConfirmation(toolName, input, { userId })) {
+          const summary = summarizeAction(toolName, input);
+          const saved = await savePendingAction({
+            conversationId, toolName, input, userId, summary
+          });
+          console.warn(`🛑 ${toolName} saved as pending action ${saved.id} — awaiting confirmation`);
+          return {
+            success: false,
+            // Distinct machine-readable flag so this is not confusable with a
+            // generic failure.
+            awaiting_confirmation: true,
+            summary,
+            error: 'Saved, not run. This action needs a human to confirm it. ' +
+              'The system has already shown the user exactly what will happen and asked them to reply "yes" — ' +
+              'do not restate the details, do not ask again, and do not call this tool a second time.'
+          };
+        }
+      } catch (gateError) {
+        console.error(`🛑 ${toolName} refused: confirmation gate failed (${gateError.message})`);
+        return {
+          success: false,
+          error: `Refused: the confirmation gate is unavailable (${gateError.message}), so this action was not run.`
+        };
+      }
+    }
+  }
+
+  // A stray `confirmed` key from an older prompt or a hopeful model means
+  // nothing now. Strip it so it can never reach an implementation.
+  if (input && typeof input === 'object' && 'confirmed' in input) {
+    const { confirmed, ...rest } = input;
+    input = rest;
   }
 
   try {
@@ -1120,16 +1144,21 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
     console.log(`✅ Tool ${toolName} completed`);
     console.log(`   Result:`, JSON.stringify(result, null, 2).substring(0, 500) + '...');
 
+    if (autoApproval) await recordResult(autoApproval.id, result).catch(() => {});
+
     return result;
 
   } catch (error) {
     console.error(`❌ Tool ${toolName} failed:`, error);
 
-    return {
+    const failure = {
       success: false,
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     };
+    if (autoApproval) await recordResult(autoApproval.id, failure).catch(() => {});
+
+    return failure;
   }
 }
 

@@ -624,7 +624,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'update_hubspot_deal',
-    description: 'Update properties on an existing HubSpot deal. Use this to change property values on a deal that already exists — for example, moving it to a new stage, updating a reimbursement amount, or filling in fields after the fact. Requires the deal ID and an object of properties to update (only include the properties you want to change, not all of them). Does not touch associations. For creating a new deal, use create_hubspot_deal instead.',
+    description: 'Update properties on an existing HubSpot deal. Use this to change property values on a deal that already exists — for example, moving it to a new stage, updating a reimbursement amount, or filling in fields after the fact. Requires the deal ID and an object of properties to update (only include the properties you want to change, not all of them). Does not touch associations. GATED: the call is saved rather than run, and the system shows the user exactly which fields change and asks them to reply "yes". Propose it once and stop — do not restate the change or call this tool again. For creating a new deal, use create_hubspot_deal instead.',
     input_schema: {
       type: 'object',
       properties: {
@@ -689,7 +689,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'merge_duplicate_companies',
-    description: 'Merge two duplicate company records in HubSpot. The primary company receives all data from the secondary company, and the secondary is deleted. All associations (contacts, deals, notes) are transferred to the primary. CRITICAL: This action is irreversible! Always use find_duplicate_companies first to confirm duplicates, and ask user which record to keep as primary.',
+    description: 'Merge two duplicate company records in HubSpot. The primary company receives all data from the secondary company, and the secondary is deleted. All associations (contacts, deals, notes) are transferred to the primary. CRITICAL: This action is irreversible! Always use find_duplicate_companies first to identify duplicates, and ask the user which record to keep as primary. GATED: the call is saved rather than run, and the system asks the user to reply "yes" before anything merges.',
     input_schema: {
       type: 'object',
       properties: {
@@ -707,7 +707,7 @@ export const HUBSPOT_TOOLS = [
   },
   {
     name: 'merge_duplicate_contacts',
-    description: 'Merge two duplicate contact records in HubSpot. The primary contact receives all data from the secondary contact, and the secondary is deleted. All associations (companies, deals, notes) are transferred to the primary. CRITICAL: This action is irreversible! Always use find_duplicate_contacts first to confirm duplicates, and ask user which record to keep as primary.',
+    description: 'Merge two duplicate contact records in HubSpot. The primary contact receives all data from the secondary contact, and the secondary is deleted. All associations (companies, deals, notes) are transferred to the primary. CRITICAL: This action is irreversible! Always use find_duplicate_contacts first to identify duplicates, and ask the user which record to keep as primary. GATED: the call is saved rather than run, and the system asks the user to reply "yes" before anything merges.',
     input_schema: {
       type: 'object',
       properties: {

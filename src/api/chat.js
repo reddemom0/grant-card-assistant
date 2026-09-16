@@ -11,8 +11,11 @@ import {
   createConversation,
   getConversation,
   getConversationForUser,
-  getConversationMessagesForUser
+  getConversationMessagesForUser,
+  saveMessage
 } from '../database/messages.js';
+import { setupSSE, sendSSE, closeSSE } from '../claude/streaming.js';
+import { tryHandleConfirmation } from './confirmation.js';
 import { isValidAgentType, getAvailableAgents } from '../agents/load-agents.js';
 import { generateAndSaveTitle } from '../utils/conversation-titles.js';
 import { filesAPI } from '../anthropic-client.js';
@@ -149,6 +152,33 @@ export async function handleChatRequest(req, res) {
 
         console.log(`✓ Existing conversation: ${convId}`);
       }
+    }
+
+    // ============================================================================
+    // 2b. Confirmation interception
+    // ----------------------------------------------------------------------------
+    // A message that is ONLY a confirmation word runs the saved action and never
+    // reaches the model. Same code as the Google Chat path (src/api/confirmation.js);
+    // only the delivery differs — the browser client expects the SSE sequence
+    // that runAgent would have produced, so an early return must emit it too.
+    // ============================================================================
+
+    const confirmation = await tryHandleConfirmation({
+      conversationId: convId,
+      userId: effectiveUserId,
+      text: message,
+      agentType
+    });
+
+    if (confirmation) {
+      await saveMessage(convId, 'user', message);
+      await saveMessage(convId, 'assistant', confirmation.replyText);
+
+      setupSSE(res);
+      sendSSE(res, { type: 'text_delta', text: confirmation.replyText });
+      sendSSE(res, { type: 'message_complete' });
+      closeSSE(res);
+      return;
     }
 
     // ============================================================================
