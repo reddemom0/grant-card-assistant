@@ -208,8 +208,15 @@ export function normalizeChatEvent(body) {
   // had been read. Both wire shapes carry the same `message` object, so one
   // check covers the add-on and classic forms. Tolerates a single object as
   // well as a list, since the shape is not verified against a live payload here.
+  //
+  // A file added from Drive is left out. Chat sends it as an attachment with
+  // source DRIVE_FILE and a driveDataRef, but it points at a Drive file Oracle
+  // can read with its Drive tools — counting it made the notice claim a file
+  // was ignored while Oracle was reading that same file.
+  const pointsToDrive = (a) => a?.source === 'DRIVE_FILE' || Boolean(a?.driveDataRef?.driveFileId);
   const attachments = [message?.attachment, message?.attachedGifs]
-    .flatMap(a => (Array.isArray(a) ? a : a ? [a] : []));
+    .flatMap(a => (Array.isArray(a) ? a : a ? [a] : []))
+    .filter(a => !pointsToDrive(a));
 
   // Prefer resource names; fall back to the add-on's weaker identifiers.
   const threadId = message?.thread?.name || message?.thread?.threadKey || null;
@@ -323,12 +330,14 @@ export function markdownToChat(md) {
 }
 
 /**
- * Said whenever a Chat message carried a file. Chat attachments are not read at
- * all (Stage 1), and answering as though the file had been read is the failure
- * worth avoiding: the user assumes it was.
+ * Said whenever a Chat message carried an uploaded file. Uploaded attachments
+ * are not read at all (Stage 1), and answering as though the file had been read
+ * is the failure worth avoiding: the user assumes it was. Drive files are
+ * different — Oracle reads those with its Drive tools — so the notice sends the
+ * user there rather than implying no file can be read in Chat.
  */
 export const SKIPPED_ATTACHMENT_NOTICE =
-  "I can't read files sent in Chat yet, so I answered from your message only. For file review, use the Hub.";
+  "I can't open files uploaded directly to Chat, so I answered from your message only. Share it as a Google Drive link and I can read it.";
 
 const FENCE_LINE = /^\s*```/;
 const LIST_ITEM = /^\s*([-*+]|\d+[.)])\s+/;

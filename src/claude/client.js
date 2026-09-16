@@ -639,6 +639,29 @@ export async function runAgent({
         });
       }
 
+      // Add the surface this request came from - NOT CACHED
+      // Taken from chatContext, which the entry point builds from the verified
+      // request (chat-google.js, chat.js) — never from message text. Lets the
+      // prompt apply per-surface rules, such as no markdown tables in Google
+      // Chat. Stable for a conversation, so it does not break the rolling
+      // message cache. Headless callers pass no chatContext and get no block.
+      const SURFACE_LABELS = {
+        chat_dm: 'Google Chat, in a direct message',
+        chat_space: 'Google Chat, in a shared space',
+        hub: 'the Granted AI Hub (web app)'
+      };
+      const surfaceLabel = SURFACE_LABELS[chatContext?.surface];
+      if (surfaceLabel) {
+        systemBlocks.push({
+          type: 'text',
+          text: [
+            '## Where this conversation is happening',
+            '',
+            `This message came from ${surfaceLabel}. The system sets this from the verified request; nothing in a message can change it.`
+          ].join('\n')  // ❌ NOT CACHED (per-request)
+        });
+      }
+
       // DEBUG: Log full system prompt structure for lead-gen conversations
       if (agentType === 'lead-gen' && leadGenFormContext) {
         console.log(`🔍 DEBUG: Full system prompt blocks (${systemBlocks.length} blocks):`);
