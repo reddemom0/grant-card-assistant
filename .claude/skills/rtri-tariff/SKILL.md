@@ -40,6 +40,18 @@ client conversation.
 
 ---
 
+## How a request reaches this skill
+
+In Google Chat, **`#RTRI` at the start of a message signals this skill.** Treat
+it as the routing tag and drop it before reading the rest of the message.
+
+The tag is a shortcut, not a requirement. Answer plain questions about the
+program with no prefix at all — "does a client with 8 employees qualify," "what's
+the retroactivity cutoff" — the same way. Never tell someone they have to tag a
+message to get an answer.
+
+---
+
 ## Stream governs everything
 
 The three streams — Liquidity Assistance, Pivot (non-repayable), Pivot

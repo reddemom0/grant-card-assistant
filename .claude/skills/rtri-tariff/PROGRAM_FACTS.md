@@ -10,7 +10,7 @@
 
 **Sources:** Granted RA (Fiscal 2025/2026); PacifiCan Applicant Guide for
 Businesses (modified 2026-09-14).
-**Last reviewed:** [DATE TO SET AT INSTALL]
+**Last reviewed:** 2026-09-16
 
 ---
 
@@ -21,7 +21,7 @@ Businesses (modified 2026-09-14).
 | **Cost-share % per stream** | The Applicant Guide states caps but no percentages. The application form states non-PacifiCan funding must be ≥25% and non-government ≥10% of project costs. The Granted RA states 50% client share (non-repayable pivot) and 25% (repayable). These may be a floor vs. a stream-level share, but no source states this. **Needs PacifiCan officer confirmation before any budget work.** |
 | **Training / coaching / mentoring / conference fees** | Eligible under original rules; absent from current BC program pages. **Do not include in BC pivot budgets until confirmed with a PacifiCan officer.** |
 
-If asked about either, say it is unconfirmed and that Jorge should confirm with a
+If asked about either, say it is unconfirmed and that Research should confirm with a
 PacifiCan officer. Do not estimate.
 
 ---
@@ -354,5 +354,5 @@ sector history; track record of similar projects or capital investments;
 implementation and project management experience; profitability trend 2+ years
 pre-tariff and current; investment or VC backing; grant reliance level.
 
-**Ownership of this file:** [TO ASSIGN] — this file must be updated when
+**Ownership of this file:** Research — this file must be updated when
 PacifiCan changes program rules or when an open item is resolved.
