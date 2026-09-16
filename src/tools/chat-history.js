@@ -275,7 +275,9 @@ export async function readChatSpaceHistory(input = {}, ctx = {}) {
       for (const m of res.data.messages || []) {
         if (collected.length >= MAX_MESSAGES) { capped = true; break; }
         collected.push({
-          sender: m.sender?.displayName || m.sender?.name || 'Unknown',
+          // Resolved to a real name after the loop, in one batch.
+          _sender: m.sender || null,
+          sender: m.sender?.displayName || null,
           time: m.createTime,
           text: m.text || '',
           thread_link: threadLink(target.spaceName, m.thread?.name)
@@ -284,6 +286,17 @@ export async function readChatSpaceHistory(input = {}, ctx = {}) {
 
       pageToken = capped ? null : res.data.nextPageToken;
     } while (pageToken);
+
+    // Names, in one batch for the whole window: "Unknown asked about the budget"
+    // is not an answer. Never blocks — an unresolved sender gets an honest label.
+    const { resolveSenderNames } = await import('./directory-names.js');
+    const names = await resolveSenderNames(collected.map(c => c._sender).filter(Boolean))
+      .catch(err => { console.warn(`⚠️  Sender names unresolved: ${err.message}`); return new Map(); });
+
+    for (const c of collected) {
+      c.sender = c.sender || names.get(c._sender?.name) || 'someone outside Granted';
+      delete c._sender;
+    }
 
     // Loose filtering: stems, partial words, any-term match. If it leaves too
     // little to judge from, hand back the whole window and say it is unfiltered

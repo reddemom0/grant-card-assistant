@@ -219,17 +219,30 @@ export async function buildMentionDigest(input = {}, ctx = {}) {
         );
 
         items.push({
-          where: kind === 'dm'
-            ? `DM with ${m.sender?.displayName || 'someone'}`
-            : (space.displayName || space.name),
+          // Sender resolved to a real name below, in one batch for the request.
+          _sender: m.sender || null,
+          where: kind === 'dm' ? null : (space.displayName || space.name),
           where_type: kind,
-          from: m.sender?.displayName || 'Unknown',
+          from: m.sender?.displayName || null,
           time,
           text: m.text || '',
           thread_link: threadLink(space.name, m.thread?.name),
           replied
         });
       }
+    }
+
+    // A digest is a list of people who are waiting on you, so the name is the
+    // load-bearing part. One batched resolution for the whole digest; it never
+    // blocks, and an unresolved sender gets an honest label instead of "Unknown".
+    const { resolveSenderNames, FALLBACKS } = await import('./directory-names.js');
+    const names = await resolveSenderNames(items.map(i => i._sender).filter(Boolean))
+      .catch(err => { console.warn(`⚠️  Sender names unresolved: ${err.message}`); return new Map(); });
+
+    for (const item of items) {
+      item.from = item.from || names.get(item._sender?.name) || FALLBACKS.external;
+      if (item.where_type === 'dm') item.where = `DM with ${item.from}`;
+      delete item._sender;
     }
 
     // 3. Group by thread/conversation, newest group first.
