@@ -104,7 +104,7 @@ const productCases = [
   { name: 'PROMOTE: sub-$2.5M exception industry clears the gate → Pro',
     session: s({ revenue_range: '$500K – $2.5M', employee_count: '5 – 19', industry: 'Construction' }, '$18K–$30K'),
     expect: 'Granted Pro' },
-  { name: 'PROMOTE: gate beats a small estimate (parseFundingEstimate is unreliable)',
+  { name: 'PROMOTE: gate beats a small estimate',
     session: s({ revenue_range: '$2.5M – $5M', employee_count: '20 – 49', industry: 'Construction' }, '$12K–$22K'),
     expect: 'Granted Pro' },
   { name: 'PROMOTE: $2.5M – $5M / 5 – 19 with a mid estimate → Pro (was Starter)',
@@ -134,9 +134,9 @@ const productCases = [
   { name: '$0 estimate beats the gate',
     session: s({ revenue_range: '$5M+', employee_count: '50 – 99', industry: 'Manufacturing' }, '$0K–$0K'),
     expect: 'Get Granted' },
-  { name: 'missing estimate beats the gate',
+  { name: 'missing estimate does NOT block the gate',
     session: s({ revenue_range: '$5M+', employee_count: '50 – 99', industry: 'Manufacturing' }, null),
-    expect: 'Get Granted' },
+    expect: 'Granted Pro' },
 
   // ─── the three traced scenarios ─────────────────────────────────────────
   { name: 'TRACE Construction $1.2M / 8 staff → Pro',

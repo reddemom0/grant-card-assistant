@@ -98,20 +98,55 @@ export async function loadEnrichedSessionData(sessionId) {
   return enrichedSession;
 }
 
+// Pieces of an estimate amount. The suffix lookahead stops "m" from matching
+// the start of "months" ("$15,000 over 12 months").
+const AMOUNT_NUMBER = String.raw`(\d+(?:,\d{3})*(?:\.\d+)?)`;
+const AMOUNT_SUFFIX = String.raw`\s*(thousand|million|mm|k|m)(?![a-z])`;
+// Upper end of a range, captured only when it carries a suffix the lower end
+// may need to borrow ("$17-49K").
+const RANGE_UPPER = String.raw`\s*(?:[-–—]|to)\s*\$?\s*` + AMOUNT_NUMBER + AMOUNT_SUFFIX;
+const AMOUNT_TAIL = `(?:${AMOUNT_SUFFIX})?(?:${RANGE_UPPER})?`;
+const DOLLAR_AMOUNT = new RegExp(String.raw`\$\s*` + AMOUNT_NUMBER + AMOUNT_TAIL, 'i');
+const BARE_AMOUNT = new RegExp(AMOUNT_NUMBER + AMOUNT_TAIL, 'i');
+
+const SUFFIX_MULTIPLIER = { k: 1e3, thousand: 1e3, m: 1e6, mm: 1e6, million: 1e6 };
+
 /**
- * Parse estimated_funding to extract numeric value for tier determination
+ * Parse estimated_funding to a dollar amount for tier determination
  *
- * @param {string} fundingStr - Funding string like "$25K-$60K"
- * @returns {number|null} First numeric value in thousands, or null if can't parse
+ * Reads the first dollar amount in the string; for a range that is the low
+ * end. The low end is what the tier thresholds were set against, and the high
+ * end is often open-ended ("$3M+"). Stored estimates are agent free text, so
+ * the amount is taken from the first "$", not the first digit
+ * ("12-month estimate: $22K–$53K" → 22,000). A string with no "$" falls back
+ * to its first number.
+ *
+ * Suffixes: K/thousand ×1,000; M/MM/million ×1,000,000. An unsuffixed low end
+ * borrows the upper end's suffix ("$17-49K" → 17,000); with no suffix anywhere
+ * the number is plain dollars ("$15,000–$30,000" → 15,000).
+ *
+ * @param {string} fundingStr - Funding string like "$25K-$60K" or "$1.5M–$3M+"
+ * @returns {number|null} Whole dollars, or null if no amount can be read
  */
 export function parseFundingEstimate(fundingStr) {
   if (!fundingStr) return null;
 
-  // Extract first number from formats like "$25K-$60K", "$30K+", "under $15K"
-  const match = fundingStr.match(/\$?(\d+(?:,\d{3})*(?:\.\d+)?)\s*K?/i);
+  const str = String(fundingStr);
+  const match = (str.includes('$') ? DOLLAR_AMOUNT : BARE_AMOUNT).exec(str);
   if (!match) return null;
 
-  return parseInt(match[1].replace(/,/g, ''), 10);
+  const [, lowStr, lowSuffix, highStr, highSuffix] = match;
+  const low = parseFloat(lowStr.replace(/,/g, ''));
+
+  let suffix = lowSuffix;
+  // Borrow only when the result is still a range (low ≤ high), so
+  // "$15,000-60K" is not read as $15 million.
+  if (!suffix && highSuffix && low <= parseFloat(highStr.replace(/,/g, ''))) {
+    suffix = highSuffix;
+  }
+
+  const multiplier = suffix ? SUFFIX_MULTIPLIER[suffix.toLowerCase()] : 1;
+  return Math.round(low * multiplier);
 }
 
 // ============================================================================
@@ -210,6 +245,10 @@ const REVENUE_BUCKET_RANK = {
 const MAIN_RULE_MIN_REVENUE_RANK      = REVENUE_BUCKET_RANK['$2.5M – $5M'];
 const EXCEPTION_RULE_MIN_REVENUE_RANK = REVENUE_BUCKET_RANK['$500K – $2.5M'];
 
+// Below the gate, the low end of the estimate at which a lead is Starter
+// rather than Get Granted. Whole dollars, as parseFundingEstimate returns.
+const STARTER_MIN_ESTIMATE = 15_000;
+
 /**
  * May this prospect be offered a discovery call?
  *
@@ -258,12 +297,17 @@ export function isProCallEligible(prospectData) {
  *
  * Order of precedence:
  *   1. industry === "Charity/Non-Profit" → "Nonprofit" (overrides everything)
- *   2. service_tier === "not_a_fit" OR $0/null estimate → "Get Granted"
+ *   2. service_tier === "not_a_fit" OR an explicit $0 estimate → "Get Granted"
  *   3. isProCallEligible → "Granted Pro"  ("GrantedPro Fit": clearing the
  *        revenue/headcount/industry thresholds IS the Pro category)
  *   4. otherwise, by 12-month estimate:
  *        ≥ $15K → "Granted Starter"
- *        < $15K → "Get Granted"
+ *        < $15K, missing or unreadable → "Get Granted"
+ *
+ * The estimate is the estimated_funding column, then the agent's input, then
+ * the estimate saved at intake (prospect_data.estimated_funding). The column
+ * is only written by save_lead_data, so a session finalized by the cron
+ * without that call has only the intake estimate.
  *
  * Product and call eligibility are ONE decision. They used to be two: the
  * estimate ladder picked the product while a separate flag decided the call,
@@ -276,9 +320,10 @@ export function isProCallEligible(prospectData) {
  * better, and the cap was what blocked a genuinely Pro-shaped smaller company
  * (a $1.2M Construction firm with 8 staff) from ever reaching a consultant.
  *
- * Estimate size does NOT constrain the promotion. parseFundingEstimate reads
- * only the first number in the string, so "$1.5M–$3M+" parses as 1 — too
- * fragile to gate a sales conversation on. Firmographics are not.
+ * Estimate size does NOT constrain the promotion. Firmographics decide Pro;
+ * the estimate only splits Starter from Get Granted below the gate. A missing
+ * estimate is not evidence against fit, so it does not block the gate — only
+ * an explicit $0 does.
  *
  * "Waitlist" is intentionally NOT a possible output — AI never writes it, and
  * it is absent from the form-level HubSpot enum for best_fit_product.
@@ -299,12 +344,16 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
   const serviceTier = pd.service_tier || sessionData?.service_tier || null;
   if (serviceTier === 'not_a_fit') return 'Get Granted';
 
-  const estimate = sessionData?.estimated_funding || input.estimated_funding || null;
-  if (!estimate) return 'Get Granted';
-  if (/\$?0K[\s\-–]+\$?0K/.test(estimate)) return 'Get Granted';
-
+  // Column, then agent input, then the intake estimate — the same fallback
+  // finalizeLeadGenConversation uses for determineServiceTier.
+  const estimate = sessionData?.estimated_funding || input.estimated_funding ||
+                   pd.estimated_funding || null;
   const fundingNum = parseFundingEstimate(estimate);
-  if (fundingNum === 0) return 'Get Granted';
+
+  // An explicit $0 is a signal; a missing estimate is not, and falls through.
+  if (estimate && (/\$?0K[\s\-–]+\$?0K/.test(estimate) || fundingNum === 0)) {
+    return 'Get Granted';
+  }
 
   // 3. GrantedPro Fit — firmographics decide, and they outrank the estimate.
   // Reads the form's own revenue/headcount/industry, not the agent's free text.
@@ -312,6 +361,6 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
 
   // 4. Below the gate, the estimate decides paid vs free. Pro is unreachable
   // here by design — a lead that should be Pro cleared the gate above.
-  if (fundingNum !== null && fundingNum >= 15) return 'Granted Starter';
+  if (fundingNum !== null && fundingNum >= STARTER_MIN_ESTIMATE) return 'Granted Starter';
   return 'Get Granted';
 }
