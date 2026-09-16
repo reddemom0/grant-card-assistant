@@ -1,0 +1,25 @@
+{
+  "_comment": "What Oracle says when it is added to a Google Chat space. Edit freely — this file is data, not code, and is re-read on each deploy. Keys are space display names, matched case-insensitively. A space with no entry gets `generic`, with {space} replaced by its name. `closing` is appended to every intro. DMs get no intro at all. Resolver: src/api/space-intros.js",
+
+  "closing": "I only see messages where I'm @mentioned. Before I change anything in HubSpot, calendars or Docs, I'll show you the details — anyone in the thread can reply \"yes\" to confirm.",
+
+  "generic": "Hi, I've been added to {space}. @mention me with a question about clients, grants, Drive files or meetings.",
+
+  "spaces": {
+    "RTRI Changes": "Hi, I've been added to RTRI Changes. Try: \"What changed in RTRI eligibility?\" · \"Summarize this update for a client\" · \"Check whether this company fits RTRI\"",
+
+    "Grant Change Detection": "Hi, I've been added to Grant Change Detection. Try: \"What does this change mean for our clients?\" · \"Which HubSpot deals are on this program?\" · \"Summarize today's alerts\"",
+
+    "Marketing": "Hi, I've been added to Marketing. Try: \"Draft a LinkedIn post about this program\" · \"Find our latest blog drafts in Drive\" · \"Summarize this thread into next steps\"",
+
+    "Strategy Team": "Hi, I've been added to Strategy Team. Try: \"Is this company a fit for CanExport?\" · \"What's the status of the Acme deal?\" · \"Pull notes from our last call with this client\"",
+
+    "AI Hub": "Hi, I've been added to AI Hub. Try: \"What can you do?\" · \"Something went wrong with Oracle — here's what happened\" · \"Summarize this thread\"",
+
+    "AI Discussions": "Hi, I've been added to AI Discussions. Try: \"What can you do?\" · \"Research how other firms use AI for grant writing\" · \"Summarize this thread\"",
+
+    "General Chat and Announcements": "Hi, I'm Oracle, Granted's internal assistant. @mention me with a question about clients, grants, Drive files or meetings.",
+    "General Chat": "Hi, I'm Oracle, Granted's internal assistant. @mention me with a question about clients, grants, Drive files or meetings.",
+    "Announcements": "Hi, I'm Oracle, Granted's internal assistant. @mention me with a question about clients, grants, Drive files or meetings."
+  }
+}

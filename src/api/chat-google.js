@@ -22,6 +22,7 @@ import { runAgent } from '../claude/client.js';
 import { createConversation, saveMessage } from '../database/messages.js';
 import { query } from '../database/connection.js';
 import { tryHandleConfirmation, currentPendingId, proposalNotice } from './confirmation.js';
+import { resolveSpaceIntro } from './space-intros.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -165,7 +166,9 @@ export function normalizeChatEvent(body) {
     threadId: null,
     threadIsResourceName: false,
     spaceId: null,
-    spaceIsResourceName: false
+    spaceIsResourceName: false,
+    spaceDisplayName: null,
+    isDm: false
   };
 
   if (!body || typeof body !== 'object') return base;
@@ -227,8 +230,30 @@ export function normalizeChatEvent(body) {
     threadId,
     threadIsResourceName: Boolean(message?.thread?.name),
     spaceId,
-    spaceIsResourceName: Boolean(space?.name)
+    spaceIsResourceName: Boolean(space?.name),
+    spaceDisplayName: space?.displayName || null,
+    // Chat has spelled this three ways over the years; accept all of them rather
+    // than guess which one this deployment sends.
+    isDm: space?.type === 'DM'
+      || space?.spaceType === 'DIRECT_MESSAGE'
+      || space?.singleUserBotDm === true
   };
+}
+
+/**
+ * Canonical event name, so one branch catches both wire spellings.
+ *
+ * The add-on shape derives its type from the payload container and yields
+ * camelCase ('addedToSpace'); the classic shape sends SCREAMING_SNAKE
+ * ('ADDED_TO_SPACE'). Comparing canonical forms means no branch is written
+ * against one spelling and silently dead for the other — which is exactly how
+ * the existing MESSAGE-only handling hid these events.
+ *
+ * @param {string} eventType
+ * @returns {string} e.g. 'addedtospace'
+ */
+export function canonicalEventType(eventType) {
+  return String(eventType || '').replace(/_/g, '').toLowerCase();
 }
 
 /**
@@ -584,9 +609,37 @@ export async function handleGoogleChatEvent(req, res) {
     return res.status(200).json({});
   }
 
+  const kind = canonicalEventType(evt.eventType);
+
+  // ==========================================================================
+  // ADDED TO A SPACE — say hello, so the space knows Oracle is here and how to
+  // reach it. Ack first and post in the background, exactly like the MESSAGE
+  // path: the synchronous response body is parsed as RenderActions on this
+  // deployment (see src/api/addon-probe.js), so a { text } body would render
+  // nothing.
+  // ==========================================================================
+  if (kind === 'addedtospace') {
+    const intro = resolveSpaceIntro({
+      displayName: evt.spaceDisplayName,
+      isDm: evt.isDm
+    });
+
+    console.log(`👋 Added to ${evt.isDm ? 'a DM' : `space "${evt.spaceDisplayName || '(no display name)'}"`} — ${intro ? 'posting intro' : 'no intro (DM)'}`);
+    res.status(200).json({});
+
+    if (intro) {
+      safePost(evt, markdownToChat(intro)).catch(err => {
+        console.error('❌ Unhandled error posting space intro:', err);
+      });
+    }
+    return;
+  }
+
   // Only respond to messages from humans. Ignoring BOT senders prevents loops.
-  if (evt.eventType !== 'MESSAGE') {
-    console.log(`↩️  Ignoring: event type is "${evt.eventType}", not MESSAGE`);
+  if (kind !== 'message') {
+    // Names only, never values: the payload carries message content. Logging the
+    // shape is how the remaining event types stop being guesswork.
+    console.log(`↩️  Ignoring event type "${evt.eventType}" (canonical: ${kind}). Payload keys: [${Object.keys(req.body?.chat || req.body || {}).join(', ')}]`);
     return res.status(200).json({});
   }
   if (evt.senderType === 'BOT') {
@@ -603,11 +656,19 @@ export async function handleGoogleChatEvent(req, res) {
     // confirmed against a live payload here; the first real file-only message
     // settles it, and until then hasAttachments simply stays false.
     console.log(`↩️  No text. Message keys: [${Object.keys(evt.message || {}).join(', ')}], attachments seen: ${evt.attachmentCount}`);
-    return res.status(200).json({
-      text: evt.hasAttachments
-        ? SKIPPED_ATTACHMENT_NOTICE
-        : 'Send me a question and I\'ll take a look.'
+
+    // Posted asynchronously, not returned in the response body, for the same
+    // reason as the intro above: this deployment parses that body as
+    // RenderActions, so a { text } reply is silently dropped.
+    const reply = evt.hasAttachments
+      ? SKIPPED_ATTACHMENT_NOTICE
+      : 'Send me a question and I\'ll take a look.';
+
+    res.status(200).json({});
+    safePost(evt, reply).catch(err => {
+      console.error('❌ Unhandled error posting no-text reply:', err);
     });
+    return;
   }
 
   let user;
