@@ -157,6 +157,25 @@ const BCAFE_FIELDS = [
 ];
 
 /**
+ * Every field any program agent can see.
+ *
+ * For generalist agents that do not know a deal's program until they have read
+ * it — asking them to choose a field set first is backwards. Oracle previously
+ * fell through to `default: CANEXPORT_FIELDS` and so read ETG deals with
+ * CanExport properties: a well-formed result with the wrong fields, and no
+ * error to notice.
+ *
+ * Derived from the constants rather than hand-listed, so it cannot drift when a
+ * program set changes. Deduped because all three spread COMMON_FIELDS, which
+ * would otherwise repeat 63 times.
+ */
+const ALL_PROGRAM_FIELDS = [...new Set([
+  ...CANEXPORT_FIELDS,
+  ...ETG_FIELDS,
+  ...BCAFE_FIELDS
+])];
+
+/**
  * Get HubSpot fields based on agent type
  * @param {string} agentType - Agent type (canexport-claims, etg-writer, bcafe-writer, etc.)
  * @returns {string[]} Array of field names
@@ -167,6 +186,10 @@ function getFieldsForAgent(agentType) {
       return CANEXPORT_FIELDS;
     case 'etg-writer':
       return ETG_FIELDS;
+    case 'internal-oracle':
+      // Generalist: needs every program's fields, since it does not know which
+      // program a deal belongs to until it reads it.
+      return ALL_PROGRAM_FIELDS;
     case 'bcafe-writer':
       return BCAFE_FIELDS;
     default:
