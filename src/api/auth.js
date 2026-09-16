@@ -8,9 +8,11 @@
  */
 
 import { Router } from 'express';
+import crypto from 'crypto';
 import { google } from 'googleapis';
 import jwt from 'jsonwebtoken';
 import { query } from '../database/connection.js';
+import { issueLoginState, consumeLoginState, TTL_SECONDS } from '../utils/google-login-state.js';
 
 const router = Router();
 
@@ -61,6 +63,87 @@ export function checkAllowedDomain(userInfo) {
   return { ok: true, email, reason: null };
 }
 
+// ============================================================================
+// OAUTH STATE — login CSRF protection
+//
+// Without it, anyone could send a staff member to /api/auth-callback carrying
+// the attacker's own authorization code and sign them in as the attacker. Each
+// sign-in attempt gets a random state that is recorded server-side (single use,
+// 10 minutes — src/utils/google-login-state.js) and bound to this browser by an
+// HttpOnly cookie. The callback accepts only a state that matches the cookie
+// AND is still on record.
+// ============================================================================
+
+const STATE_COOKIE = 'google_login_state';
+
+// Sent only to the callback. SameSite=Lax still travels on Google's top-level
+// redirect back here; Secure matches the granted_session cookie.
+function stateCookie(value, maxAgeSeconds) {
+  return `${STATE_COOKIE}=${value}; Path=/api/auth-callback; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+}
+
+/** Read one cookie by name. Parsed by hand, as src/middleware/auth.js does. */
+function readCookie(req, name) {
+  return req.headers.cookie
+    ?.split(';')
+    .map(c => c.trim())
+    .find(c => c.startsWith(`${name}=`))
+    ?.slice(name.length + 1) || null;
+}
+
+/**
+ * Check the callback's `state` against the one this browser was given.
+ *
+ * Exported for testing. Never throws. `reason` is a fixed code and safe to log:
+ * it never carries the state, the code, or anything about the user.
+ *
+ * The cookie's state is consumed before any comparison, so a failed callback
+ * still spends that attempt — the same rule as the Granola flow.
+ *
+ * @param {import('express').Request} req
+ * @returns {Promise<{ok: boolean, reason: string|null}>}
+ */
+export async function verifyLoginState(req) {
+  const expected = readCookie(req, STATE_COOKIE);
+  if (!expected) return { ok: false, reason: 'missing_cookie' };
+
+  let recorded;
+  try {
+    recorded = await consumeLoginState(expected);
+  } catch {
+    return { ok: false, reason: 'state_store_unavailable' };
+  }
+
+  // A repeated `state` parameter arrives as an array; treat it as absent.
+  const provided = typeof req.query.state === 'string' ? req.query.state : '';
+  if (!provided) return { ok: false, reason: 'missing_state' };
+
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return { ok: false, reason: 'state_mismatch' };
+  }
+
+  // Matched the cookie, but expired or already used.
+  if (!recorded) return { ok: false, reason: 'state_not_found' };
+
+  return { ok: true, reason: null };
+}
+
+/** The one page every rejected callback gets. Says nothing about why. */
+function sendSignInExpired(res) {
+  return res.status(400).setHeader('Content-Type', 'text/html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Sign-in expired</title></head>
+      <body>
+        <h1>Sign-in expired, please try again</h1>
+        <p><a href="/api/auth-google">Sign in with Google</a></p>
+      </body>
+      </html>
+    `);
+}
+
 /**
  * POST /api/logout
  * Clears the session cookie
@@ -82,7 +165,7 @@ router.post('/logout', (req, res) => {
  * GET /api/auth-google
  * Redirects to Google OAuth consent screen
  */
-router.get('/auth-google', (req, res) => {
+router.get('/auth-google', async (req, res) => {
   console.log('🔵 OAuth flow started');
   console.log('🔵 Request URL:', req.url);
   console.log('🔵 Request headers host:', req.headers.host);
@@ -109,6 +192,26 @@ router.get('/auth-google', (req, res) => {
 
   console.log('🔵 Detected host:', host);
   console.log('🔵 Protocol:', protocol);
+
+  // A fresh state for this attempt, bound to this browser. If it can't be
+  // recorded, fail closed: a sign-in started without one could never finish.
+  let state;
+  try {
+    state = await issueLoginState();
+  } catch {
+    console.error('❌ Sign-in not started — reason: state_store_unavailable');
+    return res.status(503).setHeader('Content-Type', 'text/html').send(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Sign-in unavailable</title></head>
+      <body>
+        <h1>Sign-in is unavailable right now</h1>
+        <p>Please try again in a minute.</p>
+      </body>
+      </html>
+    `);
+  }
+  res.append('Set-Cookie', stateCookie(state, TTL_SECONDS));
 
   // Include Google Drive, Docs, and Sheets scopes for document/spreadsheet creation.
   // NOTE: when this list changes, existing connected users must log out and log
@@ -153,6 +256,7 @@ router.get('/auth-google', (req, res) => {
     `client_id=${encodeURIComponent(clientId)}&` +
     `redirect_uri=${encodeURIComponent(redirectUri)}&` +
     `response_type=code&` +
+    `state=${encodeURIComponent(state)}&` +
     `scope=${encodeURIComponent(scopes)}&` +
     `access_type=offline&` +
     // Carry forward anything this user has already granted, so a future split of
@@ -161,7 +265,7 @@ router.get('/auth-google', (req, res) => {
     `hd=${encodeURIComponent(ALLOWED_EMAIL_DOMAIN)}&` +
     `prompt=consent`;
 
-  console.log('🔵 Full OAuth URL:', googleAuthUrl);
+  console.log('🔵 Full OAuth URL:', googleAuthUrl.replace(state, '[state]'));
   console.log('🔵 URL length:', googleAuthUrl.length);
   console.log('🔵 Redirecting to Google...');
 
@@ -174,9 +278,21 @@ router.get('/auth-google', (req, res) => {
  */
 router.get('/auth-callback', async (req, res) => {
   console.log('🔵 Auth callback started');
-  console.log('🔵 Full URL:', req.url);
-  console.log('🔵 Query params:', JSON.stringify(req.query, null, 2));
+  // Parameter NAMES only: the values include the authorization code and state.
+  console.log('🔵 Query params present:', Object.keys(req.query).join(', ') || '(none)');
   console.log('🔵 Method:', req.method);
+
+  // ==========================================================================
+  // STATE GATE — first, before Google's error, the code, or any token
+  // exchange. A callback this browser didn't start stops here. The state
+  // cookie is cleared on every outcome: this attempt is spent either way.
+  // ==========================================================================
+  res.append('Set-Cookie', stateCookie('', 0));
+  const stateCheck = await verifyLoginState(req);
+  if (!stateCheck.ok) {
+    console.warn(`🚫 Sign-in rejected — reason: ${stateCheck.reason}`);
+    return sendSignInExpired(res);
+  }
 
   const { code, error, error_description } = req.query;
 
@@ -190,8 +306,8 @@ router.get('/auth-callback', async (req, res) => {
       <head><title>OAuth Error</title></head>
       <body>
         <h1>Authentication Error</h1>
-        <p><strong>Error:</strong> ${error}</p>
-        <p><strong>Description:</strong> ${error_description || 'No description provided'}</p>
+        <p><strong>Error:</strong> ${escapeHtml(error)}</p>
+        <p><strong>Description:</strong> ${escapeHtml(error_description || 'No description provided')}</p>
         <p><a href="/">Return to home</a></p>
       </body>
       </html>
@@ -210,7 +326,7 @@ router.get('/auth-callback', async (req, res) => {
       <body>
         <h1>Authentication Error</h1>
         <p>No authorization code received from Google</p>
-        <p>Query params: ${JSON.stringify(req.query)}</p>
+        <p>Query params: ${escapeHtml(JSON.stringify(req.query))}</p>
         <p><a href="/">Return to home</a></p>
       </body>
       </html>
@@ -339,9 +455,10 @@ router.get('/auth-callback', async (req, res) => {
     console.log('🔵 Setting cookie...');
     // Don't set Domain attribute - let it default to current host for proper development/production separation
     const cookieHeader = `granted_session=${token}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
-    res.setHeader('Set-Cookie', cookieHeader);
+    // append, not setHeader: setHeader would drop the state-clearing cookie
+    // set at the top of this handler.
+    res.append('Set-Cookie', cookieHeader);
     console.log('✅ Cookie set for host:', host);
-    console.log('✅ Cookie header:', cookieHeader);
 
     // Use HTML redirect instead of server redirect to ensure cookie persists
     const userDataEncoded = encodeURIComponent(JSON.stringify({

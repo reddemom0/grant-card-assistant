@@ -12,6 +12,29 @@ Format:
 
 ---
 
+## 2026-09-16 — Google sign-in carries a single-use, browser-bound OAuth state
+
+**What:** `/api/auth-google` issues a random state (`src/utils/google-login-state.js`),
+records it in Redis for 10 minutes and sets it in an HttpOnly, Secure, SameSite=Lax
+cookie scoped to `/api/auth-callback`. The callback checks state before anything else,
+including Google's `error` and the code exchange. It accepts only a state that matches
+the cookie and is still on record, deletes the record either way, and always clears the
+cookie. Anything else gets a plain "Sign-in expired, please try again" page and a
+reason code in the log.
+**Why:** without state, anyone could send a staff member to the callback with the
+attacker's own code and sign them in as the attacker. Both halves are needed: the
+cookie ties the callback to the browser that started the sign-in, and the Redis record
+makes the state single-use, which a cookie alone cannot enforce. Granola's store is
+keyed by user id, which does not exist yet at sign-in, so this one is keyed by the state.
+**Trade-offs:** sign-in now needs Redis and fails closed with a 503 when it is down.
+Starting two sign-ins in two tabs replaces the cookie, so the older tab gets "expired".
+No return path exists; sign-in still always lands on `/oracle/new`.
+**Also closed in `auth.js`:** the callback logged the full `granted_session` cookie
+(a live 7-day JWT) and the raw query (code, state). It also put Google's `error` text
+and the query into HTML unescaped.
+**Impact:** `src/api/auth.js`, `src/utils/google-login-state.js`,
+`tests/unit/auth-login-state.test.js`.
+
 ## 2026-09-16 — Personal Chat digest: on demand, DM-only, and it finds its own spaces
 
 **What:** `build_mention_digest` (`src/tools/mention-digest.js`) answers "what have
