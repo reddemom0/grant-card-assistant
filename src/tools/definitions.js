@@ -1267,6 +1267,25 @@ export const GOOGLE_DRIVE_TOOLS = [
       },
       required: ['file_id']
     }
+  },
+  {
+    name: 'list_files_in_folder',
+    description: 'List the files and subfolders inside a specific Google Drive folder. Accepts either a folder URL (e.g., https://drive.google.com/drive/folders/FOLDER_ID) or just the folder ID. Use this when you already know which folder to look in — if you do not have the folder ID yet, use search_google_drive to find the folder or file first. Returns the most recently modified items up to the limit, with no paging: if the folder holds more items than the limit, the rest are not returned.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        folder_id: {
+          type: 'string',
+          description: 'Google Drive folder ID or full folder URL (URL will be automatically parsed to extract the folder ID)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of items to return, most recently modified first (default: 20)',
+          default: 20
+        }
+      },
+      required: ['folder_id']
+    }
   }
 ];
 

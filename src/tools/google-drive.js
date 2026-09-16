@@ -146,9 +146,9 @@ export async function searchGoogleDrive(query, fileType = 'any', limit = 10, use
 }
 
 /**
- * Extract file ID from Google Drive URL or return as-is if already an ID
- * @param {string} fileIdOrUrl - Google Drive file ID or URL
- * @returns {string} File ID
+ * Extract file or folder ID from Google Drive URL, or return as-is if already an ID
+ * @param {string} fileIdOrUrl - Google Drive file/folder ID or URL
+ * @returns {string} File or folder ID
  */
 function extractFileId(fileIdOrUrl) {
   // If it looks like a URL, extract the file ID
@@ -157,7 +157,10 @@ function extractFileId(fileIdOrUrl) {
     // https://drive.google.com/file/d/FILE_ID/...
     // https://docs.google.com/document/d/FILE_ID/...
     // https://docs.google.com/spreadsheets/d/FILE_ID/...
-    const match = fileIdOrUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    // https://drive.google.com/drive/folders/FOLDER_ID?usp=sharing
+    // https://drive.google.com/open?id=FILE_ID
+    const match = fileIdOrUrl.match(/\/(?:d|folders)\/([a-zA-Z0-9_-]+)/) ||
+                  fileIdOrUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
     if (match) {
       return match[1];
     }
@@ -293,14 +296,17 @@ async function fetchDriveFileContent(drive, fileId) {
 }
 
 /**
- * List files in a specific folder (utility function)
- * @param {string} folderId - Google Drive folder ID
+ * List files in a specific folder
+ * @param {string} folderIdOrUrl - Google Drive folder ID or full folder URL
  * @param {number} limit - Maximum number of results
  * @param {string} userEmail - Optional: User email for domain-wide delegation
  * @returns {Object} List of files
  */
-export async function listFilesInFolder(folderId, limit = 20, userEmail = null) {
+export async function listFilesInFolder(folderIdOrUrl, limit = 20, userEmail = null) {
   try {
+    // Accept a pasted folder link as well as a bare ID
+    const folderId = extractFileId(folderIdOrUrl);
+
     const drive = createDriveClient(userEmail, true); // Read-only access
 
     const response = await drive.files.list({
