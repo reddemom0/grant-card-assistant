@@ -290,8 +290,8 @@ export async function readChatSpaceHistory(input = {}, ctx = {}) {
     // Names, in one batch for the whole window: "Unknown asked about the budget"
     // is not an answer. Never blocks — an unresolved sender gets an honest label.
     const { resolveSenderNames } = await import('./directory-names.js');
-    const names = await resolveSenderNames(collected.map(c => c._sender).filter(Boolean))
-      .catch(err => { console.warn(`⚠️  Sender names unresolved: ${err.message}`); return new Map(); });
+    const names = await resolveSenderNames(collected.map(c => c._sender).filter(Boolean), { userId })
+      .catch(err => { console.warn(`[names] unresolved: ${err.code || 'unknown'}`); return new Map(); });
 
     for (const c of collected) {
       c.sender = c.sender || names.get(c._sender?.name) || 'someone outside Granted';

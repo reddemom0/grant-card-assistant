@@ -236,8 +236,8 @@ export async function buildMentionDigest(input = {}, ctx = {}) {
     // load-bearing part. One batched resolution for the whole digest; it never
     // blocks, and an unresolved sender gets an honest label instead of "Unknown".
     const { resolveSenderNames, FALLBACKS } = await import('./directory-names.js');
-    const names = await resolveSenderNames(items.map(i => i._sender).filter(Boolean))
-      .catch(err => { console.warn(`⚠️  Sender names unresolved: ${err.message}`); return new Map(); });
+    const names = await resolveSenderNames(items.map(i => i._sender).filter(Boolean), { userId })
+      .catch(err => { console.warn(`[names] unresolved: ${err.code || 'unknown'}`); return new Map(); });
 
     for (const item of items) {
       item.from = item.from || names.get(item._sender?.name) || FALLBACKS.external;
