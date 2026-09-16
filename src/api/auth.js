@@ -128,7 +128,14 @@ router.get('/auth-google', (req, res) => {
     'https://www.googleapis.com/auth/calendar.events',
     // freebusy.query does NOT accept calendar.events, so this is required
     // separately to check colleagues' availability.
-    'https://www.googleapis.com/auth/calendar.freebusy'
+    'https://www.googleapis.com/auth/calendar.freebusy',
+    // Google Chat, READ ONLY. Oracle reads a space's history as the person
+    // asking — never as its own service account — so recall is limited to what
+    // that person can already see. spaces.readonly is needed to turn a space's
+    // display name into a resource name and to confirm membership;
+    // messages.readonly reads the messages themselves.
+    'https://www.googleapis.com/auth/chat.messages.readonly',
+    'https://www.googleapis.com/auth/chat.spaces.readonly'
   ].join(' ');
 
   console.log('🔵 OAuth Parameters:');
@@ -148,6 +155,9 @@ router.get('/auth-google', (req, res) => {
     `response_type=code&` +
     `scope=${encodeURIComponent(scopes)}&` +
     `access_type=offline&` +
+    // Carry forward anything this user has already granted, so a future split of
+    // this list into separate requests cannot quietly drop an existing scope.
+    `include_granted_scopes=true&` +
     `hd=${encodeURIComponent(ALLOWED_EMAIL_DOMAIN)}&` +
     `prompt=consent`;
 
@@ -268,8 +278,8 @@ router.get('/auth-callback', async (req, res) => {
     const tokenExpiry = tokens.expiry_date ? new Date(tokens.expiry_date) : null;
 
     const userResult = await query(
-      `INSERT INTO users (google_id, email, name, picture, google_access_token, google_refresh_token, google_token_expiry)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO users (google_id, email, name, picture, google_access_token, google_refresh_token, google_token_expiry, google_granted_scopes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT (google_id)
        DO UPDATE SET
          name = $3,
@@ -277,9 +287,13 @@ router.get('/auth-callback', async (req, res) => {
          google_access_token = $5,
          google_refresh_token = COALESCE($6, users.google_refresh_token),
          google_token_expiry = $7,
+         -- What Google actually granted, so a tool needing a newer scope can say
+         -- "sign in again" instead of failing with an API error. COALESCE keeps
+         -- the last known value if a response ever omits it.
+         google_granted_scopes = COALESCE($8, users.google_granted_scopes),
          updated_at = CURRENT_TIMESTAMP
        RETURNING id, email, name, picture, is_active`,
-      [userInfo.id, userInfo.email, userInfo.name, userInfo.picture, tokens.access_token, tokens.refresh_token, tokenExpiry]
+      [userInfo.id, userInfo.email, userInfo.name, userInfo.picture, tokens.access_token, tokens.refresh_token, tokenExpiry, tokens.scope || null]
     );
 
     const user = userResult.rows[0];

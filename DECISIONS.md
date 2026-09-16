@@ -12,6 +12,45 @@ Format:
 
 ---
 
+## 2026-09-16 — Oracle reads Chat history as the asker, with the surface enforced in code
+
+**What:** New Oracle-only tool `read_chat_space_history` (`src/tools/chat-history.js`)
+reads a Chat space's recent messages through the **asking person's** OAuth token —
+never Oracle's `chat.bot` service account — so recall is bounded by what that
+person can already see. Two read-only scopes added to the sign-in
+(`chat.messages.readonly`, `chat.spaces.readonly`), plus `include_granted_scopes`,
+which was not previously set. Defaults live in code: 30-day window, 500-message
+cap, and a `truncated` flag the model must relay.
+**Why in code, not prompt:** the rules are privacy rules. In a shared space only
+that space is readable — asking about another gets a refusal pointing the person
+to a DM — and in a DM or the Hub any space they belong to is fair game. The
+surface and space id arrive as the `options` argument of `executeToolCall`, built
+from the Google-signed event, so the model controls only `input` and cannot claim
+to be somewhere it is not.
+**Lazy re-consent:** migration 027 stores `users.google_granted_scopes` at sign-in
+(the callback had `tokens.scope` in hand and discarded it). NULL means "not known
+yet" and is resolved once via tokeninfo, then backfilled — treating NULL as "no"
+would have told the whole team to sign in again on day one. Sessions are 7-day
+JWTs and refresh tokens keep minting access tokens on the old grant, so adding a
+scope upgrades nobody automatically; the tool detects the gap and asks, in words.
+**Topic filtering is loose on purpose:** the Chat API cannot filter by text at
+all, so matching happens locally on crude stems and partial words. If a filter
+leaves fewer than 20 messages, the whole window is returned flagged as
+unfiltered — a thin filtered result is usually the matcher failing, not the space
+being silent, and the model is better placed to judge relevance than a stemmer.
+**Known gap, for whoever adds the next surface-dependent tool:**
+`runPendingAction` (`src/tools/pending-actions.js`) re-enters `executeToolCall`
+from a stored row and passes **no** `chatContext`. It does not bite today because
+`read_chat_space_history` is read-only and ungated, so it never takes that path.
+A tool that is BOTH gated and surface-dependent would arrive at execution with no
+surface and must either persist the context on the `pending_actions` row or
+refuse — do not let it silently default.
+**Impact:** `migrations/027_users_google_granted_scopes.sql`,
+`src/tools/chat-history.js`, `src/api/auth.js`, `src/tools/definitions.js`,
+`src/tools/executor.js`, `src/claude/client.js`, `src/api/chat-google.js`,
+`src/api/chat.js`, `.claude/agents/internal-oracle.md`,
+`tests/unit/chat-history.test.js`. Migration 027 must be run by hand.
+
 ## 2026-09-16 — Tool results are labelled as untrusted data, for every agent
 
 **What:** Every tool result now reaches the model wrapped as

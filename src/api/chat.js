@@ -341,7 +341,10 @@ export async function handleChatRequest(req, res) {
       userId: userId || null,
       sessionId,
       attachments: processedAttachments,
-      res
+      res,
+      // The Hub is not a Chat space, so space-scoped reads are allowed to name
+      // any space the signed-in person belongs to.
+      chatContext: { surface: 'hub' }
     });
 
     // Note: runAgent handles the response streaming and closing

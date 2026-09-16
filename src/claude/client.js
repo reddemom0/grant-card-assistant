@@ -174,7 +174,12 @@ export async function runAgent({
   res,
   forceModel = null,
   modelConfig = {},
-  onCostCalculated = null
+  onCostCalculated = null,
+  // Which surface this request came from, built by the entry point from the
+  // verified request. Passed to tools as a function argument, never as tool
+  // input, so the model cannot claim to be somewhere it is not. Absent for
+  // headless callers (webhook, scripts), which tools treat as "no context".
+  chatContext = null
 }) {
   console.log('\n' + '='.repeat(80));
   console.log(`🤖 Running agent: ${agentType}`);
@@ -927,7 +932,8 @@ export async function runAgent({
               block.input,
               conversationId,
               userId,  // Pass userId for domain-wide delegation
-              agentType  // Pass agentType for agent-specific tool behavior
+              agentType,  // Pass agentType for agent-specific tool behavior
+              chatContext ? { chatContext } : {}  // INTERNAL ONLY — see executeToolCall
             );
 
             console.log(`  📤 Result:`, JSON.stringify(result, null, 2).substring(0, 200) + '...');

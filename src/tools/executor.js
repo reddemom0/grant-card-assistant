@@ -110,6 +110,10 @@ async function buildProspectDataFromSession(conversationId) {
  * @param {string} [options.pendingActionId] - Set by runPendingAction() when a
  *   human has confirmed a saved proposal. This is a function argument, not a
  *   tool input, so the model has no way to supply it.
+ * @param {Object} [options.chatContext] - Which surface this request came from
+ *   ('chat_space' | 'chat_dm' | 'hub') and, in Chat, the verified space. Built
+ *   by the entry point from the signed request; same guarantee as above — the
+ *   model controls only `input`, so it cannot claim to be somewhere it is not.
  * @returns {Promise<Object>} Tool execution result
  */
 export async function executeToolCall(toolName, input, conversationId, userId = null, agentType = null, options = {}) {
@@ -603,6 +607,19 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           userEmail  // For domain-wide delegation
         );
         break;
+
+      // Chat history (chat-history.js). Dynamic import: Oracle-only, so no other
+      // agent pays for the module. Context comes from `options`, never `input`.
+      case 'read_chat_space_history': {
+        const { readChatSpaceHistory } = await import('./chat-history.js');
+        result = await readChatSpaceHistory(input, {
+          userId,
+          agentType,
+          conversationId,
+          chatContext: options.chatContext || { surface: 'none' }
+        });
+        break;
+      }
 
       case 'list_files_in_folder':
         result = await googleDrive.listFilesInFolder(

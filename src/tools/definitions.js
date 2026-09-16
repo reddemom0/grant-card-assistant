@@ -2271,6 +2271,49 @@ export const GOOGLE_CALENDAR_TOOLS = [
  * replace_google_doc_section is gated in src/tools/executor.js: the call is
  * saved as a pending action and runs only after a human replies "yes".
  */
+/**
+ * Google Chat history — READ ONLY, per-user delegated OAuth.
+ *
+ * Standalone const, like GOOGLE_CALENDAR_TOOLS and GOOGLE_DOCS_EDIT_TOOLS:
+ * referenced ONLY in the internal-oracle case of getToolsForAgent(). Keeping it
+ * out of ORACLE_TOOLS and ALL_TOOLS is what stops the orchestrator — and any
+ * headless path — from reading people's Chat spaces.
+ *
+ * Reads run as the ASKER, never as Oracle's chat.bot service account, so results
+ * are bounded by what that person can already see. Which space may be read is
+ * decided in src/tools/chat-history.js from the verified request, not from these
+ * inputs: in a shared space only that space is readable, and there is no input
+ * the model can set to change that.
+ */
+export const CHAT_HISTORY_TOOLS = [
+  {
+    name: 'read_chat_space_history',
+    description: 'Read recent messages from a Google Chat space, as the person asking — use this when someone asks what was said or decided about a topic in a space. Reads only spaces that person is a member of. In a shared space you can only read THAT space; to read a different one, the person must ask you in a direct message. Defaults to the last 30 days and at most 500 messages; the result says so when it was truncated or when a topic filter was too narrow to trust. Returns sender, time, text and a thread link — never file contents.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        space: {
+          type: 'string',
+          description: 'Space display name (e.g. "RTRI Changes") or resource name ("spaces/AAA"). Omit when the question is about the current space.'
+        },
+        query: {
+          type: 'string',
+          description: 'Topic to look for, in plain words (e.g. "eligibility changes"). Matching is loose and partial; if too few messages match, the whole window is returned instead and the result says so.'
+        },
+        since: {
+          type: 'string',
+          description: 'ISO-8601 start of the window. Defaults to 30 days ago.'
+        },
+        until: {
+          type: 'string',
+          description: 'ISO-8601 end of the window. Defaults to now.'
+        }
+      },
+      required: []
+    }
+  }
+];
+
 export const GOOGLE_DOCS_EDIT_TOOLS = [
   {
     name: 'read_google_doc_outline',
@@ -2818,7 +2861,10 @@ export function getToolsForAgent(agentType) {
       // GOOGLE_CALENDAR_TOOLS above. Keeping it out of GOOGLE_DOCS_TOOLS (which
       // ALL_TOOLS spreads) is what stops the orchestrator gaining the ability to
       // rewrite documents.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS];
+      // CHAT_HISTORY_TOOLS is referenced HERE and only here — same reason again.
+      // It reads Chat as the asking person; no headless or shared-tool path
+      // should be able to reach it.
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);

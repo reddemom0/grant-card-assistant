@@ -569,7 +569,14 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       conversationId,
       userId: user.id,
       sessionId: crypto.randomUUID(),
-      res: null // headless — same pattern as src/api/hubspot-webhook.js
+      res: null, // headless — same pattern as src/api/hubspot-webhook.js
+      // Built from the Google-signed event, never from message text. A shared
+      // space may only read itself; a DM may read any space the asker belongs to.
+      chatContext: {
+        surface: evt.isDm ? 'chat_dm' : 'chat_space',
+        spaceName: evt.spaceIsResourceName ? evt.spaceId : null,
+        spaceDisplayName: evt.spaceDisplayName
+      }
     });
 
     if (!result?.success) {
