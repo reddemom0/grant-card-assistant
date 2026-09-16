@@ -62,6 +62,10 @@ export async function getLeadGenFormContext(conversationId) {
     if (prospectData.employee_count) {
       context += `Employees: ${prospectData.employee_count}\n`;
     }
+    // No call-eligibility line here on purpose. Whether a call may be offered is
+    // decided server-side from prospect_data.best_fit_product when the
+    // {{BOOKING_LINK}} sentinel is substituted (src/api/booking-link-routing.js).
+    // best_fit_product is not shown to the agent.
     if (prospectData.hiring_plans) {
       context += `Hiring Plans: ${prospectData.hiring_plans}\n`;
     }

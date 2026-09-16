@@ -136,7 +136,6 @@ export async function saveLeadData(input, conversationId) {
       company_name:           input.company_name           || null,
       province:               input.province               || null,
       revenue:                input.revenue                || null,
-      employee_count:         input.employee_count         || null,
       company_description:    input.company_description    || null,
       activities:             input.activities_summary     || null,
       prior_grant_experience: input.prior_grant_experience || null,
@@ -157,7 +156,16 @@ export async function saveLeadData(input, conversationId) {
       // provided — the JSONB || merge replaces keys, so writing an explicit
       // null here would wipe a body stored by an earlier save_lead_data call
       // (and with it, upgrade-send eligibility).
-      ...(input.email_summary_body ? { email_summary_body: input.email_summary_body } : {})
+      ...(input.email_summary_body ? { email_summary_body: input.email_summary_body } : {}),
+      // Headcount the agent heard in conversation, e.g. "8 full-time, 2 part-time".
+      // Deliberately NOT written to `employee_count` — that key holds the widget
+      // form's bucket ("5 – 19"), which is the only value the Pro call-eligibility
+      // gate and the HubSpot numemployees mapping can read. Writing free text there
+      // produced 48 distinct values in production and, via parseEmployeeCount →
+      // num_ftes → the `num_ftes < 2` rule, silently mis-tiered leads as not_a_fit.
+      // Conditional spread for the same reason as email_summary_body above: an
+      // explicit null in a JSONB || merge overwrites rather than being ignored.
+      ...(input.employee_count ? { employee_count_stated: input.employee_count } : {})
     };
 
     await query(
