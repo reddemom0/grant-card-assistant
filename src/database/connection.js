@@ -68,7 +68,33 @@ export function getPool() {
 }
 
 /**
+ * A short, value-free name for a statement, safe to log: its leading keyword
+ * and the first table it names, e.g. "INSERT pending_actions".
+ *
+ * Exported for testing. Only SQL keywords and identifiers can match, so
+ * neither a parameter nor anything a caller interpolated into the text (some
+ * build WHERE clauses and intervals that way) can reach the log.
+ *
+ * @param {string} text - SQL query text
+ * @returns {string}
+ */
+export function queryLabel(text) {
+  const sql = String(text ?? '')
+    .replace(/--[^\n]*/g, ' ')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .trim();
+  const verb = (sql.match(/^[A-Za-z]+/)?.[0] || 'SQL').toUpperCase();
+  const table = sql.match(/\b(?:FROM|INTO|UPDATE|TABLE|INDEX)\s+(?:IF\s+(?:NOT\s+)?EXISTS\s+)?("?[A-Za-z_][\w.]*"?)/i)?.[1];
+  return table ? `${verb} ${table}` : verb;
+}
+
+/**
  * Execute a parameterized query
+ *
+ * Logs name the statement (queryLabel) and the error code only — never the
+ * parameters, the SQL text or the driver's message. Parameters carry message
+ * text, emails and OAuth tokens, and a driver message or detail can echo them.
+ *
  * @param {string} text - SQL query text
  * @param {Array} params - Query parameters
  * @returns {Promise<Object>} Query result
@@ -83,35 +109,33 @@ export async function query(text, params = []) {
 
     // Log slow queries
     if (duration > 1000) {
-      console.warn(
-        `⚠️  Slow query detected (${duration}ms):\n` +
-        `   ${text.substring(0, 100)}...\n` +
-        `   Params: ${JSON.stringify(params)}`
-      );
+      console.warn(`⚠️  Slow query detected (${duration}ms): ${queryLabel(text)}`);
     }
 
     // Log query in development
     if (process.env.NODE_ENV === 'development') {
-      console.log(`DB Query (${duration}ms): ${text.substring(0, 60)}...`);
+      console.log(`DB Query (${duration}ms): ${queryLabel(text)}`);
     }
 
     return res;
   } catch (error) {
-    console.error('Database query error:', {
-      message: error.message,
-      query: text.substring(0, 100),
-      params: params
-    });
+    console.error(`Database query error: ${queryLabel(text)} (code: ${error.code || error.name || 'unknown'})`);
     throw error;
   }
 }
 
 /**
  * Execute a transaction
+ *
+ * Logs a label and the error code only, like query(). The error object itself
+ * is never logged: a constraint violation's detail reads "Failing row contains
+ * (…)" with every column value in it.
+ *
  * @param {Function} callback - Async function that receives a client
+ * @param {string} [label] - fixed name for the log; never a value
  * @returns {Promise<*>} Result of the callback
  */
-export async function transaction(callback) {
+export async function transaction(callback, label = 'transaction') {
   const pool = getPool();
   const client = await pool.connect();
 
@@ -122,7 +146,7 @@ export async function transaction(callback) {
     return result;
   } catch (error) {
     await client.query('ROLLBACK');
-    console.error('Transaction error:', error);
+    console.error(`Transaction error: ${label} (code: ${error.code || error.name || 'unknown'})`);
     throw error;
   } finally {
     client.release();
