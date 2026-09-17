@@ -2,6 +2,12 @@
   "_comment": "Chat spaces Oracle keeps a stored copy of (Stage 3). Keyed by space resource name — the part after /space/ in the Chat URL, as spaces/XXXX — because display names change. `label` is for people reading this file only. A space not listed here is never subscribed or backfilled. Removing an entry deletes that space's stored copy on the next deploy. Loader: src/chat-listen/config.js",
 
   "spaces": [
-    { "name": "spaces/AAQAsvTWxwE", "label": "RTRI Changes" }
+    { "name": "spaces/AAQAxp5UlNE", "label": "AI Hub" },
+    { "name": "spaces/AAQAoeuLVk4", "label": "Announcements" },
+    { "name": "spaces/AAQA0nxQv08", "label": "GetGranted UAT" },
+    { "name": "spaces/AAQAFDokHD0", "label": "Grant Change Detection" },
+    { "name": "spaces/AAQABg6PT7c", "label": "Marketing" },
+    { "name": "spaces/AAQAsvTWxwE", "label": "RTRI Changes" },
+    { "name": "spaces/AAQAL3y8sZQ", "label": "Strategy Team" }
   ]
 }
