@@ -1,27 +1,22 @@
 {
-  "_comment": "What Oracle's intro card says in each space. Edit freely — this file is data, not code, and is re-read on each deploy. Keys under `spaces` are space display names, matched case-insensitively; a space with no entry gets `generic`. `can` lines go under \"What I can do here\" and should each name the command or wording that starts it. `examples` are copy-paste prompts, shown behind the card's own button and in a /help reply. `privately` and `goodToKnow` are the same everywhere except that a space Oracle keeps a copy of (data/chat/listen-spaces.json) also gets `listeningNote`. Loader: src/cards/intro-card.js",
-
+  "_comment": "What Oracle's intro card says in each space. Edit freely — this file is data, not code, and is re-read on each deploy. Keys under `spaces` are space display names, matched case-insensitively; a space with no entry gets `generic`. EVERY `can` line names its command or trigger AND says how it is used in THAT space, then what Oracle does: \"/track on an announcement asking everyone to do something — I post a checklist and summarise it for you at the deadline.\" At most four are shown (MAX_LINES in src/cards/intro-card.js). `examples` are copy-paste prompts, shown behind the card's own button and in a /help reply. `privately` and `goodToKnow` are the same everywhere except that a space Oracle keeps a copy of (data/chat/listen-spaces.json) also gets `listeningNote`. Loader: src/cards/intro-card.js",
   "guideUrl": "https://docs.google.com/document/d/1KR_Kzx6-R_dgHdUYSYgHJ4q24By_owQCMgbrVodFNPk/edit",
-
   "privately": [
     "DM me for anything you'd rather not ask in front of the team — a client's history, a draft, or \"what did we decide about X?\"",
     "DM me \"digest\" for what's waiting on you, or \"what can you do?\" for the full list."
   ],
-
   "goodToKnow": [
     "In a space I only see messages where I'm @mentioned.",
     "Before I change anything in HubSpot, a calendar or a Doc, I show you exactly what I'd do — anyone in the thread can reply \"yes\" to confirm.",
     "I never contact a client. Drafts come back to you."
   ],
-
   "listeningNote": "I keep a 12-month copy of this space's messages so I can answer questions about past discussions here. I still only reply when you @mention me.",
-
   "generic": {
     "can": [
-      "Track who has the ball on a thread — reply /track in it.",
-      "Find a time for a call — /meet, with the people @mentioned.",
-      "Watch a funding program for changes — reply \"@Oracle watch\" to the post about it.",
-      "Answer questions about clients, grants, Drive files and past discussions."
+      "/track as a reply to an ask — one card shows who has the ball, until it's decided or done.",
+      "/meet with the people @mentioned — the three earliest times you're all free, and one press books it with a Meet link.",
+      "/watch as a reply to a post about a funding program — I DM you before it opens, 14 and 2 days before its deadline, and if it closes.",
+      "@Oracle <a question about a client, a grant, a Drive file or a past discussion> — I answer from HubSpot, Drive and our own grant data."
     ],
     "examples": [
       "@Oracle track this",
@@ -31,12 +26,12 @@
       "@Oracle summarise this thread into next steps"
     ]
   },
-
   "dm": {
     "can": [
-      "Ask me anything about clients, grants, Drive files, calendars or past discussions.",
-      "Ask for your digest: what's waiting on you across every card.",
-      "Send me an inbound lead's details and I'll triage it — what HubSpot knows, which tier they look like, and what to say."
+      "@Oracle <a lead's name and their email or phone> — I triage it: what HubSpot knows, which tier they look like, and who should call.",
+      "digest — what's waiting on you, across every card.",
+      "/track and /meet work here too — with no thread to reply to, I use the message just above, and ask if it could be more than one.",
+      "@Oracle <any question about clients, grants, calendars or Drive> — the same answers as in a space, privately."
     ],
     "examples": [
       "digest",
@@ -46,14 +41,13 @@
       "Draft a follow-up to the Acme review"
     ]
   },
-
   "spaces": {
     "RTRI Changes": {
       "can": [
-        "Explain what an RTRI change means for our clients.",
-        "Watch RTRI for the next change — reply \"@Oracle watch\" to a post about it.",
-        "Check whether a company fits RTRI, from HubSpot.",
-        "Track who is handling a change — reply /track in the thread."
+        "/watch as a reply to a change post — I DM you before RTRI opens, 14 and 2 days before the deadline, and if it closes.",
+        "/track on a change someone has to action — one card shows who has the ball until it's done.",
+        "@Oracle what does this change mean for our clients? — I check HubSpot for the deals on RTRI and name the ones affected.",
+        "/meet with the people @mentioned — the three earliest times you're all free, and one press books it with a Meet link."
       ],
       "examples": [
         "@Oracle what changed in RTRI eligibility?",
@@ -63,29 +57,26 @@
         "@Oracle track this"
       ]
     },
-
     "Grant Change Detection": {
       "can": [
-        "Say what a detected change means for our clients.",
-        "Watch a program so the next change reaches whoever cares — \"@Oracle watch\".",
-        "List the HubSpot deals on the program that changed.",
-        "Track the follow-up — /track in the thread."
+        "/watch as a reply to an alert — I DM you before that program opens, 14 and 2 days before its deadline, and when it closes.",
+        "@Oracle which deals are on this program? — I list the HubSpot deals and who owns them.",
+        "/track on an alert someone has to act on — one card shows who has the ball and what is left.",
+        "/meet with the people @mentioned — the three earliest times you're all free, and one press books it with a Meet link."
       ],
       "examples": [
         "@Oracle what does this change mean for our clients?",
         "@Oracle watch",
         "@Oracle which deals are on this program?",
-        "@Oracle summarise today's alerts",
         "@Oracle track this"
       ]
     },
-
     "Strategy Team": {
       "can": [
-        "Check a company against a program, from HubSpot and our grant data.",
-        "Pull what was decided in past discussions and meetings.",
-        "Find a time for a call — /meet with the people @mentioned.",
-        "Track who has the ball on a decision — /track."
+        "@Oracle is this company a fit for <program>? — I check HubSpot and our grant data and say why, or why not.",
+        "/track on a decision that needs an owner — one card shows who has the ball, with the due date.",
+        "/meet with the people @mentioned — the three earliest times you're all free, and one press books it with a Meet link.",
+        "@Oracle what did we decide about X? — I pull it from past discussions and from decisions recorded on cards."
       ],
       "examples": [
         "@Oracle is this company a fit for CanExport?",
@@ -95,76 +86,75 @@
         "@Oracle track this"
       ]
     },
-
     "Marketing": {
       "can": [
-        "Draft posts and emails about a program, from what the program actually says.",
-        "Find our latest drafts in Drive.",
-        "Turn a thread into next steps, and track who owns them — /track.",
-        "Watch a program so a campaign never goes out against an old deadline — \"@Oracle watch\"."
+        "@Oracle draft a post about this program — written from what the program actually says, for you to edit.",
+        "/watch as a reply to a post about a program you are writing about — I DM you if its dates change, so nothing goes out against an old deadline.",
+        "/review as a reply to a draft with Doc links — I ask whether to track it, then keep one card showing reviewers and open comments.",
+        "/track on a campaign task — one card shows who has the ball until it is done."
       ],
       "examples": [
         "@Oracle draft a LinkedIn post about this program",
         "@Oracle find our latest blog drafts in Drive",
-        "@Oracle summarise this thread into next steps",
         "@Oracle watch",
+        "@Oracle review this",
         "@Oracle track this"
       ]
     },
-
     "GetGranted UAT": {
       "can": [
-        "Answer questions about a grant's data and what the matcher should do with it.",
-        "Track a bug or a fix until it's done — reply /track in the thread.",
-        "Find a time to go through findings — /meet.",
-        "Summarise a long test thread."
+        "/track on a bug someone has to fix — one card shows who has the ball and when it is due.",
+        "@Oracle what does this grant say about eligibility? — I read our grant data and quote it back.",
+        "/review as a reply to a spec or test plan in Docs — I ask whether to track it, then track the open comments on it.",
+        "/meet with the people @mentioned — the three earliest times you're all free, and one press books it with a Meet link."
       ],
       "examples": [
         "@Oracle track this",
         "@Oracle what does this grant say about eligibility?",
-        "@Oracle summarise this thread",
+        "@Oracle review this",
         "@Oracle find 30 min with @Nat tomorrow"
       ]
     },
-
     "Announcements": {
       "can": [
-        "Answer questions about anything announced here.",
-        "Watch a program mentioned in an announcement — \"@Oracle watch\".",
-        "Summarise what's been announced lately."
+        "/track on an announcement asking everyone to do something — I post a checklist and summarise it for you at the deadline.",
+        "/watch as a reply to an announcement about a funding program — I DM you before it opens and before its deadline.",
+        "@Oracle what does this mean for our clients? — I check HubSpot and name the clients it affects.",
+        "/meet with the people @mentioned — the three earliest times you're all free, and one press books it with a Meet link."
       ],
       "examples": [
-        "@Oracle summarise this week's announcements",
+        "@Oracle track this",
         "@Oracle watch",
-        "@Oracle what does this mean for our clients?"
+        "@Oracle what does this mean for our clients?",
+        "@Oracle find 30 min with @Nat this week"
       ]
     },
-
     "AI Hub": {
       "can": [
-        "Say what I can do, and what I can't.",
-        "Take a report when something goes wrong with me — say what happened and I'll say what I saw.",
-        "Summarise a thread, or track who's picking something up — /track."
+        "/help — this card again, privately, with example prompts to copy.",
+        "/track on something someone has to pick up — one card shows who has the ball until it is done.",
+        "@Oracle <a question about clients, grants, Drive or past discussions> — I answer from HubSpot, Drive and our grant data, and say when I could not see something.",
+        "/watch as a reply to a post about a funding program — I DM you when its dates change."
       ],
       "examples": [
         "@Oracle what can you do?",
-        "@Oracle something went wrong — here's what happened",
+        "@Oracle track this",
         "@Oracle summarise this thread",
-        "@Oracle track this"
+        "@Oracle watch"
       ]
     },
-
     "AI Discussions": {
       "can": [
-        "Say what I can do, and what I can't.",
-        "Research how other firms use AI for grant work.",
-        "Summarise a thread, or track who's picking something up — /track."
+        "@Oracle research how other firms use AI for grant work — I search the web and summarise what I find, with the links.",
+        "/help — what I can do here, privately, with example prompts to copy.",
+        "/track on something someone has to pick up — one card shows who has the ball.",
+        "@Oracle <a question about clients, grants or Drive> — I answer from HubSpot, Drive and our grant data."
       ],
       "examples": [
-        "@Oracle what can you do?",
         "@Oracle research how other firms use AI for grant writing",
-        "@Oracle summarise this thread",
-        "@Oracle track this"
+        "@Oracle what can you do?",
+        "@Oracle track this",
+        "@Oracle summarise this thread"
       ]
     }
   }

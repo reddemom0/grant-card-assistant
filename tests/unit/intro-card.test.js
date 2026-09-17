@@ -110,7 +110,10 @@ const { handleGoogleChatEvent } = await import('../../src/api/chat-google.js');
 const { handleCardClick, whenCardsIdle } = await import('../../src/cards/actions.js');
 const { applyLifecycle } = await import('../../src/cards/lifecycle.js');
 const notify = await import('../../src/cards/notify.js');
-const { introContent, postIntro } = await import('../../src/cards/intro-card.js');
+const { introContent, introCardV2, postIntro } = await import('../../src/cards/intro-card.js');
+const { readFileSync } = await import('fs');
+// The real wording, so editing data/chat/space-guides.json is what these check.
+const guides = JSON.parse(readFileSync('data/chat/space-guides.json', 'utf8'));
 const { HELP_COMMAND_ID, REVIEW_COMMAND_ID } = await import('../../src/cards/commands.js');
 
 const SPACE = 'spaces/TEAM';
@@ -258,7 +261,7 @@ describe('being added to a space', () => {
     const text = lastCardText();
     expect(text).toContain('/track');
     expect(text).toContain('/meet');
-    expect(text).toContain('@Oracle watch');
+    expect(text).toContain('/watch');
     // One link button (the guide) and one callback button (the examples).
     expect(lastButtons().map(b => b.text)).toEqual(['Show example prompts']);
     const row = cardPosts()[0].cardsV2[0].card.sections.at(-1).widgets[0].buttonList.buttons;
@@ -312,6 +315,77 @@ describe('being added to a space', () => {
     expect(fakes.db.intros.size).toBe(1);
   });
 });
+
+// ============================================================================
+// WHAT THE LINES SAY
+// ============================================================================
+
+describe('the "what I can do here" lines', () => {
+  const everyEntry = [
+    ...Object.entries(guides.spaces).map(([name, entry]) => [name, entry]),
+    ['generic', guides.generic],
+    ['dm', guides.dm]
+  ];
+  const TRIGGER = /\/(?:track|meet|watch|help|review)\b|@Oracle|^digest\b/;
+
+  test('every line names its command or trigger, and says what happens', () => {
+    for (const [name, entry] of everyEntry) {
+      expect(entry.can.length).toBeGreaterThan(0);
+      for (const line of entry.can) {
+        expect([name, line]).toEqual([name, expect.stringMatching(TRIGGER)]);
+        // "<trigger> <when to use it here> — <what I do>"
+        expect([name, line]).toEqual([name, expect.stringContaining('—')]);
+      }
+    }
+  });
+
+  test('nothing offers to summarise the space', () => {
+    for (const [name, entry] of everyEntry) {
+      for (const line of [...entry.can, ...entry.examples || []]) {
+        expect([name, line.toLowerCase()]).not.toEqual([name, expect.stringMatching(/summari[sz]e (?:this (?:space|channel)|the space|today'?s|this week'?s|what'?s been)/)]);
+      }
+    }
+  });
+
+  test('at most four lines show, so a fifth would be invisible', () => {
+    for (const [name, entry] of everyEntry) {
+      expect([name, entry.can.length]).toEqual([name, expect.any(Number)]);
+      expect(entry.can.length).toBeLessThanOrEqual(4);
+    }
+  });
+
+  test('the rendered card keeps the slash commands intact', () => {
+    // finalizeCards strips Markdown from every card string; a line starting
+    // with "/track" must come through untouched.
+    for (const [name, entry] of everyEntry) {
+      const isDm = name === 'dm';
+      const content = introContent({ displayName: isDm ? null : name, isDm });
+      const text = cardText(introCardV2(content, { cardId: 'card-1' }));
+      for (const line of content.can) {
+        const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        expect([name, text]).toEqual([name, expect.stringContaining(escaped)]);
+      }
+      for (const command of line_commands(entry.can)) {
+        expect([name, text]).toEqual([name, expect.stringContaining(command)]);
+      }
+    }
+  });
+
+  test('a space says how its own commands are used there', () => {
+    const announcements = introContent({ displayName: 'Announcements' });
+    expect(announcements.can[0]).toBe(
+      '/track on an announcement asking everyone to do something — I post a checklist and summarise it for you at the deadline.'
+    );
+    // And the rendered card carries it, slash and all.
+    expect(cardText(introCardV2(announcements, { cardId: 'card-1' })))
+      .toContain('/track on an announcement asking everyone to do something');
+  });
+});
+
+/** The slash commands a set of lines mentions. */
+function line_commands(lines) {
+  return [...new Set(lines.join(' ').match(/\/(?:track|meet|watch|help|review)\b/g) || [])];
+}
 
 // ============================================================================
 // ON DEMAND
