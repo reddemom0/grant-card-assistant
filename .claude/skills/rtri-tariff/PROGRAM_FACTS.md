@@ -10,6 +10,10 @@
 > a question requires a fact not here, say so and name what would need
 > confirming.
 
+**Answering an eligibility question?** Use the Eligibility answer template in
+the overview (`SKILL.md`) — required structure, cost-window and funding lines
+included, no ticks on criteria in a general answer.
+
 **Sources:** Granted RA (Fiscal 2025/2026); PacifiCan Applicant Guide for
 Businesses (modified 2026-09-14); PacifiCan — Types of RTRI support
 (https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-types-of-support.html),

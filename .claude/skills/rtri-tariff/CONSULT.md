@@ -43,22 +43,9 @@ retroactivity dates, cost-share, and required documents all do. If the stream
 wasn't specified and it changes the answer, either ask or give the answer for
 each stream, whichever is shorter.
 
-**Every eligibility answer includes two things**, even when not asked, from
-`PROGRAM_FACTS`:
-
-- **(a) The cost windows** — liquidity costs from 2026-08-22; pivot costs from
-  2026-04-01; costs from 2025-03-21 to 2026-03-31 are not eligible for pivot.
-- **(b) The funding share and combined caps** — PacifiCan covers up to 50% of
-  eligible costs for liquidity and non-repayable pivot, up to 75% for repayable
-  pivot; max $3M combined non-repayable; max $20M total.
-
-This makes an eligibility answer longer than a one-line lookup. That's
-intended — these are the facts clients most often get wrong.
-
-**Checklist marks.** Use ✅ only for criteria backed by evidence Granted has
-seen. Use ☐ for criteria that are unconfirmed or only claimed by the client. In
-a general eligibility answer (no specific client), list the criteria as plain
-bullets with no ticks.
+**Eligibility questions use the Eligibility answer template in the overview
+(`SKILL.md`)** — its structure is required, including the cost-window and
+funding lines and no ticks in a general answer. It overrides "short" above.
 
 ---
 

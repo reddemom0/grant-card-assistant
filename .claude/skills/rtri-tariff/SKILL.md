@@ -14,6 +14,39 @@ checking with Research.**
 
 ---
 
+## Eligibility answer template — required
+
+Any question about whether a business could qualify ("does a BC construction
+company qualify?") is answered in this structure, whether or not `CONSULT` is
+loaded. Load `PROGRAM_FACTS` first — every fact comes from it, and if a figure
+below ever differs, `PROGRAM_FACTS` wins.
+
+- **Short answer** — 1–2 lines.
+- **Baseline gates** — the hard eligibility criteria from `PROGRAM_FACTS`, as
+  plain bullets.
+- **Tariff impact** — how this type of business could evidence it.
+- **Stream fit** — liquidity, pivot, or both, and why.
+- **Cost windows** — one line each:
+  - Liquidity: costs from 2026-08-22
+  - Pivot: costs from 2026-04-01
+  - 2025-03-21 to 2026-03-31: not eligible for pivot
+- **Funding** — one line: up to 50% liquidity / 50% pivot non-repayable / 75%
+  pivot repayable; $3M combined non-repayable; $20M total.
+- **Next step** — one offer, such as running a readiness assessment.
+
+The whole answer fits in one Chat message — aim for under 2,500 characters.
+Trim inside a section rather than dropping one.
+
+For a named client, use the same structure but mark each gate: ✅ only where
+Granted has seen the evidence, ☐ where it is unconfirmed or only claimed.
+
+**Don't:**
+- Put ✅, 🔴 or any other mark on criteria in a general answer — plain bullets
+  only.
+- Skip the cost-window or funding lines, even when the question didn't ask.
+
+---
+
 ## Load the facts first
 
 Two files are authoritative, each for its own ground:
@@ -39,7 +72,7 @@ confirm). Never answer on either as though it were settled.
 
 | The user wants | Load |
 |---|---|
-| A quick answer about the program | `CONSULT` |
+| A quick answer about the program | `CONSULT` — for eligibility questions, the template above applies either way |
 | To run a readiness assessment on a client | `READINESS`. It loads `RA_QUESTIONS` itself at its Step 6 |
 | To build or review a project budget | `BUDGET` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
 | To draft application answers | `WRITEUP`, with `APPLICATION_FIELDS` loaded alongside it |
