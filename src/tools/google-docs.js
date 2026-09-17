@@ -173,21 +173,24 @@ function processInlineFormatting(text) {
     });
   }
 
+  const boldRanges = [...formatRanges];
+
   // Find all *italic* matches (but not **), non-greedy
   const italicRegex = /(?<!\*)\*(.+?)\*(?!\*)/g;
   while ((match = italicRegex.exec(text)) !== null) {
-    // Skip if this is part of a ** bold marker
-    const beforeChar = text[match.index - 1];
-    const afterChar = text[match.index + match[0].length];
-    if (beforeChar !== '*' && afterChar !== '*') {
-      formatRanges.push({
-        type: 'italic',
-        start: match.index,
-        end: match.index + match[0].length,
-        text: match[1],
-        markupLength: 2  // * at start and end
-      });
-    }
+    const start = match.index;
+    const end = start + match[0].length;
+    // A whole "**bold**" pair also satisfies this pattern. Keeping that match
+    // would count its markup twice and shift every style range after it onto
+    // the wrong characters, so skip any match that overlaps a bold range.
+    if (boldRanges.some(b => start < b.end && end > b.start)) continue;
+    formatRanges.push({
+      type: 'italic',
+      start,
+      end,
+      text: match[1],
+      markupLength: 2  // * at start and end
+    });
   }
 
   // Remove markdown syntax
@@ -200,10 +203,18 @@ function processInlineFormatting(text) {
 
 /**
  * Convert markdown content to Google Docs requests with Granted Consulting branding
+ *
+ * Handles `## ` and `### ` headings, `- ` bullets, checkbox lines starting with
+ * ☐ / [ ] / □ / ●, `|` tables, and plain paragraphs, with **bold** and *italic*
+ * inside bullets, checkbox lines, and paragraphs. Anything else — `# ` headings,
+ * `---` dividers, `1.` numbered lists — is inserted as literal text.
+ *
+ * Exported for testing.
+ *
  * @param {string} content - Markdown formatted content
  * @returns {Array} Array of Google Docs API requests
  */
-function markdownToDocsRequests(content) {
+export function markdownToDocsRequests(content) {
   const requests = [];
   let currentIndex = 1; // Google Docs index starts at 1
 

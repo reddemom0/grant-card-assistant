@@ -344,9 +344,9 @@ agreements (third-party funding).
 **Liquidity — additional:**
 - Payroll remittance reports — last 12 months
 - Evidence of essential operating costs — last 12 months
-- Monthly cash flow forecast — 12-month assistance period, with opening balance,
-  monthly inflows/outflows, closing balance, available financing, and other
-  confirmed funding
+- Monthly cash flow forecast — covering the requested assistance period (up to
+  12 months), with opening balance, monthly inflows/outflows, closing balance,
+  available financing, and other confirmed funding
 - Liquidity attestation — separate from the main attestation
 
 **Optional, strengthens an application:** capitalization table; written

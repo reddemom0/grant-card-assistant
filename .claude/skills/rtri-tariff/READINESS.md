@@ -56,13 +56,19 @@ sequence, not interleaved.
 
 Before running the full RA, confirm the conversation is worth having:
 
-- Revenues for the past two fiscal years — top line and bottom line
+- Revenues for the last two complete fiscal years — top line and bottom line
 - Fiscal year end date (needed for portal Tab 8)
 - Proof of tariff impact — either increased input or material costs with an
   explanation of scale, or lost revenue or customers with an explanation of
   the effect
 - Which tariff type applies
 - For Pivot only: proof of matching funds
+
+**Which fiscal years.** Work out "the last two complete fiscal years" from the
+client's fiscal year end and today's date, and ask for those years by name —
+FYE Dec 31, assessed Sept 2026 → FY2024 and FY2025. Use the same two years for
+revenue, net income, and the reviewed statements. If the client offers older
+years, flag it and say which years are needed.
 
 **Viability gate.** The program funds businesses that were healthy before
 tariffs, not businesses already in distress. If they were struggling before
@@ -105,7 +111,9 @@ a project plan exists.
 **Liquidity:** whether they can demonstrate a shortfall directly caused by
 tariffs, whether payroll remittance reports and evidence of essential
 operating costs exist for the last 12 months, and whether average monthly
-eligible payroll has been calculated.
+eligible payroll has been calculated. The monthly cash flow forecast covers the
+requested assistance period (up to 12 months) — a 6-month request needs a
+6-month forecast, not 12.
 
 Make sure a Liquidity client understands what it cannot cover — the
 ineligible payroll and operating cost lists in `PROGRAM_FACTS` are narrower
@@ -129,11 +137,18 @@ or "a lot."
 
 ### Checklist marks
 
-In the RA and in chat replies about it: use ✅ only for criteria backed by
-evidence Granted has seen. Use ☐ for criteria that are unconfirmed or only
-claimed by the client — "40 FTE, per the client" is ☐ until the financials or
-payroll records are in hand. In a general eligibility answer (no specific
-client), list the criteria as plain bullets with no ticks.
+In the RA and in chat replies about it:
+
+- ✅ only for criteria backed by evidence Granted has seen — a document or
+  record, not the client's word.
+- ☐ for everything else, with the reason after it. That includes judgments
+  resting on what the client said — "strong fit", incrementality,
+  co-contribution: `☐ Incrementality — no current defence sales, per the
+  client`.
+- No conditional ticks. Never "✅ once confirmed" or "✅ pending", and no ✅
+  anywhere on a ☐ line — just ☐ plus the note.
+- In a general eligibility answer (no specific client), plain bullets, no
+  marks.
 
 ### Step 7: Output
 
@@ -141,6 +156,19 @@ Write the completed RA to a Google Doc with `create_google_doc`, as markdown.
 That is the document tool to use here, not `create_advanced_document`. Leave
 the Doc private — whoever is running the RA decides when it reaches the
 client. Part One only; nothing from Part Two goes in it.
+
+**Doc formatting.** `create_google_doc` renders `##` and `###` headings, `- `
+bullets, `☐` lines, and plain paragraphs, with `**bold**` inside a line. So:
+
+- No `#` headings, `---` dividers, or numbered lists — they show as literal
+  text. No tables either.
+- Don't repeat the title at the top — the tool adds it.
+
+**Part One is client-facing.** No internal process wording — no "RA team",
+"sign-off", "transfer to writing", or internal milestones. Write next steps as
+client actions ("Send us your FY2024 and FY2025 reviewed financial
+statements") and as "Granted will…" ("Granted will review your documents and
+book the budget interview").
 
 Reply with the link and a short summary of what's still missing and what the
 client needs to supply. Never post the RA itself as chat text. If the Doc
@@ -161,6 +189,12 @@ or capital investments; implementation and project management experience;
 profitability trend two years pre-tariff and current; investment or VC
 backing; grant reliance.
 
+**Fee estimate.** From the Internal section of `PROGRAM_FACTS`: the $5,000
+writing fee; $3,000 if a business plan is needed; 2.5% of the approved maximum
+on any repayable funding. The success fee on non-repayable funding isn't
+defined there — say it is set in Schedule B once the budget is confirmed, and
+don't estimate it.
+
 **Flag grant reliance above 25% of the operating budget.** PacifiCan funds
 viable businesses, not grant-dependent ones.
 
@@ -171,8 +205,9 @@ together, so this informs that conversation rather than replacing it.
 ### Output
 
 Write Part Two to its own Google Doc with `create_google_doc`, separate from
-Part One's, and leave it private the same way. Title it as internal so it
-can't be mistaken for the RA. Never add Part Two to the Part One Doc.
+Part One's, and leave it private the same way. The Doc formatting rules in
+Step 7 apply. Title it as internal so it can't be mistaken for the RA. Never
+add Part Two to the Part One Doc.
 
 Reply with the link and say plainly that this document is internal and not for
 the client.
