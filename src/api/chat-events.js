@@ -217,6 +217,13 @@ async function routeEvent({ type, subject, data }) {
     import('../cards/track-card.js')
       .then(({ onThreadMessages }) => onThreadMessages(spaceName, created))
       .catch(err => console.warn(`⚠️  Tracked card thread hook failed — code: ${err?.code || err?.name || 'unknown'}`));
+
+    // A new post about a watched program becomes a line in tomorrow's DM (never
+    // an immediate ping), and a post saying the program closed ends the watch.
+    // Not limited to the card's own thread: a watch follows the program.
+    import('../cards/watch-card.js')
+      .then(({ onStoredMessages }) => onStoredMessages(spaceName, created))
+      .catch(err => console.warn(`⚠️  Watch card post hook failed — code: ${err?.code || err?.name || 'unknown'}`));
   }
   return 204;
 }

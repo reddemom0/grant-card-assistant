@@ -1,0 +1,7 @@
+{
+  "_comment": "When people are willing to take a meeting. Google exposes no working-hours setting through any API (Calendar's Settings has no such key), so /meet assumes these and this file is how you change them. Times are local to each person's own calendar time zone, 24-hour; `days` are 1=Monday … 7=Sunday. `people` is keyed by Google Workspace email and overrides `default` for that person only — a partial entry keeps the rest of the default. Anyone Oracle can't read a time zone for (an invitee outside the team) is treated as DEFAULT_TIMEZONE, and the card says so. Loader: src/cards/meet-slots.js",
+
+  "default": { "start": "09:00", "end": "17:00", "days": [1, 2, 3, 4, 5] },
+
+  "people": {}
+}

@@ -639,6 +639,12 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await hubspot.createDealNote(input);
         break;
 
+      // Gated, card-only as above: the lead triage card's outcome — contact,
+      // owner and note in one confirmed write.
+      case 'record_lead_outcome':
+        result = await hubspot.recordLeadOutcome(input);
+        break;
+
       // Personal Chat digest. Same Oracle-only, context-from-options rule as
       // read_chat_space_history above.
       case 'build_mention_digest': {

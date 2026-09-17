@@ -25,7 +25,7 @@ const CHAT_ISSUER = 'addon@proj.iam.gserviceaccount.com';
 const TOPIC = 'projects/p/topics/oracle-chat-events';
 const SECRET_TEXT = 'SENTINEL-confidential-grant-figures';
 const SENDER = 'users/987654321';
-const NOTICE = "Heads up: Oracle now keeps a 12-month copy of this space's messages so it can answer questions about past discussions here. It still only replies when you @mention it.";
+const INTRO = 'ORACLE-INTRO-CARD';   // what the mocked intro card posts
 const DAY = 864e5;
 
 const ENV = {
@@ -79,6 +79,64 @@ jest.unstable_mockModule('googleapis', () => ({
     },
     chat: ({ auth }) => (auth === g.client ? g.listenerChat : g.appChat)
   }
+}));
+
+// The allowlist this suite means: its own one space. The real list
+// (data/chat/listen-spaces.json) is edited whenever a space is added, and the
+// counts below are about this fixture, not about that file.
+jest.unstable_mockModule('../../src/chat-listen/config.js', () => ({
+  RETENTION_MONTHS: 12,
+  TOMBSTONE_DAYS: 30,
+  RENEW_WITHIN_MS: 48 * 60 * 60 * 1000,
+  CATCH_UP_OVERLAP_MS: 5 * 60 * 1000,
+  MESSAGE_EVENT_TYPES: [
+    'google.workspace.chat.message.v1.created',
+    'google.workspace.chat.message.v1.updated',
+    'google.workspace.chat.message.v1.deleted'
+  ],
+  listenSpaces: () => [{ name: SPACE, label: 'RTRI Changes' }],
+  isListenSpace: (name) => name === SPACE,
+  listenEntry: (name) => (name === SPACE ? { name: SPACE, label: 'RTRI Changes' } : null),
+  listenDisabled: () => process.env.CHAT_LISTEN_DISABLED === 'true',
+  listenEnvProblems: () => ['CHAT_LISTENER_USER_EMAIL', 'CHAT_EVENTS_PUBSUB_TOPIC', 'PUBSUB_PUSH_AUDIENCE', 'PUBSUB_PUSH_SERVICE_ACCOUNT']
+    .filter(name => !process.env[name]),
+  listenReady: () => process.env.CHAT_LISTEN_DISABLED !== 'true'
+    && ['CHAT_LISTENER_USER_EMAIL', 'CHAT_EVENTS_PUBSUB_TOPIC', 'PUBSUB_PUSH_AUDIENCE', 'PUBSUB_PUSH_SERVICE_ACCOUNT'].every(name => process.env[name]),
+  monthsAgo: (months, now = new Date()) => {
+    const d = new Date(now);
+    d.setUTCMonth(d.getUTCMonth() - months);
+    return d;
+  },
+  daysAgo: (days, now = new Date()) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+}));
+
+// Members are told with the intro card (src/cards/intro-card.js), whose content
+// is tested in intro-card.test.js. Here it matters only that the space is told
+// exactly once, before anything is read, through the same Chat call as before —
+// and that a failure to tell it stops listening.
+const intro = { told: new Set() };
+jest.unstable_mockModule('../../src/cards/intro-card.js', () => ({
+  postIntro: async ({ spaceName }) => {
+    if (intro.told.has(spaceName)) return true;
+    const { postToSpace } = await import('../../src/api/chat-google.js');
+    const posted = await postToSpace(spaceName, INTRO);
+    if (posted) intro.told.add(spaceName);
+    return posted;
+  },
+  replyWithIntro: async () => true,
+  dmIntroDone: async () => true,
+  introContent: () => ({ can: [], examples: [], privately: [], goodToKnow: [], guideUrl: null, where: 'this space' }),
+  introThreadName: (spaceName) => `${spaceName}/threads/intro`,
+  introType: { type: 'intro' }
+}));
+jest.unstable_mockModule('../../src/database/tracked-cards-store.js', () => ({
+  spaceIntro: async (spaceName) => (intro.told.has(spaceName) ? { space_name: spaceName, kind: 'space' } : null),
+  claimSpaceIntro: async () => true,
+  releaseSpaceIntro: async () => {},
+  setSpaceIntroMessage: async () => {},
+  liveCardsInThread: async () => [],
+  liveCardsOfType: async () => [],
+  touchActivity: async () => {}
 }));
 
 jest.unstable_mockModule('../../src/claude/client.js', () => ({ runAgent: jest.fn() }));
@@ -155,6 +213,7 @@ const logged = () => logSpies
 beforeEach(() => {
   g = createFakeGoogle();
   g.memberSpaces.add(SPACE);
+  intro.told.clear();
   db.spaces.clear();
   db.messages.clear();
   db.tombstones.clear();
@@ -187,10 +246,11 @@ describe('enabling RTRI Changes', () => {
     expect(result.pass).toMatchObject({ spaces: 1, enabled: 1, created: 1 });
     expect(space()).toMatchObject({ status: 'active', backfill_state: 'done', backfill_page_token: null });
 
-    // The notice went out once, as a new top-level message, word for word.
+    // The space was told once, as a new top-level message: the intro card,
+    // which carries the 12-month-copy line (intro-card.test.js).
     expect(g.posts).toHaveLength(1);
     expect(g.posts[0].parent).toBe(SPACE);
-    expect(g.posts[0].requestBody.text).toBe(NOTICE);
+    expect(g.posts[0].requestBody.text).toBe(INTRO);
     expect('thread' in g.posts[0].requestBody).toBe(false);
 
     // ...before anything was subscribed or read.
@@ -608,7 +668,7 @@ describe('removal', () => {
     expect(g.subscriptions.has(subscription)).toBe(false);
   });
 
-  test('Oracle re-added: the intro carries the notice, no separate notice, and the copy restarts', async () => {
+  test('Oracle re-added: one intro card, no second notice, and the copy restarts', async () => {
     db.addSpace(SPACE, { status: 'removed', notice_posted_at: new Date(Date.now() - 30 * DAY) });
     seedChat(3);
 
@@ -619,23 +679,21 @@ describe('removal', () => {
     await subs.withSpaceLock(SPACE, () => {});
     await whenIdle();
 
+    // One message: the intro card. The listening pass that follows sees the
+    // space has already been told and posts nothing more.
     expect(g.posts).toHaveLength(1);
-    const intro = postedTexts()[0];
-    expect(intro).toContain("I've been added to RTRI Changes");
-    expect(intro).toContain(NOTICE);
-    expect(intro).not.toContain("I only see messages where I'm @mentioned");
+    expect(postedTexts()[0]).toBe(INTRO);
     expect(space().notice_posted_at.getTime()).toBeGreaterThan(Date.now() - DAY);
     expect(g.subscriptions.size).toBe(1);
     expect(db.messages.size).toBe(3);
   });
 
-  test('Oracle added to a space that is not listened: the usual intro, nothing stored', async () => {
+  test('Oracle added to a space that is not listened: the intro card, nothing stored', async () => {
     const res = await chatEvent('addedToSpacePayload', { name: 'spaces/MARKETING', type: 'ROOM', displayName: 'Marketing' });
     expect(res.body).toEqual({});
     await eventually(() => g.posts.length === 1);
 
-    expect(postedTexts()[0]).toContain("I only see messages where I'm @mentioned");
-    expect(postedTexts()[0]).not.toContain('12-month copy');
+    expect(postedTexts()[0]).toBe(INTRO);
     expect(db.spaces.size).toBe(0);
     expect(g.eventsCalls('POST')).toHaveLength(0);
   });

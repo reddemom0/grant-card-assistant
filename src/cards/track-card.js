@@ -31,7 +31,7 @@ import { postMessage, patchCard } from './chat-api.js';
 import { renderCard, rerenderCard, tellPresser } from './update.js';
 import { notifyImmediate } from './notify.js';
 import { resolvePerson, timeZoneFor, localClock, realPeople, isListenerChatUser } from './people.js';
-import { trackedCard, paragraph, button, esc, clip, threadLink, messageLink, mdToPlain, textToCardHtml } from './render.js';
+import { trackedCard, paragraph, button, esc, clip, threadLink, messageLink, mdToPlain, textToCardHtml, dialogsEnabled } from './render.js';
 import { detectShape, isFeedbackAsk, parseDueDate, pickHolder, typedCommand } from './track-parse.js';
 import { suggestBall, draftDecision } from './track-suggest.js';
 import { readThread, readAsk, listSpaceHumans, storedCopyLive, normalizeMessage } from './track-thread.js';
@@ -45,18 +45,17 @@ const SUMMARY_RESPONSE_CHARS = 150;
 const MAX_NAMES = 8;
 const DISPLAY_TZ = process.env.DEFAULT_TIMEZONE || 'America/Vancouver';
 
-export const dialogsEnabled = () => process.env.TRACK_DIALOGS_ENABLED === 'true';
-// "Schedule call" appears once /meet exists.
-const meetAvailable = () => false;
+// "Schedule call" posts a /meet card for this ask, in the same thread.
+const meetAvailable = () => true;
 
 export const TRACK_ACTIONS = {
   'track.take': { personal: true, label: 'took the ball' },
-  'track.pass': { personal: false, label: 'passed the ball on', dialog: true },
+  'track.pass': { personal: false, label: 'passed the ball on', dialog: true, saved: 'Passed on' },
   'track.client': { personal: false, label: 'marked it waiting on the client' },
   'track.call': { personal: false, label: 'marked that a call is needed' },
   'track.schedule': { personal: false, label: 'asked to schedule a call' },
-  'track.promise': { personal: false, label: 'recorded a promise', dialog: true },
-  'track.decision': { personal: false, label: 'recorded the decision', dialog: true },
+  'track.promise': { personal: false, label: 'recorded a promise', dialog: true, saved: 'Promise recorded' },
+  'track.decision': { personal: false, label: 'recorded the decision', dialog: true, saved: 'Decision recorded' },
   'track.resolve': { personal: false, label: 'marked it resolved' },
   'track.refresh': { personal: false, label: 'refreshed from the thread' },
   'track.confirm': { personal: false, label: 'confirmed the suggestion' },
@@ -65,8 +64,8 @@ export const TRACK_ACTIONS = {
   'track.switch': { personal: false, label: 'switched the card’s shape' },
   'track.done': { personal: true, label: 'marked their part done' },
   'track.help': { personal: true, label: 'asked for help' },
-  'track.respond': { personal: true, label: 'submitted a response', dialog: true },
-  'track.remove': { personal: false, label: 'took people off the list', dialog: true },
+  'track.respond': { personal: true, label: 'submitted a response', dialog: true, saved: 'Response saved' },
+  'track.remove': { personal: false, label: 'took people off the list', dialog: true, saved: 'List updated' },
   'track.start': { personal: false, label: 'started tracking' },
   'track.auto': { personal: false, label: 'updated from the thread (best guess)' }
 };
@@ -501,8 +500,20 @@ async function handleAction({ card, actor, action, now = new Date() }) {
       await moveBall(card, { state: 'call', holder: b.holder || null }, actor, now);
       return { changed: true };
 
-    case 'track.schedule':
-      return { changed: false, ignored: 'not_available', reply: 'Scheduling from the card isn’t available yet.' };
+    case 'track.schedule': {
+      const existing = await store.findLiveCard('meet', card.thread_name);
+      if (existing) return { changed: false, ignored: 'already_there', reply: 'There’s already a meeting card in this thread.' };
+      // The meet card is its own message: posted in the background, linked back
+      // to this card by id so the after-call DM knows which ask it was about.
+      return {
+        changed: false,
+        ignored: 'meet_card_posted',
+        background: async () => {
+          const { meetForTrackCard } = await import('./meet-card.js');
+          await meetForTrackCard(card, actor, now);
+        }
+      };
+    }
 
     case 'track.resolve':
       await moveBall(card, { state: 'resolved' }, actor, now);
@@ -1084,7 +1095,7 @@ const sameLocalDay = (a, b, timeZone) => localClock(a, timeZone).date === localC
  */
 async function sendDueNotices(now = new Date()) {
   const counts = { reminders: 0, summaries: 0 };
-  for (const card of await store.dueTrackCards(new Date(now.getTime() + 2 * DAY_MS))) {
+  for (const card of await store.dueCardsOfType('track', new Date(now.getTime() + 2 * DAY_MS))) {
     const d = card.data || {};
     const b = ballOf(card);
     const dueAt = new Date(card.due_at);
@@ -1153,5 +1164,7 @@ export const trackCard = {
   digestLine,
   digestItems,
   markDigestShown,
-  sendDueNotices
+  sendDueNotices,
+  dialogFor,
+  submitDialog
 };

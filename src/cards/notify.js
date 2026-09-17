@@ -24,7 +24,8 @@ export const IMMEDIATE_KINDS = Object.freeze([
   'due_today',      // something you hold is due today (track card)
   'confirmation',   // an action you started is waiting for confirmation
   'due_summary',    // your "everyone" ask is past its due date: one private summary (track card)
-  'watched_grant'   // hook — watched-grant updates are not built yet
+  'watched_grant',  // a program you watch opened, is closing, or changed (watch card)
+  'meeting_followup' // a meeting you booked has ended: record the decision (meet card)
 ]);
 
 function codeOf(err) {
@@ -79,6 +80,8 @@ export async function buildDigest(chatUserId, localDate = null, now = new Date()
     store.ownedBy(chatUserId, ['open'], localDate),
     store.ownedBy(chatUserId, ['stale'], localDate)
   ]);
+  // Card types add their own lines. Each digestItems runs per person, per type,
+  // so a type returns [] fast unless something is genuinely due.
   const extras = [];
   for (const type of allCardTypes()) {
     if (type.digestItems) extras.push(...(await type.digestItems(chatUserId, { now, localDate })));

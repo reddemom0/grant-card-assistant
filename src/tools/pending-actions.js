@@ -33,6 +33,8 @@ export const GATED_TOOLS = {
   update_hubspot_deal: () => true,
   // Proposed by tracked cards (review outcome); no agent has it as a tool.
   create_hubspot_note: () => true,
+  // Proposed by the lead triage card: contact + owner + note in one write.
+  record_lead_outcome: () => true,
 
   // Irreversible: the secondary record is deleted.
   merge_duplicate_companies: () => true,
@@ -219,6 +221,19 @@ export function summarizeAction(toolName, input = {}) {
       const body = String(input.body || '').replace(/\s+/g, ' ').trim();
       const shown = body.length > 200 ? `${body.slice(0, 199)}…` : body;
       return `Add a note to HubSpot deal ${input.deal_name ? `"${input.deal_name}" ` : ''}(${input.deal_id}): "${shown}".`;
+    }
+
+    case 'record_lead_outcome': {
+      const p = input.properties || {};
+      const person = [p.firstname, p.lastname].filter(Boolean).join(' ') || p.email || 'this lead';
+      const where = input.contact_id
+        ? `update HubSpot contact ${input.contact_id} (${person})`
+        : `create a HubSpot contact for ${person}`;
+      const note = String(input.note || '').replace(/\s+/g, ' ').trim();
+      const shown = note.length > 200 ? `${note.slice(0, 199)}…` : note;
+      const owner = input.owner_name || input.owner_id;
+      return `Record this lead's outcome: ${where}` +
+        `${owner ? `, set the owner to ${owner}` : ''}, and add the note "${shown}".`;
     }
 
     case 'merge_duplicate_companies':

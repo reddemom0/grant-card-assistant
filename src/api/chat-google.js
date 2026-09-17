@@ -22,7 +22,6 @@ import { runAgent } from '../claude/client.js';
 import { createConversation, saveMessage } from '../database/messages.js';
 import { query } from '../database/connection.js';
 import { tryHandleConfirmation, currentPendingId, proposalNotice } from './confirmation.js';
-import { resolveSpaceIntro } from './space-intros.js';
 import { hubSignInUrl } from '../tools/chat-history.js';
 import { isListenSpace } from '../chat-listen/config.js';
 import { takeCardReply, findAppCommand } from '../cards/registry.js';
@@ -695,6 +694,35 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       `Chat: ${messageText.slice(0, 60)}`
     );
 
+    // SOMEONE'S FIRST DM: the intro card, then their question is answered as
+    // usual. Claimed in space_intros, so it happens once per person.
+    if (evt.isDm && evt.spaceIsResourceName) {
+      try {
+        const { dmIntroDone, postIntro } = await import('../cards/intro-card.js');
+        if (!(await dmIntroDone(evt.spaceId))) {
+          await postIntro({ spaceName: evt.spaceId, displayName: evt.senderDisplayName, isDm: true });
+        }
+      } catch (err) {
+        console.warn(`⚠️  DM intro failed — code: ${err?.code || err?.name || 'unknown'}`);
+      }
+    }
+
+    // "@Oracle help" — the space's own intro card, privately, with examples.
+    if (/^\s*(?:help|what can you do\??)\s*$/i.test(messageText)) {
+      const { replyWithIntro } = await import('../cards/intro-card.js');
+      await replyWithIntro({
+        spaceName: evt.spaceIsResourceName ? evt.spaceId : null,
+        threadName: evt.threadIsResourceName ? evt.threadId : null,
+        displayName: evt.isDm ? evt.senderDisplayName : evt.spaceDisplayName,
+        isDm: evt.isDm,
+        listening: !evt.isDm && evt.spaceIsResourceName && isListenSpace(evt.spaceId),
+        chatUserId: evt.senderChatId
+      });
+      await saveMessage(conversationId, 'user', messageText);
+      console.log('👋 Handled by the intro card — kind: help');
+      return;
+    }
+
     // CONFIRMATION FIRST. A bare "yes" runs the action the user was shown and
     // never reaches the model. Anyone in the thread may confirm; whoever sent
     // this message is recorded as the confirmer.
@@ -740,6 +768,49 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
         await saveMessage(conversationId, 'user', messageText);
         takeCardReply(conversationId);
         console.log(`🗂️  Handled by the track card — kind: ${trackWords}`);
+        return;
+      }
+    }
+
+    // THE LEAD TRIAGE CARD, WITHOUT THE MODEL. Same shape as the track check
+    // above: a message carrying contact details and a lead's wording gets a
+    // triage card, an unclear one is asked about first, and "assign @Name" /
+    // "called: …" / "outcome: …" update an existing lead card in the thread.
+    const { leadIntent, typedLeadCommand } = await import('../cards/lead-parse.js');
+    const leadWords = leadIntent(messageText) || (typedLeadCommand(messageText) ? 'typed' : null);
+    if (leadWords) {
+      const { handleLeadMessage } = await import('../cards/lead-card.js');
+      if (await handleLeadMessage({ evt, user, conversationId, messageText, intent: leadWords })) {
+        await saveMessage(conversationId, 'user', messageText);
+        takeCardReply(conversationId);
+        console.log(`🧲 Handled by the lead card — kind: ${leadWords}`);
+        return;
+      }
+    }
+
+    // THE /MEET CARD, WITHOUT THE MODEL. "find 45 min with @Nat this week",
+    // "set up a call with @Nat". A question about a past meeting is not one of
+    // these, and neither is anything without a thread to reply in.
+    const { meetIntent } = await import('../cards/meet-slots.js');
+    if (evt.threadIsResourceName && meetIntent(messageText)) {
+      const { handleMeetMessage } = await import('../cards/meet-card.js');
+      if (await handleMeetMessage({ evt, user, conversationId, messageText })) {
+        await saveMessage(conversationId, 'user', messageText);
+        takeCardReply(conversationId);
+        console.log('📅 Handled by the meet card — kind: mention');
+        return;
+      }
+    }
+
+    // THE /WATCH CARD, WITHOUT THE MODEL. Only ever "@Oracle watch" (or /watch):
+    // Oracle never decides on its own that a program is worth watching.
+    const { watchIntent } = await import('../cards/watch-match.js');
+    if (watchIntent(messageText)) {
+      const { handleWatchMessage } = await import('../cards/watch-card.js');
+      if (await handleWatchMessage({ evt, user, conversationId, messageText })) {
+        await saveMessage(conversationId, 'user', messageText);
+        takeCardReply(conversationId);
+        console.log('👁️  Handled by the watch card — kind: mention');
         return;
       }
     }
@@ -849,20 +920,25 @@ export async function handleGoogleChatEvent(req, res) {
   // nothing.
   // ==========================================================================
   if (kind === 'addedtospace') {
-    // A space on the listen allowlist gets an intro that says its messages are
-    // copied, and — once that intro is posted — the copy starts.
+    // A space on the listen allowlist gets an intro card that says its messages
+    // are copied, and — once that card is posted — the copy starts. A DM gets
+    // its own card on the person's first message instead, not on being added.
     const listening = !evt.isDm && evt.spaceIsResourceName && isListenSpace(evt.spaceId);
-    const intro = resolveSpaceIntro({
-      displayName: evt.spaceDisplayName,
-      isDm: evt.isDm,
-      listening
-    });
+    const willPost = !evt.isDm && evt.spaceIsResourceName;
 
-    console.log(`👋 Added to ${evt.isDm ? 'a DM' : `space "${evt.spaceDisplayName || '(no display name)'}"`} — ${intro ? 'posting intro' : 'no intro (DM)'}`);
+    console.log(`👋 Added to ${evt.isDm ? 'a DM' : `space "${evt.spaceDisplayName || '(no display name)'}"`} — ${willPost ? 'posting the intro card' : 'no intro (DM)'}`);
     res.status(200).json({});
 
     (async () => {
-      const introPosted = intro ? await safePost(evt, markdownToChat(intro)) : false;
+      let introPosted = false;
+      if (willPost) {
+        // Posted once per space, claimed in space_intros before posting, so a
+        // second addedToSpace event cannot post a second intro.
+        const { postIntro } = await import('../cards/intro-card.js');
+        introPosted = await postIntro({
+          spaceName: evt.spaceId, displayName: evt.spaceDisplayName, listening
+        });
+      }
       if (listening) {
         const { enableSpace } = await import('../chat-listen/subscriptions.js');
         await enableSpace(evt.spaceId, { announced: introPosted });

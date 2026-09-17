@@ -14,9 +14,17 @@
  *               pending unexpired row once, and executes through hubspot.
  *   chat      — src/cards/chat-api.js: records posts and patches; DM spaces.
  *   drive     — getDocCommentSummary from src/tools/google-drive.js.
- *   hubspot   — searchGrantApplications / createDealNote.
- *   directory — lookupChatUserEmail; calendar — getCalendarClient.
+ *   hubspot   — searchGrantApplications / createDealNote, plus the lead card's
+ *               reads and its one gated write (leadCrmSnapshot, listHubSpotOwners,
+ *               recordLeadOutcome).
+ *   leadGen   — latestLeadGenSession (src/database/lead-gen-reads.js).
+ *   grants    — searchGetGranted (src/tools/getgranted-search.js).
+ *   directory — lookupChatUserEmail; calendar — getCalendarClient, plus /meet's
+ *               free/busy, event insert and event patch.
+ *   granola   — granolaListMeetings (the MCP shape is not modelled; the fake
+ *               returns whatever the test sets, wrapped the way tests choose).
  *   agent     — runAgent (behaviour set per test); messages — createConversation.
+ *   db.intros — space_intros (migration 034): claimed once per space or DM.
  *   listen    — the stored Chat copy (src/database/chat-listen-store.js): the
  *               listened spaces and their stored thread messages.
  *   userChat  — the Chat API as a signed-in person (thread reads for /track).
@@ -49,13 +57,29 @@ export function createTrackedCardFakes() {
     users: [],
     digests: new Map(),
     actions: new Map(),
+    intros: new Map(),
     clickSeq: 0
   };
-  const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null, members: new Map(), memberCalls: [] };
+  const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null, failPost: null, members: new Map(), memberCalls: [] };
   const driveState = { docs: new Map(), calls: [], hold: null };
-  const hubspotState = { deals: [], searches: [], notes: [], failNote: false };
+  const hubspotState = {
+    deals: [], searches: [], notes: [], failNote: false,
+    // Lead triage: what the CRM knows, and what the card wrote to it.
+    snapshots: [], snapshot: null, owners: [], outcomes: [], failOutcome: false,
+    // /watch: companies for the "might fit" list.
+    companies: []
+  };
+  const leadGenState = { sessions: new Map(), calls: [] };
+  const grantsState = { grants: [], searches: [], fail: false };
   const directoryState = { people: new Map(), calls: [] };
-  const calendarState = { zones: new Map(), calls: [] };
+  const calendarState = {
+    zones: new Map(), calls: [],
+    // /meet: busy blocks per email, calendars that cannot be seen, and the
+    // events the card created or moved.
+    busy: new Map(), unseen: [], events: [], freeBusyCalls: [],
+    failFreeBusy: null, failInsert: false, failPatch: false, seq: 0
+  };
+  const granolaState = { meetings: null, calls: [], fail: false };
   const agentState = { calls: [], impl: null };
   const messagesState = { conversations: [] };
   const listenState = { spaces: new Map(), messages: [] };
@@ -153,9 +177,9 @@ export function createTrackedCardFakes() {
       return copy(row);
     },
 
-    async dueTrackCards(until) {
+    async dueCardsOfType(cardType, until) {
       return [...db.cards.values()]
-        .filter(c => c.card_type === 'track' && ['open', 'stale'].includes(c.status) && c.due_at && new Date(c.due_at) <= until)
+        .filter(c => c.card_type === cardType && ['open', 'stale'].includes(c.status) && c.due_at && new Date(c.due_at) <= until)
         .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
         .map(copy);
     },
@@ -218,8 +242,10 @@ export function createTrackedCardFakes() {
       return [...db.cards.values()].filter(c => statuses.includes(c.status)).map(copy);
     },
 
-    async markStaleBefore(cutoff, at = new Date()) {
-      const rows = [...db.cards.values()].filter(c => c.status === 'open' && c.last_activity_at < cutoff);
+    async markStaleBefore(cutoff, at = new Date(), { onlyTypes = null, exceptTypes = null } = {}) {
+      const rows = [...db.cards.values()].filter(c => c.status === 'open' && c.last_activity_at < cutoff
+        && (!onlyTypes || onlyTypes.includes(c.card_type))
+        && (!exceptTypes || !exceptTypes.includes(c.card_type)));
       rows.forEach(c => Object.assign(c, { status: 'stale', stale_since: at }));
       return rows.map(copy);
     },
@@ -262,7 +288,7 @@ export function createTrackedCardFakes() {
           db.participants.push({
             card_id: cardId, chat_user_id: p.chatUserId, role: p.role,
             display_name: p.displayName || null, status,
-            status_changed_at: status ? new Date() : null, muted: false, assigned_notified_at: null
+            status_changed_at: status ? new Date() : null, muted: false, assigned_notified_at: null, notified_on: null
           });
         }
       }
@@ -304,6 +330,13 @@ export function createTrackedCardFakes() {
       const p = db.participants.find(r => r.card_id === cardId && r.chat_user_id === chatUserId);
       if (!p) return false;
       p.muted = muted;
+      return true;
+    },
+
+    async claimParticipantNotice(cardId, chatUserId, localDate) {
+      const p = db.participants.find(r => r.card_id === cardId && r.chat_user_id === chatUserId);
+      if (!p || (p.notified_on && p.notified_on >= localDate)) return false;
+      p.notified_on = localDate;
       return true;
     },
 
@@ -420,6 +453,27 @@ export function createTrackedCardFakes() {
       return true;
     },
 
+    // ---- intros (migration 034) -------------------------------------------
+    async claimSpaceIntro(spaceName, kind = 'space') {
+      if (!spaceName || db.intros.has(spaceName)) return false;
+      db.intros.set(spaceName, { space_name: spaceName, kind, posted_at: new Date(), message_name: null });
+      return true;
+    },
+
+    async spaceIntro(spaceName) {
+      const row = spaceName && db.intros.get(spaceName);
+      return row ? { ...row } : null;
+    },
+
+    async releaseSpaceIntro(spaceName) {
+      db.intros.delete(spaceName);
+    },
+
+    async setSpaceIntroMessage(spaceName, messageName) {
+      const row = db.intros.get(spaceName);
+      if (row) row.message_name = messageName;
+    },
+
     async pendingActionState(actionId) {
       const a = actionId && db.actions.get(actionId);
       return a ? { status: a.status, result: json(a.result), expires_at: a.expires_at } : null;
@@ -451,9 +505,10 @@ export function createTrackedCardFakes() {
       gate.runs.push({ actionId, userId });
       if (!a || a.status !== 'pending' || a.expires_at <= new Date()) return { ok: false, reason: 'not_pending' };
       Object.assign(a, { status: 'confirmed', confirmed_by: userId });
-      const result = a.tool_name === 'create_hubspot_note'
-        ? await hubspot.module.createDealNote(a.tool_input)
-        : { success: false, error: `fake gate cannot run ${a.tool_name}` };
+      let result;
+      if (a.tool_name === 'create_hubspot_note') result = await hubspot.module.createDealNote(a.tool_input);
+      else if (a.tool_name === 'record_lead_outcome') result = await hubspot.module.recordLeadOutcome(a.tool_input);
+      else result = { success: false, error: `fake gate cannot run ${a.tool_name}` };
       a.result = result;
       a.status = result?.success === false ? 'failed' : 'confirmed';
       return { ok: true, summary: a.summary, result, toolName: a.tool_name };
@@ -465,6 +520,10 @@ export function createTrackedCardFakes() {
       return true;
     },
     summarizeAction(toolName, input = {}) {
+      if (toolName === 'record_lead_outcome') {
+        return `Record this lead's outcome: ${input.contact_id ? `update contact ${input.contact_id}` : 'create a contact'}` +
+          `${input.owner_id ? `, set the owner to ${input.owner_id}` : ''}, and add the note "${input.note}".`;
+      }
       return `Add a note to HubSpot deal "${input.deal_name}" (${input.deal_id}): "${input.body}".`;
     },
     /** What "@Oracle yes" in the thread does (tryHandleConfirmation). */
@@ -482,7 +541,7 @@ export function createTrackedCardFakes() {
     runPendingAction: (...a) => gate.runPendingAction(...a),
     declinePendingAction: (...a) => gate.declinePendingAction(...a),
     summarizeAction: (...a) => gate.summarizeAction(...a),
-    GATED_TOOLS: { create_hubspot_note: () => true }
+    GATED_TOOLS: { create_hubspot_note: () => true, record_lead_outcome: () => true }
   };
 
   // --------------------------------------------------------------------------
@@ -492,6 +551,7 @@ export function createTrackedCardFakes() {
     ...chatState,
     module: {
       async postMessage({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null }) {
+        if (chatState.failPost) throw chatState.failPost;
         const name = `${spaceName}/messages/m${++chatState.seq}`;
         chatState.posts.push({ name, spaceName, threadName, text, cardsV2: json(cardsV2), privateTo });
         return name;
@@ -540,10 +600,71 @@ export function createTrackedCardFakes() {
           applications: hubspotState.deals.filter(d => String(d[field] || '').toLowerCase().includes(needle))
         };
       },
+      async searchHubSpotCompanies(query) {
+        hubspotState.searches.push({ companies: query });
+        const needle = String(query || '').toLowerCase();
+        return {
+          success: true,
+          companies: hubspotState.companies.filter(c =>
+            !needle || String(c.industry || '').toLowerCase().includes(needle) || String(c.name || '').toLowerCase().includes(needle))
+        };
+      },
+
       async createDealNote({ deal_id, body }) {
         if (hubspotState.failNote) return { success: false, error: 'HubSpot note could not be created (500)' };
         hubspotState.notes.push({ deal_id, body });
         return { success: true, note_id: `note-${hubspotState.notes.length}`, deal_id };
+      },
+
+      // ---- lead triage -----------------------------------------------------
+      async leadCrmSnapshot(lead = {}) {
+        hubspotState.snapshots.push({ ...lead });
+        const empty = { success: true, contact: null, foundBy: null, phoneMatches: 0, company: null, deals: [], failed: [] };
+        return hubspotState.snapshot ? { ...empty, ...json(hubspotState.snapshot) } : empty;
+      },
+      async listHubSpotOwners() {
+        return { success: true, count: hubspotState.owners.length, owners: json(hubspotState.owners) };
+      },
+      async recordLeadOutcome(input = {}) {
+        if (hubspotState.failOutcome) return { success: false, error: 'HubSpot contact write failed (500)' };
+        if (!input.note) return { success: false, error: 'note is required' };
+        if (!input.contact_id && !input.properties?.email) {
+          return { success: false, error: 'No HubSpot contact and no email address' };
+        }
+        hubspotState.outcomes.push(json(input));
+        return {
+          success: true,
+          contact_id: input.contact_id || `contact-${hubspotState.outcomes.length}`,
+          contact_created: !input.contact_id,
+          owner_set: Boolean(input.owner_id),
+          note_id: `note-${hubspotState.outcomes.length}`
+        };
+      }
+    }
+  };
+
+  /** Our own lead-gen sessions, keyed by email (lowercased). */
+  const leadGen = {
+    ...leadGenState,
+    module: {
+      async latestLeadGenSession(email) {
+        const key = String(email || '').trim().toLowerCase();
+        leadGenState.calls.push(key);
+        const s = leadGenState.sessions.get(key);
+        return s ? json(s) : null;
+      }
+    }
+  };
+
+  /** Our grants table, for "worth mentioning". */
+  const grants = {
+    ...grantsState,
+    module: {
+      async searchGetGranted(input = {}) {
+        grantsState.searches.push(json(input));
+        if (grantsState.fail) throw Object.assign(new Error('grants down'), { code: 'ECONNREFUSED' });
+        const limit = input.limit || 10;
+        return { success: true, count: grantsState.grants.length, grants: json(grantsState.grants).slice(0, limit) };
       }
     }
   };
@@ -580,7 +701,71 @@ export function createTrackedCardFakes() {
             }
           }
         };
+      },
+
+      // ---- /meet -----------------------------------------------------------
+      async checkCalendarAvailability(userId, { emails = [], time_min, time_max } = {}) {
+        calendarState.freeBusyCalls.push({ userId, emails: [...emails], time_min, time_max });
+        if (calendarState.failFreeBusy) return { success: false, error: calendarState.failFreeBusy };
+        const seen = emails.filter(e => !calendarState.unseen.includes(e));
+        const unavailable = emails.filter(e => calendarState.unseen.includes(e));
+        return {
+          success: true,
+          window: { time_min, time_max },
+          count_visible: seen.length,
+          availability: seen.map(email => ({ email, busy: json(calendarState.busy.get(email) || []) })),
+          ...(unavailable.length
+            ? { calendars_unavailable: unavailable.map(email => ({ email, reason: 'notFound', explanation: 'Calendar not found or not shared with you' })) }
+            : {})
+        };
+      },
+
+      async createCalendarEvent(userId, input = {}) {
+        if (calendarState.failInsert) return { success: false, error: 'Calendar insert failed (500)' };
+        const id = `ev${++calendarState.seq}`;
+        const event = {
+          id, userId, title: input.title, start: input.start, end: input.end,
+          attendees: (input.attendees || []).map(email => ({ email, response: 'needsAction' })),
+          description: input.description || null,
+          meet_link: input.add_meet_link ? `https://meet.google.com/fake-${id}` : null,
+          html_link: `https://calendar.google.com/event?eid=${id}`,
+          sendUpdates: input.send_updates || 'none',
+          patches: []
+        };
+        calendarState.events.push(event);
+        return {
+          success: true,
+          event: { ...event, meet_link: event.meet_link },
+          meet_link: event.meet_link,
+          notified: event.sendUpdates
+        };
+      },
+
+      async updateCalendarEvent(userId, { event_id, ...changes } = {}) {
+        if (calendarState.failPatch) return { success: false, error: 'Calendar patch failed (500)' };
+        const event = calendarState.events.find(e => e.id === event_id);
+        if (!event) return { success: false, error: 'Event not found' };
+        event.patches.push({ userId, ...changes });
+        if (changes.start) event.start = changes.start;
+        if (changes.end) event.end = changes.end;
+        return { success: true, event: { ...event }, notified: changes.send_updates || 'all' };
       }
+    }
+  };
+
+  /** Granola through the MCP wrapper: whatever the test stored, or nothing. */
+  const granola = {
+    ...granolaState,
+    module: {
+      async granolaListMeetings(input = {}, ctx = {}) {
+        granolaState.calls.push({ ...input, userId: ctx.userId ?? null });
+        if (granolaState.fail) return { success: false, error: 'Could not reach Granola. Try again in a moment.' };
+        return { success: true, data: json(granolaState.meetings) };
+      },
+      async granolaQueryMeetings() { return { success: false, error: 'not used' }; },
+      async granolaGetMeetings() { return { success: false, error: 'not used' }; },
+      async granolaGetMeetingTranscript() { return { success: false, error: 'not used' }; },
+      async granolaListMeetingFolders() { return { success: false, error: 'not used' }; }
     }
   };
 
@@ -612,8 +797,28 @@ export function createTrackedCardFakes() {
   // failure switches are set on the State objects, reached through setters.
   Object.defineProperty(agent, 'impl', { get: () => agentState.impl, set: (v) => { agentState.impl = v; } });
   Object.defineProperty(chat, 'failPatch', { get: () => chatState.failPatch, set: (v) => { chatState.failPatch = v; } });
+  Object.defineProperty(chat, 'failPost', { get: () => chatState.failPost, set: (v) => { chatState.failPost = v; } });
   Object.defineProperty(drive, 'hold', { get: () => driveState.hold, set: (v) => { driveState.hold = v; } });
   Object.defineProperty(hubspot, 'failNote', { get: () => hubspotState.failNote, set: (v) => { hubspotState.failNote = v; } });
+  Object.defineProperty(hubspot, 'snapshot', { get: () => hubspotState.snapshot, set: (v) => { hubspotState.snapshot = v; } });
+  Object.defineProperty(hubspot, 'failOutcome', { get: () => hubspotState.failOutcome, set: (v) => { hubspotState.failOutcome = v; } });
+  Object.defineProperty(grants, 'fail', { get: () => grantsState.fail, set: (v) => { grantsState.fail = v; } });
+  // Arrays are shared with the *State objects, so assigning a whole new list
+  // has to replace the contents rather than the property.
+  const replaceable = (obj, key, target) => Object.defineProperty(obj, key, {
+    get: () => target,
+    set: (v) => { target.length = 0; target.push(...(v || [])); }
+  });
+  replaceable(hubspot, 'owners', hubspotState.owners);
+  replaceable(hubspot, 'deals', hubspotState.deals);
+  replaceable(hubspot, 'companies', hubspotState.companies);
+  replaceable(grants, 'grants', grantsState.grants);
+  replaceable(calendar, 'unseen', calendarState.unseen);
+  Object.defineProperty(calendar, 'failFreeBusy', { get: () => calendarState.failFreeBusy, set: (v) => { calendarState.failFreeBusy = v; } });
+  Object.defineProperty(calendar, 'failInsert', { get: () => calendarState.failInsert, set: (v) => { calendarState.failInsert = v; } });
+  Object.defineProperty(calendar, 'failPatch', { get: () => calendarState.failPatch, set: (v) => { calendarState.failPatch = v; } });
+  Object.defineProperty(granola, 'meetings', { get: () => granolaState.meetings, set: (v) => { granolaState.meetings = v; } });
+  Object.defineProperty(granola, 'fail', { get: () => granolaState.fail, set: (v) => { granolaState.fail = v; } });
 
   // --------------------------------------------------------------------------
   // STORED CHAT COPY AND USER-AUTH CHAT READS
@@ -667,6 +872,7 @@ export function createTrackedCardFakes() {
     db.users.length = 0;
     db.digests.clear();
     db.actions.clear();
+    db.intros.clear();
     db.clickSeq = 0;
     db.failOn = null;
     gate.saved.length = 0;
@@ -676,6 +882,7 @@ export function createTrackedCardFakes() {
     chatState.dms.clear();
     chatState.seq = 0;
     chatState.failPatch = null;
+    chatState.failPost = null;
     driveState.docs.clear();
     driveState.calls.length = 0;
     driveState.hold = null;
@@ -683,10 +890,32 @@ export function createTrackedCardFakes() {
     hubspotState.searches.length = 0;
     hubspotState.notes.length = 0;
     hubspotState.failNote = false;
+    hubspotState.snapshots.length = 0;
+    hubspotState.snapshot = null;
+    hubspotState.owners.length = 0;
+    hubspotState.outcomes.length = 0;
+    hubspotState.companies.length = 0;
+    hubspotState.failOutcome = false;
+    leadGenState.sessions.clear();
+    leadGenState.calls.length = 0;
+    grantsState.grants.length = 0;
+    grantsState.searches.length = 0;
+    grantsState.fail = false;
     directoryState.people.clear();
     directoryState.calls.length = 0;
     calendarState.zones.clear();
     calendarState.calls.length = 0;
+    calendarState.busy.clear();
+    calendarState.unseen.length = 0;
+    calendarState.events.length = 0;
+    calendarState.freeBusyCalls.length = 0;
+    calendarState.failFreeBusy = null;
+    calendarState.failInsert = false;
+    calendarState.failPatch = false;
+    calendarState.seq = 0;
+    granolaState.meetings = null;
+    granolaState.calls.length = 0;
+    granolaState.fail = false;
     agentState.calls.length = 0;
     agentState.impl = null;
     messagesState.conversations.length = 0;
@@ -699,7 +928,7 @@ export function createTrackedCardFakes() {
     userChatState.failWith = null;
   }
 
-  return { db, store, gate, chat, drive, hubspot, directory, calendar, agent, messages, listen, userChat, reset };
+  return { db, store, gate, chat, drive, hubspot, leadGen, grants, directory, calendar, granola, agent, messages, listen, userChat, reset };
 }
 
 // ============================================================================

@@ -662,7 +662,9 @@ describe('lifecycle', () => {
 describe('immediate notifications', () => {
   test('only the immediate kinds may DM anyone', async () => {
     const card = await seedCard();
-    expect(notify.IMMEDIATE_KINDS).toEqual(['assigned', 'due_today', 'confirmation', 'due_summary', 'watched_grant']);
+    expect(notify.IMMEDIATE_KINDS).toEqual([
+      'assigned', 'due_today', 'confirmation', 'due_summary', 'watched_grant', 'meeting_followup'
+    ]);
     await expect(notify.notifyImmediate('status_changed', { card, chatUserId: STEPH, text: 'x' }))
       .rejects.toThrow(/not an immediate notification/);
     expect(fakes.chat.posts).toHaveLength(0);

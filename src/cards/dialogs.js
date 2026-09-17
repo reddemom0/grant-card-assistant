@@ -16,19 +16,10 @@
 import * as store from '../database/tracked-cards-store.js';
 import { cardTypeOf } from './types.js';
 import { finishPress } from './actions.js';
-import { finalizeCards } from './render.js';
-import { dialogsEnabled, dialogFor, submitDialog, TRACK_ACTIONS } from './track-card.js';
+import { finalizeCards, dialogsEnabled } from './render.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const OPEN_BUDGET_MS = 20_000;
-
-const SAVED = {
-  'track.decision': 'Decision recorded',
-  'track.respond': 'Response saved',
-  'track.pass': 'Passed on',
-  'track.promise': 'Promise recorded',
-  'track.remove': 'List updated'
-};
 
 function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
@@ -59,8 +50,10 @@ export async function handleCardDialog(evt, now = new Date()) {
   const { cardId, action } = evt.parameters || {};
   const card = cardId && UUID.test(cardId) ? await store.getCard(cardId) : null;
   const type = card && cardTypeOf(card);
-  if (!card || type?.type !== 'track' || !TRACK_ACTIONS[action]?.dialog || !evt.actorChatId) {
-    console.log('↩️  Card dialog ignored — reason: not_a_track_dialog');
+  // Any card type may own dialogs: it marks the action `dialog: true` and
+  // exports dialogFor / submitDialog.
+  if (!card || !type?.dialogFor || !type.actions?.[action]?.dialog || !evt.actorChatId) {
+    console.log('↩️  Card dialog ignored — reason: not_a_card_dialog');
     return closeDialog();
   }
   const actor = { chatUserId: evt.actorChatId, name: evt.actorName || null, email: evt.actorEmail || null };
@@ -71,7 +64,7 @@ export async function handleCardDialog(evt, now = new Date()) {
     let timer;
     try {
       const dialog = await Promise.race([
-        dialogFor(card, action, actor),
+        type.dialogFor(card, action, actor),
         new Promise(resolve => { timer = setTimeout(() => resolve(null), OPEN_BUDGET_MS); })
       ]);
       return dialog ? openDialog(dialog) : closeDialog('Couldn’t open that — try again.');
@@ -85,12 +78,13 @@ export async function handleCardDialog(evt, now = new Date()) {
 
   if (evt.dialogEventType === 'SUBMIT_DIALOG') {
     const outcome = live
-      ? await submitDialog(card, action, actor, evt.formInputs || {}, now)
+      ? await type.submitDialog(card, action, actor, evt.formInputs || {}, now)
       : { changed: false, ignored: 'closed', reply: 'This card is closed, so nothing changed.' };
     // The notification carries the answer; no separate private reply.
     await finishPress(card, type, actor, action, { ...outcome, reply: null }, now);
     console.log(`🗂️  Card dialog submitted — action: ${action}, result: ${outcome.ignored || (outcome.changed ? 'changed' : 'unchanged')}`);
-    return closeDialog(outcome.changed ? SAVED[action] : (outcome.reply || 'Nothing changed.'));
+    const saved = type.actions[action]?.saved || 'Saved';
+    return closeDialog(outcome.changed ? saved : (outcome.reply || 'Nothing changed.'));
   }
 
   return closeDialog();

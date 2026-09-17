@@ -155,6 +155,14 @@ export function messageLink(messageName, threadName) {
     : `https://chat.google.com/room/${space}`;
 }
 
+/**
+ * Are card dialogs switched on? Add-on dialogs are a Developer Preview
+ * feature, and one Google reference says the button setting that opens them
+ * strips the card, so every dialog has a typed fallback and this stays off
+ * until it has been tried in a real space.
+ */
+export const dialogsEnabled = () => process.env.TRACK_DIALOGS_ENABLED === 'true';
+
 export function buttonsAvailable() {
   return Boolean(endpoint());
 }
@@ -177,6 +185,33 @@ export function decorated({ top = null, text, bottom = null, buttonSpec = null }
 
 export function buttonRow(buttons) {
   return { buttonList: { buttons } };
+}
+
+/**
+ * A time zone's offset from UTC at that instant, in minutes. Intl is the only
+ * place Node exposes this, and cards need it twice: to turn a local wall time
+ * (end of someone's day, a meeting slot) into a real instant.
+ */
+export function tzOffsetMinutes(at, timeZone = DEFAULT_TZ) {
+  try {
+    const name = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+      .formatToParts(new Date(at)).find(p => p.type === 'timeZoneName')?.value || '';
+    const m = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(name);
+    if (!m) return 0;   // "GMT" itself
+    return (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] || 0));
+  } catch {
+    return 0;
+  }
+}
+
+/** The instant a local wall time falls on, e.g. ('2026-09-17', 17, 0, tz). */
+export function localInstant(localDate, hour = 0, minute = 0, timeZone = DEFAULT_TZ) {
+  const hh = String(hour).padStart(2, '0');
+  const mm = String(minute).padStart(2, '0');
+  const asUtc = new Date(`${localDate}T${hh}:${mm}:00Z`);
+  // The offset is read at the guessed instant; a DST boundary inside the same
+  // day moves it by an hour at most, which no card cares about.
+  return new Date(asUtc.getTime() - tzOffsetMinutes(asUtc, timeZone) * 60_000);
 }
 
 /** "Sep 17, 3:04 PM PDT" in the team's default time zone. */

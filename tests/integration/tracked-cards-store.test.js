@@ -113,6 +113,10 @@ run('tracked cards store (real Postgres)', () => {
     await pool.query(migration('030_tracked_cards.sql'));   // safe to re-run
     await pool.query(migration('031_track_cards.sql'));
     await pool.query(migration('031_track_cards.sql'));     // safe to re-run
+    await pool.query(migration('033_card_notices.sql'));
+    await pool.query(migration('033_card_notices.sql'));    // safe to re-run
+    await pool.query(migration('034_space_intros.sql'));
+    await pool.query(migration('034_space_intros.sql'));    // safe to re-run
   });
 
   afterAll(async () => {
@@ -413,8 +417,8 @@ run('tracked cards store (real Postgres)', () => {
     await store.setDue(card.id, at(5));
     await store.setDue(other.id, at(5));
 
-    expect((await store.dueTrackCards(at(6))).map(c => c.id)).toEqual([card.id]);
-    expect(await store.dueTrackCards(at(4))).toEqual([]);
+    expect((await store.dueCardsOfType('track', at(6))).map(c => c.id)).toEqual([card.id]);
+    expect(await store.dueCardsOfType('track', at(4))).toEqual([]);
 
     const claims = await Promise.all([1, 2, 3].map(() => store.claimDueReminder(card.id, at(5))));
     expect(claims.filter(Boolean)).toHaveLength(1);
@@ -579,5 +583,99 @@ run('tracked cards store (real Postgres)', () => {
     const out = logSpies.flatMap(s => s.mock.calls).map(a => a.join(' ')).join('\n');
     expect(out).toContain('23505');
     expect(out).not.toContain('secret-value');
+  });
+  // ==========================================================================
+  // THE NEWER RULES (migrations 033 and 034)
+  // ==========================================================================
+
+  describe('staleness by card type', () => {
+    test('a type can be left out of the blanket pass, and swept on its own clock', async () => {
+      const track = await newCard({ cardType: 'track' });
+      const watch = await newCard({ cardType: 'watch' });
+      const meet = await newCard({ cardType: 'meet' });
+      for (const c of [track, watch, meet]) await setActivity(c.id, at(0));
+
+      // The blanket pass, with two types held back.
+      const blanket = await store.markStaleBefore(at(30), at(31), { exceptTypes: ['watch', 'meet'] });
+      expect(blanket.map(c => c.id)).toEqual([track.id]);
+
+      // And one of those types swept on its own, longer clock.
+      const own = await store.markStaleBefore(at(50), at(51), { onlyTypes: ['watch'] });
+      expect(own.map(c => c.id)).toEqual([watch.id]);
+      expect((await store.getCard(meet.id)).status).toBe('open');
+    });
+
+    test('due cards are found by type, never across types', async () => {
+      const lead = await newCard({ cardType: 'lead' });
+      const meet = await newCard({ cardType: 'meet' });
+      await store.setDue(lead.id, at(5));
+      await store.setDue(meet.id, at(5));
+
+      expect((await store.dueCardsOfType('lead', at(6))).map(c => c.id)).toEqual([lead.id]);
+      expect((await store.dueCardsOfType('meet', at(6))).map(c => c.id)).toEqual([meet.id]);
+      expect(await store.dueCardsOfType('watch', at(6))).toEqual([]);
+      expect(await store.dueCardsOfType('lead', at(4))).toEqual([]);
+    });
+  });
+
+  describe('one notice per person per day', () => {
+    test('the first caller wins, and tomorrow wins again', async () => {
+      const row = await newCard({ cardType: 'watch' });
+      await store.addParticipants(row.id, [
+        { chatUserId: 'users/a', role: 'member' },
+        { chatUserId: 'users/b', role: 'member' }
+      ]);
+
+      expect(await store.claimParticipantNotice(row.id, 'users/a', '2026-09-17')).toBe(true);
+      expect(await store.claimParticipantNotice(row.id, 'users/a', '2026-09-17')).toBe(false);
+      // Another person that same day is unaffected.
+      expect(await store.claimParticipantNotice(row.id, 'users/b', '2026-09-17')).toBe(true);
+      // The next day is a new claim.
+      expect(await store.claimParticipantNotice(row.id, 'users/a', '2026-09-18')).toBe(true);
+      // Somebody not on the card claims nothing.
+      expect(await store.claimParticipantNotice(row.id, 'users/c', '2026-09-18')).toBe(false);
+    });
+
+    test('two claims at once yield exactly one winner', async () => {
+      const row = await newCard({ cardType: 'watch' });
+      await store.addParticipants(row.id, [{ chatUserId: 'users/a', role: 'member' }]);
+
+      const results = await Promise.all([
+        store.claimParticipantNotice(row.id, 'users/a', '2026-09-17'),
+        store.claimParticipantNotice(row.id, 'users/a', '2026-09-17')
+      ]);
+      expect(results.filter(Boolean)).toHaveLength(1);
+    });
+  });
+
+  describe('introducing Oracle once', () => {
+    test('a space is claimed once, and the claim can be given back', async () => {
+      expect(await store.claimSpaceIntro('spaces/NEW')).toBe(true);
+      expect(await store.claimSpaceIntro('spaces/NEW')).toBe(false);
+      expect(await store.spaceIntro('spaces/NEW')).toMatchObject({ kind: 'space', message_name: null });
+
+      await store.setSpaceIntroMessage('spaces/NEW', 'spaces/NEW/messages/m1');
+      expect((await store.spaceIntro('spaces/NEW')).message_name).toBe('spaces/NEW/messages/m1');
+
+      // Posting failed: the claim goes back and the next pass can post.
+      await store.releaseSpaceIntro('spaces/NEW');
+      expect(await store.spaceIntro('spaces/NEW')).toBeNull();
+      expect(await store.claimSpaceIntro('spaces/NEW')).toBe(true);
+    });
+
+    test('a DM is its own claim, and two at once yield one winner', async () => {
+      expect(await store.claimSpaceIntro('spaces/DM1', 'dm')).toBe(true);
+      expect((await store.spaceIntro('spaces/DM1')).kind).toBe('dm');
+
+      const results = await Promise.all([
+        store.claimSpaceIntro('spaces/DM2', 'dm'),
+        store.claimSpaceIntro('spaces/DM2', 'dm')
+      ]);
+      expect(results.filter(Boolean)).toHaveLength(1);
+    });
+
+    test('only "space" and "dm" are allowed kinds', async () => {
+      await expect(store.claimSpaceIntro('spaces/BAD', 'other')).rejects.toThrow();
+    });
   });
 });

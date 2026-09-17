@@ -28,7 +28,6 @@ import {
   reactivateSubscription, deleteSubscription, LISTENER_PROBLEMS
 } from './listener.js';
 import { startBackfill, startCatchUp } from './backfill.js';
-import { listeningNotice } from '../api/space-intros.js';
 
 // A suspended subscription with this reason can't be reactivated (Google:
 // "You can't reactivate the subscription"). It is replaced instead.
@@ -77,11 +76,24 @@ async function failed(spaceName, err, stage) {
   return pause(spaceName, `${stage}_${code}`);
 }
 
+/**
+ * Tell the space, before anything is read. This is the intro card, which
+ * carries the 12-month-copy line, and it keeps this function's contract: true
+ * when the space has been told (now or earlier), false when telling it failed —
+ * which pauses the space with `notice_failed` rather than reading messages
+ * nobody was told about.
+ */
 async function postNotice(spaceName) {
   // Loaded on use, as chat-google.js loads this module: a static import either
   // way would pull the whole agent loop into the other's dependency graph.
-  const { postToSpace } = await import('../api/chat-google.js');
-  return postToSpace(spaceName, listeningNotice());
+  const { postIntro } = await import('../cards/intro-card.js');
+  const entry = listenEntry(spaceName);
+  const posted = await postIntro({
+    spaceName,
+    displayName: entry?.label || null,
+    listening: true
+  });
+  return posted;
 }
 
 async function deleteQuietly(listener, subscriptionName) {
@@ -189,10 +201,13 @@ export async function syncSpace(spaceName, { listener } = {}) {
   }
   if (!member) return pause(spaceName, 'listener_not_member');
 
-  // Members are told before anything is read.
-  if (!row.notice_posted_at) {
+  // Members are told before anything is read. The check is space_intros, not
+  // notice_posted_at: a space that was told in plain text before the intro card
+  // existed still gets the card, once, on the next pass.
+  const { spaceIntro } = await import('../database/tracked-cards-store.js');
+  if (!(await spaceIntro(spaceName))) {
     if (!(await postNotice(spaceName))) return pause(spaceName, 'notice_failed');
-    await store.markNoticePosted(spaceName);
+    if (!row.notice_posted_at) await store.markNoticePosted(spaceName);
   }
 
   let subscription;

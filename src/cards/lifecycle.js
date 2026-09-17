@@ -17,7 +17,7 @@
  */
 
 import * as store from '../database/tracked-cards-store.js';
-import { cardTypeOf } from './types.js';
+import { cardTypeOf, allCardTypes } from './types.js';
 import { rerenderCard } from './update.js';
 
 export const STALE_AFTER_DAYS = 30;
@@ -85,8 +85,32 @@ export async function touchCardsInThread(threadName, at = new Date()) {
   return reopened;
 }
 
+/**
+ * How long a type's cards may sit still before they go stale. A type may set
+ * its own `staleAfterDays`, or `neverStale` when idleness means nothing — a
+ * watch on a program that closes in three months, or a meeting six weeks out,
+ * is not neglected just because nobody pressed a button.
+ */
+function staleRules() {
+  const never = [];
+  const custom = [];
+  for (const type of allCardTypes()) {
+    if (type.neverStale) never.push(type.type);
+    else if (type.staleAfterDays) custom.push(type);
+  }
+  return { never, custom };
+}
+
 export async function applyLifecycle(now = new Date()) {
-  const staled = await store.markStaleBefore(new Date(now.getTime() - STALE_AFTER_DAYS * DAY_MS), now);
+  const cutoff = (days) => new Date(now.getTime() - days * DAY_MS);
+  const { never, custom } = staleRules();
+
+  const staled = await store.markStaleBefore(cutoff(STALE_AFTER_DAYS), now, {
+    exceptTypes: [...never, ...custom.map(t => t.type)]
+  });
+  for (const type of custom) {
+    staled.push(...await store.markStaleBefore(cutoff(type.staleAfterDays), now, { onlyTypes: [type.type] }));
+  }
   for (const card of staled) await rerenderCard(card.id);
 
   const closed = await store.closeStaleBefore(new Date(now.getTime() - CLOSE_AFTER_STALE_DAYS * DAY_MS), now);

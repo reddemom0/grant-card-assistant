@@ -566,15 +566,28 @@ describe('moving the ball', () => {
     expect(digests()[2][0].card.sections.map(s => s.header)).toEqual(['Waiting on you']);
   });
 
-  test('Call needed: no Schedule call button while /meet doesn’t exist, and the button explains itself', async () => {
+  test('Call needed offers Schedule call, and pressing it posts a meet card in the same thread', async () => {
     await command();
     const card = await liveCard();
     const response = await press(card, 'track.call', NAT);
     expect(cardText(updated(response))).toContain(`Call needed · with ${NAMES[JASON]}`);
-    expect(buttonTexts(updated(response))).not.toContain('Schedule call');
+    expect(buttonTexts(updated(response))).toContain('Schedule call');
+
     await press(card, 'track.schedule', NAT);
     await whenCardsIdle();
-    expect(privateReplies()).toEqual([[NAT, 'Scheduling from the card isn’t available yet.']]);
+
+    // Its own message, linked back to this card; the track card is unchanged.
+    const meet = [...fakes.db.cards.values()].find(c => c.card_type === 'meet');
+    expect(meet).toBeTruthy();
+    expect(meet.thread_name).toBe(THREAD);
+    expect(meet.data.trackCardId).toBe(card.id);
+    expect(privateReplies()).toEqual([]);
+
+    // A second press does not post a second card.
+    await press(card, 'track.schedule', NAT);
+    await whenCardsIdle();
+    expect([...fakes.db.cards.values()].filter(c => c.card_type === 'meet')).toHaveLength(1);
+    expect(privateReplies()).toEqual([[NAT, 'There’s already a meeting card in this thread.']]);
   });
 
   test('Someone promised… (typed): holder and date', async () => {

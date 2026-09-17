@@ -143,13 +143,15 @@ export async function listCardsByStatus(statuses) {
 }
 
 /** Open cards idle since before `cutoff` become stale. Returns the rows changed. */
-export async function markStaleBefore(cutoff, at = new Date()) {
+export async function markStaleBefore(cutoff, at = new Date(), { onlyTypes = null, exceptTypes = null } = {}) {
   const r = await query(
     `UPDATE tracked_cards
      SET status = 'stale', stale_since = $2, updated_at = NOW()
      WHERE status = 'open' AND last_activity_at < $1
+       AND ($3::text[] IS NULL OR card_type = ANY($3))
+       AND ($4::text[] IS NULL OR card_type <> ALL($4))
      RETURNING *`,
-    [cutoff, at]
+    [cutoff, at, onlyTypes, exceptTypes]
   );
   return r.rows;
 }
@@ -195,14 +197,14 @@ export async function setDue(id, dueAt) {
   return r.rows[0] || null;
 }
 
-/** Live track cards due before `until`. */
-export async function dueTrackCards(until) {
+/** Live cards of one type with a due date before `until`. */
+export async function dueCardsOfType(cardType, until) {
   const r = await query(
     `SELECT * FROM tracked_cards
-     WHERE card_type = 'track' AND status IN ('open', 'stale')
-       AND due_at IS NOT NULL AND due_at <= $1
+     WHERE card_type = $1 AND status IN ('open', 'stale')
+       AND due_at IS NOT NULL AND due_at <= $2
      ORDER BY due_at`,
-    [until]
+    [cardType, until]
   );
   return r.rows;
 }
@@ -370,6 +372,20 @@ export async function setMuted(cardId, chatUserId, muted) {
     `UPDATE tracked_card_participants SET muted = $3
      WHERE card_id = $1 AND chat_user_id = $2`,
     [cardId, chatUserId, muted]
+  );
+  return r.rowCount > 0;
+}
+
+/**
+ * Claim today's notice for one person on one card. True only for the first
+ * caller on that local date, so several things happening at once become one DM.
+ */
+export async function claimParticipantNotice(cardId, chatUserId, localDate) {
+  const r = await query(
+    `UPDATE tracked_card_participants SET notified_on = $3::date
+     WHERE card_id = $1 AND chat_user_id = $2
+       AND (notified_on IS NULL OR notified_on < $3::date)`,
+    [cardId, chatUserId, localDate]
   );
   return r.rowCount > 0;
 }
@@ -552,6 +568,45 @@ export async function recordDigest(chatUserId, localDate, messageName = null) {
     [chatUserId, localDate, messageName]
   );
   return r.rowCount > 0;
+}
+
+// ============================================================================
+// INTROS (migration 034)
+// ============================================================================
+
+/**
+ * Claim the right to introduce Oracle in this space (or DM). The first caller
+ * wins; everyone else gets false and posts nothing.
+ * @param {string} spaceName
+ * @param {'space'|'dm'} [kind]
+ */
+export async function claimSpaceIntro(spaceName, kind = 'space') {
+  if (!spaceName) return false;
+  const r = await query(
+    `INSERT INTO space_intros (space_name, kind)
+     VALUES ($1, $2)
+     ON CONFLICT (space_name) DO NOTHING
+     RETURNING space_name`,
+    [spaceName, kind]
+  );
+  return r.rowCount > 0;
+}
+
+/** Has Oracle already introduced itself here? */
+export async function spaceIntro(spaceName) {
+  if (!spaceName) return null;
+  const r = await query('SELECT * FROM space_intros WHERE space_name = $1', [spaceName]);
+  return r.rows[0] || null;
+}
+
+/** Posting failed: give the claim back, so the next pass can try again. */
+export async function releaseSpaceIntro(spaceName) {
+  if (!spaceName) return;
+  await query('DELETE FROM space_intros WHERE space_name = $1', [spaceName]);
+}
+
+export async function setSpaceIntroMessage(spaceName, messageName) {
+  await query('UPDATE space_intros SET message_name = $2 WHERE space_name = $1', [spaceName, messageName]);
 }
 
 // ============================================================================

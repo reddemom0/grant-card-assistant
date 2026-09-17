@@ -5298,3 +5298,343 @@ export async function createDealNote({ deal_id: dealId, body } = {}) {
     return { success: false, error: `HubSpot note could not be created (${status || err?.code || 'error'})` };
   }
 }
+
+// ============================================================================
+// LEAD TRIAGE READS (src/cards/lead-card.js)
+//
+// The lookups above are fine for an agent but print what they searched for:
+// `getContactByEmail` logs the address, `getCompanyByDomain` the domain and the
+// company name, `searchGrantApplications` its whole filter object. A triage card
+// handles a stranger's contact details, so it reads through these functions
+// instead, which log counts and codes only.
+// ============================================================================
+
+const LEAD_CONTACT_PROPERTIES = [
+  'firstname', 'lastname', 'email', 'phone', 'mobilephone', 'company', 'jobtitle', 'website',
+  'lifecyclestage', 'hs_lead_status', 'hubspot_owner_id', 'createdate', 'lastmodifieddate',
+  // Written by the public calculator (src/api/hubspot-form-submission.js). The
+  // dollar estimate it produced is NOT among them — that lives in
+  // lead_gen_conversations (src/database/lead-gen-reads.js).
+  'annual_revenue_from_the_last_fiscal_year', 'numemployees', 'industry_contact',
+  'is_your_organization_for_profit_or_non_profit_', 'has_your_business_existed_for_a_year_',
+  'estimated_budget_', 'expansion_budget_', 'best_fit_product', 'what_do_you_spend_it_on_'
+];
+
+const LEAD_COMPANY_PROPERTIES = ['name', 'domain', 'industry', 'numberofemployees', 'annualrevenue',
+  'lifecyclestage', 'hubspot_owner_id', 'city', 'state', 'createdate'];
+
+const LEAD_DEAL_PROPERTIES = ['dealname', 'dealstage', 'pipeline', 'amount', 'closedate',
+  'grant_type', 'hubspot_owner_id', 'closed_lost_reason'];
+
+const numberOrNull = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+function mapLeadContact(c) {
+  const p = c.properties || {};
+  return {
+    id: c.id,
+    name: [p.firstname, p.lastname].filter(Boolean).join(' ') || null,
+    email: p.email || null,
+    phone: p.phone || p.mobilephone || null,
+    company: p.company || null,
+    jobTitle: p.jobtitle || null,
+    website: p.website || null,
+    lifecycleStage: p.lifecyclestage || null,
+    leadStatus: p.hs_lead_status || null,
+    ownerId: p.hubspot_owner_id || null,
+    createDate: p.createdate || null,
+    lastModifiedDate: p.lastmodifieddate || null,
+    calculator: {
+      revenue: p.annual_revenue_from_the_last_fiscal_year || null,
+      employees: numberOrNull(p.numemployees),
+      industry: p.industry_contact || null,
+      forProfit: p.is_your_organization_for_profit_or_non_profit_ || null,
+      existedAYear: p.has_your_business_existed_for_a_year_ || null,
+      trainingBudget: numberOrNull(p.estimated_budget_),
+      expansionBudget: numberOrNull(p.expansion_budget_),
+      bestFit: p.best_fit_product || null,
+      spendOn: p.what_do_you_spend_it_on_ || null
+    }
+  };
+}
+
+function mapLeadCompany(c) {
+  const p = c.properties || {};
+  return {
+    id: c.id,
+    name: p.name || null,
+    domain: p.domain || null,
+    industry: p.industry || null,
+    employees: numberOrNull(p.numberofemployees),
+    revenue: numberOrNull(p.annualrevenue),
+    lifecycleStage: p.lifecyclestage || null,
+    ownerId: p.hubspot_owner_id || null,
+    city: p.city || null,
+    province: p.state || null,
+    createDate: p.createdate || null
+  };
+}
+
+function mapLeadDeal(d) {
+  const p = d.properties || {};
+  const stage = String(p.dealstage || '');
+  return {
+    id: d.id,
+    name: p.dealname || null,
+    stage,
+    open: !/closed/i.test(stage),
+    won: /closedwon/i.test(stage),
+    amount: numberOrNull(p.amount),
+    closeDate: p.closedate || null,
+    program: p.grant_type || null,
+    ownerId: p.hubspot_owner_id || null,
+    lostReason: p.closed_lost_reason || null
+  };
+}
+
+/**
+ * Find a contact by phone number — the one lookup the lead triage card needs
+ * that no other function could do. `searchHubSpotContacts` ANDs its common
+ * filters into every OR group, so it cannot express a phone-only search.
+ *
+ * Matches HubSpot's own normalised field first (hs_searchable_phone_number
+ * holds digits), then the raw phone and mobile properties.
+ *
+ * @param {string} phone - any format; the last 10 digits are used
+ * @returns {Promise<{success: boolean, count?: number, contacts?: Array, error?: string}>}
+ */
+export async function findContactByPhone(phone) {
+  const digits = String(phone || '').replace(/\D/g, '').slice(-10);
+  if (digits.length !== 10) return { success: false, error: 'A 10-digit phone number is required', contacts: [] };
+  if (!HUBSPOT_TOKEN) return { success: false, error: 'HubSpot access token not configured', contacts: [] };
+
+  const groups = [
+    [{ propertyName: 'hs_searchable_phone_number', operator: 'CONTAINS_TOKEN', value: digits }],
+    [{ propertyName: 'phone', operator: 'CONTAINS_TOKEN', value: digits }],
+    [{ propertyName: 'mobilephone', operator: 'CONTAINS_TOKEN', value: digits }]
+  ];
+
+  try {
+    const client = createHubSpotClient();
+    const res = await client.post('/crm/v3/objects/contacts/search', {
+      filterGroups: groups.map(filters => ({ filters })),
+      properties: LEAD_CONTACT_PROPERTIES,
+      limit: 5
+    });
+    const contacts = (res.data?.results || []).map(mapLeadContact);
+    console.log(`📞 HubSpot phone search — matches: ${contacts.length}`);
+    return { success: true, count: contacts.length, contacts };
+  } catch (err) {
+    const status = err?.response?.status;
+    return { success: false, error: `HubSpot phone search failed (${status || err?.code || 'error'})`, contacts: [] };
+  }
+}
+
+/** The ids a contact or company is associated with, by object type. */
+async function leadAssociations(client, objectType, id) {
+  try {
+    const res = await client.get(`/crm/v3/objects/${objectType}/${id}`, {
+      params: { associations: 'companies,deals', properties: 'hs_object_id' }
+    });
+    const of = (kind) => (res.data?.associations?.[kind]?.results || []).map(r => r.id).filter(Boolean);
+    return { companies: of('companies'), deals: of('deals') };
+  } catch {
+    return { companies: [], deals: [] };
+  }
+}
+
+/**
+ * Everything the triage card knows about a lead from HubSpot, in one read:
+ * the contact (by email, else by phone), its company (by association, else by
+ * domain, else by name) and up to five associated deals.
+ *
+ * Never throws, never logs an address, a number or a company name. A part that
+ * fails is named in `failed` by its kind and the rest still comes back.
+ *
+ * @param {Object} lead - {email, phone, company, domain}
+ */
+export async function leadCrmSnapshot({ email, phone, company, domain } = {}) {
+  const empty = { contact: null, foundBy: null, company: null, deals: [], failed: [] };
+  if (!HUBSPOT_TOKEN) return { success: false, error: 'HubSpot access token not configured', ...empty };
+
+  const client = createHubSpotClient();
+  const failed = [];
+  let contact = null;
+  let foundBy = null;
+  let phoneMatches = 0;
+
+  const address = String(email || '').trim().toLowerCase();
+  if (address) {
+    try {
+      const res = await client.post('/crm/v3/objects/contacts/search', {
+        filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: address }] }],
+        properties: LEAD_CONTACT_PROPERTIES,
+        limit: 1
+      });
+      const hit = res.data?.results?.[0];
+      if (hit) {
+        contact = mapLeadContact(hit);
+        foundBy = 'email';
+      }
+    } catch (err) {
+      failed.push('contact');
+    }
+  }
+
+  if (!contact && phone) {
+    const byPhone = await findContactByPhone(phone);
+    if (!byPhone.success && byPhone.error?.startsWith('HubSpot phone search failed')) failed.push('contact');
+    phoneMatches = byPhone.contacts?.length || 0;
+    // Two people can share a company line; one match is a lead, several are a
+    // hint the card shows rather than a record it claims.
+    if (phoneMatches === 1) {
+      contact = byPhone.contacts[0];
+      foundBy = 'phone';
+    }
+  }
+
+  const associated = contact ? await leadAssociations(client, 'contacts', contact.id) : { companies: [], deals: [] };
+  const dealIds = [...associated.deals];
+  let found = null;
+
+  try {
+    if (associated.companies.length) {
+      const res = await client.post('/crm/v3/objects/companies/batch/read', {
+        properties: LEAD_COMPANY_PROPERTIES,
+        inputs: associated.companies.slice(0, 1).map(id => ({ id }))
+      });
+      const hit = res.data?.results?.[0];
+      if (hit) found = mapLeadCompany(hit);
+    }
+    if (!found && (domain || company)) {
+      const clean = String(domain || '').toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/.*$/, '');
+      const filters = clean
+        ? [{ propertyName: 'domain', operator: 'EQ', value: clean }]
+        : [{ propertyName: 'name', operator: 'CONTAINS_TOKEN', value: String(company) }];
+      const res = await client.post('/crm/v3/objects/companies/search', {
+        filterGroups: [{ filters }],
+        properties: LEAD_COMPANY_PROPERTIES,
+        limit: 1
+      });
+      const hit = res.data?.results?.[0];
+      if (hit) {
+        found = mapLeadCompany(hit);
+        if (!contact) {
+          const ofCompany = await leadAssociations(client, 'companies', found.id);
+          dealIds.push(...ofCompany.deals);
+        }
+      }
+    }
+  } catch (err) {
+    failed.push('company');
+  }
+
+  let deals = [];
+  const wanted = [...new Set(dealIds)].slice(0, 5);
+  if (wanted.length) {
+    try {
+      const res = await client.post('/crm/v3/objects/deals/batch/read', {
+        properties: LEAD_DEAL_PROPERTIES,
+        inputs: wanted.map(id => ({ id }))
+      });
+      deals = (res.data?.results || []).map(mapLeadDeal);
+      // Open deals first, then the most recently closed.
+      deals.sort((a, b) => (Number(b.open) - Number(a.open)) || String(b.closeDate || '').localeCompare(String(a.closeDate || '')));
+    } catch (err) {
+      failed.push('deals');
+    }
+  }
+
+  console.log(`🗂️  Lead CRM snapshot — contact: ${foundBy || 'none'}, company: ${found ? 'yes' : 'no'}, deals: ${deals.length}, failed: ${failed.length}`);
+  return {
+    success: true,
+    contact,
+    foundBy,
+    phoneMatches,
+    company: found,
+    deals,
+    failed: [...new Set(failed)]
+  };
+}
+
+/**
+ * A note on a CONTACT (createDealNote associates to a deal). Used by the lead
+ * triage card's outcome write, which runs only through the confirmation gate.
+ */
+export async function createContactNote({ contact_id: contactId, body } = {}) {
+  if (!contactId || !body) return { success: false, error: 'contact_id and body are required' };
+  try {
+    const client = createHubSpotClient();
+    const html = String(body)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+    const created = await client.post('/crm/v3/objects/notes', {
+      properties: { hs_timestamp: new Date().toISOString(), hs_note_body: html }
+    });
+    const noteId = created.data.id;
+    await client.put(`/crm/v4/objects/notes/${noteId}/associations/default/contacts/${contactId}`, []);
+    return { success: true, note_id: noteId, contact_id: contactId };
+  } catch (err) {
+    const status = err?.response?.status;
+    return { success: false, error: `HubSpot note could not be created (${status || err?.code || 'error'})` };
+  }
+}
+
+/**
+ * The lead triage card's outcome, as ONE action behind ONE confirmation:
+ * create or update the contact, set its owner, and add a note. Reached only
+ * through runPendingAction (GATED_TOOLS) — it is in no agent's tool list.
+ *
+ * @param {Object} input - built by the card, never by a model
+ * @param {string} [input.contact_id] - update this contact; otherwise one is created
+ * @param {Object} [input.properties] - email, firstname, lastname, phone, company
+ * @param {string} [input.owner_id] - HubSpot owner id to set
+ * @param {string} input.note - the outcome note's text
+ */
+export async function recordLeadOutcome(input = {}) {
+  const { contact_id: contactId, properties = {}, owner_id: ownerId, note } = input;
+  if (!note) return { success: false, error: 'note is required' };
+  // createHubSpotContact refuses a contact with no email, so a phone-only lead
+  // cannot be created here — the card says so rather than failing mid-write.
+  if (!contactId && !properties.email) {
+    return {
+      success: false,
+      error: 'No HubSpot contact and no email address — add the contact in HubSpot first, then record the outcome'
+    };
+  }
+
+  const props = { ...properties };
+  if (ownerId) props.hubspot_owner_id = ownerId;
+
+  let id = contactId;
+  let created = false;
+  try {
+    if (id) {
+      if (Object.keys(props).length) {
+        const updated = await updateHubSpotContact(id, props);
+        if (!updated.success) return updated;
+      }
+    } else {
+      const madeContact = await createHubSpotContact(props);
+      if (!madeContact.success) return madeContact;
+      id = madeContact.contact?.id;
+      if (!id) return { success: false, error: 'HubSpot did not return a contact id' };
+      created = true;
+    }
+  } catch (err) {
+    return { success: false, error: `HubSpot contact write failed (${err?.response?.status || err?.code || 'error'})` };
+  }
+
+  const noteResult = await createContactNote({ contact_id: id, body: note });
+  console.log(`🗂️  Lead outcome written — contact: ${created ? 'created' : 'updated'}, owner: ${ownerId ? 'set' : 'unchanged'}, note: ${noteResult.success}`);
+  return {
+    success: noteResult.success,
+    contact_id: id,
+    contact_created: created,
+    owner_set: Boolean(ownerId),
+    note_id: noteResult.note_id || null,
+    ...(noteResult.success ? {} : { error: noteResult.error })
+  };
+}

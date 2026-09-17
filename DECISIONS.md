@@ -12,6 +12,84 @@ Format:
 
 ---
 
+## 2026-09-17 — Foundation: type-aware staleness, per-person notices, dialogs for any card
+
+**What:** Small changes the remaining cards need, keeping today's behaviour for the review and track cards. A card type may declare `neverStale` or its own `staleAfterDays` (`markStaleBefore` now takes `onlyTypes`/`exceptTypes`); `dueTrackCards` became `dueCardsOfType(type, until)`; `tracked_card_participants.notified_on` (migration 033) is a per-person, per-day notice ledger claimed the same way as `claimDueReminder`; `dialogs.js` is type-agnostic (it calls `type.dialogFor` / `type.submitDialog`, so any card can own dialogs); `IMMEDIATE_KINDS` gained `watched_grant` and `meeting_followup`; `dialogsEnabled` moved to `render.js`, which also gained `tzOffsetMinutes` and `localInstant` (local wall time → a real instant, needed for callbacks and meeting slots).
+
+**Why:** a watch on a program that closes in three months, or a meeting six weeks out, would otherwise go stale at 30 days and auto-close at 44 — and nag its owner in the digest. A nested JSON counter for "one DM per person per day" would lose concurrent writes; a claimed column cannot.
+
+**Impact:** `migrations/033_card_notices.sql` (**run by hand**, needs 031), `src/cards/{lifecycle,notify,dialogs,render,track-card}.js`, `src/database/tracked-cards-store.js`, tests and fakes.
+
+## 2026-09-17 — Lead triage card: an inbound lead, triaged in the thread
+
+**What:** A third tracked card (`src/cards/lead-card.js`, type `lead`, no migration). An @Oracle message carrying an email address or phone number **and** lead wording ("called in", "voicemail", "new lead", "filled out the form") becomes a triage card before the model sees it; one carrying details but unclear wording asks "Want me to triage this lead?" first; a question stays a question, and a cue with no contact details is left to the model. States: unassigned → callback owed → called → assigned → closed.
+
+**What the card shows:** what HubSpot knows (past client, open deals, an earlier "not a fit" with its reason, a price objection, the HubSpot owner); the likely tier; up to three programs worth mentioning; and who should probably call — a hint, never an assignment.
+
+**Who to suggest is derived, not duplicated.** The card reads `data/rates/consultant-routing.json`, the file the lead-gen booking links already route through: the lead's HubSpot industry decides when we have one, and otherwise a word from an industry's own name (or a synonym pointing at one, in `data/cards/lead-owners.json`) does. A word two people's industries share — "healthcare" is Healthcare - Dental and Healthcare - Manufacturing — decides nothing rather than guessing. So **the person named on a card is always the person whose booking link that lead would be sent**, and reassigning anyone in that file moves the card with it; a test asserts the invariant across all 85 industries and re-passes with an industry moved. `data/cards/lead-owners.json` holds no mapping of sectors to people at all: just the calculator link, the synonyms, the words too generic to decide on, and optional emails for the day a suggestion should @mention someone.
+
+**Which tier, and from where:** the lead's own calculator session (`lead_gen_conversations`, read-only, by email) wins, because it is the only place the **dollar estimate** exists — the public calculator is a HubSpot form and never writes the estimate. Otherwise the contact's calculator answers go through the funnel rules in `lead-parse.js`; above $500K with no estimate the honest answer is "tier unknown — send the calculator". A hard stop in the message (sole proprietor, pre-revenue, non-profit, incorporated under a year) beats both; "startup" alone is not one. The card names the source it used.
+
+**The only write** is the outcome, as **one gated action** `record_lead_outcome` (contact + owner + note, associated to the **contact**): in `GATED_TOOLS`, in no agent's tool list, and pressing "Record in HubSpot" is the confirmation of exactly what the card shows. An **existing contact keeps its own fields** — only the owner and the note are added, because text parsed out of a Chat message must never overwrite CRM data. With no contact and no email address the card says to add the contact in HubSpot first (HubSpot refuses a contact without an email).
+
+**Logs:** this card's own reads go through new quiet functions (`leadCrmSnapshot`, `findContactByPhone`) because the ordinary lookups print the address, the domain and the whole filter object. No name, email address, phone number or company name reaches a log line, and the programs search is given industry words only.
+
+**Quiet:** no pings on changes. One DM to a new assignee, one callback reminder from 08:00 in the promiser's own day, and digest lines for a callback you owe, a lead assigned to you and a lead nobody has picked up. Dialogs (the outcome picker, the person picker) stay behind `TRACK_DIALOGS_ENABLED`; with it off, "Called" records the call and the card then shows the four outcomes as buttons, and the typed forms always work ("@Oracle called: no answer", "assign @Name", "outcome: booked discovery", "I'll call back").
+
+**Impact:** `src/cards/{lead-card,lead-parse,lead-lookup}.js`, `src/database/lead-gen-reads.js`, `data/cards/lead-owners.json`, `src/tools/hubspot.js` (quiet lead reads + the gated write), `src/tools/{pending-actions,executor}.js`, `src/cards/types.js`, `src/api/chat-google.js` (the trigger), the Oracle prompt, `tests/unit/{lead-parse,lead-card,pending-actions}.test.js` and the shared fakes. No new scope, no console step.
+
+## 2026-09-17 — /meet card: three times everyone is free, then one press books it
+
+**What:** A fourth tracked card (`src/cards/meet-card.js`, type `meet`, no migration, command ID 2). `/meet` as a reply in a thread, "@Oracle find 45 min with @Nat this week", or the /track card's **Schedule call** button (now live) posts it. Free/busy is read with the **asker's own** Calendar grant (`calendar.freebusy`, already granted — no new scope), and the three earliest times everyone is free are shown in the asker's zone with a per-person mark. Calendars Google would not show are **named on the card**, never treated as free.
+
+**Working hours are assumed, not read:** no Google API exposes them, so 9–5 local, Monday to Friday, with `data/cards/working-hours.json` as the per-person override. "Ignore working hours" and "Try next week" are buttons, because the assumption will sometimes be wrong. Nothing is offered less than two hours out, and the three options are spread at least two hours apart.
+
+**Booking:** the press **is** the confirmation — the card shows exactly what will be created — so this path does not go through the gate (model-proposed calendar writes still do). The requester may book at once; anyone invited may book once the card is two hours old. The event is created on the **requester's** calendar with a Meet link and invitations, and slot times carry a real instant (UTC), so no `timeZone` field is needed. A reschedule **patches that same event as whoever created it**, keeping the event id, its Meet link and everyone's replies; while it is being moved the card shows the booking and the alternatives together.
+
+**The description** is rule-based: the thread's ask, the last three points, the open question, the Google Docs linked in the thread (labelled as suggestions) and a link back to the thread. No model runs for a meet card at any point.
+
+**After the call:** a meeting that came from a /track card sends whoever asked one DM — "what was decided?" — with a draft from a **Granola** note matched by day, nearness and title. The MCP result shape is not modelled anywhere, so the matcher is defensive and "no note found" is a normal outcome that still sends the DM. It rides the hourly job, so it lands **within the hour** after the meeting rather than at exactly +30 minutes; a dedicated cron would be a one-line change.
+
+**Lifecycle:** meet cards are `neverStale` (a meeting six weeks out is not neglected), and instead close themselves — nothing booked and the window two weeks past, or the follow-up done.
+
+**Impact:** `src/cards/{meet-card,meet-slots}.js`, `data/cards/working-hours.json`, `src/cards/commands.js` (ID 2 + a shared command-actor helper), `src/cards/track-card.js` (Schedule call), `src/cards/types.js`, `src/api/chat-google.js` (the trigger), `tests/unit/{meet-card,meet-slots,track-card}.test.js` and the shared fakes. New env: `CHAT_MEET_COMMAND_ID` (default 2). **Console step:** register `/meet` in Chat API → Configuration → Commands.
+
+## 2026-09-17 — /watch card: one card per program, everything else by DM
+
+**What:** A fifth tracked card (`src/cards/watch-card.js`, type `watch`, no migration, command ID 3). "@Oracle watch" or `/watch`, as a reply to a post about a funding program, starts it. **Never automatic** — Oracle does not decide on its own that something is worth watching, and "keep an eye on this" still belongs to /track.
+
+**Keyed to the program, not the post:** the card's `thread_name` is the synthetic key `<space>/threads/watch-<programKey>`, so the existing "one live card per type and thread" unique index gives one live watch per program per space for free. A later post about the same program joins that card, and a second person watching from a different thread joins the same watch.
+
+**What goes where:** the space gets **one small card** — the program, its dates, "N watching", and three buttons — and nothing else, ever. Everything else is a DM: the full picture when you join (what it is, key dates with "check the page" where we are not sure, up to five clients who might fit, the reminder list) and the reminders themselves.
+
+**Reminders** are DM-only and capped at **one per program per watcher per day**, combined into a single message, enforced by the `notified_on` ledger (migration 033) rather than a JSON counter: the day before it opens, 14 days and 2 days before the deadline, when someone posts about it in a listened space, and if a post says it has closed. Nothing is sent before 08:00 in the watcher's own morning, and a muted watcher hears nothing.
+
+**Dates:** a date written in the post wins (it is what a person just read); ours is the fallback, and the card says "check the page" when the date is not from the post. With no dates at all, the watch runs six months and then asks "still watching this?", closing 14 days later if nobody answers.
+
+**Ending and reopening:** the day after the deadline (one last DM), a post saying it closed, or the last watcher pressing Stop watching. Watch cards are `neverStale` — a program that closes in three months is not neglected. When the program comes back, everyone who watched it before, in that space, is DMed: closed cards are found by the same synthetic key.
+
+**Never names the source:** nothing Oracle posts or DMs mentions GetGranted, GG3 or "our database" — the card says what the program is and when it closes, and a test asserts that across every card, DM and reply. "Stated needs" is not a HubSpot field, so the client list is matched on past applications and industry, and **says so**.
+
+**Impact:** `src/cards/{watch-card,watch-match}.js`, `src/cards/commands.js` (ID 3), `src/cards/types.js`, `src/api/chat-google.js` (the trigger), `src/api/chat-events.js` (the stored-copy hook, inactive until a space is listened to), `tests/unit/{watch-card,watch-match}.test.js` and the shared fakes. New env: `CHAT_WATCH_COMMAND_ID` (default 3). **Console step:** register `/watch` in Chat API → Configuration → Commands.
+
+## 2026-09-17 — Intro card: one card per space, /help, and /review
+
+**What:** The plain-text space intro and the plain-text listening notice are both replaced by one **intro card** (`src/cards/intro-card.js`, migration 034): who Oracle is, what it can do *in that space* with each line naming its command, what to DM it about, and what is worth knowing (only replies when @mentioned; always shows a HubSpot, calendar or Doc change before making it; never contacts a client). In a space Oracle keeps a copy of, the same card carries the 12-month-copy line instead of the "@mentioned only" line — so a space is told about the copy in the card that explains everything else. The wording lives in `data/chat/space-guides.json`, per space, and needs no code change.
+
+**Posted once, provably:** `space_intros` (migration 034) is claimed before posting and **given back if the post fails**, so a second `addedToSpace` event cannot post a second intro and a failure can still be retried. Listening keeps its guarantee: `postNotice` now posts the card and still returns false on failure, which pauses the space with `notice_failed` rather than reading messages nobody was told about. The listening gate is now keyed on `space_intros`, **not** `chat_listen_spaces.notice_posted_at` — which is exactly what gets the card to RTRI Changes, whose `notice_posted_at` was already set by the old text notice.
+
+**Buttons:** "Open the Oracle guide" (a link, from the data file) and "Show example prompts" (a private reply with 5–6 copy-paste examples). The card is a tracked card of type `intro` with **no participants** and `neverStale`, which is what makes the press route through the normal click path while keeping it out of every digest and out of the lifecycle's hands.
+
+**On demand:** `/help` (ID 4) or "@Oracle help" answers privately with the same card, examples already in it, and never runs the model. New members are never greeted.
+
+**In a DM:** on someone's first message Oracle posts the DM version of the card — different lines, no "DM me" section — and then answers what they asked. Claimed through `space_intros`, not `chat_people`, whose rows are created by mentions and presses and so would have suppressed it.
+
+**/review (ID 5):** creates the thread's Oracle conversation row first (the card carries that id as a foreign key, and it is what "@Oracle yes" later confirms against), then posts the existing "Track this as a review?" card with its button. It never counts as "they clearly asked", so it is always the question, never a guess.
+
+**Also fixed:** `tests/unit/chat-listen-lifecycle.test.js` had been failing since the listen allowlist grew from one space to seven (commit 494eecc7) because it asserted counts from the real data file. It now mocks the allowlist with its own one-space fixture, so editing `data/chat/listen-spaces.json` cannot break it again.
+
+**Impact:** `migrations/034_space_intros.sql` (**run by hand**, stands alone), `src/cards/intro-card.js`, `data/chat/space-guides.json`, `src/cards/commands.js` (IDs 4 and 5), `src/cards/types.js`, `src/api/chat-google.js` (addedToSpace, first DM, "@Oracle help"), `src/chat-listen/subscriptions.js`, `src/database/tracked-cards-store.js` (the four space_intros functions), `tests/unit/{intro-card,chat-listen-lifecycle}.test.js` and the shared fakes. New env: `CHAT_HELP_COMMAND_ID` (4), `CHAT_REVIEW_COMMAND_ID` (5). `src/api/space-intros.js` is left in place: it still resolves the old text intro, and its own tests still cover it. **Console step:** register `/help` and `/review` in Chat API → Configuration → Commands.
+
 ## 2026-09-17 — /track: who has the ball on an ask in a Chat thread
 
 **What:** A second tracked card (`src/cards/track-card.js`, migration 031). `/track` or "@Oracle track this", as a reply in a thread, tracks the thread's **first message** — the ask. Two shapes:

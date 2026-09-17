@@ -159,6 +159,12 @@ describe('which tools are gated', () => {
     await expect(isAutoApproved('create_hubspot_note', WEBHOOK_USER_ID)).resolves.toBe(false);
   });
 
+  test('a lead card\u2019s outcome write is always gated, and never auto-approved', async () => {
+    await expect(requiresConfirmation('record_lead_outcome', { contact_id: '1', note: 'x' })).resolves.toBe(true);
+    await expect(requiresConfirmation('record_lead_outcome', { properties: { email: 'a@b.ca' }, note: 'x' })).resolves.toBe(true);
+    await expect(isAutoApproved('record_lead_outcome', WEBHOOK_USER_ID)).resolves.toBe(false);
+  });
+
   test('a solo calendar event is not gated, one with attendees is', async () => {
     await expect(requiresConfirmation('create_calendar_event', { title: 'Focus' })).resolves.toBe(false);
     await expect(requiresConfirmation('create_calendar_event', { attendees: ['a@b.ca'] })).resolves.toBe(true);
@@ -192,6 +198,28 @@ describe('summaries are written from the saved input', () => {
     expect(text).toContain('Review complete. Reviewers: Steph, Natalie.');
     expect(text).toMatch(/…"\.$/);                       // long bodies are cut, visibly
     expect(text).not.toContain('create_hubspot_note');
+  });
+
+  test('a lead outcome says which contact changes, who gets it and what the note says', () => {
+    const text = summarizeAction('record_lead_outcome', {
+      contact_id: '501',
+      properties: {},
+      owner_id: '77',
+      owner_name: 'Dana Owner',
+      note: 'Lead triaged in Google Chat (Oracle): Booked discovery.\nRecorded by Nat on Sep 17.'
+    });
+    expect(text).toContain('501');
+    expect(text).toContain('Dana Owner');
+    expect(text).toContain('Booked discovery');
+    expect(text).not.toContain('record_lead_outcome');
+  });
+
+  test('a lead outcome with no contact yet says a contact will be created', () => {
+    const text = summarizeAction('record_lead_outcome', {
+      properties: { email: 'sarah@example.test', firstname: 'Sarah', lastname: 'Lee' },
+      note: 'No answer.'
+    });
+    expect(text).toMatch(/create a HubSpot contact for Sarah Lee/);
   });
 
   test('a merge says it cannot be undone', () => {
