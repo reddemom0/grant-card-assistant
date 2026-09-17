@@ -12,6 +12,90 @@ Format:
 
 ---
 
+## 2026-09-17 — Tracked cards in Google Chat; the review card is the first
+
+**What:** A tracked card is one Chat message per work item that Oracle keeps up
+to date in place. The shared code is in `src/cards/`, SQL in
+`src/database/tracked-cards-store.js`, tables in migration 030. The **review
+card** is the first type: an @Oracle mention asking for a review of Google Docs
+(any grant) gets a card posted as a thread reply, in place of a text answer. The
+card shows:
+- the requester and each @mentioned reviewer, with their own status;
+- each Doc's name and open comment count (never links or previews);
+- a pre-check against the program's source (RTRI skill only; otherwise it says
+  skipped);
+- missing client information.
+Its buttons are *I'm reviewing*, *Mark my review done* and *Draft client
+follow-up*.
+**Source of truth:** state lives in Oracle's database. Real systems win: Doc
+comments and the confirmation gate's status are re-read on every press and
+daily. Reviewers, Docs, space and thread come from the verified Chat event, never
+from the model's input (`track_review` takes only title, client, program,
+pre-check and missing info). One live card per type and thread, enforced by a
+partial unique index.
+**Buttons:** presses come to the Chat endpoint (the button's `function` is
+`GOOGLE_CHAT_AUDIENCE`, the action name travels as a parameter). They are
+answered within Chat's 30 s with `updateMessageAction`; slower work patches the
+message afterwards (`spaces.messages.patch`, app auth).
+- **Personal buttons** move only the presser's own row. A press by a
+  non-reviewer changes nothing.
+- **Logging:** every press is logged with its result, and the card shows the
+  latest press that changed something (never a mute).
+- **Closed cards** are frozen: no buttons, no refresh, rows kept.
+**Unclear requests:** when a mention doesn't clearly ask for a review, Oracle
+posts "Track this as a review?" with a button. It's a button because a bare
+"yes" belongs to the confirmation gate. The button turns that same message into
+the review card. With no Doc links (or no reviewers) Oracle asks one question,
+and the next @mention in the thread completes the card, keeping what it already
+had.
+**Completion:** when every reviewer is done, the card shows the total open
+comments. If exactly one HubSpot deal matches the client (narrowed by program),
+it **proposes** an outcome note through the confirmation gate. The new
+`create_hubspot_note` is always gated, never auto-approved, and in no agent's
+tool list. The requester gets one DM. The note is written only when a Hub user
+presses *Add note to HubSpot* or says "@Oracle yes" in the thread. If the
+proposal has expired, the press stores the identical action again and runs it.
+The requester can press *Don't add note* instead: the stored proposal becomes
+`declined` in `pending_actions` (`declinePendingAction`), so a later "yes"
+finds nothing to run.
+**After completion:** the card shows once in the requester's digest
+(`completion_shown_on`; a press on that digest the same day keeps it there),
+then drops out. It closes as soon as the note is added or declined, or 7 days
+after completion (`completed_at`, checked by the daily pass), whichever comes
+first. "@Oracle yes" refreshes the thread's cards straight away, so the card
+closes then, not at the next refresh.
+*Draft client follow-up* drafts in a separate conversation and DMs the draft to
+the presser (thread if there's no DM). It runs as the presser's own Hub account
+only, and is told not to use tools; the run still has Oracle's tools, since
+`runAgent` has no tool-free option. Nothing goes to a client.
+**Quiet by design:**
+- **Card changes never ping anyone.** The only immediate DMs are *assigned*,
+  *due today* (hook), *a confirmation you started*, and *watched grant* (hook).
+- **Daily digest:** everything else goes into one DM at 08:00 in the person's
+  calendar time zone (Calendar `events.list` with the existing `calendar.events`
+  grant; otherwise `DEFAULT_TIMEZONE`). It covers what waits on you, your open
+  requests, and cards gone quiet (Keep/Close), at most once per local day, and
+  is never sent empty. Mute is per person, per card, from the digest.
+- **Lifecycle:** 30 idle days → stale; 14 more → auto-closed; unanswered offers
+  close after 30 days; completed cards close 7 days after completion at the
+  latest.
+- **DMs:** Oracle can only DM people who have messaged it (`chat.bot` can't
+  create a DM).
+**No new OAuth scopes:** Doc comment counts use the existing domain-wide
+delegation read client (`drive.readonly`), impersonating the card's requester.
+**Slash commands:** the mechanism only (`registerAppCommand`); nothing is
+registered.
+**Impact:**
+- `migrations/030_tracked_cards.sql` (**must be run by hand before deploy**; it
+  needs 025);
+- `src/cards/{actions,chat-api,jobs,lifecycle,notify,people,registry,render,review-card,types,update}.js`;
+- `src/database/tracked-cards-store.js`;
+- `src/api/chat-google.js` (button/app-command routing, mentions and Drive files
+  on the event, card-as-reply, remembering senders' Chat ids);
+- `src/tools/{definitions,executor,pending-actions,hubspot,google-drive,directory-names}.js`;
+- `.claude/agents/internal-oracle.md`, `server.js`, tests;
+- new env: `TRACKED_CARDS_DISABLED` (kill switch). Cron assumes one instance.
+
 ## 2026-09-17 — Oracle keeps a stored copy of allowlisted Chat spaces, read as oracle@granted.ca
 
 **What:** For each space in `data/chat/listen-spaces.json` (pilot: RTRI Changes,

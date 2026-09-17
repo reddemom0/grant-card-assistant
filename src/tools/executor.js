@@ -621,6 +621,24 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
       }
 
+      // Tracked review card. Oracle-only; mentions, Doc links, space and thread
+      // come from the verified Chat event via options, never from input.
+      case 'track_review': {
+        const { trackReview } = await import('../cards/review-card.js');
+        result = await trackReview(input, {
+          userId,
+          conversationId,
+          chatContext: options.chatContext || { surface: 'none' }
+        });
+        break;
+      }
+
+      // Gated (GATED_TOOLS): reaches here only through runPendingAction. In no
+      // agent's tool list — tracked cards propose it.
+      case 'create_hubspot_note':
+        result = await hubspot.createDealNote(input);
+        break;
+
       // Personal Chat digest. Same Oracle-only, context-from-options rule as
       // read_chat_space_history above.
       case 'build_mention_digest': {

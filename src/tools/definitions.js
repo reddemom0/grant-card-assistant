@@ -2340,6 +2340,45 @@ export const CHAT_HISTORY_TOOLS = [
   }
 ];
 
+/**
+ * Tracked cards (src/cards/). Oracle-only — referenced in the internal-oracle
+ * case and nowhere else. Who reviews, which Docs, and where the card goes all
+ * come from the verified Chat event (executeToolCall options), not from input.
+ */
+export const TRACKED_CARD_TOOLS = [
+  {
+    name: 'track_review',
+    description: 'Post a tracked review card in the current Google Chat thread, when someone @mentions you asking for a review of Google Docs (any grant program). The card lists each @mentioned reviewer with their own status, the open comment count on each linked Doc, your pre-check, and missing client information; reviewers update it with its buttons. Reviewers, Docs, space and thread are taken from the Chat message itself. Before calling: read the linked Docs; for an RTRI application load the rtri-tariff skill (overview, then PROGRAM_FACTS) and check the Docs against it. The result tells you what to do next: after card_posted or asked, add no reply at all; after needs_docs or needs_reviewers, ask that one question; after already_tracked, say so briefly. Only works in a Google Chat thread. Never use it for a plain question.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          description: 'Card title: client and program, e.g. "Acme Foods — RTRI pivot application".'
+        },
+        client_name: {
+          type: 'string',
+          description: 'The client company name, as it would appear in HubSpot.'
+        },
+        program: {
+          type: 'string',
+          description: 'The grant program, e.g. "RTRI".'
+        },
+        precheck: {
+          type: 'string',
+          description: 'Short pre-check of the Docs against the program source (RTRI: the rtri-tariff skill\'s PROGRAM_FACTS) — the gaps or risks a reviewer should know. Plain sentences, under 1,200 characters. Omit when the program has no source on file.'
+        },
+        missing_info: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Client information the Docs still need, one short item each (at most 10).'
+        }
+      },
+      required: ['title', 'client_name', 'program']
+    }
+  }
+];
+
 export const GOOGLE_DOCS_EDIT_TOOLS = [
   {
     name: 'read_google_doc_outline',
@@ -2890,7 +2929,9 @@ export function getToolsForAgent(agentType) {
       // CHAT_HISTORY_TOOLS is referenced HERE and only here — same reason again.
       // It reads Chat as the asking person; no headless or shared-tool path
       // should be able to reach it.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS];
+      // TRACKED_CARD_TOOLS likewise: it posts cards into Chat threads from a
+      // verified Chat event and has no meaning anywhere else.
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);

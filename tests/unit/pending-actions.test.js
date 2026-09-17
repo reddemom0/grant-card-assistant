@@ -82,6 +82,14 @@ const mockQuery = jest.fn(async (sql, params = []) => {
     return { rows: [] };
   }
 
+  if (text.startsWith("UPDATE pending_actions SET status = 'declined'")) {
+    const row = rows.find(r => r.id === params[0] && r.status === 'pending');
+    if (!row) return { rows: [] };
+    row.status = 'declined';
+    row.result = JSON.parse(params[1]);
+    return { rows: [{ id: row.id }] };
+  }
+
   if (text.startsWith('SELECT 1 FROM pending_actions')) {
     const row = rows.find(r => r.id === params[0] &&
       ['pending', 'confirmed'].includes(r.status) && r.expires_at > new Date());
@@ -121,7 +129,7 @@ jest.unstable_mockModule('../../src/api/hubspot-webhook.js', () => ({
 
 const {
   requiresConfirmation, summarizeAction, savePendingAction,
-  getPendingAction, runPendingAction, isAuthorisedExecution,
+  getPendingAction, runPendingAction, isAuthorisedExecution, declinePendingAction,
   isAutoApproved, isWebhookSystemAccount, recordAutoApproval
 } = await import('../../src/tools/pending-actions.js');
 const { isConfirmWord, tryHandleConfirmation } = await import('../../src/api/confirmation.js');
@@ -146,6 +154,11 @@ describe('which tools are gated', () => {
     await expect(requiresConfirmation('replace_google_doc_section', {})).resolves.toBe(true);
   });
 
+  test('a HubSpot note proposed by a review card is always gated, and never auto-approved', async () => {
+    await expect(requiresConfirmation('create_hubspot_note', { deal_id: '1', body: 'x' })).resolves.toBe(true);
+    await expect(isAutoApproved('create_hubspot_note', WEBHOOK_USER_ID)).resolves.toBe(false);
+  });
+
   test('a solo calendar event is not gated, one with attendees is', async () => {
     await expect(requiresConfirmation('create_calendar_event', { title: 'Focus' })).resolves.toBe(false);
     await expect(requiresConfirmation('create_calendar_event', { attendees: ['a@b.ca'] })).resolves.toBe(true);
@@ -167,6 +180,18 @@ describe('summaries are written from the saved input', () => {
     expect(text).toContain('$50,000');
     expect(text).toContain('Submitted');
     expect(text).not.toContain('update_hubspot_deal');   // no tool names for the reader
+  });
+
+  test('a HubSpot note shows the deal and the note text the reader is approving', () => {
+    const text = summarizeAction('create_hubspot_note', {
+      deal_id: '987',
+      deal_name: 'Acme — RTRI',
+      body: 'Review complete.\nReviewers: Steph, Natalie.\n' + 'x'.repeat(300)
+    });
+    expect(text).toContain('"Acme — RTRI" (987)');
+    expect(text).toContain('Review complete. Reviewers: Steph, Natalie.');
+    expect(text).toMatch(/…"\.$/);                       // long bodies are cut, visibly
+    expect(text).not.toContain('create_hubspot_note');
   });
 
   test('a merge says it cannot be undone', () => {
@@ -249,6 +274,37 @@ describe('confirmation words', () => {
 
     const handled = await tryHandleConfirmation({ conversationId: CONV, userId: PROPOSER, text: 'yes' });
     expect(handled.replyText).toMatch(/expired/i);
+  });
+});
+
+describe('declining a proposal', () => {
+  test('a declined proposal never runs, and a later "yes" finds nothing waiting', async () => {
+    const saved = await savePendingAction({
+      conversationId: CONV, toolName: 'create_hubspot_note',
+      input: { deal_id: '9', body: 'Review complete.' }, userId: PROPOSER, summary: 'x'
+    });
+
+    await expect(declinePendingAction({ actionId: saved.id, chatUserId: 'users/1' })).resolves.toBe(true);
+    expect(rows[0]).toMatchObject({
+      status: 'declined',
+      result: { declined: true, declined_by: null, declined_by_chat_user: 'users/1' }
+    });
+
+    const handled = await tryHandleConfirmation({ conversationId: CONV, userId: OTHER_USER, text: 'yes' });
+    expect(handled.replyText).toMatch(/Nothing is waiting/i);
+    await expect(runPendingAction({ actionId: saved.id, userId: OTHER_USER })).resolves.toMatchObject({ ok: false });
+    await expect(isAuthorisedExecution(saved.id)).resolves.toBe(false);
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  test('only a pending proposal can be declined', async () => {
+    const saved = await savePendingAction({
+      conversationId: CONV, toolName: 'create_hubspot_note', input: { deal_id: '9', body: 'x' }, userId: PROPOSER, summary: 'x'
+    });
+    await runPendingAction({ actionId: saved.id, userId: OTHER_USER });
+    await expect(declinePendingAction({ actionId: saved.id, userId: PROPOSER })).resolves.toBe(false);
+    expect(rows[0].status).toBe('confirmed');
+    await expect(declinePendingAction({ actionId: 'action-missing' })).resolves.toBe(false);
   });
 });
 

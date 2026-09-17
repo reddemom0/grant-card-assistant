@@ -582,3 +582,48 @@ export async function copyTemplateFile(templateFileIdOrName, newFileName, target
     };
   }
 }
+
+/**
+ * A Doc's name and how many of its comments are still open — for tracked cards.
+ *
+ * Read with the same read-only client as readGoogleDriveFile (drive.readonly,
+ * impersonating `userEmail` through domain-wide delegation), so it sees exactly
+ * what that person can see. comments.list accepts drive.readonly; no new scope.
+ * Open = neither resolved nor deleted. Nothing about the comments' content is
+ * read or returned.
+ *
+ * @param {string} fileId
+ * @param {string|null} userEmail - person to read as
+ * @returns {Promise<{fileId: string, name: string|null, openComments: number|null, readable: boolean, code?: string}>}
+ */
+export async function getDocCommentSummary(fileId, userEmail = null) {
+  try {
+    const drive = createDriveClient(userEmail, true);
+    const meta = await drive.files.get({ fileId, fields: 'name', supportsAllDrives: true });
+
+    let open = 0;
+    let pageToken;
+    let pages = 0;
+    do {
+      const res = await drive.comments.list({
+        fileId,
+        pageSize: 100,
+        pageToken,
+        includeDeleted: false,
+        fields: 'nextPageToken, comments(resolved, deleted)'
+      });
+      for (const c of res.data.comments || []) {
+        if (!c.resolved && !c.deleted) open++;
+      }
+      pageToken = res.data.nextPageToken || undefined;
+      pages++;
+    } while (pageToken && pages < 20);
+
+    return { fileId, name: meta.data.name || null, openComments: open, readable: true };
+  } catch (err) {
+    const code = String(err?.code ?? err?.response?.status ?? 'unknown');
+    // Code only — Google's error text can carry the impersonated address.
+    console.warn(`⚠️  Doc comment summary unavailable — code: ${code}`);
+    return { fileId, name: null, openComments: null, readable: false, code };
+  }
+}

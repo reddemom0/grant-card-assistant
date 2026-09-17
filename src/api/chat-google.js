@@ -25,6 +25,7 @@ import { tryHandleConfirmation, currentPendingId, proposalNotice } from './confi
 import { resolveSpaceIntro } from './space-intros.js';
 import { hubSignInUrl } from '../tools/chat-history.js';
 import { isListenSpace } from '../chat-listen/config.js';
+import { takeCardReply, findAppCommand } from '../cards/registry.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -171,7 +172,16 @@ export function normalizeChatEvent(body) {
     spaceId: null,
     spaceIsResourceName: false,
     spaceDisplayName: null,
-    isDm: false
+    isDm: false,
+    messageName: null,
+    senderDisplayName: null,
+    actorChatId: null,
+    actorEmail: null,
+    actorName: null,
+    parameters: {},
+    appCommandId: null,
+    mentions: [],
+    driveFiles: []
   };
 
   if (!body || typeof body !== 'object') return base;
@@ -251,8 +261,62 @@ export function normalizeChatEvent(body) {
     // than guess which one this deployment sends.
     isDm: space?.type === 'DM'
       || space?.spaceType === 'DIRECT_MESSAGE'
-      || space?.singleUserBotDm === true
+      || space?.singleUserBotDm === true,
+    messageName: message?.name || null,
+    senderDisplayName: message?.sender?.displayName || null,
+    // Who pressed a button (or otherwise interacted). On a button press the
+    // message's sender is Oracle itself, so this is the only place the person is.
+    actorChatId: body.chat?.user?.name || null,
+    actorEmail: body.chat?.user?.email || null,
+    actorName: body.chat?.user?.displayName || null,
+    parameters: readParameters(body.commonEventObject?.parameters),
+    appCommandId: payload.appCommandMetadata?.appCommandId ?? null,
+    mentions: readMentions(message),
+    driveFiles: readDriveFiles(message)
   };
+}
+
+/** Add-on action parameters arrive as a map; tolerate a key/value list too. */
+function readParameters(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  if (Array.isArray(raw)) {
+    return Object.fromEntries(raw.filter(p => p?.key).map(p => [p.key, String(p.value ?? '')]));
+  }
+  return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, String(v ?? '')]));
+}
+
+/** People @mentioned in a message, excluding apps (Oracle itself). */
+function readMentions(message) {
+  const seen = new Set();
+  const out = [];
+  for (const a of message?.annotations || []) {
+    const user = a?.type === 'USER_MENTION' ? a.userMention?.user : null;
+    if (!user?.name || user.type === 'BOT' || seen.has(user.name)) continue;
+    seen.add(user.name);
+    out.push({ chatUserId: user.name, displayName: user.displayName || null });
+  }
+  return out;
+}
+
+const DRIVE_URL = /https:\/\/(?:docs\.google\.com\/(?:document|spreadsheets|presentation)\/(?:u\/\d+\/)?d\/|drive\.google\.com\/(?:file\/d\/|open\?id=))([A-Za-z0-9_-]{10,})/g;
+
+/**
+ * Google Drive files a message points at: files attached from Drive, rich link
+ * chips, and plain Docs/Sheets/Slides/Drive URLs in the text. Ids only — no
+ * file is read here.
+ */
+function readDriveFiles(message) {
+  const ids = new Set();
+  const attachments = [message?.attachment].flatMap(a => (Array.isArray(a) ? a : a ? [a] : []));
+  for (const a of attachments) {
+    if (a?.driveDataRef?.driveFileId) ids.add(a.driveDataRef.driveFileId);
+  }
+  for (const ann of message?.annotations || []) {
+    const id = ann?.richLinkMetadata?.driveLinkData?.driveDataRef?.driveFileId;
+    if (id) ids.add(id);
+  }
+  for (const m of String(message?.text || '').matchAll(DRIVE_URL)) ids.add(m[1]);
+  return [...ids].slice(0, 20).map(fileId => ({ fileId }));
 }
 
 /**
@@ -624,6 +688,14 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       await saveMessage(conversationId, 'user', messageText);
       await saveMessage(conversationId, 'assistant', confirmation.replyText);
       await safePost(evt, markdownToChat(withAttachmentNotice(evt, confirmation.replyText)));
+      // A tracked card in this thread may have been waiting on that proposal
+      // (a review's HubSpot note): update it now rather than at the next refresh.
+      try {
+        const { refreshCardsForConversation } = await import('../cards/lifecycle.js');
+        await refreshCardsForConversation(conversationId);
+      } catch (err) {
+        console.warn(`⚠️  Tracked card refresh after confirmation failed — code: ${err?.code || err?.name || 'unknown'}`);
+      }
       return;
     }
 
@@ -644,9 +716,23 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
         surface: evt.isDm ? 'chat_dm' : 'chat_space',
         spaceName: evt.spaceIsResourceName ? evt.spaceId : null,
         spaceDisplayName: evt.spaceDisplayName,
-        senderChatId: evt.senderChatId
+        senderChatId: evt.senderChatId,
+        // For tracked cards (track_review): who was @mentioned, which Drive
+        // files the message points at, and where to reply. All from the event.
+        senderDisplayName: evt.senderDisplayName,
+        messageName: evt.messageName,
+        threadName: evt.threadIsResourceName ? evt.threadId : null,
+        mentions: evt.mentions,
+        driveFiles: evt.driveFiles,
+        messageText: messageText
       }
     });
+
+    // A tool posted a card as this turn's answer; the card is the reply.
+    if (takeCardReply(conversationId)) {
+      console.log('🗂️  Reply was a tracked card — no text posted');
+      return;
+    }
 
     if (!result?.success) {
       console.error(`❌ Agent returned failure: ${result?.error || 'unknown error'}`);
@@ -761,6 +847,39 @@ export async function handleGoogleChatEvent(req, res) {
     return;
   }
 
+  // ==========================================================================
+  // BUTTON PRESS ON A TRACKED CARD — answered inside Chat's 30-second window with
+  // an update to the pressed message. Handled before the BOT check below: the
+  // pressed message was sent by Oracle, and the presser is in chat.user.
+  // ==========================================================================
+  if (kind === 'buttonclicked') {
+    try {
+      const { handleCardClick } = await import('../cards/actions.js');
+      return res.status(200).json(await handleCardClick(evt) || {});
+    } catch (err) {
+      console.error(`❌ Tracked card click failed — code: ${err?.code || err?.name || 'unknown'}`);
+      return res.status(200).json({});
+    }
+  }
+
+  // ==========================================================================
+  // APP COMMAND (slash command) — routed through the registry. None are
+  // registered yet; an unknown command is acknowledged and logged.
+  // ==========================================================================
+  if (kind === 'appcommand') {
+    const handler = findAppCommand(evt.appCommandId);
+    if (!handler) {
+      console.log(`↩️  App command not registered — id: ${evt.appCommandId ?? 'none'}`);
+      return res.status(200).json({});
+    }
+    try {
+      return res.status(200).json(await handler(evt) || {});
+    } catch (err) {
+      console.error(`❌ App command failed — code: ${err?.code || err?.name || 'unknown'}`);
+      return res.status(200).json({});
+    }
+  }
+
   // Only respond to messages from humans. Ignoring BOT senders prevents loops.
   if (kind !== 'message') {
     // Names only, never values: the payload carries message content. Logging the
@@ -841,6 +960,14 @@ export async function handleGoogleChatEvent(req, res) {
   }
 
   console.log(`✅ Accepted — user ${user.id} (${user.email}), thread ${evt.threadId || '(none)'}, conversation ${conversationId}`);
+
+  // Remember this person's Chat id and Hub account — tracked cards need both to
+  // DM them and to find their calendar time zone. Never blocks the reply.
+  import('../cards/people.js')
+    .then(({ rememberSender }) => rememberSender({
+      chatUserId: evt.senderChatId, userId: user.id, email: user.email, displayName: evt.senderDisplayName
+    }))
+    .catch(err => console.warn(`⚠️  Could not remember Chat sender — code: ${err?.code || err?.name || 'unknown'}`));
 
   // ==========================================================================
   // ACK NOW, WORK LATER. Chat times out long before Oracle finishes, so return

@@ -31,6 +31,8 @@ export const GATED_TOOLS = {
   // Writes to shared CRM records the whole company reads.
   create_hubspot_deal: () => true,
   update_hubspot_deal: () => true,
+  // Proposed by tracked cards (review outcome); no agent has it as a tool.
+  create_hubspot_note: () => true,
 
   // Irreversible: the secondary record is deleted.
   merge_duplicate_companies: () => true,
@@ -213,6 +215,12 @@ export function summarizeAction(toolName, input = {}) {
     case 'update_hubspot_deal':
       return `Update HubSpot deal ${input.deal_id}: ${describeProperties(input.properties)}.`;
 
+    case 'create_hubspot_note': {
+      const body = String(input.body || '').replace(/\s+/g, ' ').trim();
+      const shown = body.length > 200 ? `${body.slice(0, 199)}…` : body;
+      return `Add a note to HubSpot deal ${input.deal_name ? `"${input.deal_name}" ` : ''}(${input.deal_id}): "${shown}".`;
+    }
+
     case 'merge_duplicate_companies':
       return `Merge HubSpot company ${input.secondary_company_id} into ${input.primary_company_id}. ` +
         `The merged record is deleted and this cannot be undone.`;
@@ -336,6 +344,25 @@ export async function runPendingAction({ actionId, userId, agentType = 'internal
   );
 
   return { ok: true, summary: action.summary, result, toolName: action.tool_name };
+}
+
+/**
+ * Decline a saved action: it can never run afterwards, and a later "yes" finds
+ * nothing waiting. Used by a tracked card's "Don't add note" button.
+ *
+ * Status becomes 'declined' (alongside pending | confirmed | superseded |
+ * expired | failed); who declined is kept in `result`.
+ *
+ * @returns {Promise<boolean>} false when the action was no longer pending
+ */
+export async function declinePendingAction({ actionId, userId = null, chatUserId = null }) {
+  const declined = await query(
+    `UPDATE pending_actions SET status = 'declined', result = $2
+      WHERE id = $1 AND status = 'pending'
+      RETURNING id`,
+    [actionId, JSON.stringify({ declined: true, declined_by: userId ?? null, declined_by_chat_user: chatUserId ?? null })]
+  );
+  return declined.rows.length > 0;
 }
 
 /**

@@ -56,6 +56,8 @@ import { handleGoogleChatEvent } from './src/api/chat-google.js';
 // Stored copy of listened Chat spaces: Pub/Sub push endpoint and its jobs
 import { handleChatEventsPush } from './src/api/chat-events.js';
 import { startChatListen } from './src/chat-listen/jobs.js';
+// Tracked cards in Google Chat (src/cards/): digests, refresh and lifecycle jobs
+import { startTrackedCards } from './src/cards/jobs.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
 // the number is known — see src/api/addon-probe.js.
 import { handleAddonProbe } from './src/api/addon-probe.js';
@@ -1278,6 +1280,14 @@ async function startServer() {
     // CHAT_LISTENER_USER_EMAIL and the Pub/Sub variables are set. Switch off
     // with CHAT_LISTEN_DISABLED=true. Needs migration 029.
     startChatListen(cron);
+
+    // ========================================================================
+    // CRON JOBS: Tracked cards (hourly digests at 08:00 local, daily refresh)
+    // ========================================================================
+    // Each person's digest goes out when it is 08:xx in their calendar time
+    // zone. The daily pass refreshes open cards and applies stale/auto-close.
+    // Switch off with TRACKED_CARDS_DISABLED=true. Needs migration 030.
+    startTrackedCards(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';

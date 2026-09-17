@@ -232,3 +232,40 @@ export async function resolveSenderName(sender, ctx = {}) {
   const map = await resolveSenderNames([sender], ctx);
   return map.get(sender.name) || FALLBACKS.external;
 }
+
+/**
+ * The Workspace email and name for a Chat user id (users/NNN), or null.
+ *
+ * Used by tracked cards to connect a person @mentioned in Chat to their Hub
+ * account and calendar time zone. Same client and impersonation as the name
+ * lookup above: the directory is read as the requesting person.
+ *
+ * @param {string} chatUserId - users/NNN
+ * @param {Object} [ctx]
+ * @param {number} [ctx.userId] - the person on whose behalf we look (impersonated)
+ * @returns {Promise<{email: string, name: string|null}|null>}
+ */
+export async function lookupChatUserEmail(chatUserId, ctx = {}) {
+  const userKey = String(chatUserId || '').split('/')[1];
+  if (!userKey) return null;
+
+  const admin = directoryClient(await requesterEmail(ctx.userId));
+  if (!admin) return null;
+
+  try {
+    const res = await admin.users.get({ userKey, viewType: 'domain_public' });
+    const email = res.data.primaryEmail || null;
+    if (!email) return null;
+    const name = res.data.name?.fullName
+      || [res.data.name?.givenName, res.data.name?.familyName].filter(Boolean).join(' ')
+      || null;
+    return { email, name };
+  } catch (err) {
+    const code = err?.code ?? err?.response?.status;
+    if (code !== 404 && code !== '404') {
+      // Code only. Google's error text can carry the impersonated address.
+      console.warn(`[names] directory email lookup failed: code=${code ?? 'unknown'}`);
+    }
+    return null;
+  }
+}

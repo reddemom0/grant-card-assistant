@@ -5264,3 +5264,37 @@ export async function searchRecentWins({ days, program, industry, limit } = {}) 
 
   return result;
 }
+
+/**
+ * Add a note to a deal. CONFIRMATION-GATED: executor.js runs this only for a
+ * pending action a person confirmed (GATED_TOOLS.create_hubspot_note). It is not
+ * in any agent's tool list; tracked cards propose it.
+ *
+ * Same two calls as lead-gen's note writer: create the note, then a v4 default
+ * association to the deal.
+ *
+ * @param {Object} input
+ * @param {string} input.deal_id
+ * @param {string} input.body - plain text; newlines become line breaks
+ * @returns {Promise<Object>} { success, note_id, deal_id } or { success: false, error }
+ */
+export async function createDealNote({ deal_id: dealId, body } = {}) {
+  if (!dealId || !body) {
+    return { success: false, error: 'deal_id and body are required' };
+  }
+  try {
+    const client = createHubSpotClient();
+    const html = String(body)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>');
+    const created = await client.post('/crm/v3/objects/notes', {
+      properties: { hs_timestamp: new Date().toISOString(), hs_note_body: html }
+    });
+    const noteId = created.data.id;
+    await client.put(`/crm/v4/objects/notes/${noteId}/associations/default/deals/${dealId}`, []);
+    return { success: true, note_id: noteId, deal_id: dealId };
+  } catch (err) {
+    const status = err?.response?.status;
+    return { success: false, error: `HubSpot note could not be created (${status || err?.code || 'error'})` };
+  }
+}
