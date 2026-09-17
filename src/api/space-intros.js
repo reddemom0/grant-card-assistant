@@ -28,7 +28,13 @@ function load() {
     Object.entries(raw.spaces || {}).map(([name, text]) => [name.trim().toLowerCase(), text])
   );
 
-  intros = { closing: raw.closing || '', generic: raw.generic || '', byName };
+  intros = {
+    closing: raw.closing || '',
+    listeningClosing: raw.listeningClosing || '',
+    listeningNotice: raw.listeningNotice || '',
+    generic: raw.generic || '',
+    byName
+  };
   return intros;
 }
 
@@ -38,14 +44,17 @@ function load() {
  * @param {Object} params
  * @param {string} [params.displayName] - the space's display name
  * @param {boolean} [params.isDm] - a direct message, where an intro would be noise
+ * @param {boolean} [params.listening] - Oracle keeps a copy of this space, so the
+ *   usual "I only see messages where I'm @mentioned" would be untrue
  * @returns {string|null} the message to post, or null when there should be none
  */
-export function resolveSpaceIntro({ displayName, isDm } = {}) {
+export function resolveSpaceIntro({ displayName, isDm, listening = false } = {}) {
   // A DM is already one-to-one; announcing yourself to someone who just opened a
   // conversation with you adds nothing.
   if (isDm) return null;
 
-  const { closing, generic, byName } = load();
+  const { closing: usual, listeningClosing, generic, byName } = load();
+  const closing = listening ? listeningClosing : usual;
   const key = String(displayName || '').trim().toLowerCase();
   const specific = key ? byName.get(key) : null;
 
@@ -53,6 +62,11 @@ export function resolveSpaceIntro({ displayName, isDm } = {}) {
     || generic.replace('{space}', String(displayName || '').trim() || 'this space');
 
   return closing ? `${body}\n\n${closing}` : body;
+}
+
+/** Posted once when Oracle starts keeping a copy of a space. */
+export function listeningNotice() {
+  return load().listeningNotice;
 }
 
 /** Space names with a hand-written intro. Exported for tests and diagnostics. */

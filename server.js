@@ -53,6 +53,9 @@ import {
 
 // Google Chat adapter for Oracle (verifies Google-signed tokens itself)
 import { handleGoogleChatEvent } from './src/api/chat-google.js';
+// Stored copy of listened Chat spaces: Pub/Sub push endpoint and its jobs
+import { handleChatEventsPush } from './src/api/chat-events.js';
+import { startChatListen } from './src/chat-listen/jobs.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
 // the number is known — see src/api/addon-probe.js.
 import { handleAddonProbe } from './src/api/addon-probe.js';
@@ -417,6 +420,11 @@ app.post('/api/chat', authenticateUser, handleChatRequest);
 // Chat authenticates with its own Google-signed bearer token, verified inside
 // the handler before any side effect. Runs the same agent loop as /api/chat.
 app.post('/api/chat/google', handleGoogleChatEvent);
+
+// Pub/Sub push for the stored Chat copy (src/chat-listen/). Also NOT behind
+// authenticateUser: the handler verifies the push subscription's Google-signed
+// OIDC token (PUBSUB_PUSH_AUDIENCE, PUBSUB_PUSH_SERVICE_ACCOUNT) first.
+app.post('/api/chat/events', handleChatEventsPush);
 
 // TEMPORARY probe: measures how long Google waits for a self-hosted add-on
 // endpoint. Verifies the caller like the Chat route above, then sleeps. Calls no
@@ -1262,6 +1270,14 @@ async function startServer() {
 
       console.log('⏰ Cron job scheduled: Lead-gen finalization every 10 minutes');
     }
+
+    // ========================================================================
+    // CRON JOBS: Stored Chat copy (hourly subscription pass, daily retention)
+    // ========================================================================
+    // Follows only spaces in data/chat/listen-spaces.json, and only when
+    // CHAT_LISTENER_USER_EMAIL and the Pub/Sub variables are set. Switch off
+    // with CHAT_LISTEN_DISABLED=true. Needs migration 029.
+    startChatListen(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';

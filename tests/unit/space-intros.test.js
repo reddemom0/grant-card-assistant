@@ -8,7 +8,7 @@
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest tests/unit/space-intros.test.js
  */
 
-import { resolveSpaceIntro, knownSpaceNames } from '../../src/api/space-intros.js';
+import { resolveSpaceIntro, knownSpaceNames, listeningNotice } from '../../src/api/space-intros.js';
 import { normalizeChatEvent, canonicalEventType, buildMessageRequest } from '../../src/api/chat-google.js';
 
 const CLOSING = 'I only see messages where I\'m @mentioned. Before I change anything in HubSpot, calendars or Docs, I\'ll show you the details — anyone in the thread can reply "yes" to confirm.';
@@ -74,6 +74,35 @@ describe('resolving an intro', () => {
     ]) {
       expect(names).toContain(expected);
     }
+  });
+});
+
+describe('spaces Oracle keeps a copy of', () => {
+  // A listened space must not be told "I only see messages where I'm @mentioned".
+  const NOTICE = "Heads up: Oracle now keeps a 12-month copy of this space's messages so it can answer questions about past discussions here. It still only replies when you @mention it.";
+
+  test('the one-time notice is exactly the approved wording', () => {
+    expect(listeningNotice()).toBe(NOTICE);
+  });
+
+  test('a listened space gets the notice in place of the usual first sentence', () => {
+    const intro = resolveSpaceIntro({ displayName: 'RTRI Changes', listening: true });
+
+    expect(intro).toContain("I've been added to RTRI Changes");
+    expect(intro).toContain(NOTICE);
+    expect(intro).not.toContain("I only see messages where I'm @mentioned");
+    // The confirmation promise is kept.
+    expect(intro).toContain('anyone in the thread can reply "yes" to confirm.');
+    expect(intro.endsWith(CLOSING)).toBe(false);
+  });
+
+  test('listening is off by default, so every other space is unchanged', () => {
+    expect(resolveSpaceIntro({ displayName: 'RTRI Changes' }).endsWith(CLOSING)).toBe(true);
+    expect(resolveSpaceIntro({ displayName: 'RTRI Changes', listening: false }).endsWith(CLOSING)).toBe(true);
+  });
+
+  test('a DM still gets no intro, listening or not', () => {
+    expect(resolveSpaceIntro({ displayName: 'x', isDm: true, listening: true })).toBeNull();
   });
 });
 

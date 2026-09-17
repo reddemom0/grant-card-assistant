@@ -12,6 +12,73 @@ Format:
 
 ---
 
+## 2026-09-17 — Oracle keeps a stored copy of allowlisted Chat spaces, read as oracle@granted.ca
+
+**What:** For each space in `data/chat/listen-spaces.json` (pilot: RTRI Changes,
+`spaces/AAQAsvTWxwE`), a Workspace Events subscription sends message
+created/updated/deleted events through Pub/Sub to `POST /api/chat/events`
+(`src/api/chat-events.js`). The code lives in `src/chat-listen/` and
+`src/database/chat-listen-store.js`, with tables from migration 029. Pieces:
+- **Push check:** the handler verifies the push's OIDC token
+  (`PUBSUB_PUSH_AUDIENCE`, `PUBSUB_PUSH_SERVICE_ACCOUNT`) before reading anything.
+- **Fetch:** each event carries only a message name. The handler fetches the
+  current message and stores space, name, thread, sender id, times and text.
+  Nothing else is kept, and private messages are never stored.
+- **Backfill:** a one-time 12-month import that resumes from a saved page token.
+- **Hourly pass:** renews subscriptions and handles lifecycle events.
+- **Retention:** a daily job deletes messages older than 12 months.
+**Why a user, not the app:** Chat app authentication (`chat.app.*`) needs admin
+approval, and Oracle's Marketplace listing is permanently Public, which would put
+that approval through Google's public review. So a dedicated Workspace user named
+by `CHAT_LISTENER_USER_EMAIL` signs into the Hub once, and its own grant
+(`chat.messages.readonly`, `chat.spaces.readonly`) does all reading and
+subscribing. No other user's token is used, and nothing in a request can pick the
+user. Google requires every later subscription call to use the OAuth client that
+created it, and the topic to live in that client's project, so changing
+`GOOGLE_CLIENT_ID` strands existing subscriptions until they lapse (≤7 days) and
+are recreated.
+**Names only, 7-day subscriptions:** with message content in the event a
+subscription lasts at most 4 hours; without it, 7 days. Fetching each message
+also returns its current state, so out-of-order events can't store stale text.
+Two SQL guards back that up:
+- a stored message is overwritten only by a version at least as new;
+- a deleted message leaves a name-only tombstone for 30 days, so a late
+  "created" can't bring it back.
+**Pause, don't delete:** when the listener can't read (token revoked, scopes
+missing, not a member, subscription suspended), the space is paused with a
+reason code and its copy is kept. Push events are held with 503 and Pub/Sub
+retries them for up to 7 days. The hourly pass resumes the space once the
+listener works again: it reactivates or replaces the subscription (a
+`USER_AUTHORIZATION_FAILURE` suspension can't be reactivated) and catches up
+messages created meanwhile. Edits and deletions of older messages made during a
+gap are not recovered. A 404 on a fetch counts as "deleted" only if the listener
+still sees the space; otherwise the space pauses, so losing access can't wipe
+the copy. Only two things delete a space's copy: the Oracle app's
+`removedFromSpace`, or the space leaving the allowlist.
+**Notice before reading:** members are told once, word for word, before anything
+is subscribed or read. If the notice can't be posted, listening doesn't start.
+When the app joins a listened space, its intro carries the same sentence in place
+of "I only see messages where I'm @mentioned".
+**Logging:** only counts, event types and codes. `query()`/`transaction()` were
+changed (commit 0ed7dfe6) to log a label and code only, because parameters here
+carry message text.
+**Known limits:**
+- Cron assumes one instance, like the lead-gen job. A second replica would repeat
+  the pass harmlessly.
+- `googleapis` 128 has no Workspace Events client, so it is called over REST.
+- `getUserOAuth2Client` still saves refreshed tokens without the new refresh
+  token (separate ticket).
+- A removed space is re-enabled only by the app's `addedToSpace`, not by the
+  hourly pass.
+**Impact:** `migrations/029_chat_listen.sql` (**must be run by hand before
+deploy**), `data/chat/listen-spaces.json`, `src/api/chat-events.js`,
+`src/chat-listen/{config,listener,subscriptions,backfill,jobs}.js`,
+`src/database/chat-listen-store.js`, `src/api/chat-google.js`
+(`removedFromSpace`/`addedToSpace` hooks, `postToSpace`), `src/api/space-intros.js`,
+`data/chat/space-intros.json`, `server.js`, and tests. New env:
+`CHAT_LISTENER_USER_EMAIL`, `CHAT_EVENTS_PUBSUB_TOPIC`, `PUBSUB_PUSH_AUDIENCE`,
+`PUBSUB_PUSH_SERVICE_ACCOUNT`, and `CHAT_LISTEN_DISABLED` (kill switch).
+
 ## 2026-09-16 — Google sign-in carries a single-use, browser-bound OAuth state
 
 **What:** `/api/auth-google` issues a random state (`src/utils/google-login-state.js`),

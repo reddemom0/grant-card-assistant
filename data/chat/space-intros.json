@@ -1,7 +1,11 @@
 {
-  "_comment": "What Oracle says when it is added to a Google Chat space. Edit freely — this file is data, not code, and is re-read on each deploy. Keys are space display names, matched case-insensitively. A space with no entry gets `generic`, with {space} replaced by its name. `closing` is appended to every intro. DMs get no intro at all. Resolver: src/api/space-intros.js",
+  "_comment": "What Oracle says when it is added to a Google Chat space. Edit freely — this file is data, not code, and is re-read on each deploy. Keys are space display names, matched case-insensitively. A space with no entry gets `generic`, with {space} replaced by its name. `closing` is appended to every intro. DMs get no intro at all. In a space Oracle keeps a copy of (data/chat/listen-spaces.json), `listeningClosing` replaces `closing`, and `listeningNotice` is posted once when the copy starts. Resolver: src/api/space-intros.js",
 
   "closing": "I only see messages where I'm @mentioned. Before I change anything in HubSpot, calendars or Docs, I'll show you the details — anyone in the thread can reply \"yes\" to confirm.",
+
+  "listeningNotice": "Heads up: Oracle now keeps a 12-month copy of this space's messages so it can answer questions about past discussions here. It still only replies when you @mention it.",
+
+  "listeningClosing": "Heads up: Oracle now keeps a 12-month copy of this space's messages so it can answer questions about past discussions here. It still only replies when you @mention it. Before I change anything in HubSpot, calendars or Docs, I'll show you the details — anyone in the thread can reply \"yes\" to confirm.",
 
   "generic": "Hi, I've been added to {space}. @mention me with a question about clients, grants, Drive files or meetings.",
 

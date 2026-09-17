@@ -23,6 +23,8 @@ import { createConversation, saveMessage } from '../database/messages.js';
 import { query } from '../database/connection.js';
 import { tryHandleConfirmation, currentPendingId, proposalNotice } from './confirmation.js';
 import { resolveSpaceIntro } from './space-intros.js';
+import { hubSignInUrl } from '../tools/chat-history.js';
+import { isListenSpace } from '../chat-listen/config.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -339,6 +341,18 @@ export function markdownToChat(md) {
 export const SKIPPED_ATTACHMENT_NOTICE =
   "I can't open files uploaded directly to Chat, so I answered from your message only. Share it as a Google Drive link and I can read it.";
 
+/**
+ * Said when a message is accepted but Oracle does not run on it. Plain language,
+ * nothing internal. An unknown sender and a known one with no stored Google
+ * tokens get the same sentence, in spaces and DMs alike, so the reply never says
+ * whether an account exists.
+ */
+export const NOT_RUN_REPLIES = {
+  signIn: (signInUrl) =>
+    `I don't recognize your account yet. Sign in once at ${signInUrl}, then message me again.`,
+  tryAgain: 'Something went wrong on my end. Please try again in a minute.'
+};
+
 const FENCE_LINE = /^\s*```/;
 const LIST_ITEM = /^\s*([-*+]|\d+[.)])\s+/;
 const FENCE_CLOSE = '```';
@@ -531,14 +545,53 @@ export function withAttachmentNotice(evt, reply) {
  * Post a reply, swallowing errors so a post-back failure cannot crash the
  * background task. This is the ONE place where the user may get silence, so it
  * logs loudly.
+ *
+ * @returns {Promise<boolean>} whether the post went through
  */
 async function safePost(evt, text) {
   try {
     await postToChat(evt, text);
     console.log('✅ Chat reply delivered');
+    return true;
   } catch (err) {
     console.error('❌ Google Chat post-back FAILED — user received nothing:', err.message);
+    return false;
   }
+}
+
+/**
+ * Post a new top-level message into a space as the Oracle app, outside any
+ * Chat event. Used for the one-time notice that a space is being copied
+ * (src/chat-listen/subscriptions.js).
+ *
+ * @param {string} spaceName - resource name, spaces/XXX
+ * @param {string} text - markdown
+ * @returns {Promise<boolean>} whether the post went through
+ */
+export function postToSpace(spaceName, text) {
+  return safePost(
+    { spaceId: spaceName, spaceIsResourceName: true, threadId: null, threadIsResourceName: false },
+    markdownToChat(text)
+  );
+}
+
+/**
+ * Ack with an empty body, then post a fixed reply in the background.
+ *
+ * The reply cannot go in the response body: this deployment parses that body as
+ * RenderActions (see src/api/addon-probe.js), so a { text } body renders nothing
+ * and the user gets silence.
+ *
+ * @param {import('express').Response} res
+ * @param {Object} evt - a normalizeChatEvent() result
+ * @param {string} reason - a fixed code for the log; never an email or message text
+ * @param {string} reply
+ */
+function ackThenPost(res, evt, reason, reply) {
+  res.status(200).json({});
+  safePost(evt, reply).catch(err => {
+    console.error(`❌ Unhandled error posting ${reason} reply:`, err);
+  });
 }
 
 /**
@@ -665,18 +718,45 @@ export async function handleGoogleChatEvent(req, res) {
   // nothing.
   // ==========================================================================
   if (kind === 'addedtospace') {
+    // A space on the listen allowlist gets an intro that says its messages are
+    // copied, and — once that intro is posted — the copy starts.
+    const listening = !evt.isDm && evt.spaceIsResourceName && isListenSpace(evt.spaceId);
     const intro = resolveSpaceIntro({
       displayName: evt.spaceDisplayName,
-      isDm: evt.isDm
+      isDm: evt.isDm,
+      listening
     });
 
     console.log(`👋 Added to ${evt.isDm ? 'a DM' : `space "${evt.spaceDisplayName || '(no display name)'}"`} — ${intro ? 'posting intro' : 'no intro (DM)'}`);
     res.status(200).json({});
 
-    if (intro) {
-      safePost(evt, markdownToChat(intro)).catch(err => {
-        console.error('❌ Unhandled error posting space intro:', err);
-      });
+    (async () => {
+      const introPosted = intro ? await safePost(evt, markdownToChat(intro)) : false;
+      if (listening) {
+        const { enableSpace } = await import('../chat-listen/subscriptions.js');
+        await enableSpace(evt.spaceId, { announced: introPosted });
+      }
+    })().catch(err => {
+      console.error(`❌ Unhandled error after addedToSpace — code: ${err?.code || err?.name || 'unknown'}`);
+    });
+    return;
+  }
+
+  // ==========================================================================
+  // REMOVED FROM A SPACE — stop keeping a copy of it and delete what is stored.
+  // A no-op for spaces that were never copied. Runs even when listening is
+  // switched off: deleting the copy is the point.
+  // ==========================================================================
+  if (kind === 'removedfromspace') {
+    console.log(`👋 Removed from ${evt.isDm ? 'a DM' : 'a space'}`);
+    res.status(200).json({});
+
+    if (!evt.isDm && evt.spaceIsResourceName) {
+      import('../chat-listen/subscriptions.js')
+        .then(({ teardownSpace }) => teardownSpace(evt.spaceId))
+        .catch(err => {
+          console.error(`❌ Chat listen teardown failed — code: ${err?.code || err?.name || 'unknown'}`);
+        });
     }
     return;
   }
@@ -717,21 +797,25 @@ export async function handleGoogleChatEvent(req, res) {
     return;
   }
 
+  // The four replies below are posted asynchronously via ackThenPost. Their log
+  // lines carry a reason code only — never the sender's email or message text.
   let user;
   try {
     user = await resolveUser(senderEmail);
   } catch (err) {
-    console.error('❌ Chat identity lookup failed:', err.message);
-    return res.status(200).json({ text: 'I could not verify your account just now. Try again shortly.' });
+    // The driver's error code, not its message, which is not guaranteed free of
+    // the query parameter (the sender's email).
+    console.error(`❌ Not running Oracle — reason: identity_lookup_failed (${err.code || err.name})`);
+    ackThenPost(res, evt, 'identity_lookup_failed', NOT_RUN_REPLIES.tryAgain);
+    return;
   }
 
   // Unknown or deactivated — same message either way, so we do not disclose
   // whether an account exists.
   if (!user) {
-    console.log(`↩️  Ignoring: sender "${senderEmail || '(no email)'}" is not a known active user`);
-    return res.status(200).json({
-      text: `I don't recognize ${senderEmail || 'this account'}. Sign in at the Granted AI Hub first, then message me again.`
-    });
+    console.log('↩️  Not running Oracle — reason: unknown_sender');
+    ackThenPost(res, evt, 'unknown_sender', NOT_RUN_REPLIES.signIn(hubSignInUrl()));
+    return;
   }
 
   // Defensive: a users row can currently only exist if the OAuth login stored
@@ -739,19 +823,21 @@ export async function handleGoogleChatEvent(req, res) {
   // created another way degrades into a clear instruction rather than tool
   // failures mid-answer.
   if (!user.google_refresh_token) {
-    console.log(`↩️  Ignoring: user ${user.id} has no stored Google tokens`);
-    const hubUrl = process.env.PUBLIC_URL || 'https://grant-card-assistant-production.up.railway.app';
-    return res.status(200).json({
-      text: `Your account isn't fully connected yet. Sign in once at ${hubUrl}/login, then message me again.`
-    });
+    console.log(`↩️  Not running Oracle — reason: missing_google_tokens (user ${user.id})`);
+    ackThenPost(res, evt, 'missing_google_tokens', NOT_RUN_REPLIES.signIn(hubSignInUrl()));
+    return;
   }
 
   let conversationId;
   try {
     ({ conversationId } = conversationIdForEvent(evt));
-  } catch (err) {
-    console.error('❌ Could not derive conversation id:', err.message);
-    return res.status(200).json({ text: 'I could not work out which conversation this belongs to.' });
+  } catch {
+    // This only throws when the event has neither a thread nor a space — which
+    // also leaves the post without a parent, so Google rejects it and safePost
+    // logs the failure. The empty ack is what this path still guarantees.
+    console.error('❌ Not running Oracle — reason: no_conversation_id');
+    ackThenPost(res, evt, 'no_conversation_id', NOT_RUN_REPLIES.tryAgain);
+    return;
   }
 
   console.log(`✅ Accepted — user ${user.id} (${user.email}), thread ${evt.threadId || '(none)'}, conversation ${conversationId}`);
