@@ -13,7 +13,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { createTrackedCardFakes, cardText, cardButtons } from './helpers/tracked-cards-fakes.js';
+import { createTrackedCardFakes, cardText, cardButtons, allCardStrings } from './helpers/tracked-cards-fakes.js';
 
 const ENDPOINT = 'https://hub.example/api/chat/google';
 const ISSUER = 'addon@example.iam.gserviceaccount.com';
@@ -22,6 +22,8 @@ process.env.GOOGLE_CHAT_ISSUER_EMAIL = ISSUER;
 process.env.GOOGLE_SERVICE_ACCOUNT_KEY = '{}';
 process.env.PUBLIC_URL = 'https://hub.example';
 delete process.env.DEFAULT_TIMEZONE;
+const LISTENER_EMAIL = 'oracle-listener@granted.ca';
+process.env.CHAT_LISTENER_USER_EMAIL = LISTENER_EMAIL;
 
 const fakes = createTrackedCardFakes();
 
@@ -85,7 +87,13 @@ const { trackReview, REVIEW_INTENT, programSource } = await import('../../src/ca
 const OWNER = 'users/100';
 const STEPH = 'users/201';
 const NATALIE = 'users/202';
-const NAMES = { [OWNER]: 'Olivia Sentinel', [STEPH]: 'Steph Sentinel', [NATALIE]: 'Natalie Sentinel' };
+const LISTENER = 'users/300';      // the Chat-copy listener: a Workspace user, not a teammate
+const LOOKALIKE = 'users/301';     // shown as "Oracle", email unknown
+const PRIYA = 'users/302';         // a real person whose email is unknown
+const NAMES = {
+  [OWNER]: 'Olivia Sentinel', [STEPH]: 'Steph Sentinel', [NATALIE]: 'Natalie Sentinel',
+  [LISTENER]: 'Oracle', [LOOKALIKE]: 'Oracle', [PRIYA]: 'Priya Sentinel'
+};
 const EMAILS = { [OWNER]: 'olivia.sentinel@granted.ca', [STEPH]: 'steph.sentinel@granted.ca', [NATALIE]: 'natalie.sentinel@granted.ca' };
 
 const SPACE = 'spaces/AAA';
@@ -96,12 +104,12 @@ const DOC1 = 'DOC1_AAAAAAAAAA';
 const DOC2 = 'DOC2_BBBBBBBBBB';
 const docUrl = (id) => `https://docs.google.com/document/d/${id}/edit`;
 
-const TITLE = 'Acme Sentinel Ltd — RTRI application';
+const TITLE = 'Acme Sentinel Ltd · RTRI';
+const ISSUES = ['Sentinel check: tariff exposure is not quantified', 'Budget omits the 2026 hiring costs'];
 const RTRI_INPUT = {
-  title: TITLE,
   client_name: 'Acme Sentinel Ltd',
   program: 'RTRI',
-  precheck: 'Sentinel pre-check: 12 employees fits the RTRI size limit; tariff exposure is described.',
+  precheck_issues: ISSUES,
   missing_info: ['2025 financial statements', 'Proof of tariff impact']
 };
 const DRAFT = 'Subject: Sentinel follow-up\n\nHi, we still need your 2025 financial statements.';
@@ -183,6 +191,10 @@ const onlyCard = async () => {
 const cardPosts = () => fakes.chat.posts.filter(p => p.cardsV2);
 const dmsTo = (space) => fakes.chat.posts.filter(p => p.spaceName === space);
 const lastPatch = () => fakes.chat.patches.at(-1).cardsV2;
+const buttonsOf = (cardsV2) => cardButtons(cardsV2).map(b => [b.text, b.disabled]);
+const privateReplies = () => fakes.chat.posts.filter(p => p.privateTo).map(p => [p.privateTo, p.text]);
+const reviewersOf = async (cardId) => (await fakes.store.getParticipants(cardId))
+  .filter(p => p.role === 'reviewer').map(p => p.chat_user_id).sort();
 
 beforeEach(() => {
   fakes.reset();
@@ -200,6 +212,7 @@ beforeEach(() => {
   fakes.drive.docs.set(DOC2, { name: 'Acme budget', openComments: 1 });
   fakes.chat.dms.set(OWNER, 'spaces/DM-OWNER');
   fakes.chat.dms.set(STEPH, 'spaces/DM-STEPH');
+  fakes.directory.people.set(LISTENER, { email: LISTENER_EMAIL, name: 'Oracle' });
   fakes.hubspot.deals.push({ id: '555', name: 'Acme Sentinel Ltd - RTRI', companyName: 'Acme Sentinel Ltd', program: 'RTRI' });
 
   // The fake model: on a Chat turn it calls track_review and replies only when
@@ -214,7 +227,7 @@ beforeEach(() => {
     toolResults.push(r);
     const reply = r.card_posted || r.asked ? ''
       : r.needs_docs ? 'Which Docs should be reviewed?'
-        : r.needs_reviewers ? 'Who should review them?'
+        : r.needs_reviewers ? 'Who should review this?'
           : 'This thread already has a review card.';
     return { success: true, response: { content: reply ? [{ type: 'text', text: reply }] : [] } };
   };
@@ -258,19 +271,23 @@ describe('an @mention asking for a review', () => {
       conversation_id: fakes.agent.calls[0].conversationId, title: TITLE
     });
 
-    const text = cardText(post.cardsV2);
-    expect(post.cardsV2[0].card.header).toEqual({ title: TITLE, subtitle: `Review · requested by ${NAMES[OWNER]}` });
-    expect(text).toContain('0 of 2 reviews done · 5 open comments');
-    expect(text).toContain(`${NAMES[NATALIE]}\nNot started`);
-    expect(text).toContain(`${NAMES[STEPH]}\nNot started`);
-    expect(text).toContain('Acme RTRI application\n4 open comments');
-    expect(text).toContain('Acme budget\n1 open comment');
-    expect(text).toContain('Pre-check (RTRI program facts)');
-    expect(text).toContain(RTRI_INPUT.precheck);
-    expect(text).toContain('• 2025 financial statements<br>• Proof of tariff impact');
-    expect(text).not.toContain('docs.google.com');         // Doc names only, never links
-    expect(cardButtons(post.cardsV2).map(b => b.text))
-      .toEqual(['I’m reviewing', 'Mark my review done', 'Draft client follow-up']);
+    // Compact: header, status, one line per reviewer and Doc, collapsed extras.
+    const { header, sections } = post.cardsV2[0].card;
+    expect(header).toEqual({ title: 'Acme Sentinel Ltd · RTRI', subtitle: `Review · requested by ${NAMES[OWNER]}` });
+    expect(sections.map(sec => sec.header ?? null))
+      .toEqual([null, 'Reviewers', 'Documents', 'Pre-check · RTRI program facts · 2 issues', 'Missing client info', null]);
+    const texts = (sec) => sec.widgets.map(w => w.textParagraph?.text);
+    expect(texts(sections[0])).toEqual(['0 of 2 reviews done · 5 open comments']);
+    expect(texts(sections[1])).toEqual([`${NAMES[NATALIE]} · Not started<br>${NAMES[STEPH]} · Not started`]);
+    expect(texts(sections[2])).toEqual(['Acme RTRI application · 4 comments<br>Acme budget · 1 comment']);
+    expect(sections[3]).toMatchObject({ collapsible: true, uncollapsibleWidgetsCount: 1 });
+    expect(texts(sections[3])).toEqual(ISSUES.map(i => `• ${i}`));
+    expect(sections[4]).toMatchObject({ collapsible: true, uncollapsibleWidgetsCount: 1 });
+    expect(texts(sections[4])).toEqual(['2 items still needed', '• 2025 financial statements<br>• Proof of tariff impact']);
+    expect(cardText(post.cardsV2)).not.toContain('docs.google.com');   // Doc names only, never links
+    expect(buttonsOf(post.cardsV2)).toEqual([
+      ['I’m reviewing', false], ['Mark my review done', false], ['Draft client follow-up', false]
+    ]);
 
     // Comments were read as the requester; the requester's Chat id was learned.
     expect(fakes.drive.calls.map(c => c.userEmail)).toEqual([EMAILS[OWNER], EMAILS[OWNER]]);
@@ -333,10 +350,11 @@ describe('an @mention asking for a review', () => {
   });
 
   test('a program with no source on file skips the pre-check and says so', async () => {
-    await track({ ...RTRI_INPUT, program: 'CanExport SMEs', title: 'Acme Sentinel Ltd — CanExport' });
+    await track({ ...RTRI_INPUT, program: 'CanExport SMEs' });
     const text = cardText(cardPosts()[0].cardsV2);
+    expect(cardPosts()[0].cardsV2[0].card.header.title).toBe('Acme Sentinel Ltd · CanExport SMEs');
     expect(text).toContain('No program source on file — pre-check skipped.');
-    expect(text).not.toContain(RTRI_INPUT.precheck);
+    expect(text).not.toContain(ISSUES[0]);
     expect(programSource('Regional Tariff Response Initiative')).toBe('rtri-tariff');
     expect(programSource('CanExport SMEs')).toBeNull();
   });
@@ -344,8 +362,91 @@ describe('an @mention asking for a review', () => {
   test('a Doc Oracle cannot read is shown as unreadable, not as zero comments', async () => {
     await track(RTRI_INPUT, { driveFiles: [{ fileId: DOC1 }, { fileId: 'DOC_NOT_SHARED_1' }] });
     const text = cardText(cardPosts()[0].cardsV2);
-    expect(text).toContain('Untitled document\nCan’t read comments — check sharing');
+    expect(text).toContain('Untitled document · can’t read comments');
     expect(logged()).toContain('unreadable docs: 1');
+  });
+
+  test('the listener account, Oracle and other apps are never reviewers', async () => {
+    const result = await say(reviewRequest({ mentions: [LISTENER, LOOKALIKE, PRIYA, STEPH] }));
+    expect(result).toMatchObject({ card_posted: true });
+    expect(await reviewersOf((await onlyCard()).id)).toEqual([STEPH, PRIYA].sort());
+    const text = cardText(cardPosts()[0].cardsV2);
+    expect(text).toContain('0 of 2 reviews done');
+    expect(text).not.toContain('Oracle ·');
+  });
+
+  test('with only the listener mentioned, Oracle asks "Who should review this?" and makes no card', async () => {
+    const first = await say(reviewRequest({ mentions: [LISTENER] }));
+    expect(first).toMatchObject({ needs_reviewers: true });
+    expect(first.message).toContain('Ask exactly: "Who should review this?"');
+    expect(textReplies).toEqual(['Who should review this?']);
+    expect(cardPosts()).toEqual([]);
+    expect((await onlyCard()).status).toBe('awaiting_docs');
+
+    const second = await say({ text: 'Steph', mentions: [STEPH] });
+    expect(second).toMatchObject({ card_posted: true });
+    expect(await reviewersOf((await onlyCard()).id)).toEqual([STEPH]);
+  });
+
+  test('Markdown never reaches card text', async () => {
+    fakes.drive.docs.set(DOC1, { name: '**Acme** `application` draft', openComments: 4 });
+    await track({
+      client_name: '**Acme** Sentinel Ltd',
+      program: '`RTRI`',
+      precheck_issues: [
+        '**Budget:** omits *hiring* costs — see [PROGRAM_FACTS](https://example.com/facts)',
+        '## Tariff exposure not quantified',
+        '- Employee count missing'
+      ],
+      missing_info: ['**2025** financial statements', '`T4` slips', '* proof of tariff impact']
+    }, { mentions: [{ chatUserId: STEPH, displayName: '**Steph** Sentinel' }] });
+
+    const cardsV2 = cardPosts()[0].cardsV2;
+    for (const str of allCardStrings(cardsV2)) {
+      expect(str).not.toMatch(/\*\*|`|\]\(/);
+      for (const line of str.split(/<br>|\n/)) expect(line).not.toMatch(/^\s*(#{1,6}\s|[-*+]\s)/);
+    }
+    const text = cardText(cardsV2);
+    expect(cardsV2[0].card.header.title).toBe('Acme Sentinel Ltd · RTRI');
+    expect(text).toContain('• Budget: omits hiring costs — see PROGRAM_FACTS');
+    expect(text).toContain('• Tariff exposure not quantified');
+    expect(text).toContain('Steph Sentinel · Not started');
+    expect(text).toContain('Acme application draft · 4 comments');
+    expect(text).toContain('• 2025 financial statements<br>• T4 slips<br>• proof of tariff impact');
+  });
+
+  test('Markdown the card writes itself becomes card HTML, and older prose pre-checks are cleaned too', async () => {
+    await track();
+    const card = await onlyCard();
+    await fakes.store.updateCard(card.id, {
+      data: { ...card.data, precheck: { source: 'rtri-tariff', text: '**Eligibility:** ✅ fine\n- **Budget** is *short*\n✅ Employer size OK' } }
+    });
+    const cardsV2 = await renderCard(await onlyCard());
+    const pre = cardsV2[0].card.sections.find(sec => sec.header?.startsWith('Pre-check'));
+    expect(pre.widgets.map(w => w.textParagraph.text)).toEqual(['• Eligibility: fine', '• Budget is short']);
+    expect(allCardStrings(cardsV2).join(' ')).not.toMatch(/[✅*]/u);
+  });
+
+  test('the pre-check keeps at most three short issues and never a check mark', async () => {
+    await track({
+      ...RTRI_INPUT,
+      precheck_issues: [
+        '✅ Employee count fits the limit',
+        '✔️ Located in BC',
+        'Tariff exposure not quantified ✅',
+        'x'.repeat(150),
+        'Budget omits hiring costs',
+        'A fourth real issue'
+      ]
+    });
+    const pre = cardPosts()[0].cardsV2[0].card.sections.find(sec => sec.header?.startsWith('Pre-check'));
+    const bullets = pre.widgets.map(w => w.textParagraph.text);
+    expect(pre.header).toBe('Pre-check · RTRI program facts · 3 issues');
+    expect(pre).toMatchObject({ collapsible: true, uncollapsibleWidgetsCount: 1 });
+    expect(bullets).toEqual(['• Tariff exposure not quantified', `• ${'x'.repeat(99)}…`, '• Budget omits hiring costs']);
+    for (const b of bullets) expect(b.length - 2).toBeLessThanOrEqual(100);
+    expect(allCardStrings(cardPosts()[0].cardsV2).join(' ')).not.toMatch(/[✅✔☑]/u);
+    expect((await onlyCard()).data.precheck.issues).toHaveLength(3);
   });
 
   test('outside a Chat thread the tool refuses and stores nothing', async () => {
@@ -390,8 +491,8 @@ describe('when it is not clear a review is wanted', () => {
 
     // Steph presses Track: the offer shows "Setting up…" at once …
     const response = await press(offer, 'review.track', STEPH);
-    expect(cardText(updated(response))).toContain('Setting up the review…');
-    expect(cardButtons(updated(response))).toEqual([]);
+    expect(cardText(updated(response))).toContain(`Last update: Setting up the review… · ${NAMES[STEPH]}`);
+    expect(buttonsOf(updated(response))).toEqual([['Setting up…', true]]);
     await whenCardsIdle();
 
     // … Oracle runs in the thread with the offer confirmed, and the SAME message
@@ -420,9 +521,10 @@ describe('when it is not clear a review is wanted', () => {
 
     expect((await onlyCard()).status).toBe('offered');
     expect(fakes.agent.calls).toHaveLength(1);              // only the original turn
+    expect(privateReplies()).toEqual([[NATALIE, 'Only someone signed in to the Hub can start tracking.']]);
     const patched = lastPatch();
-    expect(cardText(patched)).toContain('Only someone signed in to the Hub can start tracking.');
-    expect(cardButtons(patched).map(b => b.text)).toEqual(['Track as review']);
+    expect(cardText(patched)).not.toContain('Setting up');
+    expect(buttonsOf(patched)).toEqual([['Track as review', false]]);
   });
 
   test('a second unclear mention does not post a second question', async () => {
@@ -468,7 +570,7 @@ describe('when something is missing', () => {
   test('no reviewers: Oracle asks who, and the next mention completes the card', async () => {
     const first = await say({ text: `please review ${docUrl(DOC1)}` });
     expect(first).toMatchObject({ needs_reviewers: true });
-    expect(textReplies).toEqual(['Who should review them?']);
+    expect(textReplies).toEqual(['Who should review this?']);
 
     const second = await say({ text: 'Steph please', mentions: [STEPH] });
     expect(second).toMatchObject({ card_posted: true });
@@ -493,7 +595,7 @@ describe('when every reviewer is done', () => {
   test('the card shows completion and proposes — never writes — a HubSpot note', async () => {
     const { card, response } = await bothDone();
 
-    expect(cardText(updated(response))).toContain('<b>Review complete</b> — 5 open comments across 2 docs.');
+    expect(cardText(updated(response))).toContain('<b>Review complete</b> · 2 of 2 reviews done · 5 open comments');
     expect(fakes.gate.saved).toHaveLength(1);
     const saved = fakes.gate.saved[0];
     expect(saved).toMatchObject({
@@ -512,9 +614,11 @@ describe('when every reviewer is done', () => {
     expect(card.data.hubspot).toMatchObject({ state: 'proposed', pendingActionId: saved.id });
 
     const patched = lastPatch();
-    expect(cardText(patched)).toContain('Ready to add an outcome note to “Acme Sentinel Ltd - RTRI”');
-    expect(cardButtons(patched).map(b => b.text)).toEqual([
-      'I’m reviewing', 'Mark my review done', 'Draft client follow-up', 'Add note to HubSpot', 'Don’t add note'
+    expect(cardText(patched)).toContain('HubSpot: outcome note ready for “Acme Sentinel Ltd - RTRI” — add it below, or reply “@Oracle yes”.');
+    // Review buttons no longer apply: disabled, with the state in their labels.
+    expect(buttonsOf(patched)).toEqual([
+      ['I’m reviewing', true], ['All 2 done ✓', true], ['Draft client follow-up', false],
+      ['Add note to HubSpot', false], ['Don’t add note', false]
     ]);
     expect(card).toMatchObject({ status: 'open', completion_shown_on: null });
     expect(card.completed_at).toBeInstanceOf(Date);
@@ -531,15 +635,16 @@ describe('when every reviewer is done', () => {
     const saved = fakes.gate.saved[0];
 
     const response = await press(card, 'review.hubspot', STEPH);
-    expect(cardText(updated(response))).toContain('Adding the note to HubSpot…');
+    expect(cardText(updated(response))).toContain(`Last update: Adding note to HubSpot… · ${NAMES[STEPH]}`);
+    expect(buttonsOf(updated(response)).slice(3)).toEqual([['Adding note…', true]]);
     await whenCardsIdle();
 
     expect(fakes.gate.runs).toEqual([{ actionId: saved.id, userId: 2 }]);
     expect(fakes.hubspot.notes).toEqual([{ deal_id: '555', body: saved.tool_input.body }]);
     expect(await onlyCard()).toMatchObject({ status: 'closed', closed_reason: 'note_added' });
     const patched = lastPatch();
-    expect(cardText(patched)).toContain('Outcome note added to “Acme Sentinel Ltd - RTRI”.');
-    expect(cardText(patched)).not.toContain('Adding the note');
+    expect(cardText(patched)).toContain('HubSpot: outcome note added to “Acme Sentinel Ltd - RTRI”.');
+    expect(cardText(patched)).not.toContain('Adding note');
     expect(patched[0].card.header.subtitle).toContain('Closed');
     expect(cardButtons(patched)).toEqual([]);
 
@@ -547,7 +652,8 @@ describe('when every reviewer is done', () => {
     await whenCardsIdle();
     expect(fakes.hubspot.notes).toHaveLength(1);
     expect(fakes.db.clicks.at(-1).result).toBe('closed');
-    expect(cardText(updated(again))).toContain('Outcome note added');
+    expect(cardText(updated(again))).toContain('outcome note added');
+    expect(privateReplies()).toEqual([[STEPH, 'This card is closed, so nothing changed.']]);
   });
 
   test('"@Oracle yes" in the thread adds the note and closes the card straight away', async () => {
@@ -569,7 +675,7 @@ describe('when every reviewer is done', () => {
     expect(fakes.hubspot.notes).toHaveLength(1);
     expect(await onlyCard()).toMatchObject({ status: 'closed', closed_reason: 'note_added' });
     const patched = lastPatch();
-    expect(cardText(patched)).toContain('Outcome note added');
+    expect(cardText(patched)).toContain('outcome note added');
     expect(cardButtons(patched)).toEqual([]);
   });
 
@@ -578,15 +684,17 @@ describe('when every reviewer is done', () => {
     await fakes.gate.confirmInThread(DIRECT_CONV, 1);
     await refreshLiveCards();
     expect(await onlyCard()).toMatchObject({ status: 'closed', closed_reason: 'note_added' });
-    expect(cardText(lastPatch())).toContain('Outcome note added');
+    expect(cardText(lastPatch())).toContain('outcome note added');
   });
 
   test('the requester can decline the note: the card closes and a later "yes" runs nothing', async () => {
     const { card } = await bothDone();
 
     await press(card, 'review.hubspot_decline', STEPH);            // not the requester
+    await whenCardsIdle();
     expect(fakes.db.clicks.at(-1).result).toBe('not_the_owner');
     expect((await onlyCard()).status).toBe('open');
+    expect(privateReplies()).toEqual([[STEPH, 'Only the requester can decline the note.']]);
 
     const response = await press(await onlyCard(), 'review.hubspot_decline', OWNER);
     await whenCardsIdle();
@@ -594,7 +702,7 @@ describe('when every reviewer is done', () => {
     expect(await onlyCard()).toMatchObject({ status: 'closed', closed_reason: 'note_declined' });
     expect(fakes.db.actions.get(fakes.gate.saved[0].id).status).toBe('declined');
     const cards = updated(response);
-    expect(cardText(cards)).toContain('The outcome note for “Acme Sentinel Ltd - RTRI” was declined, so nothing was recorded in HubSpot.');
+    expect(cardText(cards)).toContain('HubSpot: note for “Acme Sentinel Ltd - RTRI” declined — nothing recorded.');
     expect(cardText(cards)).toContain(`Last update: ${NAMES[OWNER]} declined the HubSpot note`);
     expect(cardButtons(cards)).toEqual([]);
 
@@ -677,9 +785,10 @@ describe('when every reviewer is done', () => {
     await whenCardsIdle();
     expect(fakes.gate.runs).toEqual([]);
     expect(fakes.hubspot.notes).toEqual([]);
-    expect(cardText(lastPatch())).toContain('Only someone signed in to the Hub can add the note to “Acme Sentinel Ltd - RTRI”.');
-    expect(cardButtons(lastPatch()).map(b => b.text)).toContain('Add note to HubSpot');   // still offered
-    expect((await onlyCard()).status).toBe('open');
+    expect(privateReplies()).toEqual([[NATALIE, 'Only someone signed in to the Hub can add the HubSpot note.']]);
+    expect(buttonsOf(lastPatch()).slice(3)).toEqual([['Add note to HubSpot', false], ['Don’t add note', false]]);   // still offered
+    expect(await onlyCard()).toMatchObject({ status: 'open', data: expect.objectContaining({ busy: null }) });
+    expect((await onlyCard()).data.hubspot.state).toBe('proposed');
 
     await press(await onlyCard(), 'review.hubspot', STEPH);
     await whenCardsIdle();
@@ -691,7 +800,7 @@ describe('when every reviewer is done', () => {
     fakes.hubspot.failNote = true;
     await press(card, 'review.hubspot', STEPH);
     await whenCardsIdle();
-    expect(cardText(lastPatch())).toContain('could not be added');
+    expect(cardText(lastPatch())).toContain('HubSpot: the note for “Acme Sentinel Ltd - RTRI” could not be added — try again.');
     expect(cardButtons(lastPatch()).map(b => b.text)).toContain('Add note to HubSpot');
 
     expect((await onlyCard()).status).toBe('open');
@@ -708,20 +817,41 @@ describe('when every reviewer is done', () => {
     fakes.hubspot.deals.length = 0;
     await bothDone();
     expect(fakes.gate.saved).toEqual([]);
-    expect(cardText(lastPatch())).toContain('No matching HubSpot deal was found');
+    expect(cardText(lastPatch())).toContain('HubSpot: no matching deal — outcome not recorded.');
   });
 
   test('several matching deals: nothing is proposed', async () => {
     fakes.hubspot.deals.push({ id: '556', name: 'Acme Sentinel Ltd - RTRI (2)', companyName: 'Acme Sentinel Ltd', program: 'RTRI' });
     await bothDone();
     expect(fakes.gate.saved).toEqual([]);
-    expect(cardText(lastPatch())).toContain('2 possible HubSpot deals matched');
+    expect(cardText(lastPatch())).toContain('HubSpot: 2 possible deals — outcome not recorded.');
   });
 
   test('another program’s deal for the same client is not a match', async () => {
     fakes.hubspot.deals.push({ id: '777', name: 'Acme Sentinel Ltd - CanExport', companyName: 'Acme Sentinel Ltd', program: 'CanExport SMEs' });
     await bothDone();
     expect(fakes.gate.saved.map(s => s.tool_input.deal_id)).toEqual(['555']);
+  });
+
+  test('with one reviewer, the buttons name them and switch off once the review is done', async () => {
+    await track(RTRI_INPUT, { mentions: [{ chatUserId: STEPH, displayName: NAMES[STEPH] }] });
+    const card = await onlyCard();
+
+    const reviewing = await press(card, 'review.reviewing', STEPH);
+    expect(buttonsOf(updated(reviewing)).slice(0, 2)).toEqual([['Reviewing · Steph', false], ['Mark my review done', false]]);
+
+    const done = await press(card, 'review.done', STEPH);
+    expect(buttonsOf(updated(done)).slice(0, 2)).toEqual([['I’m reviewing', true], ['Done ✓ · Steph', true]]);
+  });
+
+  test('with several reviewers, the labels count and stay pressable until everyone is done', async () => {
+    await track();
+    const card = await onlyCard();
+    await press(card, 'review.reviewing', STEPH);
+    const both = await press(card, 'review.reviewing', NATALIE);
+    expect(buttonsOf(updated(both)).slice(0, 2)).toEqual([['Reviewing · 2', false], ['Mark my review done', false]]);
+    const one = await press(card, 'review.done', STEPH);
+    expect(buttonsOf(updated(one)).slice(0, 2)).toEqual([['Reviewing · Natalie', false], ['Done ✓ · Steph', false]]);
   });
 
   test('completion is proposed once, even if a reviewer re-opens and re-closes', async () => {
@@ -744,7 +874,8 @@ describe('Draft client follow-up', () => {
     const card = await onlyCard();
 
     const response = await press(card, 'review.draft', STEPH);
-    expect(cardText(updated(response))).toContain(`Drafting a client follow-up for ${NAMES[STEPH]}…`);
+    expect(cardText(updated(response))).toContain(`Last update: Drafting follow-up… · ${NAMES[STEPH]}`);
+    expect(buttonsOf(updated(response))[2]).toEqual(['Drafting…', true]);
     await whenCardsIdle();
 
     const call = fakes.agent.calls.at(-1);
@@ -757,7 +888,10 @@ describe('Draft client follow-up', () => {
 
     expect(dmsTo('spaces/DM-STEPH').at(-1).text).toBe(`Draft client follow-up for ${TITLE} — not sent:\n\n${DRAFT}`);
     expect(fakes.chat.posts.filter(p => p.spaceName === SPACE && p.text)).toEqual([]);
-    expect(cardText(lastPatch())).toContain(`Follow-up draft sent to ${NAMES[STEPH]} by DM.`);
+    const done = cardText(lastPatch());
+    expect(done).toContain(`Last update: ${NAMES[STEPH]} asked for a client follow-up draft — sent to ${NAMES[STEPH]} by DM`);
+    expect(done).not.toContain('Drafting');
+    expect(buttonsOf(lastPatch())[2]).toEqual(['Draft client follow-up', false]);
     expect(fakes.gate.saved).toEqual([]);
     expect(fakes.hubspot.notes).toEqual([]);
   });
@@ -771,7 +905,7 @@ describe('Draft client follow-up', () => {
     expect(fakes.agent.calls.at(-1).userId).toBe(2);
     const threadPosts = fakes.chat.posts.filter(p => p.text?.startsWith('Draft client follow-up'));
     expect(threadPosts.map(p => [p.spaceName, p.threadName])).toEqual([[SPACE, THREAD]]);
-    expect(cardText(lastPatch())).toContain('Follow-up draft posted in this thread (no DM available).');
+    expect(cardText(lastPatch())).toContain('— posted in this thread (no DM with Oracle yet)');
   });
 
   test('someone without a Hub account cannot draft — the run never borrows the requester’s account', async () => {
@@ -782,8 +916,35 @@ describe('Draft client follow-up', () => {
     expect(fakes.agent.calls).toEqual([]);
     expect(fakes.messages.conversations).toEqual([]);
     expect(fakes.chat.posts.filter(p => p.text?.startsWith('Draft client follow-up'))).toEqual([]);
-    expect(cardText(lastPatch())).toContain('Only someone signed in to the Hub can draft a follow-up.');
+    expect(privateReplies()).toEqual([[NATALIE, 'Only someone signed in to the Hub can draft a follow-up.']]);
+    expect(cardText(lastPatch())).not.toContain('Drafting');
+    expect(buttonsOf(lastPatch())[2]).toEqual(['Draft client follow-up', false]);
     expect(logged()).toContain('reason: no_hub_user');
+  });
+
+  test('the press is answered at once; the card updates when the slow draft finishes', async () => {
+    await track();
+    let release;
+    const slow = new Promise(resolve => { release = resolve; });
+    fakes.agent.impl = async () => {
+      await slow;                                          // drafting takes a while
+      return { success: true, response: { content: [{ type: 'text', text: DRAFT }] } };
+    };
+    const t0 = Date.now();
+    const response = await press(await onlyCard(), 'review.draft', STEPH);
+    expect(Date.now() - t0).toBeLessThan(1000);
+    expect(cardText(updated(response))).toContain('Last update: Drafting follow-up…');
+    expect(dmsTo('spaces/DM-STEPH').filter(p => p.text?.startsWith('Draft'))).toEqual([]);
+
+    // Still drafting: a second press does not start another, and says so privately.
+    await press(await onlyCard(), 'review.draft', STEPH);
+    await new Promise(r => setImmediate(r));
+    expect(privateReplies()).toEqual([[STEPH, 'A follow-up draft is already being written.']]);
+
+    release();
+    await whenCardsIdle();
+    expect(fakes.agent.calls.filter(c => !c.chatContext)).toHaveLength(1);
+    expect(cardText(lastPatch())).toContain('— sent to Steph Sentinel by DM');
   });
 
   test('a failed draft says so on the card', async () => {
@@ -791,7 +952,7 @@ describe('Draft client follow-up', () => {
     fakes.agent.impl = async () => ({ success: false, error: 'boom' });
     await press(await onlyCard(), 'review.draft', STEPH);
     await whenCardsIdle();
-    expect(cardText(lastPatch())).toContain('Couldn’t draft the follow-up — try again.');
+    expect(cardText(lastPatch())).toContain('— couldn’t draft it — try again');
     expect(logged()).toContain('Review follow-up draft failed — code: no_draft');
   });
 });
@@ -810,8 +971,8 @@ describe('a closed review card', () => {
 
     const response = await press(await onlyCard(), 'review.reviewing', STEPH);
     const text = cardText(updated(response));
-    expect(text).toContain(`${NAMES[STEPH]}\nDone`);
-    expect(text).toContain('4 open comments');             // frozen, not refreshed
+    expect(text).toContain(`${NAMES[STEPH]} · Done`);
+    expect(text).toContain('Acme RTRI application · 4 comments');   // frozen, not refreshed
     expect(cardButtons(updated(response))).toEqual([]);
 
     const drivesBefore = fakes.drive.calls.length;

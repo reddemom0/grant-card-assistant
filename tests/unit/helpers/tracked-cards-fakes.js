@@ -48,7 +48,7 @@ export function createTrackedCardFakes() {
     clickSeq: 0
   };
   const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null };
-  const driveState = { docs: new Map(), calls: [] };
+  const driveState = { docs: new Map(), calls: [], hold: null };
   const hubspotState = { deals: [], searches: [], notes: [], failNote: false };
   const directoryState = { people: new Map(), calls: [] };
   const calendarState = { zones: new Map(), calls: [] };
@@ -217,6 +217,7 @@ export function createTrackedCardFakes() {
     },
 
     async logClick(cardId, { chatUserId, name = null }, action, at = new Date(), result = 'changed') {
+      if (db.failOn === 'logClick') throw Object.assign(new Error('fake database failure'), { code: 'XX000' });
       db.clicks.push({
         id: ++db.clickSeq, card_id: cardId, actor_chat_id: chatUserId,
         actor_name: name, action, result, created_at: at
@@ -394,9 +395,9 @@ export function createTrackedCardFakes() {
   const chat = {
     ...chatState,
     module: {
-      async postMessage({ spaceName, threadName = null, text = null, cardsV2 = null }) {
+      async postMessage({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null }) {
         const name = `${spaceName}/messages/m${++chatState.seq}`;
-        chatState.posts.push({ name, spaceName, threadName, text, cardsV2: json(cardsV2) });
+        chatState.posts.push({ name, spaceName, threadName, text, cardsV2: json(cardsV2), privateTo });
         return name;
       },
       async patchCard(messageName, cardsV2) {
@@ -417,6 +418,7 @@ export function createTrackedCardFakes() {
     module: {
       async getDocCommentSummary(fileId, userEmail = null) {
         driveState.calls.push({ fileId, userEmail });
+        if (driveState.hold) await driveState.hold;   // a slow Drive, released by the test
         const doc = driveState.docs.get(fileId);
         if (!doc || doc.readable === false) {
           return { fileId, name: doc?.name ?? null, openComments: 0, readable: false, code: 404 };
@@ -501,6 +503,7 @@ export function createTrackedCardFakes() {
   // failure switches are set on the State objects, reached through setters.
   Object.defineProperty(agent, 'impl', { get: () => agentState.impl, set: (v) => { agentState.impl = v; } });
   Object.defineProperty(chat, 'failPatch', { get: () => chatState.failPatch, set: (v) => { chatState.failPatch = v; } });
+  Object.defineProperty(drive, 'hold', { get: () => driveState.hold, set: (v) => { driveState.hold = v; } });
   Object.defineProperty(hubspot, 'failNote', { get: () => hubspotState.failNote, set: (v) => { hubspotState.failNote = v; } });
 
   function reset() {
@@ -512,6 +515,7 @@ export function createTrackedCardFakes() {
     db.digests.clear();
     db.actions.clear();
     db.clickSeq = 0;
+    db.failOn = null;
     gate.saved.length = 0;
     gate.runs.length = 0;
     chatState.posts.length = 0;
@@ -521,6 +525,7 @@ export function createTrackedCardFakes() {
     chatState.failPatch = null;
     driveState.docs.clear();
     driveState.calls.length = 0;
+    driveState.hold = null;
     hubspotState.deals.length = 0;
     hubspotState.searches.length = 0;
     hubspotState.notes.length = 0;
@@ -555,7 +560,21 @@ export function cardText(cardsV2) {
   return out.join('\n');
 }
 
-/** Every button on a cardsV2 payload as {text, params}. */
+/** Every string anywhere in a cardsV2 payload except button targets — for "no Markdown" checks. */
+export function allCardStrings(cardsV2) {
+  const out = [];
+  const walk = (v, key) => {
+    if (typeof v === 'string') { if (key !== 'function') out.push(v); return; }
+    if (Array.isArray(v)) { v.forEach(x => walk(x, key)); return; }
+    if (v && typeof v === 'object') {
+      for (const [k, x] of Object.entries(v)) if (k !== 'parameters') walk(x, k);
+    }
+  };
+  walk(cardsV2, null);
+  return out;
+}
+
+/** Every button on a cardsV2 payload as {text, params, disabled}. */
 export function cardButtons(cardsV2) {
   const out = [];
   const walk = (v) => {
@@ -564,6 +583,7 @@ export function cardButtons(cardsV2) {
       if (v.text && v.onClick?.action) {
         out.push({
           text: v.text,
+          disabled: Boolean(v.disabled),
           fn: v.onClick.action.function,
           params: Object.fromEntries(v.onClick.action.parameters.map(p => [p.key, p.value]))
         });

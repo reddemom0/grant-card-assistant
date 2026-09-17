@@ -12,6 +12,27 @@ Format:
 
 ---
 
+## 2026-09-17 — Review card fixes after the first live test
+
+**What:**
+- **Presses:** answered at once from stored data. Doc refresh, drafting and HubSpot run afterwards, and a busy line shows meanwhile ("Drafting follow-up…"). Every change is also patched through the Chat API.
+- **Text:** Markdown is converted to card HTML or stripped for every text field.
+- **Layout:** compact. Structured `precheck_issues` (≤3 issues, ≤100 characters, no ✅; first shown, rest collapsed) and `missing_info` (count shown, list collapsed).
+- **Reviewers:** the listener account and Oracle are never reviewers. If no one is left, Oracle asks "Who should review this?".
+- **Claiming:** anyone not on the card who presses a status button is added as a reviewer.
+- **Private replies:** presses that can't apply get one via `privateMessageViewer`.
+- **Buttons:** labels follow the state, and buttons that no longer apply are disabled.
+
+**Why:**
+- "Unable to process your request" appeared on a live press, but all presses were answered with HTTP 200 in ≤2.3 s, so the cause isn't in our logs; Google Cloud Logging for the Chat app's project should show it.
+- The card showed raw `**bold**`.
+- The listener account was counted as a reviewer.
+- The requester's presses were ignored silently.
+
+A toast is not possible: add-on Chat apps get notifications only when a dialog closes.
+
+**Impact:** `src/cards/{actions,chat-api,notify,people,render,review-card,update}.js`, `src/tools/definitions.js` (`track_review` fields), `.claude/agents/internal-oracle.md`, tests. No migration.
+
 ## 2026-09-17 — Tracked cards in Google Chat; the review card is the first
 
 **What:** A tracked card is one Chat message per work item that Oracle keeps up

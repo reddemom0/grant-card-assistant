@@ -82,6 +82,15 @@ export async function resolvePerson(chatUserId, hints = {}) {
   }
 }
 
+/**
+ * The Chat-copy listener (CHAT_LISTENER_USER_EMAIL) is a Workspace user, not a
+ * teammate: it is never a reviewer. Read the same way as src/chat-listen/listener.js.
+ */
+export function isListenerEmail(email) {
+  const listener = String(process.env.CHAT_LISTENER_USER_EMAIL || '').trim().toLowerCase();
+  return Boolean(listener) && String(email || '').trim().toLowerCase() === listener;
+}
+
 /** The person's calendar time zone, or DEFAULT_TZ. */
 export async function timeZoneFor(person, now = new Date()) {
   if (!person) return DEFAULT_TZ;

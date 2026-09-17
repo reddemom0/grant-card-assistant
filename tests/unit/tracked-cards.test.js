@@ -11,7 +11,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { createTrackedCardFakes, cardText, cardButtons } from './helpers/tracked-cards-fakes.js';
+import { createTrackedCardFakes, cardText, cardButtons, allCardStrings } from './helpers/tracked-cards-fakes.js';
 
 const ENDPOINT = 'https://hub.example/api/chat/google';
 const ISSUER = 'addon@example.iam.gserviceaccount.com';
@@ -62,6 +62,7 @@ const { handleGoogleChatEvent, normalizeChatEvent } = await import('../../src/ap
 const { handleCardClick, whenCardsIdle } = await import('../../src/cards/actions.js');
 const { registerAppCommand } = await import('../../src/cards/registry.js');
 const { renderCard } = await import('../../src/cards/update.js');
+const render = await import('../../src/cards/render.js');
 const lifecycle = await import('../../src/cards/lifecycle.js');
 const notify = await import('../../src/cards/notify.js');
 const { startTrackedCards } = await import('../../src/cards/jobs.js');
@@ -290,32 +291,78 @@ describe('buttons', () => {
     expect(await statuses(card.id)).toEqual({ [STEPH]: 'reviewing', [NATALIE]: 'done' });
   });
 
-  test('a press by someone who is not a reviewer changes nothing, is logged, and is not shown', async () => {
+  test('someone not on the card takes the review by pressing I’m reviewing', async () => {
     const card = await seedCard();
-    await handleCardClick(clickEvt(card, 'review.reviewing', STEPH));
-    const response = await handleCardClick(clickEvt(card, 'review.done', OUTSIDER));
+    const response = await handleCardClick(clickEvt(card, 'review.reviewing', OUTSIDER));
 
-    expect(await statuses(card.id)).toEqual({ [STEPH]: 'reviewing', [NATALIE]: 'not_started' });
-    expect(fakes.db.clicks.map(c => [c.actor_chat_id, c.action, c.result])).toEqual([
-      [STEPH, 'review.reviewing', 'changed'],
-      [OUTSIDER, 'review.done', 'not_a_reviewer']
-    ]);
+    expect(await statuses(card.id)).toEqual({ [STEPH]: 'not_started', [NATALIE]: 'not_started', [OUTSIDER]: 'reviewing' });
+    expect(fakes.db.clicks.map(c => [c.actor_chat_id, c.result])).toEqual([[OUTSIDER, 'changed']]);
     const text = cardText(updatedCard(response));
-    expect(text).toContain(`Last update: ${NAMES[STEPH]} started reviewing`);
-    expect(text).not.toContain(NAMES[OUTSIDER]);
-    expect(logged()).toContain('result: not_a_reviewer');
+    expect(text).toContain(`${NAMES[OUTSIDER]} · Reviewing`);
+    expect(text).toContain(`Last update: ${NAMES[OUTSIDER]} started reviewing`);
+    expect(logged()).toContain('result: changed (claimed), response: card');
+  });
+
+  test('Mark my review done by someone not on the card adds them and marks them done — the requester too', async () => {
+    const card = await seedCard();
+    await handleCardClick(clickEvt(card, 'review.done', OUTSIDER));
+    await handleCardClick(clickEvt(card, 'review.done', OWNER));
+    expect(await statuses(card.id)).toEqual({
+      [OWNER]: 'done', [STEPH]: 'not_started', [NATALIE]: 'not_started', [OUTSIDER]: 'done'
+    });
+    expect((await fakes.store.getCard(card.id)).owner_chat_id).toBe(OWNER);   // still the requester
+  });
+
+  test('the listener account cannot take a review, and is told so privately', async () => {
+    process.env.CHAT_LISTENER_USER_EMAIL = 'listener.sentinel@granted.ca';
+    try {
+      const card = await seedCard();
+      await fakes.store.upsertPerson({ chatUserId: OUTSIDER, email: 'Listener.Sentinel@granted.ca' });
+      await handleCardClick(clickEvt(card, 'review.reviewing', OUTSIDER));
+      await whenCardsIdle();
+
+      expect(await statuses(card.id)).toEqual({ [STEPH]: 'not_started', [NATALIE]: 'not_started' });
+      expect(fakes.db.clicks.at(-1).result).toBe('listener_account');
+      expect(fakes.chat.posts).toEqual([expect.objectContaining({
+        spaceName: SPACE, threadName: card.thread_name, privateTo: OUTSIDER, text: 'This account can’t take a review.'
+      })]);
+    } finally {
+      delete process.env.CHAT_LISTENER_USER_EMAIL;
+    }
+  });
+
+  test('a press that cannot apply is answered privately, never silently', async () => {
+    const card = await seedCard();
+    const response = await handleCardClick(clickEvt(card, 'card.close', STEPH));
+    await whenCardsIdle();
+
+    expect((await fakes.store.getCard(card.id)).status).toBe('open');
+    expect(updatedCard(response)[0].cardId).toBe(`tracked-${card.id}`);   // still a valid answer
+    expect(fakes.chat.posts).toEqual([expect.objectContaining({
+      spaceName: SPACE, threadName: card.thread_name, privateTo: STEPH, text: 'Only the requester can close this card.'
+    })]);
+    expect(logged()).toContain('Private reply to a press — delivered, private: true');
+  });
+
+  test('in a DM the reply is a plain message — the DM is already private', async () => {
+    const card = await seedCard();
+    await fakes.store.updateCard(card.id, { data: { ...card.data, surface: 'chat_dm' } });
+    await fakes.store.closeCard(card.id, 'closed_by_owner');
+    await handleCardClick(clickEvt(card, 'review.done', OWNER));
+    await whenCardsIdle();
+    expect(fakes.chat.posts).toEqual([expect.objectContaining({ privateTo: null, text: 'This card is closed, so nothing changed.' })]);
   });
 
   test('every press is logged and the card shows the latest', async () => {
     const card = await seedCard();
     const t0 = new Date('2026-09-17T16:00:00Z');
     await handleCardClick(clickEvt(card, 'review.reviewing', STEPH), t0);
-    const response = await handleCardClick(clickEvt(card, 'review.draft', NATALIE), new Date(t0.getTime() + 60_000));
+    const response = await handleCardClick(clickEvt(card, 'review.reviewing', NATALIE), new Date(t0.getTime() + 60_000));
 
     expect(fakes.db.clicks).toHaveLength(2);
     // ICU may put a narrow no-break space before AM/PM.
     const text = cardText(updatedCard(response)).replace(/[\u202f\u00a0]/g, ' ');
-    expect(text).toContain(`Last update: ${NAMES[NATALIE]} asked for a client follow-up draft · Sep 17, 9:01 AM PDT`);
+    expect(text).toContain(`Last update: ${NAMES[NATALIE]} started reviewing · Sep 17, 9:01 AM PDT`);
   });
 
   test('the answer replaces the pressed card in place; nothing is posted and nobody is pinged', async () => {
@@ -331,28 +378,66 @@ describe('buttons', () => {
     expect(Object.keys(response)).toEqual(['hostAppDataAction']);
     expect(updatedCard(response)[0].cardId).toBe(`tracked-${card.id}`);
     expect(fakes.chat.posts).toHaveLength(0);
-    expect(fakes.chat.patches).toHaveLength(0);
+    // The same card is also patched through the API, in case Chat drops the answer.
+    expect(new Set(fakes.chat.patches.map(p => p.messageName))).toEqual(new Set([card.message_name]));
+  });
+
+  test('whatever a card type writes, no Markdown leaves in a tracked card', () => {
+    const { trackedCard, paragraph, decorated, button } = render;
+    const cardsV2 = trackedCard({
+      card: { id: 'c1', status: 'open' },
+      title: '**Bold** title',
+      subtitle: '`code` subtitle',
+      sections: [{
+        header: '## **Head**',
+        widgets: [
+          paragraph('**b** and *i* and [link](https://example.com/x)'),
+          decorated({ text: '- **item**', top: '*top*', bottom: '**bottom**' })
+        ]
+      }],
+      buttons: [button('**Go**', { cardId: 'c1', action: 'a' })]
+    });
+    for (const str of allCardStrings(cardsV2)) {
+      expect(str).not.toMatch(/\*|`|\]\(|^#|^- /);
+    }
+    const [{ card }] = cardsV2;
+    expect(card.header).toEqual({ title: 'Bold title', subtitle: 'code subtitle' });
+    expect(card.sections[0].header).toBe('<b>Head</b>');
+    expect(card.sections[0].widgets[0].textParagraph.text).toBe('<b>b</b> and <i>i</i> and link');
+    expect(card.sections[0].widgets[1].decoratedText).toMatchObject({ text: '<b>item</b>', topLabel: 'top', bottomLabel: 'bottom' });
+    expect(cardButtons(cardsV2)[0].text).toBe('Go');
   });
 
   test('every button calls back to the Chat endpoint with the card and action', async () => {
     const card = await seedCard();
     const buttons = cardButtons(await renderCard(card));
-    expect(buttons.map(b => b.text)).toEqual(['I’m reviewing', 'Mark my review done', 'Draft client follow-up']);
+    expect(buttons.map(b => [b.text, b.disabled])).toEqual([
+      ['I’m reviewing', false], ['Mark my review done', false], ['Draft client follow-up', false]
+    ]);
     for (const b of buttons) {
       expect(b.fn).toBe(ENDPOINT);
       expect(b.params.cardId).toBe(card.id);
     }
   });
 
-  test('a press refreshes the card from Drive before answering (the real system wins)', async () => {
+  test('a press is answered before Drive is read; the card is then refreshed and patched', async () => {
     const card = await seedCard({ openComments: 3 });
     fakes.drive.docs.set(DOC, { name: 'Application draft v2', openComments: 5 });
+    let release;
+    fakes.drive.hold = new Promise(resolve => { release = resolve; });   // Drive is slow
 
     const response = await handleCardClick(clickEvt(card, 'review.reviewing', STEPH));
 
+    // Answered from what is stored, with the press applied, while Drive is still busy.
     const text = cardText(updatedCard(response));
-    expect(text).toContain('Application draft v2');
-    expect(text).toContain('5 open comments');
+    expect(text).toContain(`${NAMES[STEPH]} · Reviewing`);
+    expect(text).toContain('Application draft · 3 comments');
+    expect(fakes.chat.patches).toHaveLength(0);
+
+    release();
+    await whenCardsIdle();
+    const patched = cardText(fakes.chat.patches.at(-1).cardsV2);
+    expect(patched).toContain('Application draft v2 · 5 comments');
     expect(fakes.drive.calls.at(-1)).toEqual({ fileId: DOC, userEmail: OWNER_EMAIL });
   });
 
@@ -375,6 +460,9 @@ describe('buttons', () => {
     await handleCardClick(clickEvt(card, 'card.close', STEPH));
     expect((await fakes.store.getCard(card.id)).status).toBe('open');
     expect(fakes.db.clicks.at(-1).result).toBe('not_the_owner');
+    await handleCardClick(clickEvt(card, 'card.keep', STEPH, { from: 'digest' }));
+    await whenCardsIdle();
+    expect(fakes.chat.posts.map(p => p.text)).toEqual(['Only the requester can close this card.']);   // the digest answers the other
 
     await handleCardClick(clickEvt(card, 'card.close', OWNER));
     const closed = await fakes.store.getCard(card.id);
@@ -404,12 +492,27 @@ describe('buttons', () => {
     expect(cardButtons(fakes.chat.patches[0].cardsV2)).toEqual([]);
   });
 
-  test('a press on some other message of ours acks empty and patches the card itself', async () => {
+  test('a press on a message whose name differs from the stored one is still answered with the card', async () => {
     const card = await seedCard();
     const response = await handleCardClick({ ...clickEvt(card, 'review.reviewing'), messageName: `${SPACE}/messages/other` });
     await whenCardsIdle();
-    expect(response).toEqual({});
-    expect(fakes.chat.patches.map(p => p.messageName)).toEqual([card.message_name]);
+    expect(updatedCard(response)[0].cardId).toBe(`tracked-${card.id}`);
+    expect(new Set(fakes.chat.patches.map(p => p.messageName))).toEqual(new Set([card.message_name]));
+    expect(logged()).toContain('different message than the stored card');
+  });
+
+  test('an unexpected failure mid-press still answers with the card', async () => {
+    const card = await seedCard();
+    fakes.db.failOn = 'logClick';
+    const response = await handleCardClick(clickEvt(card, 'review.reviewing', STEPH));
+    expect(updatedCard(response)[0].cardId).toBe(`tracked-${card.id}`);
+    expect(logged()).toContain('Tracked card press failed — code: XX000');
+  });
+
+  test('an unknown action on a real card is ignored with an empty answer', async () => {
+    const card = await seedCard();
+    expect(await handleCardClick(clickEvt(card, 'bogus.action'))).toEqual({});
+    expect(logged()).toContain('reason: unknown_action');
   });
 
   test('a failed patch is logged by status code only', async () => {
@@ -500,7 +603,7 @@ describe('lifecycle', () => {
     const card = await seedCard({ openComments: 3 });
     fakes.drive.docs.set(DOC, { name: 'Application draft', readable: false });
     await lifecycle.refreshLiveCards();
-    expect(cardText(fakes.chat.patches.at(-1).cardsV2)).toContain('Can’t read comments — check sharing');
+    expect(cardText(fakes.chat.patches.at(-1).cardsV2)).toContain('Application draft · can’t read comments');
     expect((await fakes.store.getCard(card.id)).data.docs[0].openComments).toBe(3);
   });
 

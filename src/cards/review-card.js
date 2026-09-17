@@ -2,19 +2,27 @@
  * Review card — the first tracked card
  *
  * Trigger: an @Oracle mention asking for a review of Google Docs (any grant).
- * Oracle reads the Docs, writes a pre-check against the program's source where
- * one exists (the RTRI skill for RTRI), and calls track_review. Everything that
- * decides WHO and WHAT — reviewers, Docs, space, thread, requester — comes from
- * the verified Chat event, never from the model's input.
+ * Oracle reads the Docs, lists the pre-check issues against the program's
+ * source where one exists (the RTRI skill for RTRI), and calls track_review.
+ * Everything that decides WHO and WHAT — reviewers, Docs, space, thread,
+ * requester — comes from the verified Chat event, never from the model's input.
+ * Oracle itself, the Chat-copy listener account and other apps are never
+ * reviewers.
  *
- * The card shows each reviewer's own status, open comment counts per Doc (names
- * only, never links or previews), the pre-check and missing client information.
+ * The card is compact, one screen: "<client> · <program>", a status line, one
+ * line per reviewer and per Doc (names only, never links or previews), at most
+ * three pre-check issues (the first shown, the rest collapsed), how many client
+ * items are still needed (the list collapsed), then the last update and the
+ * buttons. Button labels follow the state; buttons that no longer apply are
+ * disabled.
+ *
+ * Anyone may take a review by pressing "I'm reviewing" or "Mark my review done".
+ * A press that cannot apply gets a short private reply, never silence.
+ *
  * When every reviewer is done it proposes an outcome note on the matching
  * HubSpot deal through the confirmation gate; nothing is written until someone
- * confirms.
- *
- * After completion the card shows once in the requester's digest, and closes
- * as soon as the note is added or declined — or 7 days after completion
+ * confirms. After completion the card shows once in the requester's digest, and
+ * closes as soon as the note is added or declined — or 7 days after completion
  * (lifecycle.js), whichever comes first.
  */
 
@@ -25,14 +33,18 @@ import { searchGrantApplications } from '../tools/hubspot.js';
 import { savePendingAction, runPendingAction, summarizeAction, declinePendingAction } from '../tools/pending-actions.js';
 import { markCardReply, takeCardReply, FOUNDATION_ACTIONS } from './registry.js';
 import { postMessage, patchCard } from './chat-api.js';
-import { renderCard, rerenderCard } from './update.js';
+import { renderCard, rerenderCard, tellPresser } from './update.js';
 import { notifyImmediate } from './notify.js';
-import { resolvePerson, dmSpaceFor } from './people.js';
-import { trackedCard, paragraph, decorated, button, esc, clip, threadLink } from './render.js';
+import { resolvePerson, dmSpaceFor, isListenerEmail } from './people.js';
+import { trackedCard, paragraph, button, esc, clip, threadLink, mdToPlain, textToCardHtml } from './render.js';
 
 const MAX_DOCS = 10;
 const MAX_REVIEWERS = 20;
 const MAX_MISSING = 10;
+const MAX_ISSUES = 3;
+const ISSUE_CHARS = 100;
+const MISSING_CHARS = 80;
+const DOC_NAME_CHARS = 45;
 
 /** Words that make a message an explicit review request. Anything else is asked about. */
 export const REVIEW_INTENT =
@@ -51,12 +63,25 @@ const LABELS = { ...FOUNDATION_ACTIONS, ...REVIEW_ACTIONS };
 const STATUS_WORDS = { not_started: 'Not started', reviewing: 'Reviewing', done: 'Done' };
 const SOURCES = { 'rtri-tariff': 'RTRI program facts' };
 
+/** Shown in the last-update line while slow work runs. */
+const BUSY = {
+  draft: 'Drafting follow-up…',
+  hubspot: 'Adding note to HubSpot…',
+  track: 'Setting up the review…'
+};
+
 /** HubSpot note states that still wait for someone to add or decline the note. */
-const OPEN_NOTE_STATES = ['proposed', 'expired', 'failed', 'needs_hub_user'];
+const OPEN_NOTE_STATES = ['proposed', 'expired', 'failed'];
 /** Note states that settle the review: the card closes. */
 const SETTLED_NOTE_REASONS = { added: 'note_added', declined: 'note_declined' };
 
+// Check marks mean "this is fine" — the pre-check lists issues only.
+const CHECK_MARKS = /[✅✔☑✓]️?/gu;
+const STARTS_WITH_CHECK = /^\s*(?:[-*•]\s*)?[✅✔☑✓]/u;
+const APP_DISPLAY_NAME = /^oracle$/i;
+
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || 'someone';
 
 function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
@@ -67,17 +92,36 @@ export function programSource(program) {
   return /\b(rtri|regional tariff response)\b/i.test(String(program || '')) ? 'rtri-tariff' : null;
 }
 
+/** One short plain line: no Markdown, no line breaks. */
+function cleanLine(value, max) {
+  if (typeof value !== 'string') return null;
+  const plain = mdToPlain(value.replace(CHECK_MARKS, '')).replace(/\s+/g, ' ').trim();
+  return plain ? clip(plain, max) : null;
+}
+
+/** Pre-check issues: at most three short lines; confirmations are dropped. */
+export function cleanIssues(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter(v => typeof v === 'string' && !STARTS_WITH_CHECK.test(v))
+    .map(v => cleanLine(v, ISSUE_CHARS))
+    .filter(Boolean)
+    .slice(0, MAX_ISSUES);
+}
+
 function cleanInput(input = {}) {
-  const text = (v, max) => (typeof v === 'string' && v.trim() ? clip(v, max) : null);
+  // An older prompt may still send prose; its lines are treated as a list.
+  const issues = Array.isArray(input.precheck_issues)
+    ? input.precheck_issues
+    : typeof input.precheck === 'string' ? input.precheck.split(/\n+/) : [];
   return {
-    title: text(input.title, 150),
-    client: text(input.client_name, 100),
-    program: text(input.program, 100),
-    precheck: text(input.precheck, 1200),
+    title: cleanLine(input.title, 150),
+    client: cleanLine(input.client_name, 100),
+    program: cleanLine(input.program, 60),
+    issues: cleanIssues(issues),
     missingInfo: (Array.isArray(input.missing_info) ? input.missing_info : [])
-      .filter(s => typeof s === 'string' && s.trim())
+      .map(v => cleanLine(v, MISSING_CHARS))
+      .filter(Boolean)
       .slice(0, MAX_MISSING)
-      .map(s => clip(s, 200))
   };
 }
 
@@ -88,7 +132,7 @@ function cleanMentions(list = []) {
     const id = m?.chatUserId;
     if (typeof id !== 'string' || !/^users\/[^/]+$/.test(id) || seen.has(id)) continue;
     seen.add(id);
-    out.push({ chatUserId: id, displayName: m.displayName ? clip(m.displayName, 80) : null });
+    out.push({ chatUserId: id, displayName: m.displayName ? clip(mdToPlain(m.displayName), 80) : null });
   }
   return out;
 }
@@ -97,6 +141,24 @@ function cleanMentions(list = []) {
 function mergeReviewers(prior = [], mentioned = []) {
   const seen = new Set();
   return [...prior, ...mentioned].filter(r => r?.chatUserId && !seen.has(r.chatUserId) && seen.add(r.chatUserId));
+}
+
+/**
+ * Drop anyone who is not a person who can review: the Chat-copy listener
+ * account (CHAT_LISTENER_USER_EMAIL) and Oracle itself. Apps never get here —
+ * the Chat adapter leaves BOT mentions out. The email comes from what Oracle
+ * knows, then the directory; if it stays unknown, a mention shown as "Oracle"
+ * is still dropped.
+ */
+async function realReviewers(candidates, lookupAsUserId) {
+  const out = [];
+  for (const r of candidates) {
+    const person = await resolvePerson(r.chatUserId, { displayName: r.displayName, lookupAsUserId });
+    if (isListenerEmail(person?.email)) continue;
+    if (!person?.email && APP_DISPLAY_NAME.test(String(r.displayName || '').trim())) continue;
+    out.push(r);
+  }
+  return out;
 }
 
 function mergeDocIds(existing = [], files = []) {
@@ -112,12 +174,17 @@ async function readDocs(fileIds, email) {
   }));
 }
 
+function headerTitle(client, program, fallback) {
+  return [client, program].filter(Boolean).join(' · ') || fallback || 'Document review';
+}
+
 // ============================================================================
 // TOOL: track_review
 // ============================================================================
 
 /**
- * @param {Object} input - model-written: title, client_name, program, precheck, missing_info
+ * @param {Object} input - model-written: client_name, program, precheck_issues,
+ *   missing_info, title
  * @param {Object} ctx - server-built: userId, conversationId, chatContext. NEVER from input.
  */
 export async function trackReview(input = {}, { userId = null, conversationId = null, chatContext = {} } = {}) {
@@ -146,7 +213,8 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
 
   const draft = cleanInput(input);
   const mentioned = cleanMentions(cc.mentions).filter(m => m.chatUserId !== requester.chatUserId);
-  const reviewers = mergeReviewers(prior.reviewers, mentioned).slice(0, MAX_REVIEWERS);
+  const reviewers = (await realReviewers(mergeReviewers(prior.reviewers, mentioned), requester.userId))
+    .slice(0, MAX_REVIEWERS);
   const docIds = mergeDocIds(prior.docIds, cc.driveFiles || []).slice(0, MAX_DOCS);
 
   const carried = {
@@ -173,7 +241,7 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
         cardType: 'review', status: 'offered',
         spaceName: cc.spaceName, threadName: cc.threadName, sourceMessageName: cc.messageName || null,
         conversationId, ownerChatId: requester.chatUserId, ownerUserId: requester.userId,
-        title: draft.title, data: carried
+        title: headerTitle(carried.client, carried.program, draft.title), data: carried
       });
     if (!row) {
       return { success: true, already_tracked: true, message: 'This thread already has a review card. Say that briefly.' };
@@ -197,13 +265,13 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
         cardType: 'review', status: 'awaiting_docs',
         spaceName: cc.spaceName, threadName: cc.threadName, sourceMessageName: cc.messageName || null,
         conversationId, ownerChatId: requester.chatUserId, ownerUserId: requester.userId,
-        title: draft.title, data: carried
+        title: headerTitle(carried.client, carried.program, draft.title), data: carried
       });
     }
     console.log(`🗂️  Review card waiting — reason: needs_${missing}`);
     return missing === 'docs'
       ? { success: false, needs_docs: true, message: 'This request has no Google Doc links. Ask which Docs should be reviewed — they can reply in this thread with the links and @mention you. Do not create anything else.' }
-      : { success: false, needs_reviewers: true, message: 'Nobody was @mentioned as a reviewer. Ask who should review — they can reply in this thread @mentioning the reviewers and you.' };
+      : { success: false, needs_reviewers: true, message: 'Nobody who can review was @mentioned (you and the listener account do not count). Ask exactly: "Who should review this?" — they can reply in this thread @mentioning the reviewers and you. Do not create anything else.' };
   }
 
   // Build the card.
@@ -212,14 +280,15 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
   });
   const docs = await readDocs(docIds, requesterPerson?.email || null);
   const source = programSource(carried.program);
-  const title = draft.title || offer?.title || [carried.client, carried.program].filter(Boolean).join(' — ') || 'Document review';
+  const title = headerTitle(carried.client, carried.program, draft.title || offer?.title);
   const data = {
     ...carried,
     requesterName: requester.name || requesterPerson?.display_name || null,
     docs,
-    precheck: source ? { source, text: draft.precheck || 'No pre-check was written.' } : { source: null, text: null },
+    precheck: { source, issues: source ? draft.issues : [] },
     missingInfo: draft.missingInfo.length ? draft.missingInfo : (prior.missingInfo || []),
     hubspot: { state: 'none' },
+    busy: null,
     notice: null
   };
 
@@ -261,7 +330,7 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
   }
 
   markCardReply(conversationId);
-  console.log(`🗂️  Review card posted — reviewers: ${reviewers.length}, docs: ${docs.length}, unreadable docs: ${docs.filter(d => !d.readable).length}, pre-check: ${source ? 'yes' : 'no_source'}`);
+  console.log(`🗂️  Review card posted — reviewers: ${reviewers.length}, docs: ${docs.length}, unreadable docs: ${docs.filter(d => !d.readable).length}, pre-check issues: ${source ? draft.issues.length : 'no_source'}`);
   return { success: true, card_posted: true, message: 'The review card is posted in this thread. Do not add any other reply.' };
 }
 
@@ -269,48 +338,102 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
 // RENDER
 // ============================================================================
 
+/** The outcome of the latest slow action, shown only until someone presses again. */
+function outcomeFor(d, latestClick) {
+  const n = d.notice;
+  if (!n) return null;
+  if (typeof n === 'string') return n;   // cards written before outcomes carried a time
+  if (latestClick && new Date(n.at) < new Date(latestClick.created_at)) return null;
+  return n.text || null;
+}
+
+function busyFor(d) {
+  if (d.busy?.text) return d.busy;
+  if (d.settingUp) return { text: BUSY.track };   // cards written before busy states
+  return null;
+}
+
 function offerCard(card, latestClick) {
+  const d = card.data || {};
   const expired = card.status === 'closed';
-  const settingUp = !expired && Boolean(card.data?.settingUp);
-  const notice = !expired && !settingUp && card.data?.notice ? [paragraph(`<i>${esc(card.data.notice)}</i>`)] : [];
+  const busy = expired ? null : busyFor(d);
   const text = expired
     ? 'Not tracked. @mention me with the Docs and reviewers to set up a review.'
-    : settingUp
-      ? 'Setting up the review…'
-      : 'I can keep one card here with each reviewer’s status, open comments on the Docs, and a pre-check. Nothing is tracked unless you ask.';
+    : 'I can keep one card here with each reviewer’s status, open comments on the Docs, and a pre-check. Nothing is tracked unless you ask.';
   return trackedCard({
     card,
     title: 'Track this as a review?',
     subtitle: '',
-    sections: [{ widgets: [paragraph(text), ...notice] }],
-    buttons: settingUp ? [] : [button('Track as review', { cardId: card.id, action: 'review.track' })],
+    sections: [{ widgets: [paragraph(text)] }],
+    buttons: [busy
+      ? button('Setting up…', { cardId: card.id, action: 'review.track' }, { disabled: true })
+      : button('Track as review', { cardId: card.id, action: 'review.track' })],
     latestClick,
-    labels: LABELS
+    labels: LABELS,
+    busy,
+    outcome: busy ? null : outcomeFor(d, latestClick)
   });
 }
 
-function hubspotWidget(hs = {}) {
-  const deal = hs.dealName ? `“${esc(hs.dealName)}”` : 'the matching deal';
-  switch (hs.state) {
-    case 'proposed':
-      return paragraph(`Ready to add an outcome note to ${deal}. Press <b>Add note to HubSpot</b>, or reply “@Oracle yes” in this thread.`);
-    case 'expired':
-      return paragraph(`The HubSpot note for ${deal} was not confirmed in time. Press <b>Add note to HubSpot</b> to add it now.`);
-    case 'added':
-      return paragraph(`Outcome note added to ${deal}.`);
-    case 'failed':
-      return paragraph(`The HubSpot note for ${deal} could not be added. Press <b>Add note to HubSpot</b> to try again.`);
-    case 'no_match':
-      return paragraph('No matching HubSpot deal was found, so the outcome was not recorded there.');
-    case 'ambiguous':
-      return paragraph(`${plural(hs.count || 0, 'possible HubSpot deal')} matched, so the outcome was not recorded there.`);
-    case 'needs_hub_user':
-      return paragraph(`Only someone signed in to the Hub can add the note to ${deal}.`);
-    case 'declined':
-      return paragraph(`The outcome note for ${deal} was declined, so nothing was recorded in HubSpot.`);
-    default:
-      return null;
+function noteState(hs = {}) {
+  return hs.state === 'needs_hub_user' ? 'proposed' : hs.state;   // older cards
+}
+
+function hubspotLine(hs = {}) {
+  const deal = hs.dealName ? `“${hs.dealName}”` : 'the matching deal';
+  switch (noteState(hs)) {
+    case 'proposed': return `HubSpot: outcome note ready for ${deal} — add it below, or reply “@Oracle yes”.`;
+    case 'expired': return `HubSpot: the note for ${deal} was not confirmed in time — add it below.`;
+    case 'failed': return `HubSpot: the note for ${deal} could not be added — try again.`;
+    case 'added': return `HubSpot: outcome note added to ${deal}.`;
+    case 'declined': return `HubSpot: note for ${deal} declined — nothing recorded.`;
+    case 'no_match': return 'HubSpot: no matching deal — outcome not recorded.';
+    case 'ambiguous': return `HubSpot: ${plural(hs.count || 0, 'possible deal')} — outcome not recorded.`;
+    default: return null;
   }
+}
+
+/** Issues to show: structured, or (older cards) the prose's lines. */
+function precheckIssues(pc = {}) {
+  if (Array.isArray(pc.issues)) return cleanIssues(pc.issues);
+  if (typeof pc.text === 'string') return cleanIssues(pc.text.split(/\n+/));
+  return [];
+}
+
+function reviewButtons(card, reviewers, d) {
+  const id = card.id;
+  const done = reviewers.filter(r => r.status === 'done');
+  const reviewing = reviewers.filter(r => r.status === 'reviewing');
+  const complete = reviewers.length > 0 && done.length === reviewers.length;
+
+  // Everyone sees the same card: labels name the one person when there is one,
+  // and count otherwise.
+  const reviewingLabel = complete || reviewing.length === 0
+    ? 'I’m reviewing'
+    : reviewing.length === 1 ? `Reviewing · ${firstName(reviewing[0].display_name)}` : `Reviewing · ${reviewing.length}`;
+  const doneLabel = done.length === 0
+    ? 'Mark my review done'
+    : done.length === 1 && (complete || reviewers.length > 1)
+      ? `Done ✓ · ${firstName(done[0].display_name)}`
+      : complete ? `All ${done.length} done ✓` : `Done ✓ · ${done.length} of ${reviewers.length}`;
+
+  const busy = d.busy?.kind;
+  const buttons = [
+    button(reviewingLabel, { cardId: id, action: 'review.reviewing' }, { disabled: complete }),
+    button(doneLabel, { cardId: id, action: 'review.done' }, { disabled: complete }),
+    busy === 'draft'
+      ? button('Drafting…', { cardId: id, action: 'review.draft' }, { disabled: true })
+      : button('Draft client follow-up', { cardId: id, action: 'review.draft' })
+  ];
+  if (OPEN_NOTE_STATES.includes(noteState(d.hubspot))) {
+    if (busy === 'hubspot') {
+      buttons.push(button('Adding note…', { cardId: id, action: 'review.hubspot' }, { disabled: true }));
+    } else {
+      buttons.push(button('Add note to HubSpot', { cardId: id, action: 'review.hubspot' }));
+      buttons.push(button('Don’t add note', { cardId: id, action: 'review.hubspot_decline' }));
+    }
+  }
+  return buttons;
 }
 
 function render(card, participants = [], latestClick = null) {
@@ -321,71 +444,72 @@ function render(card, participants = [], latestClick = null) {
   const d = card.data || {};
   const reviewers = participants.filter(p => p.role === 'reviewer');
   const done = reviewers.filter(p => p.status === 'done').length;
-  const allDone = reviewers.length > 0 && done === reviewers.length;
+  const complete = reviewers.length > 0 && done === reviewers.length;
   const docs = d.docs || [];
   const openTotal = docs.reduce((n, doc) => n + (doc.openComments || 0), 0);
 
   const sections = [];
-  sections.push({
-    widgets: [paragraph(allDone
-      ? `<b>Review complete</b> — ${plural(openTotal, 'open comment')} across ${plural(docs.length, 'doc')}.`
-      : `${done} of ${reviewers.length} reviews done · ${plural(openTotal, 'open comment')}`)]
-  });
+
+  const status = `${complete ? '<b>Review complete</b> · ' : ''}${done} of ${plural(reviewers.length, 'review')} done · ${plural(openTotal, 'open comment')}`;
+  const hs = hubspotLine(d.hubspot);
+  sections.push({ widgets: [paragraph(hs ? `${status}<br>${esc(hs)}` : status)] });
 
   sections.push({
     header: 'Reviewers',
-    widgets: reviewers.map(r => decorated({
-      text: esc(r.display_name || 'Reviewer'),
-      bottom: STATUS_WORDS[r.status] || STATUS_WORDS.not_started
-    }))
+    widgets: [paragraph(reviewers.length
+      ? reviewers.map(r => `${esc(mdToPlain(r.display_name || 'Reviewer'))} · ${STATUS_WORDS[r.status] || STATUS_WORDS.not_started}`).join('<br>')
+      : 'Nobody yet — press <b>I’m reviewing</b> to take it.')]
   });
 
-  sections.push({
-    header: 'Documents',
-    widgets: docs.map(doc => decorated({
-      text: esc(clip(doc.name || 'Untitled document', 120)),
-      bottom: doc.readable === false
-        ? 'Can’t read comments — check sharing'
-        : plural(doc.openComments || 0, 'open comment')
-    }))
-  });
-
-  sections.push(d.precheck?.source
-    ? {
-      header: `Pre-check (${SOURCES[d.precheck.source] || d.precheck.source})`,
-      widgets: [paragraph(esc(d.precheck.text || '').replace(/\n/g, '<br>'))]
-    }
-    : { header: 'Pre-check', widgets: [paragraph('No program source on file — pre-check skipped.')] });
-
-  if (d.missingInfo?.length) {
+  if (docs.length) {
     sections.push({
-      header: 'Missing client information',
-      widgets: [paragraph(d.missingInfo.map(item => `• ${esc(item)}`).join('<br>'))]
+      header: 'Documents',
+      widgets: [paragraph(docs.map(doc => {
+        const name = esc(clip(mdToPlain(doc.name || 'Untitled document'), DOC_NAME_CHARS));
+        const count = doc.readable === false ? 'can’t read comments' : plural(doc.openComments || 0, 'comment');
+        return `${name} · ${count}`;
+      }).join('<br>'))]
     });
   }
 
-  const hs = hubspotWidget(d.hubspot);
-  if (hs) sections.push({ header: 'HubSpot', widgets: [hs] });
-  if (d.notice) sections.push({ widgets: [paragraph(`<i>${esc(d.notice)}</i>`)] });
+  const source = d.precheck?.source;
+  const issues = source ? precheckIssues(d.precheck) : [];
+  if (!source) {
+    sections.push({ header: 'Pre-check', widgets: [paragraph('No program source on file — pre-check skipped.')] });
+  } else if (issues.length === 0) {
+    sections.push({ header: `Pre-check · ${SOURCES[source] || source}`, widgets: [paragraph('No issues found.')] });
+  } else {
+    sections.push({
+      header: `Pre-check · ${SOURCES[source] || source} · ${plural(issues.length, 'issue')}`,
+      collapsible: true,
+      shown: 1,
+      widgets: issues.map(issue => paragraph(`• ${textToCardHtml(issue)}`))
+    });
+  }
 
-  const buttons = [
-    button('I’m reviewing', { cardId: card.id, action: 'review.reviewing' }),
-    button('Mark my review done', { cardId: card.id, action: 'review.done' }),
-    button('Draft client follow-up', { cardId: card.id, action: 'review.draft' })
-  ];
-  if (OPEN_NOTE_STATES.includes(d.hubspot?.state)) {
-    buttons.push(button('Add note to HubSpot', { cardId: card.id, action: 'review.hubspot' }));
-    buttons.push(button('Don’t add note', { cardId: card.id, action: 'review.hubspot_decline' }));
+  const missing = (d.missingInfo || []).map(item => cleanLine(item, MISSING_CHARS)).filter(Boolean);
+  if (missing.length) {
+    sections.push({
+      header: 'Missing client info',
+      collapsible: true,
+      shown: 1,
+      widgets: [
+        paragraph(`${plural(missing.length, 'item')} still needed`),
+        paragraph(missing.map(item => `• ${textToCardHtml(item)}`).join('<br>'))
+      ]
+    });
   }
 
   return trackedCard({
     card,
-    title: card.title || 'Document review',
+    title: card.title || headerTitle(d.client, d.program),
     subtitle: `Review · requested by ${d.requesterName || 'a teammate'}`,
     sections,
-    buttons,
+    buttons: reviewButtons(card, reviewers, d),
     latestClick,
-    labels: LABELS
+    labels: LABELS,
+    busy: busyFor(d),
+    outcome: outcomeFor(d, latestClick)
   });
 }
 
@@ -394,60 +518,91 @@ function digestLine(card, participants = []) {
   const done = reviewers.filter(p => p.status === 'done').length;
   const open = (card.data?.docs || []).reduce((n, doc) => n + (doc.openComments || 0), 0);
   if (card.completed_at) {
-    const note = OPEN_NOTE_STATES.includes(card.data?.hubspot?.state) ? ' · HubSpot note waiting for you' : '';
+    const note = OPEN_NOTE_STATES.includes(noteState(card.data?.hubspot)) ? ' · HubSpot note waiting for you' : '';
     return `Review complete · ${plural(open, 'open comment')}${note}`;
   }
   return `${done}/${reviewers.length} reviews done · ${plural(open, 'open comment')}`;
 }
 
 // ============================================================================
-// BUTTONS
+// BUTTONS — fast: database only. Slow work is returned as `background`.
 // ============================================================================
 
-async function setNotice(cardId, notice) {
-  const card = await store.getCard(cardId);
-  await store.updateCard(cardId, { data: { ...(card.data || {}), notice } });
+/** Merge fields into a card's data, re-reading it first. */
+async function updateData(cardId, patch, fields = {}) {
+  const fresh = await store.getCard(cardId);
+  if (!fresh) return null;
+  return store.updateCard(cardId, { data: { ...(fresh.data || {}), ...patch }, ...fields });
+}
+
+const setBusy = (cardId, kind, actor, now) =>
+  updateData(cardId, { busy: { kind, text: BUSY[kind], by: actor.name || null, at: now.toISOString() }, notice: null });
+
+const finish = (cardId, text) =>
+  updateData(cardId, { busy: null, notice: text ? { text, at: new Date().toISOString() } : null });
+
+async function isListenerPresser(actor) {
+  if (isListenerEmail(actor.email)) return true;
+  const person = await store.getPerson(actor.chatUserId);
+  return isListenerEmail(person?.email);
 }
 
 async function handleAction({ card, actor, action, now = new Date() }) {
   const live = ['open', 'stale'].includes(card.status);
+  const d = card.data || {};
 
   switch (action) {
     case 'review.reviewing':
     case 'review.done': {
-      if (!live) return { changed: false, ignored: 'not_open' };
+      if (!live) return { changed: false, ignored: 'not_open', reply: 'This review isn’t open any more, so nothing changed.' };
       const status = action === 'review.done' ? 'done' : 'reviewing';
-      // Personal: only the presser's own row can move.
-      const moved = await store.setReviewerStatus(card.id, actor.chatUserId, status, now);
-      if (!moved) return { changed: false, ignored: 'not_a_reviewer' };
+      // Personal: only the presser's own row moves. Someone not on the card
+      // takes the review by pressing.
+      let moved = await store.setReviewerStatus(card.id, actor.chatUserId, status, now);
+      let claimed = false;
+      if (!moved) {
+        if (await isListenerPresser(actor)) {
+          return { changed: false, ignored: 'listener_account', reply: 'This account can’t take a review.' };
+        }
+        await store.addParticipants(card.id, [{ chatUserId: actor.chatUserId, role: 'reviewer', displayName: actor.name }]);
+        moved = await store.setReviewerStatus(card.id, actor.chatUserId, status, now);
+        claimed = moved;
+      }
+      if (!moved) return { changed: false, ignored: 'not_a_reviewer', reply: 'Couldn’t add you to this review — try again.' };
 
       if (status === 'done' && !card.completed_at) {
         const reviewers = (await store.getParticipants(card.id)).filter(p => p.role === 'reviewer');
         if (reviewers.length && reviewers.every(p => p.status === 'done')) {
           await store.updateCard(card.id, { completedAt: now });
-          return { changed: true, background: () => proposeOutcomeNote(card.id) };
+          return { changed: true, claimed, background: () => proposeOutcomeNote(card.id) };
         }
       }
-      return { changed: true };
+      return { changed: true, claimed };
     }
 
     case 'review.draft':
-      if (!live) return { changed: false, ignored: 'not_open' };
-      await setNotice(card.id, `Drafting a client follow-up for ${actor.name || 'you'}…`);
+      if (!live) return { changed: false, ignored: 'not_open', reply: 'This review is closed, so there’s nothing to draft from.' };
+      if (d.busy?.kind === 'draft') return { changed: false, ignored: 'already_running', reply: 'A follow-up draft is already being written.' };
+      await setBusy(card.id, 'draft', actor, now);
       return { changed: true, background: () => draftFollowUp(card.id, actor) };
 
     case 'review.hubspot':
-      if (!live || !OPEN_NOTE_STATES.includes(card.data?.hubspot?.state)) {
-        return { changed: false, ignored: 'nothing_to_confirm' };
+      if (!live || !OPEN_NOTE_STATES.includes(noteState(d.hubspot))) {
+        return { changed: false, ignored: 'nothing_to_confirm', reply: 'There’s no HubSpot note waiting on this card.' };
       }
-      await setNotice(card.id, 'Adding the note to HubSpot…');
+      if (d.busy?.kind === 'hubspot') return { changed: false, ignored: 'already_running', reply: 'The note is already being added.' };
+      await setBusy(card.id, 'hubspot', actor, now);
       return { changed: true, background: () => confirmOutcomeNote(card.id, actor) };
 
     // Declining closes the card, so — like Close — only the requester may.
     case 'review.hubspot_decline': {
-      const hs = card.data?.hubspot || {};
-      if (!live || !OPEN_NOTE_STATES.includes(hs.state)) return { changed: false, ignored: 'nothing_to_confirm' };
-      if (actor.chatUserId !== card.owner_chat_id) return { changed: false, ignored: 'not_the_owner' };
+      const hs = d.hubspot || {};
+      if (!live || !OPEN_NOTE_STATES.includes(noteState(hs))) {
+        return { changed: false, ignored: 'nothing_to_confirm', reply: 'There’s no HubSpot note waiting on this card.' };
+      }
+      if (actor.chatUserId !== card.owner_chat_id) {
+        return { changed: false, ignored: 'not_the_owner', reply: 'Only the requester can decline the note.' };
+      }
       if (hs.pendingActionId) {
         await declinePendingAction({ actionId: hs.pendingActionId, chatUserId: actor.chatUserId });
       }
@@ -456,12 +611,15 @@ async function handleAction({ card, actor, action, now = new Date() }) {
     }
 
     case 'review.track':
-      if (card.status !== 'offered' || card.data?.settingUp) return { changed: false, ignored: 'not_an_open_offer' };
-      await store.updateCard(card.id, { data: { ...(card.data || {}), settingUp: true } });
+      if (card.status !== 'offered') {
+        return { changed: false, ignored: 'not_an_open_offer', reply: 'This request is already being tracked.' };
+      }
+      if (busyFor(d)) return { changed: false, ignored: 'already_running', reply: 'The review is already being set up.' };
+      await setBusy(card.id, 'track', actor, now);
       return { changed: true, background: () => trackFromOffer(card.id, actor) };
 
     default:
-      return { changed: false, ignored: 'unknown_action' };
+      return { changed: false, ignored: 'unknown_action', reply: 'That button doesn’t do anything on this card.' };
   }
 }
 
@@ -473,9 +631,9 @@ function hubspotStateFrom(gate, hs) {
   if (gate?.status === 'confirmed') return gate.result?.success === false ? 'failed' : 'added';
   if (gate?.status === 'failed') return 'failed';
   if (gate?.status === 'declined') return 'declined';
-  if (gate?.status === 'pending' && new Date(gate.expires_at) > new Date()) return hs.state;
+  if (gate?.status === 'pending' && new Date(gate.expires_at) > new Date()) return noteState(hs);
   // Expired, superseded or gone: the button stores it again.
-  return hs.state === 'proposed' ? 'expired' : hs.state;
+  return noteState(hs) === 'proposed' ? 'expired' : noteState(hs);
 }
 
 /**
@@ -483,8 +641,7 @@ function hubspotStateFrom(gate, hs) {
  * closes the card (frozen, still readable).
  */
 async function settleNote(cardId, hubspot, now = new Date()) {
-  const fresh = await store.getCard(cardId);
-  await store.updateCard(cardId, { data: { ...(fresh.data || {}), hubspot, notice: null } });
+  await updateData(cardId, { hubspot, busy: null, notice: null });
   const reason = SETTLED_NOTE_REASONS[hubspot.state];
   if (reason) await store.closeCard(cardId, reason, now);
 }
@@ -507,7 +664,7 @@ async function refresh(card) {
     docs.push(next);
   }
 
-  let hubspot = d.hubspot || { state: 'none' };
+  let hubspot = { ...(d.hubspot || { state: 'none' }), state: noteState(d.hubspot) || 'none' };
   if (OPEN_NOTE_STATES.includes(hubspot.state) && hubspot.pendingActionId) {
     const state = hubspotStateFrom(await store.pendingActionState(hubspot.pendingActionId), hubspot);
     if (state !== hubspot.state) {
@@ -516,16 +673,16 @@ async function refresh(card) {
     }
   }
 
-  const data = { ...d, docs, hubspot };
-  await store.updateCard(card.id, { data, lastRefreshedAt: new Date() });
+  // Only what this refresh owns is written, so a press made meanwhile keeps its changes.
+  const updated = await updateData(card.id, { docs, hubspot }, { lastRefreshedAt: new Date() });
   // Settled elsewhere (e.g. "@Oracle yes" in the thread): close now.
   const reason = SETTLED_NOTE_REASONS[hubspot.state];
   if (reason) await store.closeCard(card.id, reason);
-  return { changed, card: { ...card, data } };
+  return { changed, card: updated || card };
 }
 
 // ============================================================================
-// BACKGROUND WORK (after the click has been answered)
+// BACKGROUND WORK (after the press has been answered)
 // ============================================================================
 
 function programKey(program) {
@@ -595,8 +752,7 @@ export async function proposeOutcomeNote(cardId) {
     hubspot = { state: 'no_match', count: 0 };
   }
 
-  const fresh = await store.getCard(cardId);
-  await store.updateCard(cardId, { data: { ...(fresh.data || {}), hubspot } });
+  await updateData(cardId, { hubspot });
   console.log(`🗂️  Review complete — HubSpot: ${hubspot.state}`);
 }
 
@@ -604,20 +760,24 @@ export async function proposeOutcomeNote(cardId) {
 export async function confirmOutcomeNote(cardId, actor) {
   const card = await store.getCard(cardId);
   if (!card || !['open', 'stale'].includes(card.status)) return;   // e.g. declined meanwhile
-  const hs = card.data?.hubspot || {};
+  const hs = { ...(card.data?.hubspot || {}), state: noteState(card.data?.hubspot) };
   const person = await resolvePerson(actor.chatUserId, {
     email: actor.email, displayName: actor.name, lookupAsUserId: card.owner_user_id
   });
 
-  let next;
   if (!person?.user_id) {
-    next = { ...hs, state: 'needs_hub_user' };
-  } else if (!hs.input || !card.conversation_id) {
+    await finish(cardId, null);
+    await tellPresser(card, actor, 'Only someone signed in to the Hub can add the HubSpot note.');
+    console.log('🗂️  Review HubSpot note — result: no_hub_user');
+    return;
+  }
+
+  let next;
+  if (!hs.input || !card.conversation_id) {
     next = { ...hs, state: 'failed' };
   } else {
     let actionId = hs.pendingActionId;
     const gate = await store.pendingActionState(actionId);
-    let run = null;
 
     if (gate?.status === 'confirmed' && gate.result?.success !== false) {
       next = { ...hs, state: 'added' };   // someone already confirmed with "yes"
@@ -636,7 +796,7 @@ export async function confirmOutcomeNote(cardId, actor) {
         });
         actionId = saved.id;
       }
-      run = await runPendingAction({ actionId, userId: person.user_id });
+      const run = await runPendingAction({ actionId, userId: person.user_id });
       next = run?.ok && run.result?.success !== false
         ? { ...hs, state: 'added', pendingActionId: actionId }
         : { ...hs, state: 'failed', pendingActionId: actionId };
@@ -663,10 +823,11 @@ export async function draftFollowUp(cardId, actor) {
   const runAs = person?.user_id || null;
   if (!runAs) {
     console.log('🗂️  Review follow-up draft not started — reason: no_hub_user');
-    await setNotice(cardId, 'Only someone signed in to the Hub can draft a follow-up.');
+    await finish(cardId, null);
+    await tellPresser(card, actor, 'Only someone signed in to the Hub can draft a follow-up.');
     return;
   }
-  let notice;
+  let outcome;
 
   try {
     const [{ runAgent }, { createConversation }] = await Promise.all([
@@ -703,17 +864,17 @@ export async function draftFollowUp(cardId, actor) {
     const dm = await dmSpaceFor(person);
     if (dm) {
       await postMessage({ spaceName: dm, text: body });
-      notice = `Follow-up draft sent to ${actor.name || 'the requester'} by DM.`;
+      outcome = `sent to ${actor.name || 'them'} by DM`;
     } else {
       await postMessage({ spaceName: card.space_name, threadName: card.thread_name, text: body });
-      notice = 'Follow-up draft posted in this thread (no DM available).';
+      outcome = 'posted in this thread (no DM with Oracle yet)';
     }
   } catch (err) {
     console.warn(`⚠️  Review follow-up draft failed — code: ${codeOf(err)}`);
-    notice = 'Couldn’t draft the follow-up — try again.';
+    outcome = 'couldn’t draft it — try again';
   }
 
-  await setNotice(cardId, notice);
+  await finish(cardId, outcome);
 }
 
 /** The offer card's "Track as review" button: Oracle writes the pre-check, then track_review. */
@@ -725,14 +886,20 @@ export async function trackFromOffer(cardId, actor) {
     email: actor.email, displayName: actor.name, lookupAsUserId: card.owner_user_id
   });
 
-  if (person?.user_id && card.conversation_id) {
+  if (!person?.user_id) {
+    await updateData(cardId, { busy: null, settingUp: false });
+    await tellPresser(card, actor, 'Only someone signed in to the Hub can start tracking.');
+    return;
+  }
+
+  if (card.conversation_id) {
     try {
       const { runAgent } = await import('../claude/client.js');
       await runAgent({
         agentType: 'internal-oracle',
         message: [
           'Yes — track the review request earlier in this thread as a review card.',
-          'Follow the tracked-card instructions: read the linked Docs, write the pre-check and the missing client information, then call track_review.',
+          'Follow the tracked-card instructions: read the linked Docs, list the pre-check issues and the missing client information, then call track_review.',
           d.docIds?.length ? `Linked Google Doc ids: ${d.docIds.join(', ')}` : ''
         ].filter(Boolean).join('\n'),
         conversationId: card.conversation_id,
@@ -762,14 +929,10 @@ export async function trackFromOffer(cardId, actor) {
 
   const after = await store.getCard(cardId);
   if (after?.status === 'offered') {
-    await store.updateCard(cardId, {
-      data: {
-        ...(after.data || {}),
-        settingUp: false,
-        notice: person?.user_id
-          ? 'Couldn’t set up the review — @mention me to try again.'
-          : 'Only someone signed in to the Hub can start tracking.'
-      }
+    await updateData(cardId, {
+      busy: null,
+      settingUp: false,
+      notice: { text: 'couldn’t set up the review — @mention me to try again', at: new Date().toISOString() }
     });
   }
 }

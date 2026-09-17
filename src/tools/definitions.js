@@ -2348,33 +2348,36 @@ export const CHAT_HISTORY_TOOLS = [
 export const TRACKED_CARD_TOOLS = [
   {
     name: 'track_review',
-    description: 'Post a tracked review card in the current Google Chat thread, when someone @mentions you asking for a review of Google Docs (any grant program). The card lists each @mentioned reviewer with their own status, the open comment count on each linked Doc, your pre-check, and missing client information; reviewers update it with its buttons. Reviewers, Docs, space and thread are taken from the Chat message itself. Before calling: read the linked Docs; for an RTRI application load the rtri-tariff skill (overview, then PROGRAM_FACTS) and check the Docs against it. The result tells you what to do next: after card_posted or asked, add no reply at all; after needs_docs or needs_reviewers, ask that one question; after already_tracked, say so briefly. Only works in a Google Chat thread. Never use it for a plain question.',
+    description: 'Post a tracked review card in the current Google Chat thread, when someone @mentions you asking for a review of Google Docs (any grant program). The card lists each @mentioned reviewer with their own status, the open comment count on each linked Doc, your pre-check issues, and the missing client information; reviewers update it with its buttons. Reviewers, Docs, space and thread are taken from the Chat message itself (you and the listener account never count as reviewers). Before calling: read the linked Docs; for an RTRI application load the rtri-tariff skill (overview, then PROGRAM_FACTS) and check the Docs against it. Give short structured fields, not prose: plain text, no Markdown, no emoji. The result tells you what to do next: after card_posted or asked, add no reply at all; after needs_docs, ask which Docs to review; after needs_reviewers, ask exactly "Who should review this?"; after already_tracked, say so briefly. Only works in a Google Chat thread. Never use it for a plain question.',
     input_schema: {
       type: 'object',
       properties: {
-        title: {
-          type: 'string',
-          description: 'Card title: client and program, e.g. "Acme Foods — RTRI pivot application".'
-        },
         client_name: {
           type: 'string',
-          description: 'The client company name, as it would appear in HubSpot.'
+          description: 'The client company name, as it would appear in HubSpot, e.g. "Acme Foods Ltd.". The card header is "<client> · <program>".'
         },
         program: {
           type: 'string',
-          description: 'The grant program, e.g. "RTRI".'
+          description: 'The grant program, short, e.g. "RTRI".'
         },
-        precheck: {
-          type: 'string',
-          description: 'Short pre-check of the Docs against the program source (RTRI: the rtri-tariff skill\'s PROGRAM_FACTS) — the gaps or risks a reviewer should know. Plain sentences, under 1,200 characters. Omit when the program has no source on file.'
+        precheck_issues: {
+          type: 'array',
+          maxItems: 3,
+          items: { type: 'string', maxLength: 100 },
+          description: 'At most 3 problems found when checking the Docs against the program source (RTRI: the rtri-tariff skill\'s PROGRAM_FACTS), most important first. Issues only — never things that are fine, never check marks. One short plain sentence each, under 100 characters. Empty array if nothing is wrong; omit when the program has no source on file.'
         },
         missing_info: {
           type: 'array',
-          items: { type: 'string' },
-          description: 'Client information the Docs still need, one short item each (at most 10).'
+          maxItems: 10,
+          items: { type: 'string', maxLength: 80 },
+          description: 'Client information the Docs still need, one short plain item each (under 80 characters), e.g. "2025 financial statements".'
+        },
+        title: {
+          type: 'string',
+          description: 'Optional fallback title, used only when client or program is unknown.'
         }
       },
-      required: ['title', 'client_name', 'program']
+      required: ['client_name', 'program']
     }
   }
 ];

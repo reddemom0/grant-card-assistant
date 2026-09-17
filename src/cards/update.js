@@ -7,7 +7,7 @@
 
 import * as store from '../database/tracked-cards-store.js';
 import { cardTypeOf } from './types.js';
-import { patchCard } from './chat-api.js';
+import { patchCard, postMessage } from './chat-api.js';
 
 /** cardsV2 for a card as it stands now. */
 export async function renderCard(card) {
@@ -34,6 +34,29 @@ export async function rerenderCard(cardId) {
     return true;
   } catch (err) {
     console.warn(`⚠️  Tracked card update failed — code: ${err?.response?.status ?? err?.code ?? 'unknown'}`);
+    return false;
+  }
+}
+
+/**
+ * A short reply only the presser sees, in the card's thread — for a press that
+ * could not apply. In a DM the thread is already private, so it is a plain
+ * reply there. Never throws; the failure is logged by code.
+ */
+export async function tellPresser(card, actor, text) {
+  if (!card?.space_name || !actor?.chatUserId || !text) return false;
+  const dm = card.data?.surface === 'chat_dm';
+  try {
+    await postMessage({
+      spaceName: card.space_name,
+      threadName: card.thread_name,
+      text,
+      privateTo: dm ? null : actor.chatUserId
+    });
+    console.log(`🗂️  Private reply to a press — delivered, private: ${!dm}`);
+    return true;
+  } catch (err) {
+    console.warn(`⚠️  Private reply to a press failed — code: ${err?.response?.status ?? err?.code ?? 'unknown'}`);
     return false;
   }
 }

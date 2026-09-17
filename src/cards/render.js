@@ -9,6 +9,12 @@
  * Workspace add-on, a button's `function` must be that endpoint's URL — the same
  * URL Chat's tokens are verified against (GOOGLE_CHAT_AUDIENCE). The action name
  * travels as a parameter, because add-ons receive no function name.
+ *
+ * Card text is the Cards v2 HTML subset (<b>, <i>, <br>, <a>), never Markdown.
+ * Model-written text often carries Markdown, so finalizeCards() runs over every
+ * text field of every card before it leaves: Markdown emphasis becomes <b>/<i>
+ * where HTML renders, and is stripped where it does not (headers, labels,
+ * buttons).
  */
 
 const DEFAULT_TZ = process.env.DEFAULT_TIMEZONE || 'America/Vancouver';
@@ -30,6 +36,81 @@ export function clip(value, max) {
   return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
+// ============================================================================
+// MARKDOWN → CARD TEXT
+// ============================================================================
+
+const MD_LINK = /\[([^\]\n]+)\]\((?:https?:\/\/|mailto:)[^)\s]*\)/g;
+const MD_CODE = /`+([^`\n]*)`+/g;
+// Only asterisk emphasis: underscores are left alone, they occur in names.
+const MD_BOLD = /\*\*(?=\S)([^\n]*?\S)\*\*/g;
+const MD_ITALIC = /(^|[^*\w])\*(?=[^\s*])([^*\n]*?[^\s*])\*(?![*\w])/g;
+const MD_LINE_START = /^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+(?=\S)|\d+[.)][ \t]+(?=\S))/gm;
+const MD_LEFTOVER = /\*\*|`/g;
+
+/** Markdown removed: plain text for fields that render no HTML. */
+export function mdToPlain(value) {
+  return String(value ?? '')
+    .replace(MD_LINK, '$1')
+    .replace(MD_CODE, '$1')
+    .replace(MD_BOLD, '$1')
+    .replace(MD_ITALIC, '$1$2')
+    .replace(MD_LINE_START, '')
+    .replace(MD_LEFTOVER, '')
+    .trim();
+}
+
+/**
+ * Card HTML from text that may already be card HTML (ours, escaped) but may
+ * still carry Markdown from the model: emphasis becomes <b>/<i>, the rest of
+ * the Markdown syntax is removed. Never un-escapes anything.
+ */
+export function mdToCardHtml(html) {
+  // Tags (ours) pass through untouched; only the text between them changes.
+  return String(html ?? '')
+    .split(/(<[^>]*>)/)
+    .map(part => (part.startsWith('<') ? part : part
+      .replace(MD_LINK, '$1')
+      .replace(MD_CODE, '$1')
+      .replace(MD_BOLD, '<b>$1</b>')
+      .replace(MD_ITALIC, '$1<i>$2</i>')
+      .replace(MD_LINE_START, '')
+      .replace(MD_LEFTOVER, '')))
+    .join('');
+}
+
+/** Raw text (model or user) → safe card HTML. */
+export function textToCardHtml(value) {
+  return mdToCardHtml(esc(value));
+}
+
+/**
+ * Last pass over outgoing cards: every text field gets the treatment its
+ * widget supports. Returns the same array, changed in place.
+ */
+export function finalizeCards(cardsV2) {
+  const plainKeys = new Set(['title', 'subtitle', 'topLabel', 'bottomLabel']);
+  const walk = (node, key) => {
+    if (Array.isArray(node)) {
+      node.forEach(item => walk(item, key));
+      return;
+    }
+    if (!node || typeof node !== 'object') return;
+    for (const [k, v] of Object.entries(node)) {
+      if (k === 'onClick') continue;   // function URL and parameters are not text
+      if (typeof v === 'string') {
+        const html = (k === 'text' && (key === 'textParagraph' || key === 'decoratedText')) || k === 'header';
+        if (html) node[k] = mdToCardHtml(v);   // section headers take simple HTML too
+        else if (k === 'text' || plainKeys.has(k)) node[k] = mdToPlain(v);
+      } else {
+        walk(v, k);
+      }
+    }
+  };
+  walk(cardsV2, null);
+  return cardsV2;
+}
+
 /**
  * Best-effort link to a Chat thread (the API has no permalink field). Same
  * construction as threadLink in src/tools/chat-history.js, kept here so card
@@ -44,10 +125,14 @@ export function threadLink(spaceName, threadName) {
     : `https://chat.google.com/room/${space}`;
 }
 
-/** A button that calls back to Oracle with these parameters. */
-export function button(text, params) {
+/**
+ * A button that calls back to Oracle with these parameters. A disabled button
+ * stays visible (its label shows the state) but cannot be pressed.
+ */
+export function button(text, params, { disabled = false } = {}) {
   return {
     text,
+    ...(disabled ? { disabled: true } : {}),
     onClick: {
       action: {
         function: endpoint(),
@@ -90,12 +175,21 @@ export function formatWhen(date, timeZone = DEFAULT_TZ) {
   }).format(new Date(date));
 }
 
-/** The latest button press, as one line. */
-export function lastUpdateLine(click, labels = {}) {
-  if (!click) return null;
+/**
+ * The latest button press, as one line. While slow work runs, `busy` replaces
+ * it ("Drafting follow-up…"); an outcome note is appended after a dash.
+ */
+export function lastUpdateLine(click, labels = {}, { busy = null, outcome = null } = {}) {
+  if (busy?.text) {
+    const who = busy.by ? ` · ${esc(busy.by)}` : '';
+    const when = busy.at ? ` · ${esc(formatWhen(busy.at))}` : '';
+    return `Last update: ${esc(busy.text)}${who}${when}`;
+  }
+  if (!click) return outcome ? `Last update: ${esc(outcome)}` : null;
   const who = click.actor_name || 'Someone';
   const what = labels[click.action]?.label || click.action;
-  return `Last update: ${esc(who)} ${esc(what)} · ${esc(formatWhen(click.created_at))}`;
+  const tail = outcome ? ` — ${esc(outcome)}` : '';
+  return `Last update: ${esc(who)} ${esc(what)}${tail} · ${esc(formatWhen(click.created_at))}`;
 }
 
 /**
@@ -110,7 +204,7 @@ export function lastUpdateLine(click, labels = {}) {
  * @param {Object} [p.labels] - action → {label}
  * @returns {Array} cardsV2
  */
-export function trackedCard({ card, title, subtitle = '', sections, buttons = [], latestClick = null, labels = {} }) {
+export function trackedCard({ card, title, subtitle = '', sections, buttons = [], latestClick = null, labels = {}, busy = null, outcome = null }) {
   const closed = card.status === 'closed';
   const stale = card.status === 'stale';
 
@@ -118,27 +212,31 @@ export function trackedCard({ card, title, subtitle = '', sections, buttons = []
     ? `Closed${card.closed_reason === 'auto_stale' ? ' (inactive)' : ''}`
     : stale ? 'Inactive — confirm in the owner’s digest' : null;
 
-  const out = sections.filter(s => s && s.widgets?.length).map(s => ({
-    ...(s.header ? { header: s.header } : {}),
-    widgets: s.widgets
-  }));
+  const out = sections.filter(s => s && s.widgets?.length).map(s => {
+    const collapsible = Boolean(s.collapsible) && s.widgets.length > (s.shown ?? 1);
+    return {
+      ...(s.header ? { header: s.header } : {}),
+      ...(collapsible ? { collapsible: true, uncollapsibleWidgetsCount: s.shown ?? 1 } : {}),
+      widgets: s.widgets
+    };
+  });
 
   const footer = [];
-  const last = lastUpdateLine(latestClick, labels);
+  const last = lastUpdateLine(latestClick, labels, { busy: closed ? null : busy, outcome });
   if (last) footer.push(paragraph(`<i>${last}</i>`));
   if (!closed && buttons.length && buttonsAvailable()) footer.push(buttonRow(buttons));
   if (footer.length) out.push({ widgets: footer });
 
-  return [{
+  return finalizeCards([{
     cardId: `tracked-${card.id}`,
     card: {
       header: {
-        title: clip(title, 200),
-        subtitle: clip([subtitle, status].filter(Boolean).join(' · '), 200)
+        title: clip(mdToPlain(title), 200),
+        subtitle: clip([subtitle, status].filter(Boolean).map(mdToPlain).join(' · '), 200)
       },
       sections: out
     }
-  }];
+  }]);
 }
 
 /** Response body that replaces the clicked message's card in place. */

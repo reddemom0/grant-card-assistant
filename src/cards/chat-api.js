@@ -23,10 +23,12 @@ function chatClient() {
 
 /**
  * Post a new message: a card, text, or both. A thread name makes it a reply in
- * that thread; without one it starts a new top-level message.
+ * that thread; without one it starts a new top-level message. `privateTo`
+ * (users/NNN) makes it visible to that person and Oracle only — app
+ * authentication, no attachments.
  * @returns {Promise<string>} the created message's resource name
  */
-export async function postMessage({ spaceName, threadName = null, text = null, cardsV2 = null }) {
+export async function postMessage({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null }) {
   const requestBody = {};
   if (text) {
     requestBody.text = text;
@@ -34,6 +36,7 @@ export async function postMessage({ spaceName, threadName = null, text = null, c
   }
   if (cardsV2) requestBody.cardsV2 = cardsV2;
   if (threadName) requestBody.thread = { name: threadName };
+  if (privateTo) requestBody.privateMessageViewer = { name: privateTo };
 
   const res = await chatClient().spaces.messages.create({
     parent: spaceName,

@@ -14,7 +14,7 @@ import * as store from '../database/tracked-cards-store.js';
 import { resolvePerson, dmSpaceFor, timeZoneFor, localClock } from './people.js';
 import { postMessage } from './chat-api.js';
 import { cardTypeOf } from './types.js';
-import { button, buttonRow, decorated, paragraph, esc, clip, threadLink } from './render.js';
+import { button, buttonRow, decorated, paragraph, esc, clip, threadLink, mdToPlain, finalizeCards } from './render.js';
 
 export const DIGEST_HOUR = 8;
 
@@ -85,7 +85,7 @@ export function digestIsEmpty(d) {
 
 function titleLink(card) {
   const link = threadLink(card.space_name, card.thread_name);
-  const title = esc(clip(card.title || 'Tracked card', 120));
+  const title = esc(clip(mdToPlain(card.title || 'Tracked card'), 120));
   return link ? `<a href="${link}">${title}</a>` : title;
 }
 
@@ -138,13 +138,13 @@ export async function renderDigest(chatUserId, digest, localDate, notice = null)
     sections.push({ widgets: [paragraph('Nothing waiting on you.')] });
   }
 
-  return [{
+  return finalizeCards([{
     cardId: `digest-${localDate}`,
     card: {
       header: { title: 'Your Oracle digest', subtitle: localDate },
       sections
     }
-  }];
+  }]);
 }
 
 /**
