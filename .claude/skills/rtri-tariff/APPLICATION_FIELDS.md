@@ -92,9 +92,13 @@ Options align to: market diversification; supply chain improvements;
 consideration and use of Canadian technology and products; expansion of
 inter-provincial trade and supply chains.
 
-⚠️ Businesses in aluminum, automotive, copper, food manufacturing, forestry,
-steel — and per the form, metal, machinery and equipment, agriculture and
-seafood — **must select "Other."** Failure to do so may slow processing.
+⚠️ Businesses in aluminum, automotive, copper, food manufacturing, forestry, or
+steel — or impacted mainly through tariffs on one of those sectors — **must
+select "Other."** Failure to do so may slow processing. All tariff-impacted
+sectors may be eligible; the list only flags files.
+
+Prior to Sept 8, 2026 the list was forestry, metal, machinery and equipment,
+and agriculture and seafood. Don't use the old list.
 
 **Explain how the project supports the indicated priority — 2,000 characters**
 

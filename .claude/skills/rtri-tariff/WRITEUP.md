@@ -23,9 +23,10 @@ produces generic answers. Say so rather than proceeding on thin material.
 stream-dependent, and a Liquidity-only application leaves most Pivot sections
 as "not applicable."
 
-**Don't draft budget figures.** The cost-share percentages are unconfirmed —
-see `PROGRAM_FACTS`. Write the narrative sections; leave dollar splits alone
-until Research confirms with a PacifiCan officer.
+**Don't draft budget figures.** The funding shares are in `PROGRAM_FACTS`, but
+dollar splits come from the client's confirmed budget, and the budget path isn't
+built yet. Write the narrative sections; leave dollar splits alone until the
+budget is confirmed.
 
 ---
 

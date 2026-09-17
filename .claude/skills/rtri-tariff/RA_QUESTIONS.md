@@ -176,8 +176,9 @@ such as EI Work-Sharing?
 Retained earnings or cash reserves? Unused line of credit? Investor capital or
 equity? Project partner contributions? Other government assistance?
 
-The percentage split is an open item — see `PROGRAM_FACTS`. Ask how they're
-funding their share without stating what the required share is.
+The required share is confirmed — see `PROGRAM_FACTS` (at least 50% of eligible
+costs for non-repayable pivot, 25% for repayable). Ask how they'll fund it, and
+check that the source they name can actually cover it.
 
 What counts as proof, and what doesn't, is in `PROGRAM_FACTS`. Forecasted
 revenues and accounts receivable are not accepted, and clients are often

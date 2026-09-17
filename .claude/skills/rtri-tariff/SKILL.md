@@ -9,6 +9,9 @@ counter-tariffs.
 > program only. If a request is about R&D readiness or innovation funding, this
 > is the wrong skill — say so.
 
+**This skill covers BC (PacifiCan) only. For other regions, say so and suggest
+checking with Research.**
+
 ---
 
 ## Load the facts first
@@ -25,9 +28,10 @@ question needs a fact that isn't there, say so plainly and name what would
 have to be confirmed. Do not estimate caps, percentages, dates, eligibility
 rules, or character limits.
 
-Two items in `PROGRAM_FACTS` are unresolved — cost-share percentages and the
-eligibility of training/coaching/mentoring/conference fees. Both need PacifiCan
-officer confirmation. Never answer on either as though it were settled.
+Two items in `PROGRAM_FACTS` are unresolved — the eligibility of
+training/coaching/mentoring/conference fees (needs PacifiCan officer
+confirmation) and whether a business plan is required (needs Research to
+confirm). Never answer on either as though it were settled.
 
 ---
 

@@ -127,6 +127,14 @@ Vague answers here produce a weak application. Push for specifics — a
 percentage, a date, a named customer — rather than accepting "significantly"
 or "a lot."
 
+### Checklist marks
+
+In the RA and in chat replies about it: use ✅ only for criteria backed by
+evidence Granted has seen. Use ☐ for criteria that are unconfirmed or only
+claimed by the client — "40 FTE, per the client" is ☐ until the financials or
+payroll records are in hand. In a general eligibility answer (no specific
+client), list the criteria as plain bullets with no ticks.
+
 ### Step 7: Output
 
 Write the completed RA to a Google Doc with `create_google_doc`, as markdown.
@@ -189,10 +197,10 @@ client who can't qualify should never reach a paid writeup.
 
 ## The two open items
 
-Cost-share percentages and the eligibility of training, coaching, mentoring,
-and conference fees are unconfirmed. If either comes up during the RA, say so
-and note that Research needs to confirm with a PacifiCan officer. Never
-estimate.
+The eligibility of training, coaching, mentoring, and conference fees, and
+whether a business plan is required, are unconfirmed. If either comes up during
+the RA, say so — training needs Research to confirm with a PacifiCan officer;
+the business plan needs Research to confirm. Never estimate.
 
 ---
 

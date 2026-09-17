@@ -11,8 +11,11 @@
 > confirming.
 
 **Sources:** Granted RA (Fiscal 2025/2026); PacifiCan Applicant Guide for
-Businesses (modified 2026-09-14).
-**Last reviewed:** 2026-09-16
+Businesses (modified 2026-09-14); PacifiCan — Types of RTRI support
+(https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-types-of-support.html),
+read 2026-09-17; RTRI BC Program Updates Summary (Sept 8, 2026); RTRI RA BC
+(Research, 2026-09-15); PacifiCan BC webinar notes (Sept 15, 2026).
+**Last reviewed:** 2026-09-17
 
 ---
 
@@ -20,11 +23,12 @@ Businesses (modified 2026-09-14).
 
 | Item | Status |
 |---|---|
-| **Cost-share % per stream** | The Applicant Guide states caps but no percentages. The application form states non-PacifiCan funding must be ≥25% and non-government ≥10% of project costs. The Granted RA states 50% client share (non-repayable pivot) and 25% (repayable). These may be a floor vs. a stream-level share, but no source states this. **Needs PacifiCan officer confirmation before any budget work.** |
 | **Training / coaching / mentoring / conference fees** | Eligible under original rules; absent from current BC program pages. **Do not include in BC pivot budgets until confirmed with a PacifiCan officer.** |
+| **Business plan requirement** | Skill says optional; Sept 8 summary lists it as required. **Confirm with Research before telling a client.** |
 
-If asked about either, say it is unconfirmed and that Research should confirm with a
-PacifiCan officer. Do not estimate.
+If asked about either, say it is unconfirmed: training needs Research to confirm
+with a PacifiCan officer; the business plan needs Research to confirm. Do not
+estimate.
 
 ---
 
@@ -45,14 +49,29 @@ writing must be evidence-based and specific.
 
 ## Three streams
 
-| Stream | Type | Cap |
-|---|---|---|
-| Liquidity Assistance | Non-repayable | Up to $2M |
-| Pivot Project (non-repayable) | Non-repayable | Up to $1M |
-| Pivot Project (repayable) | Interest-free loan | Over $1M |
+| Stream | Type | Cap | PacifiCan share |
+|---|---|---|---|
+| Liquidity Assistance | Non-repayable | Up to $2M, up to 12 months, ending no later than 2028-03-31 | Up to 50% of eligible costs |
+| Pivot Project (non-repayable) | Non-repayable | Up to $1M, for projects with local or regional economic benefits | Up to 50% of eligible costs |
+| Pivot Project (repayable) | Interest-free loan | Over $1M, for larger-scale transformative projects | Up to 75% of eligible costs |
+
+**Confirmed** on PacifiCan's Types of RTRI support page (read 2026-09-17): the
+caps, shares and durations above; all pivot projects completed by no later than
+2029-03-31; businesses may apply for liquidity, pivot, or both; max $3M combined
+non-repayable ($2M liquidity + $1M pivot); max $20M total RTRI funding when
+repayable support is included.
 
 > The Granted RA's stream table has the repayable/non-repayable labels swapped in
 > its Type column. The table above is correct: over $1M is the repayable loan.
+
+**Cost share — pivot:** the rest of eligible costs comes from the applicant and
+other confirmed sources — at least 50% for non-repayable, at least 25% for
+repayable. The application form also states non-government funding must be at
+least 10% of project costs.
+
+**Cost share — liquidity:** no matching funds required (RTRI RA BC). The request
+is sized after accounting for forecasted revenue, available financing, working
+capital, and other government assistance (Applicant Guide).
 
 **Combining:** a client can apply for Liquidity + either Pivot stream in one
 application. Max combined non-repayable: $3M. Max aggregate across all streams:
@@ -71,9 +90,8 @@ principal payments.
 **Program budget:** $3.45B nationally over four years, including $1.5B added
 2026-08-25.
 **Average award:** unknown — new program, no historical data.
-**Intake:** rolling, no fixed deadline. Applications before 2025-10-15 were
-prioritized. Confirm current intake status on PacifiCan's site before sending an
-RA to a client.
+**Intake:** rolling. There is no EOI step — apply directly. Confirm current
+intake status on PacifiCan's site.
 **Decision:** roughly 90 days after the full application is received.
 
 ### Stream timelines
@@ -93,10 +111,13 @@ RA to a client.
 Any NO stops the process.
 
 - Incorporated for-profit business operating in British Columbia
-- 10–499 full-time employees (FTE)
+- No minimum employee count for BC (removed — PacifiCan webinar, Sept 15,
+  2026). Confirm with the regional officer if a client is very small.
 - In continuous operation at least 3 years leading up to 2025-03-21
   (businesses established after that date are considered case by case)
-- Minimum $1M annual revenue in at least one of the last two fiscal years
+- Small or medium-sized enterprise with minimum $1M annual revenue, in any
+  sector (confirmed on PacifiCan's Types of RTRI support page). The Granted RA
+  applies the revenue test to at least one of the last two fiscal years.
 - Minimum 2 complete years of externally reviewed financial statements
   (if unavailable — barrier, flag for RA team, do not auto-fail)
 - **Viable prior to 2025-03-21** — confirmed by 2 years of financials showing
@@ -139,13 +160,19 @@ that still qualifies. Explain it explicitly.
 
 ## Sector identification
 
-Aluminum · Automotive · Copper · Food Manufacturing · Forestry · Steel ·
-Metal · Machinery and Equipment · Agriculture and Seafood
+**Current list:** Aluminum · Automotive · Copper · Food Manufacturing ·
+Forestry · Steel
 
-Clients in these sectors **must select "Other"** in the RDA Priority dropdown so
-their file is flagged and prioritized. Failure to do so may slow processing.
-This is identification only — all tariff-impacted businesses are encouraged to
-apply regardless of sector.
+Clients in these sectors — or whose tariff impact comes mainly through tariffs
+on one of them (Applicant Guide) — **must select "Other"** in the RDA Priority
+dropdown so their file is flagged and prioritized. Failure to do so may slow
+processing. This is identification only — all tariff-impacted sectors may be
+eligible, and all tariff-impacted businesses are encouraged to apply regardless
+of sector.
+
+**Prior to Sept 8, 2026** the prioritized list was Forestry · Metal · Machinery
+and Equipment · Agriculture and Seafood. Metal, Machinery and Equipment, and
+Agriculture and Seafood are no longer on it.
 
 ---
 
@@ -158,6 +185,13 @@ monthly average.)
 If the payroll-based amount doesn't meet demonstrated need because of high
 essential operating expenses, up to 50% of eligible operating costs may be
 considered — **exceptional basis only**.
+
+**Advances:** An advance of funds, rather than reimbursement, may be possible
+case by case (PacifiCan webinar, Sept 15). Don't promise it; tell clients to
+plan for reimbursement.
+
+**Existing agreements:** A business with an existing non-repayable agreement
+can apply for liquidity; it may be added by amendment if approved.
 
 **Eligible payroll:** regular salaries and wages paid to employees working in BC.
 
