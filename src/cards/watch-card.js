@@ -123,14 +123,74 @@ export async function startWatch({
   // Words after "watch" name the program when the post does not.
   const asked = String(messageText || '').replace(/^\s*(?:\/watch|watch)\b/i, '').trim();
   const source = [asked, postText].filter(Boolean).join('\n');
-  const guess = programFromPost(source);
-  if (!guess.name) {
+  if (!source.trim() && !userId) {
     await reply(NOT_FOUND);
     return done({ ok: false, code: 'no_program' });
   }
 
-  const candidates = await matchProgram(guess, { now });
-  const stated = datesFromPost(source, now);
+  // NOTHING SLOW BEYOND THIS POINT. Reading the post, matching the program,
+  // listing possible clients and sending the joining DM are three systems'
+  // worth of waiting; Chat gives an app seconds. The press or the message is
+  // answered now, and the card is posted by setUpWatch when it is ready.
+  const { runInBackground } = await import('./actions.js');
+  runInBackground('watch setup', () => setUpWatch({
+    trigger, actor, userId, spaceName, threadName, surface, conversationId,
+    messageText, source, messageName, now
+  }));
+  return done({ ok: true, code: 'looking', stats: `, from the post: ${Boolean(postText)}` });
+}
+
+/**
+ * Everything that takes time: what program this is, whether it is already
+ * watched here, the card itself, and the joining DM.
+ *
+ * Exported so a test can drive it directly; ordinarily only startWatch calls it.
+ */
+export async function setUpWatch({
+  trigger = 'mention', actor, userId = null, spaceName, threadName = null, surface = 'chat_space',
+  conversationId = null, messageText = '', source = '', messageName = null, now = new Date()
+} = {}) {
+  const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor?.chatUserId, text });
+  let words = source;
+  let guess = programFromPost(words);
+
+  // No program in the trigger and none in the post above it — a DM, usually.
+  // Look at what was said just before, and quote it back if it is a guess.
+  if (!guess.name) {
+    const { findSubject, confirmSubject } = await import('./subject.js');
+    const found = await findSubject({
+      spaceName,
+      threadName,
+      userIds: [userId],
+      triggerMessageName: messageName,
+      looksRight: (text) => Boolean(programFromPost(text).name)
+    });
+    if (!found.ok || !found.text) {
+      await reply(NOT_FOUND);
+      console.log(`👁️  Watch subject not found — code: ${found.code || 'none'}`);
+      return { ok: false, code: 'no_program' };
+    }
+    if (!found.sure) {
+      await reply(confirmSubject('program', found.text));
+      console.log(`👁️  Watch subject unclear — asked, from: ${found.from}, others: ${found.others}`);
+      return { ok: false, code: 'unclear' };
+    }
+    words = [words, found.text].filter(Boolean).join('\n');
+    guess = programFromPost(words);
+    console.log(`👁️  Watch subject taken from ${found.from}`);
+    if (!guess.name) {
+      await reply(NOT_FOUND);
+      return { ok: false, code: 'no_program' };
+    }
+  }
+
+  let candidates = [];
+  try {
+    candidates = await matchProgram(guess, { now });
+  } catch (err) {
+    console.warn(`⚠️  Watch program match failed — code: ${codeOf(err)}`);
+  }
+  const stated = datesFromPost(words, now);
   const best = candidates[0] || null;
   const program = {
     name: clip(best?.name || guess.name, TITLE_CHARS),
@@ -151,29 +211,25 @@ export async function startWatch({
   const existing = await store.findLiveCard('watch', threadKey);
 
   if (existing) {
-    const joined = await joinWatch(existing, actor, { now, userId });
+    const joined = await joinWatch(existing, actor, { now });
     // A later post about the same program keeps the card up to date.
-    await notePost(existing, { messageName, threadName, program, postText: source, now });
+    await notePost(existing, { messageName, threadName, postText: words, now });
     await rerenderCard(existing.id);
-    return done({
-      ok: true,
-      code: joined.added ? 'joined' : 'already_watching',
-      card: existing,
-      stats: `, watchers: ${joined.watchers}`
-    });
+    if (joined.added) await sendJoiningDm(existing.id, actor.chatUserId, userId);
+    console.log(`👁️  Watch ${joined.added ? 'joined' : 'already_watching'} — watchers: ${joined.watchers}`);
+    return { ok: true, code: joined.added ? 'joined' : 'already_watching', card: existing };
   }
 
   const data = {
     surface,
     program,
     // "Not this one?" offers the OTHER matches; the one on the card is not an option.
-    candidates: candidates
-      .filter(c => c.key !== program.key)
-      .slice(0, 3)
+    candidates: candidates.filter(c => c.key !== program.key).slice(0, 3)
       .map(c => ({ name: c.name, key: c.key, url: c.url, deadline: c.deadline, provider: c.provider })),
     picking: false,
     posts: messageName ? [{ messageName, threadName, at: now.toISOString(), kind: 'start' }] : [],
     startedBy: { ...who(actor), userId },
+    source: clip(words, 2000),
     sent: {},
     check: null,
     busy: null,
@@ -190,12 +246,11 @@ export async function startWatch({
   if (!card) {
     // Someone started the same watch a moment ago.
     const live = await store.findLiveCard('watch', threadKey);
-    if (live) {
-      const joined = await joinWatch(live, actor, { now, userId });
-      await rerenderCard(live.id);
-      return done({ ok: true, code: 'joined', card: live, stats: `, watchers: ${joined.watchers}` });
-    }
-    return done({ ok: false, code: 'insert_failed' });
+    if (!live) return { ok: false, code: 'insert_failed' };
+    const joined = await joinWatch(live, actor, { now });
+    await rerenderCard(live.id);
+    if (joined.added) await sendJoiningDm(live.id, actor.chatUserId, userId);
+    return { ok: true, code: 'joined', card: live };
   }
 
   await store.addParticipants(card.id, [
@@ -207,24 +262,19 @@ export async function startWatch({
   card = await store.updateCard(card.id, { messageName: posted });
 
   // Anyone who watched this program before, in this space, hears that it is back.
-  const reopened = await dmPastWatchers(card, now);
-  // Whoever started it is already on the card (as its owner), so the joining DM
-  // is sent here rather than through joinWatch.
-  await notifyImmediate('watched_grant', {
-    card, chatUserId: actor.chatUserId, text: await joiningMessage(card, { userId })
-  });
+  const told = await dmPastWatchers(card, now);
+  await sendJoiningDm(card.id, actor.chatUserId, userId);
   await rerenderCard(card.id);
 
-  return done({
-    ok: true,
-    code: null,
-    card,
-    stats: `, matched: ${program.matched}, deadline: ${program.deadline ? 'yes' : 'no'}, told: ${reopened}`
-  });
+  console.log(`👁️  Watch card posted — trigger: ${trigger}, matched: ${program.matched}, deadline: ${program.deadline ? 'yes' : 'no'}, told: ${told}`);
+  return { ok: true, code: null, card };
 }
 
-/** Add someone to a watch and DM them everything about the program. */
-export async function joinWatch(card, actor, { now = new Date(), userId = null, silent = false } = {}) {
+/**
+ * Add someone to a watch. Database only — the joining DM needs HubSpot and our
+ * grants table, so it is sent by sendJoiningDm() after the press is answered.
+ */
+export async function joinWatch(card, actor, { now = new Date() } = {}) {
   const participants = await store.getParticipants(card.id);
   const already = participants.find(p => p.chat_user_id === actor.chatUserId);
   if (!already) {
@@ -232,13 +282,23 @@ export async function joinWatch(card, actor, { now = new Date(), userId = null, 
       { chatUserId: actor.chatUserId, role: 'member', displayName: actor.name || null }
     ]);
   }
-  const watchers = (already ? participants : [...participants, { chat_user_id: actor.chatUserId }]).length;
-  const added = !already;
-  if (added && !silent) {
-    const text = await joiningMessage(card, { userId });
-    await notifyImmediate('watched_grant', { card, chatUserId: actor.chatUserId, text });
+  return { added: !already, watchers: participants.length + (already ? 0 : 1) };
+}
+
+/** The DM a new watcher gets: everything we know about the program, once. */
+export async function sendJoiningDm(cardId, chatUserId, userId = null) {
+  if (!chatUserId) return false;
+  const card = await store.getCard(cardId);
+  if (!card || !isLive(card)) return false;
+  try {
+    const sent = await notifyImmediate('watched_grant', {
+      card, chatUserId, text: await joiningMessage(card, { userId })
+    });
+    return sent.delivered;
+  } catch (err) {
+    console.warn(`⚠️  Watch joining DM failed — code: ${codeOf(err)}`);
+    return false;
   }
-  return { added, watchers };
 }
 
 /** Up to five companies that might fit — by past deals, then by industry. */
@@ -364,7 +424,8 @@ async function handleAction({ card, actor, action, now = new Date() }) {
       if (await isListenerChatUser(actor)) return { changed: false, ignored: 'listener_account', reply: 'This account can’t watch a program.' };
       const joined = await joinWatch(card, actor, { now });
       if (!joined.added) return { changed: false, ignored: 'already_watching', reply: `You’re already watching ${d.program?.name || 'it'}.` };
-      return { changed: true, claimed: true };
+      // The DM needs HubSpot and our grants table: after the answer, not before.
+      return { changed: true, claimed: true, background: () => sendJoiningDm(card.id, actor.chatUserId) };
     }
 
     case 'watch.stop': {
@@ -417,7 +478,7 @@ export async function switchProgram(cardId, actor, pick, now = new Date()) {
   if (threadKey === card.thread_name) {
     await store.patchCardData(cardId, { picking: false });
     await rerenderCard(cardId);
-    return;
+    return store.getCard(cardId);
   }
 
   const watchers = await store.getParticipants(cardId);
@@ -425,11 +486,14 @@ export async function switchProgram(cardId, actor, pick, now = new Date()) {
     ...d.program,
     name: clip(pick.name, TITLE_CHARS),
     key,
-    url: pick.url || null,
-    deadline: pick.deadline || null,
+    url: pick.url || d.program?.url || null,
+    // A date someone read in the post still beats ours.
+    deadline: d.program?.statedDeadline ? d.program.deadline : (pick.deadline || null),
+    amount: pick.amount ?? d.program?.amount ?? null,
     provider: pick.provider || null,
+    industries: pick.industries || d.program?.industries || [],
     matched: true,
-    statedDeadline: false
+    statedDeadline: Boolean(d.program?.statedDeadline)
   };
 
   const existing = await store.findLiveCard('watch', threadKey);
@@ -446,7 +510,7 @@ export async function switchProgram(cardId, actor, pick, now = new Date()) {
   if (!target) {
     await store.patchCardData(cardId, { picking: false, notice: { text: 'couldn’t switch the program', at: now.toISOString() } });
     await rerenderCard(cardId);
-    return;
+    return store.getCard(cardId);
   }
 
   await store.addParticipants(target.id, watchers.map(p => ({
@@ -463,6 +527,7 @@ export async function switchProgram(cardId, actor, pick, now = new Date()) {
   }
   await rerenderCard(target.id);
   console.log(`👁️  Watch program switched — watchers: ${watchers.length}, same message: ${Boolean(card.message_name)}`);
+  return store.getCard(target.id);
 }
 
 /** Presses read nothing new: the program's facts come from posts and the job. */
@@ -719,20 +784,11 @@ export async function handleWatchMessage({ evt, user, conversationId, messageTex
   const actor = { chatUserId: evt.senderChatId, name: evt.senderDisplayName || user?.name || null, email: evt.senderEmail || null };
   const surface = evt.isDm ? 'chat_dm' : 'chat_space';
 
-  let postText = '';
-  if (threadName && user?.id) {
-    try {
-      const { readAsk } = await import('./track-thread.js');
-      const read = await readAsk({ spaceName, threadName, userIds: [user.id] });
-      if (read.ok && read.ask?.name !== evt.messageName) postText = String(read.ask?.text || '');
-    } catch (err) {
-      console.warn(`⚠️  Watch post read failed — code: ${codeOf(err)}`);
-    }
-  }
-
+  // The post itself is read in the background (setUpWatch), not here: reading
+  // Chat is a network call, and this runs while the person is waiting.
   await startWatch({
     trigger: 'mention', actor, userId: user?.id || null, spaceName, threadName, surface,
-    conversationId, messageText, postText, messageName: evt.messageName, now
+    conversationId, messageText, messageName: evt.messageName, now
   });
   return true;
 }

@@ -15,6 +15,9 @@ const EMAIL = /\b[\w.+-]+@[\w-]+\.[\w.-]{2,}\b/;
 const PHONE = /(?:\+?1[\s.-]?)?(?:\(\d{3}\)|\d{3})[\s.-]?\d{3}[\s.-]?\d{4}\b/;
 const CUES = /\b(?:called in|called us|call(?:ed)? back|voicemail|left a (?:message|vm)|lead from|new lead|inbound(?: lead)?|reached out|got in touch|enquir(?:y|ies)|inquir(?:y|ies)|filled (?:in|out) (?:the )?(?:form|calculator)|contact form|referral from|wants a quote)\b/i;
 const QUESTION = /\?\s*$/;
+// Being asked outright. The details may be in the message before this one — in
+// a DM they usually are — so this counts on its own.
+const ASKED = /\btriage\b|\b(?:look at|check|qualify) (?:this|that|the) (?:lead|enquiry|inquiry|prospect)\b/i;
 
 /**
  * Does this @Oracle message look like an inbound lead?
@@ -25,6 +28,7 @@ export function leadIntent(text) {
   if (!t) return null;
   const details = EMAIL.test(t) || PHONE.test(t);
   const cues = CUES.test(t);
+  if (ASKED.test(t)) return 'lead';
   if (details && cues) return 'lead';
   if ((details || cues) && !QUESTION.test(t)) return 'maybe';
   return null;

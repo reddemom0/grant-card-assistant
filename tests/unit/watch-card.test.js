@@ -303,12 +303,14 @@ describe('starting a watch', () => {
     expect(privateReplies().some(([to, t]) => to === NAT && /already watching/.test(t))).toBe(true);
   });
 
-  test('a post nothing can be made of is answered, not guessed at', async () => {
+  test('a post nothing can be made of is quoted back, not guessed at', async () => {
     fakes.userChat.threads.set(THREAD, [chatMessage({ id: 'vague', text: 'that changed again, worth a look' })]);
     await say({ text: 'watch' });
 
     expect(watchCards()).toHaveLength(0);
-    expect(privateReplies().some(([, t]) => /couldn’t tell which program/.test(t))).toBe(true);
+    const asked = privateReplies().find(([to]) => to === CHRIS)?.[1] || '';
+    expect(asked).toContain('Which program did you mean?');
+    expect(asked).toContain('“that changed again, worth a look”');
   });
 
   test('a program we do not have on file is still watched, from the post’s own words', async () => {
@@ -325,6 +327,160 @@ describe('starting a watch', () => {
 
     expect(watchCards()).toHaveLength(0);
     expect(fakes.agent.calls).toHaveLength(1);
+  });
+});
+
+// ============================================================================
+// IN A DM, AND ANSWERING FAST
+// ============================================================================
+
+describe('in a DM', () => {
+  const DM = 'spaces/DM-CHRIS';
+  /** In a DM, Chat gives each message its own thread. */
+  const dmBody = (text, { thread = `${DM}/threads/d9`, name = `${DM}/messages/t${++seq}` } = {}) => ({
+    chat: {
+      messagePayload: {
+        message: {
+          name, text, argumentText: text,
+          sender: { name: CHRIS, displayName: NAMES[CHRIS], email: EMAILS[CHRIS], type: 'HUMAN' },
+          thread: { name: thread },
+          annotations: []
+        },
+        space: { name: DM, type: 'DM' }
+      }
+    }
+  });
+
+  async function sayInDm(text, opts = {}) {
+    const ends = () => logLines().filter(l => l.includes('Chat background task END')).length;
+    const before = ends();
+    await post(dmBody(text, opts));
+    for (let i = 0; i < 2000 && ends() === before; i++) await new Promise(r => setImmediate(r));
+    await whenCardsIdle();
+  }
+
+  test('"watch" on its own takes the program from the message before it', async () => {
+    // Two messages, each its own thread, as a DM really is.
+    fakes.userChat.threads.set(`${DM}/threads/d1`, [{
+      name: `${DM}/messages/m-post`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: `${PROGRAM} closes November 15, 2026. https://granted.ca/rtri`,
+      annotations: [],
+      createTime: new Date(Date.now() - 60_000).toISOString(),
+      thread: { name: `${DM}/threads/d1` }
+    }]);
+
+    await sayInDm('watch');
+
+    const card = await liveWatch();
+    expect(card.space_name).toBe(DM);
+    expect(card.data.program.name).toBe(PROGRAM);
+    expect(card.data.program.matched).toBe(true);
+    // The card is posted in the DM (alongside Oracle's own first-DM intro),
+    // and the joining DM still goes out.
+    const watchPosts = fakes.chat.posts
+      .filter(p => p.spaceName === DM && p.cardsV2?.[0]?.cardId?.startsWith('tracked-'));
+    expect(watchPosts).toHaveLength(1);
+    expect(dmsTo('spaces/DM-CHRIS').some(t => /You’re watching/.test(t))).toBe(true);
+    expect(logged()).toContain('👁️  Watch subject taken from recent');
+  });
+
+  test('recent chatter that names no program is quoted back, not guessed at', async () => {
+    fakes.userChat.threads.set(`${DM}/threads/d1`, [{
+      name: `${DM}/messages/m-chat`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: 'thanks!',
+      annotations: [],
+      createTime: new Date(Date.now() - 60_000).toISOString(),
+      thread: { name: `${DM}/threads/d1` }
+    }]);
+
+    await sayInDm('watch');
+
+    expect(watchCards()).toHaveLength(0);
+    const asked = fakes.chat.posts.map(p => p.text || '').find(t => /Which program did you mean/.test(t));
+    expect(asked).toContain('“thanks!”');
+  });
+
+  test('an empty conversation: Oracle says it cannot tell', async () => {
+    await sayInDm('watch');
+
+    expect(watchCards()).toHaveLength(0);
+    expect(fakes.chat.posts.some(p => /couldn’t tell which program/.test(p.text || ''))).toBe(true);
+  });
+
+  test('two programs in the last few messages: the nearest is quoted and confirmed', async () => {
+    const at = (secondsAgo) => new Date(Date.now() - secondsAgo * 1000).toISOString();
+    fakes.userChat.threads.set(`${DM}/threads/d1`, [{
+      name: `${DM}/messages/m-old`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: 'Canada Summer Jobs opens in January',
+      annotations: [], createTime: at(300), thread: { name: `${DM}/threads/d1` }
+    }]);
+    fakes.userChat.threads.set(`${DM}/threads/d2`, [{
+      name: `${DM}/messages/m-new`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: `${PROGRAM} closes November 15, 2026`,
+      annotations: [], createTime: at(60), thread: { name: `${DM}/threads/d2` }
+    }]);
+
+    await sayInDm('watch');
+
+    expect(watchCards()).toHaveLength(0);
+    const asked = fakes.chat.posts.map(p => p.text || '').find(t => /Which program did you mean/.test(t));
+    expect(asked).toBeTruthy();
+    expect(asked).toContain(PROGRAM);           // the nearest one, quoted
+  });
+
+  test('naming the program in the message needs no looking back at all', async () => {
+    await sayInDm(`watch ${PROGRAM}`);
+
+    const card = await liveWatch();
+    expect(card.data.program.name).toBe(PROGRAM);
+    // No looking back: nothing read the conversation's recent messages.
+    expect(fakes.userChat.calls.filter(c => c.orderBy)).toHaveLength(0);
+  });
+});
+
+describe('answering before the lookup', () => {
+  test('the program lookup and the joining DM happen after the turn is answered', async () => {
+    fakes.userChat.threads.set(THREAD, [chatMessage({
+      id: 'post-slow',
+      text: `${PROGRAM}: closes November 15, 2026. https://granted.ca/rtri`
+    })]);
+    // Hold the grants table open: the turn must finish anyway.
+    let release;
+    fakes.grants.hold = new Promise(resolve => { release = resolve; });
+
+    // Deliberately not say(), which waits for the card work to go idle.
+    const ends = () => logLines().filter(l => l.includes('Chat background task END')).length;
+    const before = ends();
+    await post(messageBody({ text: 'watch' }));
+    for (let i = 0; i < 2000 && ends() === before; i++) await new Promise(r => setImmediate(r));
+
+    expect(ends()).toBe(before + 1);            // the turn is answered…
+    expect(watchCards()).toHaveLength(0);       // …before anything is posted
+
+    release();
+    await whenCardsIdle();
+
+    const card = await liveWatch();
+    expect(card.data.program.name).toBe(PROGRAM);
+    expect(fakes.chat.posts.filter(p => p.cardsV2)).toHaveLength(1);
+  });
+
+  test('"Watch this" answers the press, then sends the DM', async () => {
+    const card = await watchThePost();
+    let release;
+    fakes.hubspot.hold = new Promise(resolve => { release = resolve; });
+
+    const answer = await press(card, 'watch.join', NAT);
+    expect(answer?.hostAppDataAction?.chatDataAction?.updateMessageAction).toBeTruthy();
+    expect(dmsTo('spaces/DM-NAT')).toHaveLength(0);   // not yet: the press came first
+
+    release();
+    await whenCardsIdle();
+    expect(dmsTo('spaces/DM-NAT').filter(t => /You’re watching/.test(t))).toHaveLength(1);
   });
 });
 
@@ -607,6 +763,6 @@ describe('what Oracle never says', () => {
     for (const secret of ['Acme Sentinel Foods', NAMES[CHRIS], EMAILS[CHRIS], 'granted.ca/rtri', PROGRAM]) {
       expect(cardLines).not.toContain(secret);
     }
-    expect(cardLines).toContain('👁️  Watch started');
+    expect(cardLines).toContain('👁️  Watch card posted');
   });
 });

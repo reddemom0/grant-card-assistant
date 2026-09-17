@@ -282,6 +282,89 @@ describe('the trigger', () => {
 });
 
 // ============================================================================
+// IN A DM
+// ============================================================================
+
+describe('in a DM', () => {
+  const DM = 'spaces/DM-CHRIS';
+  const at = (secondsAgo) => new Date(Date.now() - secondsAgo * 1000).toISOString();
+
+  const dmBody = (text, { thread = `${DM}/threads/d9`, name = `${DM}/messages/t${++seq}` } = {}) => ({
+    chat: {
+      messagePayload: {
+        message: {
+          name, text, argumentText: text,
+          sender: { name: CHRIS, displayName: NAMES[CHRIS], email: EMAILS[CHRIS], type: 'HUMAN' },
+          thread: { name: thread },
+          annotations: []
+        },
+        space: { name: DM, type: 'DM' }
+      }
+    }
+  });
+
+  /** A message already in the DM, in its own thread, as Chat really does it. */
+  const earlier = (id, text, secondsAgo = 60, thread = `${DM}/threads/${id}`) => {
+    fakes.userChat.threads.set(thread, [{
+      name: `${DM}/messages/${id}`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text,
+      annotations: [],
+      createTime: at(secondsAgo),
+      thread: { name: thread }
+    }]);
+  };
+
+  async function sayInDm(text, opts = {}) {
+    const ends = () => logLines().filter(l => l.includes('Chat background task END')).length;
+    const before = ends();
+    await post(dmBody(text, opts));
+    for (let i = 0; i < 2000 && ends() === before; i++) await new Promise(r => setImmediate(r));
+    await whenCardsIdle();
+  }
+
+  test('the lead pasted a moment ago is triaged, though this message has no details', async () => {
+    earlier('paste', `${LEAD.name} from ${LEAD.company} — ${LEAD.phone}, ${LEAD.email}`);
+
+    await sayInDm('triage this lead please');
+
+    const card = await liveCard();
+    expect(card.space_name).toBe(DM);
+    expect(card.data.lead).toMatchObject({ email: LEAD.email, phone: LEAD.phone });
+    expect(card.data.surface).toBe('chat_dm');
+    expect(fakes.agent.calls).toHaveLength(0);
+  });
+
+  test('two leads in the last few messages: the nearest is quoted and confirmed', async () => {
+    earlier('older', 'Bob Lee called — 604-555-0111, bob@otherco.test', 300, `${DM}/threads/d1`);
+    earlier('newer', `${LEAD.name} called — ${LEAD.phone}, ${LEAD.email}`, 60, `${DM}/threads/d2`);
+
+    await sayInDm('triage this lead');
+
+    expect(leadCards()).toHaveLength(0);
+    const asked = fakes.chat.posts.map(p => p.text || '').find(t => /Which lead did you mean/.test(t));
+    expect(asked).toBeTruthy();
+    expect(asked).toContain(LEAD.name);      // the nearest one
+  });
+
+  test('nothing with contact details in the conversation: Oracle says so', async () => {
+    earlier('chat', 'how was the weekend?');
+
+    await sayInDm('triage this lead');
+
+    expect(leadCards()).toHaveLength(0);
+    expect(fakes.chat.posts.some(p => /couldn’t see an email address or phone number/.test(p.text || ''))).toBe(true);
+  });
+
+  test('details in the message itself need no looking back', async () => {
+    await sayInDm(`${LEAD.name} called in — ${LEAD.phone}, ${LEAD.email}`);
+
+    expect((await liveCard()).data.lead.phone).toBe(LEAD.phone);
+    expect(fakes.userChat.calls.filter(c => c.orderBy)).toHaveLength(0);
+  });
+});
+
+// ============================================================================
 // WHAT WE KNOW, LIKELY FIT, PROGRAMS, OWNER
 // ============================================================================
 

@@ -225,9 +225,12 @@ beforeEach(() => {
       userId: args.userId, conversationId: args.conversationId, chatContext: args.chatContext
     });
     toolResults.push(r);
+    // The reply the tool result asks for, so a change of wording there shows up
+    // here rather than being hidden behind a fixed string.
+    const asked = /Say exactly: "([^"]+)"|Ask exactly: "([^"]+)"/.exec(r.message || '');
     const reply = r.card_posted || r.asked ? ''
-      : r.needs_docs ? 'Which Docs should be reviewed?'
-        : r.needs_reviewers ? 'Who should review this?'
+      : asked ? (asked[1] || asked[2])
+        : r.needs_docs ? 'Which Docs should be reviewed?'
           : 'This thread already has a review card.';
     return { success: true, response: { content: reply ? [{ type: 'text', text: reply }] : [] } };
   };
@@ -382,11 +385,12 @@ describe('an @mention asking for a review', () => {
     expect(text).not.toContain('Oracle ·');
   });
 
-  test('with only the listener mentioned, Oracle asks "Who should review this?" and makes no card', async () => {
+  test('with only the listener mentioned, Oracle says whose account that was and makes no card', async () => {
     const first = await say(reviewRequest({ mentions: [LISTENER] }));
     expect(first).toMatchObject({ needs_reviewers: true });
-    expect(first.message).toContain('Ask exactly: "Who should review this?"');
-    expect(textReplies).toEqual(['Who should review this?']);
+    // Not "Who should review this?": the mention WAS seen, it was just Oracle's.
+    expect(first.message).toContain('The only account @mentioned was your own');
+    expect(textReplies).toEqual(['That’s my own account — @mention the people you want to review it.']);
     expect(cardPosts()).toEqual([]);
     expect((await onlyCard()).status).toBe('awaiting_docs');
 

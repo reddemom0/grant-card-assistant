@@ -65,12 +65,12 @@ export function createTrackedCardFakes() {
   const hubspotState = {
     deals: [], searches: [], notes: [], failNote: false,
     // Lead triage: what the CRM knows, and what the card wrote to it.
-    snapshots: [], snapshot: null, owners: [], outcomes: [], failOutcome: false,
+    snapshots: [], snapshot: null, owners: [], outcomes: [], failOutcome: false, hold: null,
     // /watch: companies for the "might fit" list.
     companies: []
   };
   const leadGenState = { sessions: new Map(), calls: [] };
-  const grantsState = { grants: [], searches: [], fail: false };
+  const grantsState = { grants: [], searches: [], fail: false, hold: null };
   const directoryState = { people: new Map(), calls: [] };
   const calendarState = {
     zones: new Map(), calls: [],
@@ -593,6 +593,7 @@ export function createTrackedCardFakes() {
     module: {
       async searchGrantApplications(filters = {}) {
         hubspotState.searches.push({ ...filters });
+        if (hubspotState.hold) await hubspotState.hold;   // a slow HubSpot, released by the test
         const needle = String(filters.company_name || filters.deal_name || '').toLowerCase();
         const field = filters.company_name ? 'companyName' : 'name';
         return {
@@ -662,6 +663,7 @@ export function createTrackedCardFakes() {
     module: {
       async searchGetGranted(input = {}) {
         grantsState.searches.push(json(input));
+        if (grantsState.hold) await grantsState.hold;   // a slow grants table, released by the test
         if (grantsState.fail) throw Object.assign(new Error('grants down'), { code: 'ECONNREFUSED' });
         const limit = input.limit || 10;
         return { success: true, count: grantsState.grants.length, grants: json(grantsState.grants).slice(0, limit) };
@@ -803,6 +805,8 @@ export function createTrackedCardFakes() {
   Object.defineProperty(hubspot, 'snapshot', { get: () => hubspotState.snapshot, set: (v) => { hubspotState.snapshot = v; } });
   Object.defineProperty(hubspot, 'failOutcome', { get: () => hubspotState.failOutcome, set: (v) => { hubspotState.failOutcome = v; } });
   Object.defineProperty(grants, 'fail', { get: () => grantsState.fail, set: (v) => { grantsState.fail = v; } });
+  Object.defineProperty(grants, 'hold', { get: () => grantsState.hold, set: (v) => { grantsState.hold = v; } });
+  Object.defineProperty(hubspot, 'hold', { get: () => hubspotState.hold, set: (v) => { hubspotState.hold = v; } });
   // Arrays are shared with the *State objects, so assigning a whole new list
   // has to replace the contents rather than the property.
   const replaceable = (obj, key, target) => Object.defineProperty(obj, key, {
@@ -847,11 +851,18 @@ export function createTrackedCardFakes() {
       return {
         spaces: {
           messages: {
-            list: async ({ parent, filter, pageSize = 100, pageToken }) => {
-              userChatState.calls.push({ userId, parent, filter, pageSize });
+            list: async ({ parent, filter, pageSize = 100, pageToken, orderBy }) => {
+              userChatState.calls.push({ userId, parent, filter, pageSize, orderBy: orderBy || null });
               if (userChatState.failWith) throw userChatState.failWith;
               const thread = /thread\.name = (\S+)/.exec(filter || '')?.[1];
-              const all = (userChatState.threads.get(thread) || []).filter(m => m.name.startsWith(`${parent}/`));
+              // No thread filter: the space's own recent messages, which is how
+              // a card finds its subject in a DM (src/cards/subject.js).
+              const inSpace = () => [...userChatState.threads.values()].flat()
+                .filter(m => m.name.startsWith(`${parent}/`))
+                .sort((a, b) => new Date(b.createTime || 0) - new Date(a.createTime || 0));
+              const all = thread
+                ? (userChatState.threads.get(thread) || []).filter(m => m.name.startsWith(`${parent}/`))
+                : (/createTime desc/.test(orderBy || '') ? inSpace() : inSpace().reverse());
               const start = pageToken ? Number(pageToken) : 0;
               const page = all.slice(start, start + pageSize);
               const next = start + pageSize < all.length ? String(start + pageSize) : undefined;
@@ -896,11 +907,13 @@ export function createTrackedCardFakes() {
     hubspotState.outcomes.length = 0;
     hubspotState.companies.length = 0;
     hubspotState.failOutcome = false;
+    hubspotState.hold = null;
     leadGenState.sessions.clear();
     leadGenState.calls.length = 0;
     grantsState.grants.length = 0;
     grantsState.searches.length = 0;
     grantsState.fail = false;
+    grantsState.hold = null;
     directoryState.people.clear();
     directoryState.calls.length = 0;
     calendarState.zones.clear();

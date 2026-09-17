@@ -382,6 +382,92 @@ describe('finding times', () => {
 });
 
 // ============================================================================
+// WHO IS ON THE CALL, AND IN A DM
+// ============================================================================
+
+describe('who is on the call', () => {
+  test('@mentioning Oracle and nobody else says whose account that is', async () => {
+    await say({ text: 'find 30 min with @Oracle this week', mentions: [ORACLE] });
+
+    expect(meetCards()).toHaveLength(0);
+    // Not "Who should be on the call?": the mention WAS seen, it was Oracle's.
+    expect(privateReplies().some(([to, t]) =>
+      to === CHRIS && t === 'That’s my own account — @mention the people you want on the call.')).toBe(true);
+    expect(privateReplies().some(([, t]) => /Who should be on the call/.test(t))).toBe(false);
+  });
+
+  test('the listener account counts as my own account too', async () => {
+    await say({ text: 'set up a call with @Oracle', mentions: [LISTENER] });
+
+    expect(meetCards()).toHaveLength(0);
+    expect(privateReplies().some(([, t]) => /That’s my own account/.test(t))).toBe(true);
+  });
+
+  test('nobody named at all still asks who', async () => {
+    await say({ text: 'set up a call about the RTRI budget' });
+
+    expect(meetCards()).toHaveLength(0);
+    expect(privateReplies().some(([, t]) => /Who should be on the call/.test(t))).toBe(true);
+  });
+
+  test('a real person alongside Oracle is simply invited', async () => {
+    const card = await meetWith({ text: 'find 30 min with @Nat and @Oracle', mentions: [NAT, LISTENER] });
+    expect(card.data.invitees.map(p => p.chatUserId)).toEqual([NAT]);
+  });
+});
+
+describe('in a DM', () => {
+  const DM = 'spaces/DM-CHRIS';
+
+  const dmBody = (text, mentions = [], { thread = `${DM}/threads/d9`, name = `${DM}/messages/t${++seq}` } = {}) => ({
+    chat: {
+      messagePayload: {
+        message: {
+          name, text, argumentText: text,
+          sender: { name: CHRIS, displayName: NAMES[CHRIS], email: EMAILS[CHRIS], type: 'HUMAN' },
+          thread: { name: thread },
+          annotations: mentions.map(annotation)
+        },
+        space: { name: DM, type: 'DM' }
+      }
+    }
+  });
+
+  async function sayInDm(text, mentions = []) {
+    const ends = () => logLines().filter(l => l.includes('Chat background task END')).length;
+    const before = ends();
+    await post(dmBody(text, mentions));
+    for (let i = 0; i < 2000 && ends() === before; i++) await new Promise(r => setImmediate(r));
+    await whenCardsIdle();
+  }
+
+  test('a call asked for in a DM finds times and books in the DM', async () => {
+    await sayInDm('find 30 min with @Nat this week', [NAT]);
+
+    const card = await liveCard();
+    expect(card.space_name).toBe(DM);
+    expect(card.data.surface).toBe('chat_dm');
+    expect(card.data.slots).toHaveLength(3);
+    expect(card.data.invitees.map(p => p.chatUserId)).toEqual([NAT]);
+
+    await press(card, 'meet.book1', CHRIS);
+    await whenCardsIdle();
+    expect(fakes.calendar.events).toHaveLength(1);
+    expect(fakes.calendar.events[0].attendees.map(a => a.email)).toEqual([EMAILS[NAT]]);
+  });
+
+  test('a DM with nobody named says whose names are needed, in the DM itself', async () => {
+    await sayInDm('set up a call about the budget');
+
+    expect(meetCards()).toHaveLength(0);
+    // In a DM the reply is a plain message: there is nobody else to hide it from.
+    const replies = fakes.chat.posts.filter(p => p.spaceName === DM && p.text);
+    expect(replies.some(p => /Who should be on the call/.test(p.text))).toBe(true);
+    expect(replies.every(p => p.privateTo === null)).toBe(true);
+  });
+});
+
+// ============================================================================
 // BOOKING
 // ============================================================================
 

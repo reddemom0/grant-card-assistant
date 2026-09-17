@@ -35,7 +35,7 @@ import { markCardReply, takeCardReply, FOUNDATION_ACTIONS } from './registry.js'
 import { postMessage, patchCard } from './chat-api.js';
 import { renderCard, rerenderCard, tellPresser } from './update.js';
 import { notifyImmediate } from './notify.js';
-import { resolvePerson, dmSpaceFor, realPeople, isListenerChatUser } from './people.js';
+import { resolvePerson, dmSpaceFor, realPeople, splitMentions, isListenerChatUser } from './people.js';
 import { trackedCard, paragraph, button, esc, clip, threadLink, mdToPlain, textToCardHtml } from './render.js';
 
 const MAX_DOCS = 10;
@@ -195,8 +195,12 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
   const draft = cleanInput(input);
   const mentioned = cleanMentions(cc.mentions).filter(m => m.chatUserId !== requester.chatUserId);
   // Never Oracle, the Chat-copy listener account or @all (people.js).
-  const reviewers = (await realPeople(mergeReviewers(prior.reviewers, mentioned), requester.userId))
-    .slice(0, MAX_REVIEWERS);
+  const merged = mergeReviewers(prior.reviewers, mentioned);
+  const split = await splitMentions(merged, requester.userId);
+  const reviewers = split.people.slice(0, MAX_REVIEWERS);
+  // Every name given was Oracle's own: "Who should review this?" would read as
+  // if the mention had not been seen at all.
+  const onlyOracle = !reviewers.length && split.oracle > 0 && split.oracle === merged.length;
   const docIds = mergeDocIds(prior.docIds, cc.driveFiles || []).slice(0, MAX_DOCS);
 
   const carried = {
@@ -250,9 +254,12 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
         title: headerTitle(carried.client, carried.program, draft.title), data: carried
       });
     }
-    console.log(`🗂️  Review card waiting — reason: needs_${missing}`);
-    return missing === 'docs'
-      ? { success: false, needs_docs: true, message: 'This request has no Google Doc links. Ask which Docs should be reviewed — they can reply in this thread with the links and @mention you. Do not create anything else.' }
+    console.log(`🗂️  Review card waiting — reason: needs_${missing}${onlyOracle ? '_only_oracle' : ''}`);
+    if (missing === 'docs') {
+      return { success: false, needs_docs: true, message: 'This request has no Google Doc links. Ask which Docs should be reviewed — they can reply in this thread with the links and @mention you. Do not create anything else.' };
+    }
+    return onlyOracle
+      ? { success: false, needs_reviewers: true, message: 'The only account @mentioned was your own. Say exactly: "That’s my own account — @mention the people you want to review it." Do not ask "Who should review this?", and do not create anything else.' }
       : { success: false, needs_reviewers: true, message: 'Nobody who can review was @mentioned (you and the listener account do not count). Ask exactly: "Who should review this?" — they can reply in this thread @mentioning the reviewers and you. Do not create anything else.' };
   }
 

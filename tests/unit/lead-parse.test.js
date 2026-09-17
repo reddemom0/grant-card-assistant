@@ -31,6 +31,14 @@ describe('leadIntent', () => {
     expect(leadIntent(null)).toBeNull();
   });
 
+  test('being asked outright is a lead, details or not — they may be in the message before', () => {
+    expect(leadIntent('triage this lead')).toBe('lead');
+    expect(leadIntent('triage this')).toBe('lead');
+    expect(leadIntent('can you look at this lead')).toBe('lead');
+    // Still not a question about a lead we already have.
+    expect(leadIntent('what did we decide about that lead?')).toBeNull();
+  });
+
   test('a question with details and a cue is still a lead', () => {
     // "called in" plus a number is a lead even when the sentence ends in "?".
     expect(leadIntent('Sarah called in on 604-555-1212 — can someone call her back?')).toBe('lead');

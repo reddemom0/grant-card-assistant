@@ -30,7 +30,7 @@ import { FOUNDATION_ACTIONS, markCardReply } from './registry.js';
 import { postMessage, patchCard } from './chat-api.js';
 import { renderCard, rerenderCard, tellPresser } from './update.js';
 import { notifyImmediate } from './notify.js';
-import { resolvePerson, timeZoneFor, localClock, realPeople, isListenerChatUser } from './people.js';
+import { resolvePerson, timeZoneFor, localClock, realPeople, splitMentions, isListenerChatUser } from './people.js';
 import { trackedCard, paragraph, button, esc, clip, threadLink, messageLink, mdToPlain, textToCardHtml, dialogsEnabled } from './render.js';
 import { detectShape, isFeedbackAsk, parseDueDate, pickHolder, typedCommand } from './track-parse.js';
 import { suggestBall, draftDecision } from './track-suggest.js';
@@ -39,6 +39,8 @@ import { readThread, readAsk, listSpaceHumans, storedCopyLive, normalizeMessage 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const QUIET_AFTER_DAYS = 3;
 export const CLIENT_NUDGE_AFTER_DAYS = 5;
+/** How recent a message has to be to be taken as the ask, outside a DM. */
+export const SUBJECT_MAX_AGE_MS = 30 * 60 * 1000;
 const TITLE_CHARS = 100;
 const TEXT_CHARS = 1000;
 const SUMMARY_RESPONSE_CHARS = 150;
@@ -82,6 +84,16 @@ export const TYPED_HINTS = {
 };
 
 const HOW_TO = 'Use /track (or "@Oracle track this") as a reply in the thread you want tracked.';
+
+/**
+ * @mentioning Oracle and nobody else is a common slip. Repeating "who?" reads
+ * as if the mention was never seen, so the answer says whose name it was.
+ */
+const ONLY_ORACLE = {
+  pass: 'That’s my own account — @mention the person you want to pass it to.',
+  remove: 'That’s my own account — @mention the people you want off the list.',
+  promise: 'That’s my own account — @mention whoever promised.'
+};
 
 const BUSY = {
   refresh: 'Reading the thread…',
@@ -199,14 +211,40 @@ export async function createTrack({
   }
 
   let ask = read.ask;
+  let subjectFrom = 'thread';
   if (ask.name && ask.name === commandMessageName) {
-    // The command started its own thread: there is nothing above it to track.
+    // The trigger started its own thread, which a DM does for every message: it
+    // is the thread's first message, so there is nothing above it to track.
     const words = String(askText || '').trim();
-    if (!words) {
-      await reply(HOW_TO);
-      return done({ ok: false, code: 'no_ask' });
+    if (words) {
+      ask = { ...ask, text: words, mentions: ask.mentions, mentionsAll: ask.mentionsAll };
+    } else {
+      // Fall back to what was said just before, in this conversation.
+      const { findSubject, confirmSubject } = await import('./subject.js');
+      const found = await findSubject({
+        spaceName,
+        threadName,
+        userIds: [userId, offer?.owner_user_id],
+        triggerMessageName: commandMessageName,
+        // Anything a person actually said is a possible ask; "ok" and "thanks"
+        // are not.
+        looksRight: (text) => String(text).trim().split(/\s+/).length >= 3,
+        // In a DM the conversation is one thing; in a space the message before
+        // the command may be about something else, so only a recent one counts.
+        maxAgeMs: surface === 'chat_dm' ? Infinity : SUBJECT_MAX_AGE_MS,
+        now
+      });
+      if (!found.ok || !found.text) {
+        await reply(HOW_TO);
+        return done({ ok: false, code: 'no_ask' });
+      }
+      if (!found.sure) {
+        await reply(confirmSubject('message', found.text));
+        return done({ ok: false, code: 'ask_unclear' });
+      }
+      ask = found.message;
+      subjectFrom = found.from;
     }
-    ask = { ...ask, text: words, mentions: ask.mentions, mentionsAll: ask.mentionsAll };
   }
 
   const askedBy = ask.senderType === 'BOT' || !ask.senderChatId
@@ -294,7 +332,7 @@ export async function createTrack({
     ok: true,
     code: null,
     card,
-    stats: `, shape: ${shape}, holder: ${holder ? 'yes' : 'no'}, people: ${everyone.length}, due: ${due ? 'yes' : 'no'}`
+    stats: `, shape: ${shape}, holder: ${holder ? 'yes' : 'no'}, people: ${everyone.length}, due: ${due ? 'yes' : 'no'}, subject: ${subjectFrom}`
   });
 }
 
@@ -702,7 +740,19 @@ export async function handleTrackMessage({ evt, user, conversationId, messageTex
   const card = await store.findLiveCard('track', threadName);
   if (!isLive(card)) return false;
 
-  const people = await realPeople(evt.mentions || [], user.id);
+  const { people, oracle } = await splitMentions(evt.mentions || [], user.id);
+  // Oracle named as a person: in a space the first @mention is how it was
+  // addressed, so a second is the slip; in a DM the first already is.
+  const namedOracle = (evt.appMentions || 0) > (evt.isDm ? 0 : 1);
+  // Every name in the message was mine: say so rather than asking again.
+  if (!people.length && (oracle || namedOracle) && ONLY_ORACLE[cmd.kind]) {
+    const { finishPress } = await import('./actions.js');
+    await finishPress(card, trackCard, actor, TYPED_ACTIONS[cmd.kind],
+      { changed: false, ignored: 'only_oracle', reply: ONLY_ORACLE[cmd.kind] }, now);
+    if (conversationId) markCardReply(conversationId);
+    return true;
+  }
+
   let outcome;
   switch (cmd.kind) {
     case 'decision': outcome = await applyDecision(card, actor, cmd.text, now); break;

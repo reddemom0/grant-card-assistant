@@ -30,7 +30,7 @@ import { FOUNDATION_ACTIONS, markCardReply } from './registry.js';
 import { postMessage } from './chat-api.js';
 import { renderCard, rerenderCard, tellPresser } from './update.js';
 import { notifyImmediate } from './notify.js';
-import { resolvePerson, timeZoneFor, realPeople, DEFAULT_TZ } from './people.js';
+import { resolvePerson, timeZoneFor, splitMentions, DEFAULT_TZ } from './people.js';
 import { trackedCard, paragraph, button, esc, clip, threadLink, mdToPlain } from './render.js';
 import { readThread } from './track-thread.js';
 import {
@@ -75,6 +75,9 @@ export const TYPED_HINTS = {
 
 const HOW_TO = 'Use /meet as a reply in a thread, and @mention whoever should be on the call — for example "@Oracle find 45 min with @Nat this week".';
 const NO_PEOPLE = 'Who should be on the call? @mention them and I’ll find a time.';
+// @mentioning Oracle and nobody else is a common slip. Asking the same question
+// again reads as if the mention was never seen.
+const ONLY_ORACLE = 'That’s my own account — @mention the people you want on the call.';
 
 const BUSY = {
   slots: 'Checking calendars…',
@@ -132,7 +135,7 @@ function topicFrom(text, fallback = 'Call') {
 export async function createMeet({
   trigger, actor, userId = null, spaceName, threadName, surface = 'chat_space',
   conversationId = null, messageText = '', messageName = null, invitees = [],
-  trackCardId = null, now = new Date()
+  trackCardId = null, namedOracle = false, now = new Date()
 }) {
   const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor.chatUserId, text });
   const done = (result) => {
@@ -156,10 +159,13 @@ export async function createMeet({
     return done({ ok: false, code: 'already_there' });
   }
 
-  const people = await realPeople(invitees.filter(p => p.chatUserId !== actor.chatUserId), userId);
+  const named = invitees.filter(p => p.chatUserId !== actor.chatUserId);
+  const { people, oracle } = await splitMentions(named, userId);
   if (!people.length) {
-    await reply(NO_PEOPLE);
-    return done({ ok: false, code: 'no_invitees' });
+    // Oracle's own name, or the listener account's, is not an invitee.
+    const onlyOracle = namedOracle || (oracle > 0 && oracle === named.length);
+    await reply(onlyOracle ? ONLY_ORACLE : NO_PEOPLE);
+    return done({ ok: false, code: onlyOracle ? 'only_oracle' : 'no_invitees' });
   }
 
   const requester = await resolvePerson(actor.chatUserId, { email: actor.email, displayName: actor.name, userId });
@@ -904,6 +910,9 @@ export async function handleMeetMessage({ evt, user, conversationId, messageText
     surface: evt.isDm ? 'chat_dm' : 'chat_space',
     conversationId, messageText, messageName: evt.messageName,
     invitees: (evt.mentions || []).map(m => ({ chatUserId: m.chatUserId, name: m.displayName || m.name || null })),
+    // In a space one @mention of Oracle is how it was addressed; a second is
+    // Oracle named as someone to invite. In a DM the first already is.
+    namedOracle: (evt.appMentions || 0) > (evt.isDm ? 0 : 1),
     now
   });
   return true;

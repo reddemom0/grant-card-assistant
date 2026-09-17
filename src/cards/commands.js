@@ -43,6 +43,13 @@ export const WATCH_COMMAND_ID = String(process.env.CHAT_WATCH_COMMAND_ID || '3')
 export const HELP_COMMAND_ID = String(process.env.CHAT_HELP_COMMAND_ID || '4');
 export const REVIEW_COMMAND_ID = String(process.env.CHAT_REVIEW_COMMAND_ID || '5');
 
+/** Google Doc ids in a message, for a review request found above the command. */
+function docLinks(text) {
+  const ids = [...String(text || '').matchAll(/docs\.google\.com\/document\/d\/([\w-]{10,})/g)].map(m => m[1]);
+  // The shape the review card reads (mergeDocIds): { fileId }.
+  return [...new Set(ids)].map(fileId => ({ fileId }));
+}
+
 function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
 }
@@ -169,24 +176,14 @@ async function runMeetCommand(evt, deps) {
 async function runWatchCommand(evt, deps) {
   const found = await commandActor(evt, deps, '/watch');
   if (!found.ok) return;
-  // The post being watched is the one above the command in the thread; the card
-  // reads it as the person who typed the command.
-  let postText = '';
-  if (found.threadName) {
-    try {
-      const { readAsk } = await import('./track-thread.js');
-      const read = await readAsk({ spaceName: found.spaceName, threadName: found.threadName, userIds: [found.user.id] });
-      if (read.ok && read.ask?.name !== evt.messageName) postText = String(read.ask?.text || '');
-    } catch (err) {
-      console.warn(`⚠️  /watch post read failed — code: ${codeOf(err)}`);
-    }
-  }
+  // The post being watched — the one above the command, or the last thing said
+  // in a DM — is read inside startWatch's background step, as the person who
+  // typed the command.
   await startWatch({
     trigger: 'command',
     actor: found.actor, userId: found.user.id,
     spaceName: found.spaceName, threadName: found.threadName, surface: found.surface,
     messageText: String(evt.text || '').replace(/^\s*\/watch\b/i, '').trim(),
-    postText,
     messageName: evt.messageName
   });
 }
@@ -208,6 +205,37 @@ async function runReviewCommand(evt, deps) {
     return;
   }
 
+  // In a DM every message is its own thread, so /review has nothing above it:
+  // the request — and its Doc links — are in what was said just before.
+  let subject = null;
+  try {
+    const { findSubject, confirmSubject } = await import('./subject.js');
+    const looksRight = (text) => /docs\.google\.com|\breview\b/i.test(String(text));
+    const seen = await findSubject({
+      spaceName: found.spaceName,
+      threadName: found.threadName,
+      userIds: [found.user.id],
+      triggerMessageName: evt.messageName,
+      looksRight,
+      maxAgeMs: found.surface === 'chat_dm' ? Infinity : 30 * 60 * 1000
+    });
+    if (seen.ok && seen.text && seen.from === 'recent') {
+      if (!seen.sure) {
+        await postMessage({
+          spaceName: found.spaceName,
+          threadName: found.threadName,
+          text: confirmSubject('review request', seen.text),
+          privateTo: found.surface === 'chat_dm' ? null : found.actor.chatUserId
+        });
+        console.log('🗂️  /review — result: subject_unclear');
+        return;
+      }
+      subject = seen;
+    }
+  } catch (err) {
+    console.warn(`⚠️  /review subject read failed — code: ${codeOf(err)}`);
+  }
+
   try {
     const [{ conversationIdForEvent }, { createConversation }, { trackReview }] = await Promise.all([
       import('../api/chat-google.js'),
@@ -226,10 +254,12 @@ async function runReviewCommand(evt, deps) {
         spaceDisplayName: evt.spaceDisplayName || null,
         senderChatId: found.actor.chatUserId,
         senderDisplayName: found.actor.name,
-        messageName: evt.messageName,
+        // The request's own message, when it was found above the command, so the
+        // review card attaches to it and its Doc links are the ones reviewed.
+        messageName: subject?.message?.name || evt.messageName,
         threadName: found.threadName,
-        mentions: evt.mentions || [],
-        driveFiles: [],
+        mentions: (subject?.message?.mentions?.length ? subject.message.mentions : evt.mentions) || [],
+        driveFiles: docLinks(subject?.text),
         // Deliberately empty: /review never counts as "they clearly asked", so
         // the card is always the question with a button, never a guess.
         messageText: ''

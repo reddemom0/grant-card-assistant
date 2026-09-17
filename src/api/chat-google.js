@@ -181,6 +181,7 @@ export function normalizeChatEvent(body) {
     appCommandId: null,
     mentions: [],
     mentionsAll: false,
+    appMentions: 0,
     driveFiles: [],
     isDialogEvent: false,
     dialogEventType: null,
@@ -277,6 +278,13 @@ export function normalizeChatEvent(body) {
     mentions: readMentions(message),
     // @all is not a person: it never becomes a reviewer or a holder.
     mentionsAll: (message?.annotations || []).some(a => a?.userMention?.user?.name === 'users/all'),
+    // How many times an app was @mentioned. readMentions drops these, because
+    // an app is never a reviewer or an invitee — but a card still needs to tell
+    // "they addressed me" from "they named me as a participant". In a space
+    // every "@Oracle …" carries one; a second is Oracle named as a person, and
+    // in a DM, where no mention is needed to be heard, even the first is.
+    appMentions: (message?.annotations || [])
+      .filter(a => a?.type === 'USER_MENTION' && a.userMention?.user?.type === 'BOT').length,
     driveFiles: readDriveFiles(message),
     // Card dialogs (add-on Developer Preview; used only when TRACK_DIALOGS_ENABLED).
     isDialogEvent: payload.isDialogEvent === true,

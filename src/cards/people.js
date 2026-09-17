@@ -102,15 +102,39 @@ const APP_DISPLAY_NAME = /^oracle$/i;
  * @param {number} [lookupAsUserId] - Hub user to impersonate for the directory
  */
 export async function realPeople(candidates = [], lookupAsUserId = null) {
-  const out = [];
+  return (await splitMentions(candidates, lookupAsUserId)).people;
+}
+
+/**
+ * The same filter as realPeople, but saying what it dropped — so a card can
+ * tell "you named nobody" from "the only name you gave was mine". @mentioning
+ * Oracle and nobody else is a common slip, and repeating "who should be on the
+ * call?" reads as if the mention was not seen at all.
+ *
+ * @returns {Promise<{people: Array, oracle: number, all: number}>}
+ */
+export async function splitMentions(candidates = [], lookupAsUserId = null) {
+  const people = [];
+  let oracle = 0;
+  let all = 0;
   for (const c of candidates) {
-    if (!isChatUserId(c?.chatUserId) || c.chatUserId === 'users/all') continue;
+    if (!isChatUserId(c?.chatUserId)) continue;
+    if (c.chatUserId === 'users/all') {
+      all++;
+      continue;
+    }
     const person = await resolvePerson(c.chatUserId, { displayName: c.displayName, lookupAsUserId });
-    if (isListenerEmail(person?.email)) continue;
-    if (!person?.email && APP_DISPLAY_NAME.test(String(c.displayName || '').trim())) continue;
-    out.push(c);
+    if (isListenerEmail(person?.email)) {
+      oracle++;
+      continue;
+    }
+    if (!person?.email && APP_DISPLAY_NAME.test(String(c.displayName || '').trim())) {
+      oracle++;
+      continue;
+    }
+    people.push(c);
   }
-  return out;
+  return { people, oracle, all };
 }
 
 /** Is whoever pressed a button the listener account? Stored data only — no lookups. */

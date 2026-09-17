@@ -313,10 +313,111 @@ describe('starting to track', () => {
     expect(logged()).toContain('Track card posted — trigger: command, shape: one, holder: yes, people: 0, due: yes');
   });
 
-  test('/track typed as a new message has nothing above it to track: a private how-to', async () => {
+  test('/track typed as a new message: the nearest message is quoted back, not tracked', async () => {
     const name = `${SPACE}/messages/cmd-top`;
     setThread([chatMessage({ id: 'cmd-top', sender: CHRIS, text: '/track' })], `${SPACE}/threads/TOP`);
     await command({ thread: `${SPACE}/threads/TOP`, name });
+
+    // The only other message in the space is from another thread and hours old,
+    // so it is a guess — and a guess is quoted, never acted on.
+    expect(fakes.db.cards.size).toBe(0);
+    expect(privateReplies()).toHaveLength(1);
+    const [[to, asked]] = privateReplies();
+    expect(to).toBe(CHRIS);
+    expect(asked).toContain('Which message did you mean?');
+    expect(asked).toContain(`“${ASK_TEXT}”`);
+  });
+
+  test('in a DM, /track takes the ask from the message before it', async () => {
+    const DM = 'spaces/DM-CHRIS';
+    const dmThread = `${DM}/threads/d9`;
+    // A DM gives each message its own thread, so the command IS its thread's first.
+    fakes.userChat.threads.set(`${DM}/threads/d1`, [{
+      name: `${DM}/messages/ask`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: 'I still need the industry list from Jason before Friday',
+      annotations: [],
+      createTime: new Date(Date.now() - 60_000).toISOString(),
+      thread: { name: `${DM}/threads/d1` }
+    }]);
+    fakes.userChat.threads.set(dmThread, [{
+      name: `${DM}/messages/cmd-dm`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: '/track',
+      annotations: [],
+      createTime: new Date().toISOString(),
+      thread: { name: dmThread }
+    }]);
+
+    await post({
+      chat: {
+        user: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+        appCommandPayload: {
+          appCommandMetadata: { appCommandId: 1, appCommandType: 'SLASH_COMMAND' },
+          message: {
+            name: `${DM}/messages/cmd-dm`, text: '/track', argumentText: '',
+            sender: { name: CHRIS, displayName: NAMES[CHRIS], email: EMAILS[CHRIS], type: 'HUMAN' },
+            thread: { name: dmThread }
+          },
+          space: { name: DM, type: 'DM' }
+        }
+      }
+    });
+    await whenCardsIdle();
+
+    const card = await liveCard();
+    expect(card.space_name).toBe(DM);
+    expect(card.title).toBe('I still need the industry list from Jason before Friday');
+    expect(card.data.surface).toBe('chat_dm');
+    // Posted in the DM, as a card, with nothing else said.
+    expect(cardPosts().filter(p => p.spaceName === DM)).toHaveLength(1);
+    expect(privateReplies()).toEqual([]);
+  });
+
+  test('in a DM with two things said just before, the nearest is quoted and confirmed', async () => {
+    const DM = 'spaces/DM-CHRIS';
+    const dmThread = `${DM}/threads/d9`;
+    const msg = (id, text, secondsAgo, thread) => {
+      fakes.userChat.threads.set(thread, [{
+        name: `${DM}/messages/${id}`,
+        sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+        text,
+        annotations: [],
+        createTime: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+        thread: { name: thread }
+      }]);
+    };
+    msg('older', 'can someone chase the BCAFE numbers', 300, `${DM}/threads/d1`);
+    msg('newer', 'and the industry list is still outstanding', 60, `${DM}/threads/d2`);
+    msg('cmd-dm', '/track', 0, dmThread);
+
+    await post({
+      chat: {
+        user: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+        appCommandPayload: {
+          appCommandMetadata: { appCommandId: 1, appCommandType: 'SLASH_COMMAND' },
+          message: {
+            name: `${DM}/messages/cmd-dm`, text: '/track', argumentText: '',
+            sender: { name: CHRIS, displayName: NAMES[CHRIS], email: EMAILS[CHRIS], type: 'HUMAN' },
+            thread: { name: dmThread }
+          },
+          space: { name: DM, type: 'DM' }
+        }
+      }
+    });
+    await whenCardsIdle();
+
+    expect(fakes.db.cards.size).toBe(0);
+    const asked = fakes.chat.posts.map(p => p.text || '').find(t => /Which message did you mean/.test(t));
+    expect(asked).toContain('“and the industry list is still outstanding”');
+  });
+
+  test('/track typed as a new message with nothing else in the space: the how-to', async () => {
+    const name = `${SPACE}/messages/cmd-top`;
+    fakes.userChat.threads.clear();
+    setThread([chatMessage({ id: 'cmd-top', sender: CHRIS, text: '/track' })], `${SPACE}/threads/TOP`);
+    await command({ thread: `${SPACE}/threads/TOP`, name });
+
     expect(fakes.db.cards.size).toBe(0);
     expect(privateReplies()).toEqual([[CHRIS, 'Use /track (or "@Oracle track this") as a reply in the thread you want tracked.']]);
   });
@@ -588,6 +689,34 @@ describe('moving the ball', () => {
     await whenCardsIdle();
     expect([...fakes.db.cards.values()].filter(c => c.card_type === 'meet')).toHaveLength(1);
     expect(privateReplies()).toEqual([[NAT, 'There’s already a meeting card in this thread.']]);
+  });
+
+  test('"pass to @Oracle" says whose account that is, and the ball does not move', async () => {
+    await command();
+    const card = await liveCard();
+
+    // Two Oracle annotations: the one that addresses it, and Oracle as the target.
+    await say({ text: 'pass to @Oracle', sender: NAT, mentions: ['users/app'] });
+
+    const after = await liveCard();
+    expect(after.data.ball).toMatchObject({ state: 'person', holder: { chatUserId: JASON } });
+    expect(privateReplies()).toEqual([[NAT, 'That’s my own account — @mention the person you want to pass it to.']]);
+    expect(fakes.db.clicks.filter(c => c.result === 'only_oracle')).toHaveLength(1);
+  });
+
+  test('"pass to @<listener>" is the same slip, with the same answer', async () => {
+    await command();
+    await say({ text: 'pass to @Oracle', sender: NAT, mentions: [LISTENER] });
+
+    expect((await liveCard()).data.ball).toMatchObject({ holder: { chatUserId: JASON } });
+    expect(privateReplies().some(([, t]) => /That’s my own account/.test(t))).toBe(true);
+  });
+
+  test('"remove @Oracle" says the same, about the list', async () => {
+    await command();
+    await say({ text: 'remove @Oracle', sender: NAT, mentions: ['users/app'] });
+
+    expect(privateReplies()).toEqual([[NAT, 'That’s my own account — @mention the people you want off the list.']]);
   });
 
   test('Someone promised… (typed): holder and date', async () => {

@@ -46,6 +46,8 @@ const TITLE_CHARS = 80;
 const NOTE_CHARS = 600;
 const DRAFT_CHARS = 3500;
 export const UNASSIGNED_NUDGE_AFTER_DAYS = 1;
+/** How recent a message has to be to be taken as the lead, outside a DM. */
+export const SUBJECT_MAX_AGE_MS = 30 * 60 * 1000;
 
 const DISPLAY_TZ = process.env.DEFAULT_TIMEZONE || 'America/Vancouver';
 
@@ -150,8 +152,9 @@ function leadLabel(lead = {}) {
  */
 export async function createLead({
   trigger, actor, userId = null, spaceName, threadName, surface = 'chat_space',
-  conversationId = null, messageText = '', messageName = null, now = new Date()
+  conversationId = null, messageText: triggerText = '', messageName = null, now = new Date()
 }) {
+  let messageText = triggerText;
   const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor.chatUserId, text });
   const done = (result) => {
     if (conversationId) markCardReply(conversationId);
@@ -171,10 +174,37 @@ export async function createLead({
   }
   const offer = existing;
 
-  const lead = extractLead(messageText);
+  let lead = extractLead(messageText);
+  let subjectFrom = 'message';
   if (!lead.email && !lead.phone) {
-    await reply('I couldn’t see an email address or phone number in that message, so there’s nothing to look up yet.');
-    return done({ ok: false, code: 'no_details' });
+    // Nothing in the message itself: the details were probably in what came
+    // just before — in a DM, or pasted above the "@Oracle triage this".
+    const { findSubject, confirmSubject } = await import('./subject.js');
+    const found = await findSubject({
+      spaceName,
+      threadName,
+      userIds: [userId],
+      triggerMessageName: messageName,
+      looksRight: (text) => {
+        const seen = extractLead(text);
+        return Boolean(seen.email || seen.phone);
+      },
+      maxAgeMs: surface === 'chat_dm' ? Infinity : SUBJECT_MAX_AGE_MS,
+      now
+    });
+    const seen = found.ok && found.text ? extractLead(found.text) : {};
+
+    if (!found.ok || !(seen.email || seen.phone)) {
+      await reply('I couldn’t see an email address or phone number in that message, so there’s nothing to look up yet.');
+      return done({ ok: false, code: 'no_details' });
+    }
+    if (!found.sure) {
+      await reply(confirmSubject('lead', found.text));
+      return done({ ok: false, code: 'lead_unclear' });
+    }
+    lead = seen;
+    messageText = [messageText, found.text].filter(Boolean).join('\n');
+    subjectFrom = found.from;
   }
 
   const data = {
@@ -232,7 +262,7 @@ export async function createLead({
     ok: true,
     code: null,
     card,
-    stats: `, details: ${[lead.email && 'email', lead.phone && 'phone'].filter(Boolean).join('+') || 'none'}`
+    stats: `, details: ${[lead.email && 'email', lead.phone && 'phone'].filter(Boolean).join('+') || 'none'}, subject: ${subjectFrom}`
   });
 }
 

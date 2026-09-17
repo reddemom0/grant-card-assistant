@@ -24,6 +24,8 @@ import { listHumanMembers } from './chat-api.js';
 import { realPeople } from './people.js';
 
 const MAX_THREAD_MESSAGES = 100;
+/** How far back to look when a thread cannot say what a card is about. */
+export const RECENT_MESSAGES = 5;
 
 function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
@@ -127,6 +129,45 @@ export async function readThread({ spaceName, threadName, userIds = [], pageSize
     }
   }
   console.warn(`⚠️  Track thread read failed — code: ${code}`);
+  return { ok: false, code };
+}
+
+/**
+ * The newest messages in a space or DM, newest first — for the case a thread
+ * cannot answer: a DM where every message is its own thread, or a trigger that
+ * started the thread it is in. Read as the person who asked, like readThread.
+ *
+ * @param {Object} p
+ * @param {string} p.spaceName
+ * @param {number[]} p.userIds - whose grant to try, in order
+ * @param {number} [p.limit]
+ * @returns {Promise<{ok: true, via: 'user', messages: Object[]}|{ok: false, code: string}>}
+ */
+export async function readRecent({ spaceName, userIds = [], limit = RECENT_MESSAGES }) {
+  const wanted = Math.min(Math.max(1, limit), MAX_THREAD_MESSAGES);
+  let code = 'no_user';
+  for (const userId of [...new Set(userIds.filter(Boolean))]) {
+    try {
+      if (!(await hasChatScopes(userId)).ok) {
+        code = 'needs_reconsent';
+        continue;
+      }
+      const chat = await userChat(userId);
+      const res = await chat.spaces.messages.list({
+        parent: spaceName,
+        pageSize: wanted,
+        orderBy: 'createTime desc'
+      });
+      const messages = (res.data?.messages || []).map(normalizeMessage);
+      await fillNames(messages, userId);
+      // Newest first, whatever the API returned in.
+      messages.sort((a, b) => new Date(b.at || 0) - new Date(a.at || 0));
+      return { ok: true, via: 'user', messages: messages.slice(0, wanted) };
+    } catch (err) {
+      code = isInsufficientScopeError(err) ? 'needs_reconsent' : `read_failed_${codeOf(err)}`;
+    }
+  }
+  console.warn(`⚠️  Recent message read failed — code: ${code}`);
   return { ok: false, code };
 }
 

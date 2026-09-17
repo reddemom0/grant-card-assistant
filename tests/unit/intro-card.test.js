@@ -35,7 +35,8 @@ const EMAILS = { [CHRIS]: 'chris.sentinel@granted.ca', [NAT]: 'nat.sentinel@gran
 const HUB = [{ id: 3, chat: CHRIS }, { id: 1, chat: NAT }].map(u => ({
   id: u.id, email: EMAILS[u.chat], name: NAMES[u.chat], is_active: true,
   google_refresh_token: 'rt',
-  google_granted_scopes: 'https://www.googleapis.com/auth/chat.messages.readonly',
+  // Both Chat scopes: /review reads the conversation to find the request.
+  google_granted_scopes: 'https://www.googleapis.com/auth/chat.messages.readonly https://www.googleapis.com/auth/chat.spaces.readonly',
   chat_user_id: u.chat
 }));
 
@@ -422,6 +423,48 @@ describe('/review', () => {
     expect(fakes.messages.conversations.map(c => c.id)).toContain(offer.conversation_id);
     expect(cardText(cardPosts().at(-1).cardsV2)).toContain('Track this as a review?');
     expect(fakes.agent.calls).toHaveLength(0);
+  });
+
+  test('in a DM it takes the review request from the message before it', async () => {
+    const DM_THREAD = `${DM}/threads/d9`;
+    fakes.userChat.threads.set(`${DM}/threads/d1`, [{
+      name: `${DM}/messages/req`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: 'Can you review the Acme RTRI draft? https://docs.google.com/document/d/DOC1abcdefghij/edit',
+      annotations: [],
+      createTime: new Date(Date.now() - 60_000).toISOString(),
+      thread: { name: `${DM}/threads/d1` }
+    }]);
+
+    await command({ commandId: REVIEW_COMMAND_ID, text: '/review', space: DM, thread: DM_THREAD, type: 'DM' });
+
+    const offer = [...fakes.db.cards.values()].find(c => c.card_type === 'review');
+    expect(offer).toMatchObject({ status: 'offered', space_name: DM });
+    // The request's own message and its Doc are what the card carries.
+    expect(offer.source_message_name).toBe(`${DM}/messages/req`);
+    expect(offer.data.docIds).toEqual(['DOC1abcdefghij']);
+  });
+
+  test('in a DM with two review requests, the nearest is quoted and confirmed', async () => {
+    const DM_THREAD = `${DM}/threads/d9`;
+    const msg = (id, text, secondsAgo, thread) => {
+      fakes.userChat.threads.set(thread, [{
+        name: `${DM}/messages/${id}`,
+        sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+        text,
+        annotations: [],
+        createTime: new Date(Date.now() - secondsAgo * 1000).toISOString(),
+        thread: { name: thread }
+      }]);
+    };
+    msg('older', 'review the BCAFE one when you can https://docs.google.com/document/d/DOColdabcdefg/edit', 300, `${DM}/threads/d1`);
+    msg('newer', 'and please review https://docs.google.com/document/d/DOCnewabcdefg/edit too', 60, `${DM}/threads/d2`);
+
+    await command({ commandId: REVIEW_COMMAND_ID, text: '/review', space: DM, thread: DM_THREAD, type: 'DM' });
+
+    expect([...fakes.db.cards.values()]).toHaveLength(0);
+    const asked = fakes.chat.posts.map(p => p.text || '').find(t => /Which review request did you mean/.test(t));
+    expect(asked).toContain('DOCnewabcdefg');
   });
 
   test('outside a thread it says where to use it', async () => {
