@@ -25,7 +25,8 @@ const CARD_FIELDS = {
   closedAt: 'closed_at',
   closedReason: 'closed_reason',
   lastRefreshedAt: 'last_refreshed_at',
-  completedAt: 'completed_at'
+  completedAt: 'completed_at',
+  dueAt: 'due_at'
 };
 
 // ============================================================================
@@ -79,6 +80,27 @@ export async function updateCard(id, fields) {
     sets.push(`${column} = $${params.length}`);
   }
   if (sets.length === 0) return getCard(id);
+  const r = await query(
+    `UPDATE tracked_cards SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $1 RETURNING *`,
+    params
+  );
+  return r.rows[0] || null;
+}
+
+/**
+ * Merge top-level keys into a card's data, atomically: presses, refreshes, typed
+ * commands and the listened-space hook can all write the same card, and a
+ * read-modify-write would lose one of them. Other CARD_FIELDS may be set too.
+ */
+export async function patchCardData(id, patch, fields = {}) {
+  const sets = ['data = data || $2::jsonb'];
+  const params = [id, JSON.stringify(patch || {})];
+  for (const [key, value] of Object.entries(fields)) {
+    const column = CARD_FIELDS[key];
+    if (!column || key === 'data') throw new Error(`patchCardData: unknown field ${key}`);
+    params.push(value);
+    sets.push(`${column} = $${params.length}`);
+  }
   const r = await query(
     `UPDATE tracked_cards SET ${sets.join(', ')}, updated_at = NOW() WHERE id = $1 RETURNING *`,
     params
@@ -144,6 +166,97 @@ export async function closeStaleBefore(cutoff, at = new Date()) {
   return r.rows;
 }
 
+/** Live cards of one type. */
+export async function liveCardsOfType(cardType) {
+  const r = await query(
+    `SELECT * FROM tracked_cards WHERE card_type = $1 AND status IN ('open', 'stale') ORDER BY created_at`,
+    [cardType]
+  );
+  return r.rows;
+}
+
+/** Open or stale cards of any type in one thread. */
+export async function liveCardsInThread(threadName) {
+  const r = await query(
+    `SELECT * FROM tracked_cards WHERE thread_name = $1 AND status IN ('open', 'stale') ORDER BY created_at`,
+    [threadName]
+  );
+  return r.rows;
+}
+
+/** Set (or clear) a card's due date; both "already sent" markers start over. */
+export async function setDue(id, dueAt) {
+  const r = await query(
+    `UPDATE tracked_cards
+     SET due_at = $2, due_reminded_at = NULL, due_summary_sent_at = NULL, updated_at = NOW()
+     WHERE id = $1 RETURNING *`,
+    [id, dueAt]
+  );
+  return r.rows[0] || null;
+}
+
+/** Live track cards due before `until`. */
+export async function dueTrackCards(until) {
+  const r = await query(
+    `SELECT * FROM tracked_cards
+     WHERE card_type = 'track' AND status IN ('open', 'stale')
+       AND due_at IS NOT NULL AND due_at <= $1
+     ORDER BY due_at`,
+    [until]
+  );
+  return r.rows;
+}
+
+/** Claim the due-today reminder. True only for the first caller. */
+export async function claimDueReminder(id, at = new Date()) {
+  const r = await query(
+    `UPDATE tracked_cards SET due_reminded_at = $2
+     WHERE id = $1 AND due_reminded_at IS NULL AND status IN ('open', 'stale')
+     RETURNING id`,
+    [id, at]
+  );
+  return r.rowCount > 0;
+}
+
+/** Claim the requester's due-date summary. True only for the first caller. */
+export async function claimDueSummary(id, at = new Date()) {
+  const r = await query(
+    `UPDATE tracked_cards SET due_summary_sent_at = $2
+     WHERE id = $1 AND due_summary_sent_at IS NULL AND status IN ('open', 'stale')
+     RETURNING id`,
+    [id, at]
+  );
+  return r.rowCount > 0;
+}
+
+/**
+ * Decisions recorded on track cards in one space, open or closed, most recent
+ * first. The text is what a person typed into the card.
+ */
+export async function decisionsForSpace(spaceName, since = null, until = null, limit = 50) {
+  const r = await query(
+    `SELECT id, space_name, thread_name, title, data->'decision' AS decision
+     FROM tracked_cards
+     WHERE space_name = $1 AND card_type = 'track'
+       AND data->'decision'->>'text' IS NOT NULL
+       AND ($2::timestamptz IS NULL OR (data->'decision'->>'at')::timestamptz >= $2)
+       AND ($3::timestamptz IS NULL OR (data->'decision'->>'at')::timestamptz <= $3)
+     ORDER BY (data->'decision'->>'at')::timestamptz DESC
+     LIMIT $4`,
+    [spaceName, since, until, limit]
+  );
+  return r.rows;
+}
+
+/** Delete cards closed before `cutoff` (participants and clicks go with them). */
+export async function purgeClosedBefore(cutoff) {
+  const r = await query(
+    `DELETE FROM tracked_cards WHERE status = 'closed' AND closed_at < $1`,
+    [cutoff]
+  );
+  return r.rowCount;
+}
+
 /** Live cards completed before `cutoff` close. Returns the rows changed. */
 export async function closeCompletedBefore(cutoff, at = new Date()) {
   const r = await query(
@@ -185,11 +298,13 @@ export async function closeOffersBefore(cutoff, at = new Date()) {
 
 /**
  * Add people to a card. An existing row keeps its status and mute setting;
- * only the display name is refreshed.
- * @param {Array<{chatUserId: string, role: string, displayName?: string}>} people
+ * only the display name is refreshed, and only a reviewer role replaces
+ * another. A reviewer starts not_started unless a status is given.
+ * @param {Array<{chatUserId: string, role: string, displayName?: string, status?: string}>} people
  */
 export async function addParticipants(cardId, people) {
   for (const p of people) {
+    const status = p.status ?? (p.role === 'reviewer' ? 'not_started' : null);
     await query(
       `INSERT INTO tracked_card_participants (card_id, chat_user_id, role, display_name, status, status_changed_at)
        VALUES ($1, $2, $3, $4, $5, CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END)
@@ -197,9 +312,33 @@ export async function addParticipants(cardId, people) {
          display_name = COALESCE(EXCLUDED.display_name, tracked_card_participants.display_name),
          role = CASE WHEN EXCLUDED.role = 'reviewer' THEN 'reviewer' ELSE tracked_card_participants.role END,
          status = COALESCE(tracked_card_participants.status, EXCLUDED.status)`,
-      [cardId, p.chatUserId, p.role, p.displayName || null, p.role === 'reviewer' ? 'not_started' : null]
+      [cardId, p.chatUserId, p.role, p.displayName || null, status]
     );
   }
+}
+
+/**
+ * Change ONE member's own checklist status (track, everyone shape). Returns
+ * false when the person has no member row on this card.
+ */
+export async function setMemberStatus(cardId, chatUserId, status, at = new Date()) {
+  const r = await query(
+    `UPDATE tracked_card_participants
+     SET status = $3, status_changed_at = $4
+     WHERE card_id = $1 AND chat_user_id = $2 AND role = 'member'`,
+    [cardId, chatUserId, status, at]
+  );
+  return r.rowCount > 0;
+}
+
+/** Take someone off a card. The owner cannot be removed. */
+export async function removeParticipant(cardId, chatUserId) {
+  const r = await query(
+    `DELETE FROM tracked_card_participants
+     WHERE card_id = $1 AND chat_user_id = $2 AND role <> 'owner'`,
+    [cardId, chatUserId]
+  );
+  return r.rowCount > 0;
 }
 
 export async function getParticipants(cardId) {

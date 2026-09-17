@@ -10,6 +10,8 @@
  *    idle days, so an old question never captures a new request.
  * 5. Completed cards close 7 days after completion at the latest (a card type
  *    may close one sooner — a review closes once its HubSpot note is settled).
+ * 6. Closed cards of every type are deleted 12 months after closing, like the
+ *    stored Chat copy.
  *
  * Refreshing does not count as activity; only people do.
  */
@@ -21,19 +23,20 @@ import { rerenderCard } from './update.js';
 export const STALE_AFTER_DAYS = 30;
 export const CLOSE_AFTER_STALE_DAYS = 14;
 export const CLOSE_AFTER_COMPLETED_DAYS = 7;
+export const DELETE_CLOSED_AFTER_DAYS = 365;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
 }
 
-async function refreshCards(cards) {
+async function refreshCards(cards, reason = 'daily') {
   const counts = { cards: 0, changed: 0, failed: 0 };
   for (const card of cards) {
     counts.cards++;
     try {
       const type = cardTypeOf(card);
-      const result = type?.refresh ? await type.refresh(card) : { changed: false };
+      const result = type?.refresh ? await type.refresh(card, { reason }) : { changed: false };
       if (result.changed) {
         counts.changed++;
         await rerenderCard(card.id);
@@ -57,7 +60,29 @@ export async function refreshLiveCards() {
  */
 export async function refreshCardsForConversation(conversationId) {
   if (!conversationId) return { cards: 0, changed: 0, failed: 0 };
-  return refreshCards(await store.liveCardsForConversation(conversationId));
+  return refreshCards(await store.liveCardsForConversation(conversationId), 'confirmation');
+}
+
+/**
+ * Someone wrote in a card's thread (an @Oracle message): that is activity, and
+ * a stale card becomes open again. Never throws.
+ */
+export async function touchCardsInThread(threadName, at = new Date()) {
+  if (!threadName) return 0;
+  let reopened = 0;
+  try {
+    for (const card of await store.liveCardsInThread(threadName)) {
+      if (!card?.id || !card.card_type) continue;
+      await store.touchActivity(card.id, at);
+      if (card.status === 'stale') {
+        reopened++;
+        await rerenderCard(card.id);
+      }
+    }
+  } catch (err) {
+    console.warn(`⚠️  Tracked card thread activity failed — code: ${codeOf(err)}`);
+  }
+  return reopened;
 }
 
 export async function applyLifecycle(now = new Date()) {
@@ -73,7 +98,9 @@ export async function applyLifecycle(now = new Date()) {
   const completed = await store.closeCompletedBefore(new Date(now.getTime() - CLOSE_AFTER_COMPLETED_DAYS * DAY_MS), now);
   for (const card of completed) await rerenderCard(card.id);
 
-  return { staled: staled.length, closed: closed.length, offersClosed: offers.length, completedClosed: completed.length };
+  const deleted = await store.purgeClosedBefore(new Date(now.getTime() - DELETE_CLOSED_AFTER_DAYS * DAY_MS));
+
+  return { staled: staled.length, closed: closed.length, offersClosed: offers.length, completedClosed: completed.length, deleted };
 }
 
 export async function runDailyCardPass(now = new Date()) {
@@ -82,7 +109,7 @@ export async function runDailyCardPass(now = new Date()) {
   console.log(
     `🗂️  Tracked cards daily pass — refreshed: ${refreshed.cards}, changed: ${refreshed.changed}, ` +
     `failed: ${refreshed.failed}, now stale: ${lifecycle.staled}, auto-closed: ${lifecycle.closed}, ` +
-    `offers closed: ${lifecycle.offersClosed}, completed closed: ${lifecycle.completedClosed}`
+    `offers closed: ${lifecycle.offersClosed}, completed closed: ${lifecycle.completedClosed}, deleted: ${lifecycle.deleted}`
   );
   return { refreshed, lifecycle };
 }

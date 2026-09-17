@@ -13,7 +13,7 @@
 import * as store from '../database/tracked-cards-store.js';
 import { resolvePerson, dmSpaceFor, timeZoneFor, localClock } from './people.js';
 import { postMessage } from './chat-api.js';
-import { cardTypeOf } from './types.js';
+import { cardTypeOf, allCardTypes } from './types.js';
 import { button, buttonRow, decorated, paragraph, esc, clip, threadLink, mdToPlain, finalizeCards } from './render.js';
 
 export const DIGEST_HOUR = 8;
@@ -21,8 +21,9 @@ export const DIGEST_HOUR = 8;
 /** The only reasons Oracle may DM someone straight away. */
 export const IMMEDIATE_KINDS = Object.freeze([
   'assigned',       // you were newly assigned to a card
-  'due_today',      // hook — no card type has due dates yet
+  'due_today',      // something you hold is due today (track card)
   'confirmation',   // an action you started is waiting for confirmation
+  'due_summary',    // your "everyone" ask is past its due date: one private summary (track card)
   'watched_grant'   // hook — watched-grant updates are not built yet
 ]);
 
@@ -69,18 +70,24 @@ const STATUS_WORDS = { not_started: 'Not started', reviewing: 'Reviewing', done:
  * A person's digest content: what waits on them, what they asked for, what went
  * quiet. A completed request appears in one digest only — the one dated
  * `localDate` if that digest showed it, otherwise the next one sent.
+ * Card types add their own lines through `digestItems` (`extras`): more
+ * "waiting on you" lines, and "needs a nudge" lines.
  */
-export async function buildDigest(chatUserId, localDate = null) {
+export async function buildDigest(chatUserId, localDate = null, now = new Date()) {
   const [waiting, requests, stale] = await Promise.all([
     store.waitingOn(chatUserId),
     store.ownedBy(chatUserId, ['open'], localDate),
     store.ownedBy(chatUserId, ['stale'], localDate)
   ]);
-  return { waiting, requests, stale };
+  const extras = [];
+  for (const type of allCardTypes()) {
+    if (type.digestItems) extras.push(...(await type.digestItems(chatUserId, { now, localDate })));
+  }
+  return { waiting, requests, stale, extras };
 }
 
 export function digestIsEmpty(d) {
-  return d.waiting.length === 0 && d.requests.length === 0 && d.stale.length === 0;
+  return d.waiting.length === 0 && d.requests.length === 0 && d.stale.length === 0 && !(d.extras || []).length;
 }
 
 function titleLink(card) {
@@ -97,14 +104,23 @@ export async function renderDigest(chatUserId, digest, localDate, notice = null)
   const sections = [];
   if (notice) sections.push({ widgets: [paragraph(`<i>${esc(notice)}</i>`)] });
 
-  if (digest.waiting.length) {
+  const extras = digest.extras || [];
+  const mute = (card) => button('Mute', { cardId: card.id, action: 'card.mute', from: 'digest' });
+  const waiting = [
+    ...digest.waiting.map(card => decorated({
+      text: titleLink(card),
+      bottom: `Your status: ${STATUS_WORDS[card.my_status] || 'Not started'}`,
+      buttonSpec: mute(card)
+    })),
+    ...extras.filter(i => i.section === 'waiting').map(i => decorated({ text: titleLink(i.card), bottom: i.text, buttonSpec: mute(i.card) }))
+  ];
+  if (waiting.length) sections.push({ header: 'Waiting on you', widgets: waiting });
+
+  const nudges = extras.filter(i => i.section === 'nudge');
+  if (nudges.length) {
     sections.push({
-      header: 'Waiting on you',
-      widgets: digest.waiting.map(card => decorated({
-        text: titleLink(card),
-        bottom: `Your status: ${STATUS_WORDS[card.my_status] || 'Not started'}`,
-        buttonSpec: button('Mute', { cardId: card.id, action: 'card.mute', from: 'digest' })
-      }))
+      header: 'Needs a nudge',
+      widgets: nudges.map(i => decorated({ text: titleLink(i.card), bottom: i.text, buttonSpec: mute(i.card) }))
     });
   }
 
@@ -163,7 +179,7 @@ export async function sendDueDigests(now = new Date()) {
       if (hour !== DIGEST_HOUR) { counts.notDue++; continue; }
       if (await store.digestSent(chatUserId, date)) { counts.alreadySent++; continue; }
 
-      const digest = await buildDigest(chatUserId, date);
+      const digest = await buildDigest(chatUserId, date, now);
       if (digestIsEmpty(digest)) { counts.empty++; continue; }
 
       const dm = await dmSpaceFor(person, now);
@@ -177,6 +193,11 @@ export async function sendDueDigests(now = new Date()) {
       await store.markCompletionShown(
         [...digest.requests, ...digest.stale].filter(c => c.completed_at).map(c => c.id), date
       );
+      // Nudges are shown in one digest each.
+      for (const type of allCardTypes()) {
+        const items = digest.extras.filter(i => i.card.card_type === type.type);
+        if (items.length && type.markDigestShown) await type.markDigestShown(items, date);
+      }
     } catch (err) {
       counts.failed++;
       console.warn(`⚠️  Tracked card digest failed — code: ${codeOf(err)}`);
@@ -188,4 +209,22 @@ export async function sendDueDigests(now = new Date()) {
     `already sent: ${counts.alreadySent}, empty: ${counts.empty}, no DM: ${counts.noDm}, failed: ${counts.failed}`
   );
   return counts;
+}
+
+/**
+ * Hourly, after the digests: due-date messages from card types that have them
+ * (the track card's due-today DM and due-date summary). Each claims its own
+ * "sent" marker first, so a repeat run sends nothing twice.
+ */
+export async function sendDueReminders(now = new Date()) {
+  const totals = {};
+  for (const type of allCardTypes()) {
+    if (!type.sendDueNotices) continue;
+    try {
+      Object.assign(totals, await type.sendDueNotices(now));
+    } catch (err) {
+      console.warn(`⚠️  Due reminders failed — type: ${type.type}, code: ${codeOf(err)}`);
+    }
+  }
+  return totals;
 }

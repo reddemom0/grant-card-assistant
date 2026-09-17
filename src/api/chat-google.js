@@ -181,7 +181,11 @@ export function normalizeChatEvent(body) {
     parameters: {},
     appCommandId: null,
     mentions: [],
-    driveFiles: []
+    mentionsAll: false,
+    driveFiles: [],
+    isDialogEvent: false,
+    dialogEventType: null,
+    formInputs: {}
   };
 
   if (!body || typeof body !== 'object') return base;
@@ -272,7 +276,13 @@ export function normalizeChatEvent(body) {
     parameters: readParameters(body.commonEventObject?.parameters),
     appCommandId: payload.appCommandMetadata?.appCommandId ?? null,
     mentions: readMentions(message),
-    driveFiles: readDriveFiles(message)
+    // @all is not a person: it never becomes a reviewer or a holder.
+    mentionsAll: (message?.annotations || []).some(a => a?.userMention?.user?.name === 'users/all'),
+    driveFiles: readDriveFiles(message),
+    // Card dialogs (add-on Developer Preview; used only when TRACK_DIALOGS_ENABLED).
+    isDialogEvent: payload.isDialogEvent === true,
+    dialogEventType: payload.dialogEventType || null,
+    formInputs: readFormInputs(body.commonEventObject?.formInputs)
   };
 }
 
@@ -285,13 +295,22 @@ function readParameters(raw) {
   return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, String(v ?? '')]));
 }
 
-/** People @mentioned in a message, excluding apps (Oracle itself). */
+/** Dialog form values: {name: [values]}. Values are never logged. */
+function readFormInputs(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  return Object.fromEntries(Object.entries(raw).map(([name, input]) => [
+    name,
+    (input?.stringInputs?.value || []).map(v => String(v ?? ''))
+  ]));
+}
+
+/** People @mentioned in a message, excluding apps (Oracle itself) and @all. */
 function readMentions(message) {
   const seen = new Set();
   const out = [];
   for (const a of message?.annotations || []) {
     const user = a?.type === 'USER_MENTION' ? a.userMention?.user : null;
-    if (!user?.name || user.type === 'BOT' || seen.has(user.name)) continue;
+    if (!user?.name || user.type === 'BOT' || user.name === 'users/all' || seen.has(user.name)) continue;
     seen.add(user.name);
     out.push({ chatUserId: user.name, displayName: user.displayName || null });
   }
@@ -699,6 +718,32 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       return;
     }
 
+    // Someone wrote in a tracked card's thread: that is activity (a stale card
+    // opens again). Background, never blocks the reply.
+    if (evt.threadIsResourceName) {
+      import('../cards/lifecycle.js')
+        .then(({ touchCardsInThread }) => touchCardsInThread(evt.threadId))
+        .catch(() => {});
+    }
+
+    // THE /TRACK CARD, WITHOUT THE MODEL. Plain wording checks first — no
+    // database work for ordinary messages. "track this" makes a card, "keep an
+    // eye on this" asks first, and "@Oracle decision: …" / "pass to @Name" /
+    // "response: …" / "remove @Name" / "promised @Name by …" change the thread's
+    // track card. A typed command in a thread without a track card falls
+    // through to the model.
+    const { trackIntent, typedCommand } = await import('../cards/track-parse.js');
+    const trackWords = trackIntent(messageText) || (typedCommand(messageText) ? 'typed' : null);
+    if (trackWords) {
+      const { handleTrackMessage } = await import('../cards/track-card.js');
+      if (await handleTrackMessage({ evt, user, conversationId, messageText, intent: trackWords })) {
+        await saveMessage(conversationId, 'user', messageText);
+        takeCardReply(conversationId);
+        console.log(`🗂️  Handled by the track card — kind: ${trackWords}`);
+        return;
+      }
+    }
+
     // Anything already pending belongs to an earlier turn — only a NEW proposal
     // gets a confirmation notice appended below.
     const pendingBefore = await currentPendingId(conversationId);
@@ -854,6 +899,10 @@ export async function handleGoogleChatEvent(req, res) {
   // ==========================================================================
   if (kind === 'buttonclicked') {
     try {
+      if (evt.isDialogEvent || evt.dialogEventType) {
+        const { handleCardDialog } = await import('../cards/dialogs.js');
+        return res.status(200).json(await handleCardDialog(evt) || {});
+      }
       const { handleCardClick } = await import('../cards/actions.js');
       return res.status(200).json(await handleCardClick(evt) || {});
     } catch (err) {
@@ -863,17 +912,28 @@ export async function handleGoogleChatEvent(req, res) {
   }
 
   // ==========================================================================
-  // APP COMMAND (slash command) — routed through the registry. None are
-  // registered yet; an unknown command is acknowledged and logged.
+  // APP COMMAND (slash command) — routed through the registry. Commands
+  // register when src/cards/commands.js loads (/track). An unknown command is
+  // acknowledged and logged. The handler gets the user lookup from here, so
+  // card code never imports this module.
   // ==========================================================================
   if (kind === 'appcommand') {
-    const handler = findAppCommand(evt.appCommandId);
+    let handler = null;
+    try {
+      await import('../cards/commands.js');
+      handler = findAppCommand(evt.appCommandId);
+    } catch (err) {
+      console.error(`❌ App commands failed to load — code: ${err?.code || err?.name || 'unknown'}`);
+    }
     if (!handler) {
       console.log(`↩️  App command not registered — id: ${evt.appCommandId ?? 'none'}`);
       return res.status(200).json({});
     }
     try {
-      return res.status(200).json(await handler(evt) || {});
+      return res.status(200).json(await handler(evt, {
+        resolveUser,
+        signInReply: () => NOT_RUN_REPLIES.signIn(hubSignInUrl())
+      }) || {});
     } catch (err) {
       console.error(`❌ App command failed — code: ${err?.code || err?.name || 'unknown'}`);
       return res.status(200).json({});

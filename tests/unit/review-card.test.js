@@ -125,7 +125,7 @@ const logLines = () => [console.log, console.warn, console.error]
 const logged = () => logLines().join('\n');
 
 const oracle = { type: 'USER_MENTION', userMention: { user: { name: 'users/app', displayName: 'Oracle', type: 'BOT' } } };
-const mention = (id) => ({ type: 'USER_MENTION', userMention: { user: { name: id, displayName: NAMES[id], type: 'HUMAN' } } });
+const mention = (id) => ({ type: 'USER_MENTION', userMention: { user: { name: id, displayName: NAMES[id] || 'all', type: 'HUMAN' } } });
 
 function messageBody({ text, sender = OWNER, mentions = [], thread = THREAD }) {
   return {
@@ -338,6 +338,13 @@ describe('an @mention asking for a review', () => {
     expect((await fakes.store.getParticipants(card.id)).map(p => p.chat_user_id)).toEqual([OWNER, STEPH]);
     expect(card.data.docIds).toEqual([DOC1]);
     expect(fakes.drive.calls.map(c => c.fileId)).toEqual([DOC1]);
+  });
+
+  test('@all is never a reviewer', async () => {
+    const result = await say(reviewRequest({ mentions: ['users/all', STEPH] }));
+    expect(result).toMatchObject({ card_posted: true });
+    expect(await reviewersOf((await onlyCard()).id)).toEqual([STEPH]);
+    expect(fakes.directory.calls.map(c => c.chatUserId)).not.toContain('users/all');
   });
 
   test('the requester is never their own reviewer', async () => {

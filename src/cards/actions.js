@@ -42,6 +42,11 @@ function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
 }
 
+/** Run work after the answer; whenCardsIdle() waits for it. */
+export function runInBackground(label, work) {
+  return inBackground(label, work);
+}
+
 function inBackground(label, work) {
   const p = Promise.resolve()
     .then(work)
@@ -66,7 +71,7 @@ function afterPress(cardId, type, { background = null, patch = false } = {}) {
     const card = await store.getCard(cardId);
     if (card && ['open', 'stale'].includes(card.status) && type.refresh) {
       try {
-        changed = (await type.refresh(card)).changed || changed;
+        changed = (await type.refresh(card, { reason: 'press' })).changed || changed;
       } catch (err) {
         console.warn(`⚠️  Tracked card refresh failed — code: ${codeOf(err)}`);
       }
@@ -89,6 +94,33 @@ const FOUNDATION_REPLIES = {
   'card.close': 'Only the requester can close this card.',
   'card.keep': 'Only the requester can keep this card open.'
 };
+
+/**
+ * Everything after an action was applied, for every way in (a button, a dialog,
+ * a typed "@Oracle …" command, the listened-space hook): log it, count it as
+ * activity, answer privately if it could not apply, then refresh, run the slow
+ * part and patch the card — all after the caller has answered.
+ * @returns {Promise<string>} the logged result
+ */
+export async function finishPress(card, type, actor, action, outcome, now = new Date(), { fromDigest = false } = {}) {
+  const result = outcome.ignored || (outcome.changed ? 'changed' : 'unchanged');
+  await store.logClick(card.id, actor, action, now, result);
+
+  // Work on the card counts as activity (and reopens a stale card). Muting does not.
+  if (outcome.changed && action !== 'card.mute' && action !== 'card.close') {
+    await store.touchActivity(card.id, now);
+  }
+
+  // Any change is also patched through the API — the card's own message when
+  // the press was on the digest, and a safety net when Chat drops the
+  // synchronous update. A mute changes nothing others see.
+  if (outcome.reply && !fromDigest) inBackground('reply', () => tellPresser(card, actor, outcome.reply));
+  afterPress(card.id, type, {
+    background: outcome.background || null,
+    patch: outcome.changed && action !== 'card.mute'
+  });
+  return result;
+}
 
 /**
  * @param {Object} evt - normalizeChatEvent() result for a buttonClicked event
@@ -154,23 +186,7 @@ async function pressAnswer(evt, now, startedAt) {
       outcome = await type.handleAction({ card, actor, action, now });
     }
 
-    const result = outcome.ignored || (outcome.changed ? 'changed' : 'unchanged');
-    await store.logClick(card.id, actor, action, now, result);
-
-    // Work on the card counts as activity (and reopens a stale card). Muting does not.
-    if (outcome.changed && action !== 'card.mute' && action !== 'card.close') {
-      await store.touchActivity(card.id, now);
-    }
-
-    // After answering: the private reply, fresh data, the slow part, the patch.
-    // Any change is also patched through the API — the card's own message when
-    // the press was on the digest, and a safety net when Chat drops the
-    // synchronous update. A mute changes nothing others see.
-    if (outcome.reply && !fromDigest) inBackground('reply', () => tellPresser(card, actor, outcome.reply));
-    afterPress(card.id, type, {
-      background: outcome.background || null,
-      patch: outcome.changed && action !== 'card.mute'
-    });
+    const result = await finishPress(card, type, actor, action, outcome, now, { fromDigest });
 
     let response;
     let kind;
@@ -178,7 +194,7 @@ async function pressAnswer(evt, now, startedAt) {
       // The pressed message is the digest: answer with the digest.
       const person = await store.getPerson(actor.chatUserId);
       const { date } = localClock(now, await timeZoneFor(person, now));
-      const digest = await buildDigest(actor.chatUserId, date);
+      const digest = await buildDigest(actor.chatUserId, date, now);
       response = updateMessageResponse(
         await renderDigest(actor.chatUserId, digest, date, outcome.notice || outcome.reply || null)
       );

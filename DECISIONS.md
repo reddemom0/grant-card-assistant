@@ -12,6 +12,29 @@ Format:
 
 ---
 
+## 2026-09-17 — /track: who has the ball on an ask in a Chat thread
+
+**What:** A second tracked card (`src/cards/track-card.js`, migration 031). `/track` or "@Oracle track this", as a reply in a thread, tracks the thread's **first message** — the ask. Two shapes:
+- **One ball:** Unassigned → With <person> → Waiting on client → Call needed → Decided / Resolved (both freeze the card). Buttons: I'll take it, Pass to…, Waiting on client, Call needed, Someone promised…, Record decision, Resolved, Refresh, Switch.
+- **Everyone has a ball** (@all, "everyone", "team, …"): a checklist of the space's people minus the requester, each marking only themselves; "Submit response" instead when the ask wants responses.
+
+**How it decides:** plain rules, no model calls and no new scopes.
+- Shape, due date ("by Sept 1", "before EOD Friday" — in the requester's time zone, counted from when the ask was written) and the holder (the first @mentioned person) come from `track-parse.js`.
+- **Refresh** re-reads the thread with the reader's own Chat grant and **suggests** a change with a link to the message it read; nothing moves until Confirm. In a **listened space** new messages apply a labelled best guess instead, which "Not right" undoes.
+- The ask, decisions and responses are the only text stored; the title is the ask's first line, cut to 100 characters.
+
+**Identities:** Oracle, the Chat-copy listener account, apps and @all are never holders, reviewers or checklist members (`realPeople` in `people.js`). This also fixes @all becoming a "reviewer" on review cards.
+
+**Quiet:** no pings on changes. One DM when the ball comes to you; one due-today DM to the holder; one private summary to the requester after an everyone ask's deadline. Everything else is the daily digest: "waiting on you", plus "needs a nudge" for waiting on a client 5+ days (the chaser) and no movement for 3+ days (the holder), each in one digest per period.
+
+**Dialogs** (Pass to…, Someone promised…, Record decision, Submit response, Remove people…) are behind **`TRACK_DIALOGS_ENABLED`**, off by default: add-on dialogs are a Developer Preview feature and one Google reference says the button setting that opens them strips the card. The same actions always work typed in the thread ("@Oracle decision: …", "pass to @Name", "response: …", "remove @Name", "promised @Name by Friday"), handled in code without the model.
+
+**Also:** recall (`read_chat_space_history`) now returns `recorded_decisions` for the space, after the message read has proved membership. Closed cards of every type are deleted 12 months after closing, matching the stored Chat copy.
+
+**Why rules, not a model:** a suggestion must be checkable and free; each one names the message it came from, and a person confirms it.
+
+**Impact:** `migrations/031_track_cards.sql` and `032_chat_messages_thread_index.sql` (**run by hand**; 032 needs 029), `src/cards/{track-card,track-parse,track-suggest,track-thread,commands,dialogs}.js`, `src/cards/{types,people,review-card,actions,render,notify,jobs,lifecycle,chat-api,update}.js`, `src/database/{tracked-cards-store,chat-listen-store}.js`, `src/api/{chat-google,chat-events}.js`, `src/tools/{chat-history,definitions}.js`, the Oracle prompt, tests. New env: `TRACK_DIALOGS_ENABLED`, `CHAT_TRACK_COMMAND_ID` (default 1). **Console step:** register `/track` in Chat API → Configuration → Commands.
+
 ## 2026-09-17 — Review card fixes after the first live test
 
 **What:**

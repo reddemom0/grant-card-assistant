@@ -7,11 +7,18 @@
  */
 
 import { reviewCard } from './review-card.js';
+import { trackCard } from './track-card.js';
 
 export function cardTypeOf(cardOrType) {
   const type = typeof cardOrType === 'string' ? cardOrType : cardOrType?.card_type;
   switch (type) {
     case 'review': return reviewCard;
+    case 'track': return trackCard;
     default: return null;
   }
+}
+
+/** Every card type — a function for the same reason as cardTypeOf. */
+export function allCardTypes() {
+  return [reviewCard, trackCard];
 }

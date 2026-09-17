@@ -201,6 +201,22 @@ export function messageToRow(message, spaceName) {
   };
 }
 
+/**
+ * One thread from the stored copy, oldest first. Text is UNTRUSTED. Only for
+ * spaces the caller has already checked are listened and active.
+ */
+export async function listThreadMessages(spaceName, threadName, limit = 100) {
+  const r = await query(
+    `SELECT message_name, thread_name, sender_user_id, create_time, text
+     FROM chat_space_messages
+     WHERE space_name = $1 AND thread_name = $2
+     ORDER BY create_time
+     LIMIT $3`,
+    [spaceName, threadName, limit]
+  );
+  return r.rows;
+}
+
 const UPSERT_SQL = `
   INSERT INTO chat_space_messages
     (message_name, space_name, thread_name, sender_user_id, create_time, update_time, text)

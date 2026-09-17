@@ -1,0 +1,97 @@
+/**
+ * Card dialogs — Pass to…, Someone promised…, Record decision, Submit
+ * response, Remove people… on the /track card.
+ *
+ * Add-on Chat app dialogs are a Developer Preview feature, and one Google
+ * reference says the button setting that opens them strips the card, so they
+ * are used only while TRACK_DIALOGS_ENABLED=true. The same actions always work
+ * typed in the thread (track-card.js).
+ *
+ * A dialog request is answered with the dialog; a submit is applied through the
+ * same press path as a button (logged, "Last update", patched through the Chat
+ * API) and answered by closing the dialog with a short notification — whether a
+ * close can also carry a message update is not documented.
+ */
+
+import * as store from '../database/tracked-cards-store.js';
+import { cardTypeOf } from './types.js';
+import { finishPress } from './actions.js';
+import { finalizeCards } from './render.js';
+import { dialogsEnabled, dialogFor, submitDialog, TRACK_ACTIONS } from './track-card.js';
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const OPEN_BUDGET_MS = 20_000;
+
+const SAVED = {
+  'track.decision': 'Decision recorded',
+  'track.respond': 'Response saved',
+  'track.pass': 'Passed on',
+  'track.promise': 'Promise recorded',
+  'track.remove': 'List updated'
+};
+
+function codeOf(err) {
+  return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
+}
+
+/** Close the dialog, optionally with a short plain-text notification. */
+export function closeDialog(text = null) {
+  return {
+    action: {
+      navigations: [{ endNavigation: { action: 'CLOSE_DIALOG' } }],
+      ...(text ? { notification: { text } } : {})
+    }
+  };
+}
+
+/** Open a dialog: a bare card, cleaned like every other card. */
+export function openDialog(card) {
+  const [wrapped] = finalizeCards([{ cardId: 'dialog', card }]);
+  return { action: { navigations: [{ pushCard: wrapped.card }] } };
+}
+
+/**
+ * @param {Object} evt - normalizeChatEvent() result with isDialogEvent / dialogEventType / formInputs
+ * @returns {Promise<Object>} synchronous response body
+ */
+export async function handleCardDialog(evt, now = new Date()) {
+  if (!dialogsEnabled()) return closeDialog();
+  const { cardId, action } = evt.parameters || {};
+  const card = cardId && UUID.test(cardId) ? await store.getCard(cardId) : null;
+  const type = card && cardTypeOf(card);
+  if (!card || type?.type !== 'track' || !TRACK_ACTIONS[action]?.dialog || !evt.actorChatId) {
+    console.log('↩️  Card dialog ignored — reason: not_a_track_dialog');
+    return closeDialog();
+  }
+  const actor = { chatUserId: evt.actorChatId, name: evt.actorName || null, email: evt.actorEmail || null };
+  const live = ['open', 'stale'].includes(card.status);
+
+  if (evt.dialogEventType === 'REQUEST_DIALOG') {
+    if (!live) return closeDialog('This card is closed.');
+    let timer;
+    try {
+      const dialog = await Promise.race([
+        dialogFor(card, action, actor),
+        new Promise(resolve => { timer = setTimeout(() => resolve(null), OPEN_BUDGET_MS); })
+      ]);
+      return dialog ? openDialog(dialog) : closeDialog('Couldn’t open that — try again.');
+    } catch (err) {
+      console.warn(`⚠️  Card dialog failed to open — code: ${codeOf(err)}`);
+      return closeDialog('Couldn’t open that — try again.');
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  if (evt.dialogEventType === 'SUBMIT_DIALOG') {
+    const outcome = live
+      ? await submitDialog(card, action, actor, evt.formInputs || {}, now)
+      : { changed: false, ignored: 'closed', reply: 'This card is closed, so nothing changed.' };
+    // The notification carries the answer; no separate private reply.
+    await finishPress(card, type, actor, action, { ...outcome, reply: null }, now);
+    console.log(`🗂️  Card dialog submitted — action: ${action}, result: ${outcome.ignored || (outcome.changed ? 'changed' : 'unchanged')}`);
+    return closeDialog(outcome.changed ? SAVED[action] : (outcome.reply || 'Nothing changed.'));
+  }
+
+  return closeDialog();
+}

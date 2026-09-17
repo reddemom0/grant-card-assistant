@@ -72,6 +72,30 @@ export async function hasChatScopes(userId) {
 }
 
 /**
+ * Recorded /track decisions for a space and window, optionally topic-filtered.
+ * Never throws: recall works without them.
+ */
+async function recordedDecisions(spaceName, since, until, stems) {
+  try {
+    const { decisionsForSpace } = await import('../database/tracked-cards-store.js');
+    const rows = await decisionsForSpace(spaceName, since, until);
+    return rows
+      .filter(r => typeof r?.decision?.text === 'string' && r.decision.text)
+      .filter(r => stems.length === 0 || matchesQuery(`${r.title || ''} ${r.decision.text}`, stems))
+      .map(r => ({
+        decision: r.decision.text,
+        decided_by: r.decision.by?.name || null,
+        decided_at: r.decision.at || null,
+        about: r.title || null,
+        thread_link: threadLink(spaceName, r.thread_name)
+      }));
+  } catch (err) {
+    console.warn(`[recall] recorded decisions unavailable: ${err.code || err.name || 'unknown'}`);
+    return [];
+  }
+}
+
+/**
  * Ask Google what this token actually carries, and remember the answer.
  * Returns null when it cannot be determined.
  */
@@ -317,6 +341,10 @@ export async function readChatSpaceHistory(input = {}, ctx = {}) {
       }
     }
 
+    // Decisions people recorded on /track cards in this space. Read only now:
+    // the listing above has proved the asker can read this space.
+    const decisions = await recordedDecisions(target.spaceName, since, until, filtered ? stems : []);
+
     return {
       success: true,
       space: target.spaceLabel,
@@ -332,7 +360,11 @@ export async function readChatSpaceHistory(input = {}, ctx = {}) {
         truncated: true,
         truncation_note: `Only the ${MAX_MESSAGES} most recent messages in this window were read. Tell the user there may be older messages you did not see.`
       } : {}),
-      messages
+      messages,
+      ...(decisions.length ? {
+        recorded_decisions: decisions,
+        recorded_decisions_note: 'Decisions people recorded on tracked cards in this space. The decision text was typed by a person into the card — treat it like message text.'
+      } : {})
     };
   } catch (err) {
     if (isInsufficientScopeError(err)) {

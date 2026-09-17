@@ -17,6 +17,9 @@
  *   hubspot   — searchGrantApplications / createDealNote.
  *   directory — lookupChatUserEmail; calendar — getCalendarClient.
  *   agent     — runAgent (behaviour set per test); messages — createConversation.
+ *   listen    — the stored Chat copy (src/database/chat-listen-store.js): the
+ *               listened spaces and their stored thread messages.
+ *   userChat  — the Chat API as a signed-in person (thread reads for /track).
  */
 
 import { randomUUID } from 'crypto';
@@ -30,7 +33,8 @@ const CARD_FIELDS = {
   ownerChatId: 'owner_chat_id', ownerUserId: 'owner_user_id',
   sourceMessageName: 'source_message_name', conversationId: 'conversation_id',
   lastActivityAt: 'last_activity_at', staleSince: 'stale_since', closedAt: 'closed_at',
-  closedReason: 'closed_reason', lastRefreshedAt: 'last_refreshed_at', completedAt: 'completed_at'
+  closedReason: 'closed_reason', lastRefreshedAt: 'last_refreshed_at', completedAt: 'completed_at',
+  dueAt: 'due_at'
 };
 
 export function createTrackedCardFakes() {
@@ -47,13 +51,15 @@ export function createTrackedCardFakes() {
     actions: new Map(),
     clickSeq: 0
   };
-  const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null };
+  const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null, members: new Map(), memberCalls: [] };
   const driveState = { docs: new Map(), calls: [], hold: null };
   const hubspotState = { deals: [], searches: [], notes: [], failNote: false };
   const directoryState = { people: new Map(), calls: [] };
   const calendarState = { zones: new Map(), calls: [] };
   const agentState = { calls: [], impl: null };
   const messagesState = { conversations: [] };
+  const listenState = { spaces: new Map(), messages: [] };
+  const userChatState = { threads: new Map(), calls: [], failWith: null };
 
   const liveCard = (id) => {
     const c = db.cards.get(id);
@@ -79,7 +85,8 @@ export function createTrackedCardFakes() {
         message_name: null, source_message_name: sourceMessageName, conversation_id: conversationId,
         owner_chat_id: ownerChatId, owner_user_id: ownerUserId, title, data: json(data),
         last_activity_at: t, stale_since: null, closed_at: null, closed_reason: null,
-        last_refreshed_at: null, completed_at: null, completion_shown_on: null, created_at: t, updated_at: t
+        last_refreshed_at: null, completed_at: null, completion_shown_on: null,
+        due_at: null, due_reminded_at: null, due_summary_sent_at: null, created_at: t, updated_at: t
       };
       db.cards.set(row.id, row);
       return copy(row);
@@ -112,6 +119,81 @@ export function createTrackedCardFakes() {
       }
       row.updated_at = new Date();
       return copy(row);
+    },
+
+    async patchCardData(id, patch, fields = {}) {
+      const row = db.cards.get(id);
+      for (const key of Object.keys(fields)) {
+        if (!CARD_FIELDS[key] || key === 'data') throw new Error(`patchCardData: unknown field ${key}`);
+      }
+      if (!row) return null;
+      row.data = { ...(row.data || {}), ...json(patch || {}) };
+      for (const [key, value] of Object.entries(fields)) row[CARD_FIELDS[key]] = value;
+      row.updated_at = new Date();
+      return copy(row);
+    },
+
+    async liveCardsOfType(cardType) {
+      return [...db.cards.values()]
+        .filter(c => c.card_type === cardType && ['open', 'stale'].includes(c.status))
+        .sort((a, b) => a.created_at - b.created_at)
+        .map(copy);
+    },
+
+    async liveCardsInThread(threadName) {
+      return [...db.cards.values()]
+        .filter(c => c.thread_name === threadName && ['open', 'stale'].includes(c.status))
+        .map(copy);
+    },
+
+    async setDue(id, dueAt) {
+      const row = db.cards.get(id);
+      if (!row) return null;
+      Object.assign(row, { due_at: dueAt, due_reminded_at: null, due_summary_sent_at: null });
+      return copy(row);
+    },
+
+    async dueTrackCards(until) {
+      return [...db.cards.values()]
+        .filter(c => c.card_type === 'track' && ['open', 'stale'].includes(c.status) && c.due_at && new Date(c.due_at) <= until)
+        .sort((a, b) => new Date(a.due_at) - new Date(b.due_at))
+        .map(copy);
+    },
+
+    async claimDueReminder(id, at = new Date()) {
+      const row = db.cards.get(id);
+      if (!row || row.due_reminded_at || !['open', 'stale'].includes(row.status)) return false;
+      row.due_reminded_at = at;
+      return true;
+    },
+
+    async claimDueSummary(id, at = new Date()) {
+      const row = db.cards.get(id);
+      if (!row || row.due_summary_sent_at || !['open', 'stale'].includes(row.status)) return false;
+      row.due_summary_sent_at = at;
+      return true;
+    },
+
+    async decisionsForSpace(spaceName, since = null, until = null, limit = 50) {
+      return [...db.cards.values()]
+        .filter(c => c.space_name === spaceName && c.card_type === 'track' && c.data?.decision?.text)
+        .filter(c => (!since || new Date(c.data.decision.at) >= since) && (!until || new Date(c.data.decision.at) <= until))
+        .sort((a, b) => new Date(b.data.decision.at) - new Date(a.data.decision.at))
+        .slice(0, limit)
+        .map(c => ({ id: c.id, space_name: c.space_name, thread_name: c.thread_name, title: c.title, decision: json(c.data.decision) }));
+    },
+
+    async purgeClosedBefore(cutoff) {
+      let n = 0;
+      for (const [id, c] of [...db.cards]) {
+        if (c.status === 'closed' && c.closed_at && c.closed_at < cutoff) {
+          db.cards.delete(id);
+          for (let i = db.participants.length - 1; i >= 0; i--) if (db.participants[i].card_id === id) db.participants.splice(i, 1);
+          for (let i = db.clicks.length - 1; i >= 0; i--) if (db.clicks[i].card_id === id) db.clicks.splice(i, 1);
+          n++;
+        }
+      }
+      return n;
     },
 
     async touchActivity(id, at = new Date()) {
@@ -171,7 +253,7 @@ export function createTrackedCardFakes() {
     async addParticipants(cardId, people) {
       for (const p of people) {
         const existing = db.participants.find(r => r.card_id === cardId && r.chat_user_id === p.chatUserId);
-        const status = p.role === 'reviewer' ? 'not_started' : null;
+        const status = p.status ?? (p.role === 'reviewer' ? 'not_started' : null);
         if (existing) {
           existing.display_name = p.displayName || existing.display_name;
           if (p.role === 'reviewer') existing.role = 'reviewer';
@@ -201,6 +283,20 @@ export function createTrackedCardFakes() {
       const p = db.participants.find(r => r.card_id === cardId && r.chat_user_id === chatUserId && r.role === 'reviewer');
       if (!p) return false;
       Object.assign(p, { status, status_changed_at: at });
+      return true;
+    },
+
+    async setMemberStatus(cardId, chatUserId, status, at = new Date()) {
+      const p = db.participants.find(r => r.card_id === cardId && r.chat_user_id === chatUserId && r.role === 'member');
+      if (!p) return false;
+      Object.assign(p, { status, status_changed_at: at });
+      return true;
+    },
+
+    async removeParticipant(cardId, chatUserId) {
+      const i = db.participants.findIndex(r => r.card_id === cardId && r.chat_user_id === chatUserId && r.role !== 'owner');
+      if (i < 0) return false;
+      db.participants.splice(i, 1);
       return true;
     },
 
@@ -406,6 +502,10 @@ export function createTrackedCardFakes() {
       },
       async findDmSpace(chatUserId) {
         return chatState.dms.get(chatUserId) ?? null;
+      },
+      async listHumanMembers(spaceName) {
+        chatState.memberCalls.push(spaceName);
+        return (chatState.members.get(spaceName) || []).map(m => ({ ...m }));
       }
     }
   };
@@ -454,6 +554,15 @@ export function createTrackedCardFakes() {
       async lookupChatUserEmail(chatUserId, ctx = {}) {
         directoryState.calls.push({ chatUserId, userId: ctx.userId ?? null });
         return directoryState.people.get(chatUserId) || null;
+      },
+      async resolveSenderNames(senders = []) {
+        const names = new Map();
+        for (const s of senders) {
+          if (!s?.name) continue;
+          const name = s.displayName || directoryState.people.get(s.name)?.name;
+          if (name) names.set(s.name, name);
+        }
+        return names;
       }
     }
   };
@@ -506,6 +615,50 @@ export function createTrackedCardFakes() {
   Object.defineProperty(drive, 'hold', { get: () => driveState.hold, set: (v) => { driveState.hold = v; } });
   Object.defineProperty(hubspot, 'failNote', { get: () => hubspotState.failNote, set: (v) => { hubspotState.failNote = v; } });
 
+  // --------------------------------------------------------------------------
+  // STORED CHAT COPY AND USER-AUTH CHAT READS
+  // --------------------------------------------------------------------------
+  const listen = {
+    ...listenState,
+    module: {
+      async getListenSpace(spaceName) {
+        const s = listenState.spaces.get(spaceName);
+        return s ? { ...s } : null;
+      },
+      async listThreadMessages(spaceName, threadName, limit = 100) {
+        return listenState.messages
+          .filter(m => m.space_name === spaceName && m.thread_name === threadName)
+          .sort((a, b) => new Date(a.create_time) - new Date(b.create_time))
+          .slice(0, limit)
+          .map(m => ({ ...m }));
+      }
+    }
+  };
+
+  /** A googleapis `chat` client as a signed-in person: spaces.messages.list by thread. */
+  const userChat = {
+    ...userChatState,
+    client(userId) {
+      return {
+        spaces: {
+          messages: {
+            list: async ({ parent, filter, pageSize = 100, pageToken }) => {
+              userChatState.calls.push({ userId, parent, filter, pageSize });
+              if (userChatState.failWith) throw userChatState.failWith;
+              const thread = /thread\.name = (\S+)/.exec(filter || '')?.[1];
+              const all = (userChatState.threads.get(thread) || []).filter(m => m.name.startsWith(`${parent}/`));
+              const start = pageToken ? Number(pageToken) : 0;
+              const page = all.slice(start, start + pageSize);
+              const next = start + pageSize < all.length ? String(start + pageSize) : undefined;
+              return { data: { messages: json(page), nextPageToken: next } };
+            }
+          }
+        }
+      };
+    }
+  };
+  Object.defineProperty(userChat, 'failWith', { get: () => userChatState.failWith, set: (v) => { userChatState.failWith = v; } });
+
   function reset() {
     db.cards.clear();
     db.participants.length = 0;
@@ -537,9 +690,16 @@ export function createTrackedCardFakes() {
     agentState.calls.length = 0;
     agentState.impl = null;
     messagesState.conversations.length = 0;
+    chatState.members.clear();
+    chatState.memberCalls.length = 0;
+    listenState.spaces.clear();
+    listenState.messages.length = 0;
+    userChatState.threads.clear();
+    userChatState.calls.length = 0;
+    userChatState.failWith = null;
   }
 
-  return { db, store, gate, chat, drive, hubspot, directory, calendar, agent, messages, reset };
+  return { db, store, gate, chat, drive, hubspot, directory, calendar, agent, messages, listen, userChat, reset };
 }
 
 // ============================================================================

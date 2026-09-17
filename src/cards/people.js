@@ -91,6 +91,36 @@ export function isListenerEmail(email) {
   return Boolean(listener) && String(email || '').trim().toLowerCase() === listener;
 }
 
+const APP_DISPLAY_NAME = /^oracle$/i;
+
+/**
+ * Keep only people who can hold work: never @all, the Chat-copy listener
+ * account (by email — stored, else the directory), or a mention shown as
+ * "Oracle" whose email is unknown. Apps never get here: the Chat adapter and
+ * members.list leave them out.
+ * @param {Array<{chatUserId: string, displayName?: string}>} candidates
+ * @param {number} [lookupAsUserId] - Hub user to impersonate for the directory
+ */
+export async function realPeople(candidates = [], lookupAsUserId = null) {
+  const out = [];
+  for (const c of candidates) {
+    if (!isChatUserId(c?.chatUserId) || c.chatUserId === 'users/all') continue;
+    const person = await resolvePerson(c.chatUserId, { displayName: c.displayName, lookupAsUserId });
+    if (isListenerEmail(person?.email)) continue;
+    if (!person?.email && APP_DISPLAY_NAME.test(String(c.displayName || '').trim())) continue;
+    out.push(c);
+  }
+  return out;
+}
+
+/** Is whoever pressed a button the listener account? Stored data only — no lookups. */
+export async function isListenerChatUser(actor) {
+  if (isListenerEmail(actor?.email)) return true;
+  if (!isChatUserId(actor?.chatUserId)) return false;
+  const person = await store.getPerson(actor.chatUserId);
+  return isListenerEmail(person?.email);
+}
+
 /** The person's calendar time zone, or DEFAULT_TZ. */
 export async function timeZoneFor(person, now = new Date()) {
   if (!person) return DEFAULT_TZ;

@@ -174,6 +174,8 @@ async function routeEvent({ type, subject, data }) {
 
   const rows = [];
   const gone = [];
+  const created = [];   // new messages, for tracked cards in their threads
+  const isCreated = action.verb.replace(/^batch/, '').toLowerCase() === 'created';
   for (const name of inSpace) {
     let message;
     try {
@@ -197,6 +199,7 @@ async function routeEvent({ type, subject, data }) {
 
     const result = store.messageToRow(message, spaceName);
     if (result.row) rows.push(result.row);
+    if (result.row && isCreated) created.push(message);
     else if (result.skip === 'private') counts.private++;
     else counts.skipped++;
   }
@@ -205,6 +208,16 @@ async function routeEvent({ type, subject, data }) {
   counts.unchanged = rows.length - counts.stored;
   if (gone.length) counts.deleted = await store.tombstoneMessages(spaceName, gone);
   console.log(summary());
+
+  // New messages may move the ball on a tracked card in their thread (a
+  // labelled best guess). Only *created* events — an edit, including Oracle
+  // patching its own card, is never activity. Background: it can never change
+  // this response, so Pub/Sub never redelivers because of it.
+  if (created.length) {
+    import('../cards/track-card.js')
+      .then(({ onThreadMessages }) => onThreadMessages(spaceName, created))
+      .catch(err => console.warn(`⚠️  Tracked card thread hook failed — code: ${err?.code || err?.name || 'unknown'}`));
+  }
   return 204;
 }
 

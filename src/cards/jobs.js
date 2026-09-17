@@ -2,7 +2,8 @@
  * Scheduled work for tracked cards
  *
  *   hourly :05 UTC   digests — each person gets theirs when it is 08:xx in their
- *                    calendar time zone, at most once per local day
+ *                    calendar time zone, at most once per local day; then
+ *                    due-date messages (track card), each sent once
  *   daily 13:00 UTC  refresh open cards from real sources, then stale/auto-close
  *                    (before the Pacific-time digests)
  *
@@ -10,7 +11,7 @@
  * other cron jobs in server.js. Needs migration 030.
  */
 
-import { sendDueDigests } from './notify.js';
+import { sendDueDigests, sendDueReminders } from './notify.js';
 import { runDailyCardPass } from './lifecycle.js';
 
 function guarded(label, fn) {
@@ -29,7 +30,10 @@ export function startTrackedCards(cron) {
     console.log('⏸️  Tracked cards jobs DISABLED (TRACKED_CARDS_DISABLED=true)');
     return false;
   }
-  cron.schedule('5 * * * *', guarded('digest', () => sendDueDigests()), {
+  cron.schedule('5 * * * *', guarded('digest', async () => {
+    await sendDueDigests();
+    await sendDueReminders();
+  }), {
     name: 'tracked-cards-digest', timezone: 'UTC', noOverlap: true
   });
   cron.schedule('0 13 * * *', guarded('daily pass', () => runDailyCardPass()), {

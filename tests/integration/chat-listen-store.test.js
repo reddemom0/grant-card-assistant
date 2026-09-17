@@ -42,6 +42,7 @@ if (url && loopback) {
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MIGRATION = readFileSync(join(__dirname, '../../migrations/029_chat_listen.sql'), 'utf8');
+const THREAD_INDEX = readFileSync(join(__dirname, '../../migrations/032_chat_messages_thread_index.sql'), 'utf8');
 
 const SPACE = 'spaces/INTEGRATION';
 const OTHER = 'spaces/OTHER';
@@ -79,6 +80,8 @@ run('chat listen store (real Postgres)', () => {
     await pool.query('DROP TABLE IF EXISTS chat_message_tombstones, chat_space_messages, chat_listen_spaces');
     await pool.query(MIGRATION);
     await pool.query(MIGRATION); // safe to re-run
+    await pool.query(THREAD_INDEX);
+    await pool.query(THREAD_INDEX); // safe to re-run
   });
 
   afterAll(async () => {
@@ -280,6 +283,23 @@ run('chat listen store (real Postgres)', () => {
     expect(result).toEqual({ messages: 1, tombstones: 1 });
     expect(await stored('old')).toBeUndefined();
     expect(await stored('new')).toBeDefined();
+  });
+
+  test('one thread is read oldest first, from its own space only', async () => {
+    const thread = `${SPACE}/threads/t`;
+    await store.upsertMessages([
+      row('late', { create_time: '2026-09-01T12:00:00Z', update_time: '2026-09-01T12:00:00Z' }),
+      row('early', { create_time: '2026-09-01T09:00:00Z', update_time: '2026-09-01T09:00:00Z' }),
+      row('other-thread', { thread_name: `${SPACE}/threads/u` })
+    ]);
+    const msgs = await store.listThreadMessages(SPACE, thread);
+    expect(msgs.map(m => m.message_name)).toEqual([`${SPACE}/messages/early`, `${SPACE}/messages/late`]);
+    expect(Object.keys(msgs[0]).sort()).toEqual(['create_time', 'message_name', 'sender_user_id', 'text', 'thread_name']);
+    expect(await store.listThreadMessages(SPACE, thread, 1)).toHaveLength(1);
+    expect(await store.listThreadMessages(OTHER, thread)).toEqual([]);
+
+    const idx = await db.query(`SELECT 1 FROM pg_indexes WHERE indexname = 'idx_chat_space_messages_thread_time'`);
+    expect(idx.rowCount).toBe(1);
   });
 
   test('teardown deletes the copy; forgetting the space cascades', async () => {

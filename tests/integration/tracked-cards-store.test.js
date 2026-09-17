@@ -111,6 +111,8 @@ run('tracked cards store (real Postgres)', () => {
     await pool.query(migration('026_pending_actions_auto_approved_reason.sql'));
     await pool.query(migration('030_tracked_cards.sql'));
     await pool.query(migration('030_tracked_cards.sql'));   // safe to re-run
+    await pool.query(migration('031_track_cards.sql'));
+    await pool.query(migration('031_track_cards.sql'));     // safe to re-run
   });
 
   afterAll(async () => {
@@ -358,6 +360,120 @@ run('tracked cards store (real Postgres)', () => {
               (SELECT COUNT(*) FROM tracked_card_clicks)::int AS c`
     );
     expect(left.rows[0]).toEqual({ p: 0, c: 0 });
+  });
+
+  // --------------------------------------------------------------------------
+  // TRACK CARDS (migration 031)
+  // --------------------------------------------------------------------------
+
+  test('members: a pending checklist, own-row changes only, and removal never touches the owner', async () => {
+    const card = await newCard({ cardType: 'track' });
+    await store.addParticipants(card.id, [
+      { chatUserId: 'users/1', role: 'owner' },
+      { chatUserId: 'users/2', role: 'member', status: 'pending' },
+      { chatUserId: 'users/3', role: 'member' }
+    ]);
+    let rows = await store.getParticipants(card.id);
+    expect(rows.map(p => [p.chat_user_id, p.role, p.status])).toEqual([
+      ['users/1', 'owner', null], ['users/2', 'member', 'pending'], ['users/3', 'member', null]
+    ]);
+
+    expect(await store.setMemberStatus(card.id, 'users/2', 'needs_help', at(1))).toBe(true);
+    expect(await store.setMemberStatus(card.id, 'users/1', 'done')).toBe(false);          // owner row
+    expect(await store.setReviewerStatus(card.id, 'users/2', 'done')).toBe(false);        // not a reviewer
+    await store.addParticipants(card.id, [{ chatUserId: 'users/2', role: 'member', status: 'pending' }]);
+    rows = await store.getParticipants(card.id);
+    expect(rows.find(p => p.chat_user_id === 'users/2')).toMatchObject({ status: 'needs_help', status_changed_at: at(1) });
+
+    expect(await store.removeParticipant(card.id, 'users/1')).toBe(false);
+    expect(await store.removeParticipant(card.id, 'users/3')).toBe(true);
+    expect((await store.getParticipants(card.id)).map(p => p.chat_user_id)).toEqual(['users/1', 'users/2']);
+
+    await expect(store.addParticipants(card.id, [{ chatUserId: 'users/4', role: 'holder' }]))
+      .rejects.toMatchObject({ code: '23514' });
+    await expect(store.setMemberStatus(card.id, 'users/2', 'waiting')).rejects.toMatchObject({ code: '23514' });
+  });
+
+  test('card data is merged atomically, so concurrent writers keep each other\'s keys', async () => {
+    const card = await newCard({ cardType: 'track', data: { ball: { state: 'unassigned' }, keep: 1 } });
+    await Promise.all([
+      store.patchCardData(card.id, { suggestion: { state: 'person' } }),
+      store.patchCardData(card.id, { busy: { kind: 'refresh' } }),
+      store.patchCardData(card.id, { ball: { state: 'person' } }, { lastActivityAt: at(3) })
+    ]);
+    const after = await store.getCard(card.id);
+    expect(after.data).toEqual({ ball: { state: 'person' }, keep: 1, suggestion: { state: 'person' }, busy: { kind: 'refresh' } });
+    expect(after.last_activity_at).toEqual(at(3));
+    await expect(store.patchCardData(card.id, {}, { data: {} })).rejects.toThrow('unknown field data');
+  });
+
+  test('due dates: setting one clears the markers, and each reminder can be claimed once', async () => {
+    const card = await newCard({ cardType: 'track' });
+    const other = await newCard({ cardType: 'review' });
+    await store.setDue(card.id, at(5));
+    await store.setDue(other.id, at(5));
+
+    expect((await store.dueTrackCards(at(6))).map(c => c.id)).toEqual([card.id]);
+    expect(await store.dueTrackCards(at(4))).toEqual([]);
+
+    const claims = await Promise.all([1, 2, 3].map(() => store.claimDueReminder(card.id, at(5))));
+    expect(claims.filter(Boolean)).toHaveLength(1);
+    expect(await store.claimDueSummary(card.id, at(6))).toBe(true);
+    expect(await store.claimDueSummary(card.id, at(6))).toBe(false);
+
+    await store.setDue(card.id, at(9));                     // moved: both go out again
+    expect(await store.getCard(card.id)).toMatchObject({ due_at: at(9), due_reminded_at: null, due_summary_sent_at: null });
+    await store.closeCard(card.id, 'resolved');
+    expect(await store.claimDueReminder(card.id)).toBe(false);
+  });
+
+  test('live cards by type and by thread', async () => {
+    const thread = `${SPACE}/threads/both`;
+    const review = await newCard({ threadName: thread });
+    const track = await newCard({ threadName: thread, cardType: 'track' });
+    const closed = await newCard({ cardType: 'track' });
+    await store.closeCard(closed.id, 'resolved');
+
+    expect((await store.liveCardsOfType('track')).map(c => c.id)).toEqual([track.id]);
+    expect((await store.liveCardsInThread(thread)).map(c => c.id).sort()).toEqual([review.id, track.id].sort());
+  });
+
+  test('recorded decisions are found per space and window, closed cards included', async () => {
+    const decided = await newCard({ cardType: 'track', title: 'Industry list' });
+    await store.patchCardData(decided.id, { decision: { text: 'Use the 2024 NAICS list', by: 'Nat', at: at(2).toISOString() } });
+    await store.closeCard(decided.id, 'decided', at(2));
+    const open = await newCard({ cardType: 'track' });
+    await store.patchCardData(open.id, { decision: { text: 'Later one', by: 'Jo', at: at(8).toISOString() } });
+    const elsewhere = await newCard({ cardType: 'track', spaceName: 'spaces/OTHER' });
+    await store.patchCardData(elsewhere.id, { decision: { text: 'Other space', by: 'X', at: at(2).toISOString() } });
+    const review = await newCard();
+    await store.patchCardData(review.id, { decision: { text: 'Not a track card', at: at(2).toISOString() } });
+    await newCard({ cardType: 'track' });                  // no decision
+
+    const all = await store.decisionsForSpace(SPACE);
+    expect(all.map(d => d.decision.text)).toEqual(['Later one', 'Use the 2024 NAICS list']);
+    expect(all[1]).toMatchObject({ id: decided.id, title: 'Industry list', thread_name: decided.thread_name });
+
+    expect((await store.decisionsForSpace(SPACE, at(1), at(5))).map(d => d.decision.text)).toEqual(['Use the 2024 NAICS list']);
+  });
+
+  test('closed cards are deleted 12 months on, with their participants and clicks', async () => {
+    const old = await newCard();
+    const recent = await newCard();
+    const live = await newCard();
+    for (const c of [old, recent, live]) {
+      await store.addParticipants(c.id, [{ chatUserId: 'users/2', role: 'reviewer' }]);
+      await store.logClick(c.id, { chatUserId: 'users/2' }, 'review.done');
+    }
+    await store.closeCard(old.id, 'closed_by_owner', at(0));
+    await store.closeCard(recent.id, 'closed_by_owner', at(400));
+
+    expect(await store.purgeClosedBefore(at(365))).toBe(1);
+    expect(await store.getCard(old.id)).toBeNull();
+    expect(await store.getCard(recent.id)).not.toBeNull();
+    expect(await store.getCard(live.id)).not.toBeNull();
+    const left = await db.query('SELECT COUNT(*)::int AS n FROM tracked_card_participants WHERE card_id = $1', [old.id]);
+    expect(left.rows[0].n).toBe(0);
   });
 
   // --------------------------------------------------------------------------

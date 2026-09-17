@@ -69,3 +69,31 @@ export async function findDmSpace(chatUserId) {
     throw err;
   }
 }
+
+/**
+ * The human members of a space, as the app (chat.bot). Chat never lists app
+ * memberships to app authentication, so Oracle and other apps are already
+ * absent. People who are in the space only through a Google Group are not
+ * listed either. Display names are not documented for app authentication —
+ * callers resolve names themselves.
+ * @returns {Promise<Array<{chatUserId: string, displayName: string|null}>>}
+ */
+export async function listHumanMembers(spaceName) {
+  const out = [];
+  let pageToken;
+  do {
+    const res = await chatClient().spaces.members.list({
+      parent: spaceName,
+      filter: 'member.type = "HUMAN"',
+      pageSize: 1000,
+      pageToken
+    });
+    for (const m of res.data?.memberships || []) {
+      if (m.member?.type !== 'HUMAN' || !m.member?.name) continue;
+      if (m.state && m.state !== 'JOINED') continue;
+      out.push({ chatUserId: m.member.name, displayName: m.member.displayName || null });
+    }
+    pageToken = res.data?.nextPageToken || undefined;
+  } while (pageToken && out.length < 5000);
+  return out;
+}

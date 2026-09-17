@@ -35,7 +35,7 @@ import { markCardReply, takeCardReply, FOUNDATION_ACTIONS } from './registry.js'
 import { postMessage, patchCard } from './chat-api.js';
 import { renderCard, rerenderCard, tellPresser } from './update.js';
 import { notifyImmediate } from './notify.js';
-import { resolvePerson, dmSpaceFor, isListenerEmail } from './people.js';
+import { resolvePerson, dmSpaceFor, realPeople, isListenerChatUser } from './people.js';
 import { trackedCard, paragraph, button, esc, clip, threadLink, mdToPlain, textToCardHtml } from './render.js';
 
 const MAX_DOCS = 10;
@@ -78,7 +78,6 @@ const SETTLED_NOTE_REASONS = { added: 'note_added', declined: 'note_declined' };
 // Check marks mean "this is fine" — the pre-check lists issues only.
 const CHECK_MARKS = /[✅✔☑✓]️?/gu;
 const STARTS_WITH_CHECK = /^\s*(?:[-*•]\s*)?[✅✔☑✓]/u;
-const APP_DISPLAY_NAME = /^oracle$/i;
 
 const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const firstName = (name) => String(name || '').trim().split(/\s+/)[0] || 'someone';
@@ -130,7 +129,7 @@ function cleanMentions(list = []) {
   const out = [];
   for (const m of list) {
     const id = m?.chatUserId;
-    if (typeof id !== 'string' || !/^users\/[^/]+$/.test(id) || seen.has(id)) continue;
+    if (typeof id !== 'string' || !/^users\/[^/]+$/.test(id) || id === 'users/all' || seen.has(id)) continue;
     seen.add(id);
     out.push({ chatUserId: id, displayName: m.displayName ? clip(mdToPlain(m.displayName), 80) : null });
   }
@@ -141,24 +140,6 @@ function cleanMentions(list = []) {
 function mergeReviewers(prior = [], mentioned = []) {
   const seen = new Set();
   return [...prior, ...mentioned].filter(r => r?.chatUserId && !seen.has(r.chatUserId) && seen.add(r.chatUserId));
-}
-
-/**
- * Drop anyone who is not a person who can review: the Chat-copy listener
- * account (CHAT_LISTENER_USER_EMAIL) and Oracle itself. Apps never get here —
- * the Chat adapter leaves BOT mentions out. The email comes from what Oracle
- * knows, then the directory; if it stays unknown, a mention shown as "Oracle"
- * is still dropped.
- */
-async function realReviewers(candidates, lookupAsUserId) {
-  const out = [];
-  for (const r of candidates) {
-    const person = await resolvePerson(r.chatUserId, { displayName: r.displayName, lookupAsUserId });
-    if (isListenerEmail(person?.email)) continue;
-    if (!person?.email && APP_DISPLAY_NAME.test(String(r.displayName || '').trim())) continue;
-    out.push(r);
-  }
-  return out;
 }
 
 function mergeDocIds(existing = [], files = []) {
@@ -213,7 +194,8 @@ export async function trackReview(input = {}, { userId = null, conversationId = 
 
   const draft = cleanInput(input);
   const mentioned = cleanMentions(cc.mentions).filter(m => m.chatUserId !== requester.chatUserId);
-  const reviewers = (await realReviewers(mergeReviewers(prior.reviewers, mentioned), requester.userId))
+  // Never Oracle, the Chat-copy listener account or @all (people.js).
+  const reviewers = (await realPeople(mergeReviewers(prior.reviewers, mentioned), requester.userId))
     .slice(0, MAX_REVIEWERS);
   const docIds = mergeDocIds(prior.docIds, cc.driveFiles || []).slice(0, MAX_DOCS);
 
@@ -541,12 +523,6 @@ const setBusy = (cardId, kind, actor, now) =>
 const finish = (cardId, text) =>
   updateData(cardId, { busy: null, notice: text ? { text, at: new Date().toISOString() } : null });
 
-async function isListenerPresser(actor) {
-  if (isListenerEmail(actor.email)) return true;
-  const person = await store.getPerson(actor.chatUserId);
-  return isListenerEmail(person?.email);
-}
-
 async function handleAction({ card, actor, action, now = new Date() }) {
   const live = ['open', 'stale'].includes(card.status);
   const d = card.data || {};
@@ -561,7 +537,7 @@ async function handleAction({ card, actor, action, now = new Date() }) {
       let moved = await store.setReviewerStatus(card.id, actor.chatUserId, status, now);
       let claimed = false;
       if (!moved) {
-        if (await isListenerPresser(actor)) {
+        if (await isListenerChatUser(actor)) {
           return { changed: false, ignored: 'listener_account', reply: 'This account can’t take a review.' };
         }
         await store.addParticipants(card.id, [{ chatUserId: actor.chatUserId, role: 'reviewer', displayName: actor.name }]);

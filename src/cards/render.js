@@ -128,8 +128,10 @@ export function threadLink(spaceName, threadName) {
 /**
  * A button that calls back to Oracle with these parameters. A disabled button
  * stays visible (its label shows the state) but cannot be pressed.
+ * `openDialog` makes the press open a dialog (add-on dialogs are a Developer
+ * Preview feature — callers only set it when TRACK_DIALOGS_ENABLED is on).
  */
-export function button(text, params, { disabled = false } = {}) {
+export function button(text, params, { disabled = false, openDialog = false } = {}) {
   return {
     text,
     ...(disabled ? { disabled: true } : {}),
@@ -137,10 +139,20 @@ export function button(text, params, { disabled = false } = {}) {
       action: {
         function: endpoint(),
         parameters: Object.entries(params).map(([key, value]) => ({ key, value: String(value) })),
-        loadIndicator: 'SPINNER'
+        ...(openDialog ? { interaction: 'OPEN_DIALOG' } : { loadIndicator: 'SPINNER' })
       }
     }
   };
+}
+
+/** Link to one message in its thread (best effort, like threadLink). */
+export function messageLink(messageName, threadName) {
+  const [, space, , message] = String(messageName || '').split('/');
+  const thread = String(threadName || '').split('/')[3];
+  if (!space || !message) return null;
+  return thread
+    ? `https://chat.google.com/room/${space}/${thread}/${message}`
+    : `https://chat.google.com/room/${space}`;
 }
 
 export function buttonsAvailable() {

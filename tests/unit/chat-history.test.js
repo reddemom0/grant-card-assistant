@@ -323,3 +323,58 @@ describe('loose topic matching', () => {
     expect(r.filter_note).toMatch(/judge relevance yourself/);
   });
 });
+
+// ---------------------------------------------------------------------------
+describe('decisions recorded on tracked cards', () => {
+  const decisionRow = (text, title = 'Industry list', at = new Date().toISOString()) => ({
+    id: 'c1', space_name: 'spaces/AAA', thread_name: 'spaces/AAA/threads/T9', title,
+    decision: { text, by: { chatUserId: 'users/1', name: 'Nat' }, at }
+  });
+
+  const withDecisions = (rows) => mockQuery.mockImplementation(async (sql) => (
+    /data->'decision'/.test(sql) ? { rows } : { rows: [{ google_granted_scopes: ALL_SCOPES }] }
+  ));
+
+  test('recall returns them for the space and window, after the space was read', async () => {
+    withDecisions([decisionRow('Use the 2024 NAICS list')]);
+    const r = await readChatSpaceHistory({}, { userId: 1, chatContext: SPACE_CTX });
+
+    expect(r.recorded_decisions).toEqual([{
+      decision: 'Use the 2024 NAICS list', decided_by: 'Nat', decided_at: expect.any(String),
+      about: 'Industry list', thread_link: 'https://chat.google.com/room/AAA/T9'
+    }]);
+    expect(r.recorded_decisions_note).toMatch(/typed by a person/);
+    const call = mockQuery.mock.calls.find(([sql]) => /data->'decision'/.test(sql));
+    expect(call[1][0]).toBe('spaces/AAA');
+    expect(call[1][1]).toBeInstanceOf(Date);                 // the recall window
+  });
+
+  test('a topic filter applies to them too', async () => {
+    withDecisions([decisionRow('Use the 2024 NAICS list'), decisionRow('Book the venue', 'Offsite')]);
+    const messages = Array.from({ length: 25 }, (_, i) => msg(`naics point ${i}`, i));
+    mockMessagesList.mockResolvedValue(messagesPage(messages));
+    const r = await readChatSpaceHistory({ query: 'naics' }, { userId: 1, chatContext: SPACE_CTX });
+    expect(r.recorded_decisions.map(d => d.decision)).toEqual(['Use the 2024 NAICS list']);
+  });
+
+  test('nothing is looked up when the space cannot be read', async () => {
+    withDecisions([decisionRow('Use the 2024 NAICS list')]);
+    mockMessagesList.mockRejectedValue(Object.assign(new Error('forbidden'), { code: 403, response: { status: 403 } }));
+    const r = await readChatSpaceHistory({}, { userId: 1, chatContext: SPACE_CTX });
+    expect(r.success).toBe(false);
+    expect(mockQuery.mock.calls.some(([sql]) => /data->'decision'/.test(sql))).toBe(false);
+  });
+
+  test('a failing lookup leaves recall working', async () => {
+    mockQuery.mockImplementation(async (sql) => {
+      if (/data->'decision'/.test(sql)) throw Object.assign(new Error('no table'), { code: '42P01' });
+      return { rows: [{ google_granted_scopes: ALL_SCOPES }] };
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const r = await readChatSpaceHistory({}, { userId: 1, chatContext: SPACE_CTX });
+    expect(r.success).toBe(true);
+    expect(r.recorded_decisions).toBeUndefined();
+    expect(warn.mock.calls.flat().join(' ')).toContain('42P01');
+    warn.mockRestore();
+  });
+});

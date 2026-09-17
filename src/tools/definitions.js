@@ -2291,7 +2291,7 @@ export const GOOGLE_CALENDAR_TOOLS = [
 export const CHAT_HISTORY_TOOLS = [
   {
     name: 'read_chat_space_history',
-    description: 'Read recent messages from a Google Chat space, as the person asking — use this when someone asks what was said or decided about a topic in a space. Reads only spaces that person is a member of. In a shared space you can only read THAT space; to read a different one, the person must ask you in a direct message. Defaults to the last 30 days and at most 500 messages; the result says so when it was truncated or when a topic filter was too narrow to trust. Returns sender, time, text and a thread link — never file contents.',
+    description: 'Read recent messages from a Google Chat space, as the person asking — use this when someone asks what was said or decided about a topic in a space. Reads only spaces that person is a member of. In a shared space you can only read THAT space; to read a different one, the person must ask you in a direct message. Defaults to the last 30 days and at most 500 messages; the result says so when it was truncated or when a topic filter was too narrow to trust. Returns sender, time, text and a thread link — never file contents — plus any decisions people recorded on tracked (/track) cards in that space, with who decided and when.',
     input_schema: {
       type: 'object',
       properties: {

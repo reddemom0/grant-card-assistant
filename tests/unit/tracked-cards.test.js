@@ -225,6 +225,16 @@ describe('Chat routes button presses and app commands', () => {
     expect(fakes.db.clicks).toHaveLength(0);
   });
 
+  test('a dialog event is routed to the dialog handler — which only closes while dialogs are off', async () => {
+    const card = await seedCard();
+    const body = buttonBody(card, 'track.decision');
+    body.chat.buttonClickedPayload.isDialogEvent = true;
+    body.chat.buttonClickedPayload.dialogEventType = 'REQUEST_DIALOG';
+    const res = await send(body);
+    expect(res.json.mock.calls[0][0]).toEqual({ action: { navigations: [{ endNavigation: { action: 'CLOSE_DIALOG' } }] } });
+    expect(fakes.db.clicks).toHaveLength(0);
+  });
+
   test('an unregistered app command is acknowledged and logged by id', async () => {
     const res = await send(commandBody(7));
     expect(res.json.mock.calls[0][0]).toEqual({});
@@ -264,6 +274,24 @@ describe('normalizeChatEvent reads what cards need', () => {
     expect(evt.driveFiles.map(f => f.fileId).sort()).toEqual(['DOC_FROM_ATTACH', 'DOC_FROM_CHIP_1', 'DOC_FROM_TEXT_1']);
     expect(evt.messageName).toBe(`${SPACE}/messages/M1`);
     expect(evt.senderDisplayName).toBe(NAMES[OWNER]);
+  });
+
+  test('@all is flagged, never listed as a person; dialog events carry their type and form values', () => {
+    const withAll = { ...message, annotations: [
+      ...message.annotations,
+      { type: 'USER_MENTION', userMention: { user: { name: 'users/all', displayName: 'all', type: 'HUMAN' } } }
+    ] };
+    const evt = normalizeChatEvent({ chat: { messagePayload: { message: withAll, space: { name: SPACE } } } });
+    expect(evt.mentionsAll).toBe(true);
+    expect(evt.mentions.map(m => m.chatUserId)).not.toContain('users/all');
+
+    const body = buttonBody({ id: 'x', message_name: 'm', thread_name: 't' }, 'track.decision');
+    body.chat.buttonClickedPayload.isDialogEvent = true;
+    body.chat.buttonClickedPayload.dialogEventType = 'SUBMIT_DIALOG';
+    body.commonEventObject.formInputs = { decision: { stringInputs: { value: ['Use B'] } }, empty: {} };
+    expect(normalizeChatEvent(body)).toMatchObject({
+      isDialogEvent: true, dialogEventType: 'SUBMIT_DIALOG', formInputs: { decision: ['Use B'], empty: [] }
+    });
   });
 
   test('a press carries the presser and the parameters, in map or list form', () => {
@@ -632,9 +660,9 @@ describe('lifecycle', () => {
 // ============================================================================
 
 describe('immediate notifications', () => {
-  test('only the four immediate kinds may DM anyone', async () => {
+  test('only the immediate kinds may DM anyone', async () => {
     const card = await seedCard();
-    expect(notify.IMMEDIATE_KINDS).toEqual(['assigned', 'due_today', 'confirmation', 'watched_grant']);
+    expect(notify.IMMEDIATE_KINDS).toEqual(['assigned', 'due_today', 'confirmation', 'due_summary', 'watched_grant']);
     await expect(notify.notifyImmediate('status_changed', { card, chatUserId: STEPH, text: 'x' }))
       .rejects.toThrow(/not an immediate notification/);
     expect(fakes.chat.posts).toHaveLength(0);
