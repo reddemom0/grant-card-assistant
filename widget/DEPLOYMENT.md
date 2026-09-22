@@ -100,6 +100,10 @@ Add to site footer (before `</body>`):
 
 ### For /get-started/ Page (Inline Widget)
 
+> **Update 2026-09-22:** the inline widget no longer sits in a fixed 600px box. It
+> grows with the form and the conversation, and the WordPress page scrolls. The
+> snippet below is unchanged — nothing needs editing in WordPress.
+
 Replace the grant calculator form with:
 
 ```html

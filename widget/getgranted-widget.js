@@ -503,11 +503,41 @@
           margin: 0 auto;
           background: white;
           border-radius: 12px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+          border: 1px solid ${BRAND_COLORS.lightGrey};
           display: flex;
           flex-direction: column;
           min-height: 340px;
-          height: 600px;
+        }
+
+        /* Inline mode grows with its content: the page scrolls, not the widget.
+           Never set display here — .gg-form-container.hidden and
+           .gg-chat-interface.hidden have the same specificity. */
+        .gg-widget-inline .gg-form-container,
+        .gg-widget-inline .gg-chat-interface,
+        .gg-widget-inline .gg-chat-messages {
+          flex: none;
+        }
+
+        .gg-widget-inline .gg-form-container,
+        .gg-widget-inline .gg-chat-messages {
+          overflow: visible;
+        }
+
+        /* Clears the host page's sticky header when we scroll to a message */
+        .gg-widget-inline,
+        .gg-widget-inline .gg-message {
+          scroll-margin-top: 96px;
+        }
+
+        .gg-widget-inline .gg-chat-input-wrapper {
+          position: sticky;
+          bottom: 0;
+          background: white;
+          z-index: 2;
+        }
+
+        .gg-widget-inline .gg-combobox-dropdown {
+          overscroll-behavior: contain;
         }
 
         /* =================================================================== */
@@ -630,6 +660,21 @@
         .gg-message-user .gg-message-content {
           background: ${BRAND_COLORS.primary};
           color: white;
+        }
+
+        /* Inline mode on phones: give replies the full column width */
+        @media (max-width: 480px) {
+          .gg-widget-inline .gg-message-avatar {
+            display: none;
+          }
+
+          .gg-widget-inline .gg-message-content {
+            max-width: 100%;
+          }
+
+          .gg-widget-inline .gg-message-user .gg-message-content {
+            max-width: 85%;
+          }
         }
 
         .gg-typing-indicator {
@@ -966,6 +1011,7 @@
 
         .gg-form-field input[type="text"],
         .gg-form-field input[type="email"],
+        .gg-form-field input[type="tel"],
         .gg-form-field input[type="url"],
         .gg-form-field textarea {
           border: 1px solid ${BRAND_COLORS.lightGrey};
@@ -1735,7 +1781,7 @@
     `;
 
     messagesContainer.appendChild(messageDiv);
-    scrollToBottom();
+    revealMessage(messageDiv, 'nearest');
   }
 
   function createAssistantMessage(text) {
@@ -1785,7 +1831,7 @@
     errorDiv.className = 'gg-error-message';
     errorDiv.textContent = text;
     messagesContainer.appendChild(errorDiv);
-    scrollToBottom();
+    revealMessage(errorDiv, 'nearest');
   }
 
   function scrollToBottom() {
@@ -1794,6 +1840,50 @@
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }, 100);
     }
+  }
+
+  // Matches scroll-margin-top in the inline styles — clears the host page's header
+  const SCROLL_TOP_INSET = 96;
+
+  function matchesMedia(query) {
+    return typeof window.matchMedia === 'function' && window.matchMedia(query).matches;
+  }
+
+  function scrollBehavior() {
+    return matchesMedia('(prefers-reduced-motion: reduce)') ? 'auto' : 'smooth';
+  }
+
+  // Floating mode scrolls inside its own panel. Inline mode grows with the page,
+  // so the page does the scrolling: replies land on their first line, everything
+  // else only moves the page when it isn't already on screen.
+  function revealMessage(element, block) {
+    if (config.mode !== 'inline') {
+      scrollToBottom();
+      return;
+    }
+    if (!element) return;
+
+    setTimeout(() => {
+      const rect = element.getBoundingClientRect();
+      const inputWrapper = shadowRoot?.querySelector('.gg-chat-input-wrapper');
+      const bottomLimit = window.innerHeight - (inputWrapper ? inputWrapper.offsetHeight : 0);
+
+      // Already readable in full — don't move the page under the reader
+      if (rect.top >= SCROLL_TOP_INSET && rect.bottom <= bottomLimit) return;
+
+      element.scrollIntoView({ block: block, behavior: scrollBehavior() });
+    }, 100);
+  }
+
+  // Keeps the top of the form in view when the form swaps content under the reader
+  function scrollWidgetTopIntoView() {
+    if (config.mode !== 'inline') return;
+
+    const widget = shadowRoot?.querySelector('.gg-widget-inline');
+    if (!widget) return;
+    if (widget.getBoundingClientRect().top >= SCROLL_TOP_INSET) return;
+
+    widget.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
   }
 
   function showQuickActions() {
@@ -1869,7 +1959,7 @@
     const isFirstMessage = (trimmedMessage === 'Hi' && isHidden === true);
     const typingIndicator = isFirstMessage ? createEstimateLoadingMessage() : createTypingIndicator();
     messagesContainer.appendChild(typingIndicator);
-    scrollToBottom();
+    revealMessage(typingIndicator, 'nearest');
 
     let assistantWrapper = null;
     let assistantText = '';
@@ -1959,7 +2049,7 @@
               assistantWrapper = createAssistantMessage('');
               messagesContainer.appendChild(assistantWrapper);
               assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
-              scrollToBottom();
+              revealMessage(assistantWrapper, 'start');
             } else {
               typingIndicator.remove();
             }
@@ -2003,7 +2093,7 @@
         assistantWrapper = createAssistantMessage('');
         messagesContainer.appendChild(assistantWrapper);
         assistantWrapper.querySelector('.gg-message-content').innerHTML = formatAssistantMessage(assistantText);
-        scrollToBottom();
+        revealMessage(assistantWrapper, 'start');
       }
 
       // If typing indicator is still there (no response came back), remove it
@@ -2019,7 +2109,15 @@
       isWaitingForResponse = false;
       setInputEnabled(true);
       if (inputField) {
-        inputField.focus();
+        if (config.mode === 'inline') {
+          // Focusing must not scroll the page away from the reply, and on touch
+          // screens it would raise the keyboard over what was just answered
+          if (!matchesMedia('(pointer: coarse)')) {
+            inputField.focus({ preventScroll: true });
+          }
+        } else {
+          inputField.focus();
+        }
       }
 
       // Show quick actions after every agent message (using parsed suggestions)
@@ -2150,6 +2248,8 @@
 
     // Update submit button state
     updateFinalSubmitButtonState();
+
+    scrollWidgetTopIntoView();
   }
 
   function goToPage1() {
@@ -2160,6 +2260,8 @@
     shadowRoot?.getElementById('gg-step-2')?.classList.add('inactive');
     shadowRoot?.getElementById('gg-step-1')?.classList.remove('inactive');
     shadowRoot?.getElementById('gg-step-1')?.classList.add('active');
+
+    scrollWidgetTopIntoView();
   }
 
   async function submitForm() {
@@ -2277,6 +2379,7 @@
       // Transition: hide form, show chat
       if (formContainer) formContainer.classList.add('hidden');
       if (chatInterface) chatInterface.classList.remove('hidden');
+      scrollWidgetTopIntoView();
 
       // Auto-init: send simple greeting (form data already in system prompt via <lead_info>)
       setInputEnabled(false);
@@ -2476,8 +2579,7 @@
             option.classList.add('selected');
 
             // Close dropdown
-            industryInput.setAttribute('aria-expanded', 'false');
-            industryDropdown.classList.remove('open');
+            closeIndustryList();
 
             // Update validation
             updateNextButtonState();
@@ -2485,8 +2587,7 @@
         });
       }
 
-      // Open dropdown on focus (lazy-load on first open)
-      industryInput.addEventListener('focus', () => {
+      function openIndustryList(query) {
         // Lazy-load industries on first interaction
         if (!industriesLoaded) {
           loadIndustryOptions(industryDropdown);
@@ -2496,7 +2597,37 @@
 
         industryInput.setAttribute('aria-expanded', 'true');
         industryDropdown.classList.add('open');
-        filterIndustries(''); // Show all initially
+        filterIndustries(query);
+
+        // Inline mode grows with the page, so the list can open below the fold.
+        // Phones get the centred overlay instead, which needs no nudge.
+        if (config.mode === 'inline' && !matchesMedia('(max-width: 480px)')) {
+          requestAnimationFrame(() => {
+            industryDropdown.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+          });
+        }
+      }
+
+      function closeIndustryList() {
+        industryInput.setAttribute('aria-expanded', 'false');
+        industryDropdown.classList.remove('open');
+      }
+
+      // Open on focus, and on click or typing for when focus never left the field
+      industryInput.addEventListener('focus', () => {
+        openIndustryList(''); // Show all initially
+      });
+
+      industryInput.addEventListener('click', () => {
+        if (industryDropdown.classList.contains('open')) return;
+        // A chosen industry fills the input, so show the whole list again
+        openIndustryList(industryHidden.value ? '' : industryInput.value);
+      });
+
+      industryInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && industryDropdown.classList.contains('open')) {
+          closeIndustryList();
+        }
       });
 
       // Prevent click on input from closing dropdown (stop propagation)
@@ -2510,7 +2641,11 @@
       // Filter as user types
       industryInput.addEventListener('input', (e) => {
         const query = e.target.value;
-        filterIndustries(query);
+        if (industryDropdown.classList.contains('open')) {
+          filterIndustries(query);
+        } else {
+          openIndustryList(query);
+        }
 
         // Clear selection if user is typing
         if (industryHidden.value) {
@@ -2530,8 +2665,7 @@
         const clickedOutside = wrapper && !path.includes(wrapper) && !wrapper.contains(e.target);
 
         if (clickedOutside && industryDropdown.classList.contains('open')) {
-          industryInput.setAttribute('aria-expanded', 'false');
-          industryDropdown.classList.remove('open');
+          closeIndustryList();
         }
       };
 
