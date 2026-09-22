@@ -180,7 +180,9 @@ The widget uses Granted Consulting's brand colors:
 **Floating Mode:**
 - Chat bubble: 62px diameter circle
 - Chat panel: 500px wide × 680px tall (capped at `calc(100vh - 120px)`)
-- Mobile: Nearly full-width (calc(100vw - 32px))
+- Mobile (480px and below): the panel becomes a full-screen sheet (`inset: 0`,
+  `100dvh`, square corners), and the bubble hides while it is open so it can't
+  sit on top of the sheet. Close it with the × in the header.
 
 **Inline Mode:**
 - Maximum width: 720px
@@ -240,9 +242,11 @@ The widget handles:
 
 ### Shared Features
 
-- **Auto-scroll**: Floating mode scrolls its own panel to the latest message.
-  Inline mode scrolls the page to the first line of each new reply, and leaves
-  the page alone when the new content already fits on screen.
+- **Auto-scroll**: Both modes put the first line of each new reply at the top,
+  so long answers are read from their start rather than their end. Floating mode
+  scrolls inside its own panel; inline mode scrolls the host page, and leaves it
+  alone when the new content already fits on screen. Your own messages and the
+  typing indicator always go to the end of the conversation.
 - **Typing Indicator**: Three bouncing dots while waiting for response
 - **Input Auto-resize**: Textarea grows as user types (max 120px)
 - **Enter to Send**: Press Enter to send, Shift+Enter for newline

@@ -486,10 +486,42 @@
           pointer-events: auto;
         }
 
+        .gg-chat-panel .gg-message-content {
+          max-width: 90%;
+        }
+
+        .gg-chat-panel .gg-combobox-dropdown {
+          overscroll-behavior: contain;
+        }
+
+        /* Phones: the panel becomes a full-screen sheet */
         @media (max-width: 480px) {
           .gg-chat-panel {
-            width: calc(100vw - 32px);
-            height: calc(100vh - 100px);
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            max-height: none;
+            border-radius: 0;
+          }
+
+          .gg-chat-panel .gg-chat-header {
+            border-radius: 0;
+            padding-top: calc(12px + env(safe-area-inset-top));
+          }
+
+          .gg-chat-panel .gg-chat-input-wrapper {
+            padding-bottom: calc(16px + env(safe-area-inset-bottom));
+          }
+
+          .gg-chat-panel .gg-message-content {
+            max-width: 100%;
+          }
+
+          /* The bubble is painted after the panel, so it would sit on the sheet */
+          .gg-widget-floating.gg-panel-open .gg-chat-bubble {
+            display: none;
           }
         }
 
@@ -1858,6 +1890,18 @@
   // else only moves the page when it isn't already on screen.
   function revealMessage(element, block) {
     if (config.mode !== 'inline') {
+      // The panel scrolls internally. Replies start at the top of the message
+      // area; everything else (user messages, errors, typing dots) goes to the end.
+      if (block === 'start' && element && messagesContainer) {
+        setTimeout(() => {
+          const gap = element.getBoundingClientRect().top - messagesContainer.getBoundingClientRect().top;
+          messagesContainer.scrollTo({
+            top: messagesContainer.scrollTop + gap - 12,
+            behavior: scrollBehavior()
+          });
+        }, 100);
+        return;
+      }
       scrollToBottom();
       return;
     }
@@ -1884,6 +1928,14 @@
     if (widget.getBoundingClientRect().top >= SCROLL_TOP_INSET) return;
 
     widget.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
+  }
+
+  // The popout's form is its own scroll box, so a page swap has to rewind it
+  function scrollFormToTop() {
+    if (config.mode !== 'floating') return;
+
+    const formContainer = shadowRoot?.querySelector('.gg-form-container');
+    if (formContainer) formContainer.scrollTop = 0;
   }
 
   function showQuickActions() {
@@ -2115,7 +2167,8 @@
           if (!matchesMedia('(pointer: coarse)')) {
             inputField.focus({ preventScroll: true });
           }
-        } else {
+        } else if (!matchesMedia('(pointer: coarse)')) {
+          // Same reason as inline: don't raise the keyboard over a fresh reply
           inputField.focus();
         }
       }
@@ -2250,6 +2303,7 @@
     updateFinalSubmitButtonState();
 
     scrollWidgetTopIntoView();
+    scrollFormToTop();
   }
 
   function goToPage1() {
@@ -2262,6 +2316,7 @@
     shadowRoot?.getElementById('gg-step-1')?.classList.add('active');
 
     scrollWidgetTopIntoView();
+    scrollFormToTop();
   }
 
   async function submitForm() {
@@ -2380,6 +2435,7 @@
       if (formContainer) formContainer.classList.add('hidden');
       if (chatInterface) chatInterface.classList.remove('hidden');
       scrollWidgetTopIntoView();
+      scrollFormToTop();
 
       // Auto-init: send simple greeting (form data already in system prompt via <lead_info>)
       setInputEnabled(false);
@@ -2606,11 +2662,31 @@
             industryDropdown.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
           });
         }
+
+        // The popout's form is a fixed-height scroll box that would clip the list.
+        // Bring the field to the top of it and cap the list to what's left below.
+        if (config.mode === 'floating' && !matchesMedia('(max-width: 480px)')) {
+          const formContainer = shadowRoot?.querySelector('.gg-form-container');
+          if (formContainer) {
+            const gap = industryInput.getBoundingClientRect().top - formContainer.getBoundingClientRect().top;
+            formContainer.scrollTop += gap - 8;
+
+            requestAnimationFrame(() => {
+              const room = formContainer.getBoundingClientRect().bottom - industryInput.getBoundingClientRect().bottom - 8;
+              industryDropdown.style.maxHeight = Math.max(160, Math.round(room)) + 'px';
+            });
+          }
+        }
       }
 
       function closeIndustryList() {
         industryInput.setAttribute('aria-expanded', 'false');
         industryDropdown.classList.remove('open');
+
+        // Drop the popout's measured cap so the phone overlay keeps its own height
+        if (config.mode === 'floating') {
+          industryDropdown.style.maxHeight = '';
+        }
       }
 
       // Open on focus, and on click or typing for when focus never left the field
@@ -2682,13 +2758,19 @@
       const bubble = shadowRoot?.querySelector('.gg-chat-bubble');
       const panel = shadowRoot?.querySelector('.gg-chat-panel');
       const closeBtn = shadowRoot?.querySelector('.gg-close-button');
+      const floatingRoot = shadowRoot?.querySelector('.gg-widget-floating');
+
+      // On phones the panel is a full-screen sheet, so the bubble has to get out
+      // of the way while it is open and come back when it closes
+      function setPanelOpen(open) {
+        isOpen = open;
+        panel?.classList.toggle('open', open);
+        floatingRoot?.classList.toggle('gg-panel-open', open);
+      }
 
       if (bubble) {
         bubble.addEventListener('click', () => {
-          isOpen = !isOpen;
-          if (panel) {
-            panel.classList.toggle('open', isOpen);
-          }
+          setPanelOpen(!isOpen);
 
           // Hide greeting tooltip when opened
           const greeting = shadowRoot?.querySelector('.gg-greeting-tooltip');
@@ -2701,10 +2783,7 @@
       if (closeBtn) {
         closeBtn.addEventListener('click', (e) => {
           e.stopPropagation();
-          isOpen = false;
-          if (panel) {
-            panel.classList.remove('open');
-          }
+          setPanelOpen(false);
         });
       }
 
