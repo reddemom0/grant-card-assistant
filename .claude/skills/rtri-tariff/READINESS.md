@@ -230,12 +230,14 @@ client who can't qualify should never reach a paid writeup.
 
 ---
 
-## The two open items
+## The open item
 
-The eligibility of training, coaching, mentoring, and conference fees, and
-whether a business plan is required, are unconfirmed. If either comes up during
-the RA, say so — training needs Research to confirm with a PacifiCan officer;
-the business plan needs Research to confirm. Never estimate.
+The eligibility of training, coaching, mentoring, and conference fees is
+unconfirmed. If it comes up during the RA, say so — training needs Research to
+confirm with a PacifiCan officer. Never estimate.
+
+A business plan is an optional supporting document, not required (resolved
+2026-09-23 — see `PROGRAM_FACTS`).
 
 ---
 

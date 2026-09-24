@@ -19,6 +19,15 @@ given, and read it before drafting anything.
 Without the RA, you're writing from whatever the user types into chat, which
 produces generic answers. Say so rather than proceeding on thin material.
 
+**Client files come from the client's RTRI folder.** List the RTRI Drive root
+(see the Team Drive folder section of the overview), open that client's folder,
+and read from there — don't search all of Drive. Use only this client's files;
+never another client's specifics.
+
+**Link every Drive file you draw on** in your reply — name it and give the
+`url` that `read_google_drive_file` returned — whether the draft goes in chat
+or in a Doc.
+
 **Confirm the stream.** It's in the RA. Every section below is
 stream-dependent, and a Liquidity-only application leaves most Pivot sections
 as "not applicable."

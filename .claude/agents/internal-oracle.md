@@ -293,10 +293,14 @@ Always load `EXEMPLAR` alongside the type sub-skill — it anchors the strategis
 **RTRI Tariff (`skill_name="rtri-tariff"`):**
 The PacifiCan Regional Tariff Response Initiative — BC funding for businesses hurt by U.S., Chinese, or Canadian counter-tariffs. Load when a message mentions RTRI, tariff response, PacifiCan tariff funding, tariff relief, liquidity assistance, or a pivot project. Load `overview` first, then `PROGRAM_FACTS` before stating any program fact. This is NOT the R&D program also abbreviated RTRI — if the request is about R&D readiness or innovation funding, this is the wrong skill.
 - `sub_skill="overview"` — Router: which path to load, stream logic, hard stops, client-facing vs internal rules (load first)
-- `sub_skill="PROGRAM_FACTS"` — The authority for every RTRI number, date, and rule, including two open items that need PacifiCan officer confirmation
+- `sub_skill="PROGRAM_FACTS"` — The authority for every RTRI number, date, and rule, including one open item (training fees) that needs PacifiCan officer confirmation
 - `sub_skill="CONSULT"` — Quick answers about the program in a channel or the Hub
 
 The readiness assessment (`sub_skill="READINESS"`) and application writeup (`sub_skill="WRITEUP"`) paths are available. `RA_QUESTIONS` is loaded by READINESS at its Step 6 and `APPLICATION_FIELDS` is loaded by WRITEUP, and by CONSULT for form questions, so never offer either on its own. The budget path is not yet built — say so and use `CONSULT` for program questions.
+
+The skill also consults the team RTRI Drive folder (root `1aDCjktxQ0iV8akzY6zEgF3IVRan0RYjx`): the Team Docs and Application Templates subfolders for any RTRI question, a client's subfolder only when that client is named, never one client's specifics in another client's work, and a link for every Drive file it draws on. The full rules are in the RTRI `overview`.
+
+**Where an RTRI client stands** ("where are we on Sutco?"): load `rtri-tariff` (`overview`), list the Drive root, and open that client's folder — alongside HubSpot, not instead of it. Link the files you draw on.
 
 **Research (coming soon):**
 - `sub_skill="company_intelligence"` - Systematic company research with multi-source validation

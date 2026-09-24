@@ -15,11 +15,12 @@ the overview (`SKILL.md`) — required structure, cost-window and funding lines
 included, no ticks on criteria in a general answer.
 
 **Sources:** Granted RA (Fiscal 2025/2026); PacifiCan Applicant Guide for
-Businesses (modified 2026-09-14); PacifiCan — Types of RTRI support
+Businesses (modified 2026-09-21; https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html); PacifiCan — Types of RTRI support
 (https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-types-of-support.html),
 read 2026-09-17; RTRI BC Program Updates Summary (Sept 8, 2026); RTRI RA BC
 (Research, 2026-09-15); PacifiCan BC webinar notes (Sept 15, 2026).
-**Last reviewed:** 2026-09-17
+**Last reviewed:** against the Applicant Guide modified 2026-09-21; review
+performed 2026-09-23 (changes reported by Research).
 
 ---
 
@@ -28,11 +29,12 @@ read 2026-09-17; RTRI BC Program Updates Summary (Sept 8, 2026); RTRI RA BC
 | Item | Status |
 |---|---|
 | **Training / coaching / mentoring / conference fees** | Eligible under original rules; absent from current BC program pages. **Do not include in BC pivot budgets until confirmed with a PacifiCan officer.** |
-| **Business plan requirement** | Skill says optional; Sept 8 summary lists it as required. **Confirm with Research before telling a client.** |
 
-If asked about either, say it is unconfirmed: training needs Research to confirm
-with a PacifiCan officer; the business plan needs Research to confirm. Do not
-estimate.
+If asked, say it is unconfirmed: training needs Research to confirm with a
+PacifiCan officer. Do not estimate.
+
+**Resolved 2026-09-23:** the business plan is an optional supporting document,
+not required — see Required documents.
 
 ---
 
@@ -60,10 +62,10 @@ writing must be evidence-based and specific.
 | Pivot Project (repayable) | Interest-free loan | Over $1M, for larger-scale transformative projects | Up to 75% of eligible costs |
 
 **Confirmed** on PacifiCan's Types of RTRI support page (read 2026-09-17): the
-caps, shares and durations above; all pivot projects completed by no later than
-2029-03-31; businesses may apply for liquidity, pivot, or both; max $3M combined
-non-repayable ($2M liquidity + $1M pivot); max $20M total RTRI funding when
-repayable support is included.
+caps, shares and durations above; pivot projects end no later than the
+program end date of March 31, 2029; businesses may apply for liquidity, pivot,
+or both; max $3M combined non-repayable ($2M liquidity + $1M pivot); max $20M
+total RTRI funding when repayable support is included.
 
 > The Granted RA's stream table has the repayable/non-repayable labels swapped in
 > its Type column. The table above is correct: over $1M is the repayable loan.
@@ -103,7 +105,10 @@ intake status on PacifiCan's site.
 | | Start date | End date | Retroactive costs |
 |---|---|---|---|
 | **Liquidity** | On or after 2026-08-22 | ≤12 months after start; no later than 2028-03-31 | Up to 12 months prior to application receipt, no earlier than 2026-08-22 |
-| **Pivot (both)** | On or after 2026-04-01 | No later than 2029-03-31 | Up to 12 months prior to application receipt, no earlier than 2026-04-01 |
+| **Pivot (both)** | On or after 2026-04-01 | No later than the program end date of March 31, 2029 | Up to 12 months prior to application receipt, no earlier than 2026-04-01 |
+
+Pivot end date wording: "The project end date must be no later than the
+program end date of March 31, 2029." (Applicant Guide, 2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html)
 
 > Costs incurred between 2025-03-21 and 2026-03-31 are **not** eligible for pivot
 > projects.
@@ -132,12 +137,20 @@ Any NO stops the process.
 
 ## Tariff impact — must select and evidence at least one
 
+The form question (Tab 8) asks how "U.S. tariffs, Chinese tariffs and Canadian
+counter-tariffs, or the uncertainty created by these tariffs, affect your
+business." The guide links the Department of Finance list of U.S. products
+subject to Canadian counter-tariffs effective September 8, 2026:
+https://www.canada.ca/en/department-finance/news/2026/08/list-of-products-from-the-united-states-subject-to-counter-tariffs-effective-september-8-2026.html
+(Applicant Guide, 2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html)
+
 - At least 25% of revenues from exports to the U.S. or China (in the year
   leading up to March 2025, or as a 3-year average leading up to 2025-03-21)
 - Directly impacted by Section 232 tariffs — steel, aluminum, copper and
   derivatives; automobiles, trucks and parts; buses; softwood timber and lumber;
   certain upholstered furniture, kitchen cabinets and vanities; certain
-  semiconductors; patented pharmaceuticals and ingredients
+  semiconductors; patented pharmaceuticals and ingredients (Applicant Guide,
+  2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html)
 - Directly impacted by Section 338 tariffs (Smoot-Hawley Tariff Act; announced
   2026-07-20)
 - Directly impacted by Canadian tariff countermeasures
@@ -167,14 +180,14 @@ that still qualifies. Explain it explicitly.
 **Current list:** Aluminum · Automotive · Copper · Food Manufacturing ·
 Forestry · Steel
 
-Clients in these sectors — or whose tariff impact comes mainly through tariffs
-on one of them (Applicant Guide) — **must select "Other"** in the RDA Priority
-dropdown so their file is flagged and prioritized. Failure to do so may slow
-processing. This is identification only — all tariff-impacted sectors may be
-eligible, and all tariff-impacted businesses are encouraged to apply regardless
-of sector.
+Clients in these sectors — or experiencing tariff impacts primarily as a
+result of tariffs in one of them — **select "Other"** in the RDA Priority
+dropdown. The guide's stated reason: "This will ensure applications from
+businesses in these industries are easily identified." (Applicant Guide,
+2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html) It is identification only; eligibility is open to any sector
+(see Hard eligibility).
 
-**Prior to Sept 8, 2026** the prioritized list was Forestry · Metal · Machinery
+**Prior to Sept 8, 2026** the list was Forestry · Metal · Machinery
 and Equipment · Agriculture and Seafood. Metal, Machinery and Equipment, and
 Agriculture and Seafood are no longer on it.
 
@@ -197,7 +210,9 @@ plan for reimbursement.
 **Existing agreements:** A business with an existing non-repayable agreement
 can apply for liquidity; it may be added by amendment if approved.
 
-**Eligible payroll:** regular salaries and wages paid to employees working in BC.
+**Eligible payroll:** salaries and wages paid to "employees working in the
+region of Canada to which you are applying" — for a PacifiCan applicant, BC
+(Applicant Guide, 2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html).
 
 **Ineligible payroll:** contractors or contracted service providers; dividends
 or shareholder distributions; owner withdrawals; employee bonuses including
@@ -253,6 +268,17 @@ goodwill, in-kind costs, or assets purchased above fair market value · ongoing
 operating costs (cannot appear in a pivot budget) · anything not incremental,
 reasonable, and necessary.
 
+**Consulting guidance (Granted — not a guide quote):** raw materials and
+production inputs are ineligible for every project. Materials that form part of
+a project asset — e.g. the bill of materials for a new production line — are a
+capital cost, not a production input. Budget them as capital in the project
+costs table. (The guide's cost-table example lists "Materials | Capital":
+https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html)
+
+**Team guidance (Fadi, Granted) — internal, not in the guide:** "motorized
+vehicles" includes hauling equipment. If a client's case depends on this,
+confirm with PacifiCan before advising.
+
 PacifiCan makes the final determination on eligible costs and may exclude
 expenditures deemed ineligible or outside RTRI scope.
 
@@ -300,7 +326,9 @@ completion.
 
 **Jobs maintained** excludes contractors, vacant positions, future hires,
 employees elsewhere in Canada or outside Canada, and payroll covered by another
-government program. Must not exceed the FTE count reported in Tab 1.
+government program. Must not exceed "the total number of Canadian employees
+provided in the 'Organization Information' section" (Tab 1) (Applicant Guide,
+2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html).
 
 **Liquidity-only applicants:** focus on the accuracy of "jobs maintained";
 enter "not applicable" for the full project description.
@@ -339,14 +367,26 @@ agreements (third-party funding).
   for current operations, the new project alone, and combined; with all rationale
   and assumptions; may include breakeven scenarios
 - Key staff biographies
-- Business plan or pitch deck — strongly recommended, no longer mandatory
+- Business plan — optional supporting document, not required. The guide lists
+  business plans among "other attachments, such as letters of support, business
+  plans, biographies of key staff…" (Applicant Guide, 2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html)
 
 **Liquidity — additional:**
 - Payroll remittance reports — last 12 months
 - Evidence of essential operating costs — last 12 months
-- Monthly cash flow forecast — covering the requested assistance period (up to
-  12 months), with opening balance, monthly inflows/outflows, closing balance,
-  available financing, and other confirmed funding
+- Cash flow — the guide requires both: "you must provide information in the
+  cash flow table in the application portal **AND** attach a cash flow
+  forecast." Applicants "may create [their] own cash flow forecast or use"
+  PacifiCan's template, linked from the guide's Funding and Documents sections:
+  https://www.canada.ca/content/dam/ped-dep/documents/services/funding/rtri/rtri-cash-flow-template.xlsx (Applicant Guide, 2026-09-21: https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html)
+- The forecast covers the requested assistance period (up to 12 months), with
+  opening balance, monthly inflows/outflows, closing balance, available
+  financing, and other confirmed funding
+- Bank statements or other supporting documentation for the forecast amounts —
+  PacifiCan's template says:
+  "Please provide bank statements or other supporting documentation to support
+  amounts." (Cash flow forecast template, Cash Flow Forecast sheet:
+  https://www.canada.ca/content/dam/ped-dep/documents/services/funding/rtri/rtri-cash-flow-template.xlsx)
 - Liquidity attestation — separate from the main attestation
 
 **Optional, strengthens an application:** capitalization table; written
@@ -365,7 +405,8 @@ products under the Buy Canadian Policy — applicants must address this;
 inter-provincial trade and supply chain expansion; export market
 diversification).
 
-**Pivot — additional:** project and business plan quality · articulation of
+**Pivot — additional:** project plan quality (and business plan quality, if
+one is attached — it is optional) · articulation of
 growth opportunity, not just survival · market demand evidence · clear economic
 benefits for BC and Canada (productivity, market diversification, supply chain,
 value for money) · technology readiness where applicable · incrementality ·

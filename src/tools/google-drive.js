@@ -3,11 +3,13 @@
  *
  * Provides access to Google Drive files including:
  * - Search for documents
- * - Read file contents (Google Docs, PDFs, plain text)
+ * - Read file contents (Google Docs, PDFs, plain text, Word .docx, Excel .xlsx)
  */
 
 import { google } from 'googleapis';
 import { PDFParse, VerbosityLevel } from 'pdf-parse';
+import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
 
 // OAuth2 credentials from environment (for user access)
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
@@ -257,6 +259,40 @@ async function fetchDriveFileContent(drive, fileId) {
     } catch (pdfError) {
       console.error('❌ PDF text extraction failed:', pdfError.message);
       content = `[PDF file - text extraction failed: ${pdfError.message}. File size: ${response.data.byteLength} bytes]`;
+    }
+  } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    // Uploaded Word file (.docx) - download and extract raw text
+    const response = await drive.files.get({
+      fileId: fileId,
+      alt: 'media',
+      supportsAllDrives: true
+    }, { responseType: 'arraybuffer' });
+
+    try {
+      const result = await mammoth.extractRawText({ buffer: Buffer.from(response.data) });
+      content = result.value;
+      console.log(`✓ Word text extracted: ${content.length} characters`);
+    } catch (docxError) {
+      console.error('❌ Word text extraction failed:', docxError.message);
+      content = `[Word file - text extraction failed: ${docxError.message}. File size: ${response.data.byteLength} bytes]`;
+    }
+  } else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+    // Uploaded Excel file (.xlsx) - download and convert each sheet to CSV
+    const response = await drive.files.get({
+      fileId: fileId,
+      alt: 'media',
+      supportsAllDrives: true
+    }, { responseType: 'arraybuffer' });
+
+    try {
+      const workbook = XLSX.read(Buffer.from(response.data), { type: 'buffer' });
+      content = workbook.SheetNames
+        .map(name => `=== Sheet: ${name} ===\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name])}`)
+        .join('\n\n');
+      console.log(`✓ Excel text extracted: ${workbook.SheetNames.length} sheets, ${content.length} characters`);
+    } catch (xlsxError) {
+      console.error('❌ Excel text extraction failed:', xlsxError.message);
+      content = `[Excel file - text extraction failed: ${xlsxError.message}. File size: ${response.data.byteLength} bytes]`;
     }
   } else if (mimeType === 'text/plain' || mimeType.startsWith('text/')) {
     // Plain text or other text files

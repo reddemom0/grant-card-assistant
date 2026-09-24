@@ -115,7 +115,7 @@ At runtime `runAgent` appends a per-request user-identity block marked **not cac
 
 ## Skills
 
-Oracle can load **all 12** registered skills. There is no gating by agent type or role —
+Oracle can load **all 13** registered skills. There is no gating by agent type or role —
 `loadSkill` takes only `{ skill_name, sub_skill }` and validates against `SKILL_PATHS`.
 This is deliberate, so Oracle picks up new skills without enum drift.
 

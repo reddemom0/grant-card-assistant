@@ -93,9 +93,10 @@ consideration and use of Canadian technology and products; expansion of
 inter-provincial trade and supply chains.
 
 ⚠️ Businesses in aluminum, automotive, copper, food manufacturing, forestry, or
-steel — or impacted mainly through tariffs on one of those sectors — **must
-select "Other."** Failure to do so may slow processing. All tariff-impacted
-sectors may be eligible; the list only flags files.
+steel — or experiencing tariff impacts primarily as a result of tariffs in one
+of those sectors — **select "Other."** Per the guide, "This will ensure
+applications from businesses in these industries are easily identified." Any
+sector may be eligible; the list only identifies files.
 
 Prior to Sept 8, 2026 the list was forestry, metal, machinery and equipment,
 and agriculture and seafood. Don't use the old list.
@@ -171,7 +172,8 @@ employees elsewhere in Canada outside this RDA's catchment; employees outside
 Canada; payroll covered by another government program, including jobs
 maintained through an RTRI pivot project.
 
-It must not exceed the FTE count reported in Tab 1, must be current as of the
+It must not exceed the total number of Canadian employees entered in
+Organization Information (Tab 1), must be current as of the
 application date, and must be consistent with the payroll information
 supplied.
 

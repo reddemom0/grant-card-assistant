@@ -1256,7 +1256,7 @@ export const GOOGLE_DRIVE_TOOLS = [
   },
   {
     name: 'read_google_drive_file',
-    description: 'Read the contents of a specific Google Drive file. Works with Google Docs, PDFs, and text files. Accepts either a Google Drive URL (e.g., https://docs.google.com/document/d/FILE_ID/...) or just the file ID.',
+    description: 'Read the contents of a specific Google Drive file. Works with Google Docs, PDFs, text files, Word (.docx) and Excel (.xlsx) files. Accepts either a Google Drive URL (e.g., https://docs.google.com/document/d/FILE_ID/...) or just the file ID.',
     input_schema: {
       type: 'object',
       properties: {
@@ -1476,7 +1476,7 @@ Use when simple information retrieval is insufficient and you need specialized e
 
 **RTRI Tariff Skill (PacifiCan Regional Tariff Response Initiative — the BC tariff program, NOT the R&D program also abbreviated RTRI):**
 - \`overview\` - Router: which path to load, stream logic, hard stops, client-facing vs internal rules (load first)
-- \`PROGRAM_FACTS\` - The authority for every RTRI number, date, and rule: streams, caps, timelines, eligibility, eligible costs, application tabs, required documents, and two open items that need PacifiCan officer confirmation. Load before stating any program fact.
+- \`PROGRAM_FACTS\` - The authority for every RTRI number, date, and rule: streams, caps, timelines, eligibility, eligible costs, application tabs, required documents, and one open item (training fees) that needs PacifiCan officer confirmation. Load before stating any program fact.
 - \`CONSULT\` - Quick answers about the program for a channel or the Hub
 - \`READINESS\` - Runs a readiness assessment on a client: stream, pre-assessment, eligibility, tariff impact, RA questions, then the internal RA team assessment. Works in Chat; writes the completed RA to a Google Doc.
 - \`RA_QUESTIONS\` - The RA question bank. Not a path of its own: \`READINESS\` loads it at its Step 6. Don't offer it or load it standalone.

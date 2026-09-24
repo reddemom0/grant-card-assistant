@@ -63,17 +63,19 @@ answer to "would this qualify" is usually what still needs to be established.
 
 ---
 
-## The two open items
+## The open item
 
-The eligibility of training, coaching, mentoring, and conference fees, and
-whether a business plan is required, are both unresolved. If either comes up:
+The eligibility of training, coaching, mentoring, and conference fees is
+unresolved. If it comes up:
 
-> That one isn't confirmed — [training: it needs a PacifiCan officer / business
-> plan: Research needs to confirm it]. [State what the sources disagree on,
-> briefly.]
+> That one isn't confirmed — it needs a PacifiCan officer. [State what the
+> sources disagree on, briefly.]
 
 Don't split the difference, don't pick the likelier reading, don't bury it in a
-caveat at the end. Stated wrong, either one costs a client money or time.
+caveat at the end. Stated wrong, it costs a client money or time.
+
+A business plan is an optional supporting document, not required (resolved
+2026-09-23 — see `PROGRAM_FACTS`).
 
 ---
 
@@ -86,8 +88,8 @@ Worth stating proactively when adjacent to a question:
   disqualifier.
 - **Incrementality.** A pivot can't fund what the business is already doing.
 - **Evidence per box.** Every tariff impact checked must be evidenced separately.
-- **The "Other" dropdown.** Clients in the flagged sectors must select "Other" in
-  the RDA Priority dropdown or processing slows.
+- **The "Other" dropdown.** Clients in the listed sectors select "Other" in the
+  RDA Priority dropdown so their applications are easily identified.
 - **Volume, not just revenue.** If revenues held but volume fell because cost
   increases were passed to customers, that still qualifies — it just has to be
   explained.
