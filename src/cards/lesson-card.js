@@ -366,24 +366,34 @@ export async function recheckEdit(cardId, lessonId, text, actor) {
 // ============================================================================
 
 /**
- * The thread a lesson card is filed under. In a space, the real thread. A DM
- * has no thread to reply in, so its card is filed under one fixed name per DM
- * (like the intro card) — which also keeps one live lesson card per DM.
+ * The thread a lesson card is filed under and replies in: the /learn-this
+ * message's own thread, in a DM as in a space. Only a message that arrives with
+ * no thread falls back to one fixed name per space (like the intro card); such a
+ * card is posted unthreaded.
  */
-export function lessonThreadName({ surface, spaceName, threadName }) {
-  return surface === 'chat_dm' ? `${spaceName}/threads/lessons` : threadName;
-}
-
-/** The live lesson card in this thread (or DM), if any. */
-export async function liveLessonCard({ surface, spaceName, threadName }) {
-  return store.findLiveCard('lesson', lessonThreadName({ surface, spaceName, threadName }));
+export function lessonThreadName({ spaceName, threadName }) {
+  return threadName || `${spaceName}/threads/lessons`;
 }
 
 /**
- * Post the card as "Checking…" before the learn run. A lesson card already live
- * in this thread (or, in a DM, this space) is replaced first: its waiting
- * lessons are deleted and it says so. Returns the card row, or null when the card
- * couldn't be posted (the run then falls back to a text reply).
+ * The live lesson card in this thread, if any — one per thread. In a DM, where a
+ * typed "@Oracle edit lesson N: …" is often sent top-level (a new thread), `anyInDm`
+ * falls back to the teacher's newest live lesson card in that DM.
+ */
+export async function liveLessonCard({ surface, spaceName, threadName, ownerChatId = null, anyInDm = false }) {
+  const here = await store.findLiveCard('lesson', lessonThreadName({ spaceName, threadName }));
+  if (here || !anyInDm || surface !== 'chat_dm' || !ownerChatId) return here;
+  const mine = (await store.liveCardsOfType('lesson'))
+    .filter(c => c.space_name === spaceName && c.owner_chat_id === ownerChatId);
+  return mine.pop() || null;
+}
+
+/**
+ * Post the card as "Checking…" before the learn run, as a reply in the
+ * /learn-this message's thread. A lesson card already live in this thread is
+ * replaced first: its waiting lessons are deleted and it says so. Returns the
+ * card row, or null when the card couldn't be posted (the run then falls back to
+ * a text reply).
  */
 export async function startLessonCard({ spaceName, threadName, surface, conversationId, ownerChatId, ownerUserId, now = new Date() }) {
   const dm = surface === 'chat_dm';
@@ -392,15 +402,17 @@ export async function startLessonCard({ spaceName, threadName, surface, conversa
 
   try {
     const row = await store.insertCard({
-      cardType: 'lesson', status: 'open', spaceName, threadName: lessonThreadName({ surface, spaceName, threadName }),
+      cardType: 'lesson', status: 'open', spaceName, threadName: lessonThreadName({ spaceName, threadName }),
       conversationId, ownerChatId, ownerUserId,
       title: 'Lessons to confirm',
-      data: { surface, noThread: dm, phase: 'checking', items: [], outcomes: {}, known: [], overflow: 0 }
+      // Filed under the fallback name only when the message had no thread; then
+      // private replies to presses go unthreaded too (tellPresser).
+      data: { surface, noThread: !threadName, phase: 'checking', items: [], outcomes: {}, known: [], overflow: 0 }
     });
     const { renderCard } = await import('./update.js');
     const messageName = await postMessage({
       spaceName,
-      threadName: dm ? null : threadName,
+      threadName: threadName || null,
       cardsV2: await renderCard(row),
       privateTo: dm ? null : ownerChatId
     });

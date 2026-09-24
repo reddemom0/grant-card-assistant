@@ -106,11 +106,55 @@ describe('posting', () => {
     expect(card.owner_chat_id).toBe(TEACHER);
   });
 
-  test('in a DM, it is a normal card with no thread, filed under one name per DM', async () => {
+  test('in a DM, it is a normal card posted as a reply in the /learn-this message\'s thread', async () => {
     const card = await startLessonCard({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/x', surface: 'chat_dm', conversationId: null, ownerChatId: TEACHER, ownerUserId: 3 });
-    expect(fakes.chat.posts.at(-1)).toMatchObject({ spaceName: 'spaces/DM1', threadName: null, privateTo: null });
+    expect(fakes.chat.posts.at(-1)).toMatchObject({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/x', privateTo: null });
+    expect(card.thread_name).toBe('spaces/DM1/threads/x');
+    expect(card.data.noThread).toBe(false);
+    expect((await liveLessonCard({ surface: 'chat_dm', spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/x' })).id).toBe(card.id);
+  });
+
+  test('a message that arrives with no thread: the card is posted unthreaded and filed under the fallback name', async () => {
+    const card = await startLessonCard({ spaceName: 'spaces/DM1', threadName: null, surface: 'chat_dm', conversationId: null, ownerChatId: TEACHER, ownerUserId: 3 });
+    expect(fakes.chat.posts.at(-1)).toMatchObject({ threadName: null, privateTo: null });
     expect(card.thread_name).toBe('spaces/DM1/threads/lessons');
-    expect((await liveLessonCard({ surface: 'chat_dm', spaceName: 'spaces/DM1', threadName: 'anything' })).id).toBe(card.id);
+    expect(card.data.noThread).toBe(true);
+  });
+
+  test('in a DM, one live card per thread: a /learn-this in another thread gets its own card', async () => {
+    const first = await startLessonCard({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/a', surface: 'chat_dm', conversationId: null, ownerChatId: TEACHER, ownerUserId: 3 });
+    const again = await startLessonCard({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/a', surface: 'chat_dm', conversationId: null, ownerChatId: TEACHER, ownerUserId: 3 });
+    const other = await startLessonCard({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/b', surface: 'chat_dm', conversationId: null, ownerChatId: TEACHER, ownerUserId: 3 });
+    expect((await current(first.id)).status).toBe('closed');
+    expect((await current(again.id)).status).toBe('open');
+    expect((await current(other.id)).status).toBe('open');
+  });
+
+  test('a typed edit sent top-level in a DM (a new thread) still finds the teacher\'s live card there', async () => {
+    const card = await startLessonCard({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/a', surface: 'chat_dm', conversationId: null, ownerChatId: TEACHER, ownerUserId: 3 });
+    const found = await liveLessonCard({ surface: 'chat_dm', spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/new', ownerChatId: TEACHER, anyInDm: true });
+    expect(found.id).toBe(card.id);
+    // Not in a space, and never someone else's card.
+    expect(await liveLessonCard({ surface: 'chat_dm', spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/new', ownerChatId: OTHER, anyInDm: true })).toBeNull();
+    await startInSpace();
+    expect(await liveLessonCard({ surface: 'chat_space', spaceName: SPACE, threadName: `${SPACE}/threads/other`, ownerChatId: TEACHER, anyInDm: true })).toBeNull();
+  });
+
+  test('in a DM, a reply to a press goes in the card\'s thread and needs no privacy flag', async () => {
+    const card = await startLessonCard({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/a', surface: 'chat_dm', conversationId: null, ownerChatId: TEACHER, ownerUserId: 3 });
+    const { tellPresser } = await import('../../src/cards/update.js');
+    await tellPresser(await current(card.id), teacher, 'That lesson isn’t waiting any more.');
+    expect(fakes.chat.posts.at(-1)).toMatchObject({ spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/a', privateTo: null });
+  });
+
+  test('a refusal to a press is a private reply in the card\'s own thread', async () => {
+    const card = await startInSpace();
+    const id = addPending(card.id);
+    await finishLessonCard(card.id, '');
+    const { tellPresser } = await import('../../src/cards/update.js');
+    await tellPresser(await current(card.id), other, 'Only the person who ran /learn-this can save or change these lessons.');
+    expect(fakes.chat.posts.at(-1)).toMatchObject({ threadName: THREAD, privateTo: OTHER });
+    expect(lessonRows.get(id).state).toBe('pending');
   });
 
   test('nothing waiting: the card shows Oracle\'s result, closes, and nothing else is posted', async () => {

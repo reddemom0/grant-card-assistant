@@ -833,7 +833,9 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       const card = await liveLessonCard({
         surface: evt.isDm ? 'chat_dm' : 'chat_space',
         spaceName: evt.spaceId,
-        threadName: evt.threadIsResourceName ? evt.threadId : null
+        threadName: evt.threadIsResourceName ? evt.threadId : null,
+        ownerChatId: evt.senderChatId,
+        anyInDm: true
       });
       if (card) {
         await saveMessage(conversationId, 'user', messageText);

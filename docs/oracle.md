@@ -98,8 +98,9 @@ weighing changes, but it is not an open hole.
   `taught_in`; it must be applied before the DM code deploys.
   **Confirmation card.** Nothing a learn run finds is used until the teacher confirms it
   (`src/cards/lesson-card.js`, card type `lesson`). `runLearnThis` first posts the card as
-  "Checking…" (`startLessonCard`; `privateMessageViewer` to the teacher in a space, a
-  normal card in a DM, filed under `<space>/threads/lessons` since a DM has no thread), then
+  "Checking…" (`startLessonCard`) as a reply in the /learn-this message's own thread, in a
+  DM as in a space (`privateMessageViewer` to the teacher in a space, a normal card in a
+  DM; only a message with no thread falls back to `<space>/threads/lessons`, unthreaded), then
   updates it in place (`finishLessonCard`): the lessons waiting, or — when none are —
   Oracle's short result, and closes it. `save_team_lesson` saves lessons as
   `state = 'pending'` with `card_id` and a 24-hour `expires_at`; `activeLessons` reads
@@ -116,7 +117,9 @@ weighing changes, but it is not an open hole.
   and always has the typed fallback "@Oracle edit lesson N: <text>". Either way
   `recheckEdit` runs one restricted learn run with `editLessonId`, and `save_team_lesson`
   confirms that one row with the re-checked text and status. A newer /learn-this in the
-  same thread or DM replaces the live card and deletes its waiting lessons. The hourly
+  same thread replaces the live card and deletes its waiting lessons — one live card per
+  thread, in DMs too. A typed edit sent top-level in a DM (a new thread) falls back to the
+  teacher's newest live lesson card in that DM (`liveLessonCard`, `anyInDm`). The hourly
   tracked-cards job calls `expireLessonCards`: pending rows past 24 hours are deleted and
   their cards patched silently — nothing is posted. Card types now receive the pressed
   button's `params` (`handleAction`, `dialogFor`, `submitDialog`).
