@@ -175,7 +175,8 @@ async function listThreadMessages(chat, spaceName, threadName) {
   do {
     const res = await chat.spaces.messages.list({
       parent: spaceName,
-      filter: `thread.name = "${threadName}"`,
+      // Unquoted, as in the Chat API docs and src/cards/track-thread.js.
+      filter: `thread.name = ${threadName}`,
       pageSize: 100,
       orderBy: 'createTime DESC',
       pageToken

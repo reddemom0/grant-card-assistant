@@ -1083,6 +1083,17 @@ async function runLearnThis(evt, user, conversationId, messageText) {
 }
 
 /**
+ * /learn-this arriving as a registered slash command (src/cards/commands.js):
+ * the same run as the typed form. The command's text is only what followed it,
+ * so the "/learn-this" prefix is put back — in a DM that text is the lesson.
+ */
+async function runLearnThisFromCommand(evt, user) {
+  const { conversationId } = conversationIdForEvent(evt);
+  await createConversation(conversationId, user.id, 'internal-oracle', 'Chat: /learn-this');
+  await runLearnThis(evt, user, conversationId, `/learn-this ${evt.text || ''}`.trim());
+}
+
+/**
  * POST /api/chat/google
  */
 export async function handleGoogleChatEvent(req, res) {
@@ -1206,7 +1217,8 @@ export async function handleGoogleChatEvent(req, res) {
     try {
       return res.status(200).json(await handler(evt, {
         resolveUser,
-        signInReply: () => NOT_RUN_REPLIES.signIn(hubSignInUrl())
+        signInReply: () => NOT_RUN_REPLIES.signIn(hubSignInUrl()),
+        runLearnThis: runLearnThisFromCommand
       }) || {});
     } catch (err) {
       console.error(`❌ App command failed — code: ${err?.code || err?.name || 'unknown'}`);

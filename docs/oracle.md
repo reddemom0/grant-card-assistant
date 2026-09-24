@@ -70,11 +70,15 @@ weighing changes, but it is not an open hole.
   grant), limited to the thread in the verified event. **File text is never stored:**
   `runAgent` saves `[Chat attachment: name — read, not stored]` in place of attachment
   blocks and of `read_chat_attachments` results.
-- **/learn-this.** "@Oracle /learn-this" in a thread (text intent `learnIntent` in
-  `src/tools/team-lessons.js`, checked in `runOracleAndReply`; not a console slash
-  command). The slash form counts anywhere in the message as its own word — people
-  often write the lesson first and end with "/learn-this"; plain "learn this" counts only
-  at the start. It runs `runLearnThis`: the thread's transcript and files are read as the asker
+- **/learn-this.** Two ways in, one run. A registered slash command, ID 6
+  (`LEARN_COMMAND_ID` / `CHAT_LEARN_COMMAND_ID` in `src/cards/commands.js`, set up in the
+  Cloud console like /help): `handleLearnCommand` checks sign-in (`commandActor`) and calls
+  `runLearnThisFromCommand` in `chat-google.js`, passed in as `deps.runLearnThis`; the text
+  after the command is `argumentText`. And the typed fallback, "@Oracle /learn-this" in a
+  thread (text intent `learnIntent` in `src/tools/team-lessons.js`, checked in
+  `runOracleAndReply`). In the typed form the slash form counts anywhere in the message as
+  its own word — people often write the lesson first and end with "/learn-this"; plain
+  "learn this" counts only at the start. Both run `runLearnThis`: the thread's transcript and files are read as the asker
   (`readThreadTranscript`), then Oracle runs once with `allowedTools = LEARN_MODE_TOOLS`
   (read tools plus `save_team_lesson`) and posts a one- or two-line summary. Lessons go to
   `team_lessons` (`migrations/035_team_lessons.sql`, `src/database/team-lessons-store.js`)

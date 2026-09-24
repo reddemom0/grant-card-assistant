@@ -27,6 +27,13 @@
  * CHAT_MEET_COMMAND_ID (default 2), description "Find a time for a call on this
  * thread", "Open a dialog" unchecked. Typed as a reply in a thread with the
  * people @mentioned, it finds the three earliest times everyone is free.
+ *
+ * /learn-this — the same console screen: slash command "/learn-this", ID
+ * CHAT_LEARN_COMMAND_ID (default 6), description "Teach Oracle from this
+ * thread", "Open a dialog" unchecked. Runs the same /learn-this as the typed
+ * "@Oracle /learn-this" (which still works as a fallback): the lesson card in
+ * the command's thread, private to the person in a space. Text after the
+ * command is the lesson in a DM.
  */
 
 import { registerAppCommand } from './registry.js';
@@ -42,6 +49,7 @@ export const MEET_COMMAND_ID = String(process.env.CHAT_MEET_COMMAND_ID || '2');
 export const WATCH_COMMAND_ID = String(process.env.CHAT_WATCH_COMMAND_ID || '3');
 export const HELP_COMMAND_ID = String(process.env.CHAT_HELP_COMMAND_ID || '4');
 export const REVIEW_COMMAND_ID = String(process.env.CHAT_REVIEW_COMMAND_ID || '5');
+export const LEARN_COMMAND_ID = String(process.env.CHAT_LEARN_COMMAND_ID || '6');
 
 /** Google Doc ids in a message, for a review request found above the command. */
 function docLinks(text) {
@@ -98,6 +106,23 @@ export async function handleHelpCommand(evt) {
 
 export async function handleReviewCommand(evt, deps = {}) {
   runInBackground('review command', () => runReviewCommand(evt, deps));
+  return {};
+}
+
+/**
+ * /learn-this as a registered command. The learn run itself lives in the Chat
+ * adapter and is passed in (deps.runLearnThis), so card code never imports it.
+ */
+export async function handleLearnCommand(evt, deps = {}) {
+  runInBackground('learn command', async () => {
+    const who = await commandActor(evt, deps, '/learn-this');
+    if (!who.ok) return;
+    if (!deps.runLearnThis) {
+      console.warn('⚠️  /learn-this command not run — reason: no_learn_runner');
+      return;
+    }
+    await deps.runLearnThis(evt, who.user);
+  });
   return {};
 }
 
@@ -282,3 +307,4 @@ registerAppCommand(MEET_COMMAND_ID, handleMeetCommand);
 registerAppCommand(WATCH_COMMAND_ID, handleWatchCommand);
 registerAppCommand(HELP_COMMAND_ID, handleHelpCommand);
 registerAppCommand(REVIEW_COMMAND_ID, handleReviewCommand);
+registerAppCommand(LEARN_COMMAND_ID, handleLearnCommand);
