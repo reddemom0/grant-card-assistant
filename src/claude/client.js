@@ -17,6 +17,7 @@ import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
 import { streamToSSE, setupSSE, closeSSE, sendSSE, applyChatBookingSubstitution } from './streaming.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from './tool-output.js';
+import { attachmentPlaceholder } from '../tools/chat-attachments.js';
 import { BookingLinkRoutingError } from '../api/booking-link-routing.js';
 import { getQueryConfig, getQueryConfigForModel, logConfigDecision } from './query-classifier.js';
 import {
@@ -164,6 +165,34 @@ function withMessageCacheBreakpoints(messages, everyN) {
  * @param {Object} params.modelConfig - Optional model configuration overrides (maxIterations, etc)
  * @returns {Promise<Object>} Execution result
  */
+/**
+ * The user turn as saved: ephemeral attachment blocks (Chat files) become a
+ * placeholder, everything else is kept as sent.
+ *
+ * @param {Array} userContent - Content blocks sent to the model
+ * @param {Map<number, string>} ephemeralBlocks - Block index → file name
+ * @returns {Array}
+ */
+export function userContentToStore(userContent, ephemeralBlocks) {
+  return userContent.map((block, i) => (ephemeralBlocks.has(i)
+    ? { type: 'text', text: attachmentPlaceholder(ephemeralBlocks.get(i)) }
+    : block));
+}
+
+/**
+ * Tool results as saved: read_chat_attachments output (Chat file text) becomes a
+ * placeholder, everything else is kept as returned.
+ *
+ * @param {Array} toolResults - tool_result blocks sent to the model
+ * @param {Map<string, string>} toolNamesById - tool_use_id → tool name
+ * @returns {Array}
+ */
+export function toolResultsToStore(toolResults, toolNamesById) {
+  return toolResults.map(tr => (toolNamesById.get(tr.tool_use_id) === 'read_chat_attachments'
+    ? { ...tr, content: attachmentPlaceholder('files read from this thread') }
+    : tr));
+}
+
 export async function runAgent({
   agentType,
   message,
@@ -415,6 +444,9 @@ export async function runAgent({
     // ============================================================================
 
     const userContent = [];
+    // Blocks built from ephemeral attachments (Chat files), by index: the model
+    // gets their text this turn, the database gets a placeholder.
+    const ephemeralBlocks = new Map();
 
     // Add attachments (images/PDFs/documents) - these go first
     for (const attachment of attachments) {
@@ -454,6 +486,7 @@ export async function runAgent({
         console.log(`📝 Added DOCX text from ${attachment.filename} (${attachment.content.length} chars)`);
       } else if (attachment.type === 'text_file') {
         // Plain text file content - send as text block
+        if (attachment.ephemeral) ephemeralBlocks.set(userContent.length, attachment.filename);
         userContent.push({
           type: 'text',
           text: attachment.content
@@ -485,6 +518,10 @@ export async function runAgent({
       type: 'text',
       text: message
     });
+
+    // What is saved for this turn: identical, except ephemeral attachment text is
+    // replaced by a placeholder, so Chat files are never stored.
+    const userContentForStorage = userContentToStore(userContent, ephemeralBlocks);
 
     // ============================================================================
     // Build messages array
@@ -858,7 +895,7 @@ export async function runAgent({
           // only save it here if no tool loop ran (direct end_turn on first iteration).
           const { saveMessage } = await import('../database/messages.js');
           if (!userMessageSaved) {
-            await saveMessage(conversationId, 'user', userContent);
+            await saveMessage(conversationId, 'user', userContentForStorage);
             userMessageSaved = true;
           }
           await saveMessage(conversationId, 'assistant', contentToSave);
@@ -935,6 +972,7 @@ export async function runAgent({
 
         // Extract and execute tool calls
         const toolResults = [];
+        const toolNamesById = new Map();
         for (const block of fullResponse.content) {
           if (block.type === 'tool_use') {
             console.log(`\n  🛠️  Tool: ${block.name}`);
@@ -986,6 +1024,7 @@ export async function runAgent({
             // Standard tool result, wrapped in an untrusted-data envelope so the
             // model can tell retrieved content from what the team actually said.
             // Labelling only — nothing is stripped (src/claude/tool-output.js).
+            toolNamesById.set(block.id, block.name);
             toolResults.push({
               type: 'tool_result',
               tool_use_id: block.id,
@@ -1030,7 +1069,7 @@ export async function runAgent({
 
             // Save user's initial message on first tool iteration (only once)
             if (!userMessageSaved) {
-              await saveMessage(conversationId, 'user', userContent);
+              await saveMessage(conversationId, 'user', userContentForStorage);
               userMessageSaved = true;
             }
 
@@ -1049,8 +1088,9 @@ export async function runAgent({
               });
             await saveMessage(conversationId, 'assistant', toolTurnContent);
 
-            // Save the tool results
-            await saveMessage(conversationId, 'user', toolResults);
+            // Save the tool results — except Chat attachment text, which is never
+            // stored: the model has it for this turn, the database gets a note.
+            await saveMessage(conversationId, 'user', toolResultsToStore(toolResults, toolNamesById));
 
             console.log(`✓ Tool-loop messages persisted to database`);
           } catch (dbError) {
@@ -1109,7 +1149,7 @@ export async function runAgent({
         } else {
           const { saveMessage } = await import('../database/messages.js');
           if (!userMessageSaved) {
-            await saveMessage(conversationId, 'user', userContent);
+            await saveMessage(conversationId, 'user', userContentForStorage);
             userMessageSaved = true;
           }
           await saveMessage(conversationId, 'assistant', contentToSave);
@@ -1171,7 +1211,7 @@ export async function runAgent({
         } else {
           const { saveMessage } = await import('../database/messages.js');
           if (!userMessageSaved) {
-            await saveMessage(conversationId, 'user', userContent);
+            await saveMessage(conversationId, 'user', userContentForStorage);
             userMessageSaved = true;
           }
           await saveMessage(conversationId, 'assistant', contentToSave);
@@ -1211,7 +1251,7 @@ export async function runAgent({
       if (agentType !== 'lead-gen' && !userMessageSaved) {
         try {
           const { saveMessage } = await import('../database/messages.js');
-          await saveMessage(conversationId, 'user', userContent);
+          await saveMessage(conversationId, 'user', userContentForStorage);
           userMessageSaved = true;
           console.log('✓ User message saved before loop-exhaustion exit');
         } catch (dbError) {

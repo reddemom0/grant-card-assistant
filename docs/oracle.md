@@ -57,6 +57,19 @@ weighing changes, but it is not an open hole.
   headings, skipping fenced code blocks), chunked at 3500 chars on paragraph boundaries,
   posted via the service-account Chat client with markdown markup syntax.
 - **No streaming or progressive edits** — deliberately out of scope for Phase 1.
+- **Attachments.** Files on the incoming message are read before the agent runs
+  (`readAttachments` in `src/tools/chat-attachments.js`): uploads are downloaded with
+  `media.download` as Oracle's own Chat identity (`chat.bot` scope, no admin change); files
+  attached from Drive are read with the Drive reader as the sender. Both use
+  `extractFileText` in `src/tools/google-drive.js` (PDF, .docx, .xlsx, text) and the 10 MB
+  limit, enforced on the download stream since Chat attachment metadata has no size.
+  Readable files reach the model as `[Chat attachment: name]` text blocks; unreadable ones
+  get one plain line prepended to the reply (`withAttachmentNotes`). A files-only message
+  runs on `FILE_ONLY_MESSAGE`. Earlier files in the same thread are read by the
+  `read_chat_attachments` tool as the asker (`chat.messages.readonly`, the Chat-history
+  grant), limited to the thread in the verified event. **File text is never stored:**
+  `runAgent` saves `[Chat attachment: name — read, not stored]` in place of attachment
+  blocks and of `read_chat_attachments` results.
 
 ## Confirmation gate
 

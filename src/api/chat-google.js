@@ -23,6 +23,7 @@ import { createConversation, saveMessage } from '../database/messages.js';
 import { query } from '../database/connection.js';
 import { tryHandleConfirmation, currentPendingId, proposalNotice } from './confirmation.js';
 import { hubSignInUrl } from '../tools/chat-history.js';
+import { attachmentsOf, readAttachments, attachmentBlockText, unreadableLine } from '../tools/chat-attachments.js';
 import { isListenSpace } from '../chat-listen/config.js';
 import { takeCardReply, findAppCommand } from '../cards/registry.js';
 
@@ -183,6 +184,7 @@ export function normalizeChatEvent(body) {
     mentionsAll: false,
     appMentions: 0,
     driveFiles: [],
+    files: [],
     isDialogEvent: false,
     dialogEventType: null,
     formInputs: {}
@@ -286,6 +288,9 @@ export function normalizeChatEvent(body) {
     appMentions: (message?.annotations || [])
       .filter(a => a?.type === 'USER_MENTION' && a.userMention?.user?.type === 'BOT').length,
     driveFiles: readDriveFiles(message),
+    // Every file on the message, uploads and Drive attachments alike, for the
+    // attachment reader (src/tools/chat-attachments.js). Names and references only.
+    files: attachmentsOf(message),
     // Card dialogs (add-on Developer Preview; used only when TRACK_DIALOGS_ENABLED).
     isDialogEvent: payload.isDialogEvent === true,
     dialogEventType: payload.dialogEventType || null,
@@ -422,14 +427,11 @@ export function markdownToChat(md) {
 }
 
 /**
- * Said whenever a Chat message carried an uploaded file. Uploaded attachments
- * are not read at all (Stage 1), and answering as though the file had been read
- * is the failure worth avoiding: the user assumes it was. Drive files are
- * different — Oracle reads those with its Drive tools — so the notice sends the
- * user there rather than implying no file can be read in Chat.
+ * The message Oracle runs on when someone sends files with no text. It says what
+ * happened rather than inventing a question for them.
  */
-export const SKIPPED_ATTACHMENT_NOTICE =
-  "I can't open files uploaded directly to Chat, so I answered from your message only. Share it as a Google Drive link and I can read it.";
+export const FILE_ONLY_MESSAGE =
+  '[Files sent without a message. Say briefly what each attached file is, then ask what they would like done with it.]';
 
 /**
  * Said when a message is accepted but Oracle does not run on it. Plain language,
@@ -616,19 +618,19 @@ export function buildMessageRequest(evt, chunk) {
 }
 
 /**
- * Prepend the skipped-file notice when the incoming message carried one.
+ * Prepend the lines about files that couldn't be read.
  *
- * Prepended, not appended, and added before splitting — so it lands at the top
- * of the first chunk, where someone who sent a file will actually see it, rather
- * than at the end of a reply that may be several messages long.
+ * Prepended, not appended, and added before splitting — so they land at the top
+ * of the first chunk, where someone who sent a file will actually see them,
+ * rather than at the end of a reply that may be several messages long.
  *
- * @param {Object} evt - a normalizeChatEvent() result
+ * @param {string[]} notes - one plain line per unreadable file
  * @param {string} reply
  * @returns {string}
  */
-export function withAttachmentNotice(evt, reply) {
-  if (!evt?.hasAttachments) return reply;
-  return `${SKIPPED_ATTACHMENT_NOTICE}\n\n${reply}`.trim();
+export function withAttachmentNotes(notes, reply) {
+  if (!notes?.length) return reply;
+  return `${notes.join('\n')}\n\n${reply}`.trim();
 }
 
 /**
@@ -742,7 +744,7 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
     if (confirmation) {
       await saveMessage(conversationId, 'user', messageText);
       await saveMessage(conversationId, 'assistant', confirmation.replyText);
-      await safePost(evt, markdownToChat(withAttachmentNotice(evt, confirmation.replyText)));
+      await safePost(evt, markdownToChat(confirmation.replyText));
       // A tracked card in this thread may have been waiting on that proposal
       // (a review's HubSpot note): update it now rather than at the next refresh.
       try {
@@ -827,12 +829,37 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
     // gets a confirmation notice appended below.
     const pendingBefore = await currentPendingId(conversationId);
 
+    // FILES ON THIS MESSAGE. Uploads are downloaded with Oracle's own Chat
+    // identity; Drive attachments are read as the sender. The text goes to the
+    // model for this turn only — client.js saves a placeholder in its place.
+    let attachments = [];
+    let attachmentNotes = [];
+    if (evt.files.length) {
+      const results = await readAttachments(evt.files, { chat: createChatClient(), userEmail: user.email });
+      attachments = results.filter(r => r.ok).map(r => ({
+        type: 'text_file',
+        filename: r.name,
+        content: attachmentBlockText(r),
+        ephemeral: true
+      }));
+      attachmentNotes = results.filter(r => !r.ok).map(unreadableLine);
+      console.log(`📎 Chat attachments — read: ${attachments.length}, unreadable: ${attachmentNotes.length}`);
+
+      // Files only, and none of them readable: there is nothing to run on.
+      if (!evt.text && attachments.length === 0) {
+        await saveMessage(conversationId, 'user', messageText);
+        await safePost(evt, markdownToChat(attachmentNotes.join('\n')));
+        return;
+      }
+    }
+
     const result = await runAgent({
       agentType: 'internal-oracle',
       message: messageText,
       conversationId,
       userId: user.id,
       sessionId: crypto.randomUUID(),
+      attachments,
       res: null, // headless — same pattern as src/api/hubspot-webhook.js
       // Built from the Google-signed event, never from message text. A shared
       // space may only read itself; a DM may read any space the asker belongs to.
@@ -848,6 +875,7 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
         threadName: evt.threadIsResourceName ? evt.threadId : null,
         mentions: evt.mentions,
         driveFiles: evt.driveFiles,
+        attachmentNames: evt.files.map(f => f.name),
         messageText: messageText
       }
     });
@@ -882,7 +910,7 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       return;
     }
 
-    await safePost(evt, markdownToChat(withAttachmentNotice(evt, `${text}${notice || ''}`.trim())));
+    await safePost(evt, markdownToChat(withAttachmentNotes(attachmentNotes, `${text}${notice || ''}`.trim())));
   } catch (err) {
     console.error('❌ Oracle run failed for Chat event:', err);
     await safePost(evt, `Something went wrong while I was working on that: ${err.message}`);
@@ -1037,21 +1065,19 @@ export async function handleGoogleChatEvent(req, res) {
   }
 
   const senderEmail = evt.senderEmail;
-  const messageText = evt.text;
+  // Files with no text still get an answer: Oracle says what they are and asks.
+  const messageText = evt.text || (evt.files.length ? FILE_ONLY_MESSAGE : '');
 
   if (!messageText) {
     // Log the message's top-level KEYS ONLY — never values, which carry content.
-    // The Chat attachment field name is taken from the API spec and has not been
-    // confirmed against a live payload here; the first real file-only message
-    // settles it, and until then hasAttachments simply stays false.
+    // A message with files never reaches here (it runs on FILE_ONLY_MESSAGE), so
+    // this line is where an unexpected attachment field name would show up.
     console.log(`↩️  No text. Message keys: [${Object.keys(evt.message || {}).join(', ')}], attachments seen: ${evt.attachmentCount}`);
 
     // Posted asynchronously, not returned in the response body, for the same
     // reason as the intro above: this deployment parses that body as
     // RenderActions, so a { text } reply is silently dropped.
-    const reply = evt.hasAttachments
-      ? SKIPPED_ATTACHMENT_NOTICE
-      : 'Send me a question and I\'ll take a look.';
+    const reply = 'Send me a question and I\'ll take a look.';
 
     res.status(200).json({});
     safePost(evt, reply).catch(err => {

@@ -1,5 +1,5 @@
 /**
- * Google Chat message splitting and the skipped-attachment notice
+ * Google Chat message splitting and the notes about unreadable attachments
  *
  * The splitter's contract: every chunk Chat receives must render on its own.
  * A chunk that ends inside a code fence renders as an unterminated block and the
@@ -13,8 +13,7 @@ import {
   splitForChat,
   markdownToChat,
   normalizeChatEvent,
-  withAttachmentNotice,
-  SKIPPED_ATTACHMENT_NOTICE
+  withAttachmentNotes
 } from '../../src/api/chat-google.js';
 
 const LIMIT = 3500;
@@ -211,30 +210,22 @@ describe('attachment detection — presence only', () => {
   });
 });
 
-describe('the notice', () => {
-  test('is prepended once, and lands in the first chunk only', () => {
-    const evt = { hasAttachments: true };
+describe('notes about unreadable files', () => {
+  const NOTE = "I couldn't read archive.zip — that file type isn't supported.";
+
+  test('are prepended once, and land in the first chunk only', () => {
     const long = Array.from({ length: 60 }, (_, i) => `Paragraph ${i}. ${'word '.repeat(20)}`).join('\n\n');
-    const chunks = splitForChat(withAttachmentNotice(evt, long));
+    const chunks = splitForChat(withAttachmentNotes([NOTE], long));
 
     expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks[0].startsWith(SKIPPED_ATTACHMENT_NOTICE)).toBe(true);
-    const total = chunks.join('\n').split(SKIPPED_ATTACHMENT_NOTICE).length - 1;
+    expect(chunks[0].startsWith(NOTE)).toBe(true);
+    const total = chunks.join('\n').split(NOTE).length - 1;
     expect(total).toBe(1);
   });
 
-  test('is absent when no file was sent', () => {
-    expect(withAttachmentNotice({ hasAttachments: false }, 'answer')).toBe('answer');
-    expect(withAttachmentNotice(null, 'answer')).toBe('answer');
-  });
-
-  test('says what happened and where to go instead', () => {
-    expect(SKIPPED_ATTACHMENT_NOTICE).toMatch(/uploaded directly to Chat/i);
-    expect(SKIPPED_ATTACHMENT_NOTICE).toMatch(/Google Drive link/i);
-  });
-
-  test('never implies Drive files are unreadable in Chat', () => {
-    expect(SKIPPED_ATTACHMENT_NOTICE).not.toMatch(/can't read files/i);
-    expect(SKIPPED_ATTACHMENT_NOTICE).not.toMatch(/use the Hub/i);
+  test('are absent when every file was read', () => {
+    expect(withAttachmentNotes([], 'answer')).toBe('answer');
+    expect(withAttachmentNotes(null, 'answer')).toBe('answer');
   });
 });
+

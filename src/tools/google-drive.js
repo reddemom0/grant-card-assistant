@@ -214,11 +214,100 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
 // Uploaded files above this are never downloaded. Office files are zip archives
 // that inflate well beyond their stored size, so this bounds memory and parse time
 // for PDFs, Word and Excel. Native Google Docs have no stored size and are exported.
-const MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024;
+// Shared with Chat attachments (src/tools/chat-attachments.js).
+export const MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024;
 
 // Row cap per Excel sheet: the size check is on the compressed file, so this bounds
 // what a small but highly compressed workbook can expand into.
 const MAX_SHEET_ROWS = 5000;
+
+const PDF_TYPE = 'application/pdf';
+const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const XLSX_TYPE = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+// Used only when the declared type is missing or generic (Chat sometimes sends
+// application/octet-stream for uploads).
+const TYPE_BY_EXTENSION = { pdf: PDF_TYPE, docx: DOCX_TYPE, xlsx: XLSX_TYPE, txt: 'text/plain', csv: 'text/csv', md: 'text/markdown' };
+
+/**
+ * Which parser a file needs, from its declared type or, failing that, its name.
+ * @param {string} mimeType
+ * @param {string} [name]
+ * @returns {'pdf'|'docx'|'xlsx'|'text'|null} null when unsupported
+ */
+export function fileKind(mimeType, name = '') {
+  let type = mimeType || '';
+  if (!type || type === 'application/octet-stream') {
+    const ext = String(name).split('.').pop().toLowerCase();
+    type = TYPE_BY_EXTENSION[ext] || type;
+  }
+  if (type === PDF_TYPE) return 'pdf';
+  if (type === DOCX_TYPE) return 'docx';
+  if (type === XLSX_TYPE) return 'xlsx';
+  if (type.startsWith('text/')) return 'text';
+  return null;
+}
+
+/**
+ * Extract readable text from a downloaded file's bytes. The one set of parsers
+ * shared by Drive files and Chat attachments.
+ *
+ * A parse failure is returned as a bracketed note in `content`, not thrown, so the
+ * agent can say the file couldn't be read instead of reporting a tool error.
+ *
+ * @param {Object} params
+ * @param {Buffer} params.buffer - File bytes
+ * @param {string} params.mimeType - Declared MIME type
+ * @param {string} [params.name] - File name, used when the type is generic
+ * @returns {Promise<{supported: boolean, content: string}>}
+ */
+export async function extractFileText({ buffer, mimeType, name = '' }) {
+  const kind = fileKind(mimeType, name);
+  if (!kind) return { supported: false, content: '' };
+
+  if (kind === 'pdf') {
+    console.log('📄 Extracting text from PDF...');
+    try {
+      // Extract text from PDF using pdf-parse v2 (PDFParse class API)
+      const parser = new PDFParse({ data: buffer, verbosity: VerbosityLevel.ERRORS });
+      const pdfData = await parser.getText();
+      console.log(`✓ PDF text extracted: ${pdfData.total} pages, ${pdfData.text.length} characters`);
+      return { supported: true, content: pdfData.text };
+    } catch (pdfError) {
+      console.error('❌ PDF text extraction failed:', pdfError.message);
+      return { supported: true, content: `[PDF file - text extraction failed: ${pdfError.message}. File size: ${buffer.byteLength} bytes]` };
+    }
+  }
+
+  if (kind === 'docx') {
+    try {
+      const result = await mammoth.extractRawText({ buffer });
+      console.log(`✓ Word text extracted: ${result.value.length} characters`);
+      return { supported: true, content: result.value };
+    } catch (docxError) {
+      console.error('❌ Word text extraction failed:', docxError.message);
+      return { supported: true, content: `[Word file - text extraction failed: ${docxError.message}. File size: ${buffer.byteLength} bytes]` };
+    }
+  }
+
+  if (kind === 'xlsx') {
+    try {
+      // Each sheet as CSV
+      const workbook = XLSX.read(buffer, { type: 'buffer', sheetRows: MAX_SHEET_ROWS });
+      const content = workbook.SheetNames
+        .map(sheet => `=== Sheet: ${sheet} ===\n${XLSX.utils.sheet_to_csv(workbook.Sheets[sheet])}`)
+        .join('\n\n');
+      console.log(`✓ Excel text extracted: ${workbook.SheetNames.length} sheets, ${content.length} characters`);
+      return { supported: true, content };
+    } catch (xlsxError) {
+      console.error('❌ Excel text extraction failed:', xlsxError.message);
+      return { supported: true, content: `[Excel file - text extraction failed: ${xlsxError.message}. File size: ${buffer.byteLength} bytes]` };
+    }
+  }
+
+  // Plain text or other text files
+  return { supported: true, content: buffer.toString('utf8') };
+}
 
 /**
  * Fetch one file's metadata and text content with an already-authenticated client
@@ -259,7 +348,6 @@ async function fetchDriveFileContent(drive, fileId) {
     };
   }
 
-  // Handle different file types
   if (mimeType === 'application/vnd.google-apps.document') {
     // Google Docs - export as plain text
     // files.export takes no supportsAllDrives parameter; it resolves by file ID
@@ -269,68 +357,14 @@ async function fetchDriveFileContent(drive, fileId) {
       mimeType: 'text/plain'
     });
     content = response.data;
-  } else if (mimeType === 'application/pdf') {
-    // PDF - download and extract text
-    console.log('📄 Extracting text from PDF...');
+  } else if (fileKind(mimeType)) {
+    // Uploaded file (PDF, Word, Excel, text) - download the bytes and parse
     const response = await drive.files.get({
       fileId: fileId,
       alt: 'media',
       supportsAllDrives: true
     }, { responseType: 'arraybuffer' });
-
-    try {
-      // Extract text from PDF using pdf-parse v2 (PDFParse class API)
-      const pdfBuffer = Buffer.from(response.data);
-      const parser = new PDFParse({ data: pdfBuffer, verbosity: VerbosityLevel.ERRORS });
-      const pdfData = await parser.getText();
-      content = pdfData.text;
-      console.log(`✓ PDF text extracted: ${pdfData.total} pages, ${content.length} characters`);
-    } catch (pdfError) {
-      console.error('❌ PDF text extraction failed:', pdfError.message);
-      content = `[PDF file - text extraction failed: ${pdfError.message}. File size: ${response.data.byteLength} bytes]`;
-    }
-  } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-    // Uploaded Word file (.docx) - download and extract raw text
-    const response = await drive.files.get({
-      fileId: fileId,
-      alt: 'media',
-      supportsAllDrives: true
-    }, { responseType: 'arraybuffer' });
-
-    try {
-      const result = await mammoth.extractRawText({ buffer: Buffer.from(response.data) });
-      content = result.value;
-      console.log(`✓ Word text extracted: ${content.length} characters`);
-    } catch (docxError) {
-      console.error('❌ Word text extraction failed:', docxError.message);
-      content = `[Word file - text extraction failed: ${docxError.message}. File size: ${response.data.byteLength} bytes]`;
-    }
-  } else if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
-    // Uploaded Excel file (.xlsx) - download and convert each sheet to CSV
-    const response = await drive.files.get({
-      fileId: fileId,
-      alt: 'media',
-      supportsAllDrives: true
-    }, { responseType: 'arraybuffer' });
-
-    try {
-      const workbook = XLSX.read(Buffer.from(response.data), { type: 'buffer', sheetRows: MAX_SHEET_ROWS });
-      content = workbook.SheetNames
-        .map(name => `=== Sheet: ${name} ===\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name])}`)
-        .join('\n\n');
-      console.log(`✓ Excel text extracted: ${workbook.SheetNames.length} sheets, ${content.length} characters`);
-    } catch (xlsxError) {
-      console.error('❌ Excel text extraction failed:', xlsxError.message);
-      content = `[Excel file - text extraction failed: ${xlsxError.message}. File size: ${response.data.byteLength} bytes]`;
-    }
-  } else if (mimeType === 'text/plain' || mimeType.startsWith('text/')) {
-    // Plain text or other text files
-    const response = await drive.files.get({
-      fileId: fileId,
-      alt: 'media',
-      supportsAllDrives: true
-    }, { responseType: 'text' });
-    content = response.data;
+    ({ content } = await extractFileText({ buffer: Buffer.from(response.data), mimeType, name: metadata.data.name }));
   } else {
     return {
       success: false,

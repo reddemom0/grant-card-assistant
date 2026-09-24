@@ -621,6 +621,17 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
       }
 
+      // Earlier files in the current Chat thread. Thread and space come from the
+      // verified Chat event via options, never from input.
+      case 'read_chat_attachments': {
+        const { readThreadAttachments } = await import('./chat-attachments.js');
+        result = await readThreadAttachments(input, {
+          userId,
+          chatContext: options.chatContext || { surface: 'none' }
+        });
+        break;
+      }
+
       // Tracked review card. Oracle-only; mentions, Doc links, space and thread
       // come from the verified Chat event via options, never from input.
       case 'track_review': {

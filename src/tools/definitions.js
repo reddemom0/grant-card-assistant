@@ -2341,6 +2341,20 @@ export const CHAT_HISTORY_TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'read_chat_attachments',
+    description: 'Read files attached to EARLIER messages in the current Google Chat thread, as the person asking — use this when someone refers to a file sent before their current message ("what did that PDF say about…"). Files on the current message are already given to you with it; don\'t call this for those. Reads only this thread. Reads PDF, Word (.docx), Excel (.xlsx), text, and files attached from Drive; at most 5 files, 10 MB each. Cite what you use by file name.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        file_name: {
+          type: 'string',
+          description: 'Part of the file name to read, e.g. "budget" or "report.pdf". Omit to read the most recent files in the thread.'
+        }
+      },
+      required: []
+    }
   }
 ];
 
