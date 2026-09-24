@@ -196,22 +196,17 @@ Dropbox-sourced.
 - Oracle prompt advertises 7 of 12 loadable skills
 - Three of eleven users lack a usable HubSpot owner ID
 - Confirmation gate has no meaning on headless surfaces
-- .docx and .xlsx can't be read from Drive — queued 2026-09-16, not built.
-  `fetchDriveFileContent` in `src/tools/google-drive.js` rejects them as unsupported and
-  Oracle declines cleanly. Converting via `files.copy` is ruled out: it needs full `drive`
-  scope, creates files in client folders, and can't run as the service account (no
-  storage quota). Agreed approach: download the bytes and parse in-process, as
-  `src/tools/dropbox.js`, `src/tools/hubspot.js` and `src/api/chat.js` already do.
-  - Stage 1: .docx via `mammoth` (no advisories), with a file size check before
-    download. Office files are zip archives and nothing guards size today.
-  - Stage 2: .xlsx, pending a library decision. SheetJS (`xlsx` 0.18.5) has a high
-    advisory with no npm fix and already parses user uploads in `chat.js`; `exceljs`
-    avoids it but can't read .xls.
-  - Stage 3: clearer declines for .doc, .xls, .pptx, and native Sheets and Slides.
-  - Update 2026-09-24: .docx and .xlsx reading shipped in `bce2877b` (`fetchDriveFileContent`)
-    without following this plan — no size check before download, and .xlsx uses SheetJS
-    (`xlsx`), the library with the open advisory. The Stage 1 size guard and the Stage 2
-    library decision are still open.
+- Drive file reading: clearer declines for .doc, .xls, .pptx, and native Sheets and Slides
+  are still to do (Stage 3 of the 2026-09-16 plan). Stages 1 and 2 are done:
+  `fetchDriveFileContent` in `src/tools/google-drive.js` reads .docx (`mammoth`) and .xlsx
+  (SheetJS) by downloading the bytes and parsing in-process. Files over 10 MB (`size` from
+  Drive metadata) are never downloaded; Oracle gets a "too large to read, ask for a smaller
+  export" note instead of an error. Excel parsing is capped at 5,000 rows per sheet, since
+  the size check is on the compressed file. `xlsx` is SheetJS 0.20.3 installed from the
+  official SheetJS CDN tarball (SheetJS no longer publishes to npm; 0.18.5 on npm has
+  unfixed high advisories). `npm outdated` and Dependabot do not track it — check
+  https://cdn.sheetjs.com for new versions. The same package also parses Hub chat uploads
+  in `src/api/chat.js`.
 - Honesty checks (`scripts/oracle-checks/run-honesty-checks.mjs`, 2026-09-24): check c
   (Pazmac Tab 8 draft) still fails after four rounds of prompt changes. `[TO CONFIRM]` lands
   in a list below the draft instead of inline, disputed figures ($3.3M vs $3.5M) are

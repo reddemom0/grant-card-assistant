@@ -211,6 +211,15 @@ export async function readGoogleDriveFile(fileIdOrUrl, userEmail = null) {
   }
 }
 
+// Uploaded files above this are never downloaded. Office files are zip archives
+// that inflate well beyond their stored size, so this bounds memory and parse time
+// for PDFs, Word and Excel. Native Google Docs have no stored size and are exported.
+const MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024;
+
+// Row cap per Excel sheet: the size check is on the compressed file, so this bounds
+// what a small but highly compressed workbook can expand into.
+const MAX_SHEET_ROWS = 5000;
+
 /**
  * Fetch one file's metadata and text content with an already-authenticated client
  * @param {Object} drive - Authenticated Google Drive client
@@ -221,7 +230,7 @@ async function fetchDriveFileContent(drive, fileId) {
   // Get file metadata first
   const metadata = await drive.files.get({
     fileId: fileId,
-    fields: 'id, name, mimeType, webViewLink',
+    fields: 'id, name, mimeType, webViewLink, size',
     supportsAllDrives: true
   });
 
@@ -229,6 +238,26 @@ async function fetchDriveFileContent(drive, fileId) {
   const mimeType = metadata.data.mimeType;
 
   console.log(`Reading file: ${metadata.data.name} (${mimeType})`);
+
+  // Too large to download: return a readable note rather than an error, so the
+  // agent can ask for a smaller export instead of reporting a failure.
+  const sizeBytes = Number(metadata.data.size);
+  if (sizeBytes > MAX_DOWNLOAD_BYTES) {
+    const mb = bytes => (bytes / (1024 * 1024)).toFixed(1);
+    console.log(`⚠️  File too large to read: ${metadata.data.name} (${mb(sizeBytes)} MB)`);
+    return {
+      success: true,
+      file: {
+        id: metadata.data.id,
+        name: metadata.data.name,
+        type: metadata.data.mimeType,
+        url: metadata.data.webViewLink
+      },
+      content: `[File too large to read (${mb(sizeBytes)} MB; limit ${mb(MAX_DOWNLOAD_BYTES)} MB). Ask for a smaller export — for example just the relevant sheet or pages.]`,
+      tooLarge: true,
+      truncated: false
+    };
+  }
 
   // Handle different file types
   if (mimeType === 'application/vnd.google-apps.document') {
@@ -285,7 +314,7 @@ async function fetchDriveFileContent(drive, fileId) {
     }, { responseType: 'arraybuffer' });
 
     try {
-      const workbook = XLSX.read(Buffer.from(response.data), { type: 'buffer' });
+      const workbook = XLSX.read(Buffer.from(response.data), { type: 'buffer', sheetRows: MAX_SHEET_ROWS });
       content = workbook.SheetNames
         .map(name => `=== Sheet: ${name} ===\n${XLSX.utils.sheet_to_csv(workbook.Sheets[name])}`)
         .join('\n\n');
