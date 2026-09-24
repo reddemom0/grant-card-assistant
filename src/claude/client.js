@@ -165,15 +165,22 @@ function withMessageCacheBreakpoints(messages, everyN) {
  * @param {Object} params.modelConfig - Optional model configuration overrides (maxIterations, etc)
  * @returns {Promise<Object>} Execution result
  */
+// Tools that exist only for a run that names them in allowedTools. A normal turn
+// never sees them, so it can't attempt one (and then report a refusal as success).
+const RUN_ONLY_TOOLS = ['save_team_lesson'];
+
 /**
  * The tools one run may use: the agent's set, narrowed to allowedTools when given.
+ * Run-only tools (save_team_lesson) are left out unless allowedTools names them.
  * @param {string} agentType
  * @param {string[]|null} allowedTools
  * @returns {Array}
  */
 export function toolsForRun(agentType, allowedTools = null) {
   const tools = getToolsForAgent(agentType);
-  return allowedTools ? tools.filter(t => allowedTools.includes(t.name)) : tools;
+  return allowedTools
+    ? tools.filter(t => allowedTools.includes(t.name))
+    : tools.filter(t => !RUN_ONLY_TOOLS.includes(t.name));
 }
 
 /**
@@ -278,17 +285,18 @@ export async function runAgent({
       console.log(`✓ No learned patterns available yet (feedback learning will run as feedback is collected)`);
     }
 
-    // Team notes taught in Chat with /learn-this (general ones; skill-tagged ones
-    // arrive with that skill's overview). Oracle only. Uses are logged to the same
-    // learning_applications audit table as the feedback files.
+    // Team notes taught in Chat with /learn-this — every active one, grouped by
+    // skill, so none depends on which skill file the model loads. Oracle only.
+    // Uses are logged to the same learning_applications audit table as the
+    // feedback files.
     let teamNotes = '';
     if (agentType === 'internal-oracle') {
       try {
         const { activeLessons, formatLessons } = await import('../database/team-lessons-store.js');
-        const lessons = await activeLessons({ skill: null });
+        const lessons = await activeLessons();
         teamNotes = formatLessons(lessons);
         if (lessons.length) {
-          console.log(`✓ ${lessons.length} general team notes added`);
+          console.log(`✓ ${lessons.length} team notes added`);
           const { saveLearningApplication } = await import('../database/learning-tracking.js');
           await saveLearningApplication(agentType, conversationId, userId, ['team_lessons'], lessons[0].created_at)
             .catch(err => console.warn(`⚠️  Team notes use not logged: ${err.code || err.message}`));

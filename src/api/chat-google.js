@@ -940,7 +940,7 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
  * attachments, the saved history keeps placeholders.
  */
 async function runLearnThis(evt, user, conversationId, messageText) {
-  const { buildLearnMessage, textAfterCommand, LEARN_MODE_TOOLS } = await import('../tools/team-lessons.js');
+  const { buildLearnMessage, textWithoutCommand, LEARN_MODE_TOOLS } = await import('../tools/team-lessons.js');
   const { readThreadTranscript, readRecentDmMessages } = await import('../tools/chat-attachments.js');
 
   const learnContext = {
@@ -963,7 +963,7 @@ async function runLearnThis(evt, user, conversationId, messageText) {
   let messages;
   let results;
   if (evt.isDm) {
-    const inline = textAfterCommand(messageText);
+    const inline = textWithoutCommand(messageText);
     if (inline || evt.files.length) {
       // The lesson is in this message. Its files are read with Oracle's own
       // identity, like any file sent to it; no other messages are read.

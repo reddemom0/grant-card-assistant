@@ -11,8 +11,13 @@
 import { saveLesson, LESSON_STATUSES } from '../database/team-lessons-store.js';
 import { threadLink } from './chat-history.js';
 
-/** "/learn-this", "learn this", "learn-this" at the start of the message. */
-const LEARN = /^\s*\/?learn[\s-]this\b/i;
+/**
+ * The command. The slash form counts anywhere in the message, as its own word —
+ * people write the lesson first and add "/learn-this" at the end. The plain form
+ * ("learn this") counts only at the start, so "can you learn this" is a question.
+ */
+const SLASH_COMMAND = /(^|\s)\/learn[\s-]?this(?=$|[\s.,!?;:])/gi;
+const PLAIN_COMMAND = /^\s*learn[\s-]this(?=$|[\s.,!?;:])/i;
 
 /**
  * Is this @Oracle message the /learn-this command?
@@ -20,7 +25,8 @@ const LEARN = /^\s*\/?learn[\s-]this\b/i;
  * @returns {boolean}
  */
 export function learnIntent(text) {
-  return LEARN.test(String(text || ''));
+  const t = String(text || '');
+  return new RegExp(SLASH_COMMAND.source, 'i').test(t) || PLAIN_COMMAND.test(t);
 }
 
 /**
@@ -37,12 +43,18 @@ export const LEARN_MODE_TOOLS = [
 ];
 
 /**
- * The text after the command, if any: "/learn-this pivot costs exclude X" → "pivot costs exclude X".
+ * The message with the command taken out, wherever it was:
+ * "Pivot costs exclude X. /learn-this" → "Pivot costs exclude X."
  * @param {string} text
  * @returns {string}
  */
-export function textAfterCommand(text) {
-  return String(text || '').replace(LEARN, '').trim();
+export function textWithoutCommand(text) {
+  return String(text || '')
+    .replace(SLASH_COMMAND, '$1')
+    .replace(PLAIN_COMMAND, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,!?;:])/g, '$1')
+    .trim();
 }
 
 /**
@@ -59,7 +71,7 @@ export function textAfterCommand(text) {
  * @returns {string}
  */
 export function buildLearnMessage(messages, askerText = '', { dm = false } = {}) {
-  const extra = textAfterCommand(askerText);
+  const extra = textWithoutCommand(askerText);
   const transcript = messages.map(m => {
     const files = m.files?.length ? ` [attached: ${m.files.join(', ')}]` : '';
     return `- ${m.sender} (${m.time || 'undated'}): ${m.text || '(no text)'}${files}`;

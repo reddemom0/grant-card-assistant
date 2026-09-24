@@ -1031,7 +1031,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await loadSkill({
           skill_name: input.skill_name,
           sub_skill: input.sub_skill
-        }, { agentType, conversationId, userId });
+        });
         break;
 
       // ============================================================================

@@ -9,7 +9,7 @@
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest tests/unit/team-lessons.test.js
  */
 
-import { learnIntent, buildLearnMessage, saveTeamLesson, lessonRow, textAfterCommand, LEARN_MODE_TOOLS } from '../../src/tools/team-lessons.js';
+import { learnIntent, buildLearnMessage, saveTeamLesson, lessonRow, textWithoutCommand, LEARN_MODE_TOOLS } from '../../src/tools/team-lessons.js';
 import { selectRecentOwnMessages, DM_LEARN_WINDOW_MS } from '../../src/tools/chat-attachments.js';
 import { formatLessons } from '../../src/database/team-lessons-store.js';
 import { userContentToStore, toolsForRun } from '../../src/claude/client.js';
@@ -22,8 +22,28 @@ describe('the command', () => {
     expect(learnIntent(text)).toBe(true);
   });
 
-  test.each(['can you learn this for me', 'learnthis', '/learn', 'what did you learn this week', ''])('"%s" is not', text => {
+  // How it was actually used: the lesson first, the command last.
+  test.each([
+    'PacifiCan said at the webinar they aim to acknowledge complete applications within 10 business days. /learn-this',
+    'PacifiCan said X.  /learn-this',
+    'Heads up /learn-this: X',
+    'X is true /learn-this.',
+    'X is true /learn this'
+  ])('"%s" — the slash form counts anywhere', text => {
+    expect(learnIntent(text)).toBe(true);
+  });
+
+  test.each(['can you learn this for me', 'learnthis', '/learn', 'what did you learn this week', 'see /learn-things', '/learn-thisx', ''])('"%s" is not', text => {
     expect(learnIntent(text)).toBe(false);
+  });
+
+  test.each([
+    ['PacifiCan aims for 10 business days. /learn-this', 'PacifiCan aims for 10 business days.'],
+    ['/learn-this PacifiCan aims for 10 business days', 'PacifiCan aims for 10 business days'],
+    ['Heads up /learn-this: X', 'Heads up: X'],
+    ['learn this', '']
+  ])('the command is taken out wherever it is: "%s"', (text, expected) => {
+    expect(textWithoutCommand(text)).toBe(expected);
   });
 });
 
@@ -39,6 +59,12 @@ describe('the learn run', () => {
     const restricted = toolsForRun('internal-oracle', LEARN_MODE_TOOLS).map(t => t.name);
     expect(new Set(restricted)).toEqual(new Set(LEARN_MODE_TOOLS));
     expect(toolsForRun('internal-oracle').length).toBeGreaterThan(restricted.length);
+  });
+
+  test('a normal turn is never offered save_team_lesson — it can only be used in a learn run', () => {
+    const normal = toolsForRun('internal-oracle').map(t => t.name);
+    expect(normal).not.toContain('save_team_lesson');
+    expect(normal).toContain('read_chat_space_history');
   });
 
   test('the message carries the transcript in order, with files named', () => {
@@ -116,6 +142,22 @@ describe('how lessons are labelled in answers', () => {
     expect(block).toMatch(/\(verified — Applicant Guide \(https:\/\/example\.ca\/guide\)\)/);
   });
 
+  test('skill notes arrive in the one block, grouped by skill, general last — no skill file needed', () => {
+    const block = formatLessons([
+      { ...base, status: 'unverified', skill: null, topic: 'client onboarding' },
+      { ...base, status: 'unverified', skill: 'rtri-tariff', topic: 'acknowledgement time' },
+      { ...base, status: 'unverified', skill: 'canexport-writer', topic: 'claim timing' }
+    ]);
+    const canexport = block.indexOf('### canexport-writer');
+    const rtri = block.indexOf('### rtri-tariff');
+    const general = block.indexOf('### General');
+    expect(canexport).toBeGreaterThan(-1);
+    expect(rtri).toBeGreaterThan(canexport);
+    expect(general).toBeGreaterThan(rtri);
+    expect(block.indexOf('acknowledgement time')).toBeGreaterThan(rtri);
+    expect(block.indexOf('acknowledgement time')).toBeLessThan(general);
+  });
+
   test('a conflict says the official source wins', () => {
     const block = formatLessons([{ ...base, status: 'conflict', source_label: "Granted's RTRI notes" }]);
     expect(block).toMatch(/conflicts with Granted's RTRI notes — the official source wins/);
@@ -134,8 +176,8 @@ describe('/learn-this in a direct message', () => {
   const lesson = { lesson: 'Acknowledgement comes within 10 business days.', topic: 'acknowledgement time', status: 'unverified' };
 
   test('the text after the command is the lesson', () => {
-    expect(textAfterCommand('/learn-this acknowledgement takes 10 business days')).toBe('acknowledgement takes 10 business days');
-    expect(textAfterCommand('learn this')).toBe('');
+    expect(textWithoutCommand('/learn-this acknowledgement takes 10 business days')).toBe('acknowledgement takes 10 business days');
+    expect(textWithoutCommand('acknowledgement takes 10 business days /learn-this')).toBe('acknowledgement takes 10 business days');
   });
 
   test('the learn message says who is teaching and shows what they sent', () => {

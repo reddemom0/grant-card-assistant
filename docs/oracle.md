@@ -72,19 +72,24 @@ weighing changes, but it is not an open hole.
   blocks and of `read_chat_attachments` results.
 - **/learn-this.** "@Oracle /learn-this" in a thread (text intent `learnIntent` in
   `src/tools/team-lessons.js`, checked in `runOracleAndReply`; not a console slash
-  command) runs `runLearnThis`: the thread's transcript and files are read as the asker
+  command). The slash form counts anywhere in the message as its own word — people
+  often write the lesson first and end with "/learn-this"; plain "learn this" counts only
+  at the start. It runs `runLearnThis`: the thread's transcript and files are read as the asker
   (`readThreadTranscript`), then Oracle runs once with `allowedTools = LEARN_MODE_TOOLS`
   (read tools plus `save_team_lesson`) and posts a one- or two-line summary. Lessons go to
   `team_lessons` (`migrations/035_team_lessons.sql`, `src/database/team-lessons-store.js`)
   with status verified / unverified / conflict, source, teacher, and thread link;
-  `save_team_lesson` is refused outside a learn run, and where a lesson came from is taken
-  from the verified event. Lessons reach answers as labelled "Team notes": skill-tagged
-  ones appended to that skill's `overview` by `loadSkill`, general ones as a system block
-  in `runAgent`, both Oracle-only, with uses logged to `learning_applications`. Official
-  sources win over notes. Lessons are used in every space, DM and the Hub, so only general
-  knowledge is saved, never client specifics. The transcript and file text are not stored.
-  **In a DM** the source is the person's own message: the text after the command plus
-  that message's files (read with Oracle's own identity), or, when the command is sent
+  `save_team_lesson` is offered only in a learn run (`toolsForRun` in `client.js` drops it
+  unless `allowedTools` names it) and refused outside one, and where a lesson came from
+  is taken from the verified event. Lessons reach answers as one labelled "Team notes"
+  system block in `runAgent` — every active lesson, grouped by skill, capped at 40 — so
+  a note doesn't depend on which skill file the model loads. Oracle-only, with uses
+  logged to `learning_applications`. Official sources win over notes. Lessons are used in
+  every space, DM and the Hub, so only general knowledge is saved, never client
+  specifics. The transcript and file text are not stored.
+  **In a DM** the source is the person's own message: its text with the command removed
+  (`textWithoutCommand`), plus that message's files (read with Oracle's own identity),
+  or, when the command is sent
   alone, their messages from the last 10 minutes, at most 5 (`readRecentDmMessages`, as
   the asker; `selectRecentOwnMessages` picks them). A DM lesson is still team-wide, but
   `lessonRow` stores it with `taught_in = 'dm'`, the DM person as teacher, and no thread

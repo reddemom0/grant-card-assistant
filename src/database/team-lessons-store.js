@@ -2,20 +2,18 @@
  * Team lessons — what the team taught Oracle with "@Oracle /learn-this"
  *
  * Table from migrations/035_team_lessons.sql. Lessons are written only by the
- * save_team_lesson tool during a /learn-this run, and read back into answers
- * labelled as team notes: skill-tagged ones when that skill's overview loads
- * (src/tools/load-skill.js), general ones in runAgent's learning step
- * (src/claude/client.js). Official sources always win over them.
+ * save_team_lesson tool during a /learn-this run, and read back into every
+ * Oracle run as one labelled "Team notes" block, grouped by skill, in runAgent's
+ * learning step (src/claude/client.js) — whichever skill files that run loads.
+ * Official sources always win over them.
  */
 
 import { query } from './connection.js';
 
 export const LESSON_STATUSES = ['verified', 'unverified', 'conflict'];
 
-/** General lessons injected into every Oracle run are capped; newest first. */
-const MAX_GENERAL_LESSONS = 20;
-/** Lessons appended to one skill's overview. */
-const MAX_SKILL_LESSONS = 30;
+/** Lessons injected into every Oracle run are capped; newest first. */
+const MAX_PROMPT_LESSONS = 40;
 
 /**
  * Save one lesson.
@@ -41,23 +39,17 @@ export async function saveLesson(row) {
 }
 
 /**
- * Active lessons for one skill, or general lessons when skill is null.
- * @param {Object} opts
- * @param {string|null} opts.skill
+ * Every active lesson, general and skill-tagged, newest first, capped. Oracle
+ * gets them all in one block, so a lesson doesn't depend on which skill file
+ * the model happens to load.
  * @returns {Promise<Array>}
  */
-export async function activeLessons({ skill = null } = {}) {
-  const result = skill
-    ? await query(
-      `SELECT * FROM team_lessons WHERE skill = $1 AND retired_at IS NULL
-       ORDER BY created_at DESC LIMIT $2`,
-      [skill, MAX_SKILL_LESSONS]
-    )
-    : await query(
-      `SELECT * FROM team_lessons WHERE skill IS NULL AND retired_at IS NULL
-       ORDER BY created_at DESC LIMIT $1`,
-      [MAX_GENERAL_LESSONS]
-    );
+export async function activeLessons() {
+  const result = await query(
+    `SELECT * FROM team_lessons WHERE retired_at IS NULL
+     ORDER BY created_at DESC LIMIT $1`,
+    [MAX_PROMPT_LESSONS]
+  );
   return result.rows;
 }
 
@@ -84,19 +76,33 @@ function statusLabel(row) {
  */
 export function formatLessons(rows) {
   if (!rows?.length) return '';
-  const lines = rows.map(r => {
+  const line = r => {
     const who = r.taught_by_name || 'a team member';
     const when = shortDate(r.taught_at || r.created_at);
     // A DM has no thread anyone else can open, so it gets no link.
     return r.taught_in === 'dm' || !r.thread_link
       ? `- Team note taught by ${who} in a DM, ${when} (${statusLabel(r)}) — ${r.topic}: ${r.lesson}`
       : `- Team note from ${who}, ${when} (${statusLabel(r)}) — ${r.topic}: ${r.lesson} — thread: ${r.thread_link}`;
-  });
+  };
+
+  // Grouped by skill, general notes last; within a group, as given (newest first).
+  const groups = new Map();
+  for (const r of rows) {
+    const key = r.skill || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  }
+  const keys = [...groups.keys()].sort((a, b) => (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+  const sections = keys.flatMap(key => [
+    '',
+    key ? `### ${key}` : '### General',
+    ...groups.get(key).map(line)
+  ]);
+
   return [
     '## Team notes (taught in Chat — not official)',
     '',
     'Taught by the team with /learn-this. Use one when it is relevant, and label it the way it is labelled here. Official sources win: where a note conflicts with the program notes, a guide, or another official source, give the official fact and mention the note as conflicting.',
-    '',
-    ...lines
+    ...sections
   ].join('\n');
 }
