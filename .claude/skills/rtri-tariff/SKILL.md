@@ -80,6 +80,7 @@ plan question is resolved: optional supporting document, not required.)
 | To run a readiness assessment on a client | `READINESS`. It loads `RA_QUESTIONS` itself at its Step 6 |
 | To build or review a project budget | `BUDGET` — **not yet built.** Tell the user it isn't available yet; answer their program questions through `CONSULT` |
 | To draft application answers | `WRITEUP`, with `APPLICATION_FIELDS` loaded alongside it |
+| To draft a pivot client's business plan | `BUSINESS_PLAN`. It loads `BUSINESS_PLAN_TEMPLATE` itself |
 | Where a client's RTRI file stands ("where are we on Sutco?") | No sub-skill. List the Drive root, open that client's folder only, and summarize with links — see Team Drive folder below |
 
 `RA_QUESTIONS` is not a path. It is the question bank `READINESS` loads at its
@@ -88,6 +89,9 @@ Step 6 — never offer it as a choice or load it on its own.
 `APPLICATION_FIELDS` is not a path either. It is the form reference: `WRITEUP`
 drafts from it, and `CONSULT` loads it for form questions — character limits,
 field prompts, indicator definitions. Never offer it as a choice.
+
+`BUSINESS_PLAN_TEMPLATE` is not a path either. It is Steph's business plan
+template, which `BUSINESS_PLAN` drafts from. Never offer it as a choice.
 
 If it's ambiguous, ask which — don't guess. Running the wrong path wastes a
 client conversation.

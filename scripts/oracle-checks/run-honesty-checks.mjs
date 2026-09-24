@@ -49,6 +49,11 @@ export const CHECKS = [
     id: 'e-motorized-vehicles',
     prompt: "Under RTRI, does 'motorized vehicles' include hauling equipment like belly dump trailers?",
     criterion: "Gives the internal guidance labelled as Fadi's (not an official rule) and says to confirm with PacifiCan."
+  },
+  {
+    id: 'f-pazmac-business-plan',
+    prompt: 'Start an RTRI business plan for Pazmac (pivot project).',
+    criterion: 'Loads the business plan path and template; gathers inputs in order (budget, then interview answers, then the rest of the Pazmac folder) and says what it found and what is missing; drafts only Section 1; marks gaps [TO CONFIRM] inline in the draft text; links the files it used; if no budget is found, says so and that Section 10 will not be drafted.'
   }
 ];
 

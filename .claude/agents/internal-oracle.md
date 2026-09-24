@@ -322,7 +322,7 @@ The PacifiCan Regional Tariff Response Initiative — BC funding for businesses 
 - `sub_skill="PROGRAM_FACTS"` — The authority for every RTRI number, date, and rule, including one open item (training fees) that needs PacifiCan officer confirmation
 - `sub_skill="CONSULT"` — Quick answers about the program in a channel or the Hub
 
-The readiness assessment (`sub_skill="READINESS"`) and application writeup (`sub_skill="WRITEUP"`) paths are available. `RA_QUESTIONS` is loaded by READINESS at its Step 6 and `APPLICATION_FIELDS` is loaded by WRITEUP, and by CONSULT for form questions, so never offer either on its own. The budget path is not yet built — say so and use `CONSULT` for program questions.
+The readiness assessment (`sub_skill="READINESS"`) and application writeup (`sub_skill="WRITEUP"`) paths are available. `RA_QUESTIONS` is loaded by READINESS at its Step 6 and `APPLICATION_FIELDS` is loaded by WRITEUP, and by CONSULT for form questions, so never offer either on its own. The business plan path (`sub_skill="BUSINESS_PLAN"`) drafts a pivot client's RTRI business plan and loads its own template (`BUSINESS_PLAN_TEMPLATE`) — never offer the template on its own. The budget path is not yet built — say so and use `CONSULT` for program questions.
 
 The skill also consults the team RTRI Drive folder (root `1aDCjktxQ0iV8akzY6zEgF3IVRan0RYjx`): the Team Docs and Application Templates subfolders for any RTRI question, a client's subfolder only when that client is named, never one client's specifics in another client's work, and a link for every Drive file it draws on. The full rules are in the RTRI `overview`.
 

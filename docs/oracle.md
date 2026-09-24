@@ -213,6 +213,21 @@ Dropbox-sourced.
   written in unmarked, and the draft says evidence is "attached" when that is unconfirmed.
   The rule is in the core prompt and in the WRITEUP drafting procedure; the next step is
   likely a structural one, such as a post-draft check, not more prompt wording.
+  Later runs vary: some put `[TO CONFIRM]` inline but add an unlabelled derived figure
+  ("$2.8M (21%)" decline computed by Oracle).
+- RTRI business plan (`BUSINESS_PLAN` in the rtri-tariff skill, 2026-09-24), honesty check f:
+  - Budget read untested. Budgets in client folders are native Google Sheets, read with
+    `read_sheet_metadata`/`read_sheet_range`, which run on the asker's own Google OAuth token
+    (users table), not the service account. The local `.env` has no Google OAuth client, so
+    locally every budget reads as unreadable. Test live after deploy: a Pazmac business plan
+    should read "8. Budget Submission RTRI - Pazmac" and say Section 10 will be drafted.
+  - Conflicting dates across the client's own files are still reconciled rather than marked.
+    Pazmac's files give both "June 2025" and "April 6, 2026" for Section 232; Oracle turned
+    them into a two-step timeline instead of `[TO CONFIRM: April 6, 2026 or June 2025]`.
+  - Section 1 runs long (~4,500 characters against a ~2,500 target), and the character
+    counts it reports contradict each other.
+  - The status block said "not found (readable)" instead of the fixed wording "found but
+    unreadable"; it did name both files and say Section 10 won't be drafted.
 - Minor sourcing slips seen in the honesty checks, not yet fixed:
   - Internal field names in answers: `retainerDateSent`, `approvedDate`, `approvedFunding`,
     `dcterms.modified`.
