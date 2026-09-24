@@ -56,6 +56,10 @@ Two files are authoritative, each for its own ground:
 - `APPLICATION_FIELDS` — the form itself: field prompts, character limits,
   indicator definitions, and form mechanics.
 
+In answers, call these files "Granted's RTRI notes" (with the review date when it
+matters) — never `PROGRAM_FACTS` or `APPLICATION_FIELDS`. Where a fact has a
+source recorded next to it, cite that source instead.
+
 **Never state an RTRI fact that is not in the file that governs it.** If a
 question needs a fact that isn't there, say so plainly and name what would
 have to be confirmed. Do not estimate caps, percentages, dates, eligibility

@@ -24,9 +24,9 @@ produces generic answers. Say so rather than proceeding on thin material.
 and read from there — don't search all of Drive. Use only this client's files;
 never another client's specifics.
 
-**Link every Drive file you draw on** in your reply — name it and give the
-`url` that `read_google_drive_file` returned — whether the draft goes in chat
-or in a Doc.
+**Your core sourcing rules apply to every draft.** Link each source file,
+mark anything unconfirmed `[TO CONFIRM: …]`, and label any figure you derived
+as an estimate with the math shown — in chat or in a Doc.
 
 **Confirm the stream.** It's in the RA. Every section below is
 stream-dependent, and a Liquidity-only application leaves most Pivot sections
@@ -49,8 +49,8 @@ other sections lean on. If they have no preference, suggest the tariff impact
 narrative first — it's the foundation, and the project rationale, economic
 benefits, and market sections all echo its specifics.
 
-**One section at a time.** Draft it, show it, take their edits, move on when
-they're satisfied. Don't draft three sections at once and ask them to review
+**One section at a time.** Draft it, mark its gaps inline (see Drafting well),
+show it, take their edits, move on when they're satisfied. Don't draft three sections at once and ask them to review
 all of them.
 
 **Show the character count** against the limit every time. The portal enforces
@@ -96,6 +96,15 @@ across sections is the fastest way to lose a reviewer's confidence.
 **Never invent a number.** If a section needs a figure the RA doesn't have,
 say what's missing and ask. Do not estimate revenue, job counts, cost savings,
 or market size.
+
+**Mark gaps inside the draft text.** Before showing a draft, go through it
+sentence by sentence. Anything not confirmed by a source you read gets
+`[TO CONFIRM: what's missing]` right there in the sentence — a figure the
+sources disagree on (write `[TO CONFIRM: $3.3M or $3.5M]`, don't pick one or
+give a range), a date or claim no source states, and any statement that
+evidence exists or is attached when you haven't seen it. A list of items to
+confirm below the draft is fine as a summary, but it never replaces the inline
+marker: the draft gets pasted into the portal without the notes around it.
 
 **Answer the sub-questions.** Most fields have several asks buried in the
 guidance — the project description wants steps, people, place, and timing.

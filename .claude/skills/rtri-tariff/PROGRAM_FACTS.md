@@ -24,6 +24,36 @@ performed 2026-09-23 (changes reported by Research).
 
 ---
 
+## Sept 21, 2026 guide changes
+
+What changed in the Applicant Guide update of 2026-09-21 (page "Date modified:
+2026-09-21"). Research (Kelly) identified these by comparing the new guide with
+the previous version; each was confirmed present in the Sept 21 guide on
+2026-09-23. Source for every item: Applicant Guide, 2026-09-21 (https://www.canada.ca/en/pacific-economic-development/services/funding/regional-tariff-response-initiative/rtri-business-applicant-guide.html).
+This is the only record of what changed on that date — the guide itself has no
+change log. Other updates to these notes on 2026-09-23 (sector wording, the
+business plan answer, team guidance) were corrections to Granted's notes, not
+guide changes.
+
+1. **Pivot end date wording:** "The project end date must be no later than the
+   program end date of March 31, 2029."
+2. **Liquidity cash flow:** applicants must fill in the cash flow table in the
+   portal **and** attach a cash flow forecast; PacifiCan's template is linked
+   from the Funding and Documents sections (use of the template is optional).
+3. **Tariff impact question:** now names "U.S. tariffs, Chinese tariffs and
+   Canadian counter-tariffs", and links the Department of Finance list of
+   counter-tariffs effective September 8, 2026.
+4. **Section 232 description:** now also covers softwood timber and lumber,
+   certain upholstered furniture, kitchen cabinets and vanities, certain
+   semiconductors, and patented pharmaceuticals, alongside steel, aluminum,
+   copper and automotive.
+5. **Eligible payroll:** "employees working in the region of Canada to which you
+   are applying."
+6. **Jobs maintained cap:** must not exceed "the total number of Canadian
+   employees provided in the 'Organization Information' section."
+
+---
+
 ## ⚠️ Open items — do not state as fact
 
 | Item | Status |

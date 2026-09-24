@@ -113,6 +113,11 @@ the multi-file assembly pattern exists only for lead-gen variant B. `loadAgentPr
 
 At runtime `runAgent` appends a per-request user-identity block marked **not cacheable**.
 
+Sourcing and honesty rules (cite with links, "couldn't find it" over guessing, estimates show
+their math, `[TO CONFIRM]` in drafts, internal guidance attributed) live in one section of the
+prompt, **Sources and honesty**. Drafting skills point to it rather than copying it. Re-check
+behaviour after prompt changes with `scripts/oracle-checks/run-honesty-checks.mjs` (read-only).
+
 ## Skills
 
 Oracle can load **all 13** registered skills. There is no gating by agent type or role —
@@ -203,3 +208,19 @@ Dropbox-sourced.
     advisory with no npm fix and already parses user uploads in `chat.js`; `exceljs`
     avoids it but can't read .xls.
   - Stage 3: clearer declines for .doc, .xls, .pptx, and native Sheets and Slides.
+  - Update 2026-09-24: .docx and .xlsx reading shipped in `bce2877b` (`fetchDriveFileContent`)
+    without following this plan — no size check before download, and .xlsx uses SheetJS
+    (`xlsx`), the library with the open advisory. The Stage 1 size guard and the Stage 2
+    library decision are still open.
+- Honesty checks (`scripts/oracle-checks/run-honesty-checks.mjs`, 2026-09-24): check c
+  (Pazmac Tab 8 draft) still fails after four rounds of prompt changes. `[TO CONFIRM]` lands
+  in a list below the draft instead of inline, disputed figures ($3.3M vs $3.5M) are
+  written in unmarked, and the draft says evidence is "attached" when that is unconfirmed.
+  The rule is in the core prompt and in the WRITEUP drafting procedure; the next step is
+  likely a structural one, such as a post-draft check, not more prompt wording.
+- Minor sourcing slips seen in the honesty checks, not yet fixed:
+  - Internal field names in answers: `retainerDateSent`, `approvedDate`, `approvedFunding`,
+    `dcterms.modified`.
+  - HubSpot figures given without record links (approval-rate answer).
+  - Narration openers ("Let me fetch…", "I'll put it directly…").
+  - "PacifiCan hasn't published approval rates" stated without checking.

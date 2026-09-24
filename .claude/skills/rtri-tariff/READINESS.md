@@ -33,6 +33,10 @@ whether to continue. The two halves produce two different documents with two
 different audiences, and mixing them is how internal judgment ends up in a
 client's inbox.
 
+**Your core sourcing rules apply to both documents.** Link each source, mark
+anything unconfirmed `[TO CONFIRM: …]`, and label any figure you derived as an
+estimate with the math shown.
+
 ---
 
 ## Part One — client-facing

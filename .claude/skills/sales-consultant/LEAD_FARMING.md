@@ -80,7 +80,7 @@ Official registered business name (may differ from operating/trade name)
 ### 4. Annual Revenue (`annualrevenue`)
 Revenue in dollars (numeric value)
 - **Sources:** LinkedIn (sometimes visible), website annual reports, business registry
-- **Can estimate:** From employee count and industry if unavailable
+- **Can estimate:** From employee count and industry if unavailable — labelled as an estimate with the basis shown, per your core sourcing rules
 
 ### 5. Incorporation Date (`incorporation_date`)
 Format: YYYY-MM-DD (e.g., "2015-03-20")
