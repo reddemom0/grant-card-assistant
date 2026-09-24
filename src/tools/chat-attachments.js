@@ -229,6 +229,84 @@ export async function readThreadTranscript(ctx = {}) {
   }
 }
 
+/** /learn-this in a DM with the command alone: this far back, at most this many. */
+export const DM_LEARN_WINDOW_MS = 10 * 60 * 1000;
+export const DM_LEARN_MAX_MESSAGES = 5;
+
+/**
+ * The person's own recent messages in a DM, oldest first: sent by them, within
+ * the window, not the /learn-this message itself, at most max. Pure.
+ *
+ * @param {Array} messages - Chat message resources, any order
+ * @param {Object} opts - { senderChatId, excludeMessageName, now, windowMs, max }
+ * @returns {Array}
+ */
+export function selectRecentOwnMessages(messages, {
+  senderChatId,
+  excludeMessageName = null,
+  now = Date.now(),
+  windowMs = DM_LEARN_WINDOW_MS,
+  max = DM_LEARN_MAX_MESSAGES
+} = {}) {
+  const since = now - windowMs;
+  return (messages || [])
+    .filter(m => m?.sender?.name && m.sender.name === senderChatId)
+    .filter(m => m.name !== excludeMessageName)
+    .filter(m => {
+      const t = Date.parse(m.createTime);
+      return Number.isFinite(t) && t >= since && t <= now;
+    })
+    .sort((a, b) => Date.parse(b.createTime) - Date.parse(a.createTime))
+    .slice(0, max)
+    .reverse();
+}
+
+/**
+ * /learn-this alone in a DM: the person's own recent messages there (last ten
+ * minutes, at most five), as the person asking, with their files.
+ *
+ * @param {Object} ctx - { userId, chatContext }
+ * @returns {Promise<{success: boolean, messages?: Array, files?: Array, chat?: Object, userEmail?: string, error?: string}>}
+ */
+export async function readRecentDmMessages(ctx = {}) {
+  const { userId, chatContext } = ctx;
+  if (!userId || !chatContext?.spaceName || !chatContext?.senderChatId) {
+    return { success: false, error: 'I couldn\'t read this conversation.' };
+  }
+
+  const asker = await askerChat(userId);
+  if (asker.error) return { success: false, error: asker.error };
+
+  try {
+    const since = new Date(Date.now() - DM_LEARN_WINDOW_MS).toISOString();
+    const res = await asker.chat.spaces.messages.list({
+      parent: chatContext.spaceName,
+      filter: `create_time > "${since}"`,
+      pageSize: 50,
+      orderBy: 'createTime DESC'
+    });
+    const picked = selectRecentOwnMessages(res.data.messages || [], {
+      senderChatId: chatContext.senderChatId,
+      excludeMessageName: chatContext.messageName
+    });
+    return {
+      success: true,
+      chat: asker.chat,
+      userEmail: asker.userEmail,
+      messages: picked.map(m => ({
+        sender: chatContext.senderDisplayName || m.sender?.displayName || 'you',
+        time: m.createTime,
+        text: m.text || '',
+        files: attachmentsOf(m).map(f => f.name)
+      })),
+      files: picked.flatMap(m => attachmentsOf(m))
+    };
+  } catch (err) {
+    console.warn(`⚠️  Recent DM messages unreadable: ${err.code || err.response?.status || 'error'}`);
+    return { success: false, error: 'I couldn\'t read your recent messages here.' };
+  }
+}
+
 /**
  * Tool: read files attached to earlier messages in the current Chat thread.
  *

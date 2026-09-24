@@ -26,14 +26,15 @@ export async function saveLesson(row) {
   const result = await query(
     `INSERT INTO team_lessons
        (lesson, skill, topic, status, source_label, source_url, taught_by_name, taught_at,
-        captured_by, space_name, thread_name, thread_link)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        captured_by, space_name, thread_name, thread_link, taught_in)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING id`,
     [
       row.lesson, row.skill || null, row.topic, row.status,
       row.source_label || null, row.source_url || null,
       row.taught_by_name || null, row.taught_at || null,
-      row.captured_by || null, row.space_name, row.thread_name, row.thread_link
+      row.captured_by || null, row.space_name, row.thread_name || null, row.thread_link || null,
+      row.taught_in === 'dm' ? 'dm' : 'space'
     ]
   );
   return { id: result.rows[0]?.id };
@@ -83,9 +84,14 @@ function statusLabel(row) {
  */
 export function formatLessons(rows) {
   if (!rows?.length) return '';
-  const lines = rows.map(r =>
-    `- Team note from ${r.taught_by_name || 'a team member'}, ${shortDate(r.taught_at || r.created_at)} (${statusLabel(r)}) — ${r.topic}: ${r.lesson} — thread: ${r.thread_link}`
-  );
+  const lines = rows.map(r => {
+    const who = r.taught_by_name || 'a team member';
+    const when = shortDate(r.taught_at || r.created_at);
+    // A DM has no thread anyone else can open, so it gets no link.
+    return r.taught_in === 'dm' || !r.thread_link
+      ? `- Team note taught by ${who} in a DM, ${when} (${statusLabel(r)}) — ${r.topic}: ${r.lesson}`
+      : `- Team note from ${who}, ${when} (${statusLabel(r)}) — ${r.topic}: ${r.lesson} — thread: ${r.thread_link}`;
+  });
   return [
     '## Team notes (taught in Chat — not official)',
     '',

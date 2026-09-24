@@ -83,6 +83,14 @@ weighing changes, but it is not an open hole.
   in `runAgent`, both Oracle-only, with uses logged to `learning_applications`. Official
   sources win over notes. Lessons are used in every space, DM and the Hub, so only general
   knowledge is saved, never client specifics. The transcript and file text are not stored.
+  **In a DM** the source is the person's own message: the text after the command plus
+  that message's files (read with Oracle's own identity), or, when the command is sent
+  alone, their messages from the last 10 minutes, at most 5 (`readRecentDmMessages`, as
+  the asker; `selectRecentOwnMessages` picks them). A DM lesson is still team-wide, but
+  `lessonRow` stores it with `taught_in = 'dm'`, the DM person as teacher, and no thread
+  name or link (nobody else can open a DM); it is labelled "taught by [name] in a DM".
+  `migrations/036_team_lessons_dm.sql` makes the thread columns nullable and adds
+  `taught_in`; it must be applied before the DM code deploys.
 
 ## Confirmation gate
 

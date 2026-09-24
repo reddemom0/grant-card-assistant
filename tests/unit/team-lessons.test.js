@@ -9,7 +9,8 @@
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest tests/unit/team-lessons.test.js
  */
 
-import { learnIntent, buildLearnMessage, saveTeamLesson, LEARN_MODE_TOOLS } from '../../src/tools/team-lessons.js';
+import { learnIntent, buildLearnMessage, saveTeamLesson, lessonRow, textAfterCommand, LEARN_MODE_TOOLS } from '../../src/tools/team-lessons.js';
+import { selectRecentOwnMessages, DM_LEARN_WINDOW_MS } from '../../src/tools/chat-attachments.js';
 import { formatLessons } from '../../src/database/team-lessons-store.js';
 import { userContentToStore, toolsForRun } from '../../src/claude/client.js';
 import { attachmentPlaceholder } from '../../src/tools/chat-attachments.js';
@@ -119,5 +120,104 @@ describe('how lessons are labelled in answers', () => {
     const block = formatLessons([{ ...base, status: 'conflict', source_label: "Granted's RTRI notes" }]);
     expect(block).toMatch(/conflicts with Granted's RTRI notes — the official source wins/);
     expect(block).toMatch(/Official sources win/);
+  });
+});
+
+describe('/learn-this in a direct message', () => {
+  const DM_CTX = {
+    learnMode: true,
+    surface: 'chat_dm',
+    spaceName: 'spaces/DM1',
+    threadName: 'spaces/DM1/threads/X',
+    senderDisplayName: 'Kelly Tran'
+  };
+  const lesson = { lesson: 'Acknowledgement comes within 10 business days.', topic: 'acknowledgement time', status: 'unverified' };
+
+  test('the text after the command is the lesson', () => {
+    expect(textAfterCommand('/learn-this acknowledgement takes 10 business days')).toBe('acknowledgement takes 10 business days');
+    expect(textAfterCommand('learn this')).toBe('');
+  });
+
+  test('the learn message says who is teaching and shows what they sent', () => {
+    const msg = buildLearnMessage([{ sender: 'Kelly Tran', time: 't', text: 'acknowledgement takes 10 business days', files: [] }], '/learn-this acknowledgement takes 10 business days', { dm: true });
+    expect(msg).toMatch(/direct message/);
+    expect(msg).toMatch(/Kelly Tran \(t\): acknowledgement takes 10 business days/);
+    expect(msg).not.toMatch(/Thread transcript/);
+  });
+
+  test('a DM lesson needs no thread, stores no thread or link, and is taught by the person in the DM', () => {
+    const { row, error } = lessonRow({ ...lesson, taught_by_name: 'Someone Else' }, { userId: 7, chatContext: DM_CTX });
+    expect(error).toBeUndefined();
+    expect(row).toMatchObject({
+      taught_in: 'dm',
+      thread_name: null,
+      thread_link: null,
+      space_name: 'spaces/DM1',
+      taught_by_name: 'Kelly Tran',
+      captured_by: 7
+    });
+  });
+
+  test('a DM lesson without a thread in the event still saves', () => {
+    const { row } = lessonRow(lesson, { userId: 7, chatContext: { ...DM_CTX, threadName: null } });
+    expect(row.taught_in).toBe('dm');
+  });
+
+  test('a space lesson keeps its thread link and the teacher Oracle named', () => {
+    const { row } = lessonRow({ ...lesson, taught_by_name: 'Fadi' }, { userId: 7, chatContext: { ...LEARN_CTX, surface: 'chat_space' } });
+    expect(row).toMatchObject({
+      taught_in: 'space',
+      thread_name: 'spaces/AAA/threads/TTT',
+      thread_link: 'https://chat.google.com/room/AAA/TTT',
+      taught_by_name: 'Fadi'
+    });
+  });
+
+  test('the same status and source rules apply in a DM', () => {
+    expect(lessonRow({ ...lesson, status: 'verified' }, { chatContext: DM_CTX }).error).toMatch(/needs the source/);
+    expect(lessonRow({ ...lesson, status: 'maybe' }, { chatContext: DM_CTX }).error).toMatch(/status must be/);
+  });
+
+  test('labelled "taught by [name] in a DM", with no link', () => {
+    const block = formatLessons([{
+      ...lesson,
+      taught_by_name: 'Kelly Tran',
+      taught_at: '2026-09-23T16:00:00Z',
+      taught_in: 'dm',
+      thread_link: null
+    }]);
+    expect(block).toMatch(/Team note taught by Kelly Tran in a DM, Sept 23, 2026 \(unverified\) — acknowledgement time: /);
+    expect(block).not.toMatch(/thread:/);
+  });
+
+  describe('when the command is alone: the person\'s recent messages', () => {
+    const now = Date.parse('2026-09-24T12:00:00Z');
+    const at = (minutesAgo) => new Date(now - minutesAgo * 60000).toISOString();
+    const mine = (name, minutesAgo) => ({ name, sender: { name: 'users/KELLY' }, createTime: at(minutesAgo), text: name });
+
+    test('only theirs, only the last 10 minutes, never the command, oldest first', () => {
+      const picked = selectRecentOwnMessages([
+        mine('m1', 2),
+        { name: 'bot', sender: { name: 'users/ORACLE' }, createTime: at(1), text: 'reply' },
+        mine('old', 11),
+        mine('cmd', 0),
+        mine('m2', 5)
+      ], { senderChatId: 'users/KELLY', excludeMessageName: 'cmd', now });
+      expect(picked.map(m => m.name)).toEqual(['m2', 'm1']);
+    });
+
+    test('at most five — the most recent five', () => {
+      const msgs = [1, 2, 3, 4, 5, 6, 7].map(i => mine(`m${i}`, i));
+      const picked = selectRecentOwnMessages(msgs, { senderChatId: 'users/KELLY', now });
+      expect(picked.map(m => m.name)).toEqual(['m5', 'm4', 'm3', 'm2', 'm1']);
+    });
+
+    test('the window is ten minutes', () => {
+      expect(DM_LEARN_WINDOW_MS).toBe(10 * 60 * 1000);
+    });
+
+    test('nothing recent → nothing picked', () => {
+      expect(selectRecentOwnMessages([mine('old', 30)], { senderChatId: 'users/KELLY', now })).toEqual([]);
+    });
   });
 });

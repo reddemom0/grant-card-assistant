@@ -37,19 +37,41 @@ export const LEARN_MODE_TOOLS = [
 ];
 
 /**
- * The message Oracle runs on for /learn-this: the fixed instruction and the
- * thread transcript. Attachment text goes separately, as attachment blocks.
- *
- * @param {Array<{sender: string, time: string, text: string, files: string[]}>} messages - oldest first
- * @param {string} askerText - anything the person added after /learn-this
+ * The text after the command, if any: "/learn-this pivot costs exclude X" → "pivot costs exclude X".
+ * @param {string} text
  * @returns {string}
  */
-export function buildLearnMessage(messages, askerText = '') {
-  const extra = String(askerText || '').replace(LEARN, '').trim();
+export function textAfterCommand(text) {
+  return String(text || '').replace(LEARN, '').trim();
+}
+
+/**
+ * The message Oracle runs on for /learn-this: the fixed instruction and what to
+ * learn from. Attachment text goes separately, as attachment blocks.
+ *
+ * In a space the source is the thread. In a DM it is the person's own message:
+ * the text after the command, or their recent messages when the command is alone.
+ *
+ * @param {Array<{sender: string, time: string, text: string, files: string[]}>} messages - oldest first
+ * @param {string} askerText - the /learn-this message itself
+ * @param {Object} [opts]
+ * @param {boolean} [opts.dm] - taught in a direct message
+ * @returns {string}
+ */
+export function buildLearnMessage(messages, askerText = '', { dm = false } = {}) {
+  const extra = textAfterCommand(askerText);
   const transcript = messages.map(m => {
     const files = m.files?.length ? ` [attached: ${m.files.join(', ')}]` : '';
     return `- ${m.sender} (${m.time || 'undated'}): ${m.text || '(no text)'}${files}`;
   }).join('\n');
+  if (dm) {
+    return [
+      '[/learn-this in a direct message — follow the "Team lessons (/learn-this)" rules in your instructions. The person below is the one teaching.]',
+      '',
+      'What they sent, oldest first:',
+      transcript || '(nothing to learn from — no text after the command and no recent messages)'
+    ].join('\n');
+  }
   return [
     '[/learn-this — follow the "Team lessons (/learn-this)" rules in your instructions.]',
     extra ? `The person who asked added: ${extra}` : '',
@@ -60,45 +82,66 @@ export function buildLearnMessage(messages, askerText = '') {
 }
 
 /**
+ * The row to save for one lesson, or the reason it can't be saved. Pure, so the
+ * rules are testable without a database.
+ *
+ * Where the lesson came from is taken from the verified Chat event. A DM lesson
+ * has no thread anyone else can open, so it gets no thread name or link, and the
+ * person in the DM is always the one who taught it.
+ *
+ * @param {Object} input - lesson, skill, topic, status, source_label, source_url, taught_by_name, taught_at
+ * @param {Object} ctx - { userId, chatContext }
+ * @returns {{row?: Object, error?: string}}
+ */
+export function lessonRow(input = {}, { userId, chatContext } = {}) {
+  if (!chatContext?.learnMode) {
+    return { error: 'Lessons are saved only when someone uses /learn-this in Chat.' };
+  }
+  const dm = chatContext.surface === 'chat_dm';
+  if (!chatContext.spaceName || (!dm && !chatContext.threadName)) {
+    return { error: 'This lesson has no Chat thread to link back to, so it was not saved.' };
+  }
+
+  const lesson = String(input.lesson || '').trim();
+  const topic = String(input.topic || '').trim();
+  const status = String(input.status || '').trim();
+  if (!lesson || !topic) return { error: 'A lesson needs both the lesson text and a short topic.' };
+  if (!LESSON_STATUSES.includes(status)) {
+    return { error: `status must be one of: ${LESSON_STATUSES.join(', ')}.` };
+  }
+  if ((status === 'verified' || status === 'conflict') && !input.source_label && !input.source_url) {
+    return { error: `A ${status} lesson needs the source it was checked against (source_label or source_url).` };
+  }
+
+  return {
+    row: {
+      lesson,
+      topic,
+      status,
+      skill: input.skill ? String(input.skill).trim() : null,
+      source_label: input.source_label || null,
+      source_url: input.source_url || null,
+      taught_by_name: dm ? (chatContext.senderDisplayName || input.taught_by_name || null) : (input.taught_by_name || null),
+      taught_at: input.taught_at || null,
+      captured_by: userId || null,
+      space_name: chatContext.spaceName,
+      thread_name: dm ? null : chatContext.threadName,
+      thread_link: dm ? null : threadLink(chatContext.spaceName, chatContext.threadName),
+      taught_in: dm ? 'dm' : 'space'
+    }
+  };
+}
+
+/**
  * Tool: save one checked lesson. Only works inside a /learn-this run.
  *
  * @param {Object} input - lesson, skill, topic, status, source_label, source_url, taught_by_name, taught_at
  * @param {Object} ctx - { userId, chatContext }
  */
 export async function saveTeamLesson(input = {}, ctx = {}) {
-  const { userId, chatContext } = ctx;
-  if (!chatContext?.learnMode) {
-    return { success: false, error: 'Lessons are saved only when someone uses /learn-this in a Chat thread.' };
-  }
-  if (!chatContext.spaceName || !chatContext.threadName) {
-    return { success: false, error: 'This lesson has no Chat thread to link back to, so it was not saved.' };
-  }
-
-  const lesson = String(input.lesson || '').trim();
-  const topic = String(input.topic || '').trim();
-  const status = String(input.status || '').trim();
-  if (!lesson || !topic) return { success: false, error: 'A lesson needs both the lesson text and a short topic.' };
-  if (!LESSON_STATUSES.includes(status)) {
-    return { success: false, error: `status must be one of: ${LESSON_STATUSES.join(', ')}.` };
-  }
-  if ((status === 'verified' || status === 'conflict') && !input.source_label && !input.source_url) {
-    return { success: false, error: `A ${status} lesson needs the source it was checked against (source_label or source_url).` };
-  }
-
-  const { id } = await saveLesson({
-    lesson,
-    topic,
-    status,
-    skill: input.skill ? String(input.skill).trim() : null,
-    source_label: input.source_label || null,
-    source_url: input.source_url || null,
-    taught_by_name: input.taught_by_name || null,
-    taught_at: input.taught_at || null,
-    captured_by: userId || null,
-    space_name: chatContext.spaceName,
-    thread_name: chatContext.threadName,
-    thread_link: threadLink(chatContext.spaceName, chatContext.threadName)
-  });
-  console.log(`🧠 Team lesson saved — id ${id}, status ${status}`);
-  return { success: true, id, status };
+  const { row, error } = lessonRow(input, ctx);
+  if (error) return { success: false, error };
+  const { id } = await saveLesson(row);
+  console.log(`🧠 Team lesson saved — id ${id}, status ${row.status}, taught in ${row.taught_in}`);
+  return { success: true, id, status: row.status };
 }

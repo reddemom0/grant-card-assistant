@@ -2358,7 +2358,7 @@ export const CHAT_HISTORY_TOOLS = [
   },
   {
     name: 'save_team_lesson',
-    description: 'Save one lesson the team taught you with /learn-this. Works ONLY during a /learn-this run; anywhere else it is refused. Call it once per lesson, after checking the lesson against the skill\'s reference material, the Drive reference folders, and the official page. General program or process knowledge only — never client names, figures, or other client specifics. Where the lesson came from (space, thread, link, who asked) is recorded automatically.',
+    description: 'Save one lesson the team taught you with /learn-this. Works ONLY during a /learn-this run; anywhere else it is refused. Call it once per lesson, after checking the lesson against the skill\'s reference material, the Drive reference folders, and the official page. General program or process knowledge only — never client names, figures, or other client specifics. Where the lesson came from (space, thread, link, who asked) is recorded automatically; for a lesson taught in a direct message, the person in the DM is recorded as its teacher and no link is stored.',
     input_schema: {
       type: 'object',
       properties: {
