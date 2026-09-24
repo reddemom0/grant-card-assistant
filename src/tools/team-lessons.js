@@ -8,7 +8,10 @@
  * is taken from the verified Chat event, never from the model.
  */
 
-import { saveLesson, LESSON_STATUSES } from '../database/team-lessons-store.js';
+import {
+  saveLesson, confirmLesson, countPendingForCard, recordKnown, recordOverflow,
+  LESSON_STATUSES, PENDING_TTL_MS, MAX_PENDING_PER_CARD
+} from '../database/team-lessons-store.js';
 import { threadLink } from './chat-history.js';
 
 /**
@@ -116,10 +119,22 @@ export function lessonRow(input = {}, { userId, chatContext } = {}) {
 
   const lesson = String(input.lesson || '').trim();
   const topic = String(input.topic || '').trim();
-  const status = String(input.status || '').trim();
   if (!lesson || !topic) return { error: 'A lesson needs both the lesson text and a short topic.' };
+
+  // Already in Granted's notes: recorded on the card, never stored as a lesson.
+  if (input.already_known) {
+    if (!input.known_source) return { error: 'An already-known lesson needs known_source: where in Granted\'s notes it already is.' };
+    return { known: { lesson, topic, known_source: String(input.known_source).trim() } };
+  }
+
+  const status = String(input.status || '').trim();
   if (!LESSON_STATUSES.includes(status)) {
     return { error: `status must be one of: ${LESSON_STATUSES.join(', ')}.` };
+  }
+  const fromDocument = input.from_document ? String(input.from_document).trim() : null;
+  if (status === 'verified' && fromDocument && !input.source_url && !input.source_label) {
+    // A document can't verify itself: only an independent source can.
+    return { error: 'A fact from an attached document is verified only by another source; otherwise save it as unverified with from_document.' };
   }
   if ((status === 'verified' || status === 'conflict') && !input.source_label && !input.source_url) {
     return { error: `A ${status} lesson needs the source it was checked against (source_label or source_url).` };
@@ -139,7 +154,10 @@ export function lessonRow(input = {}, { userId, chatContext } = {}) {
       space_name: chatContext.spaceName,
       thread_name: dm ? null : chatContext.threadName,
       thread_link: dm ? null : threadLink(chatContext.spaceName, chatContext.threadName),
-      taught_in: dm ? 'dm' : 'space'
+      taught_in: dm ? 'dm' : 'space',
+      from_document: fromDocument,
+      card_id: chatContext.lessonCardId || null,
+      expires_at: new Date((chatContext.now ? Date.parse(chatContext.now) : Date.now()) + PENDING_TTL_MS).toISOString()
     }
   };
 }
@@ -151,9 +169,41 @@ export function lessonRow(input = {}, { userId, chatContext } = {}) {
  * @param {Object} ctx - { userId, chatContext }
  */
 export async function saveTeamLesson(input = {}, ctx = {}) {
-  const { row, error } = lessonRow(input, ctx);
+  const { chatContext } = ctx;
+  const { row, known, error } = lessonRow(input, ctx);
   if (error) return { success: false, error };
+  const cardId = chatContext?.lessonCardId || null;
+
+  // Edit run: the teacher's edited text, re-checked — confirm that one lesson.
+  if (chatContext?.editLessonId) {
+    if (known) return { success: false, error: 'This is an edit: save the edited lesson with its checked status, not as already known.' };
+    const updated = await confirmLesson(chatContext.editLessonId, {
+      lesson: row.lesson,
+      status: row.status,
+      source_label: row.source_label,
+      source_url: row.source_url
+    });
+    if (!updated) return { success: false, error: 'That lesson is no longer pending (saved, discarded, or expired).' };
+    console.log(`🧠 Team lesson edited and saved — id ${updated.id}, status ${updated.status}`);
+    return { success: true, id: updated.id, status: updated.status, saved: 'active' };
+  }
+
+  if (known) {
+    if (cardId) await recordKnown(cardId, known);
+    console.log('🧠 Lesson already in Granted\'s notes — not saved');
+    return { success: true, saved: false, already_known: true };
+  }
+
+  if (cardId && (await countPendingForCard(cardId)) >= MAX_PENDING_PER_CARD) {
+    await recordOverflow(cardId);
+    return {
+      success: false,
+      capped: true,
+      error: `This card already has ${MAX_PENDING_PER_CARD} lessons to confirm. Don't save more; the card tells the teacher to send the rest in smaller pieces.`
+    };
+  }
+
   const { id } = await saveLesson(row);
-  console.log(`🧠 Team lesson saved — id ${id}, status ${row.status}, taught in ${row.taught_in}`);
-  return { success: true, id, status: row.status };
+  console.log(`🧠 Team lesson pending — id ${id}, status ${row.status}, taught in ${row.taught_in}`);
+  return { success: true, id, status: row.status, saved: 'pending' };
 }

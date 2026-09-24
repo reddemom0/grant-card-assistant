@@ -183,7 +183,7 @@ async function pressAnswer(evt, now, startedAt) {
         outcome = { changed: true, notice: `Kept open: ${card.title}` };
       }
     } else {
-      outcome = await type.handleAction({ card, actor, action, now });
+      outcome = await type.handleAction({ card, actor, action, now, params });
     }
 
     const result = await finishPress(card, type, actor, action, outcome, now, { fromDigest });

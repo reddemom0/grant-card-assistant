@@ -46,10 +46,11 @@ export function openDialog(card) {
  * @returns {Promise<Object>} synchronous response body
  */
 export async function handleCardDialog(evt, now = new Date()) {
-  if (!dialogsEnabled()) return closeDialog();
-  const { cardId, action } = evt.parameters || {};
+  const params = evt.parameters || {};
+  const { cardId, action } = params;
   const card = cardId && UUID.test(cardId) ? await store.getCard(cardId) : null;
   const type = card && cardTypeOf(card);
+  if (!dialogsEnabled(type)) return closeDialog();
   // Any card type may own dialogs: it marks the action `dialog: true` and
   // exports dialogFor / submitDialog.
   if (!card || !type?.dialogFor || !type.actions?.[action]?.dialog || !evt.actorChatId) {
@@ -64,7 +65,7 @@ export async function handleCardDialog(evt, now = new Date()) {
     let timer;
     try {
       const dialog = await Promise.race([
-        type.dialogFor(card, action, actor),
+        type.dialogFor(card, action, actor, params),
         new Promise(resolve => { timer = setTimeout(() => resolve(null), OPEN_BUDGET_MS); })
       ]);
       return dialog ? openDialog(dialog) : closeDialog('Couldn’t open that — try again.');
@@ -78,7 +79,7 @@ export async function handleCardDialog(evt, now = new Date()) {
 
   if (evt.dialogEventType === 'SUBMIT_DIALOG') {
     const outcome = live
-      ? await type.submitDialog(card, action, actor, evt.formInputs || {}, now)
+      ? await type.submitDialog(card, action, actor, evt.formInputs || {}, now, params)
       : { changed: false, ignored: 'closed', reply: 'This card is closed, so nothing changed.' };
     // The notification carries the answer; no separate private reply.
     await finishPress(card, type, actor, action, { ...outcome, reply: null }, now);

@@ -825,8 +825,31 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       }
     }
 
+    // "@Oracle edit lesson 2: …" — the typed fallback for a lesson card's Edit
+    // button. Only when a lesson card is live here; otherwise an ordinary message.
+    const { editLessonIntent, liveLessonCard, handleTypedEdit } = await import('../cards/lesson-card.js');
+    const lessonEdit = editLessonIntent(messageText);
+    if (lessonEdit && evt.spaceIsResourceName) {
+      const card = await liveLessonCard({
+        surface: evt.isDm ? 'chat_dm' : 'chat_space',
+        spaceName: evt.spaceId,
+        threadName: evt.threadIsResourceName ? evt.threadId : null
+      });
+      if (card) {
+        await saveMessage(conversationId, 'user', messageText);
+        const actor = { chatUserId: evt.senderChatId, name: evt.senderDisplayName || null, email: evt.senderEmail || null };
+        const outcome = await handleTypedEdit({ card, actor, number: lessonEdit.number, text: lessonEdit.text });
+        if (outcome.reply) {
+          const { tellPresser } = await import('../cards/update.js');
+          await tellPresser(card, actor, outcome.reply);
+        }
+        console.log('🧠 Handled by the lesson card — kind: typed edit');
+        return;
+      }
+    }
+
     // /LEARN-THIS. The team teaches Oracle from this thread: one restricted run
-    // that checks and saves the lessons, then one short reply. Nothing else posts.
+    // that checks the lessons and puts them on a card for the teacher to confirm.
     const { learnIntent } = await import('../tools/team-lessons.js');
     if (learnIntent(messageText)) {
       await runLearnThis(evt, user, conversationId, messageText);
@@ -929,8 +952,11 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
 }
 
 /**
- * "@Oracle /learn-this": gather what to learn from, run Oracle once in learn mode
- * — read-only tools plus save_team_lesson — and post its one- or two-line summary.
+ * "@Oracle /learn-this": post the lesson card ("Checking…"), gather what to learn
+ * from, run Oracle once in learn mode — read-only tools plus save_team_lesson,
+ * which saves lessons as pending on the card — then update the card in place
+ * with the lessons to confirm, or with Oracle's short result when none are
+ * waiting. The card is the only reply (src/cards/lesson-card.js).
  *
  * - In a space: the whole thread, read as the person asking (text and files).
  * - In a DM: the text after the command and this message's files; if the command
@@ -942,6 +968,7 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
 async function runLearnThis(evt, user, conversationId, messageText) {
   const { buildLearnMessage, textWithoutCommand, LEARN_MODE_TOOLS } = await import('../tools/team-lessons.js');
   const { readThreadTranscript, readRecentDmMessages } = await import('../tools/chat-attachments.js');
+  const { startLessonCard, finishLessonCard } = await import('../cards/lesson-card.js');
 
   const learnContext = {
     surface: evt.isDm ? 'chat_dm' : 'chat_space',
@@ -955,9 +982,28 @@ async function runLearnThis(evt, user, conversationId, messageText) {
     learnMode: true
   };
 
+  // The card first, so the teacher sees "Checking…" straight away. Without a
+  // card nothing could be confirmed, so nothing is saved.
+  const card = learnContext.spaceName
+    ? await startLessonCard({
+      spaceName: learnContext.spaceName,
+      threadName: learnContext.threadName,
+      surface: learnContext.surface,
+      conversationId,
+      ownerChatId: evt.senderChatId,
+      ownerUserId: user.id
+    })
+    : null;
+  if (!card) {
+    await saveMessage(conversationId, 'user', messageText);
+    await safePost(evt, markdownToChat("I couldn't open the lesson card, so nothing was saved — try /learn-this again."));
+    return;
+  }
+  learnContext.lessonCardId = card.id;
+
   const fail = async (reply) => {
     await saveMessage(conversationId, 'user', messageText);
-    await safePost(evt, markdownToChat(reply));
+    await finishLessonCard(card.id, reply);
   };
 
   let messages;
@@ -1030,7 +1076,8 @@ async function runLearnThis(evt, user, conversationId, messageText) {
     .map(b => b.text)
     .join('')
     .trim();
-  await safePost(evt, markdownToChat(text || `I couldn't find a lesson to save in ${evt.isDm ? 'your message' : 'this thread'}.`));
+  const waiting = await finishLessonCard(card.id, text || `I couldn't find a lesson in ${evt.isDm ? 'your message' : 'this thread'}.`);
+  console.log(`🧠 /learn-this card — ${waiting} lessons waiting for the teacher`);
 }
 
 /**

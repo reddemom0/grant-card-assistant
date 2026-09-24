@@ -584,7 +584,13 @@ export function createTrackedCardFakes() {
           return { fileId, name: doc?.name ?? null, openComments: 0, readable: false, code: 404 };
         }
         return { fileId, name: doc.name, openComments: doc.openComments, readable: true };
-      }
+      },
+      // What src/tools/chat-attachments.js imports (the Chat adapter loads it).
+      // Card tests send no attachments; these only have to exist.
+      MAX_DOWNLOAD_BYTES: 10 * 1024 * 1024,
+      fileKind() { return null; },
+      async extractFileText() { return { supported: false, content: '' }; },
+      async readGoogleDriveFile() { return { success: false, error: 'not used in card tests' }; }
     }
   };
 

@@ -160,8 +160,16 @@ export function messageLink(messageName, threadName) {
  * feature, and one Google reference says the button setting that opens them
  * strips the card, so every dialog has a typed fallback and this stays off
  * until it has been tried in a real space.
+ *
+ * A card type can opt in on its own (`dialogs: true`): the lesson card does, so
+ * its Edit dialog can be tried live without switching dialogs on for every
+ * card. LESSON_DIALOGS_DISABLED=true turns that off again without a deploy.
+ *
+ * @param {Object} [type] - a card type; omitted means "every card"
  */
-export const dialogsEnabled = () => process.env.TRACK_DIALOGS_ENABLED === 'true';
+export const dialogsEnabled = (type = null) =>
+  process.env.TRACK_DIALOGS_ENABLED === 'true'
+  || (type?.dialogs === true && process.env.LESSON_DIALOGS_DISABLED !== 'true');
 
 export function buttonsAvailable() {
   return Boolean(endpoint());

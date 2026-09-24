@@ -12,6 +12,7 @@ import { leadCard } from './lead-card.js';
 import { meetCard } from './meet-card.js';
 import { watchCard } from './watch-card.js';
 import { introType } from './intro-card.js';
+import { lessonCard } from './lesson-card.js';
 
 export function cardTypeOf(cardOrType) {
   const type = typeof cardOrType === 'string' ? cardOrType : cardOrType?.card_type;
@@ -22,11 +23,12 @@ export function cardTypeOf(cardOrType) {
     case 'meet': return meetCard;
     case 'watch': return watchCard;
     case 'intro': return introType;
+    case 'lesson': return lessonCard;
     default: return null;
   }
 }
 
 /** Every card type — a function for the same reason as cardTypeOf. */
 export function allCardTypes() {
-  return [reviewCard, trackCard, leadCard, meetCard, watchCard, introType];
+  return [reviewCard, trackCard, leadCard, meetCard, watchCard, introType, lessonCard];
 }

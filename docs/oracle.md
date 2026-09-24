@@ -96,6 +96,33 @@ weighing changes, but it is not an open hole.
   name or link (nobody else can open a DM); it is labelled "taught by [name] in a DM".
   `migrations/036_team_lessons_dm.sql` makes the thread columns nullable and adds
   `taught_in`; it must be applied before the DM code deploys.
+  **Confirmation card.** Nothing a learn run finds is used until the teacher confirms it
+  (`src/cards/lesson-card.js`, card type `lesson`). `runLearnThis` first posts the card as
+  "Checking…" (`startLessonCard`; `privateMessageViewer` to the teacher in a space, a
+  normal card in a DM, filed under `<space>/threads/lessons` since a DM has no thread), then
+  updates it in place (`finishLessonCard`): the lessons waiting, or — when none are —
+  Oracle's short result, and closes it. `save_team_lesson` saves lessons as
+  `state = 'pending'` with `card_id` and a 24-hour `expires_at`; `activeLessons` reads
+  `state = 'active'` only. A lesson already in Granted's notes is sent with
+  `already_known` and recorded on the card (`data.known`, greyed, never saved). At most 10
+  pending per card (`MAX_PENDING_PER_CARD`); beyond that the tool refuses and the card
+  counts the overflow. An attached document is scope-checked first (program, region,
+  date against the notes); new in-scope facts are saved with `from_document` and labelled
+  "from [document], not yet in Granted's notes" — a document never verifies itself.
+  Buttons, teacher only (`owner_chat_id`; others get a private refusal): Save, Edit,
+  Discard, plus Save all / Discard all with 2+ waiting. Edit opens a dialog — lesson cards
+  opt in on their own (`dialogs: true`, `dialogsEnabled(type)` in `render.js`;
+  `LESSON_DIALOGS_DISABLED=true` turns it off) while every other card keeps dialogs off —
+  and always has the typed fallback "@Oracle edit lesson N: <text>". Either way
+  `recheckEdit` runs one restricted learn run with `editLessonId`, and `save_team_lesson`
+  confirms that one row with the re-checked text and status. A newer /learn-this in the
+  same thread or DM replaces the live card and deletes its waiting lessons. The hourly
+  tracked-cards job calls `expireLessonCards`: pending rows past 24 hours are deleted and
+  their cards patched silently — nothing is posted. Card types now receive the pressed
+  button's `params` (`handleAction`, `dialogFor`, `submitDialog`).
+  `migrations/037_team_lessons_pending.sql` adds `state`, `expires_at`, `card_id`,
+  `confirmed_at` and `from_document`; apply it **before** deploying this code — until then
+  team notes are unavailable and /learn-this cannot save.
 
 ## Confirmation gate
 

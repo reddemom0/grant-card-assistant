@@ -49,7 +49,8 @@ export async function tellPresser(card, actor, text) {
   try {
     await postMessage({
       spaceName: card.space_name,
-      threadName: card.thread_name,
+      // A card filed under a placeholder thread (a DM lesson card) replies unthreaded.
+      threadName: card.data?.noThread ? null : card.thread_name,
       text,
       privateTo: dm ? null : actor.chatUserId
     });
