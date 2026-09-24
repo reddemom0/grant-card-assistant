@@ -2355,6 +2355,28 @@ export const CHAT_HISTORY_TOOLS = [
       },
       required: []
     }
+  },
+  {
+    name: 'save_team_lesson',
+    description: 'Save one lesson the team taught you with /learn-this. Works ONLY during a /learn-this run; anywhere else it is refused. Call it once per lesson, after checking the lesson against the skill\'s reference material, the Drive reference folders, and the official page. General program or process knowledge only — never client names, figures, or other client specifics. Where the lesson came from (space, thread, link, who asked) is recorded automatically.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        lesson: { type: 'string', description: 'The lesson, in one or two plain sentences, as general knowledge.' },
+        topic: { type: 'string', description: 'A short label, e.g. "motorized vehicles" or "pivot end date".' },
+        skill: { type: 'string', description: 'The skill this belongs to, e.g. "rtri-tariff". Omit for general team knowledge.' },
+        status: {
+          type: 'string',
+          enum: ['verified', 'unverified', 'conflict'],
+          description: 'verified: an official or reference source confirms it. unverified: no source confirms or contradicts it. conflict: an official source says otherwise.'
+        },
+        source_label: { type: 'string', description: 'The source that confirms it (verified) or contradicts it (conflict), e.g. "PacifiCan Applicant Guide, 2026-09-21". Required for verified and conflict.' },
+        source_url: { type: 'string', description: 'Link to that source, when there is one.' },
+        taught_by_name: { type: 'string', description: 'Name of the person whose message in the thread stated the lesson.' },
+        taught_at: { type: 'string', description: 'When that message was sent (ISO-8601, from the transcript).' }
+      },
+      required: ['lesson', 'topic', 'status']
+    }
   }
 ];
 

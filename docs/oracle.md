@@ -70,6 +70,19 @@ weighing changes, but it is not an open hole.
   grant), limited to the thread in the verified event. **File text is never stored:**
   `runAgent` saves `[Chat attachment: name — read, not stored]` in place of attachment
   blocks and of `read_chat_attachments` results.
+- **/learn-this.** "@Oracle /learn-this" in a thread (text intent `learnIntent` in
+  `src/tools/team-lessons.js`, checked in `runOracleAndReply`; not a console slash
+  command) runs `runLearnThis`: the thread's transcript and files are read as the asker
+  (`readThreadTranscript`), then Oracle runs once with `allowedTools = LEARN_MODE_TOOLS`
+  (read tools plus `save_team_lesson`) and posts a one- or two-line summary. Lessons go to
+  `team_lessons` (`migrations/035_team_lessons.sql`, `src/database/team-lessons-store.js`)
+  with status verified / unverified / conflict, source, teacher, and thread link;
+  `save_team_lesson` is refused outside a learn run, and where a lesson came from is taken
+  from the verified event. Lessons reach answers as labelled "Team notes": skill-tagged
+  ones appended to that skill's `overview` by `loadSkill`, general ones as a system block
+  in `runAgent`, both Oracle-only, with uses logged to `learning_applications`. Official
+  sources win over notes. Lessons are used in every space, DM and the Hub, so only general
+  knowledge is saved, never client specifics. The transcript and file text are not stored.
 
 ## Confirmation gate
 

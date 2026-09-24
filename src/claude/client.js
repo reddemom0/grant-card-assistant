@@ -166,6 +166,17 @@ function withMessageCacheBreakpoints(messages, everyN) {
  * @returns {Promise<Object>} Execution result
  */
 /**
+ * The tools one run may use: the agent's set, narrowed to allowedTools when given.
+ * @param {string} agentType
+ * @param {string[]|null} allowedTools
+ * @returns {Array}
+ */
+export function toolsForRun(agentType, allowedTools = null) {
+  const tools = getToolsForAgent(agentType);
+  return allowedTools ? tools.filter(t => allowedTools.includes(t.name)) : tools;
+}
+
+/**
  * The user turn as saved: ephemeral attachment blocks (Chat files) become a
  * placeholder, everything else is kept as sent.
  *
@@ -208,7 +219,10 @@ export async function runAgent({
   // verified request. Passed to tools as a function argument, never as tool
   // input, so the model cannot claim to be somewhere it is not. Absent for
   // headless callers (webhook, scripts), which tools treat as "no context".
-  chatContext = null
+  chatContext = null,
+  // Optional list of tool names this run may use (e.g. a /learn-this run, which
+  // may only read and save a lesson). Absent: the agent's full tool set.
+  allowedTools = null
 }) {
   console.log('\n' + '='.repeat(80));
   console.log(`🤖 Running agent: ${agentType}`);
@@ -262,6 +276,27 @@ export async function runAgent({
       console.log(`✓ Injected learned patterns from feedback into system prompt`);
     } else {
       console.log(`✓ No learned patterns available yet (feedback learning will run as feedback is collected)`);
+    }
+
+    // Team notes taught in Chat with /learn-this (general ones; skill-tagged ones
+    // arrive with that skill's overview). Oracle only. Uses are logged to the same
+    // learning_applications audit table as the feedback files.
+    let teamNotes = '';
+    if (agentType === 'internal-oracle') {
+      try {
+        const { activeLessons, formatLessons } = await import('../database/team-lessons-store.js');
+        const lessons = await activeLessons({ skill: null });
+        teamNotes = formatLessons(lessons);
+        if (lessons.length) {
+          console.log(`✓ ${lessons.length} general team notes added`);
+          const { saveLearningApplication } = await import('../database/learning-tracking.js');
+          await saveLearningApplication(agentType, conversationId, userId, ['team_lessons'], lessons[0].created_at)
+            .catch(err => console.warn(`⚠️  Team notes use not logged: ${err.code || err.message}`));
+        }
+      } catch (err) {
+        // Never fail a turn over team notes — the table may not exist yet.
+        console.warn(`⚠️  Team notes unavailable: ${err.code || err.message}`);
+      }
     }
 
     // ============================================================================
@@ -553,8 +588,8 @@ export async function runAgent({
     // 5. Get tools for this agent
     // ============================================================================
 
-    const tools = getToolsForAgent(agentType);
-    console.log(`🔧 Loaded ${tools.length} tools for agent`)
+    const tools = toolsForRun(agentType, allowedTools);
+    console.log(`🔧 Loaded ${tools.length} tools for agent${allowedTools ? ' (restricted for this run)' : ''}`)
 
     // ============================================================================
     // 6. Agent execution loop
@@ -635,6 +670,11 @@ export async function runAgent({
           type: 'text',
           text: learningMemory  // ❌ NOT CACHED (user-specific)
         });
+      }
+
+      // Team notes from /learn-this - NOT CACHED (change whenever a lesson is saved)
+      if (teamNotes) {
+        systemBlocks.push({ type: 'text', text: teamNotes });
       }
 
       // Add lead-gen form context (if present) - NOT CACHED

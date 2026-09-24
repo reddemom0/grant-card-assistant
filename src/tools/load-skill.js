@@ -115,14 +115,37 @@ const SKILL_PATHS = {
 };
 
 /**
+ * The team notes block for one skill, or '' when there are none. Uses are logged
+ * to learning_applications, like the feedback files.
+ */
+async function teamNotesForSkill(skillName, { agentType, conversationId, userId }) {
+  try {
+    const { activeLessons, formatLessons } = await import('../database/team-lessons-store.js');
+    const lessons = await activeLessons({ skill: skillName });
+    if (!lessons.length) return '';
+    console.log(`✓ ${lessons.length} team notes appended to ${skillName}`);
+    if (conversationId) {
+      const { saveLearningApplication } = await import('../database/learning-tracking.js');
+      await saveLearningApplication(agentType, conversationId, userId, [`team_lessons:${skillName}`], lessons[0].created_at)
+        .catch(err => console.warn(`⚠️  Team notes use not logged: ${err.code || err.message}`));
+    }
+    return `\n\n---\n\n${formatLessons(lessons)}\n`;
+  } catch (err) {
+    console.warn(`⚠️  Team notes unavailable for ${skillName}: ${err.code || err.message}`);
+    return '';
+  }
+}
+
+/**
  * Load a specific skill sub-module
  *
  * @param {Object} params
  * @param {string} params.skill_name - The skill domain (e.g., 'sales')
  * @param {string} params.sub_skill - The specific sub-skill to load (e.g., 'lead_farming')
+ * @param {Object} [ctx] - { agentType, conversationId, userId }, from the executor
  * @returns {Object} - Skill content and metadata
  */
-export async function loadSkill({ skill_name, sub_skill }) {
+export async function loadSkill({ skill_name, sub_skill }, ctx = {}) {
   try {
     // Validate skill exists
     if (!SKILL_PATHS[skill_name]) {
@@ -144,7 +167,13 @@ export async function loadSkill({ skill_name, sub_skill }) {
 
     // Read skill file
     console.log(`📚 Loading skill: ${skill_name}/${sub_skill} from ${relativeFilePath}`);
-    const content = await fs.readFile(absoluteFilePath, 'utf-8');
+    let content = await fs.readFile(absoluteFilePath, 'utf-8');
+
+    // Oracle only: lessons the team taught for this skill (/learn-this) arrive
+    // with its overview, labelled as team notes. Never fails the load.
+    if (ctx.agentType === 'internal-oracle' && /^overview$/i.test(sub_skill)) {
+      content += await teamNotesForSkill(skill_name, ctx);
+    }
 
     // Calculate token estimate (rough: 4 characters per token)
     const tokenEstimate = Math.ceil(content.length / 4);

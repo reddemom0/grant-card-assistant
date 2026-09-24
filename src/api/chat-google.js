@@ -825,6 +825,14 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       }
     }
 
+    // /LEARN-THIS. The team teaches Oracle from this thread: one restricted run
+    // that checks and saves the lessons, then one short reply. Nothing else posts.
+    const { learnIntent } = await import('../tools/team-lessons.js');
+    if (learnIntent(messageText)) {
+      await runLearnThis(evt, user, conversationId, messageText);
+      return;
+    }
+
     // Anything already pending belongs to an earlier turn — only a NEW proposal
     // gets a confirmation notice appended below.
     const pendingBefore = await currentPendingId(conversationId);
@@ -918,6 +926,79 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
     // COMPLETION MARKER — always runs, including on every early return above.
     console.log(`⏹️  Chat background task END — conversation ${conversationId} (${Date.now() - startedAt}ms)`);
   }
+}
+
+/**
+ * "@Oracle /learn-this": read the thread as the person asking (text and files),
+ * run Oracle once in learn mode — read-only tools plus save_team_lesson — and
+ * post its one- or two-line summary in the thread.
+ *
+ * The transcript and file text reach the model for this run only; like Chat
+ * attachments, the saved history keeps placeholders.
+ */
+async function runLearnThis(evt, user, conversationId, messageText) {
+  const { buildLearnMessage, LEARN_MODE_TOOLS } = await import('../tools/team-lessons.js');
+  const { readThreadTranscript } = await import('../tools/chat-attachments.js');
+
+  const learnContext = {
+    surface: evt.isDm ? 'chat_dm' : 'chat_space',
+    spaceName: evt.spaceIsResourceName ? evt.spaceId : null,
+    spaceDisplayName: evt.spaceDisplayName,
+    threadName: evt.threadIsResourceName ? evt.threadId : null,
+    senderChatId: evt.senderChatId,
+    senderDisplayName: evt.senderDisplayName,
+    messageName: evt.messageName,
+    messageText,
+    learnMode: true
+  };
+
+  const thread = await readThreadTranscript({ userId: user.id, chatContext: learnContext });
+  if (!thread.success) {
+    await saveMessage(conversationId, 'user', messageText);
+    await safePost(evt, markdownToChat(thread.error));
+    return;
+  }
+
+  // The most recent files in the thread, read as the person asking.
+  const results = await readAttachments(thread.files.slice(-5), { chat: thread.chat, userEmail: thread.userEmail });
+  const unreadable = results.filter(r => !r.ok).map(unreadableLine);
+  const attachments = [
+    {
+      type: 'text_file',
+      filename: 'thread transcript',
+      content: [
+        buildLearnMessage(thread.messages, messageText),
+        unreadable.length ? `\nFiles in the thread I couldn't read:\n${unreadable.join('\n')}` : ''
+      ].join(''),
+      ephemeral: true
+    },
+    ...results.filter(r => r.ok).map(r => ({
+      type: 'text_file',
+      filename: r.name,
+      content: attachmentBlockText(r),
+      ephemeral: true
+    }))
+  ];
+  console.log(`🧠 /learn-this — ${thread.messages.length} messages, ${attachments.length - 1} files read`);
+
+  const result = await runAgent({
+    agentType: 'internal-oracle',
+    message: messageText,
+    conversationId,
+    userId: user.id,
+    sessionId: crypto.randomUUID(),
+    attachments,
+    allowedTools: LEARN_MODE_TOOLS,
+    res: null,
+    chatContext: learnContext
+  });
+
+  const text = (result?.response?.content || [])
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('')
+    .trim();
+  await safePost(evt, markdownToChat(text || "I couldn't find a lesson to save in this thread."));
 }
 
 /**

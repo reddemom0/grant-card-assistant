@@ -621,6 +621,17 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
       }
 
+      // A lesson from /learn-this. Refused outside a learn run; space, thread and
+      // link come from the verified Chat event via options, never from input.
+      case 'save_team_lesson': {
+        const { saveTeamLesson } = await import('./team-lessons.js');
+        result = await saveTeamLesson(input, {
+          userId,
+          chatContext: options.chatContext || { surface: 'none' }
+        });
+        break;
+      }
+
       // Earlier files in the current Chat thread. Thread and space come from the
       // verified Chat event via options, never from input.
       case 'read_chat_attachments': {
@@ -1020,7 +1031,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         result = await loadSkill({
           skill_name: input.skill_name,
           sub_skill: input.sub_skill
-        });
+        }, { agentType, conversationId, userId });
         break;
 
       // ============================================================================

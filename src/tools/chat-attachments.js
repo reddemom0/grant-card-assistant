@@ -150,6 +150,86 @@ export function unreadableLine(result) {
 }
 
 /**
+ * A Chat client and email for the person asking, or the reason there isn't one.
+ * Thread reads always run as them, never as Oracle.
+ */
+async function askerChat(userId) {
+  const scopeCheck = await hasChatScopes(userId);
+  if (!scopeCheck.ok) {
+    return { error: MESSAGES.needsReconsent(hubSignInUrl()), needs_reconsent: true };
+  }
+  let chat;
+  try {
+    chat = google.chat({ version: 'v1', auth: await getUserOAuth2Client(userId) });
+  } catch {
+    return { error: MESSAGES.needsReconsent(hubSignInUrl()), needs_reconsent: true };
+  }
+  const userRow = await query('SELECT email FROM users WHERE id = $1', [userId]).catch(() => ({ rows: [] }));
+  return { chat, userEmail: userRow.rows[0]?.email || null };
+}
+
+/** Messages in one thread, newest first, up to MAX_THREAD_MESSAGES. */
+async function listThreadMessages(chat, spaceName, threadName) {
+  const messages = [];
+  let pageToken;
+  do {
+    const res = await chat.spaces.messages.list({
+      parent: spaceName,
+      filter: `thread.name = "${threadName}"`,
+      pageSize: 100,
+      orderBy: 'createTime DESC',
+      pageToken
+    });
+    messages.push(...(res.data.messages || []));
+    pageToken = messages.length < MAX_THREAD_MESSAGES ? res.data.nextPageToken : null;
+  } while (pageToken);
+  return messages.slice(0, MAX_THREAD_MESSAGES);
+}
+
+/**
+ * The whole current thread, oldest first, as the person asking: who said what and
+ * when, plus the files attached anywhere in it. For /learn-this.
+ *
+ * @param {Object} ctx - { userId, chatContext }
+ * @returns {Promise<{success: boolean, messages?: Array, files?: Array, chat?: Object, userEmail?: string, error?: string}>}
+ */
+export async function readThreadTranscript(ctx = {}) {
+  const { userId, chatContext } = ctx;
+  const threadName = chatContext?.threadName;
+  const spaceName = chatContext?.spaceName;
+  if (!userId || !threadName || !spaceName) {
+    return { success: false, error: 'Reply with /learn-this inside the thread you want me to learn from.' };
+  }
+
+  const asker = await askerChat(userId);
+  if (asker.error) return { success: false, error: asker.error };
+
+  try {
+    const raw = (await listThreadMessages(asker.chat, spaceName, threadName)).reverse();
+
+    const { resolveSenderNames } = await import('./directory-names.js');
+    const names = await resolveSenderNames(raw.map(m => m.sender).filter(Boolean), { userId })
+      .catch(() => new Map());
+
+    return {
+      success: true,
+      chat: asker.chat,
+      userEmail: asker.userEmail,
+      messages: raw.map(m => ({
+        sender: m.sender?.displayName || names.get(m.sender?.name) || 'someone outside Granted',
+        time: m.createTime,
+        text: m.text || '',
+        files: attachmentsOf(m).map(f => f.name)
+      })),
+      files: raw.flatMap(m => attachmentsOf(m))
+    };
+  } catch (err) {
+    console.warn(`⚠️  Thread transcript unreadable: ${err.code || err.response?.status || 'error'}`);
+    return { success: false, error: 'I couldn\'t read this thread.' };
+  }
+}
+
+/**
  * Tool: read files attached to earlier messages in the current Chat thread.
  *
  * @param {Object} input - { file_name?: string }
@@ -165,39 +245,12 @@ export async function readThreadAttachments(input = {}, ctx = {}) {
     return { success: false, error: 'I can only read attachments from the Chat thread this conversation is in.' };
   }
 
-  const scopeCheck = await hasChatScopes(userId);
-  if (!scopeCheck.ok) {
-    return { success: false, needs_reconsent: true, error: MESSAGES.needsReconsent(hubSignInUrl()) };
-  }
-
-  let chat;
-  try {
-    chat = google.chat({ version: 'v1', auth: await getUserOAuth2Client(userId) });
-  } catch (err) {
-    return { success: false, error: MESSAGES.needsReconsent(hubSignInUrl()) };
-  }
-
-  const userRow = await query('SELECT email FROM users WHERE id = $1', [userId]).catch(() => ({ rows: [] }));
-  const userEmail = userRow.rows[0]?.email || null;
+  const asker = await askerChat(userId);
+  if (asker.error) return { success: false, needs_reconsent: asker.needs_reconsent, error: asker.error };
+  const { chat, userEmail } = asker;
 
   try {
-    const files = [];
-    let pageToken;
-    let seen = 0;
-    do {
-      const res = await chat.spaces.messages.list({
-        parent: spaceName,
-        filter: `thread.name = "${threadName}"`,
-        pageSize: 100,
-        orderBy: 'createTime DESC',
-        pageToken
-      });
-      for (const m of res.data.messages || []) {
-        seen += 1;
-        files.push(...attachmentsOf(m));
-      }
-      pageToken = seen < MAX_THREAD_MESSAGES ? res.data.nextPageToken : null;
-    } while (pageToken);
+    const files = (await listThreadMessages(chat, spaceName, threadName)).flatMap(m => attachmentsOf(m));
 
     const wanted = String(input.file_name || '').trim().toLowerCase();
     const matching = wanted ? files.filter(f => f.name.toLowerCase().includes(wanted)) : files;
