@@ -88,6 +88,21 @@ export async function confirmLesson(id, edits = {}) {
   return r.rows[0] || null;
 }
 
+/**
+ * Retire a saved lesson: it stops appearing in answers at once (activeLessons
+ * reads retired_at IS NULL on every run). Only an active, not-yet-retired lesson.
+ * Returns true if one was retired.
+ */
+export async function retireLesson(id) {
+  const r = await query(
+    `UPDATE team_lessons SET retired_at = NOW()
+     WHERE id = $1 AND state = 'active' AND retired_at IS NULL
+     RETURNING id`,
+    [id]
+  );
+  return r.rows.length > 0;
+}
+
 /** Delete a pending lesson. Returns true if one was deleted. */
 export async function discardLesson(id) {
   const r = await query(`DELETE FROM team_lessons WHERE id = $1 AND state = 'pending' RETURNING id`, [id]);

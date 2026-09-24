@@ -37,6 +37,12 @@ const lessonsFake = {
     Object.assign(r, { state: 'active', confirmed_at: new Date() }, Object.fromEntries(Object.entries(edits).filter(([, v]) => v != null)));
     return { ...r };
   },
+  async retireLesson(id) {
+    const r = lessonRows.get(Number(id));
+    if (!r || r.state !== 'active' || r.retired_at) return false;
+    r.retired_at = new Date();
+    return true;
+  },
   async discardLesson(id) {
     const r = lessonRows.get(Number(id));
     if (!r || r.state !== 'pending') return false;
@@ -237,15 +243,18 @@ describe('only the teacher can act', () => {
 });
 
 describe('Save, Discard, and their outcome on the card', () => {
-  test('Save makes it active and the card says "Saved as unverified"; the card closes when nothing is waiting', async () => {
+  test('Save makes it active; the card says "Saved as unverified", stays open, and offers only Remove on it', async () => {
     const card = await startInSpace();
     const id = addPending(card.id);
     await finishLessonCard(card.id, '');
     expect(await press(card, 'lesson.save', teacher, { lessonId: id })).toMatchObject({ changed: true });
     expect(lessonRows.get(id).state).toBe('active');
     const after = await current(card.id);
-    expect(cardText(await renderCard(after))).toMatch(/Saved as unverified/);
-    expect(after.status).toBe('closed');
+    const shown = await renderCard(after);
+    expect(cardText(shown)).toMatch(/Saved as unverified/);
+    expect(after.status).toBe('open');
+    expect(cardButtons(shown).map(b => b.text)).toEqual(['Remove']);
+    expect(cardButtons(shown)[0].params).toMatchObject({ action: 'lesson.remove', lessonId: String(id) });
   });
 
   test('Discard deletes it and the card says "Discarded"', async () => {
@@ -299,6 +308,84 @@ describe('Save, Discard, and their outcome on the card', () => {
   });
 });
 
+describe('Remove, on a saved lesson', () => {
+  async function savedCard(extraPending = 0) {
+    const card = await startInSpace();
+    const id = addPending(card.id);
+    const others = Array.from({ length: extraPending }, () => addPending(card.id));
+    await finishLessonCard(card.id, '');
+    await press(card, 'lesson.save', teacher, { lessonId: id });
+    return { card, id, others };
+  }
+
+  test('retires the lesson at once; the card says "Removed" and closes when nothing is left', async () => {
+    const { card, id } = await savedCard();
+    expect(await press(card, 'lesson.remove', teacher, { lessonId: id })).toMatchObject({ changed: true });
+    expect(lessonRows.get(id).retired_at).toBeInstanceOf(Date);
+    const after = await current(card.id);
+    expect(cardText(await renderCard(after))).toMatch(/Removed/);
+    expect(cardButtons(await renderCard(after))).toEqual([]);
+    expect(after.status).toBe('closed');
+  });
+
+  test('someone else pressing Remove is refused politely; the lesson stays', async () => {
+    const { card, id } = await savedCard();
+    const outcome = await press(card, 'lesson.remove', other, { lessonId: id });
+    expect(outcome).toMatchObject({ changed: false, ignored: 'not_the_teacher' });
+    expect(outcome.reply).toMatch(/Only the person who ran \/learn-this/);
+    expect(lessonRows.get(id).retired_at).toBeUndefined();
+  });
+
+  test('Remove on a lesson that isn\'t saved changes nothing', async () => {
+    const card = await startInSpace();
+    const id = addPending(card.id);
+    await finishLessonCard(card.id, '');
+    const outcome = await press(card, 'lesson.remove', teacher, { lessonId: id });
+    expect(outcome).toMatchObject({ changed: false, ignored: 'not_saved' });
+    expect(lessonRows.get(id).state).toBe('pending');
+  });
+
+  test('pressing Remove twice: the second says there is nothing to remove', async () => {
+    const { card, id } = await savedCard(1);
+    await press(card, 'lesson.remove', teacher, { lessonId: id });
+    expect(await press(card, 'lesson.remove', teacher, { lessonId: id })).toMatchObject({ changed: false, ignored: 'not_saved' });
+  });
+
+  test('an edited-and-saved lesson can be removed too', async () => {
+    const card = await startInSpace();
+    const id = addPending(card.id);
+    await finishLessonCard(card.id, '');
+    fakes.agent.impl = async (args) => {
+      await lessonsFake.confirmLesson(args.chatContext.editLessonId, { lesson: 'new text', status: 'verified' });
+      return { success: true, response: { content: [] } };
+    };
+    await handleTypedEdit({ card: await current(card.id), actor: teacher, number: 1, text: 'new text' });
+    expect(cardButtons(await renderCard(await current(card.id))).map(b => b.text)).toEqual(['Remove']);
+    await press(card, 'lesson.remove', teacher, { lessonId: id });
+    expect(cardText(await renderCard(await current(card.id)))).toMatch(/Removed/);
+  });
+
+  test('saved lessons don\'t count as waiting: no Save all for one waiting next to a saved one', async () => {
+    const { card } = await savedCard(1);
+    const shown = await renderCard(await current(card.id));
+    const names = cardButtons(shown).map(b => b.text);
+    expect(names).not.toContain('Save all');
+    expect(names).toEqual(['Remove', 'Save', 'Edit', 'Discard']);
+    expect(cardText(shown)).toMatch(/1 waiting/);
+  });
+
+  test('Save all counts only what is waiting, and leaves saved lessons with their Remove', async () => {
+    const { card, id, others } = await savedCard(2);
+    const names = cardButtons(await renderCard(await current(card.id))).map(b => b.text);
+    expect(names.slice(0, 2)).toEqual(['Save all', 'Discard all']);
+    await press(card, 'lesson.save_all', teacher);
+    expect(others.every(o => lessonRows.get(o).state === 'active')).toBe(true);
+    const after = cardButtons(await renderCard(await current(card.id))).map(b => b.text);
+    expect(after).toEqual(['Remove', 'Remove', 'Remove']);
+    expect(lessonRows.get(id).state).toBe('active');
+  });
+});
+
 describe('expiry', () => {
   test('after 24 hours pending lessons are deleted and the card updates in place — nothing is posted', async () => {
     const card = await startInSpace();
@@ -313,6 +400,23 @@ describe('expiry', () => {
     const after = await current(card.id);
     expect(cardText(await renderCard(after))).toMatch(/Expired — not saved/);
     expect(cardButtons(await renderCard(after))).toEqual([]);
+  });
+
+  test('expiry touches only pending lessons: a saved lesson keeps its Remove and the card stays open', async () => {
+    const card = await startInSpace();
+    const saved = addPending(card.id);
+    const old = addPending(card.id, { expires_at: new Date(Date.now() - 1000) });
+    await finishLessonCard(card.id, '');
+    await press(card, 'lesson.save', teacher, { lessonId: saved });
+    lessonRows.get(saved).expires_at = new Date(Date.now() - 1000); // even an overdue timestamp on a saved row
+    expect(await expireLessonCards(new Date())).toEqual({ expired: 1, cards: 1 });
+    expect(lessonRows.has(old)).toBe(false);
+    expect(lessonRows.get(saved).state).toBe('active');
+    const after = await current(card.id);
+    expect(after.status).toBe('open');
+    const shown = await renderCard(after);
+    expect(cardText(shown)).toMatch(/Expired — not saved/);
+    expect(cardButtons(shown).map(b => b.text)).toEqual(['Remove']);
   });
 
   test('lessons still within 24 hours are untouched', async () => {

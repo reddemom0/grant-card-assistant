@@ -62,6 +62,14 @@ describe('saving and confirming', () => {
     expect(sent[1].text).toMatch(/DELETE FROM team_lessons WHERE id = \$1 AND state = 'pending'/);
   });
 
+  test('removing a saved lesson retires only an active, not-yet-retired row — answers stop using it at once', async () => {
+    answer = () => ({ rows: [{ id: 7 }] });
+    expect(await store.retireLesson(7)).toBe(true);
+    expect(sent[0].text).toMatch(/UPDATE team_lessons SET retired_at = NOW\(\) WHERE id = \$1 AND state = 'active' AND retired_at IS NULL/);
+    answer = () => ({ rows: [] });
+    expect(await store.retireLesson(7)).toBe(false);
+  });
+
   test('expiry deletes only pending rows past their time, and returns their cards', async () => {
     answer = () => ({ rows: [{ id: 1, card_id: CARD }, { id: 2, card_id: CARD }] });
     const r = await store.expirePending(new Date('2026-09-25T12:00:00Z'));

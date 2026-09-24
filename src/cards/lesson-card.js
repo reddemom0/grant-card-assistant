@@ -11,7 +11,9 @@
  *
  * Only the teacher (the card's owner) can press anything. Pending lessons are
  * never used in answers; unconfirmed ones expire after 24 hours, and the card
- * then updates silently — nothing is posted.
+ * then updates silently — nothing is posted. A saved lesson keeps a Remove
+ * button: it retires the lesson, which stops it appearing in answers at once.
+ * The card stays open while anything is waiting or can still be removed.
  *
  * Edit opens a dialog (lesson cards opt in to dialogs on their own; see
  * dialogsEnabled in render.js) and always has a typed fallback:
@@ -40,8 +42,11 @@ export const LESSON_ACTIONS = {
   'lesson.discard': { personal: false, label: 'discarded a lesson' },
   'lesson.edit': { personal: false, label: 'edited a lesson', dialog: true, saved: 'Checking the edited lesson…' },
   'lesson.save_all': { personal: false, label: 'saved all lessons' },
-  'lesson.discard_all': { personal: false, label: 'discarded all lessons' }
+  'lesson.discard_all': { personal: false, label: 'discarded all lessons' },
+  'lesson.remove': { personal: false, label: 'removed a lesson' }
 };
+
+const NOT_SAVED = 'That lesson isn’t saved, so there’s nothing to remove.';
 
 function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
@@ -84,6 +89,7 @@ export function statusLine(item) {
 export function outcomeLine(outcome) {
   if (!outcome) return null;
   if (outcome.result === 'saved') return `Saved as ${outcome.status}${outcome.edited ? ' (edited)' : ''}`;
+  if (outcome.result === 'removed') return 'Removed';
   if (outcome.result === 'discarded') return 'Discarded';
   if (outcome.result === 'expired') return 'Expired — not saved';
   if (outcome.result === 'replaced') return 'Not saved — replaced by a newer /learn-this';
@@ -95,8 +101,14 @@ function tidySource(text) {
   return String(text || '').replace(/PROGRAM_FACTS/g, 'program notes').replace(/APPLICATION_FIELDS/g, 'form notes');
 }
 
+/** Lessons still waiting for Save / Edit / Discard. Saved lessons are not waiting. */
 function pendingItems(d) {
   return (d.items || []).filter(item => !d.outcomes?.[item.id]);
+}
+
+/** Saved lessons that can still be removed. */
+function removableItems(d) {
+  return (d.items || []).filter(item => d.outcomes?.[item.id]?.result === 'saved');
 }
 
 // ============================================================================
@@ -145,6 +157,9 @@ function render(card, participants = [], latestClick = null) {
           button('Discard', { cardId: card.id, action: 'lesson.discard', lessonId: item.id })
         ]));
       }
+      if (outcome?.result === 'saved' && live) {
+        widgets.push(buttonRow([button('Remove', { cardId: card.id, action: 'lesson.remove', lessonId: item.id })]));
+      }
       sections.push({ header: `Lesson ${item.n}`, widgets });
     }
 
@@ -190,9 +205,15 @@ async function setOutcome(card, lessonId, outcome) {
   card.data = { ...(card.data || {}), outcomes };
 }
 
-/** Close the card once nothing on it is waiting. */
+/**
+ * Close the card once nothing on it is waiting and nothing saved can still be
+ * removed — a saved lesson keeps its Remove button, so the card stays open.
+ */
 async function closeIfDone(card, now) {
-  if (pendingItems(card.data || {}).length === 0) await store.closeCard(card.id, 'all_handled', now);
+  const d = card.data || {};
+  if (pendingItems(d).length === 0 && removableItems(d).length === 0) {
+    await store.closeCard(card.id, 'all_handled', now);
+  }
 }
 
 async function saveOne(card, lessonId) {
@@ -232,6 +253,16 @@ async function handleAction({ card, actor, action, now = new Date(), params = {}
   }
 
   const item = itemFor(card, params.lessonId);
+
+  if (action === 'lesson.remove') {
+    const outcome = item && card.data?.outcomes?.[item.id];
+    if (!item || outcome?.result !== 'saved') return { changed: false, ignored: 'not_saved', reply: NOT_SAVED };
+    if (!(await lessons.retireLesson(item.id))) return { changed: false, ignored: 'not_saved', reply: NOT_SAVED };
+    await setOutcome(card, item.id, { ...outcome, result: 'removed' });
+    await closeIfDone(card, now);
+    return { changed: true };
+  }
+
   if (!item || card.data?.outcomes?.[item.id]) return { changed: false, ignored: 'not_waiting', reply: GONE };
 
   if (action === 'lesson.edit') {

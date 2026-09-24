@@ -115,7 +115,12 @@ weighing changes, but it is not an open hole.
   date against the notes); new in-scope facts are saved with `from_document` and labelled
   "from [document], not yet in Granted's notes" — a document never verifies itself.
   Buttons, teacher only (`owner_chat_id`; others get a private refusal): Save, Edit,
-  Discard, plus Save all / Discard all with 2+ waiting. Edit opens a dialog — lesson cards
+  Discard, plus Save all / Discard all with 2+ waiting. A saved lesson keeps a Remove button:
+  it retires the lesson (`retireLesson` sets `retired_at`, so answers stop using it on the
+  next run) and the card says "Removed". Saved lessons don't count as waiting; the card
+  stays open while anything is waiting or can still be removed, and closes after that.
+  Expiry only ever touches pending lessons. A newer /learn-this in the same thread still
+  closes the old card (one live card per thread), which ends its Remove buttons. Edit opens a dialog — lesson cards
   opt in on their own (`dialogs: true`, `dialogsEnabled(type)` in `render.js`;
   `LESSON_DIALOGS_DISABLED=true` turns it off) while every other card keeps dialogs off —
   and always has the typed fallback "@Oracle edit lesson N: <text>". Either way
