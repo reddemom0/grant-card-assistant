@@ -105,7 +105,7 @@ jest.unstable_mockModule('../../src/database/tracked-cards-store.js', () => fake
 jest.unstable_mockModule('../../src/cards/chat-api.js', () => fakes.chat.module);
 jest.unstable_mockModule('../../src/tools/google-drive.js', () => fakes.drive.module);
 jest.unstable_mockModule('../../src/tools/hubspot.js', () => fakes.hubspot.module);
-jest.unstable_mockModule('../../src/tools/getgranted-search.js', () => fakes.grants.module);
+jest.unstable_mockModule('../../src/tools/grant-data.js', () => fakes.grants.module);
 jest.unstable_mockModule('../../src/database/lead-gen-reads.js', () => fakes.leadGen.module);
 jest.unstable_mockModule('../../src/tools/pending-actions.js', () => fakes.gate.module);
 jest.unstable_mockModule('../../src/tools/directory-names.js', () => fakes.directory.module);
@@ -553,10 +553,10 @@ describe('what the card shows', () => {
 
   test('up to three programs, searched on industry words and never on the company name', async () => {
     fakes.grants.grants = [
-      { grant_name: 'Sentinel One', grant_amount: '$10,000', deadline: '2026-11-01', url: 'https://x.test/1' },
-      { grant_name: 'Sentinel Two', grant_amount: '$20,000', deadline: null, url: null },
-      { grant_name: 'Sentinel Three' },
-      { grant_name: 'Sentinel Four' }
+      { name: 'Sentinel One', amount: '$10,000', deadline: '2026-11-01', links: { app: 'https://x.test/1' }, status: 'active' },
+      { name: 'Sentinel Two', amount: '$20,000', deadline: null, status: 'active' },
+      { name: 'Sentinel Three', status: 'active' },
+      { name: 'Sentinel Four', status: 'active' }
     ];
     fakes.hubspot.snapshot = {
       foundBy: 'email',

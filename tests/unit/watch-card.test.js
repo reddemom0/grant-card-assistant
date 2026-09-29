@@ -102,7 +102,7 @@ jest.unstable_mockModule('../../src/database/tracked-cards-store.js', () => fake
 jest.unstable_mockModule('../../src/cards/chat-api.js', () => fakes.chat.module);
 jest.unstable_mockModule('../../src/tools/google-drive.js', () => fakes.drive.module);
 jest.unstable_mockModule('../../src/tools/hubspot.js', () => fakes.hubspot.module);
-jest.unstable_mockModule('../../src/tools/getgranted-search.js', () => fakes.grants.module);
+jest.unstable_mockModule('../../src/tools/grant-data.js', () => fakes.grants.module);
 jest.unstable_mockModule('../../src/database/lead-gen-reads.js', () => fakes.leadGen.module);
 jest.unstable_mockModule('../../src/tools/pending-actions.js', () => fakes.gate.module);
 jest.unstable_mockModule('../../src/tools/directory-names.js', () => fakes.directory.module);
@@ -226,8 +226,8 @@ beforeEach(() => {
   fakes.chat.dms.set(NAT, 'spaces/DM-NAT');
   fakes.chat.dms.set(STEPH, 'spaces/DM-STEPH');
   fakes.grants.grants = [
-    { grant_name: PROGRAM, url: 'https://granted.ca/rtri', deadline: '2026-11-15', grant_amount: '$50,000', program_provider: 'Transport Canada', industries: ['Transportation'], currently_accepting: true },
-    { grant_name: 'Rural Transit Modernisation Fund', url: 'https://granted.ca/rtmf', deadline: '2026-12-01', program_provider: 'BC', industries: ['Transportation'], currently_accepting: true }
+    { name: PROGRAM, links: { app: 'https://granted.ca/rtri' }, deadline: '2026-11-15', amount: '$50,000', funder: 'Transport Canada', industries: ['Transportation'], status: 'active' },
+    { name: 'Rural Transit Modernisation Fund', links: { app: 'https://granted.ca/rtmf' }, deadline: '2026-12-01', funder: 'BC', industries: ['Transportation'], status: 'active' }
   ];
   fakes.agent.impl = async () => ({ success: true, response: { content: [{ type: 'text', text: 'model answer' }] } });
 

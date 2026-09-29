@@ -173,22 +173,23 @@ export async function matchProgram(guess, { limit = 4, now = new Date() } = {}) 
   const query = [guess?.name, guess?.acronym].filter(Boolean).join(' ').trim();
   if (!query) return [];
   try {
-    const { searchGetGranted } = await import('../tools/getgranted-search.js');
-    const res = await searchGetGranted({ query: query.slice(0, 120), limit: Math.max(limit, 6), include_inactive: true });
+    // Every status but GG3's "hide": a watch can be on a program that is closed now.
+    const { searchGrantData, GG3_VISIBLE_STATUSES } = await import('../tools/grant-data.js');
+    const res = await searchGrantData({ query: query.slice(0, 120), limit: Math.max(limit, 6), status: GG3_VISIBLE_STATUSES });
     if (!res?.success) return [];
-    return (res.grants || [])
+    return (res.results || [])
       .map(grant => ({
-        name: grant.grant_name || null,
-        key: programKey(grant.grant_name),
-        url: grant.url || null,
+        name: grant.name || null,
+        key: programKey(grant.name),
+        url: grant.links?.app || null,
         deadline: grant.deadline || null,
-        amount: grant.grant_amount ?? null,
-        provider: grant.program_provider || null,
+        amount: grant.amount ?? null,
+        provider: grant.funder || null,
         industries: Array.isArray(grant.industries) ? grant.industries.slice(0, 3) : [],
         regions: Array.isArray(grant.regions) ? grant.regions.slice(0, 3) : [],
         description: null,
-        accepting: grant.currently_accepting !== false,
-        score: Math.max(scoreOf(guess?.name, grant.grant_name), scoreOf(guess?.acronym, grant.grant_name))
+        accepting: grant.status === 'active',
+        score: Math.max(scoreOf(guess?.name, grant.name), scoreOf(guess?.acronym, grant.name))
       }))
       .filter(p => p.name)
       .sort((a, b) => b.score - a.score)

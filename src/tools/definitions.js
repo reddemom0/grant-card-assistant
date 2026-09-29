@@ -1558,6 +1558,200 @@ Use when simple information retrieval is insufficient and you need specialized e
 };
 
 // ============================================================================
+// GRANT DATA (GG3)
+// Oracle's grant-data tool. One tool, a required `mode`; later modes (counts,
+// card checks, bulk search, tag audit, compare) add enum values and
+// parameters here rather than new tools, so Oracle's tool set — and with it the
+// cached prefix — stays fixed. Implementation: src/tools/grant-data.js.
+// ============================================================================
+
+export const GRANT_DATA_TOOL = {
+  name: 'grant_data',
+  description: `Look up grant programs in Oracle's copy of the live GG3 (GetGranted) platform grant database. The copy is refreshed from GG3 every hour; each response carries data_as_of, the time of the last successful refresh.
+
+mode "search" (the only mode for now):
+- query: keywords, matched against grant names and grant card text. A grant matches if any keyword appears; grants matching more keywords, and matches in the name, rank first.
+- Filters (optional, each takes a list; a grant matches any value in a list, and must pass every filter given): regions (province names or codes like "BC"; grants open to "All of Canada" are always included), industries, grant_types (e.g. "Hiring", "Training", "Market Expansion"), funders (the program provider).
+- status: defaults to ["active"]. Pass other statuses (inactive, archived, draft) only when the user asks about closed or past programs.
+- Hidden grants (GG3 status "hide") are left out unless include_hidden is true. When hidden grants also match, hidden_matches gives their count — offer to include them rather than including them unasked.
+- Returns at most 20 results (limit, default 10) plus total_matches, the full number of matches, so say when there are more than shown.
+
+Each result has: id, name, status, funder, amount, deadline, regions, industries (long lists are cut to 12, with regions_more / industries_more counting the rest), a short summary, and two links — links.app (the grant on app.getgranted.ai) and links.admin (the same grant in the GG3 admin).
+
+GG1 status: only for grants linked to a GG1 record by exact name, a result also carries gg1 {id, status}. status_mismatch is true when GG1 and GG3 disagree on whether the grant is active. Unlinked grants have no gg1 field — that is not an error.
+
+Deadlines are stored as written on the card ("Open Until Filled", dates in several formats). Before telling anyone a program is open or quoting a deadline, verify it (VisualPing alerts, the official program page, web search). Do not quote a total number of grants in the database; use total_matches only as the count for the search you ran.`,
+  input_schema: {
+    type: 'object',
+    properties: {
+      mode: {
+        type: 'string',
+        enum: ['search'],
+        description: 'What to do. "search" finds grants by keyword and filters.'
+      },
+      query: {
+        type: 'string',
+        description: 'Keywords to match against grant names and card text, e.g. "wage subsidy youth" or "CanExport". Leave empty to list by filters alone.'
+      },
+      regions: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Provinces or territories, full names or codes (e.g. ["BC"], ["Ontario", "Quebec"]). All-of-Canada grants are always included.'
+      },
+      industries: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Industry words as GG3 tags them (e.g. ["Manufacturing"], ["Tech - AI"], ["Agriculture"]). Partial words match.'
+      },
+      grant_types: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Grant types, e.g. ["Hiring"], ["Training"], ["Market Expansion"], ["Research & Development"], ["Capital Costs"].'
+      },
+      funders: {
+        type: 'array',
+        items: { type: 'string' },
+        description: 'Program provider names or parts of them, e.g. ["Alberta Innovates"].'
+      },
+      status: {
+        type: 'array',
+        items: { type: 'string', enum: ['active', 'inactive', 'archived', 'draft'] },
+        description: 'GG3 statuses to include. Default ["active"].'
+      },
+      include_hidden: {
+        type: 'boolean',
+        description: 'Also include grants with GG3 status "hide". Default false.'
+      },
+      limit: {
+        type: 'number',
+        description: 'Results to return, 1–20. Default 10.'
+      }
+    },
+    required: ['mode']
+  }
+};
+
+// ============================================================================
+// GG1 SEARCH (lead-gen only)
+// The GG1-mirror search, kept for the lead-gen agent (and nothing in
+// ORACLE_TOOLS, so Oracle and the orchestrator no longer see it). Its text is
+// unchanged from when it lived in ORACLE_TOOLS.
+// ============================================================================
+
+export const SEARCH_GETGRANTED_TOOL = {
+    name: 'search_getgranted',
+    description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
+
+**CRITICAL - Active vs Inactive Grants:**
+- By default, this tool ONLY returns ACTIVE grants (grants you can apply to NOW)
+- When users ask "find grants for X", they mean ACTIVE grants unless stated otherwise
+- NEVER return inactive grants unless the user explicitly asks for historical/inactive grants
+- Always use active_only=true (default) for normal grant searches
+- If an inactive grant is returned, CLEARLY label it as INACTIVE and suggest active alternatives
+
+Use this to:
+- Search grants by name or keywords (e.g., "BuyBC", "hiring grant", "export funding")
+- Find grants for specific clients based on their industry, location, and needs
+- Discover hiring, training, export, R&D, or capital grants
+- Filter by region, company size, owner demographics
+- Get quick summaries or full grant card details
+
+This tool searches a nightly-refreshed copy of the GG1 (GetGranted 1.0) grant database and returns matching opportunities with eligibility, funding details, and deadlines. Do not quote a total grant count from this description.
+
+**⚠️ DATA FRESHNESS**: Data comes from a scheduled copy of GG1 and can lag the live program. For critical deadline verification, Oracle should also:
+1. Check VisualPing alerts for recent changes to this grant
+2. Run a web search for "{grant_name} deadline 2026" to find recent announcements
+3. Cross-reference multiple sources before confirming deadline dates
+
+**Search Strategy:**
+1. Start with 'query' parameter for text-based search (searches grant names, criteria, descriptions)
+2. Add filters (purposes, regions, industries) to narrow results
+3. Use 'fetch_full_details' to get complete grant card information
+
+**Common use cases:**
+- "Find the BuyBC grant" → query: "BuyBC", active_only: true
+- "Find hiring grants for a BC tech company" → query: "hiring", regions: ["British Columbia"], industries: ["Technology"], active_only: true
+- "Show market expansion grants for Indigenous-owned businesses" → purposes: ["Market Expansion"], owner_demographics: ["Indigenous"], active_only: true
+- "Search for R&D grants in Ontario with open intakes" → query: "R&D", regions: ["Ontario"], open_intakes_only: true, active_only: true
+- "What grants did we have for digitization in 2023?" → query: "digitization", active_only: false (historical search)`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Text search query to match against grant names, descriptions, criteria, and other text fields. Use this for searching specific grant names or keywords (e.g., "BuyBC", "export", "training"). Leave empty to browse all grants with filters only.'
+        },
+        purposes: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['Hiring', 'Training', 'Market Expansion', 'Capital Costs', 'Business Assessments, Planning & Coaching', 'Systems & Processes', 'Loan', 'Contests & Prizes', 'Investment', 'Research & Development', 'Rebates']
+          },
+          description: 'Grant purposes/types to search for. Leave empty for all types.'
+        },
+        regions: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['British Columbia', 'Ontario', 'Alberta', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia', 'Nunavut', 'Prince Edward Island', 'Quebec', 'Saskatchewan', 'Yukon']
+          },
+          description: 'Canadian provinces/territories. Leave empty for all regions.'
+        },
+        industries: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Industry sectors (e.g., "Technology", "Manufacturing", "Agriculture"). Leave empty for all industries.'
+        },
+        business_type: {
+          type: 'string',
+          enum: ['Incorporated', 'Sole Proprietorship', 'General Partnership', 'Non-Profit', 'Charity'],
+          description: 'Business structure type. Leave empty for any business type.'
+        },
+        owner_demographics: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: ['Female', 'Indigenous', 'Newcomers', 'People with disabilities', 'Rural Entrepreneur', 'Youth']
+          },
+          description: 'Owner demographics for targeted grants. Leave empty if not applicable.'
+        },
+        company_size_min: {
+          type: 'number',
+          description: 'Minimum company size (number of employees). Leave empty for no minimum.'
+        },
+        company_size_max: {
+          type: 'number',
+          description: 'Maximum company size (number of employees). Leave empty for no maximum.'
+        },
+        active_only: {
+          type: 'boolean',
+          default: true,
+          description: 'Only show ACTIVE grants that can be applied to NOW (default: true). Set to false ONLY if user explicitly asks for inactive/historical/closed grants. When users ask "find grants for X", they mean active grants - keep this as true.'
+        },
+        open_intakes_only: {
+          type: 'boolean',
+          description: 'Only show grants with open intake periods (default false).'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of grants to return (default 10, max 50).',
+          minimum: 1,
+          maximum: 50
+        },
+        fetch_full_details: {
+          type: 'boolean',
+          description: 'Fetch full grant card details including eligibility criteria and best practices (slower, default false).'
+        },
+        bypass_cache: {
+          type: 'boolean',
+          description: 'Force fresh scraping, bypassing Redis cache. Use this if results seem stale or incorrect (default false).'
+        }
+      },
+      required: []
+    }
+};
+
+// ============================================================================
 // ORACLE TOOLS
 // Internal knowledge base search for Granted Consulting documentation
 // ============================================================================
@@ -1796,118 +1990,7 @@ Wraps search_grant_applications under the hood for marketing analytics use cases
       }
     }
   },
-  {
-    name: 'search_getgranted',
-    description: `Search Granted Consulting's GetGranted database for grant opportunities matching client criteria.
-
-**CRITICAL - Active vs Inactive Grants:**
-- By default, this tool ONLY returns ACTIVE grants (grants you can apply to NOW)
-- When users ask "find grants for X", they mean ACTIVE grants unless stated otherwise
-- NEVER return inactive grants unless the user explicitly asks for historical/inactive grants
-- Always use active_only=true (default) for normal grant searches
-- If an inactive grant is returned, CLEARLY label it as INACTIVE and suggest active alternatives
-
-Use this to:
-- Search grants by name or keywords (e.g., "BuyBC", "hiring grant", "export funding")
-- Find grants for specific clients based on their industry, location, and needs
-- Discover hiring, training, export, R&D, or capital grants
-- Filter by region, company size, owner demographics
-- Get quick summaries or full grant card details
-
-This tool searches a nightly-refreshed copy of the GG1 (GetGranted 1.0) grant database and returns matching opportunities with eligibility, funding details, and deadlines. Do not quote a total grant count from this description.
-
-**⚠️ DATA FRESHNESS**: Data comes from a scheduled copy of GG1 and can lag the live program. For critical deadline verification, Oracle should also:
-1. Check VisualPing alerts for recent changes to this grant
-2. Run a web search for "{grant_name} deadline 2026" to find recent announcements
-3. Cross-reference multiple sources before confirming deadline dates
-
-**Search Strategy:**
-1. Start with 'query' parameter for text-based search (searches grant names, criteria, descriptions)
-2. Add filters (purposes, regions, industries) to narrow results
-3. Use 'fetch_full_details' to get complete grant card information
-
-**Common use cases:**
-- "Find the BuyBC grant" → query: "BuyBC", active_only: true
-- "Find hiring grants for a BC tech company" → query: "hiring", regions: ["British Columbia"], industries: ["Technology"], active_only: true
-- "Show market expansion grants for Indigenous-owned businesses" → purposes: ["Market Expansion"], owner_demographics: ["Indigenous"], active_only: true
-- "Search for R&D grants in Ontario with open intakes" → query: "R&D", regions: ["Ontario"], open_intakes_only: true, active_only: true
-- "What grants did we have for digitization in 2023?" → query: "digitization", active_only: false (historical search)`,
-    input_schema: {
-      type: 'object',
-      properties: {
-        query: {
-          type: 'string',
-          description: 'Text search query to match against grant names, descriptions, criteria, and other text fields. Use this for searching specific grant names or keywords (e.g., "BuyBC", "export", "training"). Leave empty to browse all grants with filters only.'
-        },
-        purposes: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: ['Hiring', 'Training', 'Market Expansion', 'Capital Costs', 'Business Assessments, Planning & Coaching', 'Systems & Processes', 'Loan', 'Contests & Prizes', 'Investment', 'Research & Development', 'Rebates']
-          },
-          description: 'Grant purposes/types to search for. Leave empty for all types.'
-        },
-        regions: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: ['British Columbia', 'Ontario', 'Alberta', 'Manitoba', 'New Brunswick', 'Newfoundland and Labrador', 'Northwest Territories', 'Nova Scotia', 'Nunavut', 'Prince Edward Island', 'Quebec', 'Saskatchewan', 'Yukon']
-          },
-          description: 'Canadian provinces/territories. Leave empty for all regions.'
-        },
-        industries: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Industry sectors (e.g., "Technology", "Manufacturing", "Agriculture"). Leave empty for all industries.'
-        },
-        business_type: {
-          type: 'string',
-          enum: ['Incorporated', 'Sole Proprietorship', 'General Partnership', 'Non-Profit', 'Charity'],
-          description: 'Business structure type. Leave empty for any business type.'
-        },
-        owner_demographics: {
-          type: 'array',
-          items: {
-            type: 'string',
-            enum: ['Female', 'Indigenous', 'Newcomers', 'People with disabilities', 'Rural Entrepreneur', 'Youth']
-          },
-          description: 'Owner demographics for targeted grants. Leave empty if not applicable.'
-        },
-        company_size_min: {
-          type: 'number',
-          description: 'Minimum company size (number of employees). Leave empty for no minimum.'
-        },
-        company_size_max: {
-          type: 'number',
-          description: 'Maximum company size (number of employees). Leave empty for no maximum.'
-        },
-        active_only: {
-          type: 'boolean',
-          default: true,
-          description: 'Only show ACTIVE grants that can be applied to NOW (default: true). Set to false ONLY if user explicitly asks for inactive/historical/closed grants. When users ask "find grants for X", they mean active grants - keep this as true.'
-        },
-        open_intakes_only: {
-          type: 'boolean',
-          description: 'Only show grants with open intake periods (default false).'
-        },
-        limit: {
-          type: 'number',
-          description: 'Maximum number of grants to return (default 10, max 50).',
-          minimum: 1,
-          maximum: 50
-        },
-        fetch_full_details: {
-          type: 'boolean',
-          description: 'Fetch full grant card details including eligibility criteria and best practices (slower, default false).'
-        },
-        bypass_cache: {
-          type: 'boolean',
-          description: 'Force fresh scraping, bypassing Redis cache. Use this if results seem stale or incorrect (default false).'
-        }
-      },
-      required: []
-    }
-  },
+  GRANT_DATA_TOOL,
   {
     name: 'search_federal_grants_aggregate',
     description: `Aggregate-mode search over the Government of Canada Proactive Disclosure dataset (federal grants and contribution agreements, ~1.26M rows). Returns grouped rollups: counts, total dollars, average award size, median, YoY growth, p90. Always returns net values — queries run against pdg_latest_amendments (one row per ref_number) so amendments don't double-count.
@@ -3002,8 +3085,9 @@ export function getToolsForAgent(agentType) {
       // HubSpot write tools (create_contact, etc.) will be added back in a later step
       // once proper input validation is in place.
       const webSearchTool = SERVER_TOOLS.find(t => t.name === 'web_search');
-      // search_getgranted is defined in ORACLE_TOOLS (not HUBSPOT_TOOLS)
-      const searchGrantedTool = ORACLE_TOOLS.find(t => t.name === 'search_getgranted');
+      // search_getgranted (the GG1-mirror search) is its own const; Oracle's
+      // ORACLE_TOOLS carries grant_data (GG3) in its place.
+      const searchGrantedTool = SEARCH_GETGRANTED_TOOL;
       const leadGenTools = [
         ...(webSearchTool ? [webSearchTool] : []),   // Anthropic-controlled, safe
         ...MEMORY_TOOLS,                              // session-scoped DB key-value, safe

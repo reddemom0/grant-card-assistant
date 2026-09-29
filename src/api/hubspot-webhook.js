@@ -322,8 +322,8 @@ Reason: [Specific disqualifier]
 **🚨 THE CARDINAL RULE: NEVER recommend a closed grant 🚨**
 
 **Step 1: Find Active Grants**
-- **CRITICAL:** Use search_getgranted with **active_only=true** (MANDATORY)
-- Check **open_intakes_only=true** for immediate opportunities
+- **CRITICAL:** Use grant_data with **mode "search"** (MANDATORY) — it returns active grants only by default; do not widen the status
+- Check each result's **deadline** for immediate opportunities
 - **Consult get_visualping_alerts (past 30 days)** for program changes
 
 **Step 2: VALIDATE Each Grant is Currently Open**
@@ -335,7 +335,7 @@ For EVERY grant you plan to recommend:
    - WebSearch: "[grant name] currently accepting applications"
 
 2. Check official program page:
-   - WebFetch: [official URL from GetGranted]
+   - WebFetch: [official program page, found by web search]
 
 3. Look for OPEN signals:
    ✅ "Now accepting applications"

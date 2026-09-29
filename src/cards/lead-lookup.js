@@ -378,22 +378,21 @@ export async function programsToMention({ industry = null, province = null, acti
   const words = [industry, activities].filter(Boolean).join(' ').trim();
   if (!words) return [];
   try {
-    // Imported here, not at the top: that module opens a Redis client as it
-    // loads, and every process that renders a card would pay for it.
-    const { searchGetGranted } = await import('../tools/getgranted-search.js');
-    const res = await searchGetGranted({
+    // Imported here, not at the top, like the other lazy reads a card makes.
+    // Active grants only (the default); GG3 "hide" grants never.
+    const { searchGrantData } = await import('../tools/grant-data.js');
+    const res = await searchGrantData({
       query: words.slice(0, 120),
       regions: province ? [province] : [],
-      limit: 3,
-      open_intakes_only: false
+      limit: 3
     });
     if (!res?.success) return [];
-    return (res.grants || []).slice(0, 3).map(g => ({
-      name: g.grant_name || null,
-      amount: g.grant_amount || null,
+    return (res.results || []).slice(0, 3).map(g => ({
+      name: g.name || null,
+      amount: g.amount || null,
       deadline: g.deadline || null,
-      url: g.url || null,
-      accepting: g.currently_accepting !== false
+      url: g.links?.app || null,
+      accepting: g.status === 'active'
     })).filter(g => g.name);
   } catch (err) {
     console.warn(`⚠️  Lead programs search failed — code: ${err?.code || err?.name || 'unknown'}`);

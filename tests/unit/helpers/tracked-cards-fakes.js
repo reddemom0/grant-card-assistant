@@ -18,7 +18,9 @@
  *               reads and its one gated write (leadCrmSnapshot, listHubSpotOwners,
  *               recordLeadOutcome).
  *   leadGen   — latestLeadGenSession (src/database/lead-gen-reads.js).
- *   grants    — searchGetGranted (src/tools/getgranted-search.js).
+ *   grants    — searchGrantData (src/tools/grant-data.js, the GG3 copy);
+ *               fixtures are in its result shape (name, amount, deadline,
+ *               funder, status, links.app, …).
  *   directory — lookupChatUserEmail; calendar — getCalendarClient, plus /meet's
  *               free/busy, event insert and event patch.
  *   granola   — granolaListMeetings (the MCP shape is not modelled; the fake
@@ -663,16 +665,18 @@ export function createTrackedCardFakes() {
     }
   };
 
-  /** Our grants table, for "worth mentioning". */
+  /** Our GG3 grants copy, for "worth mentioning" and watch matching. */
   const grants = {
     ...grantsState,
     module: {
-      async searchGetGranted(input = {}) {
+      GG3_VISIBLE_STATUSES: ['active', 'inactive', 'archived', 'draft'],
+      async searchGrantData(input = {}) {
         grantsState.searches.push(json(input));
         if (grantsState.hold) await grantsState.hold;   // a slow grants table, released by the test
         if (grantsState.fail) throw Object.assign(new Error('grants down'), { code: 'ECONNREFUSED' });
         const limit = input.limit || 10;
-        return { success: true, count: grantsState.grants.length, grants: json(grantsState.grants).slice(0, limit) };
+        const results = json(grantsState.grants).slice(0, limit);
+        return { success: true, mode: 'search', total_matches: grantsState.grants.length, returned: results.length, hidden_matches: 0, results };
       }
     }
   };
