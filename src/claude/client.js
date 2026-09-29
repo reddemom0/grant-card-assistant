@@ -183,6 +183,62 @@ export function toolsForRun(agentType, allowedTools = null) {
     : tools.filter(t => !RUN_ONLY_TOOLS.includes(t.name));
 }
 
+// Oracle tools used in 2 or fewer conversations over the 30 days to 2026-09-29.
+// On Oracle's Sonnet 5.5 requests they are sent with defer_loading, so they stay
+// out of the cached prefix until tool search finds them. track_review and
+// read_chat_attachments qualified but stay loaded: the review card and Chat file
+// uploads depend on them.
+export const ORACLE_DEFERRED_TOOLS = [
+  'create_hubspot_company', 'update_hubspot_company', 'create_hubspot_contact',
+  'update_hubspot_contact', 'associate_contact_with_company', 'create_hubspot_deal',
+  'update_hubspot_deal', 'generate_hubspot_embed_link', 'list_hubspot_owners',
+  'get_deal_count', 'search_recent_wins',
+  'list_calendar_events', 'check_calendar_availability', 'create_calendar_event',
+  'update_calendar_event',
+  'search_federal_grants_aggregate', 'get_program_stats', 'read_dropbox_file',
+  'granola_list_meeting_folders', 'memory_list', 'get_recent_granted_ca_post',
+  'append_sheet_row', 'insert_into_google_doc'
+];
+
+export const TOOL_SEARCH_TOOL = { type: 'tool_search_tool_bm25_20251119', name: 'tool_search_tool_bm25' };
+
+/**
+ * The tool list as sent. Oracle's Sonnet 5.5 requests defer ORACLE_DEFERRED_TOOLS
+ * and add Anthropic's tool search; the API keeps deferred tools out of the prefix
+ * and appends the ones Claude finds, so the cache is unaffected. Everything else —
+ * Oracle's Haiku tiers, the webhook, runs restricted by allowedTools, other
+ * agents — gets the list unchanged.
+ *
+ * @param {Array} tools - from toolsForRun
+ * @param {{agentType: string, model: string, allowedTools: string[]|null}} run
+ * @returns {Array}
+ */
+export function withToolSearch(tools, { agentType, model, allowedTools = null }) {
+  if (agentType !== 'internal-oracle' || model !== 'claude-sonnet-5-5' || allowedTools) {
+    return tools;
+  }
+  return [
+    ...tools.map(t => (ORACLE_DEFERRED_TOOLS.includes(t.name) ? { ...t, defer_loading: true } : t)),
+    TOOL_SEARCH_TOOL
+  ];
+}
+
+/**
+ * Reloaded history as sent: thinking blocks and tool search results are dropped
+ * from assistant messages. messages.js already drops the server_tool_use that
+ * started each search, so its result can't be sent without it; a later turn
+ * searches again instead.
+ *
+ * @param {Array} history - from getConversationMessages
+ * @returns {Array}
+ */
+export function historyForRequest(history) {
+  const dropped = ['thinking', 'redacted_thinking', 'tool_search_tool_result'];
+  return history.map(msg => (msg.role === 'assistant' && Array.isArray(msg.content)
+    ? { ...msg, content: msg.content.filter(block => !dropped.includes(block.type)) }
+    : msg));
+}
+
 /**
  * The user turn as saved: ephemeral attachment blocks (Chat files) become a
  * placeholder, everything else is kept as sent.
@@ -446,24 +502,14 @@ export async function runAgent({
     console.log(`✓ Retrieved ${history.length} messages for conversation ${conversationId}`);
 
     // ============================================================================
-    // 3.5. Strip thinking blocks from historical assistant messages
+    // 3.5. Strip thinking blocks and tool search results from historical
+    //      assistant messages (historyForRequest)
     // ============================================================================
-    // CRITICAL FIX: Anthropic API throws 400 error if thinking blocks are modified
-    // in multi-turn conversations. We must remove all thinking/redacted_thinking blocks
-    // from historical assistant messages before sending them back to the API.
+    // Earlier turns' thinking is optional to send back, and a search result can't
+    // be sent without the server_tool_use that messages.js drops on reload.
     // Reference: https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
 
-    history = history.map(msg => {
-      if (msg.role === 'assistant' && Array.isArray(msg.content)) {
-        return {
-          ...msg,
-          content: msg.content.filter(block =>
-            block.type !== 'thinking' && block.type !== 'redacted_thinking'
-          )
-        };
-      }
-      return msg;
-    });
+    history = historyForRequest(history);
 
     console.log(`✓ Loaded ${history.length} previous messages (max: ${maxMessages})`);
 
@@ -630,8 +676,9 @@ export async function runAgent({
     // 5. Get tools for this agent
     // ============================================================================
 
-    const tools = toolsForRun(agentType, allowedTools);
-    console.log(`🔧 Loaded ${tools.length} tools for agent${allowedTools ? ' (restricted for this run)' : ''}`)
+    const tools = withToolSearch(toolsForRun(agentType, allowedTools), { agentType, model: MODEL, allowedTools });
+    const deferredCount = tools.filter(t => t.defer_loading).length;
+    console.log(`🔧 Loaded ${tools.length} tools for agent${allowedTools ? ' (restricted for this run)' : ''}${deferredCount ? ` (${deferredCount} on demand via tool search)` : ''}`)
 
     // ============================================================================
     // 6. Agent execution loop

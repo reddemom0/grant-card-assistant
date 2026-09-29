@@ -1388,144 +1388,22 @@ export const GRANOLA_TOOLS = [
 
 export const LOAD_SKILL_TOOL = {
   name: 'load_skill',
-  description: `Load specialized skill documentation with methodologies, frameworks, and best practices for complex workflows.
+  description: `Load a skill: Granted's written methodology for a specialised task. Pass skill_name plus a sub_skill (the sub_skill parameter lists each skill's sub-skills). Answer simple lookups with tools directly; load a skill for specialised analysis, writing, or multi-step workflows. The system prompt's "When to Load Skills" section says which to load when.
 
-**When to use this tool:**
-Use when simple information retrieval is insufficient and you need specialized expertise for complex tasks.
-
-**Available skills:**
-
-**Sales Skill:**
-- \`lead_farming\` - Complete lead creation & enrichment workflow (12 priority fields, confidence scoring)
-- \`linkedin_enrichment\` - Free LinkedIn research strategies for companies and decision-makers
-- \`data_quality\` - Verification, deduplication, and cleanup workflows
-- \`icp_analysis\` - Build Ideal Client Profiles from won customer patterns
-
-**Grants Skill:**
-- \`overview\` - Grant workflow decision tree and capability overview
-- \`eligibility\` - Eligibility analysis framework and disqualifiers
-- \`matching\` - Client-to-program matching methodology
-- \`validation\` - Grant status validation workflow (MANDATORY before recommendations)
-
-**CanExport Writer Skill:**
-- \`overview\` - Skills overview and decision tree for CanExport application lifecycle
-- \`PROGRAM_DETAILS\` - Complete CanExport SME program details (eligibility, expenses, compliance rules)
-- \`APPLICATION_STRUCTURE\` - All 8 application sections with character limits and requirements
-- \`KNOWLEDGE_BASE_INDEX\` - Index of Google Drive knowledge base documents
-- \`STAGE_1_READINESS\` - Preparedness assessment methodology and rubrics
-- \`STAGE_1_BUDGET_GUIDE\` - Budget Building Guide creation methodology
-- \`STAGE_1_INTERVIEW_QUESTIONS\` - Budget Review Interview Questions generation
-- \`STAGE_2_DRAFTING\` - Section-by-section application drafting guidance
-- \`STAGE_3_REVIEW\` - Application review and optimization using evaluation criteria
-
-**BCAFE Writer Skill:**
-- \`FINAL_REPORT\` - Final Progress Report writing guide (template-aligned, section-by-section guidance)
-
-**HubSpot Skill:**
-- \`DEAL_CREATION\` - Full deal creation workflow: pipeline selection, required-field matrix, enum references, confirmation flow, batch mode, error handling. MANDATORY before any deal write.
-
-**Granted Marketing Skill:**
-- \`overview\` - Marketing strategy and content production overview
-- \`FOUNDATIONS\` - Brand voice, audience, and positioning fundamentals
-- \`COMPANY_CONTEXT\` - Granted Consulting product lines and positioning
-- \`GRANT_BLASTS\` - Grant Blasts content methodology
-- \`BLOGS\` - Blog post creation methodology
-- \`EMAILS\` - Email drafting playbook (Grant Blast, Blog Blast, webinar promo, success story share, re-engagement, etc.)
-- \`LINKEDIN\` - LinkedIn post types, hook discipline, voice rules, attribution
-- \`WEBINARS\` - Webinar cadence, 2026 schedule, promo sequence, monthly content rhythm
-- \`SUCCESS_STORIES\` - Client success story drafting — four-part narrative, length variants, anonymization
-- \`PARTNERSHIPS\` - Partnership outreach (CPAs, CFOs, accelerators, banks, VCs, industry associations)
-- \`DATA_SOURCES\` - Content sourcing and data references
-- \`EXPLORATION\` - Idea-generation: weekly digests + scoped exploration. Load when the user is asking what to write about (not when they've already specified the subject).
-
-**Staff Meeting Recap Skill:**
-- \`overview\` - End-to-end weekly staff meeting recap (Granola transcript → Weekly Staff Meeting Sheet Oracle Notes column + last-week/coming-week action items). MANDATORY for any "process/recap/fill in [date] staff meeting" request.
-
-**Grant Card Writing Skill:**
-- \`OVERVIEW\` - General formatting rules, grant-type detection, and routing to the type-specific sub-skill (load first)
-- \`RD\` - R&D grant card format (TRL, scalability, IP, GHG outcomes)
-- \`BUSINESS_ASSESSMENT\` - Advisory/planning/coaching grant card format
-- \`MARKET_EXPANSION\` - Domestic/international market entry grant card format
-- \`HIRING_TRAINING\` - Wage subsidy/student placement/workforce grant card format
-- \`SYSTEMS_PROCESSES\` - Software adoption/automation/process improvement grant card format
-- \`CAPITAL_COST\` - Equipment/facility/retrofit grant card format
-- \`LOANS\` - Repayable financing program card format
-- \`INVESTMENT\` - Equity investment program card format
-- \`PRIZES_CONTESTS\` - Competition/award/prize program card format
-
-**Grant Card Tagging Skill:**
-- \`OVERVIEW\` - Score grant programs across 13 fields × 52 genres on 0-3 scale (matches GG2 v2 mirror taxonomy)
-
-**Granted Insights Skill:**
-- \`OVERVIEW\` - Consultant-grade strategic insights framework: voice, anti-fabrication discipline, grant-type classification, and fallback output format (load first)
-- \`HIRING\` - Strategic read on Pure/dominant Hiring grants (net-new requirement, candidate constraints, timing rules, reimbursement burden)
-- \`TRAINING\` - Strategic read on Training grants (fine-print exclusions, exam/certification fees, approved-provider lists, pre-approval)
-- \`MARKET_EXPANSION\` - Strategic read on Market Expansion grants (export-readiness bar, eligible markets, project window, spend-first cash flow)
-- \`RD_CAPEX\` - Strategic read on R&D and Capital Cost grants (TRL fit, pre-approval, matching funds, max-vs-realistic funding)
-- \`REPAYABLE_FUNDING\` - Strategic read on loans/repayable/non-dilutive financing (forgivable portion, guarantees, underwriting, "sounds like a grant" trap)
-- \`EXEMPLAR\` - Always load alongside the type sub-skill — anchors the strategist voice and rhythm the output should match
-
-**Strategy Consulting Skill (internal team — how Granted's consultants think):**
-- \`overview\` - Skill map, decision tree, and internal-use boundaries (program names always shared internally)
-- \`DISCOVERY\` - Discovery call prep: five core dimensions, probes for 11 client types, 5 critical eligibility gates, contact-type adaptation
-- \`SIZING\` - Rightsizing a client to a service tier: decision tree by revenue/volume/sophistication, 10x-ROI heuristic
-- \`SEQUENCING\` - Grant roadmap building: 5-part priority framework, 9 real sequencing patterns, annual strategy rhythm
-- \`CONVERSATIONS\` - Consultant prep for client conversations: trust principles, analogies, sophistication-adapted framing, competitive differentiation, 11-objection playbook
-- \`RED_FLAGS\` - Prospect screening: 9 hard disqualifiers, 10 soft red flags, how to deliver a "no"
-- \`TIMING\` - Timing strategy: apply-before-spend, fiscal-year plays, semester alignment, re-application timing
-
-**RTRI Tariff Skill (PacifiCan Regional Tariff Response Initiative — the BC tariff program, NOT the R&D program also abbreviated RTRI):**
-- \`overview\` - Router: which path to load, stream logic, hard stops, client-facing vs internal rules (load first)
-- \`PROGRAM_FACTS\` - The authority for every RTRI number, date, and rule: streams, caps, timelines, eligibility, eligible costs, application tabs, required documents, and one open item (training fees) that needs PacifiCan officer confirmation. Load before stating any program fact.
-- \`CONSULT\` - Quick answers about the program for a channel or the Hub
-- \`READINESS\` - Runs a readiness assessment on a client: stream, pre-assessment, eligibility, tariff impact, RA questions, then the internal RA team assessment. Works in Chat; writes the completed RA to a Google Doc.
-- \`RA_QUESTIONS\` - The RA question bank. Not a path of its own: \`READINESS\` loads it at its Step 6. Don't offer it or load it standalone.
-- \`WRITEUP\` - Drafts application answers one section at a time from the completed RA, building them up in a Google Doc and revising sections in place. Works in Chat.
-- \`APPLICATION_FIELDS\` - Every application field: its prompt, character limit, and what PacifiCan's guidance says to cover. Not a path of its own: loaded by \`WRITEUP\`, and by \`CONSULT\` for form questions. Don't offer it as a choice.
-- \`BUSINESS_PLAN\` - Drafts a pivot client's RTRI business plan section by section into a Google Doc from Steph's template: gathers the budget, interview answers, and the client's RTRI folder first, marks every gap, and ends with the template's cross-checks. Pivot applications only. Works in Chat.
-- \`BUSINESS_PLAN_TEMPLATE\` - Steph's business plan template: section order, character targets, guiding questions, tables, internal checklist. Not a path of its own: loaded by \`BUSINESS_PLAN\`. Don't offer it as a choice.
-- The budget path is not yet built
-
-**Research Skill (coming soon):**
-- \`company_intelligence\` - Systematic company research with multi-source validation
-
-**Do NOT load skills for simple queries:**
-- "Tell me about Company X" → Use tools directly
-- "Find grants for BC tech companies" → Use grant_data (mode "search")
-- "Show me recent alerts" → Use get_visualping_alerts
-
-**Load skills for specialized tasks:**
-- "Enrich TechCo's HubSpot record with 12 priority fields" → load_skill(sales, lead_farming)
-- "Find duplicate companies and merge them" → load_skill(sales, data_quality)
-- "Build an ICP from our construction customers" → load_skill(sales, icp_analysis)
-- "Check if Company X qualifies for Grant Y" → load_skill(grants, eligibility)
-- "Find best grants for this construction company" → load_skill(grants, matching)
-- "Validate if program X is accepting applications" → load_skill(grants, validation)
-- "What are the CanExport application questions?" → load_skill(canexport-writer, APPLICATION_STRUCTURE)
-- "Assess client readiness for CanExport" → load_skill(canexport-writer, STAGE_1_READINESS)
-- "Draft Section 2 of the application" → load_skill(canexport-writer, STAGE_2_DRAFTING)
-- "Review this CanExport draft" → load_skill(canexport-writer, STAGE_3_REVIEW)
-- "Help with BCAFE final report" → load_skill(bcafe-writer, FINAL_REPORT)
-- "Create a WorkBC deal for TechCo" → load_skill(hubspot, DEAL_CREATION)
-- "Draft a Grant Blast for GetGranted" → load_skill(granted-marketing, GRANT_BLASTS)
-- "Process the May 6 staff meeting" → load_skill(staff-meeting-recap, overview)
-- "Recap last Tuesday's meeting" → load_skill(staff-meeting-recap, overview)
-- "Write a grant card for this RFP" → load_skill(grant-card-writing, OVERVIEW)
-- "This looks like an R&D program — generate the card" → load_skill(grant-card-writing, RD)
-- "Generate genre tags for this program" → load_skill(grant-card-tagging, OVERVIEW)
-- "Give me the Granted Insights on this program" → load_skill(granted-insights, OVERVIEW)
-- "Strategic read on this hiring grant — is it worth pursuing?" → load_skill(granted-insights, HIRING)
-- "Should we recommend this loan program to a client?" → load_skill(granted-insights, REPAYABLE_FUNDING)
-- "Prep me for a discovery call with a manufacturer" → load_skill(strategy-consulting, DISCOVERY)
-- "Build a grant roadmap for this client" → load_skill(strategy-consulting, SEQUENCING)
-- "Should this client be on Starter or Pro?" → load_skill(strategy-consulting, SIZING)
-- "Any red flags before we take this prospect?" → load_skill(strategy-consulting, RED_FLAGS)
-- "They got burned by a grant consultant before — how do I handle it?" → load_skill(strategy-consulting, CONVERSATIONS)
-- "Quick RTRI question — can a pivot budget include training?" → load_skill(rtri-tariff, CONSULT)
-- "What documents does a liquidity assistance application need?" → load_skill(rtri-tariff, PROGRAM_FACTS)
-- "Run an RTRI readiness assessment for this client" → load_skill(rtri-tariff, READINESS)
-- "Draft the tariff impact narrative for this RTRI application" → load_skill(rtri-tariff, WRITEUP)
-- "Start an RTRI business plan for this pivot client" → load_skill(rtri-tariff, BUSINESS_PLAN)`,
+Skills (skill_name — what it's for; load first):
+- sales — lead creation and enrichment, LinkedIn research, data quality and deduplication, ICP analysis. Pick the matching sub-skill.
+- grants — grant eligibility, client-to-program matching, and status validation (validation is MANDATORY before recommending a program). overview first.
+- canexport-writer — CanExport SME applications from readiness to review. overview first.
+- bcafe-writer — BCAFE final progress report (FINAL_REPORT).
+- hubspot — deal creation workflow (DEAL_CREATION). MANDATORY before any deal write.
+- granted-marketing — Grant Blasts, blogs, emails, LinkedIn, webinars, success stories, partnerships, content ideas. overview + FOUNDATIONS first.
+- staff-meeting-recap — weekly staff meeting recap into the staff meeting sheet (overview). MANDATORY for any "process/recap/fill in the [date] staff meeting" request.
+- grant-card-writing — writing a grant card from program documentation. OVERVIEW first, then the grant-type sub-skill.
+- grant-card-tagging — scoring a program across the smart-filter genres (OVERVIEW).
+- granted-insights — consultant-grade strategic read on a program (fit, effort, watchouts). OVERVIEW first, then the type sub-skill plus EXEMPLAR.
+- strategy-consulting — how Granted's consultants think: discovery prep, sizing, sequencing, client conversations, red flags, timing. overview first.
+- rtri-tariff — PacifiCan Regional Tariff Response Initiative (the BC tariff program, not the R&D program also called RTRI). overview first, then PROGRAM_FACTS before stating any program fact.
+- research — not available yet (company_intelligence); don't load it.`,
   input_schema: {
     type: 'object',
     properties: {

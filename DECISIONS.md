@@ -12,6 +12,14 @@ Format:
 
 ---
 
+## 2026-09-29 — Oracle loads rarely used tools on demand; one home for the skill list
+
+**What:** On Oracle's Sonnet 5.5 path, 23 rarely used tools (≤2 conversations in 30 days) are sent with `defer_loading` behind Anthropic's tool search (`withToolSearch`, `ORACLE_DEFERRED_TOOLS` in `src/claude/client.js`). `track_review` and `read_chat_attachments` qualified but stay loaded. Haiku tiers, the webhook and `allowedTools` runs send the full list. The skill catalogue moved out of `internal-oracle.md` into a trimmed `load_skill` description (one line per skill).
+
+**Why:** It shrinks the fixed start of each request from 58K to 41K tokens (count_tokens, Sonnet 5.5), and that prefix is what every cache write pays for. The deal-write test found `create_hubspot_deal` by search and stopped at the confirmation gate. The oracle-grant-data eval held at 14/20. Search results are dropped from reloaded history, so later turns search again.
+
+**Impact:** `src/claude/client.js`, `src/claude/streaming.js` (keeps `tool_search_tool_result`), `src/tools/definitions.js`, `.claude/agents/internal-oracle.md`, `docs/oracle.md`, `tests/unit/oracle-tool-search.test.js`.
+
 ## 2026-09-29 — Pass thinking blocks back unchanged within a tool-use turn
 
 **What:** The tool loop now sends `thinking` and `redacted_thinking` blocks back exactly as received (`assistantTurnForToolLoop` in `src/claude/client.js`), replacing the Feb 2026 strip (150c83f6). `streamToSSE` now keeps `redacted_thinking` blocks whole, including `data`.

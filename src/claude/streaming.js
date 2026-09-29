@@ -154,6 +154,11 @@ export async function streamToSSE(stream, res, sessionId, agentType = null, conv
           // The entire content object is provided in content_block_start (not streamed via deltas)
           currentContent.tool_use_id = event.content_block.tool_use_id;
           currentContent.content = event.content_block.content; // Full content object from API
+        } else if (event.content_block.type === 'tool_search_tool_result') {
+          // Tool search result (tool_reference blocks). Arrives whole; kept so the
+          // tool loop can pass it back unchanged.
+          currentContent.tool_use_id = event.content_block.tool_use_id;
+          currentContent.content = event.content_block.content;
         } else if (event.content_block.type === 'thinking') {
           currentContent.thinking = '';
           currentContent.signature = ''; // Initialize signature field

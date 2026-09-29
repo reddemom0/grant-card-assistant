@@ -163,8 +163,19 @@ A gated tool there either gets `confirmed: true` from the model or fails.
 ## Tool loadout
 
 From the `internal-oracle` case in `getToolsForAgent` (`src/tools/definitions.js`).
-~63 tools. Oracle builds `oracleBaseTools` from scratch rather than reusing shared
-`baseTools`.
+58 tools; a normal turn is sent 57, because `toolsForRun` in `src/claude/client.js` drops
+the run-only `save_team_lesson` unless `allowedTools` names it. Oracle builds
+`oracleBaseTools` from scratch rather than reusing shared `baseTools`.
+
+**Tools on demand (Sonnet 5.5 path only).** `withToolSearch` in `src/claude/client.js`
+sends the 23 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
+Anthropic's tool search (`tool_search_tool_bm25`), so rarely used tools stay out of the
+cached prefix until Claude searches for them. The list is the tools used in 2 or fewer
+conversations over the 30 days to 2026-09-29. `track_review` and `read_chat_attachments`
+qualified but stay loaded: the review card and Chat file uploads depend on them. Oracle's
+Haiku tiers, the HubSpot webhook, and runs restricted by `allowedTools` (/learn-this,
+lesson runs) send the full list unchanged. Search results are dropped from reloaded
+history (`historyForRequest`), so a later turn searches again.
 
 Included: `SERVER_TOOLS`, `MEMORY_TOOLS`, `LOAD_SKILL_TOOL`, `ORACLE_TOOLS` (9),
 Drive (2), Dropbox read (1), `coreHubSpotTools` (18 of 36), Granola (5), Sheets
@@ -185,7 +196,7 @@ and document-rewrite repo-wide.
 
 ## Prompt
 
-Single file, `.claude/agents/internal-oracle.md` (~331 lines, ~24.5 KB). No concatenation —
+Single file, `.claude/agents/internal-oracle.md` (~426 lines, ~40 KB). No concatenation —
 the multi-file assembly pattern exists only for lead-gen variant B. `loadAgentPrompt` in
 `src/agents/load-agents.js` strips YAML frontmatter if present; Oracle's file has none.
 
@@ -202,11 +213,13 @@ Oracle can load **all 13** registered skills. There is no gating by agent type o
 `loadSkill` takes only `{ skill_name, sub_skill }` and validates against `SKILL_PATHS`.
 This is deliberate, so Oracle picks up new skills without enum drift.
 
-Two gaps:
-- **Oracle's prompt advertises only 7.** Not mentioned: `staff-meeting-recap`,
-  `strategy-consulting`, `grant-card-writing`, `canexport-writer`, `bcafe-writer`. The
-  model can still load them from the tool description, but gets no routing guidance.
-  `staff-meeting-recap` is written as mandatory yet is never mentioned in the prompt.
+**The skill list lives only in the `load_skill` description** (`LOAD_SKILL_TOOL` in
+`src/tools/definitions.js`): all 13 skills, one line each, with the load-first and
+mandatory rules. The sub-skills are in the `sub_skill` parameter's enum and description.
+The prompt keeps only routing ("When to Load Skills") and skill-specific behaviour rules —
+don't add a skill catalogue back to it.
+
+One gap:
 - **`research/company_intelligence` is broken.** It is in `SKILL_PATHS`, the enum, and the
   tool description, but `.claude/skills/research-consultant/` does not exist on disk. The
   call throws at read time.
@@ -271,7 +284,6 @@ Dropbox-sourced.
 
 - HubSpot v3 signature verification deferred (workflow token is the only check)
 - `research/company_intelligence` skill missing on disk
-- Oracle prompt advertises 7 of 12 loadable skills
 - Three of eleven users lack a usable HubSpot owner ID
 - Confirmation gate has no meaning on headless surfaces
 - Drive file reading: clearer declines for .doc, .xls, .pptx, and native Sheets and Slides
