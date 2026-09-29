@@ -1,9 +1,9 @@
 /**
  * grant_data — Oracle's grant-data tool over its GG3 copy
  *
- * One tool with a required `mode`, so later modes (counts, card checks, bulk
- * search, tag audit, compare) arrive as enum values, not new tools. Only
- * "search" exists today.
+ * One tool with a required `mode`, so new modes arrive as enum values, not new
+ * tools. "search" lives here; report, check, find, tags and compare live in
+ * grant-data-modes.js and share this file's filters, status rules and links.
  *
  * search reads gg3_grants (the hourly copy, migration 038), never GG3 itself:
  *   - ID lookup: GG3 grant links anywhere in the query, or a query that is only
@@ -42,8 +42,8 @@ const SUMMARY_CHARS = 240;
 const LIST_CAP = 12;
 const OTHER_STATUS_TOP = 3;
 export const GG3_VISIBLE_STATUSES = ['active', 'inactive', 'archived', 'draft'];
-const APP_URL = 'https://app.getgranted.ai/grants/';
-const ADMIN_URL = 'https://admin.getgranted.ai/grants/';
+export const APP_URL = 'https://app.getgranted.ai/grants/';
+export const ADMIN_URL = 'https://admin.getgranted.ai/grants/';
 
 /** Words that never match or score on their own; they still count inside a phrase. */
 const FILLER = new Set([
@@ -143,7 +143,7 @@ export function rankCandidates(rows, { phrase, numbers }) {
     .map(x => x.row);
 }
 
-const list = (v) => (Array.isArray(v) ? v : v == null ? [] : [v])
+export const list = (v) => (Array.isArray(v) ? v : v == null ? [] : [v])
   .map(x => fold(x).trim())
   .filter(Boolean)
   .slice(0, MAX_FILTER_VALUES);
@@ -155,7 +155,7 @@ export function expandRegions(values) {
   return list(values).map(v => PROVINCES[v.toLowerCase().replace(/\./g, '')] ?? v);
 }
 
-function statusesFor({ status, include_hidden }) {
+export function statusesFor({ status, include_hidden }) {
   const asked = list(status).map(s => s.toLowerCase());
   const includeHidden = include_hidden === true || asked.includes('hide');
   const visible = asked.filter(s => GG3_VISIBLE_STATUSES.includes(s));
@@ -170,17 +170,13 @@ function clampLimit(limit) {
 }
 
 /**
- * The candidate query's FROM and match condition, shared by the page and the
- * hidden count. Status and the cheap filters sit inside the subquery, so the
- * card text — the expensive part — is only built for rows that pass them, and
- * only once each (OFFSET 0 keeps the planner from inlining the subquery). Words
- * match at the start of a word: " text" LIKE "% word%".
+ * The region, industry, grant type and funder conditions on gg (a gg3_grants
+ * row), shared by search and the other modes. p(value) adds a parameter and
+ * returns its placeholder.
+ * @returns {string[]}
  */
-function buildCandidates(opts, terms) {
-  const params = [];
-  const p = (v) => { params.push(v); return `$${params.length}`; };
+export function filterClauses(opts, p) {
   const inner = [];
-
   const regions = expandRegions(opts.regions);
   if (regions.length) {
     inner.push(`EXISTS (SELECT 1 FROM jsonb_array_elements_text(CASE jsonb_typeof(gg.regions) WHEN 'array' THEN gg.regions ELSE '[]'::jsonb END) r
@@ -195,6 +191,20 @@ function buildCandidates(opts, terms) {
   if (types.length) inner.push(`gg.grant_type ILIKE ANY(${p(patterns(types))}::text[])`);
   const funders = list(opts.funders);
   if (funders.length) inner.push(`gg.program_provider ILIKE ANY(${p(patterns(funders))}::text[])`);
+  return inner;
+}
+
+/**
+ * The candidate query's FROM and match condition, shared by the page and the
+ * hidden count. Status and the cheap filters sit inside the subquery, so the
+ * card text — the expensive part — is only built for rows that pass them, and
+ * only once each (OFFSET 0 keeps the planner from inlining the subquery). Words
+ * match at the start of a word: " text" LIKE "% word%".
+ */
+function buildCandidates(opts, terms) {
+  const params = [];
+  const p = (v) => { params.push(v); return `$${params.length}`; };
+  const inner = filterClauses(opts, p);
 
   let bodyExpr = `''`;
   let nameHits = '0';
@@ -230,7 +240,7 @@ function buildCandidates(opts, terms) {
   return { fromFor, where, params, nameHits, bodyHits };
 }
 
-const decode = (s) => s
+export const decode = (s) => s
   .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"')
   .replace(/&#39;|&apos;|&rsquo;|&lsquo;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
 
@@ -294,7 +304,7 @@ async function details(ids) {
   return ids.map(id => byId.get(Number(id))).filter(Boolean);
 }
 
-async function dataAsOf() {
+export async function dataAsOf() {
   const { rows } = await query(
     `SELECT finished_at FROM gg3_refresh_runs
       WHERE status = 'success' ORDER BY finished_at DESC LIMIT 1`
@@ -302,7 +312,7 @@ async function dataAsOf() {
   return rows[0]?.finished_at ?? null;
 }
 
-const asOfNote = (asOf) => (asOf ? {} : { data_note: 'No successful GG3 refresh recorded yet; the copy may be empty.' });
+export const asOfNote = (asOf) => (asOf ? {} : { data_note: 'No successful GG3 refresh recorded yet; the copy may be empty.' });
 const asOfText = (asOf) => (asOf ? new Date(asOf).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : 'unknown');
 
 /** Exactly these grants, any status, hide included. */
@@ -413,12 +423,18 @@ export async function searchGrantData(opts = {}) {
   };
 }
 
-/** The tool entry point: dispatch on mode. */
-export async function runGrantData(input = {}) {
-  switch (input.mode) {
-    case 'search':
-      return searchGrantData(input);
-    default:
-      return { success: false, error: `Unknown grant_data mode "${input.mode ?? ''}". Available: search.` };
+export const GRANT_DATA_MODES = ['search', 'report', 'check', 'find', 'tags', 'compare'];
+
+/**
+ * The tool entry point: dispatch on mode.
+ * @param {Object} input - the tool input
+ * @param {{userId?: number}} context - the asker, for the results sheet
+ */
+export async function runGrantData(input = {}, { userId = null } = {}) {
+  if (input.mode === 'search') return searchGrantData(input);
+  if (GRANT_DATA_MODES.includes(input.mode)) {
+    const { runMode } = await import('./grant-data-modes.js');
+    return runMode(input, { userId });
   }
+  return { success: false, error: `Unknown grant_data mode "${input.mode ?? ''}". Available: ${GRANT_DATA_MODES.join(', ')}.` };
 }

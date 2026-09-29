@@ -1559,17 +1559,20 @@ Use when simple information retrieval is insufficient and you need specialized e
 
 // ============================================================================
 // GRANT DATA (GG3)
-// Oracle's grant-data tool. One tool, a required `mode`; later modes (counts,
-// card checks, bulk search, tag audit, compare) add enum values and
-// parameters here rather than new tools, so Oracle's tool set — and with it the
-// cached prefix — stays fixed. Implementation: src/tools/grant-data.js.
+// Oracle's grant-data tool. One tool, a required `mode`; new modes add enum
+// values and parameters here rather than new tools, so Oracle's tool set — and
+// with it the cached prefix — stays fixed. Implementation: search in
+// src/tools/grant-data.js; report, check, find, tags and compare in
+// src/tools/grant-data-modes.js; the results sheet in src/tools/grant-data-sheet.js.
 // ============================================================================
 
 export const GRANT_DATA_TOOL = {
   name: 'grant_data',
   description: `Look up grant programs in Oracle's copy of the live GG3 (GetGranted) platform grant database. The copy is refreshed from GG3 every hour; each response carries data_as_of, the time of the last successful refresh.
 
-mode "search" (the only mode for now):
+Modes: "search" (find grants), "report" (counts or a full list), "check" (card problems), "find" (every card containing exact words or a number), "tags" (a grant's tags or tag gaps), "compare" (GG1 vs GG3).
+
+mode "search":
 - Looking up a specific grant: put its GG3 link (app.getgranted.ai/grants/{id} or admin.getgranted.ai/grants/{id}) in query, or a query that is only its id ("1856"). That returns exactly that grant at any status, hidden included, and filters are ignored. An id that isn't in GG3 comes back in not_found with a note — then say the grant isn't in GG3.
 - query: keywords, matched at the start of words in grant names and grant card text. Ranking: a grant whose name is exactly the query comes first, then names containing the whole query as a phrase, then grants matching more keywords (name matches count double). Filler words (grant, program, fund, stream, and, for…) and bare numbers never match on their own; numbers count inside the phrase and break ties, so "… Stream 2" ranks above "… Stream 1". Search with the program's full name when you know it.
 - Filters (optional, each takes a list; a grant matches any value in a list, and must pass every filter given): regions (province names or codes like "BC"; grants open to "All of Canada" are always included), industries, grant_types (e.g. "Hiring", "Training", "Market Expansion"), funders (the program provider).
@@ -1583,18 +1586,57 @@ Each result has: id, name, status, funder, amount, deadline, regions, industries
 
 GG1 status: only for grants linked to a GG1 record by exact name, a result also carries gg1 {id, status}. status_mismatch is true when GG1 and GG3 disagree on whether the grant is active. Unlinked grants have no gg1 field — that is not an error.
 
-Deadlines are stored as written on the card ("Open Until Filled", dates in several formats). Before telling anyone a program is open or quoting a deadline, verify it (VisualPing alerts, the official program page, web search). Do not quote a total number of grants in the database; use total_matches only as the count for the search you ran.`,
+Deadlines are stored as written on the card ("Open Until Filled", dates in several formats). Before telling anyone a program is open or quoting a deadline, verify it (VisualPing alerts, the official program page, web search). Do not quote a total number of grants in the database; use total_matches only as the count for the search you ran.
+
+The other modes take the same filters as search (status default ["active"], hidden left out unless include_hidden, regions, industries, grant_types, funders) and cover every matching grant — no 20-result cap. Each returns data_as_of and filters (the filters used, in words).
+- mode "report": counts with group_by (one or two of status, region, industry, grant_type, funder, deadline_month), or a full list with columns (any of name, status, funder, amount, contribution, deadline, regions, industries, grant_type, last_updated; links always included). Grants tagged with almost every industry come back separately as all_industries, not inside each industry. When overlap_note is present, say the counts overlap (a grant with several industries, regions or types is counted in each). For counts by status, pass the statuses wanted.
+- mode "check": card problems, checks = any of missing_sections (no overview, eligibility, funding value section or deadline; or a blank card), past_deadlines (a readable deadline before today), contradictions (dollar amounts or percentages in the card text that don't include the amount or contribution field), stale_text (content only in old GG1 import text, or intake/deadline wording naming a past year). Default: all four. Each row gives the grant, the check and what failed in words. With past_deadlines, unreadable_deadlines lists deadlines that can't be read as one date — name them as unreadable, never guess a date.
+- mode "find": phrase = the exact words or number (e.g. "70%"); matches whole words and whole numbers ("70%" does not match "170%") in grant names and every card section. One row per hit with the section and a snippet; total_grants and total_hits give the full counts.
+- mode "tags": with query (a GG3 id, link or the grant's name) shows that grant's tags — industries, regions, grant types, eligibility tags, tagging confidence and notes, top genres, boost tags. Without query, lists grants by tag_check = any of no_industry_tags, empty_eligibility_tags, low_confidence (default all).
+- mode "compare": with query (GG3 id, link or name) shows GG1 and GG3 side by side for one grant. Without query, lists by compare_list = any of status_differs (linked grants whose active status disagrees), gg1_only (GG1 grants with no GG3 match), gg3_only_active (active GG3 grants with no GG1 record); default all three. Status defaults to every visible status here. Report both sides; never say which is right.
+- A name that doesn't clearly name one grant returns candidates instead — ask which one is meant.
+
+Results sheet: when a report, check, find, tags or compare result has more than 10 rows, the tool itself creates a NEW Google Sheet in the asker's own Drive (private to them) with every row, and returns sheet {url, title}, the first 10 rows, and total_rows. Share the sheet link and the headline numbers; don't call the same mode again to get the rest. If sheet_error is set, no sheet was made — say why in plain words and give the rows you have.`,
   input_schema: {
     type: 'object',
     properties: {
       mode: {
         type: 'string',
-        enum: ['search'],
-        description: 'What to do. "search" finds grants by keyword and filters.'
+        enum: ['search', 'report', 'check', 'find', 'tags', 'compare'],
+        description: 'What to do: "search" finds grants; "report" counts or lists; "check" finds card problems; "find" finds every card with an exact phrase or number; "tags" shows or audits tags; "compare" compares GG1 and GG3.'
       },
       query: {
         type: 'string',
-        description: 'Keywords to match against grant names and card text, e.g. "wage subsidy youth" or "CanExport". Leave empty to list by filters alone.'
+        description: 'search: keywords to match against grant names and card text, e.g. "wage subsidy youth" or "CanExport"; leave empty to list by filters alone. tags / compare: one grant\'s GG3 id, link or name.'
+      },
+      group_by: {
+        type: 'array',
+        items: { type: 'string', enum: ['status', 'region', 'industry', 'grant_type', 'funder', 'deadline_month'] },
+        description: 'report: one or two dimensions to count by.'
+      },
+      columns: {
+        type: 'array',
+        items: { type: 'string', enum: ['name', 'status', 'funder', 'amount', 'contribution', 'deadline', 'regions', 'industries', 'grant_type', 'last_updated'] },
+        description: 'report: list every matching grant with these columns instead of counting.'
+      },
+      checks: {
+        type: 'array',
+        items: { type: 'string', enum: ['missing_sections', 'past_deadlines', 'contradictions', 'stale_text'] },
+        description: 'check: which card checks to run. Default all.'
+      },
+      phrase: {
+        type: 'string',
+        description: 'find: the exact words or number to look for, e.g. "70%" or "stackable".'
+      },
+      tag_check: {
+        type: 'array',
+        items: { type: 'string', enum: ['no_industry_tags', 'empty_eligibility_tags', 'low_confidence'] },
+        description: 'tags (without query): which tag gaps to list. Default all.'
+      },
+      compare_list: {
+        type: 'array',
+        items: { type: 'string', enum: ['status_differs', 'gg1_only', 'gg3_only_active'] },
+        description: 'compare (without query): which lists to return. Default all.'
       },
       regions: {
         type: 'array',
@@ -1619,7 +1661,7 @@ Deadlines are stored as written on the card ("Open Until Filled", dates in sever
       status: {
         type: 'array',
         items: { type: 'string', enum: ['active', 'inactive', 'archived', 'draft'] },
-        description: 'GG3 statuses to include. Default ["active"].'
+        description: 'GG3 statuses to include. Default ["active"] (compare: all four).'
       },
       include_hidden: {
         type: 'boolean',
@@ -1627,7 +1669,7 @@ Deadlines are stored as written on the card ("Open Until Filled", dates in sever
       },
       limit: {
         type: 'number',
-        description: 'Results to return, 1–20. Default 10.'
+        description: 'search only: results to return, 1–20. Default 10.'
       }
     },
     required: ['mode']

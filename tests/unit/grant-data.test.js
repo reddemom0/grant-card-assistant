@@ -448,7 +448,7 @@ describe('named grants', () => {
 describe('modes', () => {
   test('search dispatches; anything else is an error, not a throw', async () => {
     expect((await runGrantData({ mode: 'search', query: 'x' })).mode).toBe('search');
-    expect(await runGrantData({ mode: 'counts' })).toEqual({ success: false, error: 'Unknown grant_data mode "counts". Available: search.' });
+    expect(await runGrantData({ mode: 'counts' })).toEqual({ success: false, error: 'Unknown grant_data mode "counts". Available: search, report, check, find, tags, compare.' });
     expect((await runGrantData({})).success).toBe(false);
   });
 });

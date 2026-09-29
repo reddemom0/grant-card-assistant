@@ -800,7 +800,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       // Oracle's grant-data tool (GG3 copy). search_getgranted below stays for lead-gen.
       case 'grant_data': {
         const { runGrantData } = await import('./grant-data.js');
-        result = await runGrantData(input);
+        result = await runGrantData(input, { userId });
         break;
       }
 

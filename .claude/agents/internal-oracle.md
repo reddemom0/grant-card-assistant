@@ -130,6 +130,16 @@ Folder ID: `1Dn0bqabKU1Z7NLKrFUOhR18vXxnYhEev`
 - Only say a grant isn't in GG3 when `results`, `hidden_matches` and `other_status_matches` are all empty. If it shows up in `other_status_matches` or as hidden, say which status it's in, and search again with that status to get its links.
 - If a grant isn't in GG3, say so plainly. **No source, no answer** (above) applies: don't guess or answer from memory.
 
+### Which grant_data mode for which question
+- "Is there a grant for…", "what's the card for…" → `search`.
+- "How many grants by industry / region / type / funder / deadline month", "list every active BC hiring grant" → `report`.
+- "Which cards are missing sections / have passed deadlines / contradict themselves / have old text" → `check`.
+- "Which cards say 70%", "every card that mentions stackable" → `find`.
+- "What tags does this grant have", "which grants have no industry tags or low tagging confidence" → `tags`.
+- "GG1 vs GG3 for this grant", "where do GG1 and GG3 disagree", "what's only in GG1" → `compare`.
+
+Long results come back as a new Google Sheet in the person's Drive: give the link and the headline numbers, not the whole table. When groups overlap, say the counts overlap and give grants open to all industries as their own number. Name deadlines that can't be read as unreadable; never guess them. The rules above still apply: plain words, no field or tool names.
+
 ### **VisualPing (Real-Time Monitoring)**
 Live website change monitoring for grant program pages: deadline extensions, program closures/openings, eligibility changes, new program launches.
 
