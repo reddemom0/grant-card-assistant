@@ -25,6 +25,7 @@
  */
 
 import { query, transaction } from '../database/connection.js';
+import { rebuildGg1Gg3Links } from './gg1-gg3-links.js';
 
 export const SEARCH_CONTEXT_LIMIT = 700;
 // Every status seen in production gg3_grants on 2026-09-29, plus the four the
@@ -214,7 +215,16 @@ export async function runGg3Refresh({ env = process.env, fetchImpl = fetch, now 
     if (capped) {
       console.error(`🚨 GG3 refresh CAPPED at ${SEARCH_CONTEXT_LIMIT} rows for status ${cappedStatuses.join(', ')} — grants are being cut off. search-context has no pagination; ask for it or a higher limit.`);
     }
-    return done({ status: 'success', row_count, previous_count, capped });
+    const result = await done({ status: 'success', row_count, previous_count, capped });
+
+    // The copy is committed and its run recorded; a failed link rebuild leaves
+    // the previous links in place and must never fail the refresh.
+    try {
+      await rebuildGg1Gg3Links();
+    } catch (err) {
+      console.error(`❌ GG1↔GG3 link rebuild failed — code: ${err?.code ?? err?.name ?? 'unknown'}`);
+    }
+    return result;
   } finally {
     inFlight = false;
   }

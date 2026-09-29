@@ -39,6 +39,11 @@ jest.unstable_mockModule('../../src/database/connection.js', () => ({
   }
 }));
 
+// The GG1↔GG3 link rebuild runs after a successful refresh; its own tests are in
+// gg1-gg3-links.test.js. Here only: called when it should be, and harmless when it throws.
+const rebuildGg1Gg3Links = jest.fn(async () => ({ linked: 0, ambiguous: 0, gg1_only: 0, gg3_only: 0 }));
+jest.unstable_mockModule('../../src/services/gg1-gg3-links.js', () => ({ rebuildGg1Gg3Links }));
+
 const { runGg3Refresh, decideRefresh, GG3_STATUSES } = await import('../../src/services/gg3-refresh.js');
 
 const TOKEN = 'test-token-never-logged';
@@ -97,6 +102,8 @@ let errorSpy;
 beforeEach(() => {
   sent.length = 0;
   previousCount = null;
+  rebuildGg1Gg3Links.mockReset();
+  rebuildGg1Gg3Links.mockResolvedValue({ linked: 0, ambiguous: 0, gg1_only: 0, gg3_only: 0 });
   errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   jest.spyOn(console, 'log').mockImplementation(() => {});
 });
@@ -205,6 +212,36 @@ describe('replacing the copy', () => {
     const r = await runGg3Refresh({ env: ENV, fetchImpl: fetchByStatus(perStatus({ active: 3 })) });
     expect(r).toMatchObject({ status: 'success', row_count: 3, previous_count: null });
     expect(deletes()).toHaveLength(1);
+  });
+});
+
+describe('GG1↔GG3 link rebuild after a refresh', () => {
+  test('runs once after a success, after the copy is committed and the run recorded', async () => {
+    rebuildGg1Gg3Links.mockImplementation(async () => {
+      expect(sent.some(s => s.text === 'COMMIT')).toBe(true);
+      expect(runRows()).toHaveLength(1);
+      return { linked: 1, ambiguous: 0, gg1_only: 0, gg3_only: 0 };
+    });
+    const r = await runGg3Refresh({ env: ENV, fetchImpl: fetchByStatus(perStatus({ active: 3 })) });
+    expect(r.status).toBe('success');
+    expect(rebuildGg1Gg3Links).toHaveBeenCalledTimes(1);
+  });
+
+  test('a rebuild that throws is logged; the refresh stays a success with one run row', async () => {
+    rebuildGg1Gg3Links.mockRejectedValue(Object.assign(new Error('relation "gg1_gg3_links" does not exist'), { code: '42P01' }));
+    const r = await runGg3Refresh({ env: ENV, fetchImpl: fetchByStatus(perStatus({ active: 3 })) });
+    expect(r).toMatchObject({ status: 'success', row_count: 3, error: null });
+    expect(runRows()).toHaveLength(1);
+    expect(recorded()).toMatchObject({ status: 'success' });
+    expect(errorSpy.mock.calls.flat().join(' ')).toMatch(/GG1↔GG3 link rebuild failed — code: 42P01/);
+  });
+
+  test('never runs after a failed or skipped refresh', async () => {
+    previousCount = 681;
+    await runGg3Refresh({ env: ENV, fetchImpl: fetchByStatus({}) });
+    await runGg3Refresh({ env: ENV, fetchImpl: fetchByStatus(perStatus(NORMAL), { fail: { hide: 400 } }) });
+    await runGg3Refresh({ env: {}, fetchImpl: fetchByStatus({}) });
+    expect(rebuildGg1Gg3Links).not.toHaveBeenCalled();
   });
 });
 
