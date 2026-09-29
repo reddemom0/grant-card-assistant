@@ -19,6 +19,9 @@
  *     industries, grant types, funders — OR inside a filter, AND across
  *   - status defaults to active; GG3 "hide" grants only with include_hidden,
  *     and when they are left out their match count comes back as hidden_matches
+ *   - matches at the visible statuses the search left out come back as
+ *     other_status_matches (count, by status, best three), so a grant that
+ *     exists but isn't active never looks absent
  *   - at most 20 results plus total_matches
  *   - GG1 status for grants linked by exact name (gg1_gg3_links, migration 039)
  *   - data_as_of from the latest successful gg3_refresh_runs row
@@ -35,6 +38,7 @@ const MAX_IDS = 20;
 const MAX_FILTER_VALUES = 10;
 const SUMMARY_CHARS = 240;
 const LIST_CAP = 12;
+const OTHER_STATUS_TOP = 3;
 export const GG3_VISIBLE_STATUSES = ['active', 'inactive', 'archived', 'draft'];
 const APP_URL = 'https://app.getgranted.ai/grants/';
 const ADMIN_URL = 'https://admin.getgranted.ai/grants/';
@@ -201,7 +205,7 @@ function buildCandidates(opts, terms) {
 
   /** @param {string} statusCondition - a condition on gg.status */
   const fromFor = (statusCondition) => `(
-      SELECT gg.id, gg.last_updated,
+      SELECT gg.id, gg.grant_name, gg.status, gg.last_updated,
              ${normalizedSql(`coalesce(gg.grant_name, '')`)} AS name_n,
              ${bodyExpr} AS body_n
         FROM gg3_grants gg
@@ -314,6 +318,20 @@ async function lookupIds(ids, opts) {
 }
 
 /**
+ * Matches at the visible statuses the search left out: how many, by status, and
+ * the three best-ranked — enough to say "it's there, but inactive" and search again.
+ */
+function otherStatusMatches(rows, terms) {
+  const byStatus = {};
+  for (const r of rows) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+  return {
+    count: rows.length,
+    by_status: byStatus,
+    top: rankCandidates(rows, terms).slice(0, OTHER_STATUS_TOP).map(r => ({ id: r.id, name: r.grant_name, status: r.status }))
+  };
+}
+
+/**
  * Search the GG3 copy.
  * @param {Object} opts - query, regions, industries, grant_types, funders, status, include_hidden, limit
  */
@@ -326,18 +344,24 @@ export async function searchGrantData(opts = {}) {
   const terms = queryTerms(opts.query);
   const c = buildCandidates(opts, terms);
 
+  // One scan covers the asked statuses and the visible ones left out, so a grant
+  // that exists at another status is reported instead of looking absent. Hidden
+  // grants stay out of it: they are counted only in hidden_matches.
+  const otherStatuses = GG3_VISIBLE_STATUSES.filter(s => !statuses.includes(s));
   const candidateParams = [...c.params];
-  const statusParam = `$${candidateParams.push(statuses)}`;
+  const statusParam = `$${candidateParams.push([...statuses, ...otherStatuses])}`;
   const candidates = await query(
-    `SELECT g.id, g.name_n, g.last_updated,
+    `SELECT g.id, g.grant_name, g.status, g.name_n, g.last_updated,
             ${c.nameHits} AS name_hits,
             ${c.bodyHits} AS body_hits
        FROM ${c.fromFor(`gg.status = ANY(${statusParam}::text[])`)}
       WHERE ${c.where}`,
     candidateParams
   );
+  const asked = candidates.rows.filter(r => statuses.includes(r.status));
+  const others = candidates.rows.filter(r => otherStatuses.includes(r.status));
 
-  const ranked = rankCandidates(candidates.rows, terms);
+  const ranked = rankCandidates(asked, terms);
   const rows = await details(ranked.slice(0, limit).map(r => Number(r.id)));
 
   let hiddenMatches = null;
@@ -358,9 +382,10 @@ export async function searchGrantData(opts = {}) {
     data_as_of: asOf,
     ...asOfNote(asOf),
     statuses,
-    total_matches: candidates.rows.length,
+    total_matches: asked.length,
     returned: results.length,
     hidden_matches: hiddenMatches,
+    ...(otherStatuses.length ? { other_status_matches: otherStatusMatches(others, terms) } : {}),
     results
   };
 }

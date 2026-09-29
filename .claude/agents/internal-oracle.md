@@ -126,6 +126,7 @@ Folder ID: `1Dn0bqabKU1Z7NLKrFUOhR18vXxnYhEev`
 - Never build a grant link yourself. Use only the `links.app` / `links.admin` that `grant_data` returned: `links.app` by default, `links.admin` when the person is editing or fixing a card. No result, no link.
 - GG3 status `active` means listed as active on the platform, not confirmed open. Don't call a program "open now" without checking.
 - When freshness matters ("is it open?"), check it yourself before answering — VisualPing, the official program page, web search — and mention `data_as_of`. Don't offer to check; check.
+- Only say a grant isn't in GG3 when `results`, `hidden_matches` and `other_status_matches` are all empty. If it shows up in `other_status_matches` or as hidden, say which status it's in, and search again with that status to get its links.
 - If a grant isn't in GG3, say so plainly. **No source, no answer** (above) applies: don't guess or answer from memory.
 
 ### **VisualPing (Real-Time Monitoring)**

@@ -48,10 +48,10 @@ function detail(id, extra = {}) {
     summary_src: '<p>Short overview.</p>', gg1_id: null, gg1_active: null, ...extra
   };
 }
-const cand = (id, name, extra = {}) => ({ id, name_n: normalize(name), last_updated: '2026/01/01', name_hits: 0, body_hits: 0, ...extra });
+const cand = (id, name, extra = {}) => ({ id, grant_name: name, status: 'active', name_n: normalize(name), last_updated: '2026/01/01', name_hits: 0, body_hits: 0, ...extra });
 /** Candidates for the given ids, and details for all of them. */
 function fixtures(rows) {
-  candidateRows = rows.map(r => cand(r.id, r.name, r));
+  candidateRows = rows.map(r => cand(r.id, r.name, { status: r.detail?.status ?? 'active', ...r }));
   detailRows = new Map(rows.map(r => [r.id, detail(r.id, { grant_name: r.name, ...(r.detail || {}) })]));
 }
 
@@ -189,7 +189,7 @@ describe('ranking', () => {
       { id: 1425, name: 'Agricultural Water Infrastructure Program - Stream 2', name_hits: 3 },
       { id: 1426, name: 'Agricultural Water Infrastructure Program - Stream 3', name_hits: 3 }
     ]);
-    const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program Stream 2', status: ['inactive'] });
+    const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program Stream 2' });
     expect(r.results.map(x => x.id)).toEqual([1425, 1424, 1426]);
     expect(detailQuery().params).toEqual([[1425, 1424, 1426]]);
   });
@@ -217,11 +217,12 @@ describe('filters', () => {
   });
 
   test('status defaults to active; asked statuses are used; unknown ones dropped', async () => {
-    await searchGrantData({});
-    expect(candidateQuery().params).toContainEqual(['active']);
+    // one scan: the asked statuses first, then the visible ones left out (for other_status_matches)
+    expect((await searchGrantData({})).statuses).toEqual(['active']);
+    expect(candidateQuery().params).toContainEqual(['active', 'inactive', 'archived', 'draft']);
     sent.length = 0;
-    await searchGrantData({ status: ['inactive', 'archived', 'bogus'] });
-    expect(candidateQuery().params).toContainEqual(['inactive', 'archived']);
+    expect((await searchGrantData({ status: ['inactive', 'archived', 'bogus'] })).statuses).toEqual(['inactive', 'archived']);
+    expect(candidateQuery().params).toContainEqual(['inactive', 'archived', 'active', 'draft']);
   });
 
   test('status and cheap filters run before the card text is built; keywords after', async () => {
@@ -248,7 +249,7 @@ describe('hidden grants', () => {
 
   test('include_hidden adds hide to the statuses and skips the count', async () => {
     const r = await searchGrantData({ query: 'tariff', include_hidden: true });
-    expect(candidateQuery().params).toContainEqual(['active', 'hide']);
+    expect(candidateQuery().params).toContainEqual(['active', 'hide', 'inactive', 'archived', 'draft']);
     expect(hiddenQuery()).toBeUndefined();
     expect(r.hidden_matches).toBeNull();
     expect(r.statuses).toEqual(['active', 'hide']);
@@ -318,6 +319,61 @@ describe('results', () => {
     const r = await searchGrantData({});
     expect(r.data_as_of).toBeNull();
     expect(r.data_note).toMatch(/No successful GG3 refresh/);
+  });
+});
+
+describe('matches at other statuses', () => {
+  const water = (id, stream, status) => ({ id, name: `Agricultural Water Infrastructure Program - Stream ${stream}`, name_hits: 3, detail: { status } });
+
+  test('a default search reports a matching inactive grant in other_status_matches.top', async () => {
+    fixtures([
+      { id: 1660, name: 'Agriculture and Food Innovation Program', name_hits: 1 },
+      water(1424, 1, 'hide'),          // never in the candidate scan: hide is not a visible status
+      water(1425, 2, 'inactive'),
+      water(1426, 3, 'inactive'),
+      { id: 1287, name: 'Accelerating Agricultural Innovations 2.0', name_hits: 1, detail: { status: 'archived' } }
+    ].filter(r => r.detail?.status !== 'hide'));
+    const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program Stream 2' });
+    expect(r.results.map(x => x.id)).toEqual([1660]);
+    expect(r.total_matches).toBe(1);
+    expect(r.other_status_matches).toEqual({
+      count: 3,
+      by_status: { inactive: 2, archived: 1 },
+      top: [
+        { id: 1425, name: 'Agricultural Water Infrastructure Program - Stream 2', status: 'inactive' },
+        { id: 1426, name: 'Agricultural Water Infrastructure Program - Stream 3', status: 'inactive' },
+        { id: 1287, name: 'Accelerating Agricultural Innovations 2.0', status: 'archived' }
+      ]
+    });
+    expect(detailQuery().params).toEqual([[1660]]);   // details only for the asked statuses
+  });
+
+  test('searching every visible status returns no other_status_matches', async () => {
+    fixtures([water(1425, 2, 'inactive')]);
+    const r = await searchGrantData({ query: 'water', status: ['active', 'inactive', 'archived', 'draft'] });
+    expect(r.results.map(x => x.id)).toEqual([1425]);
+    expect(r).not.toHaveProperty('other_status_matches');
+  });
+
+  test('hidden grants are never scanned for it — they are counted only in hidden_matches', async () => {
+    hiddenCount = 2;
+    const r = await searchGrantData({ query: 'water' });
+    expect(candidateQuery().params.flat()).not.toContain('hide');
+    expect(r.hidden_matches).toBe(2);
+    expect(r.other_status_matches).toEqual({ count: 0, by_status: {}, top: [] });
+    sent.length = 0;
+    await searchGrantData({ query: 'water', include_hidden: true });
+    // hide is asked for, so it sits in the asked statuses, never in the "other" ones
+    expect(candidateQuery().params).toContainEqual(['active', 'hide', 'inactive', 'archived', 'draft']);
+  });
+
+  test('a filtered-out status still scores through the same ranking', async () => {
+    fixtures([
+      { id: 1, name: 'Water Plan', name_hits: 1, detail: { status: 'draft' } },
+      { id: 2, name: 'Agricultural Water Infrastructure Program', name_hits: 3, detail: { status: 'archived' } }
+    ]);
+    const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program' });
+    expect(r.other_status_matches.top.map(t => t.id)).toEqual([2, 1]);
   });
 });
 
