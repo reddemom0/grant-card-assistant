@@ -59,6 +59,8 @@ import { handleChatEventsPush } from './src/api/chat-events.js';
 import { startChatListen } from './src/chat-listen/jobs.js';
 // Tracked cards in Google Chat (src/cards/): digests, refresh and lifecycle jobs
 import { startTrackedCards } from './src/cards/jobs.js';
+// Oracle's hourly copy of GG3 grant data (gg3_grants, migration 038)
+import { startGg3Refresh, gg3RefreshEndpoint } from './src/services/gg3-refresh.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
 // the number is known — see src/api/addon-probe.js.
 import { handleAddonProbe } from './src/api/addon-probe.js';
@@ -166,6 +168,10 @@ app.use((req, res, next) => {
 // be sufficient.
 import { runMigrationEndpoint } from './run-migration-endpoint.js';
 app.get('/run-migration', authenticateUser, requireAuth, runMigrationEndpoint);
+
+// Manual GG3 refresh (first fill and testing). Same gate as /run-migration:
+// a session AND ?secret=. Read-only against GG3; replaces gg3_grants.
+app.get('/api/admin/gg3-refresh', authenticateUser, requireAuth, gg3RefreshEndpoint);
 
 // Database admin endpoint (diagnostics and migrations)
 import { dbAdminEndpoint } from './db-admin-endpoint.js';
@@ -1289,6 +1295,15 @@ async function startServer() {
     // zone. The daily pass refreshes open cards and applies stale/auto-close.
     // Switch off with TRACKED_CARDS_DISABLED=true. Needs migration 030.
     startTrackedCards(cron);
+
+    // ========================================================================
+    // CRON JOB: GG3 grant copy (hourly at :41 UTC, once 60s after startup)
+    // ========================================================================
+    // Replaces gg3_grants from ai-api-backend search-context when the pull
+    // passes its guard; every run is logged in gg3_refresh_runs. Needs
+    // AI_API_BACKEND_URL and AI_API_BACKEND_TOKEN. Switch off with
+    // GG3_REFRESH_DISABLED=true. Needs migration 038.
+    startGg3Refresh(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';
