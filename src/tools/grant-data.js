@@ -19,7 +19,9 @@
  *     industries, grant types, funders — OR inside a filter, AND across
  *   - status defaults to active; GG3 "hide" grants only with include_hidden,
  *     and when they are left out their match count comes back as hidden_matches
- *   - matches at the visible statuses the search left out come back as
+ *   - a grant the query clearly names (isClearlyNamed) is a full result at any
+ *     visible status, ranked first, with named_match: true
+ *   - other matches at the visible statuses the search left out come back as
  *     other_status_matches (count, by status, best three), so a grant that
  *     exists but isn't active never looks absent
  *   - at most 20 results plus total_matches
@@ -104,6 +106,17 @@ export function queryTerms(text) {
 export const keywordTokens = (text) => queryTerms(text).tokens;
 
 const padded = (s) => ` ${s} `;
+
+/**
+ * Does the query clearly name this grant? Its normalized name is the query, or
+ * contains the whole query as a phrase and the query has at least 3 meaningful
+ * words (tokens exclude filler and bare numbers, so "Stream 2" never qualifies).
+ */
+export function isClearlyNamed(nameN, { phrase, tokens }) {
+  if (!phrase || !nameN) return false;
+  if (nameN === phrase) return true;
+  return tokens.length >= 3 && padded(nameN).includes(padded(phrase));
+}
 
 /**
  * Rank candidate rows ({id, name_n, last_updated, name_hits, body_hits}).
@@ -358,10 +371,16 @@ export async function searchGrantData(opts = {}) {
       WHERE ${c.where}`,
     candidateParams
   );
+  // A grant the query clearly names is returned in full at any visible status,
+  // first, flagged named_match; it leaves other_status_matches. Hidden grants
+  // are only in the scan when they were asked for, so never named otherwise.
+  const named = rankCandidates(candidates.rows.filter(r => isClearlyNamed(r.name_n, terms)), terms);
+  const namedIds = new Set(named.map(r => Number(r.id)));
   const asked = candidates.rows.filter(r => statuses.includes(r.status));
-  const others = candidates.rows.filter(r => otherStatuses.includes(r.status));
+  const others = candidates.rows.filter(r => otherStatuses.includes(r.status) && !namedIds.has(Number(r.id)));
+  const namedElsewhere = named.filter(r => !statuses.includes(r.status)).length;
 
-  const ranked = rankCandidates(asked, terms);
+  const ranked = [...named, ...rankCandidates(asked, terms).filter(r => !namedIds.has(Number(r.id)))];
   const rows = await details(ranked.slice(0, limit).map(r => Number(r.id)));
 
   let hiddenMatches = null;
@@ -375,14 +394,18 @@ export async function searchGrantData(opts = {}) {
   }
 
   const asOf = await dataAsOf();
-  const results = rows.map(toResult);
+  const results = rows.map(row => {
+    const result = toResult(row);
+    if (namedIds.has(Number(row.id))) result.named_match = true;
+    return result;
+  });
   return {
     success: true,
     mode: 'search',
     data_as_of: asOf,
     ...asOfNote(asOf),
     statuses,
-    total_matches: asked.length,
+    total_matches: asked.length + namedElsewhere,
     returned: results.length,
     hidden_matches: hiddenMatches,
     ...(otherStatuses.length ? { other_status_matches: otherStatusMatches(others, terms) } : {}),

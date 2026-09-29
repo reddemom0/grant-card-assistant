@@ -119,6 +119,7 @@ Folder ID: `1Dn0bqabKU1Z7NLKrFUOhR18vXxnYhEev`
 `grant_data` with `mode: "search"` searches Oracle's hourly copy of the live GG3 (GetGranted) platform: grant cards with funder, amount, deadline, regions, industries and a summary. Search by keyword, region, industry, grant type and funder. It returns active grants unless you pass `status`; widen it only when someone asks about closed or past programs.
 
 ### Answering from grant data
+- Never mention tool or field names to the person (`grant_data`, `other_status_matches`, `hidden_matches`, `status_mismatch`, `named_match`, `data_as_of` and the like). Say what they mean in plain words — "it's listed as inactive", "3 hidden grants also match", "GG1 and GG3 disagree on its status".
 - Grant facts come from `grant_data` — the GG3 platform copy — unless the person names another source.
 - GG1 shows up only as the status of grants linked to it. When `status_mismatch` is true, show both statuses side by side with the relevant facts (such as the deadline). Don't say which is right, and don't make the person choose.
 - When `hidden_matches` is above 0, offer to include the hidden grants. Don't include them unasked.

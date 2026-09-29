@@ -34,7 +34,7 @@ jest.unstable_mockModule('../../src/database/connection.js', () => ({
 }));
 
 const {
-  runGrantData, searchGrantData, keywordTokens, queryTerms, idsFromQuery, rankCandidates, normalize, expandRegions, summarize
+  runGrantData, searchGrantData, keywordTokens, queryTerms, idsFromQuery, rankCandidates, isClearlyNamed, normalize, expandRegions, summarize
 } = await import('../../src/tools/grant-data.js');
 
 const candidateQuery = () => sent.find(s => /AS name_hits/.test(s.text));
@@ -325,7 +325,7 @@ describe('results', () => {
 describe('matches at other statuses', () => {
   const water = (id, stream, status) => ({ id, name: `Agricultural Water Infrastructure Program - Stream ${stream}`, name_hits: 3, detail: { status } });
 
-  test('a default search reports a matching inactive grant in other_status_matches.top', async () => {
+  test('a default search reports matching inactive grants in other_status_matches.top', async () => {
     fixtures([
       { id: 1660, name: 'Agriculture and Food Innovation Program', name_hits: 1 },
       water(1424, 1, 'hide'),          // never in the candidate scan: hide is not a visible status
@@ -333,7 +333,8 @@ describe('matches at other statuses', () => {
       water(1426, 3, 'inactive'),
       { id: 1287, name: 'Accelerating Agricultural Innovations 2.0', name_hits: 1, detail: { status: 'archived' } }
     ].filter(r => r.detail?.status !== 'hide'));
-    const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program Stream 2' });
+    // two meaningful words: nothing is clearly named, so the inactive ones stay in other_status_matches
+    const r = await searchGrantData({ query: 'Agricultural Water' });
     expect(r.results.map(x => x.id)).toEqual([1660]);
     expect(r.total_matches).toBe(1);
     expect(r.other_status_matches).toEqual({
@@ -372,8 +373,75 @@ describe('matches at other statuses', () => {
       { id: 1, name: 'Water Plan', name_hits: 1, detail: { status: 'draft' } },
       { id: 2, name: 'Agricultural Water Infrastructure Program', name_hits: 3, detail: { status: 'archived' } }
     ]);
-    const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program' });
+    const r = await searchGrantData({ query: 'water' });
     expect(r.other_status_matches.top.map(t => t.id)).toEqual([2, 1]);
+  });
+});
+
+describe('named grants', () => {
+  const STREAM_2 = 'Agricultural Water Infrastructure Program - Stream 2';
+
+  test('which queries clearly name a grant', () => {
+    const n = normalize;
+    expect(isClearlyNamed(n(STREAM_2), queryTerms('Agricultural Water Infrastructure Program Stream 2'))).toBe(true);   // exact
+    expect(isClearlyNamed(n('BC Clean Energy Vehicles for Business Rebate'), queryTerms('clean energy vehicles'))).toBe(true);   // 3-word phrase
+    expect(isClearlyNamed(n('Clean Energy Vehicles Rebate'), queryTerms('clean energy'))).toBe(false);   // 2 words: not enough
+    expect(isClearlyNamed(n('Clean Energy'), queryTerms('clean energy'))).toBe(true);   // but an exact name always is
+    expect(isClearlyNamed(n('PSCE - Stream 2'), queryTerms('Stream 2'))).toBe(false);   // filler and numbers only
+    expect(isClearlyNamed(n('Water Vehicles Energy Clean'), queryTerms('clean energy vehicles'))).toBe(false);   // words, not the phrase
+  });
+
+  test('an exact name at inactive status comes back in full, first, with links and GG1 status', async () => {
+    fixtures([
+      { id: 1660, name: 'Agriculture and Food Innovation Program', name_hits: 1 },
+      { id: 1425, name: STREAM_2, name_hits: 3, detail: { status: 'inactive', gg1_id: '852', gg1_active: true } },
+      { id: 1426, name: 'Agricultural Water Infrastructure Program - Stream 3', name_hits: 3, detail: { status: 'inactive' } }
+    ]);
+    const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program Stream 2' });
+    expect(r.results.map(x => x.id)).toEqual([1425, 1660]);
+    expect(r.results[0]).toMatchObject({
+      id: 1425, status: 'inactive', named_match: true,
+      links: { app: 'https://app.getgranted.ai/grants/1425', admin: 'https://admin.getgranted.ai/grants/1425' },
+      gg1: { id: '852', status: 'active' }, status_mismatch: true
+    });
+    expect(r.results[1]).not.toHaveProperty('named_match');
+    expect(r.total_matches).toBe(2);                                             // 1 active + the named one
+    expect(r.other_status_matches).toEqual({                                    // the named grant has left it
+      count: 1, by_status: { inactive: 1 },
+      top: [{ id: 1426, name: 'Agricultural Water Infrastructure Program - Stream 3', status: 'inactive' }]
+    });
+  });
+
+  test('a 3-word phrase inside a longer name is included, even archived', async () => {
+    fixtures([{ id: 7, name: 'BC Clean Energy Vehicles for Business Rebate', name_hits: 3, detail: { status: 'archived' } }]);
+    const r = await searchGrantData({ query: 'clean energy vehicles' });
+    expect(r.results.map(x => [x.id, x.named_match])).toEqual([[7, true]]);
+    expect(r.other_status_matches.count).toBe(0);
+  });
+
+  test('a 2-word phrase is not auto-included; it stays in other_status_matches', async () => {
+    fixtures([{ id: 7, name: 'Clean Energy Vehicles Rebate', name_hits: 2, detail: { status: 'inactive' } }]);
+    const r = await searchGrantData({ query: 'clean energy' });
+    expect(r.results).toEqual([]);
+    expect(r.other_status_matches.top.map(t => t.id)).toEqual([7]);
+  });
+
+  test('a hidden exact match is not auto-included: the scan never holds hide unless asked', async () => {
+    hiddenCount = 1;
+    const r = await searchGrantData({ query: 'Activate Circular Accelerator - COIL' });
+    expect(candidateQuery().params.flat()).not.toContain('hide');
+    expect(r.results).toEqual([]);
+    expect(r.hidden_matches).toBe(1);
+  });
+
+  test('a named grant already at an asked status is flagged too, and never listed twice', async () => {
+    fixtures([
+      { id: 1, name: 'Wage Subsidy Youth Program', name_hits: 3 },
+      { id: 2, name: 'Youth Wage Subsidy Top-Up', name_hits: 3, last_updated: '2026/09/01' }
+    ]);
+    const r = await searchGrantData({ query: 'wage subsidy youth program' });
+    expect(r.results.map(x => [x.id, x.named_match ?? false])).toEqual([[1, true], [2, false]]);
+    expect(r.total_matches).toBe(2);
   });
 });
 
