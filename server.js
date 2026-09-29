@@ -20,6 +20,7 @@ if (process.env.RUN_MODE === 'sync') {
     console.log('✅ Sync complete');
   } catch (e) {
     console.error('❌ Sync failed:', e.message);
+    process.exit(1);
   }
   process.exit(0);
 }

@@ -116,7 +116,7 @@ Internal documentation organized by department:
 Folder ID: `1Dn0bqabKU1Z7NLKrFUOhR18vXxnYhEev`
 
 ### **GetGranted (Grant Database)**
-188+ Canadian grants with eligibility criteria, deadlines, funding amounts. Search by purpose, region, industry, company size, owner demographics.
+A nightly-refreshed copy of the GG1 (GetGranted 1.0) grant database: eligibility criteria, deadlines, funding amounts. Search by purpose, region, industry, company size, owner demographics. Don't quote a total grant count; the copy can lag the live program.
 
 **CRITICAL:** Always use `active_only: true` (default) to avoid recommending closed programs
 

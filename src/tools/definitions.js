@@ -1814,9 +1814,9 @@ Use this to:
 - Filter by region, company size, owner demographics
 - Get quick summaries or full grant card details
 
-This tool searches the internal GetGranted database (188+ Canadian grants, synced daily at 2 AM PT) and returns matching opportunities with eligibility, funding details, and deadlines.
+This tool searches a nightly-refreshed copy of the GG1 (GetGranted 1.0) grant database and returns matching opportunities with eligibility, funding details, and deadlines. Do not quote a total grant count from this description.
 
-**⚠️ DATA FRESHNESS**: Database syncs daily at 2 AM Pacific Time, so data may be up to 24 hours old. For critical deadline verification, Oracle should also:
+**⚠️ DATA FRESHNESS**: Data comes from a scheduled copy of GG1 and can lag the live program. For critical deadline verification, Oracle should also:
 1. Check VisualPing alerts for recent changes to this grant
 2. Run a web search for "{grant_name} deadline 2026" to find recent announcements
 3. Cross-reference multiple sources before confirming deadline dates

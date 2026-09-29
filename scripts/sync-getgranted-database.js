@@ -76,6 +76,11 @@ async function syncDatabase() {
       console.log('   Inserting new data...');
       let imported = 0;
       let failed = 0;
+      // Insert failures are tracked apart from scrape errors (grant.error): one
+      // failed INSERT aborts the transaction, and COMMIT on an aborted
+      // transaction rolls back silently, so the sync must fail instead.
+      let insertFailed = 0;
+      let firstInsertError = null;
 
       for (const grant of exportData.grants) {
         if (grant.error) {
@@ -122,7 +127,20 @@ async function syncDatabase() {
         } catch (error) {
           console.error(`   ⚠️  Failed to import grant ${grant.grant_id}: ${error.message}`);
           failed++;
+          insertFailed++;
+          if (!firstInsertError) firstInsertError = `grant ${grant.grant_id}: ${error.message}`;
         }
+      }
+
+      if (insertFailed > 0 || imported === 0) {
+        const reason = insertFailed > 0
+          ? `${insertFailed} grant insert(s) failed. First error: ${firstInsertError}`
+          : `0 grants imported (${failed} scrape errors out of ${exportData.grants.length})`;
+        console.error(`   ❌ Database import aborted: ${reason}`);
+        console.error('   Rolling back. Existing grants data is left unchanged.\n');
+        // The catch below issues ROLLBACK and rethrows to the outer handler,
+        // which records the failure in sync-log.json and exits 1.
+        throw new Error(`Database import aborted: ${reason}`);
       }
 
       // Commit transaction
