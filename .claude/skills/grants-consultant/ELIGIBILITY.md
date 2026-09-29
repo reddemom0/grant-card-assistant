@@ -88,20 +88,20 @@ From discovery questions:
 
 ### Step 2: Search for Relevant Programs
 
-Use `search_getgranted` with client-specific filters:
+Use `grant_data` (mode `"search"`) with client-specific filters:
 
 ```javascript
-search_getgranted({
-  purposes: ["Hiring"],  // Based on client need
+grant_data({
+  mode: "search",
+  grant_types: ["Hiring"],  // Based on client need
   regions: ["British Columbia"],  // Client location
-  industries: ["Technology"],  // Client industry
-  company_size_min: 20,  // Employee count
-  company_size_max: 100,
-  active_only: true,  // ALWAYS true unless historical research
-  open_intakes_only: true,  // If urgent need
+  industries: ["Tech"],  // Client industry
+  // status defaults to ["active"]; pass other statuses only for historical research
   limit: 20
 })
 ```
+
+There is no company-size filter: check the employee-count rules on each card. For an urgent need, read each result's `deadline` — there is no open-intake filter.
 
 ### Step 3: Assess Each Program
 

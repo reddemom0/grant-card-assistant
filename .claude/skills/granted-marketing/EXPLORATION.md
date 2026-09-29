@@ -72,7 +72,7 @@ Run these queries in parallel where possible, then assemble:
 
 2. **Programs with recent activity** — `get_deal_count(program_name, date_range_months=3)` against the top 5–10 programs Granted typically works with (CanExport, ETG, IRAP, BC ETG, hiring grants). Surface the 2–3 with the most recent volume.
 
-3. **Programs opening or closing soon** — `search_getgranted` filtered to programs with status changes in the next 30 days.
+3. **Programs opening or closing soon** — `grant_data` (mode `"search"`, active), then read each result's `deadline` for the next 30 days. There is no date filter.
 
 4. **Recent consulting conversations** — `granola_query_meetings` for the past 7–14 days, scanning for repeated client questions, common objections, or insight worth a blog. Search terms like "objection," "question," "didn't know," or specific program names.
 
@@ -133,7 +133,7 @@ The principle: each content type has its own *natural signal sources*. Don't run
 Grant Blasts announce *external news* about live grant programs: a program just opened, a deadline is closing soon, a major change happened on a grantor page. They are NOT about Granted's internal track record — deal counts and success rates are confidence-checks on a candidate, not signals to surface one.
 
 1. `get_visualping_alerts(days=14, priority="medium")` — what changed in the grant landscape recently? `change_type="new_program"`, `"deadline_change"`, `"funding_change"`, and `"eligibility_update"` are the highest-signal types for Grant Blasts. `"guidelines_update"` and `"minor_update"` rarely make good Grant Blasts on their own.
-2. `search_getgranted` with `open_intakes_only=true` — what programs are open right now with deadlines in the next 30–60 days?
+2. `grant_data` (mode `"search"`, active by default), reading each result's `deadline` — what programs are open right now with deadlines in the next 30–60 days? There is no open-intake filter.
 3. For each candidate that emerges from steps 1–2: `get_deal_count(program_name, date_range_months=12)` — confidence check. Does Granted have meaningful experience with this program? Programs with zero deals in 12 months may not be worth the Blast (Granted can't support applicants well). This is *filter logic*, not the candidate signal itself.
 4. Return 2–3 Grant Blast candidates with the shape: program name + the news angle (what just changed or is about to) + the urgency (deadline / window) + Granted's fit (can we help). One-line rationale per candidate. If there's a clear winner, name it and explain why — but **stop after presenting the options**. Do not begin drafting until the user picks one. Always end the response with a question that requires the user to choose ("Which one would you like to draft?" / "Should I go with [X], or do you want a different angle?"). Recommending a winner is not the same as drafting it.
 
@@ -226,7 +226,7 @@ The tools exploration relies on. See `DATA_SOURCES` for verification rules on th
 | Tool | What it gives | Most common exploration use |
 |---|---|---|
 | `get_visualping_alerts` | Grantor page change events | Weekly digest, Grant Blast triggering. **Filters available:** `priority` (critical/high/medium/low), `change_type` (new_program / deadline_change / eligibility_update / guidelines_update / funding_change / minor_update), `days`, `limit`. **No URL filter** — to scope to a specific grantor page, post-filter results in-model. |
-| `search_getgranted` | 188+ Canadian grants catalog | Programs opening/closing, scope filters |
+| `grant_data` (mode `"search"`) | GG3 grants catalog, hourly copy | Programs opening/closing (read `deadline`), scope filters |
 | `get_deal_count(program, date_range_months)` | Granted's recent deal volume on a program | Surface programs with client demand |
 | `get_program_stats(program)` | Success rate, sample size, confidence | Scoped exploration by program |
 | `search_recent_wins({ days, program?, industry? })` | Recent won deals (marketing-shaped output) | Celebration posts, proof-point cites, industry analytics. Prefer over `search_grant_applications` for won-deals questions. |

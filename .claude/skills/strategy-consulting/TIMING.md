@@ -29,5 +29,5 @@ Timing is one of the most powerful tools in grant strategy. The same company wit
 When a consultant asks a timing question:
 1. Identify the commitment at risk (spend, hire start, training start, deposit, fiscal filing)
 2. Apply the relevant principle/tactic and state the safe default plus any documented exception
-3. Verify current program status and deadlines before the consultant relays dates (`grants/validation`, `get_visualping_alerts`, `search_getgranted`)
+3. Verify current program status and deadlines before the consultant relays dates (`grants/validation`, `get_visualping_alerts`, `grant_data`)
 4. Timing-check the whole roadmap while you're at it: anything the client is about to spend on, any window opening within 90 days, any fiscal boundary approaching

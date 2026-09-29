@@ -27,28 +27,27 @@ Recommending closed programs destroys credibility and wastes everyone's time. Al
 
 ## The 5-Step Validation Workflow
 
-### Step 1: Search GetGranted with `active_only=true`
+### Step 1: Search GetGranted with `grant_data` (status active)
 
 **Always start here:**
 
 ```javascript
-search_getgranted({
-  purposes: ["Hiring"],
+grant_data({
+  mode: "search",
+  grant_types: ["Hiring"],
   regions: ["British Columbia"],
-  active_only: true,  // DEFAULT - DO NOT change to false
-  open_intakes_only: false,  // Use true only for urgent needs
+  // status defaults to ["active"] - DO NOT widen it for recommendations
   limit: 20
 })
 ```
 
-**What `active_only=true` means:**
-- Program exists and has not been discontinued
-- Program has either current open intake OR predictable future intake
-- Does NOT guarantee applications are being accepted right now
+**What GG3 status `active` means:**
+- The program is live on the GetGranted platform and has not been retired
+- Does NOT guarantee applications are being accepted right now — read each result's `deadline`
 
 **Why this isn't enough:**
-- GetGranted may have stale intake dates
-- Programs can close between GetGranted updates
+- A card's deadline or intake details may be stale
+- Programs can close between card updates (the copy is at most an hour behind GG3; see `data_as_of`)
 - Need real-time validation from official sources
 
 **Output:**
@@ -118,7 +117,7 @@ WebSearch: "Basin Apprentice Wage Subsidy 2026 open intake deadline application"
 
 ```javascript
 WebFetch({
-  url: "[Official program URL from GetGranted or search results]",
+  url: "[Official program URL from web search — grant_data results carry no program URL]",
   prompt: "Extract: 1) Current application status (open/closed), 2) Deadline if open, 3) Next intake date if closed, 4) Any special conditions or updates"
 })
 ```
@@ -216,7 +215,7 @@ Filter results for mentions of:
 ### Category A: ACTIVE - Open Intake
 
 **Criteria:**
-- ✅ Found in GetGranted (active_only=true)
+- ✅ Found in GetGranted (grant_data, status active)
 - ✅ Web search confirms open status
 - ✅ Official page confirms accepting applications
 - ✅ Deadline is in the FUTURE
@@ -242,7 +241,7 @@ Filter results for mentions of:
 ### Category B: ACTIVE - Closed Intake (Annual Pattern)
 
 **Criteria:**
-- ✅ Found in GetGranted (active_only=true)
+- ✅ Found in GetGranted (grant_data, status active)
 - ⚠️ Web search indicates "opens annually in [month]"
 - ⚠️ Official page shows "next intake [future date]"
 - ✅ No VisualPing alerts indicating permanent closure
@@ -271,7 +270,7 @@ Filter results for mentions of:
 ### Category C: ACTIVE - Rolling Intake
 
 **Criteria:**
-- ✅ Found in GetGranted (active_only=true)
+- ✅ Found in GetGranted (grant_data, status active)
 - ✅ Web search indicates "rolling applications" or "continuous intake"
 - ✅ Official page confirms "no deadline" or "ongoing"
 - ✅ No recent VisualPing alerts indicating closure
@@ -298,7 +297,7 @@ Filter results for mentions of:
 ### Category D: INACTIVE - Do Not Recommend
 
 **Criteria:**
-- ❌ Not found in GetGranted OR active_only=false required to find
+- ❌ Not found in GetGranted OR found only with a non-active status
 - ❌ Web search indicates "program closed" or "suspended"
 - ❌ Official page shows no future intake planned
 - ❌ VisualPing alerts indicate permanent closure
@@ -323,7 +322,7 @@ Would you like me to analyze these alternatives?"
 
 **Before recommending ANY grant, confirm:**
 
-- [ ] Found in GetGranted with `active_only=true`
+- [ ] Found in GetGranted by `grant_data` with status active
 - [ ] Web search confirms current status (open, annual, or rolling)
 - [ ] Official program page verified (tried all 4 URL variations if needed)
 - [ ] Cross-referenced VisualPing alerts for recent changes
@@ -466,7 +465,7 @@ ALTERNATIVE PROGRAMS available in your region:
 **Validation Date:** [YYYY-MM-DD]
 
 ### Validation Steps Completed:
-✅ Step 1: GetGranted search (active_only=true) → Found
+✅ Step 1: GetGranted search (grant_data, status active) → Found
 ✅ Step 2: Web search → Status confirmed
 ✅ Step 3: Official program page → Verified
 ✅ Step 4: VisualPing alerts → No concerning changes
@@ -484,7 +483,7 @@ ALTERNATIVE PROGRAMS available in your region:
 [Proceed immediately / Prepare for [month] intake / Find alternatives]
 
 ### Sources Consulted:
-1. GetGranted: [URL or "Internal DB"]
+1. GetGranted: [links.app from grant_data]
 2. Official Page: [URL]
 3. Web Search: [Query used]
 4. VisualPing: [Alert findings or "No alerts"]

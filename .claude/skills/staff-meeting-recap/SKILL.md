@@ -128,8 +128,8 @@ Do this for each section, one batch per section. Approximately 9 calls total for
 **Cross-reference behavior.** When the transcript mentions a verifiable claim, look it up:
 - Deal/company claims → `search_grant_applications` (with `company_name`) or `search_hubspot_companies` (with `query`)
 - Pipeline counts / deal-stage queries → `search_grant_applications` with `dealstage` and `pipeline` filters. Note: HubSpot deals in this codebase are surfaced as "grant applications" — there's no `search_hubspot_deals` tool.
-- Grant lookups → `search_getgranted`, plus `web_search` if context warrants
-- Highlighted grants → `search_getgranted` (have we seen it? similar funders we work with?) AND `web_search` (recent program changes, deadlines, news)
+- Grant lookups → `grant_data` (mode `"search"`), plus `web_search` if context warrants
+- Highlighted grants → `grant_data` (have we seen it? similar funders we work with?) AND `web_search` (recent program changes, deadlines, news)
 
 When the transcript matches reality, write the note as stated. When it contradicts, write the note AND flag the contradiction inline. Don't quietly correct — surface disagreements.
 
@@ -233,7 +233,7 @@ This workflow uses approximately 18-25 agent loop iterations:
 - 5-10: per-row writes for new coming-week items
 - 1: final summary
 
-Cross-reference lookups (HubSpot, web_search, search_getgranted) add iterations as needed but should be used sparingly — only when the transcript surfaces a verifiable claim worth checking.
+Cross-reference lookups (HubSpot, web_search, grant_data) add iterations as needed but should be used sparingly — only when the transcript surfaces a verifiable claim worth checking.
 
 ## Out of scope
 

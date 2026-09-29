@@ -58,7 +58,7 @@ For comprehensive workflows and methodologies, load specific sub-skills:
 ## Available Tools
 
 You already have access to grant-related tools (loaded separately):
-- `search_getgranted` - Search 188+ Canadian grants by criteria
+- `grant_data` (mode `"search"`) - Search Oracle's hourly copy of the GG3 grant database by keyword, region, industry, grant type and funder
 - `get_visualping_alerts` - Monitor grant page changes in real-time
 - `WebSearch`, `WebFetch` - Validate official grant pages
 - `search_hubspot_companies` - Pull client data for matching
@@ -140,7 +140,7 @@ User: "Is Basin Apprentice Wage Subsidy still available?"
 
 Process:
 1. Load validation sub-skill for 5-step workflow
-2. Search GetGranted (active_only=true)
+2. Search with grant_data (mode "search"; active is the default status)
 3. WebSearch: "[program name] 2026 open intake"
 4. WebFetch official program page
 5. Check VisualPing alerts for recent changes
@@ -181,7 +181,7 @@ For client-based grant matching:
 - **Total:** ~10,500 tokens (load only what you need)
 
 **Tools Required:**
-- `search_getgranted` (primary grant search)
+- `grant_data`, mode `"search"` (primary grant search)
 - `get_visualping_alerts` (status monitoring)
 - `WebSearch`, `WebFetch` (validation)
 - `search_hubspot_companies` (client data)

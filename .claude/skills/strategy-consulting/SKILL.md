@@ -4,7 +4,7 @@
 
 This skill is for supporting Granted's internal strategy consulting team. The user is a consultant (or another team member) preparing for or debriefing client work — not a client. Distilled from hundreds of real consultations (Jorge, Stephanie) via the strategic consulting doc lineage; this is the internal edition.
 
-This is NOT a program reference. It teaches consultant judgment that operates across all programs. For program-specific intelligence, load `granted-insights` (consultant-grade go/no-go reads by grant type) or `grants` (eligibility/matching/validation methodology), and use `search_getgranted` for live program data.
+This is NOT a program reference. It teaches consultant judgment that operates across all programs. For program-specific intelligence, load `granted-insights` (consultant-grade go/no-go reads by grant type) or `grants` (eligibility/matching/validation methodology), and use `grant_data` (mode `"search"`) for live program data.
 
 ## When to Use This Skill
 
@@ -42,7 +42,7 @@ Load a sub-skill when a consultant asks you to:
 
 This skill is methodology. Ground it in current data before advising:
 - Client facts: `search_hubspot_companies` / `get_hubspot_company` / `get_grant_application`
-- Program fit and status: `search_getgranted`, then `grants/validation` before recommending
+- Program fit and status: `grant_data` (mode `"search"`), then `grants/validation` before recommending
 - Granted's actual track record on a program: `get_program_stats`, `search_recent_wins` — use real numbers, don't quote remembered stats
 - Landscape changes: `get_visualping_alerts`
 
@@ -57,4 +57,4 @@ This skill is methodology. Ground it in current data before advising:
 
 ## What Moved Elsewhere
 
-The source document's tactical program mechanics section (hiring grant streams, BC ETG detail, CanExport operational detail, candidate-pool prioritization) is intentionally NOT here. For that layer: `granted-insights` sub-skills by grant type, `grants` methodology, `search_getgranted` for live program cards. Keep this skill program-agnostic so it doesn't go stale.
+The source document's tactical program mechanics section (hiring grant streams, BC ETG detail, CanExport operational detail, candidate-pool prioritization) is intentionally NOT here. For that layer: `granted-insights` sub-skills by grant type, `grants` methodology, `grant_data` (mode `"search"`) for live program cards. Keep this skill program-agnostic so it doesn't go stale.

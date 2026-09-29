@@ -109,7 +109,7 @@ If confidence is "insufficient_data" (<5 deals), the Oracle must NOT cite the pr
 
 ### Live infrastructure beyond HubSpot
 
-**Grants database (`search_getgranted`)** — Live. 188+ Canadian grant programs, daily-synced. Use this for any current program details: eligibility, amounts, deadlines, status. Replaces "ask the user for program specifics" for any program in the DB.
+**Grants database (`grant_data`, mode `"search"`)** — Live. Oracle's hourly copy of the GG3 platform grant database; each result carries `data_as_of`. Use this for any current program details: eligibility, amounts, deadlines, status. Replaces "ask the user for program specifics" for any program in the DB.
 
 **Meeting transcripts (`granola_query_meetings`)** — Live. Searches recent consulting conversations and team meetings. Use this when blog refresh or success-story drafting calls for "recent intel from the team" — instead of hand-waving, actually query.
 
@@ -151,7 +151,7 @@ Sheet ID is hardcoded in the tool implementation (`src/tools/marketing-calendar.
 
 ### Still planned
 
-**Publicly disclosed funding recipients dataset** — The government recipient data Stephanie referenced in the April 14 meeting (named companies that received specific grants, totals by year and region). Distinct from `search_getgranted`, which is our internal program catalog. Not yet built.
+**Publicly disclosed funding recipients dataset** — The government recipient data Stephanie referenced in the April 14 meeting (named companies that received specific grants, totals by year and region). Distinct from `grant_data`, which is our internal program catalog. Not yet built.
 
 **Case study consent tracking** — Not yet a HubSpot property. Consent currently tracked informally; a structured property is a prerequisite for a `get_case_study_consent` tool.
 - Until formalized, use the public case study list in `COMPANY_CONTEXT` §9 as the authoritative source.
@@ -374,7 +374,7 @@ Oracle drafts. Every stat in the output is either user-provided, from `COMPANY_C
 ### What's live now
 - **HubSpot `get_program_stats`** — per-program success rate, deal volume, deal days, confidence scoring
 - **HubSpot `get_deal_count`** — program deal volume over configurable time windows
-- **`search_getgranted`** — 188+ Canadian grants database, daily-synced
+- **`grant_data`** (mode `"search"`) — Oracle's hourly copy of the GG3 grant database
 - **`granola_query_meetings`** — searchable consulting meeting transcripts
 - **`get_visualping_alerts`** — grantor page change monitoring
 - **`web_search`, `web_fetch`** — open research and known-URL fetch

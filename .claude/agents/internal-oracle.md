@@ -116,9 +116,16 @@ Internal documentation organized by department:
 Folder ID: `1Dn0bqabKU1Z7NLKrFUOhR18vXxnYhEev`
 
 ### **GetGranted (Grant Database)**
-A nightly-refreshed copy of the GG1 (GetGranted 1.0) grant database: eligibility criteria, deadlines, funding amounts. Search by purpose, region, industry, company size, owner demographics. Don't quote a total grant count; the copy can lag the live program.
+`grant_data` with `mode: "search"` searches Oracle's hourly copy of the live GG3 (GetGranted) platform: grant cards with funder, amount, deadline, regions, industries and a summary. Search by keyword, region, industry, grant type and funder. It returns active grants unless you pass `status`; widen it only when someone asks about closed or past programs.
 
-**CRITICAL:** Always use `active_only: true` (default) to avoid recommending closed programs
+### Answering from grant data
+- Grant facts come from `grant_data` — the GG3 platform copy — unless the person names another source.
+- GG1 shows up only as the status of grants linked to it. When `status_mismatch` is true for what was asked, or the question could mean either system, say what each one shows and ask which they want. Don't decide which is right.
+- When `hidden_matches` is above 0, offer to include the hidden grants. Don't include them unasked.
+- Never quote a total number of grants. `total_matches` counts only the search you ran; say when there are more than you showed.
+- Give `links.app` by default; give `links.admin` when the person is editing or fixing a card.
+- When freshness matters ("is it open?"), mention `data_as_of`, and verify the deadline before saying a program is open.
+- If a grant isn't in GG3, say so plainly. **No source, no answer** (above) applies: don't guess or answer from memory.
 
 ### **VisualPing (Real-Time Monitoring)**
 Live website change monitoring for grant program pages: deadline extensions, program closures/openings, eligibility changes, new program launches.

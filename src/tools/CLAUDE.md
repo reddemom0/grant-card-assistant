@@ -43,13 +43,14 @@ And two important local-scope constants inside `getToolsForAgent`:
 
 ### `ORACLE_TOOLS` — shared, not Oracle-exclusive
 
-Despite the name, `ORACLE_TOOLS` is consumed in three places:
+Despite the name, `ORACLE_TOOLS` is consumed in two places:
 
-- `definitions.js:2035` — spread into `ALL_TOOLS` (so orchestrator receives it)
-- `definitions.js:2105` — spread into `internal-oracle`'s loadout (primary use)
-- `definitions.js:2127` — `ORACLE_TOOLS.find(t => t.name === 'search_getgranted')` inside the lead-gen case (lead-gen extracts just the `search_getgranted` schema)
+- spread into `ALL_TOOLS` (so orchestrator receives it)
+- spread into `internal-oracle`'s loadout in `getToolsForAgent` (primary use)
 
-When adding a tool to `ORACLE_TOOLS`, know that orchestrator automatically gets it, and if it's named `search_getgranted`, lead-gen's behavior changes too.
+When adding a tool to `ORACLE_TOOLS`, know that orchestrator automatically gets it.
+
+Lead-gen does not read `ORACLE_TOOLS`. Its GG1 search is the standalone `SEARCH_GETGRANTED_TOOL` constant in `definitions.js`, referenced directly by the lead-gen case. Oracle's grant search is `GRANT_DATA_TOOL` (`grant_data`, over the GG3 copy), which sits in `ORACLE_TOOLS`. Changing one does not change the other.
 
 For which agent uses which tool sets, see `.claude/agents/CLAUDE.md`.
 
@@ -222,7 +223,7 @@ Edit `src/tools/definitions.js` `getToolsForAgent` switch at line 2047. For each
 - **The dual HubSpot layer.** Grep both files when fixing HubSpot bugs.
 - **`coreHubSpotTools` is human-maintained.** If you add a HubSpot write tool that the `hubspot/DEAL_CREATION` skill teaches, add it to `coreHubSpotTools` too. No test enforces this.
 - **Tool naming conventions:** `snake_case` at runtime. `camelCase` appears in some agent frontmatter but isn't load-bearing — the runtime speaks `snake_case` only.
-- **`ORACLE_TOOLS` is not Oracle-exclusive.** Also used by orchestrator (via `ALL_TOOLS`) and partially by lead-gen (for `search_getgranted`). Deliberate additions only.
+- **`ORACLE_TOOLS` is not Oracle-exclusive.** Also used by orchestrator (via `ALL_TOOLS`). Lead-gen uses the standalone `SEARCH_GETGRANTED_TOOL`, not anything from `ORACLE_TOOLS`. Deliberate additions only.
 - **`src/tools/index.js` is broken/dead.** Don't extend it. See known dead code section above.
 
 ## When something's broken

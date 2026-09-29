@@ -191,16 +191,16 @@ const clientProfile = {
 Cast a wide net initially:
 
 ```javascript
-search_getgranted({
-  purposes: ["Hiring", "Market Expansion", "Research & Development"],
+grant_data({
+  mode: "search",
+  grant_types: ["Hiring", "Market Expansion", "Research & Development"],
   regions: ["British Columbia"],
-  industries: ["Technology"],
-  company_size_min: 10,
-  company_size_max: 100,
-  active_only: true,
-  limit: 50  // Get comprehensive list first
+  industries: ["Tech"],
+  limit: 20  // the maximum; total_matches says how many exist
 })
 ```
+
+Status defaults to active. There is no company-size filter: check size limits in each grant's card when scoring. If `total_matches` is more than 20, narrow the search rather than stopping at the first page.
 
 ### Step 3: Score Each Program
 

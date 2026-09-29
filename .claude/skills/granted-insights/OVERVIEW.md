@@ -15,7 +15,7 @@ Load this skill when the user (typically a Granted consultant) asks for:
 - "Should we recommend this to a client?"
 - Any variant of "is this grant worth pursuing"
 
-The user will typically either paste a grant card / program documentation, or ask you to retrieve it via `search_getgranted`.
+The user will typically either paste a grant card / program documentation, or ask you to retrieve it via `grant_data` (mode `"search"`).
 
 ## Audience and voice
 

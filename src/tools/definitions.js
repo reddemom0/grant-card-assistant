@@ -1491,7 +1491,7 @@ Use when simple information retrieval is insufficient and you need specialized e
 
 **Do NOT load skills for simple queries:**
 - "Tell me about Company X" → Use tools directly
-- "Find grants for BC tech companies" → Use search_getgranted
+- "Find grants for BC tech companies" → Use grant_data (mode "search")
 - "Show me recent alerts" → Use get_visualping_alerts
 
 **Load skills for specialized tasks:**

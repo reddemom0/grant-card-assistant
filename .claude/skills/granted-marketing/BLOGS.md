@@ -68,7 +68,7 @@ The Oracle asks for any missing:
 
 Then ground the draft by fetching real data — never write from training memory:
 
-- **Program details** — for any program named in the blog, call `search_getgranted` to get current eligibility, funding amount, and deadline. Cite from the tool result, not from memory.
+- **Program details** — for any program named in the blog, call `grant_data` (mode `"search"`) to get current eligibility, funding amount, and deadline. Cite from the tool result, not from memory.
 - **Recent client questions** — call `granola_query_meetings(query="<topic keyword>")` to surface real client confusion or objections from recent consulting calls. These make the blog read true-to-life. Skip the call if the blog is purely evergreen with no current-week framing.
 - **Recent grantor changes** — call `get_visualping_alerts(days=30, priority="medium")` if the blog references a specific program; post-filter the results for that program's URL to confirm nothing material changed recently that would make the blog stale on publication.
 - **News tie-in (optional)** — call `web_search` if the blog ties to current news (a budget release, a federal announcement). Only for time-sensitive framing.
@@ -146,7 +146,7 @@ User says: *"Refresh the [topic] blog"* or *"Which blog should we refresh this m
 If the user specifies a blog, use that. If not, the Oracle recommends candidates by combining signals:
 
 - **Program changes** — call `get_visualping_alerts(days=60, priority="medium")` to find programs that have had material changes (deadline shifts, funding changes, eligibility updates, new programs). Any blog referencing one of these programs is a strong refresh candidate.
-- **Stale program details** — for blogs referencing specific programs by name, call `search_getgranted` on the named program. Compare the live amounts, deadlines, and eligibility against what the blog currently says. Discrepancies = refresh signal.
+- **Stale program details** — for blogs referencing specific programs by name, call `grant_data` (mode `"search"`) on the named program. Compare the live amounts, deadlines, and eligibility against what the blog currently says. Discrepancies = refresh signal.
 - **Seasonal relevance** — blogs matching upcoming content calendar moments (e.g., budget-season blogs before budget release). The hardcoded 2026 calendar in §5 covers the planned rhythm; for what's actually scheduled this week, see the calendar source note at the end of §5.
 - **Stale figures** — blogs with year-specific stats from 2024 or earlier are mechanical refresh candidates regardless of program changes.
 - **Update recency** — call `check_blog_coverage({ modified_after: "<date 6 months ago>" })` to list blogs not updated in the last 6 months. The `modified` timestamp on each result is the staleness signal — no traffic tool needed.
@@ -156,8 +156,8 @@ If the user specifies a blog, use that. If not, the Oracle recommends candidates
 
 Before editing, run these queries and combine the results:
 
-1. **Live program details** — `search_getgranted` on every program named in the blog. Note any discrepancies between blog content and current eligibility, amounts, deadlines, or program names.
-2. **Grantor page changes** — `get_visualping_alerts(days=90, priority="medium")` and post-filter for each named program's URL. Recent changes flagged by Visualping are likely already reflected in `search_getgranted` results, but the alert payload often surfaces *what specifically changed* in human-readable form.
+1. **Live program details** — `grant_data` (mode `"search"`) on every program named in the blog. Note any discrepancies between blog content and current eligibility, amounts, deadlines, or program names.
+2. **Grantor page changes** — `get_visualping_alerts(days=90, priority="medium")` and post-filter for each named program's URL. Recent changes flagged by Visualping are likely already reflected in `grant_data` results, but the alert payload often surfaces *what specifically changed* in human-readable form.
 3. **New intel from the team** — `granola_query_meetings(query="<program name>")` to surface what consultants have learned about each program in the past 1-2 months. Patterns ("clients keep asking X," "the form now requires Y") are blog gold.
 4. **Granted's own track record** — `get_program_stats(program_name)` if the blog cites historical numbers. Update if confidence is medium-or-higher and the new numbers differ from what's published.
 5. **External news** — `web_search` for budget releases, federal announcements, or sector news from the past 60 days that could update the blog's framing.
@@ -283,7 +283,7 @@ Including a "what grants don't fund" section in a blog is often a trust-builder 
 
 - **"Ultimate guide" posts without specifics.** Generic, encyclopedic content that doesn't help the reader decide anything.
 - **Burying the CTA.** The reader should know what to do next before they leave the page. Don't hide the CTA in the last line of a wall of text.
-- **Stale program details.** Funding amounts, deadlines, eligibility change. If a blog references any of these, do not flag for the user — call `search_getgranted` on the named program and use the live values. Falling back to "[confirm current figures]" is acceptable only if the tool returns nothing or errors.
+- **Stale program details.** Funding amounts, deadlines, eligibility change. If a blog references any of these, do not flag for the user — call `grant_data` (mode `"search"`) on the named program and use the live values. Falling back to "[confirm current figures]" is acceptable only if the tool returns nothing or errors.
 - **Over-claiming eligibility in writing.** A blog that reads *"your business can apply for…"* creates legal and reputation risk. Use *"may qualify if..."* / *"eligible businesses include..."*
 - **Fabricating case study numbers.** Only reference clients on the public list (see `COMPANY_CONTEXT`). For anonymous examples, use *"a BC-based manufacturer"* style — not invented specifics like "Acme Corp secured $100K."
 - **Pulling strategic application advice into public content.** *"Here's exactly how to frame your CanExport application"* — paid-tier only. Public content teaches eligibility and opportunity; strategic angles are gated.
@@ -349,7 +349,7 @@ Including a "what grants don't fund" section in a blog is often a trust-builder 
 
 ### Oracle's approach
 
-1. **Identify stale content** — call `search_getgranted` on every program named in the blog; flag any discrepancies between blog text and live program details.
+1. **Identify stale content** — call `grant_data` (mode `"search"`) on every program named in the blog; flag any discrepancies between blog text and live program details.
 2. **Layer new intel** — call `granola_query_meetings(query="grant myths")` or similar to surface what consultants have learned since the original publication. Patterns from real client conversations beat training-data assumptions.
 3. **Flag budget-era context** — call `web_search` for recent provincial or federal budget announcements that could update the myths (e.g., a budget that changes the SR&ED timing myth).
 
