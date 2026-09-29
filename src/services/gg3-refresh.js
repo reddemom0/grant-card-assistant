@@ -6,10 +6,15 @@
  *   startup + 60s    one pull, so a deploy doesn't wait up to an hour
  *   on demand        GET /api/admin/gg3-refresh (session + ?secret=)
  *
- * Guard: the old copy stays when the call errors, returns 0 rows, or returns
- * fewer than 80% of the last successful run's rows. A pull at the 700-row limit
- * still replaces the copy but is recorded capped=true with a loud warning —
- * search-context has no pagination, so grants past 700 are being cut off.
+ * search-context caps each call at 700 rows with no pagination, and all
+ * statuses together pass 700, so a pull is one call per status in GG3_STATUSES,
+ * merged and deduped by id. A status missing from the list is never copied;
+ * an unknown one is a 400 from the backend, which fails the whole run.
+ *
+ * Guard: the old copy stays when any call errors, the merge is empty, or it
+ * holds fewer than 80% of the last successful run's rows. A single status call
+ * at the 700-row limit still replaces the copy but is recorded capped=true with
+ * a loud warning naming the status — grants in it past 700 are being cut off.
  * Every run, whatever its outcome, is one row in gg3_refresh_runs; the latest
  * success is the copy's "data as of" time.
  *
@@ -22,6 +27,9 @@
 import { query, transaction } from '../database/connection.js';
 
 export const SEARCH_CONTEXT_LIMIT = 700;
+// Every status seen in production gg3_grants on 2026-09-29, plus the four the
+// backend documents. Add a status here when GG3 gains one.
+export const GG3_STATUSES = ['active', 'inactive', 'archived', 'draft', 'hide'];
 export const MIN_RATIO = 0.8;
 const FETCH_TIMEOUT_MS = 60_000;
 const INSERT_CHUNK = 100;
@@ -61,14 +69,14 @@ function config(env) {
 }
 
 /**
- * Every GG3 grant, all statuses. Throws on a non-2xx or a malformed body; the
+ * GG3 grants with one status. Throws on a non-2xx or a malformed body; the
  * error never carries the token or the response body.
  */
-export async function fetchSearchContext({ url, token, fetchImpl = fetch }) {
+export async function fetchSearchContext({ url, token, status, fetchImpl = fetch }) {
   const res = await fetchImpl(`${url}/api/v1/ai/grants/search-context`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-AI-Service-Token': token },
-    body: JSON.stringify({ filters: { active_only: false }, limit: SEARCH_CONTEXT_LIMIT }),
+    body: JSON.stringify({ filters: { status: [status] }, limit: SEARCH_CONTEXT_LIMIT }),
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS)
   });
   if (!res.ok) throw new Error(`search-context HTTP ${res.status}`);
@@ -78,21 +86,42 @@ export async function fetchSearchContext({ url, token, fetchImpl = fetch }) {
 }
 
 /**
+ * Every GG3 grant: one call per status, in turn, merged and deduped by id (first
+ * seen wins). Any failed call fails the pull, its message naming the status.
+ * @returns {Promise<{grants: Object[], cappedStatuses: string[]}>}
+ */
+export async function fetchAllStatuses({ url, token, statuses = GG3_STATUSES, fetchImpl = fetch }) {
+  const byId = new Map();
+  const cappedStatuses = [];
+  for (const status of statuses) {
+    let rows;
+    try {
+      rows = await fetchSearchContext({ url, token, status, fetchImpl });
+    } catch (err) {
+      throw new Error(`status "${status}": ${describeError(err)}`);
+    }
+    if (rows.length >= SEARCH_CONTEXT_LIMIT) cappedStatuses.push(status);
+    for (const row of rows) {
+      if (!byId.has(row.id)) byId.set(row.id, row);
+    }
+  }
+  return { grants: [...byId.values()], cappedStatuses };
+}
+
+/**
  * The guard. Pure: decides from counts alone whether a pull may replace the copy.
  * @param {{count: number, previousCount: number|null}} counts
- * @returns {{ok: boolean, capped: boolean, reason: string|null}}
+ * @returns {{ok: boolean, reason: string|null}}
  */
 export function decideRefresh({ count, previousCount }) {
-  const capped = count >= SEARCH_CONTEXT_LIMIT;
-  if (count === 0) return { ok: false, capped, reason: '0 rows returned' };
+  if (count === 0) return { ok: false, reason: '0 rows returned' };
   if (previousCount && count < MIN_RATIO * previousCount) {
     return {
       ok: false,
-      capped,
       reason: `${count} rows is below ${MIN_RATIO * 100}% of the last successful run (${previousCount})`
     };
   }
-  return { ok: true, capped, reason: null };
+  return { ok: true, reason: null };
 }
 
 async function lastSuccessCount() {
@@ -159,32 +188,33 @@ export async function runGg3Refresh({ env = process.env, fetchImpl = fetch, now 
   try {
     const previous_count = await lastSuccessCount();
 
-    let grants;
+    let grants, cappedStatuses;
     try {
-      grants = await fetchSearchContext({ ...cfg, fetchImpl });
+      ({ grants, cappedStatuses } = await fetchAllStatuses({ ...cfg, fetchImpl }));
     } catch (err) {
-      return done({ status: 'failed', previous_count, error: describeError(err) });
+      return done({ status: 'failed', previous_count, error: err.message });
     }
 
     const row_count = grants.length;
+    const capped = cappedStatuses.length > 0;
     const decision = decideRefresh({ count: row_count, previousCount: previous_count });
     if (!decision.ok) {
-      return done({ status: 'failed', row_count, previous_count, capped: decision.capped, error: decision.reason });
+      return done({ status: 'failed', row_count, previous_count, capped, error: decision.reason });
     }
 
     try {
       await replaceCopy(grants);
     } catch (err) {
       return done({
-        status: 'failed', row_count, previous_count, capped: decision.capped,
+        status: 'failed', row_count, previous_count, capped,
         error: `database replace failed — code: ${err?.code ?? err?.name ?? 'unknown'}`
       });
     }
 
-    if (decision.capped) {
-      console.error(`🚨 GG3 refresh CAPPED at ${SEARCH_CONTEXT_LIMIT} rows — grants are being cut off. search-context has no pagination; ask for it or a higher limit.`);
+    if (capped) {
+      console.error(`🚨 GG3 refresh CAPPED at ${SEARCH_CONTEXT_LIMIT} rows for status ${cappedStatuses.join(', ')} — grants are being cut off. search-context has no pagination; ask for it or a higher limit.`);
     }
-    return done({ status: 'success', row_count, previous_count, capped: decision.capped });
+    return done({ status: 'success', row_count, previous_count, capped });
   } finally {
     inFlight = false;
   }
