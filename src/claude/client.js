@@ -212,6 +212,21 @@ export function toolResultsToStore(toolResults, toolNamesById) {
 }
 
 /**
+ * cache_control for the base-prompt system block (the tools + prompt prefix).
+ * Oracle gets the 1h TTL: its traffic has 5–60 minute gaps that a 5m entry
+ * misses, and the prefix is ~40K tokens (~55K on Sonnet 5.5's tokenizer). 1h writes cost 2x input against 1.25x
+ * for 5m. Other agents keep the 5m default.
+ *
+ * @param {string} agentType
+ * @returns {Object}
+ */
+export function baseAgentPromptCache(agentType) {
+  return agentType === 'internal-oracle'
+    ? { type: 'ephemeral', ttl: '1h' }
+    : { type: 'ephemeral' };
+}
+
+/**
  * The assistant turn as sent back inside a tool loop: empty text blocks and the
  * stream's `index` field are dropped, every other block is kept as received and
  * in order. thinking and redacted_thinking blocks must come back unmodified —
@@ -594,7 +609,8 @@ export async function runAgent({
     //    blocks, so the cache_control on systemBlocks[0] (below) already caches
     //    the whole tools array + base prompt as one prefix. Tools do NOT need
     //    their own breakpoint.
-    // 2. systemBlocks[0] (base prompt) carries a 1h breakpoint; the dynamic
+    // 2. systemBlocks[0] (base prompt) carries the prefix breakpoint (1h for
+    //    Oracle, 5m for other agents — see baseAgentPromptCache); the dynamic
     //    system blocks (summary/memories/learning) sit after it and are uncached.
     // 3. The message history below now carries ROLLING cache_control breakpoints,
     //    applied at the apiParams build site via withMessageCacheBreakpoints().
@@ -654,15 +670,10 @@ export async function runAgent({
           type: 'text',
           text: baseAgentPrompt,
           // ✅ CACHED (reused across conversations): base prompt + the tools
-          // that render before it, as one prefix.
-          //
-          // 5m (the default), NOT 1h. The 1h TTL bills writes at 2x base
-          // against 1.25x for 5m, and July's billing showed it wasn't earning
-          // that premium: prefix writes ran at roughly one per conversation
-          // regardless of TTL, and 47% of Oracle's conversation gaps exceed an
-          // hour anyway, so the longer window rescued fewer than half the
-          // cases it was paying for.
-          cache_control: { type: 'ephemeral' }
+          // that render before it, as one prefix. 1h for Oracle, 5m otherwise
+          // (baseAgentPromptCache). The rolling message breakpoints stay 5m, and
+          // the API requires the longer TTL first, which render order gives.
+          cache_control: baseAgentPromptCache(agentType)
         }
       ];
 
@@ -722,7 +733,7 @@ export async function runAgent({
       }
 
       // Add signed-in user identity (if resolved) - NOT CACHED
-      // Placed after the cached base prompt so it never invalidates the 1h
+      // Placed after the cached base prompt so it never invalidates the cached
       // prefix, matching how summary/memories/learning-memory are handled.
       if (userIdentity) {
         const ownerLine = userIdentity.hubspot_owner_id
@@ -779,7 +790,6 @@ export async function runAgent({
       const apiParams = {
         model: MODEL,
         max_tokens: MAX_TOKENS,
-        temperature: TEMPERATURE,
 
         // System prompt blocks (with proper cache separation)
         system: systemBlocks,
@@ -797,6 +807,15 @@ export async function runAgent({
       // Only add thinking if configured (undefined = disabled for simple queries)
       if (THINKING_CONFIG) {
         apiParams.thinking = THINKING_CONFIG;
+      }
+
+      // Sonnet 5.5 (Oracle's complex tier) rejects non-default temperature and
+      // sets thinking depth with effort instead of a budget.
+      if (TEMPERATURE !== undefined) {
+        apiParams.temperature = TEMPERATURE;
+      }
+      if (queryConfig.effort) {
+        apiParams.output_config = { effort: queryConfig.effort };
       }
 
       const stream = await anthropic.messages.create(apiParams, {
@@ -1275,6 +1294,39 @@ export async function runAgent({
         return {
           success: true,
           response: fullResponse,
+          iterations: loopCount
+        };
+      }
+
+      // CASE 4b: The model declined (Sonnet 5.5 safety classifiers). HTTP 200
+      // with stop_reason 'refusal'; without this branch the loop breaks and
+      // runAgent returns undefined, which the Chat path can't post.
+      if (fullResponse.stop_reason === 'refusal') {
+        console.warn(`⚠️  Model declined the request (category: ${fullResponse.stop_details?.category ?? 'none'})`);
+
+        const refusalText = "Sorry — I can't help with that request. Try rephrasing it, or ask a teammate.";
+        const refusalContent = [{ type: 'text', text: refusalText }];
+
+        if (agentType === 'lead-gen') {
+          const userText = typeof message === 'string' ? message : JSON.stringify(message);
+          const { appendLeadGenMessages } = await import('../api/lead-gen.js');
+          await appendLeadGenMessages(conversationId, userText, refusalText);
+        } else {
+          const { saveMessage } = await import('../database/messages.js');
+          if (!userMessageSaved) {
+            await saveMessage(conversationId, 'user', userContentForStorage);
+            userMessageSaved = true;
+          }
+          await saveMessage(conversationId, 'assistant', refusalContent);
+        }
+
+        sendSSE(res, { type: 'text_delta', text: refusalText, sessionId });
+        sendSSE(res, { type: 'message_complete' });
+        closeSSE(res);
+
+        return {
+          success: true,
+          response: { ...fullResponse, content: refusalContent },
           iterations: loopCount
         };
       }

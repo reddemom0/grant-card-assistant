@@ -221,6 +221,19 @@ export function getModelForQuery(queryComplexity) {
 }
 
 /**
+ * Oracle's complex tier. Sonnet 5.5 rejects manual thinking budgets and
+ * non-default temperature, so it runs adaptive thinking with an effort level.
+ * display 'summarized' keeps thinking text visible in the Hub (5.5 defaults to
+ * 'omitted'). Other agents' complex tier stays on getModelForQuery.
+ */
+export const ORACLE_SONNET = {
+  model: 'claude-sonnet-5-5',
+  thinking: { type: 'adaptive', display: 'summarized' },
+  effort: 'medium',
+  temperature: undefined
+};
+
+/**
  * Get extended thinking configuration
  * @param {string} queryComplexity - 'simple', 'moderate', or 'complex'
  * @returns {Object|undefined} Thinking configuration (undefined = disabled)
@@ -307,6 +320,7 @@ export function getIterationLimit(queryComplexity) {
  */
 export function getQueryConfig(message, agentType, conversationMemories = null) {
   const complexity = classifyQuery(message, agentType, conversationMemories);
+  const oracleSonnet = agentType === 'internal-oracle' && complexity === 'complex';
 
   return {
     complexity,
@@ -315,6 +329,7 @@ export function getQueryConfig(message, agentType, conversationMemories = null) 
     maxTokens: getMaxTokens(complexity),
     temperature: getTemperature(complexity),
     maxIterations: getIterationLimit(complexity),
+    ...(oracleSonnet ? ORACLE_SONNET : {}),
 
     // Metadata for logging
     metadata: {

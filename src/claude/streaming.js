@@ -66,6 +66,21 @@ function convertMarkdownToHtml(text) {
 }
 
 /**
+ * Final usage for a streamed message: message_delta's counts win, but a null or
+ * missing value (message_delta has no cache_creation split) keeps message_start's.
+ * @param {Object|null} startUsage - usage from message_start
+ * @param {Object} deltaUsage - usage from message_delta
+ * @returns {Object}
+ */
+export function mergeUsage(startUsage, deltaUsage) {
+  const merged = { ...(startUsage || {}) };
+  for (const [key, value] of Object.entries(deltaUsage || {})) {
+    if (value !== null && value !== undefined) merged[key] = value;
+  }
+  return merged;
+}
+
+/**
  * Stream Claude response to frontend via SSE and collect full response
  * @param {AsyncIterable} stream - Claude API stream
  * @param {Object} res - Express response object
@@ -85,6 +100,10 @@ export async function streamToSSE(stream, res, sessionId, agentType = null, conv
 
   let currentContent = null;
 
+  // message_start carries the only usage.cache_creation split (5m vs 1h writes);
+  // message_delta's usage has the final counts but not the split, so they merge.
+  let startUsage = null;
+
   // For lead-gen: buffer text instead of streaming immediately (prevents tool narration leaking)
   let textBuffer = '';
   let hasToolUse = false;
@@ -93,6 +112,7 @@ export async function streamToSSE(stream, res, sessionId, agentType = null, conv
     for await (const event of stream) {
       // Message start event
       if (event.type === 'message_start') {
+        startUsage = event.message?.usage || null;
         if (res) {
           res.write(`data: ${JSON.stringify({
             type: 'message_start',
@@ -284,6 +304,9 @@ export async function streamToSSE(stream, res, sessionId, agentType = null, conv
 
       // Message delta (metadata updates)
       if (event.type === 'message_delta') {
+        if (event.delta.stop_details) {
+          fullResponse.stop_details = event.delta.stop_details;
+        }
         if (event.delta.stop_reason) {
           fullResponse.stop_reason = event.delta.stop_reason;
 
@@ -335,7 +358,7 @@ export async function streamToSSE(stream, res, sessionId, agentType = null, conv
           }
         }
         if (event.usage) {
-          fullResponse.usage = event.usage;
+          fullResponse.usage = mergeUsage(startUsage, event.usage);
         }
       }
 

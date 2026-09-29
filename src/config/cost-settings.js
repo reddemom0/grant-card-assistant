@@ -71,10 +71,16 @@ export function getMaxTurnsForAgent(agentType) {
 export function calculateRequestCost(usage, model) {
   if (!usage) return 0;
 
-  // Pricing per million tokens (as of Jan 2026)
+  // Pricing per million tokens (as of Jan 2026; Sonnet 5.5 added Sep 2026).
+  // cacheWritePrice is the 5m rate; 1h writes cost 2x input (cacheWrite1hPrice).
   let inputPrice, cacheWritePrice, cacheReadPrice, outputPrice;
 
-  if (model.includes('sonnet-4-5')) {
+  if (model.includes('sonnet-5-5')) {
+    inputPrice = 2.00;
+    cacheWritePrice = 2.50;
+    cacheReadPrice = 0.20;
+    outputPrice = 10.00;
+  } else if (model.includes('sonnet-4-5')) {
     inputPrice = 3.00;
     cacheWritePrice = 3.75;
     cacheReadPrice = 0.30;
@@ -107,8 +113,19 @@ export function calculateRequestCost(usage, model) {
     outputPrice = 15.00;
   }
 
+  const cacheWrite1hPrice = inputPrice * 2;
+
+  // Split 5m from 1h writes when the usage carries the breakdown (streamed
+  // messages do, via message_start). Without it, every write is costed at the
+  // 5m rate, as before.
+  const split = usage.cache_creation;
+  const writes1h = split ? (split.ephemeral_1h_input_tokens || 0) : 0;
+  const writes5m = split
+    ? (split.ephemeral_5m_input_tokens || 0)
+    : (usage.cache_creation_input_tokens || 0);
+
   const inputCost = (usage.input_tokens || 0) * inputPrice / 1_000_000;
-  const cacheWriteCost = (usage.cache_creation_input_tokens || 0) * cacheWritePrice / 1_000_000;
+  const cacheWriteCost = (writes5m * cacheWritePrice + writes1h * cacheWrite1hPrice) / 1_000_000;
   const cacheReadCost = (usage.cache_read_input_tokens || 0) * cacheReadPrice / 1_000_000;
   const outputCost = (usage.output_tokens || 0) * outputPrice / 1_000_000;
 
