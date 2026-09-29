@@ -145,6 +145,10 @@ export async function streamToSSE(stream, res, sessionId, agentType = null, conv
               sessionId
             })}\n\n`);
           }
+        } else if (event.content_block.type === 'redacted_thinking') {
+          // Arrives whole in content_block_start. Kept verbatim so the tool loop can
+          // pass it back unmodified; never shown to the user.
+          currentContent.data = event.content_block.data;
         }
       }
 

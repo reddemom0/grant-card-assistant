@@ -12,6 +12,14 @@ Format:
 
 ---
 
+## 2026-09-29 — Pass thinking blocks back unchanged within a tool-use turn
+
+**What:** The tool loop now sends `thinking` and `redacted_thinking` blocks back exactly as received (`assistantTurnForToolLoop` in `src/claude/client.js`), replacing the Feb 2026 strip (150c83f6). `streamToSSE` now keeps `redacted_thinking` blocks whole, including `data`.
+
+**Why:** Stripping silently turned thinking off on every follow-up tool call and broke the prompt cache (controlled test: 0/6 follow-ups thought before, 6/6 after, with call 2 reading call 1's cache). The original "thinking blocks cannot be modified" 400 was caused by redacted blocks rebuilt without their `data` field, not by passing thinking back. Between-turn history reload (`client.js` §3.5, `src/database/messages.js`) still drops thinking, so each turn's first call can't reuse the previous turn's message cache. That is a separate follow-up.
+
+**Impact:** `src/claude/client.js`, `src/claude/streaming.js`, `tests/unit/thinking-tool-loop.test.js`. Every `runAgent` path with thinking on: Hub, Google Chat, /learn-this, cards.
+
 ## 2026-09-17 — Foundation: type-aware staleness, per-person notices, dialogs for any card
 
 **What:** Small changes the remaining cards need, keeping today's behaviour for the review and track cards. A card type may declare `neverStale` or its own `staleAfterDays` (`markStaleBefore` now takes `onlyTypes`/`exceptTypes`); `dueTrackCards` became `dueCardsOfType(type, until)`; `tracked_card_participants.notified_on` (migration 033) is a per-person, per-day notice ledger claimed the same way as `claimDueReminder`; `dialogs.js` is type-agnostic (it calls `type.dialogFor` / `type.submitDialog`, so any card can own dialogs); `IMMEDIATE_KINDS` gained `watched_grant` and `meeting_followup`; `dialogsEnabled` moved to `render.js`, which also gained `tzOffsetMinutes` and `localInstant` (local wall time → a real instant, needed for callbacks and meeting slots).

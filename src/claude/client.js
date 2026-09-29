@@ -211,6 +211,24 @@ export function toolResultsToStore(toolResults, toolNamesById) {
     : tr));
 }
 
+/**
+ * The assistant turn as sent back inside a tool loop: empty text blocks and the
+ * stream's `index` field are dropped, every other block is kept as received and
+ * in order. thinking and redacted_thinking blocks must come back unmodified —
+ * stripping them makes the API silently turn thinking off for the follow-up call,
+ * which also changes the cached prefix. The Feb 2026 "thinking blocks cannot be
+ * modified" 400 came from redacted_thinking blocks rebuilt without their `data`;
+ * streamToSSE now keeps it.
+ *
+ * @param {Array} content - fullResponse.content from streamToSSE
+ * @returns {Array}
+ */
+export function assistantTurnForToolLoop(content) {
+  return content
+    .filter(block => !(block.type === 'text' && (!block.text || block.text.trim() === '')))
+    .map(({ index, ...block }) => block);
+}
+
 export async function runAgent({
   agentType,
   message,
@@ -992,30 +1010,10 @@ export async function runAgent({
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
 
-        // Clean content blocks: remove index field and filter out empty text blocks
-        // CRITICAL: Also remove thinking/redacted_thinking blocks to prevent 400 errors
-        // when messages are sent back to API in multi-turn tool use loops
-        const cleanedContent = fullResponse.content
-          .filter(block => {
-            // Remove empty text blocks that would cause API errors
-            if (block.type === 'text' && (!block.text || block.text.trim() === '')) {
-              return false;
-            }
-            // Remove thinking blocks (they cannot be modified/resent to API)
-            if (block.type === 'thinking' || block.type === 'redacted_thinking') {
-              return false;
-            }
-            return true;
-          })
-          .map(block => {
-            const { index, ...cleanBlock} = block;
-            return cleanBlock;
-          });
-
-        // Add assistant response to messages (WITHOUT thinking blocks)
+        // Thinking blocks go back exactly as received — see assistantTurnForToolLoop
         messages.push({
           role: 'assistant',
-          content: cleanedContent
+          content: assistantTurnForToolLoop(fullResponse.content)
         });
 
         // Extract and execute tool calls
