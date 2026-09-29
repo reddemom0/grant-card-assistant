@@ -1,0 +1,165 @@
+{
+  "about": "Oracle grant-data eval. Questions paraphrased from Oracle's logs (themes in oracle-gg3-use-cases.md), no client names. Expected facts pulled read-only from the production GG3 copy on 2026-09-29; re-check them if a grant's status changes.",
+  "questions": [
+    {
+      "id": 1,
+      "category": "freshness",
+      "question": "Is CanExport SMEs open for applications right now?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 932, "name": "CanExport - SMEs", "status": "active", "deadline": "31/08/2026" }], "gg1": { "id": "59", "status": "active" } },
+      "flags": { "freshness": true },
+      "rubric": "Finds CanExport SMEs (932). Does not call it open on GG3 status alone: it checks freshness itself (VisualPing, official page or web search) before saying open or closed, and notes the card deadline of 31/08/2026 has passed if it relies on it. Gives the app link from the tool."
+    },
+    {
+      "id": 2,
+      "category": "freshness",
+      "question": "Is the BC Employer Training Grant still taking applications?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1314, "name": "Employer Training Grant (ETG)", "status": "active", "deadline": "Open Until Filled" }], "gg1": { "id": "571", "status": "active" } },
+      "flags": { "freshness": true },
+      "rubric": "Finds ETG (1314), listed as active with an 'Open Until Filled' deadline. Checks current intake status itself before saying it is open; does not treat 'active' as confirmed open. App link from the tool."
+    },
+    {
+      "id": 3,
+      "category": "freshness",
+      "question": "Is the Regional Tariff Response Initiative open in BC?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1742, "name": "Regional Tariff Response Initiative - British Columbia", "status": "active", "deadline": "Open Until Filled" }] },
+      "flags": { "freshness": true },
+      "rubric": "Identifies the BC RTRI grant (1742), not another region's. Verifies intake status before calling it open. App link from the tool."
+    },
+    {
+      "id": 4,
+      "category": "fit",
+      "question": "A BC manufacturer wants to hire a recent grad (not a student) for a production role. Any wage subsidies?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1099, "name": "WorkBC Wage Subsidy Program", "status": "active" }] },
+      "flags": { "expects_hidden_offer_possible": true },
+      "rubric": "Suggests active hiring/wage-subsidy grants relevant to BC (e.g. WorkBC Wage Subsidy 1099), with app links from the tool. Doesn't recommend student-only programs as a fit for a non-student without saying so. No closed programs presented as available."
+    },
+    {
+      "id": 5,
+      "category": "fit",
+      "question": "An Ontario software company wants to hire co-op students next term. What funding fits?",
+      "expected": { "exists_in_gg3": true },
+      "flags": {},
+      "rubric": "Suggests active student-hiring programs that cover Ontario (e.g. Student Work Placement Program streams), with app links from the tool. No invented programs or amounts."
+    },
+    {
+      "id": 6,
+      "category": "fit",
+      "question": "An Alberta food processor wants help paying for new equipment. What should we look at?",
+      "expected": { "exists_in_gg3": true },
+      "flags": {},
+      "rubric": "Suggests active capital-cost or agri-food grants that cover Alberta, with app links from the tool, or says plainly that few match. Amounts and eligibility only as the cards state them."
+    },
+    {
+      "id": 7,
+      "category": "in-database",
+      "question": "Is the Telus #StandWithOwners contest in our database?",
+      "expected": { "exists_in_gg3": false, "gg1_only": { "id": "661", "name": "Telus #StandWithOwners Contest", "status": "active" } },
+      "flags": { "expects_not_in_gg3": true },
+      "rubric": "Says plainly it is not in GG3 (it exists only in the old GG1 copy). Does not invent a GG3 link or details from memory."
+    },
+    {
+      "id": 8,
+      "category": "in-database",
+      "question": "Do we have the Regional Tariff Response Initiative for the Prairies in our database?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1834, "name": "Regional Tariff Response Initiative - Prairie Region", "status": "active" }] },
+      "flags": {},
+      "rubric": "Confirms it is in GG3 (1834, listed as active) and gives the app link from the tool."
+    },
+    {
+      "id": 9,
+      "category": "links",
+      "question": "Send me the card link for the Employer Training Grant.",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1314, "name": "Employer Training Grant (ETG)", "status": "active" }], "links": ["https://app.getgranted.ai/grants/1314"] },
+      "flags": {},
+      "rubric": "Gives https://app.getgranted.ai/grants/1314 (the app link, not admin), taken from the tool result."
+    },
+    {
+      "id": 10,
+      "category": "links",
+      "question": "I'm fixing grant 1856's card — give me its admin link.",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1856, "name": "Green Jobs - Sustainable Energy", "status": "active" }], "links": ["https://admin.getgranted.ai/grants/1856"] },
+      "flags": {},
+      "rubric": "Gives https://admin.getgranted.ai/grants/1856 (admin, because they are fixing the card), taken from the tool result, and names the grant (Green Jobs - Sustainable Energy)."
+    },
+    {
+      "id": 11,
+      "category": "links",
+      "question": "What's this one? https://app.getgranted.ai/grants/1742",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1742, "name": "Regional Tariff Response Initiative - British Columbia", "status": "active" }] },
+      "flags": {},
+      "rubric": "Identifies grant 1742 as the BC Regional Tariff Response Initiative and summarizes it from the card. Doesn't confuse it with another RTRI region."
+    },
+    {
+      "id": 12,
+      "category": "mismatch",
+      "question": "Is the Agricultural Water Infrastructure Program Stream 2 active?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1425, "name": "Agricultural Water Infrastructure Program - Stream 2", "status": "inactive", "deadline": "31/07/2023" }], "gg1": { "id": "852", "status": "active" }, "status_mismatch": true },
+      "flags": { "expects_mismatch": true },
+      "rubric": "Finds Stream 2 (1425), not Stream 1 or 3. Shows both statuses side by side — GG3 inactive, GG1 active — with the 31/07/2023 deadline, without saying which system is right and without making the person choose. Doesn't say it's not in GG3."
+    },
+    {
+      "id": 13,
+      "category": "mismatch",
+      "question": "Is the 2 Billion Trees Program still running?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1384, "name": "2 Billion Trees Program", "status": "archived" }], "gg1": { "id": "741", "status": "active" }, "status_mismatch": true },
+      "flags": { "expects_mismatch": true, "freshness": true },
+      "rubric": "Finds 1384 (archived in GG3). Shows GG3 archived and GG1 active side by side with no verdict on which is right. If it says whether the program is running, it checked freshness itself first."
+    },
+    {
+      "id": 14,
+      "category": "hidden",
+      "question": "What youth or student hiring subsidies are there in BC?",
+      "expected": { "exists_in_gg3": true, "hidden_matches_expected": true },
+      "flags": { "expects_hidden_offer": true },
+      "rubric": "Lists active BC youth/student hiring programs with app links. Hidden grants also match: it offers to include them in plain words but does not list them unasked. Says when there are more matches than shown."
+    },
+    {
+      "id": 15,
+      "category": "rules",
+      "question": "For ETG, what percentage of training costs is covered and what's the max per employee?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1314, "name": "Employer Training Grant (ETG)", "status": "active" }], "facts": ["80% of eligible training costs", "up to $10,000 per trainee/employee"] },
+      "flags": {},
+      "rubric": "States 80% of eligible costs and a maximum of $10,000 per employee, citing the card (or the official source). No different numbers."
+    },
+    {
+      "id": 16,
+      "category": "rules",
+      "question": "How much can a company get from CanExport SMEs, and what share of costs does it cover?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 932, "name": "CanExport - SMEs", "status": "active" }], "facts": ["50% of eligible costs", "$10,000 to $50,000 per project"] },
+      "flags": {},
+      "rubric": "States 50% of eligible costs and $10,000–$50,000 per project, citing the card (or the official source). No different numbers."
+    },
+    {
+      "id": 17,
+      "category": "promote",
+      "question": "What grant should we feature in next week's email blast?",
+      "expected": { "exists_in_gg3": true },
+      "flags": { "freshness": true },
+      "rubric": "Recommends one or a few active grants with app links, and checks the pick is actually open (VisualPing, official page or web) before presenting it as open. No closed or past-deadline program presented as open. No database totals."
+    },
+    {
+      "id": 18,
+      "category": "promote",
+      "question": "Which programs are open that we could promote to BC manufacturers this week?",
+      "expected": { "exists_in_gg3": true },
+      "flags": { "freshness": true },
+      "rubric": "Lists active BC-relevant programs for manufacturers with app links, verifies open status before calling them open (or says which still need checking), no database totals, says when more exist than shown."
+    },
+    {
+      "id": 19,
+      "category": "inactive-only",
+      "question": "Tell me about Accelerating Agricultural Innovations 2.0.",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1287, "name": "Accelerating Agricultural Innovations 2.0", "status": "archived" }] },
+      "flags": {},
+      "rubric": "Finds 1287 and says it is archived in GG3 (not 'not in our database'). Describes it from the card, with the app link from the tool."
+    },
+    {
+      "id": 20,
+      "category": "inactive-only",
+      "question": "Is the Innovation Growth Program available?",
+      "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1804, "name": "Innovation Growth Program", "status": "inactive", "deadline": "June 30, 2026" }] },
+      "flags": { "freshness": true },
+      "rubric": "Finds 1804 and says it is listed as inactive in GG3 (not 'not in our database'), noting the June 30, 2026 deadline has passed. Doesn't call it available without checking."
+    }
+  ]
+}
