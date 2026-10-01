@@ -158,7 +158,7 @@ describe('grouping', () => {
     { kind: 'error', label: 'chat broke', category: 'connection_error', userId: 'user_aaaa1111' },
     { kind: 'error', label: 'chat broke', category: 'connection_error', userId: 'user_bbbb2222' }
   ];
-  const reviews = [{ ok: true, flags: ['pushback'], take: 'Gave the wrong deadline', owner: 'Fadi (grant card data)', userId: 'user_cccc3333' }];
+  const reviews = [{ ok: true, flags: ['pushback'], take: 'Gave the wrong deadline', owner: 'Research (grant card data)', userId: 'user_cccc3333' }];
 
   test('the model names the issues; counts and clients are counted in code; unknown ids dropped; leftovers kept', async () => {
     const items = buildItems(errors, reviews);
@@ -228,9 +228,9 @@ describe('the morning run', () => {
   const badChat = conv(9, 'user_dddd4444', [msg('user', 'that is wrong'), msg('assistant', 'Sorry.')]);
   const answers = {
     conversation_review: { flags: ['pushback'], take: 'Client said the answer was wrong', owner: 'Chris (AI behaviour)' },
-    issues: { issues: [{ name: 'Wrong answers on deadlines', item_ids: ['c1'], take: 'Deadline answers were wrong', owner: 'Fadi (grant card data)', existing_row: 2 }] }
+    issues: { issues: [{ name: 'Wrong answers on deadlines', item_ids: ['c1'], take: 'Deadline answers were wrong', owner: 'Research (grant card data)', existing_row: 2 }] }
   };
-  const SHEET_ROWS = [['Wrong answers on deadlines', '2026-09-20', '2026-09-28', '4', 'Acme', 'Fadi (grant card data)', 'being fixed', 'Fadi checking', 'reported by Steph']];
+  const SHEET_ROWS = [['Wrong answers on deadlines', '2026-09-20', '2026-09-28', '4', 'Acme', 'Research (grant card data)', 'being fixed', 'Research checking', 'reported by Steph']];
 
   test('nothing happened: no claim, no sheet, no DM', async () => {
     const d = makeDeps();
@@ -261,7 +261,7 @@ describe('the morning run', () => {
     const [space, text] = d.post.mock.calls[0];
     expect(space).toBe('spaces/DM1');
     expect(text).toContain('☀️ GetGranted chat — last 24h: 1 issue across 1 client.');
-    expect(text).toContain('• Wrong answers on deadlines — Co 44 — Deadline answers were wrong — Fadi (grant card data) — known, being fixed');
+    expect(text).toContain('• Wrong answers on deadlines — Co 44 — Deadline answers were wrong — Research (grant card data) — known, being fixed');
     // Oracle's words only: the client's own text is never in the DM.
     expect(text).not.toContain('that is wrong');
   });

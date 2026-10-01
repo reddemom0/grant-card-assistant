@@ -88,8 +88,9 @@ export function mergeClients(existing = [], added = [], cap = MAX_EXAMPLE_CLIENT
 export const isBeingFixed = (status) => /being fixed/i.test(String(status || ''));
 
 /**
- * Write today's issues. Each issue: {name, count, clients: string[], owner, existingRow?}.
- * Two issues matched to the same row are added to it together.
+ * Write today's issues. Each issue: {name, count, clients: string[], owner, existingRow?, source?, notes?}.
+ * Two issues matched to the same row are added to it together. source and notes
+ * are used only on a new row (default 'Oracle-detected' and blank).
  *
  * @returns {Promise<{updated: number, appended: number, failed: number, issues: Object[]}>}
  *   issues come back with seenBefore / beingFixed set from the row they matched
@@ -131,7 +132,7 @@ export async function writeIssues({ issues, rows, sheetId, userId, today, update
       range: 'A:I',
       values: fresh.map(i => [
         safeText(i.name), today, today, i.count, safeText(mergeClients([], i.clients).join(', ')), safeText(i.owner),
-        'new', '', 'Oracle-detected'
+        'new', safeText(i.notes || ''), safeText(i.source || 'Oracle-detected')
       ])
     });
     if (r?.success) appended = fresh.length; else failed += 1;

@@ -13,7 +13,7 @@ const SHEET = 'sheet123';
 const ROWS = [
   ['Chat times out', '2026-09-20', '2026-09-28', '7', 'Acme, Birch', 'Chris (AI behaviour)', 'being fixed', 'Chris on it', 'Oracle-detected'],
   [],
-  ['Wrong deadline on CDAP card', '2026-09-25', '2026-09-25', '1', 'Cedar', 'Fadi (grant card data)', 'new', '', 'reported by Steph']
+  ['Wrong deadline on CDAP card', '2026-09-25', '2026-09-25', '1', 'Cedar', 'Research (grant card data)', 'new', '', 'reported by Steph']
 ];
 const read = jest.fn(async () => ({ success: true, data: { values: ROWS } }));
 
@@ -64,6 +64,21 @@ test('a new issue is appended with Status "new" and Source "Oracle-detected"', a
     values: [['Asks for a person', '2026-10-01', '2026-10-01', 2, 'Fir, a client ·ab12', 'Client follow-up', 'new', '', 'Oracle-detected']]
   });
   expect(out.issues[0]).toMatchObject({ seenBefore: false, beingFixed: false });
+});
+
+test('a reported issue carries its own Source and Notes on a new row; a matched row still gets C–E only', async () => {
+  const update = jest.fn(async () => ({ success: true }));
+  const append = jest.fn(async () => ({ success: true }));
+  await writeIssues({
+    issues: [
+      { name: 'Region tag hides grant', count: 1, clients: ['Fir'], owner: 'Research (grant card data)', existingRow: null, source: 'reported by Steph', notes: '=fix the tag' },
+      { name: 'Chat times out', count: 1, clients: ['Fir'], owner: 'Jason (app/UI)', existingRow: 2, source: 'reported by Steph', notes: 'ignored' }
+    ],
+    rows: (await readIssueRows({ sheetId: SHEET, userId: 7, read: jest.fn(async () => ({ success: true, data: { values: ROWS } })) })).rows,
+    sheetId: SHEET, userId: 7, today: '2026-10-01', update, append
+  });
+  expect(append.mock.calls[0][1].values).toEqual([['Region tag hides grant', '2026-10-01', '2026-10-01', 1, 'Fir', 'Research (grant card data)', 'new', "'=fix the tag", 'reported by Steph']]);
+  expect(update.mock.calls[0][1].range).toBe('C2:E2');
 });
 
 test('a row number that is not in the sheet is treated as new', async () => {

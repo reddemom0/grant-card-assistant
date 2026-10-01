@@ -2390,6 +2390,46 @@ export const CHAT_HISTORY_TOOLS = [
 ];
 
 /**
+ * GetGranted client conversations (src/tools/gg3-conversations.js). Oracle-only —
+ * referenced in the internal-oracle case, not ORACLE_TOOLS, so the orchestrator
+ * never gets it. Loaded on demand (ORACLE_DEFERRED_TOOLS in src/claude/client.js),
+ * so the description carries the words tool search matches on. One tool with a
+ * required mode, like grant_data.
+ */
+export const GG3_CONVERSATIONS_TOOL = {
+  name: 'gg3_conversations',
+  description: `Read GetGranted (GG3) client chat conversations: what a client asked the GetGranted AI assistant, what it replied, and where the chat broke. Use for follow-ups on the Pulse morning roundup or the errors sheet, "what did client ·abcd ask", "who asked about hiring grants this week", and troubleshooting a client complaint ("matches didn't make sense", "chat broke"). Read-only, except mode "log_issue", which adds or updates one row in the errors sheet.
+
+Clients are identified by the short ref from the roundup ("·abcd", "a client ·abcd") or a full Clerk id ("user_…"). A company name in "name" is tried as a text search; when it isn't found, the result says names can't be looked up yet — ask for the ref. When a ref matches several clients the result lists candidates with longer refs: ask which one.
+
+Modes:
+- "read": one client's recent conversations (client or name; days default 30, max 90; limit default 3, max 5). Each has when, the mode, problems (failed turns in plain words), grants shown, and the transcript (client and assistant text, most recent part when long).
+- "search": conversations across all clients whose client messages contain every one of terms (1–5 words or phrases), in a date window: days (default 7) or from/to (YYYY-MM-DD). failed_only keeps chats with a failed turn. For "the one from this morning's roundup about X", use days 1, failed_only true and terms for X. Returns at most 10 inline; more than 10 also come back as a Google Sheet in the asker's Drive.
+- "troubleshoot": everything read returns (days default 14), plus complaint, the client's company when it can be looked up, grants (names or ids the client or asker mentioned, up to 3) with their place in the client's latest matching run and a match explanation when available, and the errors sheet's current issues. It writes nothing: work out the likely cause, owner and fix, then call log_issue.
+- "log_issue": name (short issue name, at most 8 words), take (likely cause and suggested fix, one or two lines), owner, client (the ref), existing_row (the sheet row when it is one of the issues troubleshoot listed, else null). Adds to an existing issue (last seen, count, clients only) or appends a new row reported by the asker.`,
+  input_schema: {
+    type: 'object',
+    properties: {
+      mode: { type: 'string', enum: ['read', 'search', 'troubleshoot', 'log_issue'] },
+      client: { type: 'string', description: 'The client ref ("·abcd") or full Clerk id.' },
+      name: { type: 'string', description: 'read/troubleshoot: a company name, when no ref is given. log_issue: the issue name.' },
+      days: { type: 'integer', description: 'How many days back to look (max 90).' },
+      limit: { type: 'integer', description: 'read: conversations to return (default 3, max 5).' },
+      terms: { type: 'array', items: { type: 'string' }, description: 'search: words or phrases that must all appear in the client\'s messages.' },
+      from: { type: 'string', description: 'search: first day, YYYY-MM-DD.' },
+      to: { type: 'string', description: 'search: last day, YYYY-MM-DD (inclusive).' },
+      failed_only: { type: 'boolean', description: 'search: only chats where a turn failed.' },
+      complaint: { type: 'string', description: 'troubleshoot: what was reported, in a line.' },
+      grants: { type: 'array', items: { type: 'string' }, description: 'troubleshoot: grant names or GG3 ids in question (up to 3).' },
+      take: { type: 'string', description: 'log_issue: likely cause and suggested fix.' },
+      owner: { type: 'string', enum: ['Chris (AI behaviour)', 'Research (grant card data)', 'Jason (app/UI)', 'Client follow-up'], description: 'log_issue: who should look at it.' },
+      existing_row: { type: ['integer', 'null'], description: 'log_issue: the errors sheet row this belongs to, or null for a new issue.' }
+    },
+    required: ['mode']
+  }
+};
+
+/**
  * Tracked cards (src/cards/). Oracle-only — referenced in the internal-oracle
  * case and nowhere else. Who reviews, which Docs, and where the card goes all
  * come from the verified Chat event (executeToolCall options), not from input.
@@ -2983,7 +3023,9 @@ export function getToolsForAgent(agentType) {
       // should be able to reach it.
       // TRACKED_CARD_TOOLS likewise: it posts cards into Chat threads from a
       // verified Chat event and has no meaning anywhere else.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS];
+      // GG3_CONVERSATIONS_TOOL likewise: client conversations are for the team
+      // through Oracle only, not for the orchestrator.
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);

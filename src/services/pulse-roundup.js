@@ -56,7 +56,7 @@ const TAKE_CHARS = 160;
 const NAME_CHARS = 60;
 
 export const FLAGS = ['repeated_question', 'pushback', 'asked_for_human', 'left_unanswered'];
-export const OWNERS = ['Chris (AI behaviour)', 'Fadi (grant card data)', 'Jason (app/UI)', 'Client follow-up'];
+export const OWNERS = ['Chris (AI behaviour)', 'Research (grant card data)', 'Jason (app/UI)', 'Client follow-up'];
 const FLAG_WORDS = {
   repeated_question: 'asked again',
   pushback: 'pushed back',
@@ -168,7 +168,7 @@ const REVIEW_SYSTEM = [
   '- asked_for_human: the CLIENT asked for a person, a human, a call, or help@granted.ca. The assistant mentioning help@granted.ca is NOT this flag.',
   '- left_unanswered: the conversation ends on an assistant reply that did not answer the client\'s question, and the client said nothing after it.',
   'Leaving on its own is NOT a flag: a client who got an answer and left is fine. A normal, helpful chat has no flags.',
-  'Owner: "Chris (AI behaviour)" for how the assistant answered; "Fadi (grant card data)" when a grant\'s facts were wrong or missing; "Jason (app/UI)" for the app itself; "Client follow-up" when the client needs a person to reach out.',
+  'Owner: "Chris (AI behaviour)" for how the assistant answered; "Research (grant card data)" when a grant\'s facts were wrong or missing; "Jason (app/UI)" for the app itself; "Client follow-up" when the client needs a person to reach out.',
   UNTRUSTED_DATA_INSTRUCTION
 ].join('\n');
 

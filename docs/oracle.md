@@ -227,23 +227,26 @@ A gated tool there either gets `confirmed: true` from the model or fails.
 ## Tool loadout
 
 From the `internal-oracle` case in `getToolsForAgent` (`src/tools/definitions.js`).
-58 tools; a normal turn is sent 57, because `toolsForRun` in `src/claude/client.js` drops
+59 tools; a normal turn is sent 58, because `toolsForRun` in `src/claude/client.js` drops
 the run-only `save_team_lesson` unless `allowedTools` names it. Oracle builds
 `oracleBaseTools` from scratch rather than reusing shared `baseTools`.
 
 **Tools on demand (Sonnet 5.5 path only).** `withToolSearch` in `src/claude/client.js`
-sends the 23 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
+sends the 24 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
 Anthropic's tool search (`tool_search_tool_bm25`), so rarely used tools stay out of the
 cached prefix until Claude searches for them. The list is the tools used in 2 or fewer
 conversations over the 30 days to 2026-09-29. `track_review` and `read_chat_attachments`
-qualified but stay loaded: the review card and Chat file uploads depend on them. Oracle's
+qualified but stay loaded: the review card and Chat file uploads depend on them.
+`gg3_conversations` was deferred from the start. Oracle's
 Haiku tiers, the HubSpot webhook, and runs restricted by `allowedTools` (/learn-this,
 lesson runs) send the full list unchanged. Search results are dropped from reloaded
 history (`historyForRequest`), so a later turn searches again.
 
 Included: `SERVER_TOOLS`, `MEMORY_TOOLS`, `LOAD_SKILL_TOOL`, `ORACLE_TOOLS` (9),
 Drive (2), Dropbox read (1), `coreHubSpotTools` (18 of 36), Granola (5), Sheets
-read/write (4), Calendar (4), `create_google_doc` only, and `GOOGLE_DOCS_EDIT_TOOLS` (3).
+read/write (4), Calendar (4), `create_google_doc` only, `GOOGLE_DOCS_EDIT_TOOLS` (3), and `gg3_conversations`
+(GetGranted client chats: read, search, troubleshoot, log to the Pulse errors sheet;
+`src/tools/gg3-conversations.js`).
 
 Excluded, with reasons in code:
 - `ANTHROPIC_MEMORY_TOOL` — wastes iterations on an empty directory. Postgres

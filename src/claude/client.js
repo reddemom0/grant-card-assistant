@@ -187,7 +187,8 @@ export function toolsForRun(agentType, allowedTools = null) {
 // On Oracle's Sonnet 5.5 requests they are sent with defer_loading, so they stay
 // out of the cached prefix until tool search finds them. track_review and
 // read_chat_attachments qualified but stay loaded: the review card and Chat file
-// uploads depend on them.
+// uploads depend on them. gg3_conversations (GetGranted client chats) is new and
+// deferred from the start; its description carries the words search matches on.
 export const ORACLE_DEFERRED_TOOLS = [
   'create_hubspot_company', 'update_hubspot_company', 'create_hubspot_contact',
   'update_hubspot_contact', 'associate_contact_with_company', 'create_hubspot_deal',
@@ -197,7 +198,8 @@ export const ORACLE_DEFERRED_TOOLS = [
   'update_calendar_event',
   'search_federal_grants_aggregate', 'get_program_stats', 'read_dropbox_file',
   'granola_list_meeting_folders', 'memory_list', 'get_recent_granted_ca_post',
-  'append_sheet_row', 'insert_into_google_doc'
+  'append_sheet_row', 'insert_into_google_doc',
+  'gg3_conversations'
 ];
 
 export const TOOL_SEARCH_TOOL = { type: 'tool_search_tool_bm25_20251119', name: 'tool_search_tool_bm25' };

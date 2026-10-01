@@ -804,6 +804,15 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
       }
 
+      case 'gg3_conversations': {
+        const { runGg3Conversations } = await import('./gg3-conversations.js');
+        result = await runGg3Conversations(input, {
+          userId,
+          chatContext: options.chatContext || { surface: 'none' }
+        });
+        break;
+      }
+
       case 'search_getgranted': {
         const { searchGetGranted } = await import('./getgranted-search.js');
 
