@@ -110,6 +110,7 @@ jest.unstable_mockModule('../../src/tools/hubspot.js', () => fakes.hubspot.modul
 jest.unstable_mockModule('../../src/tools/pending-actions.js', () => fakes.gate.module);
 jest.unstable_mockModule('../../src/tools/directory-names.js', () => fakes.directory.module);
 jest.unstable_mockModule('../../src/tools/google-calendar.js', () => fakes.calendar.module);
+jest.unstable_mockModule('../../src/cards/interpret.js', () => fakes.interpret.module);
 
 const { handleGoogleChatEvent } = await import('../../src/api/chat-google.js');
 const { handleCardClick, whenCardsIdle } = await import('../../src/cards/actions.js');
@@ -273,6 +274,146 @@ afterEach(async () => {
 // ============================================================================
 // STARTING
 // ============================================================================
+
+// ============================================================================
+// THE HAIKU STEP (src/cards/interpret.js, faked here — its own tests are in
+// card-interpret.test.js). The fake answers ok: false unless a test sets impl,
+// so every other test in this file is the rule-based card, unchanged.
+// ============================================================================
+
+describe('reading the ask with the interpreter', () => {
+  const TOP = `${SPACE}/threads/TOP`;
+  const DOC_ID = 'DOC1234567890abc';
+  // The card links the doc's address as matched in the text (without /edit).
+  const DOC_URL = `https://docs.google.com/document/d/${DOC_ID}`;
+  const TEAM_ASK = `/track show me an example for if i want the full team to read through this: ${DOC_URL}/edit`;
+  const TEAM_WORDS = TEAM_ASK.replace(/^\/track\s+/, '');
+
+  async function trackTeamAsk() {
+    const name = `${SPACE}/messages/cmd-top`;
+    setThread([chatMessage({ id: 'cmd-top', sender: CHRIS, text: TEAM_ASK })], TOP);
+    await command({ thread: TOP, name, text: TEAM_ASK });
+    return liveCard();
+  }
+
+  const readingAsk = async () => ({
+    ok: true,
+    fields: { title: 'Team reads Oracle guide', shape: 'everyone', feedback: false, holderId: null, due: undefined },
+    buttons: { shape: 'everyone', ids: ['track.done', 'track.help'] }
+  });
+
+  test('"the full team to read through this: <Doc>" → everyone, a real title, the Doc link, reading buttons only', async () => {
+    fakes.drive.docs.set(DOC_ID, { name: 'Oracle guide', openComments: 0 });
+    fakes.interpret.impl = readingAsk;
+
+    const card = await trackTeamAsk();
+
+    // What the interpreter was given: the ask's words, its people, its links — as the asker.
+    expect(fakes.interpret.calls).toHaveLength(1);
+    expect(fakes.interpret.calls[0]).toMatchObject({
+      cardType: 'track', askText: TEAM_WORDS, mentions: [], links: [{ fileId: DOC_ID, name: null, url: DOC_URL }]
+    });
+    expect(fakes.drive.nameCalls).toEqual([{ fileId: DOC_ID, userEmail: EMAILS[CHRIS] }]);
+
+    expect(card.title).toBe('Team reads Oracle guide');
+    expect(card.data).toMatchObject({
+      shape: 'everyone', feedback: false, interpreted: true,
+      buttons: { shape: 'everyone', ids: ['track.done', 'track.help'] },
+      docs: [{ fileId: DOC_ID, name: 'Oracle guide', url: DOC_URL }],
+      ball: { state: 'unassigned' }
+    });
+    expect(Object.keys(await members(card.id)).sort()).toEqual([JASON, NAT, STEPH].sort());
+
+    const cardsV2 = cardPosts()[0].cardsV2;
+    expect(cardsV2[0].card.header).toEqual({ title: 'Team reads Oracle guide', subtitle: `Track · asked by ${NAMES[CHRIS]} · Everyone` });
+    expect(cardText(cardsV2)).toContain(`<a href="${DOC_URL}">Open doc: Oracle guide</a>`);
+    expect(buttonTexts(cardsV2)).toEqual(['I’ve done it', 'I need help', 'Refresh', 'Switch to one ball']);
+    expect(logged()).toContain('interpreted: yes, docs: 1');
+
+    // The choice is on the card row: Refresh re-renders with the same buttons.
+    await press(card, 'track.refresh', CHRIS);
+    await whenCardsIdle();
+    expect(buttonTexts(lastPatch())).toEqual(['I’ve done it', 'I need help', 'Refresh', 'Switch to one ball']);
+    expect(cardText(lastPatch())).toContain('Open doc: Oracle guide');
+
+    // After Switch the other shape shows its full set; switching back restores the choice.
+    await press(card, 'track.switch', CHRIS);
+    await whenCardsIdle();
+    expect(buttonTexts(lastPatch())).toEqual([
+      'I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…',
+      'Record decision', 'Resolved', 'Refresh', 'Switch to everyone'
+    ]);
+  });
+
+  test('a one-ball ask with an @mention and a due date: the holder, the date and a model title', async () => {
+    const at = new Date('2030-10-01T17:00:00-07:00');
+    fakes.interpret.impl = async ({ mentions }) => ({
+      ok: true,
+      fields: { title: 'Jason sends sector list', shape: 'one', feedback: false, holderId: mentions[0].chatUserId, due: { at, label: 'by Oct 1, 2030', hasTime: true } },
+      buttons: { shape: 'one', ids: ['track.take', 'track.pass', 'track.resolve'] }
+    });
+
+    await command();
+    const card = await liveCard();
+
+    expect(fakes.interpret.calls[0].mentions).toEqual([{ chatUserId: JASON, name: NAMES[JASON] }]);
+    expect(card.title).toBe('Jason sends sector list');
+    expect(card.data).toMatchObject({
+      shape: 'one', ball: { state: 'person', holder: { chatUserId: JASON } },
+      due: { label: 'by Oct 1, 2030', hasTime: true }, docs: []
+    });
+    expect(new Date(card.due_at).toISOString()).toBe(at.toISOString());
+    expect(buttonTexts(cardPosts()[0].cardsV2)).toEqual(['I’ll take it', 'Pass to…', 'Resolved', 'Refresh', 'Switch to everyone']);
+    expect(dmsTo('spaces/DM-JASON')).toEqual([`${NAMES[NAT]} passed you the ball on “Jason sends sector list”. https://chat.google.com/room/TEAM/T1`]);
+  });
+
+  test('forced fallback: the interpreter fails, so the card is the rule-based one, and it is logged', async () => {
+    fakes.drive.docs.set(DOC_ID, { name: 'Oracle guide', openComments: 0 });
+    fakes.interpret.impl = async () => ({ ok: false, code: 'call_failed_timeout' });
+
+    const card = await trackTeamAsk();
+
+    expect(card.title).toBe(TEAM_WORDS.slice(0, 99) + '…');
+    expect(card.data).toMatchObject({ shape: 'one', interpreted: false, buttons: null, ball: { state: 'unassigned' } });
+    const cardsV2 = cardPosts()[0].cardsV2;
+    expect(cardsV2[0].card.header.subtitle).toBe(`Track · asked by ${NAMES[CHRIS]} · One ball`);
+    expect(buttonTexts(cardsV2)).toEqual([
+      'I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…',
+      'Record decision', 'Resolved', 'Refresh', 'Switch to everyone'
+    ]);
+    // The doc link does not depend on the model.
+    expect(cardText(cardsV2)).toContain(`<a href="${DOC_URL}">Open doc: Oracle guide</a>`);
+    expect(logged()).toContain('Track interpreter fallback — code: call_failed_timeout');
+    expect(logged()).toContain('interpreted: no, docs: 1');
+  });
+
+  test('a doc whose name can’t be read still gets a plain Open doc link', async () => {
+    fakes.interpret.impl = readingAsk;
+    const card = await trackTeamAsk();
+    expect(card.data.docs).toEqual([{ fileId: DOC_ID, name: null, url: DOC_URL }]);
+    expect(cardText(cardPosts()[0].cardsV2)).toContain(`<a href="${DOC_URL}">Open doc</a>`);
+  });
+
+  test('a Drive chip and an attachment on the ask count as links, with Chat’s own name when it gives one', async () => {
+    fakes.interpret.impl = readingAsk;
+    const name = `${SPACE}/messages/cmd-top`;
+    const text = '/track team, please read these by Friday';
+    setThread([{
+      ...chatMessage({ id: 'cmd-top', sender: CHRIS, text }),
+      attachment: [{ contentName: 'Budget sheet', source: 'DRIVE_FILE', driveDataRef: { driveFileId: 'SHEET1234567890' } }],
+      annotations: [{ type: 'RICH_LINK', richLinkMetadata: { uri: DOC_URL, richLinkType: 'DRIVE_FILE', driveLinkData: { driveDataRef: { driveFileId: DOC_ID } } } }]
+    }], TOP);
+    fakes.drive.docs.set(DOC_ID, { name: 'Oracle guide', openComments: 0 });
+    await command({ thread: TOP, name, text });
+
+    const card = await liveCard();
+    expect(card.data.docs).toEqual([
+      { fileId: 'SHEET1234567890', name: 'Budget sheet', url: 'https://drive.google.com/open?id=SHEET1234567890' },
+      { fileId: DOC_ID, name: 'Oracle guide', url: DOC_URL }
+    ]);
+    expect(fakes.drive.nameCalls).toEqual([{ fileId: DOC_ID, userEmail: EMAILS[CHRIS] }]);   // the attachment's name came with it
+  });
+});
 
 describe('starting to track', () => {
   test('/track in a thread tracks its first message: one card, answered with {} and no model', async () => {

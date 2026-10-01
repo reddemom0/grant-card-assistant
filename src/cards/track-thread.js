@@ -22,6 +22,7 @@ import { isListenSpace, listenReady } from '../chat-listen/config.js';
 import { getListenSpace, listThreadMessages } from '../database/chat-listen-store.js';
 import { listHumanMembers } from './chat-api.js';
 import { realPeople } from './people.js';
+import { driveFilesOf } from './doc-links.js';
 
 const MAX_THREAD_MESSAGES = 100;
 /** How far back to look when a thread cannot say what a card is about. */
@@ -50,7 +51,8 @@ export function normalizeMessage(m) {
     mentions,
     mentionsAll,
     text: m?.text || m?.argumentText || '',
-    at: m?.createTime || null
+    at: m?.createTime || null,
+    driveFiles: driveFilesOf(m)
   };
 }
 

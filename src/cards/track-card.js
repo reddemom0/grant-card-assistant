@@ -35,6 +35,9 @@ import { trackedCard, paragraph, button, esc, clip, threadLink, messageLink, mdT
 import { detectShape, isFeedbackAsk, parseDueDate, pickHolder, typedCommand } from './track-parse.js';
 import { suggestBall, draftDecision } from './track-suggest.js';
 import { readThread, readAsk, listSpaceHumans, storedCopyLive, normalizeMessage } from './track-thread.js';
+import { interpretAsk } from './interpret.js';
+import { driveFilesOf, openUrl } from './doc-links.js';
+import { getDriveFileName } from '../tools/google-drive.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export const QUIET_AFTER_DAYS = 3;
@@ -43,6 +46,7 @@ export const CLIENT_NUDGE_AFTER_DAYS = 5;
 export const SUBJECT_MAX_AGE_MS = 30 * 60 * 1000;
 const TITLE_CHARS = 100;
 const TEXT_CHARS = 1000;
+const DOC_NAME_CHARS = 80;
 const SUMMARY_RESPONSE_CHARS = 150;
 const MAX_NAMES = 8;
 const DISPLAY_TZ = process.env.DEFAULT_TIMEZONE || 'America/Vancouver';
@@ -134,6 +138,18 @@ function htmlToPlain(html) {
 function firstLine(text) {
   const line = String(text || '').split(/\n/).map(l => l.trim()).find(Boolean) || '';
   return clip(mdToPlain(line), TITLE_CHARS) || 'Tracked ask';
+}
+
+/**
+ * The ask's linked Drive files, each with a name read as the asker — or none
+ * when it can't be read, so the card shows a plain "Open doc" link instead.
+ */
+async function docsFor(links, askerEmail) {
+  return Promise.all((links || []).map(async (l) => ({
+    fileId: l.fileId,
+    name: l.name || (askerEmail ? await getDriveFileName(l.fileId, askerEmail).catch(() => null) : null),
+    url: openUrl(l)
+  })));
 }
 
 function cleanText(text) {
@@ -256,11 +272,46 @@ export async function createTrack({
     lookupAsUserId: userId
   });
   const timeZone = await timeZoneFor(ownerPerson, now);
-  const due = parseDueDate(ask.text, timeZone, ask.at ? new Date(ask.at) : now);
-  const shape = detectShape(ask.text, ask.mentionsAll);
-  const feedback = shape === 'everyone' && isFeedbackAsk(ask.text);
+  const askAt = ask.at ? new Date(ask.at) : now;
   const mentioned = await realPeople((ask.mentions || []).filter(m => m.chatUserId !== askedBy.chatUserId), userId);
-  const holder = pickHolder(mentioned);
+
+  // The rules first — they are the card whenever the model step can't be used.
+  let due = parseDueDate(ask.text, timeZone, askAt);
+  let shape = detectShape(ask.text, ask.mentionsAll);
+  let feedback = shape === 'everyone' && isFeedbackAsk(ask.text);
+  let holder = pickHolder(mentioned);
+  let title = firstLine(ask.text);
+  let chosenButtons = null;
+
+  // The model step and the doc names run side by side; neither can block the card.
+  const links = ask.driveFiles || driveFilesOf({ text: ask.text });
+  const askerEmail = actor.email
+    || (askedBy.chatUserId === actor.chatUserId ? ownerPerson?.email : null)
+    || (await resolvePerson(actor.chatUserId, { displayName: actor.name, userId, lookupAsUserId: userId }).catch(() => null))?.email
+    || null;
+  const [model, docs] = await Promise.all([
+    interpretAsk({
+      cardType: 'track',
+      askText: ask.text,
+      mentions: mentioned.map(m => ({ chatUserId: m.chatUserId, name: m.displayName || null })),
+      links,
+      timeZone,
+      now: askAt
+    }).catch(err => ({ ok: false, code: `threw_${codeOf(err)}` })),
+    docsFor(links, askerEmail)
+  ]);
+  if (model.ok) {
+    const f = model.fields;
+    if (f.title !== undefined) title = f.title;
+    if (f.shape !== undefined) shape = f.shape;
+    if (f.shape !== undefined || f.feedback !== undefined) feedback = shape === 'everyone' && (f.feedback ?? isFeedbackAsk(ask.text));
+    if (f.holderId !== undefined) holder = f.holderId ? pickHolder(mentioned.filter(m => m.chatUserId === f.holderId)) : null;
+    if (f.due !== undefined) due = f.due.at ? f.due : null;
+    if (model.buttons?.shape === shape) chosenButtons = model.buttons;
+    if (f.shape === 'everyone') holder = null;
+  } else {
+    console.log(`🗂️  Track interpreter fallback — code: ${model.code}`);
+  }
 
   let checklist = { built: false, code: null };
   let everyone = [];
@@ -275,7 +326,6 @@ export async function createTrack({
   const ball = holder
     ? { state: 'person', holder, since, by, source: ask.name, guess: false }
     : { state: 'unassigned', holder: null, since, by, source: ask.name, guess: false };
-  const title = firstLine(ask.text);
   const data = {
     surface,
     requesterName: askedBy.name,
@@ -293,7 +343,10 @@ export async function createTrack({
     checklist,
     shown: {},
     busy: null,
-    notice: null
+    notice: null,
+    interpreted: model.ok,
+    buttons: chosenButtons,
+    docs
   };
 
   let card = offer
@@ -332,7 +385,7 @@ export async function createTrack({
     ok: true,
     code: null,
     card,
-    stats: `, shape: ${shape}, holder: ${holder ? 'yes' : 'no'}, people: ${everyone.length}, due: ${due ? 'yes' : 'no'}, subject: ${subjectFrom}`
+    stats: `, shape: ${shape}, holder: ${holder ? 'yes' : 'no'}, people: ${everyone.length}, due: ${due ? 'yes' : 'no'}, subject: ${subjectFrom}, interpreted: ${model.ok ? 'yes' : 'no'}, docs: ${docs.length}`
   });
 }
 
@@ -1020,6 +1073,10 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
     sections.push({ widgets: [paragraph(lines.join('<br>'))] });
   }
 
+  const docLines = (d.docs || []).filter(doc => doc.url).map(doc =>
+    `<a href="${esc(doc.url)}">${doc.name ? `Open doc: ${esc(clip(mdToPlain(doc.name), DOC_NAME_CHARS))}` : 'Open doc'}</a>`);
+  if (docLines.length) sections.push({ widgets: [paragraph(docLines.join('<br>'))] });
+
   const suggestion = suggestionLine(card);
   if (suggestion && isLive(card)) sections.push({ widgets: [paragraph(suggestion)] });
 
@@ -1027,6 +1084,11 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
   const dialog = (text, action, opts = {}) => button(text, { cardId: id, action }, { ...opts, openDialog: dialogsEnabled() && !opts.disabled });
   const refreshing = busy?.kind === 'refresh';
   const buttons = [];
+  // The buttons chosen for this ask when the card was set up, for the shape
+  // they were chosen for; after a Switch the other shape shows its full set.
+  // Only the pool is filtered — state buttons, Refresh and Switch always show.
+  const chosen = d.buttons?.shape === d.shape && Array.isArray(d.buttons.ids) ? new Set(d.buttons.ids) : null;
+  const offered = (...ids) => !chosen || ids.some(i => chosen.has(i));
 
   if (d.suggestion && isLive(card)) {
     buttons.push(d.suggestion.state === 'decided'
@@ -1036,21 +1098,25 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
   }
 
   if (everyone) {
-    buttons.push(d.feedback
-      ? dialog('Submit response', 'track.respond')
-      : button('I’ve done it', { cardId: id, action: 'track.done' }));
-    buttons.push(button('I need help', { cardId: id, action: 'track.help' }));
-    buttons.push(dialog('Remove people…', 'track.remove'));
+    // One slot: the model may name either id, the ask decides which shows.
+    if (offered('track.done', 'track.respond')) {
+      buttons.push(d.feedback
+        ? dialog('Submit response', 'track.respond')
+        : button('I’ve done it', { cardId: id, action: 'track.done' }));
+    }
+    if (offered('track.help')) buttons.push(button('I need help', { cardId: id, action: 'track.help' }));
+    if (offered('track.remove')) buttons.push(dialog('Remove people…', 'track.remove'));
   } else {
     if (b.guess) buttons.push(button('Not right', { cardId: id, action: 'track.not_right' }));
-    buttons.push(button('I’ll take it', { cardId: id, action: 'track.take' }));
-    buttons.push(dialog('Pass to…', 'track.pass'));
-    buttons.push(button('Waiting on client', { cardId: id, action: 'track.client' }, { disabled: b.state === 'client' }));
-    buttons.push(button('Call needed', { cardId: id, action: 'track.call' }, { disabled: b.state === 'call' }));
+    if (offered('track.take')) buttons.push(button('I’ll take it', { cardId: id, action: 'track.take' }));
+    if (offered('track.pass')) buttons.push(dialog('Pass to…', 'track.pass'));
+    // A state the card is in keeps its (disabled) button, so the label still shows it.
+    if (offered('track.client') || b.state === 'client') buttons.push(button('Waiting on client', { cardId: id, action: 'track.client' }, { disabled: b.state === 'client' }));
+    if (offered('track.call') || b.state === 'call') buttons.push(button('Call needed', { cardId: id, action: 'track.call' }, { disabled: b.state === 'call' }));
     if (b.state === 'call' && meetAvailable()) buttons.push(button('Schedule call', { cardId: id, action: 'track.schedule' }));
-    buttons.push(dialog('Someone promised…', 'track.promise'));
-    if (!d.suggestion || d.suggestion.state !== 'decided') buttons.push(dialog('Record decision', 'track.decision'));
-    buttons.push(button('Resolved', { cardId: id, action: 'track.resolve' }));
+    if (offered('track.promise')) buttons.push(dialog('Someone promised…', 'track.promise'));
+    if (offered('track.decision') && (!d.suggestion || d.suggestion.state !== 'decided')) buttons.push(dialog('Record decision', 'track.decision'));
+    if (offered('track.resolve')) buttons.push(button('Resolved', { cardId: id, action: 'track.resolve' }));
   }
   buttons.push(refreshing
     ? button('Reading…', { cardId: id, action: 'track.refresh' }, { disabled: true })

@@ -13,7 +13,11 @@
  *   gate      — src/tools/pending-actions.js: save supersedes, run claims a
  *               pending unexpired row once, and executes through hubspot.
  *   chat      — src/cards/chat-api.js: records posts and patches; DM spaces.
- *   drive     — getDocCommentSummary from src/tools/google-drive.js.
+ *   drive     — getDocCommentSummary and getDriveFileName from
+ *               src/tools/google-drive.js (names come from the same docs map).
+ *   interpret — src/cards/interpret.js (the Haiku step). By default it answers
+ *               { ok: false, code: 'fake' }, so cards use the rules exactly as
+ *               before; a test sets `impl` to return model fields.
  *   hubspot   — searchGrantApplications / createDealNote, plus the lead card's
  *               reads and its one gated write (leadCrmSnapshot, listHubSpotOwners,
  *               recordLeadOutcome).
@@ -63,7 +67,8 @@ export function createTrackedCardFakes() {
     clickSeq: 0
   };
   const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null, failPost: null, members: new Map(), memberCalls: [] };
-  const driveState = { docs: new Map(), calls: [], hold: null };
+  const driveState = { docs: new Map(), calls: [], nameCalls: [], hold: null };
+  const interpretState = { calls: [], impl: null };
   const hubspotState = {
     deals: [], searches: [], notes: [], failNote: false,
     // Lead triage: what the CRM knows, and what the card wrote to it.
@@ -587,6 +592,11 @@ export function createTrackedCardFakes() {
         }
         return { fileId, name: doc.name, openComments: doc.openComments, readable: true };
       },
+      async getDriveFileName(fileId, userEmail) {
+        driveState.nameCalls.push({ fileId, userEmail });
+        const doc = driveState.docs.get(fileId);
+        return doc && doc.readable !== false ? doc.name ?? null : null;
+      },
       // What src/tools/chat-attachments.js imports (the Chat adapter loads it).
       // Card tests send no attachments; these only have to exist.
       MAX_DOWNLOAD_BYTES: 10 * 1024 * 1024,
@@ -795,6 +805,18 @@ export function createTrackedCardFakes() {
     }
   };
 
+  const interpret = {
+    ...interpretState,
+    module: {
+      async interpretAsk(args) {
+        interpretState.calls.push(args);
+        if (interpretState.impl) return interpretState.impl(args);
+        return { ok: false, code: 'fake' };
+      },
+      interpreterEnabled: () => true
+    }
+  };
+
   const messages = {
     ...messagesState,
     module: {
@@ -808,6 +830,7 @@ export function createTrackedCardFakes() {
   // Spread copies above share the arrays/maps with the *State objects; impl and
   // failure switches are set on the State objects, reached through setters.
   Object.defineProperty(agent, 'impl', { get: () => agentState.impl, set: (v) => { agentState.impl = v; } });
+  Object.defineProperty(interpret, 'impl', { get: () => interpretState.impl, set: (v) => { interpretState.impl = v; } });
   Object.defineProperty(chat, 'failPatch', { get: () => chatState.failPatch, set: (v) => { chatState.failPatch = v; } });
   Object.defineProperty(chat, 'failPost', { get: () => chatState.failPost, set: (v) => { chatState.failPost = v; } });
   Object.defineProperty(drive, 'hold', { get: () => driveState.hold, set: (v) => { driveState.hold = v; } });
@@ -906,7 +929,10 @@ export function createTrackedCardFakes() {
     chatState.failPost = null;
     driveState.docs.clear();
     driveState.calls.length = 0;
+    driveState.nameCalls.length = 0;
     driveState.hold = null;
+    interpretState.calls.length = 0;
+    interpretState.impl = null;
     hubspotState.deals.length = 0;
     hubspotState.searches.length = 0;
     hubspotState.notes.length = 0;
@@ -951,7 +977,7 @@ export function createTrackedCardFakes() {
     userChatState.failWith = null;
   }
 
-  return { db, store, gate, chat, drive, hubspot, leadGen, grants, directory, calendar, granola, agent, messages, listen, userChat, reset };
+  return { db, store, gate, chat, drive, hubspot, leadGen, grants, directory, calendar, granola, agent, interpret, messages, listen, userChat, reset };
 }
 
 // ============================================================================

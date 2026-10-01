@@ -695,6 +695,32 @@ export async function copyTemplateFile(templateFileIdOrName, newFileName, target
  * @param {string|null} userEmail - person to read as
  * @returns {Promise<{fileId: string, name: string|null, openComments: number|null, readable: boolean, code?: string}>}
  */
+/**
+ * A Drive file's name, read as `userEmail` (domain-wide delegation), so it is
+ * only found when that person can open the file. Only @granted.ca addresses are
+ * impersonated. Never throws: null when the name can't be read.
+ *
+ * @param {string} fileId
+ * @param {string} userEmail
+ * @param {{timeoutMs?: number}} [opts]
+ * @returns {Promise<string|null>}
+ */
+export async function getDriveFileName(fileId, userEmail, { timeoutMs = 3000 } = {}) {
+  if (!fileId || !GOOGLE_SERVICE_ACCOUNT_KEY || !/@granted\.ca$/i.test(String(userEmail || ''))) return null;
+  try {
+    const drive = createDriveClient(userEmail, true);
+    const res = await drive.files.get(
+      { fileId, fields: 'name', supportsAllDrives: true },
+      { timeout: timeoutMs }
+    );
+    return res.data?.name || null;
+  } catch (err) {
+    // Code only — Google's error text can carry the impersonated address.
+    console.warn(`⚠️  Drive file name unavailable — code: ${String(err?.code ?? err?.response?.status ?? 'unknown')}`);
+    return null;
+  }
+}
+
 export async function getDocCommentSummary(fileId, userEmail = null) {
   try {
     const drive = createDriveClient(userEmail, true);
