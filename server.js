@@ -61,6 +61,8 @@ import { startChatListen } from './src/chat-listen/jobs.js';
 import { startTrackedCards } from './src/cards/jobs.js';
 // Oracle's hourly copy of GG3 grant data (gg3_grants, migration 038)
 import { startGg3Refresh, gg3RefreshEndpoint } from './src/services/gg3-refresh.js';
+// GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
+import { startPulseSpike } from './src/services/pulse-spike.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
 // the number is known — see src/api/addon-probe.js.
 import { handleAddonProbe } from './src/api/addon-probe.js';
@@ -1304,6 +1306,15 @@ async function startServer() {
     // AI_API_BACKEND_URL and AI_API_BACKEND_TOKEN. Switch off with
     // GG3_REFRESH_DISABLED=true. Needs migration 038.
     startGg3Refresh(cron);
+
+    // ========================================================================
+    // CRON JOB: GetGranted Pulse chat spike alert (every 5 minutes)
+    // ========================================================================
+    // DMs PULSE_SPIKE_SUBSCRIBERS when GetGranted chat fails 2+ times in 15
+    // minutes, then stays quiet for 60. Reads the gg3-ai-service ops DB through
+    // GG3_OPS_DB_READONLY_URL. Not scheduled unless both are set. Needs
+    // migration 040.
+    startPulseSpike(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';
