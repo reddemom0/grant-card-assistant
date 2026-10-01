@@ -63,6 +63,7 @@ import { startTrackedCards } from './src/cards/jobs.js';
 import { startGg3Refresh, gg3RefreshEndpoint } from './src/services/gg3-refresh.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
+import { startPulseRoundup } from './src/services/pulse-roundup.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
 // the number is known — see src/api/addon-probe.js.
 import { handleAddonProbe } from './src/api/addon-probe.js';
@@ -1315,6 +1316,15 @@ async function startServer() {
     // GG3_OPS_DB_READONLY_URL. Not scheduled unless both are set. Needs
     // migration 040.
     startPulseSpike(cron);
+
+    // ========================================================================
+    // CRON JOB: GetGranted Pulse morning roundup (08:00 America/Vancouver)
+    // ========================================================================
+    // DMs PULSE_ROUNDUP_SUBSCRIBERS a grouped summary of the last 24h of client
+    // chat problems (only when there were any) and keeps the errors sheet
+    // (PULSE_ERRORS_SHEET_ID, written as PULSE_SHEET_OWNER_EMAIL) up to date.
+    // Not scheduled unless all of those and GG3_OPS_DB_READONLY_URL are set.
+    startPulseRoundup(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';
