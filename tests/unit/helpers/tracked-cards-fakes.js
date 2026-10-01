@@ -1012,6 +1012,26 @@ export function allCardStrings(cardsV2) {
   return out;
 }
 
+/**
+ * The card's footer row as people see it: the primary buttons, and the items
+ * of its "More" overflow menu (empty when it has none). Texts only.
+ */
+export function buttonRowOf(cardsV2) {
+  const row = [];
+  const walk = (v) => {
+    if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') {
+      if (Array.isArray(v.buttonList?.buttons)) row.push(...v.buttonList.buttons);
+      else Object.values(v).forEach(walk);
+    }
+  };
+  walk(cardsV2);
+  return {
+    primary: row.filter(b => !b.onClick?.overflowMenu).map(b => b.text),
+    more: row.filter(b => b.onClick?.overflowMenu).flatMap(b => b.onClick.overflowMenu.items.map(i => i.text))
+  };
+}
+
 /** Every button on a cardsV2 payload as {text, params, disabled}. */
 export function cardButtons(cardsV2) {
   const out = [];

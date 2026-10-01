@@ -136,6 +136,70 @@ weighing changes, but it is not an open hole.
   `confirmed_at` and `from_document`; apply it **before** deploying this code — until then
   team notes are unavailable and /learn-this cannot save.
 
+## Tracked cards
+
+Cards that live in a Chat thread and are updated in place. Rows are in `tracked_cards`
+(`src/database/tracked-cards-store.js`). Each card type's `render` builds the card, and
+`renderCard` / `rerenderCard` in `src/cards/update.js` call it with the stored row. Slash
+commands are registered in `src/cards/commands.js` (`registerAppCommand`). Each needs a
+matching Chat API command in the Cloud console.
+
+| Command | Card | What it does |
+|---|---|---|
+| `/track`, "@Oracle track this" | `src/cards/track-card.js` (`createTrack`) | Who has the ball on an ask, or (everyone shape) a checklist of the space |
+| `/meet`, "@Oracle find 30 min with @Name" | `src/cards/meet-card.js` (`createMeet`) | Three times everyone is free, read with the asker's Calendar grant; books one |
+| `/watch`, "@Oracle watch" | `src/cards/watch-card.js` (`startWatch` → `setUpWatch`) | Watches one funding program for date changes; one card per program per space |
+| `/review` | `src/cards/review-card.js` (`trackReview`) | "Track this as a review?". Oracle fills the card through the `track_review` tool |
+| `/help`, joining a space, a first DM | `src/cards/intro-card.js` (`postIntro`, `replyWithIntro`) | Fixed guide per space from `data/chat/space-guides.json`; no parsing |
+
+**Interpreter.**
+- `interpretAsk` in `src/cards/interpret.js` makes one Haiku call per new /track, /meet or
+  /watch card: `claude-haiku-4-5-20251001`, forced `card_fields` tool output, 6 s cap, no
+  retries.
+- The rules (`track-parse.js`, `meet-slots.js`, `watch-match.js`) still run first.
+- The model's validated fields replace the rule values one by one:
+  - track: title, shape, feedback, holder (must be @mentioned), due date
+  - meet: topic, plus length and window only when stated
+  - watch: program name (must appear in the post)
+- The ask is wrapped with `wrapToolOutput('chat_ask', …)` and `UNTRUSTED_DATA_INSTRUCTION`.
+  Links go in as names, never URLs.
+- It is off with `CARD_INTERPRETER=off`, without `ANTHROPIC_API_KEY`, and under a test runner
+  unless `CARD_INTERPRETER=on`. Card tests swap in `fakes.interpret`.
+- Review and intro are not interpreted.
+
+**Buttons.**
+- Each card type has a fixed pool (`BUTTON_POOLS`). The model's picks are filtered against
+  it and saved on the row (`data.buttons`), so Refresh and re-renders keep them.
+- /track's primaries are filtered for the shape they were picked for; after Switch the
+  other shape shows its full set.
+- Buttons that show the card's state (Confirm, Dismiss, Not right, Schedule call, a
+  disabled Waiting on client / Call needed) always show.
+- Refresh, Switch and Remove people… are always in the card's "More" overflow menu
+  (`moreMenu` in `src/cards/render.js`, the `more` argument of `trackedCard`). Each menu item
+  is a `button()` result, so a press reaches the same handler.
+- /meet's only optional button is "Ignore working hours". It can be dropped only while times
+  are shown, because the no-times text points to it.
+- /watch's buttons are not chosen.
+
+**Links.**
+- `driveFilesOf` in `src/cards/doc-links.js` finds Docs, Sheets, Slides and Drive files in a
+  message: URLs, rich-link chips, and files attached from Drive. Its URL pattern copies
+  `DRIVE_URL` in `chat-google.js`; keep the two in step.
+- `normalizeMessage` in `track-thread.js` attaches them as `driveFiles`.
+- /track shows each one as "Open doc: <name>". The name comes from Chat (an attachment's
+  `contentName`) or from `getDriveFileName` in `src/tools/google-drive.js`: the service
+  account acting as the asker, @granted.ca only, 3 s cap. When the name can't be read it
+  shows a plain "Open doc" link. A failure never blocks the card.
+- /review takes its documents from the same reader (`docLinks` in `commands.js`).
+
+**Fallback.**
+- An error, timeout, missing tool call or invalid answer returns `{ ok: false, code }`. The
+  card is then built from the rules exactly as before.
+- The log line is `Track interpreter fallback — code: …` (and the same for Meet and Watch).
+  /track's "Track card posted" line ends `interpreted: yes|no, docs: N`.
+- /meet started from a /track card's Schedule call is not interpreted, since its text is
+  already that card's title.
+
 ## Confirmation gate
 
 `CONFIRMATION_POLICY` in `src/tools/executor.js`, enforced pre-dispatch inside

@@ -12,7 +12,7 @@
  */
 
 import { jest } from '@jest/globals';
-import { createTrackedCardFakes, cardText, cardButtons, allCardStrings } from './helpers/tracked-cards-fakes.js';
+import { createTrackedCardFakes, cardText, cardButtons, allCardStrings, buttonRowOf } from './helpers/tracked-cards-fakes.js';
 
 const ENDPOINT = 'https://hub.example/api/chat/google';
 const ISSUER = 'addon@example.iam.gserviceaccount.com';
@@ -327,22 +327,23 @@ describe('reading the ask with the interpreter', () => {
     const cardsV2 = cardPosts()[0].cardsV2;
     expect(cardsV2[0].card.header).toEqual({ title: 'Team reads Oracle guide', subtitle: `Track · asked by ${NAMES[CHRIS]} · Everyone` });
     expect(cardText(cardsV2)).toContain(`<a href="${DOC_URL}">Open doc: Oracle guide</a>`);
-    expect(buttonTexts(cardsV2)).toEqual(['I’ve done it', 'I need help', 'Refresh', 'Switch to one ball']);
+    // The model left Remove people… out; it is in the More menu regardless.
+    expect(buttonRowOf(cardsV2)).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Remove people…'] });
     expect(logged()).toContain('interpreted: yes, docs: 1');
 
     // The choice is on the card row: Refresh re-renders with the same buttons.
     await press(card, 'track.refresh', CHRIS);
     await whenCardsIdle();
-    expect(buttonTexts(lastPatch())).toEqual(['I’ve done it', 'I need help', 'Refresh', 'Switch to one ball']);
+    expect(buttonRowOf(lastPatch())).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Remove people…'] });
     expect(cardText(lastPatch())).toContain('Open doc: Oracle guide');
 
     // After Switch the other shape shows its full set; switching back restores the choice.
     await press(card, 'track.switch', CHRIS);
     await whenCardsIdle();
-    expect(buttonTexts(lastPatch())).toEqual([
-      'I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…',
-      'Record decision', 'Resolved', 'Refresh', 'Switch to everyone'
-    ]);
+    expect(buttonRowOf(lastPatch())).toEqual({
+      primary: ['I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…', 'Record decision', 'Resolved'],
+      more: ['Refresh', 'Switch to everyone']
+    });
   });
 
   test('a one-ball ask with an @mention and a due date: the holder, the date and a model title', async () => {
@@ -363,7 +364,7 @@ describe('reading the ask with the interpreter', () => {
       due: { label: 'by Oct 1, 2030', hasTime: true }, docs: []
     });
     expect(new Date(card.due_at).toISOString()).toBe(at.toISOString());
-    expect(buttonTexts(cardPosts()[0].cardsV2)).toEqual(['I’ll take it', 'Pass to…', 'Resolved', 'Refresh', 'Switch to everyone']);
+    expect(buttonRowOf(cardPosts()[0].cardsV2)).toEqual({ primary: ['I’ll take it', 'Pass to…', 'Resolved'], more: ['Refresh', 'Switch to everyone'] });
     expect(dmsTo('spaces/DM-JASON')).toEqual([`${NAMES[NAT]} passed you the ball on “Jason sends sector list”. https://chat.google.com/room/TEAM/T1`]);
   });
 
@@ -377,10 +378,10 @@ describe('reading the ask with the interpreter', () => {
     expect(card.data).toMatchObject({ shape: 'one', interpreted: false, buttons: null, ball: { state: 'unassigned' } });
     const cardsV2 = cardPosts()[0].cardsV2;
     expect(cardsV2[0].card.header.subtitle).toBe(`Track · asked by ${NAMES[CHRIS]} · One ball`);
-    expect(buttonTexts(cardsV2)).toEqual([
-      'I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…',
-      'Record decision', 'Resolved', 'Refresh', 'Switch to everyone'
-    ]);
+    expect(buttonRowOf(cardsV2)).toEqual({
+      primary: ['I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…', 'Record decision', 'Resolved'],
+      more: ['Refresh', 'Switch to everyone']
+    });
     // The doc link does not depend on the model.
     expect(cardText(cardsV2)).toContain(`<a href="${DOC_URL}">Open doc: Oracle guide</a>`);
     expect(logged()).toContain('Track interpreter fallback — code: call_failed_timeout');
@@ -440,11 +441,14 @@ describe('starting to track', () => {
     const status = sections[0].widgets[0].textParagraph.text;
     expect(status).toMatch(new RegExp(`^With <b>${NAMES[JASON]}</b> · since \\w{3} \\d+<br>Due Tue, Oct 1<br>`));
     expect(status).toContain('<a href="https://chat.google.com/room/TEAM/T1/ask">based on this message</a>');
-    expect(buttonTexts(post.cardsV2)).toEqual([
-      'I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…',
-      'Record decision', 'Resolved', 'Refresh', 'Switch to everyone'
-    ]);
+    expect(buttonRowOf(post.cardsV2)).toEqual({
+      primary: ['I’ll take it', 'Pass to…', 'Waiting on client', 'Call needed', 'Someone promised…', 'Record decision', 'Resolved'],
+      more: ['Refresh', 'Switch to everyone']
+    });
     for (const b of cardButtons(post.cardsV2)) expect(b.fn).toBe(ENDPOINT);
+    // The More menu's items call back like buttons: same endpoint, same actions.
+    expect(cardButtons(post.cardsV2).filter(b => ['Refresh', 'Switch to everyone'].includes(b.text)).map(b => b.params))
+      .toEqual([{ cardId: expect.any(String), action: 'track.refresh' }, { cardId: expect.any(String), action: 'track.switch' }]);
 
     // The thread was read as the person who typed /track; the holder was told once.
     expect(fakes.userChat.calls[0]).toMatchObject({ userId: 3, parent: SPACE, filter: `thread.name = ${THREAD}`, pageSize: 1 });
@@ -682,7 +686,7 @@ describe('the holder and the shape', () => {
     expect(text).toContain('People in this space only through a Google Group aren’t listed.');
     expect(text).toMatch(/Still to do: [^<]*$/m);
     expect(/Still to do: ([^<\n]*)/.exec(text)[1]).not.toContain(NAMES[NAT]);   // the requester has no part
-    expect(buttonTexts(cardsV2)).toEqual(['I’ve done it', 'I need help', 'Remove people…', 'Refresh', 'Switch to one ball']);
+    expect(buttonRowOf(cardsV2)).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Remove people…'] });
   });
 
   test('Switch keeps the card; the everyone list is built once, after answering', async () => {

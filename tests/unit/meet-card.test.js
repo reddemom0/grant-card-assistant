@@ -98,6 +98,7 @@ jest.unstable_mockModule('../../src/chat-listen/config.js', () => ({
 }));
 jest.unstable_mockModule('../../src/database/chat-listen-store.js', () => fakes.listen.module);
 jest.unstable_mockModule('../../src/claude/client.js', () => fakes.agent.module);
+jest.unstable_mockModule('../../src/cards/interpret.js', () => fakes.interpret.module);
 jest.unstable_mockModule('../../src/database/messages.js', () => fakes.messages.module);
 jest.unstable_mockModule('../../src/database/tracked-cards-store.js', () => fakes.store);
 jest.unstable_mockModule('../../src/cards/chat-api.js', () => fakes.chat.module);
@@ -276,6 +277,27 @@ describe('finding times', () => {
 
     expect(call.userId).toBe(3);                       // Chris asked
     expect(call.emails).toEqual(expect.arrayContaining([EMAILS[CHRIS], EMAILS[NAT]]));
+  });
+
+  test('the interpreter names the topic, length and window, and can drop Ignore working hours', async () => {
+    fakes.interpret.impl = async () => ({
+      ok: true,
+      fields: { title: 'Grant budget sync', durationMinutes: 60, window: 'next week' },
+      buttons: { ids: [] }
+    });
+    await command({ text: '/meet can we sync on the grant budget, an hour or so, sometime next wk? @Nat strictly work hours', mentions: [NAT] });
+
+    const card = await liveCard();
+    expect(fakes.interpret.calls[0]).toMatchObject({ cardType: 'meet', mentions: [{ chatUserId: NAT }] });
+    expect(card).toMatchObject({ title: 'Grant budget sync' });
+    expect(card.data).toMatchObject({ topic: 'Grant budget sync', durationMinutes: 60, window: { words: 'next week' }, interpreted: true, buttons: { ids: [] } });
+
+    // With times found, the dropped button stays dropped.
+    const slot = { start: '2030-01-07T17:00:00Z', end: '2030-01-07T18:00:00Z', free: [], busyFor: [], marks: [] };
+    await fakes.store.patchCardData(card.id, { slots: [slot], busy: null });
+    const texts = cardButtons(await renderCard(await fakes.store.getCard(card.id))).map(b => b.text);
+    expect(texts).toContain('Try next week');
+    expect(texts).not.toContain('Ignore working hours');
   });
 
   test('/meet as a command does the same', async () => {

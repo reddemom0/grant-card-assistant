@@ -168,7 +168,76 @@ const SPECS = {
   }
 };
 
-export const BUTTON_POOLS = { track: TRACK_POOL };
+// --- meet --------------------------------------------------------------------
+// Meet's buttons follow the card's state (slots found, booked, rescheduling);
+// the only one an ask can make pointless is "Ignore working hours".
+const MEET_POOL = {
+  'meet.ignore_hours': 'Ignore working hours — look outside 9–5 (keep it unless the ask rules that out, e.g. "during work hours")'
+};
+const MEET_WINDOWS = ['today', 'tomorrow', 'this week', 'next week', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+
+SPECS.meet = {
+  schema: {
+    type: 'object',
+    properties: {
+      topic: { type: 'string', description: '2–8 word topic for the call, e.g. "Budget review with client". Never copy the message.' },
+      duration_minutes: { type: ['integer', 'null'], description: 'Length asked for, in minutes; null when not stated.' },
+      window: { type: ['string', 'null'], enum: [...MEET_WINDOWS, null], description: 'When to look; null when not stated.' },
+      buttons: { type: 'array', items: { type: 'string' }, description: 'Button ids from the pool that fit this ask.' }
+    },
+    required: ['topic', 'buttons']
+  },
+  instructions: [
+    'You set up a card that finds a meeting time for the people mentioned in a team chat message.',
+    'Name the topic from what the call is about, not from the words "find time" or the people’s names.'
+  ],
+  context: ({ mentions }) => [
+    `People to meet (id — name): ${mentions.length ? mentions.map(m => `${m.chatUserId} — ${m.name || 'unknown'}`).join('; ') : 'none'}`,
+    `Button pool:\n${Object.entries(MEET_POOL).map(([id, d]) => `- ${id}: ${d}`).join('\n')}`
+  ],
+  validate(raw, { askText }) {
+    const minutes = Number(raw.duration_minutes);
+    const ids = pickButtons(raw.buttons, Object.keys(MEET_POOL));
+    return {
+      fields: {
+        title: cleanTitle(raw.topic, askText) ?? undefined,
+        durationMinutes: raw.duration_minutes === null
+          ? null
+          : (Number.isInteger(minutes) && minutes >= 5 && minutes <= 8 * 60 ? minutes : undefined),
+        window: raw.window === null ? null : (MEET_WINDOWS.includes(raw.window) ? raw.window : undefined)
+      },
+      // An empty list is a choice too: the model dropped the one optional button.
+      buttons: Array.isArray(raw.buttons) ? { ids } : null
+    };
+  }
+};
+
+// --- watch -------------------------------------------------------------------
+// No optional buttons: the model only names the program to look up.
+SPECS.watch = {
+  schema: {
+    type: 'object',
+    properties: {
+      program_name: { type: ['string', 'null'], description: 'The funding program the post is about, as named in it (full name, or the acronym if that is all there is). null when no program is named.' }
+    },
+    required: ['program_name']
+  },
+  instructions: [
+    'You set up a card that watches one funding program (a grant, loan or tax credit) a team chat post is about.',
+    'Return the program’s name as the post gives it. Never invent a program the post does not name.'
+  ],
+  context: () => [],
+  validate(raw, { askText }) {
+    const name = typeof raw.program_name === 'string' ? raw.program_name.replace(/\s+/g, ' ').trim() : null;
+    const askWords = new Set(squash(askText).split(' '));
+    // The name must come from the post: at least one of its words is in it.
+    const grounded = name && name.length <= 120 && !/https?:/i.test(name)
+      && squash(name).split(' ').some(w => w.length >= 3 && askWords.has(w));
+    return { fields: { programName: raw.program_name === null ? null : (grounded ? name : undefined) }, buttons: null };
+  }
+};
+
+export const BUTTON_POOLS = { track: TRACK_POOL, meet: MEET_POOL };
 
 // ============================================================================
 // THE CALL
@@ -184,7 +253,7 @@ function whenWritten(now, timeZone) {
  * Read an ask for one card type.
  *
  * @param {Object} p
- * @param {'track'} p.cardType
+ * @param {'track'|'meet'|'watch'} p.cardType
  * @param {string} p.askText
  * @param {Array<{chatUserId: string, name?: string}>} [p.mentions] - real people only
  * @param {Array<{fileId: string, name?: string|null}>} [p.links]

@@ -97,6 +97,7 @@ jest.unstable_mockModule('../../src/chat-listen/config.js', () => ({
 }));
 jest.unstable_mockModule('../../src/database/chat-listen-store.js', () => fakes.listen.module);
 jest.unstable_mockModule('../../src/claude/client.js', () => fakes.agent.module);
+jest.unstable_mockModule('../../src/cards/interpret.js', () => fakes.interpret.module);
 jest.unstable_mockModule('../../src/database/messages.js', () => fakes.messages.module);
 jest.unstable_mockModule('../../src/database/tracked-cards-store.js', () => fakes.store);
 jest.unstable_mockModule('../../src/cards/chat-api.js', () => fakes.chat.module);
@@ -241,6 +242,14 @@ beforeEach(() => {
 // ============================================================================
 
 describe('starting a watch', () => {
+  test('the interpreter names the program the post is about; the match uses its name', async () => {
+    fakes.interpret.impl = async () => ({ ok: true, fields: { programName: 'Rural Transit Modernisation Fund' }, buttons: null });
+    const card = await watchThePost({ text: `Not the ${PROGRAM} — the Rural Transit Modernisation Fund is the one to watch, it closes December 1.` });
+
+    expect(fakes.interpret.calls.at(-1)).toMatchObject({ cardType: 'watch' });
+    expect(card.data.program).toMatchObject({ name: 'Rural Transit Modernisation Fund', matched: true });
+  });
+
   test('one small card in the space, and nothing else', async () => {
     const card = await watchThePost();
 

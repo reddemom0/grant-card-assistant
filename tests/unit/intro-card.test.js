@@ -519,6 +519,23 @@ describe('/review', () => {
     expect(offer.data.docIds).toEqual(['DOC1abcdefghij']);
   });
 
+  test('Sheets links and Drive chips in the request count as documents, not only Docs URLs', async () => {
+    const DM_THREAD = `${DM}/threads/d9`;
+    fakes.userChat.threads.set(`${DM}/threads/d1`, [{
+      name: `${DM}/messages/req`,
+      sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
+      text: 'Can you review the Acme budget? https://docs.google.com/spreadsheets/d/SHEET1abcdefgh/edit',
+      annotations: [{ type: 'RICH_LINK', richLinkMetadata: { uri: 'https://docs.google.com/document/d/DOC1abcdefghij', richLinkType: 'DRIVE_FILE', driveLinkData: { driveDataRef: { driveFileId: 'DOC1abcdefghij' } } } }],
+      createTime: new Date(Date.now() - 60_000).toISOString(),
+      thread: { name: `${DM}/threads/d1` }
+    }]);
+
+    await command({ commandId: REVIEW_COMMAND_ID, text: '/review', space: DM, thread: DM_THREAD, type: 'DM' });
+
+    const offer = [...fakes.db.cards.values()].find(c => c.card_type === 'review');
+    expect(offer.data.docIds).toEqual(['DOC1abcdefghij', 'SHEET1abcdefgh']);
+  });
+
   test('in a DM with two review requests, the nearest is quoted and confirmed', async () => {
     const DM_THREAD = `${DM}/threads/d9`;
     const msg = (id, text, secondsAgo, thread) => {

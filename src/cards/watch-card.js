@@ -35,6 +35,7 @@ import {
   programFromPost, programKey, watchThreadName, matchProgram,
   datesFromPost, closureFromPost, postMatchesProgram, dueNotices
 } from './watch-match.js';
+import { interpretAsk } from './interpret.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_CLIENTS = 5;
@@ -67,6 +68,26 @@ const nameOf = (p) => mdToPlain(p?.name || 'someone');
 const isLive = (card) => ['open', 'stale'].includes(card?.status);
 const PLURALS = { person: 'people' };
 const plural = (n, word) => `${n} ${n === 1 ? word : (PLURALS[word] || `${word}s`)}`;
+
+/**
+ * The program a post names: the rules' reading, with the program's name from
+ * the model when it found one in the text. The rules stand when it can't help.
+ */
+async function readProgram(words, now) {
+  const guess = programFromPost(words);
+  if (!String(words || '').trim()) return guess;
+  const model = await interpretAsk({ cardType: 'watch', askText: words, timeZone: DISPLAY_TZ, now })
+    .catch(err => ({ ok: false, code: `threw_${codeOf(err)}` }));
+  if (!model.ok) {
+    console.log(`👁️  Watch interpreter fallback — code: ${model.code}`);
+    return guess;
+  }
+  const name = model.fields.programName;
+  if (!name) return guess;
+  // The rules' acronym may belong to another program in the same post.
+  const acronym = guess.acronym && name.includes(guess.acronym) ? guess.acronym : null;
+  return { ...guess, name, acronym };
+}
 
 function codeOf(err) {
   return err?.response?.status ?? err?.code ?? err?.name ?? 'unknown';
@@ -152,7 +173,7 @@ export async function setUpWatch({
 } = {}) {
   const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor?.chatUserId, text });
   let words = source;
-  let guess = programFromPost(words);
+  let guess = await readProgram(words, now);
 
   // No program in the trigger and none in the post above it — a DM, usually.
   // Look at what was said just before, and quote it back if it is a guess.
@@ -176,7 +197,7 @@ export async function setUpWatch({
       return { ok: false, code: 'unclear' };
     }
     words = [words, found.text].filter(Boolean).join('\n');
-    guess = programFromPost(words);
+    guess = await readProgram(words, now);
     console.log(`👁️  Watch subject taken from ${found.from}`);
     if (!guess.name) {
       await reply(NOT_FOUND);

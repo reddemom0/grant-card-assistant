@@ -38,6 +38,7 @@
 
 import { registerAppCommand } from './registry.js';
 import { createTrack } from './track-card.js';
+import { driveFilesOf } from './doc-links.js';
 import { createMeet } from './meet-card.js';
 import { startWatch } from './watch-card.js';
 import { resolvePerson } from './people.js';
@@ -52,10 +53,11 @@ export const REVIEW_COMMAND_ID = String(process.env.CHAT_REVIEW_COMMAND_ID || '5
 export const LEARN_COMMAND_ID = String(process.env.CHAT_LEARN_COMMAND_ID || '6');
 
 /** Google Doc ids in a message, for a review request found above the command. */
-function docLinks(text) {
-  const ids = [...String(text || '').matchAll(/docs\.google\.com\/document\/d\/([\w-]{10,})/g)].map(m => m[1]);
+/** Docs, Sheets, Slides and Drive files a message links, chips and attachments included. */
+function docLinks(message) {
+  const files = message?.driveFiles || driveFilesOf({ text: message?.text });
   // The shape the review card reads (mergeDocIds): { fileId }.
-  return [...new Set(ids)].map(fileId => ({ fileId }));
+  return files.map(f => ({ fileId: f.fileId }));
 }
 
 function codeOf(err) {
@@ -235,7 +237,8 @@ async function runReviewCommand(evt, deps) {
   let subject = null;
   try {
     const { findSubject, confirmSubject } = await import('./subject.js');
-    const looksRight = (text) => /docs\.google\.com|\breview\b/i.test(String(text));
+    const looksRight = (text, message) => /docs\.google\.com|drive\.google\.com|\breview\b/i.test(String(text))
+      || Boolean(message?.driveFiles?.length);
     const seen = await findSubject({
       spaceName: found.spaceName,
       threadName: found.threadName,
@@ -284,7 +287,7 @@ async function runReviewCommand(evt, deps) {
         messageName: subject?.message?.name || evt.messageName,
         threadName: found.threadName,
         mentions: (subject?.message?.mentions?.length ? subject.message.mentions : evt.mentions) || [],
-        driveFiles: docLinks(subject?.text),
+        driveFiles: docLinks(subject?.message),
         // Deliberately empty: /review never counts as "they clearly asked", so
         // the card is always the question with a button, never a guess.
         messageText: ''

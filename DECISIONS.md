@@ -12,6 +12,34 @@ Format:
 
 ---
 
+## 2026-09-29 — Tracked cards read the ask with Haiku; rules become the fallback
+
+**What:** /track, /meet and /watch now send the ask to one Haiku call (`interpretAsk` in `src/cards/interpret.js`, `claude-haiku-4-5-20251001`, forced tool output, 6 s cap, no retries) before the card is built. The call returns the card's fields and which of its existing buttons fit the ask:
+- /track: title, shape, feedback, holder, due date, primary buttons
+- /meet: topic, length, window, and whether "Ignore working hours" shows
+- /watch: the program's name
+
+This **reverses the 2026-09-17 "plain rules, no model calls" decision.** Two related changes:
+- Links to Docs, Sheets, Slides and Drive files (URLs, chips, files attached from Drive) are found by `driveFilesOf` (`src/cards/doc-links.js`). /track shows each one as "Open doc: <name>". The name is read by the service account acting as the asker (`getDriveFileName`, @granted.ca only), because the Hub sign-in's `drive.file` scope can't read docs other people own. /review now counts the same links.
+- Refresh, Switch and Remove people… moved into a "More" overflow menu on the /track card (`moreMenu` in `render.js`). Their handlers are unchanged.
+
+Intro (fixed content) and review (Oracle already writes its fields) are not interpreted.
+
+**Why:** The rules missed intent. "/track … the full team to read through this: <Doc>" came out as One ball, with the raw message as its title, no doc link, and every one-ball button.
+
+**Safeguards:**
+- A fixed button pool per card. Unknown IDs are dropped, and nothing the model picks can hide the More menu or a button that shows the card's state.
+- Every field is validated. A field that fails falls back to its rule value. An error, timeout or invalid answer falls back to the whole rule-built card, and that is logged.
+- Every decision is visible and editable on the card: Switch, Pass to, Record decision, Try next week, Not this one?.
+- The ask is quoted inside the `trust="untrusted"` envelope. The model sees file IDs and names, never URLs.
+- `CARD_INTERPRETER=off` turns it off. It is also off without `ANTHROPIC_API_KEY` and under a test runner.
+
+**Impact:**
+- New: `src/cards/{interpret,doc-links}.js`
+- Changed: `src/cards/{track-card,meet-card,watch-card,track-thread,commands,render}.js`, `src/tools/google-drive.js`
+- Tests: `tests/unit/card-interpret.test.js`, the track, meet, watch and intro card tests, and the shared fakes
+- New env: `CARD_INTERPRETER`. No migration, no new scope.
+
 ## 2026-09-29 — Oracle loads rarely used tools on demand; one home for the skill list
 
 **What:** On Oracle's Sonnet 5.5 path, 23 rarely used tools (≤2 conversations in 30 days) are sent with `defer_loading` behind Anthropic's tool search (`withToolSearch`, `ORACLE_DEFERRED_TOOLS` in `src/claude/client.js`). `track_review` and `read_chat_attachments` qualified but stay loaded. Haiku tiers, the webhook and `allowedTools` runs send the full list. The skill catalogue moved out of `internal-oracle.md` into a trimmed `load_skill` description (one line per skill).

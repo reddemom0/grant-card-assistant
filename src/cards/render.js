@@ -196,6 +196,22 @@ export function buttonRow(buttons) {
 }
 
 /**
+ * A "More" button that opens Chat's overflow menu. Items are button() results
+ * (the same text / disabled / onClick.action), so a press reaches the same
+ * handler as the button it replaces.
+ */
+export function moreMenu(items, text = 'More') {
+  return {
+    text,
+    onClick: {
+      overflowMenu: {
+        items: items.map(({ text: itemText, disabled, onClick }) => ({ text: itemText, ...(disabled ? { disabled: true } : {}), onClick }))
+      }
+    }
+  };
+}
+
+/**
  * A time zone's offset from UTC at that instant, in minutes. Intl is the only
  * place Node exposes this, and cards need it twice: to turn a local wall time
  * (end of someone's day, a meeting slot) into a real instant.
@@ -255,11 +271,12 @@ export function lastUpdateLine(click, labels = {}, { busy = null, outcome = null
  * @param {string} [p.subtitle]
  * @param {Array} p.sections - [{header?, widgets}]
  * @param {Array} [p.buttons] - button() results; dropped on a closed card
+ * @param {Array} [p.more] - button() results shown in a "More" menu after them
  * @param {Object} [p.latestClick]
  * @param {Object} [p.labels] - action → {label}
  * @returns {Array} cardsV2
  */
-export function trackedCard({ card, title, subtitle = '', sections, buttons = [], latestClick = null, labels = {}, busy = null, outcome = null }) {
+export function trackedCard({ card, title, subtitle = '', sections, buttons = [], more = [], latestClick = null, labels = {}, busy = null, outcome = null }) {
   const closed = card.status === 'closed';
   const stale = card.status === 'stale';
 
@@ -279,7 +296,8 @@ export function trackedCard({ card, title, subtitle = '', sections, buttons = []
   const footer = [];
   const last = lastUpdateLine(latestClick, labels, { busy: closed ? null : busy, outcome });
   if (last) footer.push(paragraph(`<i>${last}</i>`));
-  if (!closed && buttons.length && buttonsAvailable()) footer.push(buttonRow(buttons));
+  const row = more.length ? [...buttons, moreMenu(more)] : buttons;
+  if (!closed && row.length && buttonsAvailable()) footer.push(buttonRow(row));
   if (footer.length) out.push({ widgets: footer });
 
   return finalizeCards([{

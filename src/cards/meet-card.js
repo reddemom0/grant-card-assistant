@@ -33,6 +33,7 @@ import { notifyImmediate } from './notify.js';
 import { resolvePerson, timeZoneFor, splitMentions, DEFAULT_TZ } from './people.js';
 import { trackedCard, paragraph, button, esc, clip, threadLink, mdToPlain } from './render.js';
 import { readThread } from './track-thread.js';
+import { interpretAsk } from './interpret.js';
 import {
   parseDuration, parseWindow, findSlots, slotMarks, slotWords, slotButtonWords,
   MIN_LEAD_MS, DEFAULT_WINDOW_DAYS
@@ -170,12 +171,36 @@ export async function createMeet({
 
   const requester = await resolvePerson(actor.chatUserId, { email: actor.email, displayName: actor.name, userId });
   const timeZone = await timeZoneFor(requester, now);
-  const durationMinutes = parseDuration(messageText);
-  const window = parseWindow(messageText, now, timeZone);
+  // The rules first — they are the card whenever the model step can't be used.
+  let durationMinutes = parseDuration(messageText);
+  let window = parseWindow(messageText, now, timeZone);
+  let topic = topicFrom(messageText, trackCardId ? 'Call about a tracked ask' : 'Call');
+  let chosenButtons = null;
+
+  // From a /track card the text is already that card's title: nothing to read.
+  const model = trigger === 'track'
+    ? { ok: false, code: 'from_track_card' }
+    : await interpretAsk({
+      cardType: 'meet',
+      askText: messageText,
+      mentions: people.map(p => ({ chatUserId: p.chatUserId, name: p.name || null })),
+      timeZone,
+      now
+    }).catch(err => ({ ok: false, code: `threw_${codeOf(err)}` }));
+  if (model.ok) {
+    const f = model.fields;
+    if (f.title !== undefined) topic = f.title;
+    // "Not stated" keeps what the rules read; only a stated value replaces it.
+    if (f.durationMinutes) durationMinutes = f.durationMinutes;
+    if (f.window) window = parseWindow(f.window, now, timeZone);
+    chosenButtons = model.buttons;
+  } else if (model.code !== 'from_track_card') {
+    console.log(`📅 Meet interpreter fallback — code: ${model.code}`);
+  }
 
   const data = {
     surface,
-    topic: topicFrom(messageText, trackCardId ? 'Call about a tracked ask' : 'Call'),
+    topic,
     durationMinutes,
     timeZone,
     window: { from: window.from.toISOString(), to: window.to.toISOString(), words: window.words },
@@ -192,7 +217,9 @@ export async function createMeet({
     followup: null,
     busy: { kind: 'slots', text: BUSY.slots, by: actor.name || null, at: now.toISOString() },
     shown: {},
-    notice: null
+    notice: null,
+    interpreted: model.ok,
+    buttons: chosenButtons
   };
 
   let card = await store.insertCard({
@@ -220,7 +247,7 @@ export async function createMeet({
     ok: true,
     code: null,
     card,
-    stats: `, invitees: ${people.length}, minutes: ${durationMinutes}, window: ${window.words || 'default'}`
+    stats: `, invitees: ${people.length}, minutes: ${durationMinutes}, window: ${window.words || 'default'}, interpreted: ${model.ok ? 'yes' : 'no'}`
   });
 }
 
@@ -833,7 +860,10 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
       buttons.push(button('These work for me', { cardId: id, action: 'meet.works' }));
       buttons.push(button('None work', { cardId: id, action: 'meet.none' }));
       buttons.push(button('Try next week', { cardId: id, action: 'meet.next_week' }));
-      if (!d.ignoreHours) buttons.push(button('Ignore working hours', { cardId: id, action: 'meet.ignore_hours' }));
+      // Left out when the ask ruled it out. With no time found it always shows:
+      // the card's own text points to it.
+      const hoursOffered = !Array.isArray(d.buttons?.ids) || d.buttons.ids.includes('meet.ignore_hours');
+      if (!d.ignoreHours && hoursOffered) buttons.push(button('Ignore working hours', { cardId: id, action: 'meet.ignore_hours' }));
     } else {
       buttons.push(button('Try next week', { cardId: id, action: 'meet.next_week' }));
       if (!d.ignoreHours) buttons.push(button('Ignore working hours', { cardId: id, action: 'meet.ignore_hours' }));

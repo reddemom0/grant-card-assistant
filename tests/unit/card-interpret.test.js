@@ -153,3 +153,22 @@ test('pickButtons keeps pool order', () => {
   expect(pickButtons(['c', 'a', 'x'], ['a', 'b', 'c'])).toEqual(['a', 'c']);
   expect(pickButtons('a', ['a'])).toEqual([]);
 });
+
+test('meet: a stated length and window are kept; out-of-range ones refused; the only optional button can be dropped', async () => {
+  const meet = (answer) => { sdk.answer = answer; return interpretAsk({ cardType: 'meet', askText: 'sync on the grant budget next week, an hour', mentions: [JASON], timeZone: TZ, now: NOW }); };
+
+  expect(await meet({ topic: 'Grant budget sync', duration_minutes: 60, window: 'next week', buttons: [] })).toEqual({
+    ok: true, fields: { title: 'Grant budget sync', durationMinutes: 60, window: 'next week' }, buttons: { ids: [] }
+  });
+  const odd = await meet({ topic: 'Grant budget sync', duration_minutes: 1000, window: 'someday', buttons: ['meet.ignore_hours', 'meet.cancel'] });
+  expect(odd.fields).toMatchObject({ durationMinutes: undefined, window: undefined });
+  expect(odd.buttons).toEqual({ ids: ['meet.ignore_hours'] });
+});
+
+test('watch: the program must be named in the post; an invented one is refused', async () => {
+  const watch = (answer) => { sdk.answer = answer; return interpretAsk({ cardType: 'watch', askText: 'heads up, the Rural Transit Modernisation Fund closes Dec 1', timeZone: TZ, now: NOW }); };
+
+  expect((await watch({ program_name: 'Rural Transit Modernisation Fund' })).fields.programName).toBe('Rural Transit Modernisation Fund');
+  expect(await watch({ program_name: 'Canada Digital Adoption Program' })).toEqual({ ok: false, code: 'invalid' });
+  expect((await watch({ program_name: null })).fields.programName).toBeNull();
+});

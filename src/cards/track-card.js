@@ -1084,9 +1084,11 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
   const dialog = (text, action, opts = {}) => button(text, { cardId: id, action }, { ...opts, openDialog: dialogsEnabled() && !opts.disabled });
   const refreshing = busy?.kind === 'refresh';
   const buttons = [];
+  // Refresh, Switch and Remove people… live in the "More" menu, always.
+  const more = [];
   // The buttons chosen for this ask when the card was set up, for the shape
   // they were chosen for; after a Switch the other shape shows its full set.
-  // Only the pool is filtered — state buttons, Refresh and Switch always show.
+  // Only the primaries are filtered — state buttons and the More menu always show.
   const chosen = d.buttons?.shape === d.shape && Array.isArray(d.buttons.ids) ? new Set(d.buttons.ids) : null;
   const offered = (...ids) => !chosen || ids.some(i => chosen.has(i));
 
@@ -1105,7 +1107,7 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
         : button('I’ve done it', { cardId: id, action: 'track.done' }));
     }
     if (offered('track.help')) buttons.push(button('I need help', { cardId: id, action: 'track.help' }));
-    if (offered('track.remove')) buttons.push(dialog('Remove people…', 'track.remove'));
+    more.push(dialog('Remove people…', 'track.remove'));
   } else {
     if (b.guess) buttons.push(button('Not right', { cardId: id, action: 'track.not_right' }));
     if (offered('track.take')) buttons.push(button('I’ll take it', { cardId: id, action: 'track.take' }));
@@ -1118,10 +1120,12 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
     if (offered('track.decision') && (!d.suggestion || d.suggestion.state !== 'decided')) buttons.push(dialog('Record decision', 'track.decision'));
     if (offered('track.resolve')) buttons.push(button('Resolved', { cardId: id, action: 'track.resolve' }));
   }
-  buttons.push(refreshing
-    ? button('Reading…', { cardId: id, action: 'track.refresh' }, { disabled: true })
-    : button('Refresh', { cardId: id, action: 'track.refresh' }));
-  buttons.push(button(everyone ? 'Switch to one ball' : 'Switch to everyone', { cardId: id, action: 'track.switch' }, { disabled: busy?.kind === 'checklist' }));
+  more.unshift(
+    refreshing
+      ? button('Reading…', { cardId: id, action: 'track.refresh' }, { disabled: true })
+      : button('Refresh', { cardId: id, action: 'track.refresh' }),
+    button(everyone ? 'Switch to one ball' : 'Switch to everyone', { cardId: id, action: 'track.switch' }, { disabled: busy?.kind === 'checklist' })
+  );
 
   const closedLabel = card.status === 'closed' ? CLOSED_REASONS[card.closed_reason] : null;
   return trackedCard({
@@ -1134,6 +1138,7 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
     ].filter(Boolean).join(' · '),
     sections,
     buttons,
+    more,
     latestClick,
     labels: LABELS,
     busy,
