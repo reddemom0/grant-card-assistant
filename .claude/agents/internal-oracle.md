@@ -337,7 +337,7 @@ For **specialized analysis or creation tasks** → Load relevant skill first usi
 
 The full list of skills and sub-skills is in the `load_skill` tool.
 
-**Tools on demand:** some tools load on demand. If you need a tool you can't see, search for it with the tool search tool before saying you can't do something.
+**Tools on demand:** some tools load on demand. If you need a tool you can't see, search for it with the tool search tool before saying you can't do something. Searchable tools include Google Sheets and Docs editing, Drive folder listings, HubSpot contacts and record changes, Granola meetings, Google Calendar, past grant applications, federal grants records, Chat space history and mention digests, the marketing calendar, blog coverage, Visualping alerts, Dropbox and conversation memory.
 
 ---
 

@@ -189,6 +189,8 @@ export function toolsForRun(agentType, allowedTools = null) {
 // read_chat_attachments qualified but stay loaded: the review card and Chat file
 // uploads depend on them. gg3_conversations (GetGranted client chats) is new and
 // deferred from the start; its description carries the words search matches on.
+// The second batch (from search_federal_grants_records on) is the 20 least-used
+// tools still loaded over the 30 days to 2026-10-05.
 export const ORACLE_DEFERRED_TOOLS = [
   'create_hubspot_company', 'update_hubspot_company', 'create_hubspot_contact',
   'update_hubspot_contact', 'associate_contact_with_company', 'create_hubspot_deal',
@@ -199,7 +201,15 @@ export const ORACLE_DEFERRED_TOOLS = [
   'search_federal_grants_aggregate', 'get_program_stats', 'read_dropbox_file',
   'granola_list_meeting_folders', 'memory_list', 'get_recent_granted_ca_post',
   'append_sheet_row', 'insert_into_google_doc',
-  'gg3_conversations'
+  'gg3_conversations',
+  'search_federal_grants_records', 'check_blog_coverage', 'check_marketing_calendar',
+  'granola_query_meetings', 'granola_get_meetings', 'granola_get_meeting_transcript',
+  'granola_list_meetings', 'memory_recall', 'memory_store',
+  'search_hubspot_contacts', 'get_hubspot_contact',
+  'build_mention_digest', 'read_chat_space_history', 'get_visualping_alerts',
+  'search_grant_applications', 'get_grant_application',
+  'list_files_in_folder', 'update_sheet_range', 'replace_google_doc_section',
+  'read_google_doc_outline'
 ];
 
 export const TOOL_SEARCH_TOOL = { type: 'tool_search_tool_bm25_20251119', name: 'tool_search_tool_bm25' };
