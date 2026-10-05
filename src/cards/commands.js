@@ -32,7 +32,7 @@
  * CHAT_LEARN_COMMAND_ID (default 6), description "Teach Oracle from this
  * thread", "Open a dialog" unchecked. Runs the same /learn-this as the typed
  * "@Oracle /learn-this" (which still works as a fallback): the lesson card in
- * the command's thread, private to the person in a space. Text after the
+ * the command's thread, visible to everyone in the space. Text after the
  * command is the lesson in a DM.
  */
 

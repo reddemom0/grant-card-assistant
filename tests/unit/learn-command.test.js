@@ -3,7 +3,7 @@
  *
  * Through the real Chat adapter: the command event is answered at once, then
  * runs the same learn run as "@Oracle /learn-this" — the lesson card in the
- * command's thread (private in a space), the thread read as the person, one
+ * command's thread (visible to the space), the thread read as the person, one
  * restricted Oracle run. In a DM the text after the command is the lesson. A
  * person who isn't signed in gets the private sign-in reply; an unknown command
  * ID is ignored; the typed form still works.
@@ -196,13 +196,13 @@ describe('the registered command', () => {
     expect(LEARN_COMMAND_ID).toBe('6');
   });
 
-  test('in a space: answered at once, then a private "Checking…" card in the command\'s thread, the thread read, one restricted run, and the lesson on the card', async () => {
+  test('in a space: answered at once, then a "Checking…" card visible to the space in the command\'s thread, the thread read, one restricted run, and the lesson on the card', async () => {
     const answer = await post(commandBody({}));
     expect(answer).toEqual({});
     await settle();
 
     const [first] = lessonCardPosts();
-    expect(first).toMatchObject({ spaceName: SPACE, threadName: THREAD, privateTo: KELLY });
+    expect(first).toMatchObject({ spaceName: SPACE, threadName: THREAD, privateTo: null });
     expect(cardText(first.cardsV2)).toMatch(/Checking what to learn/);
 
     const run = fakes.agent.calls.at(-1);
@@ -258,7 +258,7 @@ describe('the typed form still works as a fallback', () => {
     await post(messageBody({ text: 'PacifiCan said 10 business days. /learn-this' }));
     await settle();
     const [card] = lessonCardPosts();
-    expect(card).toMatchObject({ spaceName: SPACE, threadName: THREAD, privateTo: KELLY });
+    expect(card).toMatchObject({ spaceName: SPACE, threadName: THREAD, privateTo: null });
     expect(fakes.agent.calls.at(-1).chatContext).toMatchObject({ learnMode: true });
   });
 });

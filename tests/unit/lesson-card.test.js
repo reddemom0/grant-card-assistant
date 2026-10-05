@@ -1,7 +1,7 @@
 /**
  * The /learn-this lesson card
  *
- * "Checking…" first (private in a space), then the lessons to confirm or
+ * "Checking…" first (visible to the space), then the lessons to confirm or
  * Oracle's result; teacher-only Save / Edit / Discard (and Save all / Discard all
  * with two or more); silent 24-hour expiry; edits re-checked before saving; a
  * newer /learn-this replacing the live card; lesson cards' own dialog switch.
@@ -103,10 +103,10 @@ const press = async (card, action, actor, params = {}) =>
   lessonCard.handleAction({ card: await current(card.id), actor, action, now: new Date(), params });
 
 describe('posting', () => {
-  test('in a space, "Checking…" goes privately to the teacher, in the thread', async () => {
+  test('in a space, "Checking…" is visible to everyone in the space, in the thread', async () => {
     const card = await startInSpace();
     const post = fakes.chat.posts.at(-1);
-    expect(post).toMatchObject({ spaceName: SPACE, threadName: THREAD, privateTo: TEACHER });
+    expect(post).toMatchObject({ spaceName: SPACE, threadName: THREAD, privateTo: null });
     expect(cardText(post.cardsV2)).toMatch(/Checking what to learn/);
     expect(cardButtons(post.cardsV2)).toEqual([]);
     expect(card.owner_chat_id).toBe(TEACHER);

@@ -103,8 +103,9 @@ weighing changes, but it is not an open hole.
   **Confirmation card.** Nothing a learn run finds is used until the teacher confirms it
   (`src/cards/lesson-card.js`, card type `lesson`). `runLearnThis` first posts the card as
   "Checking…" (`startLessonCard`) as a reply in the /learn-this message's own thread, in a
-  DM as in a space (`privateMessageViewer` to the teacher in a space, a normal card in a
-  DM; only a message with no thread falls back to `<space>/threads/lessons`, unthreaded), then
+  DM as in a space (a normal card visible to everyone in the space, and the same in a DM;
+  refusals to non-teachers who press it stay private (`tellPresser`);
+  only a message with no thread falls back to `<space>/threads/lessons`, unthreaded), then
   updates it in place (`finishLessonCard`): the lessons waiting, or — when none are —
   Oracle's short result, and closes it. `save_team_lesson` saves lessons as
   `state = 'pending'` with `card_id` and a 24-hour `expires_at`; `activeLessons` reads

@@ -1,8 +1,8 @@
 /**
  * The lesson card — "@Oracle /learn-this" asks the teacher before anything is saved
  *
- * One card per /learn-this run. It is posted at once as "Checking…" (privately
- * to the teacher in a space, normally in a DM), then updated in place:
+ * One card per /learn-this run. It is posted at once as "Checking…" (a normal
+ * card everyone in the space can see; the same in a DM), then updated in place:
  * - with the lessons waiting for confirmation — each with its check status and
  *   source, and Save / Edit / Discard (Save all / Discard all with two or more);
  * - or, when nothing is waiting (all already known, out of scope, nothing to
@@ -427,7 +427,6 @@ export async function liveLessonCard({ surface, spaceName, threadName, ownerChat
  * a text reply).
  */
 export async function startLessonCard({ spaceName, threadName, surface, conversationId, ownerChatId, ownerUserId, now = new Date() }) {
-  const dm = surface === 'chat_dm';
   const previous = await liveLessonCard({ surface, spaceName, threadName });
   if (previous) await replaceCard(previous, now);
 
@@ -444,8 +443,7 @@ export async function startLessonCard({ spaceName, threadName, surface, conversa
     const messageName = await postMessage({
       spaceName,
       threadName: threadName || null,
-      cardsV2: await renderCard(row),
-      privateTo: dm ? null : ownerChatId
+      cardsV2: await renderCard(row)
     });
     await store.updateCard(row.id, { messageName });
     return { ...row, message_name: messageName };
