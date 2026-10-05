@@ -391,32 +391,32 @@ describe('named grants', () => {
     expect(isClearlyNamed(n('Water Vehicles Energy Clean'), queryTerms('clean energy vehicles'))).toBe(false);   // words, not the phrase
   });
 
-  test('an exact name at inactive status comes back in full, first, with links and GG1 status', async () => {
+  test('an exact name at inactive status is never promoted into results: it leads other_status_matches', async () => {
     fixtures([
       { id: 1660, name: 'Agriculture and Food Innovation Program', name_hits: 1 },
       { id: 1425, name: STREAM_2, name_hits: 3, detail: { status: 'inactive', gg1_id: '852', gg1_active: true } },
       { id: 1426, name: 'Agricultural Water Infrastructure Program - Stream 3', name_hits: 3, detail: { status: 'inactive' } }
     ]);
     const r = await searchGrantData({ query: 'Agricultural Water Infrastructure Program Stream 2' });
-    expect(r.results.map(x => x.id)).toEqual([1425, 1660]);
-    expect(r.results[0]).toMatchObject({
-      id: 1425, status: 'inactive', named_match: true,
-      links: { app: 'https://app.getgranted.ai/grants/1425', admin: 'https://admin.getgranted.ai/grants/1425' },
-      gg1: { id: '852', status: 'active' }, status_mismatch: true
-    });
-    expect(r.results[1]).not.toHaveProperty('named_match');
-    expect(r.total_matches).toBe(2);                                             // 1 active + the named one
-    expect(r.other_status_matches).toEqual({                                    // the named grant has left it
-      count: 1, by_status: { inactive: 1 },
-      top: [{ id: 1426, name: 'Agricultural Water Infrastructure Program - Stream 3', status: 'inactive' }]
+    expect(r.results.map(x => x.id)).toEqual([1660]);
+    expect(r.total_matches).toBe(1);                                             // active only
+    expect(r.other_status_matches).toEqual({
+      count: 2, by_status: { inactive: 2 },
+      top: [
+        { id: 1425, name: STREAM_2, status: 'inactive', exact_match: true },
+        { id: 1426, name: 'Agricultural Water Infrastructure Program - Stream 3', status: 'inactive' }
+      ]
     });
   });
 
-  test('a 3-word phrase inside a longer name is included, even archived', async () => {
-    fixtures([{ id: 7, name: 'BC Clean Energy Vehicles for Business Rebate', name_hits: 3, detail: { status: 'archived' } }]);
+  test('a 3-word phrase inside an archived name stays out of results, at the top of other_status_matches', async () => {
+    fixtures([
+      { id: 8, name: 'Clean Tech Vehicles Fund', name_hits: 2, detail: { status: 'archived' } },
+      { id: 7, name: 'BC Clean Energy Vehicles for Business Rebate', name_hits: 3, detail: { status: 'archived' } }
+    ]);
     const r = await searchGrantData({ query: 'clean energy vehicles' });
-    expect(r.results.map(x => [x.id, x.named_match])).toEqual([[7, true]]);
-    expect(r.other_status_matches.count).toBe(0);
+    expect(r.results).toEqual([]);
+    expect(r.other_status_matches.top.map(t => [t.id, t.exact_match ?? false])).toEqual([[7, false], [8, false]]);
   });
 
   test('a 2-word phrase is not auto-included; it stays in other_status_matches', async () => {
@@ -442,6 +442,79 @@ describe('named grants', () => {
     const r = await searchGrantData({ query: 'wage subsidy youth program' });
     expect(r.results.map(x => [x.id, x.named_match ?? false])).toEqual([[1, true], [2, false]]);
     expect(r.total_matches).toBe(2);
+  });
+});
+
+// THE RULE (active exact-name match first):
+// 1. default searches: results are active only; an exact name ranks first among them
+// 2. a non-active exact match never enters results; it leads other_status_matches, labelled with its status
+// 3. with no active exact match, the non-active exact match still leads other_status_matches
+// 4. an explicitly asked non-active status: the exact name ranks first within it
+describe('active exact-name match first (ETG)', () => {
+  const ETG = [
+    { id: 1314, name: 'Employer Training Grant (ETG)', name_hits: 1, last_updated: '2025/01/01' },
+    { id: 1501, name: 'LNG Canada Trades Training Fund (TTF)', name_hits: 1, last_updated: '2026/09/01' },
+    { id: 935, name: '(Z-EXPIRED) 2019 BC Employer Training Grant (ETG) - Workforce - Intake #1', name_hits: 4, last_updated: '2026/09/30', detail: { status: 'archived' } },
+    { id: 990, name: 'Employer Training Grant (ETG)', name_hits: 1, last_updated: '2026/09/30', detail: { status: 'archived' } }
+  ];
+
+  test('rule 1: a default search returns active grants only, the active exact name first', async () => {
+    fixtures(ETG);
+    const r = await searchGrantData({ query: 'Employer Training Grant (ETG)' });
+    expect(r.statuses).toEqual(['active']);
+    expect(r.results.map(x => [x.id, x.status])).toEqual([[1314, 'active'], [1501, 'active']]);
+    expect(r.results[0].named_match).toBe(true);
+    expect(r.total_matches).toBe(2);
+  });
+
+  test('rule 1: a longer query that archived cards contain still keeps them out of results', async () => {
+    fixtures(ETG);
+    const r = await searchGrantData({ query: 'BC Employer Training Grant' });
+    expect(r.results.every(x => x.status === 'active')).toBe(true);
+    expect(r.other_status_matches.top[0]).toMatchObject({ id: 935, status: 'archived' });
+  });
+
+  test('rule 2: the archived exact match leads other_status_matches, labelled with its status', async () => {
+    fixtures(ETG);
+    const r = await searchGrantData({ query: 'Employer Training Grant (ETG)' });
+    expect(r.results.map(x => x.id)).not.toContain(990);
+    expect(r.other_status_matches.top[0]).toEqual({ id: 990, name: 'Employer Training Grant (ETG)', status: 'archived', exact_match: true });
+    expect(r.other_status_matches.top[1]).toMatchObject({ id: 935, status: 'archived' });
+    expect(r.other_status_matches.top[1]).not.toHaveProperty('exact_match');
+  });
+
+  test('rule 2: every exact match leads, even past the usual three', async () => {
+    fixtures([1, 2, 3, 4].map(id => ({ id, name: 'Employer Training Grant (ETG)', name_hits: 1, detail: { status: id % 2 ? 'archived' : 'inactive' } }))
+      .concat([{ id: 5, name: 'Employer Training Grant (ETG) Extra Stream', name_hits: 9, detail: { status: 'archived' } }]));
+    const r = await searchGrantData({ query: 'Employer Training Grant (ETG)' });
+    expect(r.other_status_matches.top.map(t => [t.id, t.exact_match ?? false])).toEqual([[1, true], [2, true], [3, true], [4, true]]);
+  });
+
+  test('rule 3: no active exact match — the archived exact match still leads other_status_matches', async () => {
+    fixtures([
+      { id: 1501, name: 'LNG Canada Trades Training Fund (TTF)', name_hits: 1 },
+      { id: 990, name: 'ETG', name_hits: 1, detail: { status: 'archived' } },
+      { id: 935, name: '(Z-EXPIRED) 2019 BC ETG Workforce', name_hits: 1, last_updated: '2026/09/30', detail: { status: 'archived' } }
+    ]);
+    const r = await searchGrantData({ query: 'ETG' });
+    expect(r.results.map(x => x.id)).toEqual([1501]);
+    expect(r.other_status_matches.top[0]).toEqual({ id: 990, name: 'ETG', status: 'archived', exact_match: true });
+  });
+
+  test('rule 4: asking for archived puts the archived exact match first within that status', async () => {
+    fixtures(ETG);
+    const r = await searchGrantData({ query: 'Employer Training Grant (ETG)', status: ['archived'] });
+    expect(r.results.map(x => [x.id, x.status])).toEqual([[990, 'archived'], [935, 'archived']]);
+    expect(r.results[0].named_match).toBe(true);
+    // the active exact match is then the one reported elsewhere
+    expect(r.other_status_matches.top[0]).toEqual({ id: 1314, name: 'Employer Training Grant (ETG)', status: 'active', exact_match: true });
+  });
+
+  test('all statuses asked (how Oracle finds a named grant in client conversations): exact name first, flagged', async () => {
+    fixtures(ETG);
+    const r = await searchGrantData({ query: 'Employer Training Grant (ETG)', status: ['active', 'inactive', 'archived', 'draft'] });
+    expect(r.results.slice(0, 2).map(x => [x.id, x.named_match ?? false])).toEqual([[990, true], [1314, true]]);
+    expect(r).not.toHaveProperty('other_status_matches');
   });
 });
 

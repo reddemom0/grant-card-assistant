@@ -19,11 +19,13 @@
  *     industries, grant types, funders — OR inside a filter, AND across
  *   - status defaults to active; GG3 "hide" grants only with include_hidden,
  *     and when they are left out their match count comes back as hidden_matches
- *   - a grant the query clearly names (isClearlyNamed) is a full result at any
- *     visible status, ranked first, with named_match: true
- *   - other matches at the visible statuses the search left out come back as
- *     other_status_matches (count, by status, best three), so a grant that
- *     exists but isn't active never looks absent
+ *   - results hold only the statuses asked for (active by default); an exact
+ *     name ranks first among them, and a grant the query clearly names
+ *     (isClearlyNamed) carries named_match: true
+ *   - matches at the visible statuses the search left out never enter results;
+ *     they come back as other_status_matches (count, by status, top), exact
+ *     name matches first with exact_match: true, so a grant that exists but
+ *     isn't active never looks absent and Oracle can say it's archived
  *   - at most 20 results plus total_matches
  *   - GG1 status for grants linked by exact name (gg1_gg3_links, migration 039)
  *   - data_as_of from the latest successful gg3_refresh_runs row
@@ -342,15 +344,20 @@ async function lookupIds(ids, opts) {
 
 /**
  * Matches at the visible statuses the search left out: how many, by status, and
- * the three best-ranked — enough to say "it's there, but inactive" and search again.
+ * the best-ranked — enough to say "it's there, but archived" and search again.
+ * Every exact name match leads the list (even past three), labelled exact_match.
  */
 function otherStatusMatches(rows, terms) {
   const byStatus = {};
   for (const r of rows) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+  const ranked = rankCandidates(rows, terms);
+  const isExact = (r) => Boolean(terms.phrase) && r.name_n === terms.phrase;
+  const exact = ranked.filter(isExact);
+  const top = [...exact, ...ranked.filter(r => !isExact(r)).slice(0, Math.max(0, OTHER_STATUS_TOP - exact.length))];
   return {
     count: rows.length,
     by_status: byStatus,
-    top: rankCandidates(rows, terms).slice(0, OTHER_STATUS_TOP).map(r => ({ id: r.id, name: r.grant_name, status: r.status }))
+    top: top.map(r => ({ id: r.id, name: r.grant_name, status: r.status, ...(isExact(r) ? { exact_match: true } : {}) }))
   };
 }
 
@@ -381,16 +388,14 @@ export async function searchGrantData(opts = {}) {
       WHERE ${c.where}`,
     candidateParams
   );
-  // A grant the query clearly names is returned in full at any visible status,
-  // first, flagged named_match; it leaves other_status_matches. Hidden grants
-  // are only in the scan when they were asked for, so never named otherwise.
-  const named = rankCandidates(candidates.rows.filter(r => isClearlyNamed(r.name_n, terms)), terms);
-  const namedIds = new Set(named.map(r => Number(r.id)));
+  // Results hold only the asked statuses, an exact name first (rankCandidates).
+  // A match at another visible status — even an exact name — is never promoted
+  // into them: it leads other_status_matches instead.
   const asked = candidates.rows.filter(r => statuses.includes(r.status));
-  const others = candidates.rows.filter(r => otherStatuses.includes(r.status) && !namedIds.has(Number(r.id)));
-  const namedElsewhere = named.filter(r => !statuses.includes(r.status)).length;
+  const others = candidates.rows.filter(r => otherStatuses.includes(r.status));
+  const namedIds = new Set(asked.filter(r => isClearlyNamed(r.name_n, terms)).map(r => Number(r.id)));
 
-  const ranked = [...named, ...rankCandidates(asked, terms).filter(r => !namedIds.has(Number(r.id)))];
+  const ranked = rankCandidates(asked, terms);
   const rows = await details(ranked.slice(0, limit).map(r => Number(r.id)));
 
   let hiddenMatches = null;
@@ -415,7 +420,7 @@ export async function searchGrantData(opts = {}) {
     data_as_of: asOf,
     ...asOfNote(asOf),
     statuses,
-    total_matches: asked.length + namedElsewhere,
+    total_matches: asked.length,
     returned: results.length,
     hidden_matches: hiddenMatches,
     ...(otherStatuses.length ? { other_status_matches: otherStatusMatches(others, terms) } : {}),

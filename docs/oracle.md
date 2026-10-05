@@ -316,6 +316,27 @@ This is the only read of `users.hubspot_owner_id` in the codebase. Every other
 `hubspot_owner_id` hit in `src/tools/hubspot.js` is the HubSpot property of the same name
 on contacts/companies/deals — a different thing.
 
+## Grant data search
+
+`grant_data` search mode reads Oracle's hourly copy of GetGranted (`searchGrantData` in
+`src/tools/grant-data.js`). How a name search ranks:
+
+1. **Main results show only the statuses asked for.** That is active unless the person
+   asks about closed or past programs. A grant whose name is exactly what was searched
+   comes first among them, then names containing the search as a phrase, then the rest by
+   how well they match.
+2. **Cards at other statuses never enter the main results,** even an exact-name match. They
+   are listed separately as other-status matches, with their status. Exact-name matches
+   always lead that list, so an old archived card can't push the live grant down or out.
+3. **With no active exact-name match,** an archived or closed card with that exact name
+   still leads the other-status list. Oracle can then say "it's there, but archived" rather
+   than "not found".
+4. **When a specific status is asked for** (for example archived), the exact-name match
+   ranks first within that status.
+
+Hidden cards are never in either list; only their count is reported. Looking up a grant
+by id or GetGranted link returns that grant at any status.
+
 ## Behavior worth knowing
 
 - **Model routing is per-message, not per-agent.** `getQueryConfig` in
