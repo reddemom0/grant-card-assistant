@@ -5,7 +5,8 @@
  * Sends each question in questions.json through the real internal-oracle agent
  * (runAgent, headless, the Google Chat handler's call shape), scores the answer
  * with rule checks (checks.mjs) and a grader model, and writes
- * report-<date>.md plus runs-<date>.json next to this file.
+ * report-<date>-<HHMM>.md plus runs-<date>-<HHMM>.json next to this file (UTC start
+ * time, so repeat runs on the same day don't overwrite each other).
  *
  *   node tests/evals/oracle-grant-data/run.mjs            # all questions
  *   node tests/evals/oracle-grant-data/run.mjs --only 9,12
@@ -296,9 +297,10 @@ for (const q of toRun) {
 const totalMs = Date.now() - started.getTime();
 
 const date = started.toISOString().slice(0, 10);
+const time = started.toISOString().slice(11, 16).replace(':', '');
 const suffix = subset ? `-only-${[...subset].join('-')}` : '';
-const reportPath = path.join(HERE, `report-${date}${suffix}.md`);
-const runsPath = path.join(HERE, `runs-${date}${suffix}.json`);
+const reportPath = path.join(HERE, `report-${date}-${time}${suffix}.md`);
+const runsPath = path.join(HERE, `runs-${date}-${time}${suffix}.json`);
 await writeFile(reportPath, report({ runs, started, totalMs, subset }));
 await writeFile(runsPath, JSON.stringify({ started, oracleModels: oracleModels(runs), graderModel: GRADER_MODEL, readOnlyRejections, runs }, null, 2));
 console.log(`\n📝 Report: ${path.relative(ROOT, reportPath)}\n🗂️  Raw runs: ${path.relative(ROOT, runsPath)}`);

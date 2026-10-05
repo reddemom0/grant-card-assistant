@@ -94,8 +94,8 @@
       "category": "mismatch",
       "question": "Is the Agricultural Water Infrastructure Program Stream 2 active?",
       "expected": { "exists_in_gg3": true, "gg3": [{ "id": 1425, "name": "Agricultural Water Infrastructure Program - Stream 2", "status": "inactive", "deadline": "31/07/2023" }], "gg1": { "id": "852", "status": "active" }, "status_mismatch": true },
-      "flags": { "expects_mismatch": true },
-      "rubric": "Finds Stream 2 (1425), not Stream 1 or 3. Shows GetGranted's status (GG3 inactive, deadline 31/07/2023) and GG1's (active). If it checked the official program page, it reports that first, with its date, then GetGranted's status. Never says which system is wrong or needs updating, and doesn't make the person choose. Says how fresh the GetGranted data is. Doesn't say it's not in GG3."
+      "flags": { "expects_mismatch": true, "freshness": true },
+      "rubric": "Finds Stream 2 (1425), not Stream 1 or 3. Freshness question: checks the program's official page and reports it first, with its date, then GetGranted's status (GG3 inactive, deadline 31/07/2023) and GG1's (active). If it can't reach the page, says so and doesn't state active/open as fact. Never says which system is wrong or needs updating, and doesn't make the person choose. Says how fresh the GetGranted data is. Doesn't say it's not in GG3."
     },
     {
       "id": 13,

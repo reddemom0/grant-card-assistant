@@ -58,11 +58,12 @@ export function checkNoTotalCount(answer) {
 const VERDICT = /(GG[13]\s+(?:is|looks|seems)\s+(?:correct|right|wrong|out[- ]of[- ]date|outdated|stale|accurate)|(?:correct|right|actual|true|real)\s+status\s+is|trust\s+(?:the\s+)?GG[13]|go\s+with\s+(?:the\s+)?GG[13]|GG[13]['’]?s?\s+(?:status\s+)?is\s+(?:likely|probably)\s+(?:right|correct|wrong|outdated))/i;
 
 /**
- * Picking a side about one system: GG1, GG3, GetGranted or "the card", then within
- * a few words "needs updating", "is out of date", "is wrong"… ("our GetGranted card
- * is out of date", "GG1 needs updating").
+ * Picking a side about one system: GG1, GG3, GetGranted, "the card", "our database",
+ * "the database" or "our data", then within a few words "needs updating", "is out of
+ * date", "is wrong"… ("our GetGranted card is out of date", "GG1 needs updating",
+ * "our database is out of date").
  */
-const SIDE_TAKEN = /\b(?:GG[13]|GetGranted|the card|our card)\b(?:\W+\w+){0,4}?\W+(?:needs?\s+(?:to\s+be\s+)?(?:updat(?:ing|ed)|correct(?:ing|ed)|fix(?:ing|ed))|(?:is|are|looks|seems)\s+(?:outdated|out[- ]of[- ]date|wrong|incorrect|stale|behind))\b/i;
+const SIDE_TAKEN = /\b(?:GG[13]|GetGranted|the card|our card|our database|the database|our data)\b(?:\W+\w+){0,4}?\W+(?:needs?\s+(?:to\s+be\s+)?(?:updat(?:ing|ed)|correct(?:ing|ed)|fix(?:ing|ed))|(?:is|are|looks|seems)\s+(?:outdated|out[- ]of[- ]date|wrong|incorrect|stale|behind))\b/i;
 
 /** When a tool flagged a GG1/GG3 disagreement on a grant the answer names: both shown, no verdict. */
 export function checkMismatch(answer, trace) {

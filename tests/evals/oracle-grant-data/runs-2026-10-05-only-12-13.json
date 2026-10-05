@@ -1,0 +1,943 @@
+{
+  "started": "2026-10-05T10:50:58.438Z",
+  "oracleModels": [
+    "claude-sonnet-5-5"
+  ],
+  "graderModel": "claude-sonnet-4-6",
+  "readOnlyRejections": [],
+  "runs": [
+    {
+      "id": 12,
+      "category": "mismatch",
+      "question": "Is the Agricultural Water Infrastructure Program Stream 2 active?",
+      "conversationId": "b570c329-6411-44a8-99d1-5be4bf47cb9c",
+      "agentSuccess": true,
+      "agentError": null,
+      "model": "claude-sonnet-5-5",
+      "answer": "**Short answer:** Yes, going by the funder's own page. Our GetGranted card is out of date.\n\n- **Funder (IAF):** The program page says applications for Stream 2: Community Projects are open. It also says applications close on October 29, 2026. That means about 3.5 weeks remain from today (Oct 5, 2026). The Stream 2 page says it is reopening on October 1. Both pages were crawled 3 days ago. Source: [Agriculture Water Infrastructure Program – IAF](https://iafbc.ca/agriculture-water-infrastructure-program/) and [AWP – Stream 2 – IAF](https://iafbc.ca/agriculture-water-infrastructure-program/stream-2/).\n- **Funding:** Up to $21M allocated, $2M maximum per project, 50% cost-share.\n- **GetGranted (GG3), refreshed today around 10:42 UTC:** The [Stream 2 card](https://app.getgranted.ai/grants/1425) is listed as **inactive**, with a deadline of 31/07/2023. GG1 lists the same grant as **active**, so the two systems disagree.\n\n**Eligibility note:** Stream 2 is aimed at community-type applicants. These include irrigation or improvement districts, local governments, non-profits, water user communities and Indigenous organizations. Individual producers aren't the target. Source: [HelloDarwin summary](https://hellodarwin.com/business-aid/programs/the-agriculture-water-infrastructure-program-stream-2). This is a third-party page, so check the IAF guide before relying on it.\n\nWould you like me to:\n1. Pull the Stream 2 eligibility and application details from the IAF page?\n2. Check HubSpot for clients or leads who fit Stream 2?\n3. Look at the other open AWP streams?",
+      "checks": {
+        "links": {
+          "status": "pass",
+          "reason": "1 link(s), all from tool results"
+        },
+        "no_internal_names": {
+          "status": "pass",
+          "reason": "none"
+        },
+        "no_total_count": {
+          "status": "pass",
+          "reason": "none"
+        },
+        "mismatch_both_shown": {
+          "status": "fail",
+          "reason": "declares a verdict: \"GetGranted card is out of date\""
+        },
+        "freshness_checked": {
+          "status": "pass",
+          "reason": "checked with web_search"
+        },
+        "no_false_absence": {
+          "status": "pass",
+          "reason": "no absence claim"
+        }
+      },
+      "failedChecks": [
+        "mismatch_both_shown"
+      ],
+      "grader": {
+        "pass": false,
+        "error": false,
+        "reason": "Oracle states active as fact based on web search results and gives specific dates/amounts not verifiable, violating the rule against stating active/open as fact if page can't be confirmed reliable."
+      },
+      "result": "fail",
+      "pass": false,
+      "oracleCost": 0.0427195,
+      "graderCost": 0.0075899999999999995,
+      "runtimeMs": 23467,
+      "tools": [
+        "grant_data",
+        "web_search"
+      ],
+      "blocked": [],
+      "trace": {
+        "calls": [
+          {
+            "conversationId": "b570c329-6411-44a8-99d1-5be4bf47cb9c",
+            "tool": "grant_data",
+            "input": {
+              "mode": "search",
+              "query": "Agricultural Water Infrastructure Program Stream 2",
+              "status": [
+                "active",
+                "inactive",
+                "archived",
+                "draft"
+              ]
+            },
+            "at": "2026-10-05T10:51:06.734Z",
+            "result": {
+              "success": true,
+              "mode": "search",
+              "data_as_of": "2026-10-05T10:42:34.728Z",
+              "statuses": [
+                "active",
+                "inactive",
+                "archived",
+                "draft"
+              ],
+              "total_matches": 171,
+              "returned": 10,
+              "hidden_matches": 21,
+              "results": [
+                {
+                  "id": 1425,
+                  "name": "Agricultural Water Infrastructure Program - Stream 2",
+                  "status": "inactive",
+                  "funder": "Investment Agriculture Foundation",
+                  "amount": "2000000",
+                  "deadline": "31/07/2023",
+                  "regions": [
+                    "British Columbia",
+                    "BC- Interior (Thompson/Okanagan + Kootenay)",
+                    "BC- Lower Mainland",
+                    "BC- Northern (Cariboo and above)",
+                    "BC- Vancouver Island"
+                  ],
+                  "industries": [
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "Through this program, primary and Indigenous producers, conservation groups, water purveyors and Indigenous communities will have access to cost-shared funding to adapt to climate change by investing in water infrastructure. Stream 2…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1425",
+                    "admin": "https://admin.getgranted.ai/grants/1425"
+                  },
+                  "gg1": {
+                    "id": "852",
+                    "status": "active"
+                  },
+                  "status_mismatch": true,
+                  "named_match": true
+                },
+                {
+                  "id": 1426,
+                  "name": "Agricultural Water Infrastructure Program - Stream 3",
+                  "status": "inactive",
+                  "funder": "Investment Agriculture Foundation",
+                  "amount": "100000",
+                  "deadline": "31/07/2023",
+                  "regions": [
+                    "British Columbia",
+                    "BC- Interior (Thompson/Okanagan + Kootenay)",
+                    "BC- Lower Mainland",
+                    "BC- Northern (Cariboo and above)",
+                    "BC- Vancouver Island"
+                  ],
+                  "industries": [
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "Through this program, primary and Indigenous producers, conservation groups, water purveyors and Indigenous communities will have access to cost-shared funding to adapt to climate change by investing in water infrastructure. Stream 3…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1426",
+                    "admin": "https://admin.getgranted.ai/grants/1426"
+                  },
+                  "gg1": {
+                    "id": "853",
+                    "status": "active"
+                  },
+                  "status_mismatch": true
+                },
+                {
+                  "id": 1287,
+                  "name": "Accelerating Agricultural Innovations 2.0",
+                  "status": "archived",
+                  "funder": "Results Driven Agriculture Research",
+                  "amount": "0",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Alberta"
+                  ],
+                  "industries": [
+                    "Agriculture",
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "This provincial program funds research projects that explore the adoption and/or adaption of new and existing technologies to the agricultural industry in Alberta. The aim of the program is to increase discovery, development and…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1287",
+                    "admin": "https://admin.getgranted.ai/grants/1287"
+                  }
+                },
+                {
+                  "id": 1196,
+                  "name": "Agricultural Clean Technology Program: Research and Innovation Stream",
+                  "status": "active",
+                  "funder": "The Government of Canada",
+                  "amount": "2000000",
+                  "deadline": "31/03/2028",
+                  "regions": [
+                    "All of Canada",
+                    "Alberta",
+                    "British Columbia",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "Northwest Territories",
+                    "Nova Scotia",
+                    "Nunavut",
+                    "Ontario",
+                    "Prince Edward Island",
+                    "Quebec"
+                  ],
+                  "regions_more": 10,
+                  "industries": [
+                    "Tech - Biotechnology",
+                    "Other",
+                    "Environmental - Waste Management",
+                    "Environmental - Green Technologies",
+                    "Food Processing",
+                    "Engineering",
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "The Agricultural Clean Technology Program: Research and Innovation stream provides up to $2 million in repayable and non-repayable funding to support the research, development, and demonstration of pre-market clean technology. The priority…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1196",
+                    "admin": "https://admin.getgranted.ai/grants/1196"
+                  },
+                  "gg1": {
+                    "id": "417",
+                    "status": "active"
+                  },
+                  "status_mismatch": false
+                },
+                {
+                  "id": 1778,
+                  "name": "Beneficial Management Practices (BMP) – Energy & Fuel Efficiency",
+                  "status": "inactive",
+                  "funder": "Investment Agriculture Foundation (IAF)",
+                  "amount": "50000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "BC- Interior (Thompson/Okanagan + Kootenay)",
+                    "BC- Lower Mainland",
+                    "BC- Northern (Cariboo and above)",
+                    "BC- Vancouver Island",
+                    "British Columbia"
+                  ],
+                  "industries": [
+                    "Agriculture",
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "The Beneficial Management Practices (BMP) Program &ndash; Energy & Fuel Efficiency stream provides up to $50,000 in cost-share funding to agricultural producers in British Columbia to adopt renewable energy and energy-efficient…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1778",
+                    "admin": "https://admin.getgranted.ai/grants/1778"
+                  }
+                },
+                {
+                  "id": 1061,
+                  "name": "Agricultural Clean Technology Program",
+                  "status": "inactive",
+                  "funder": "Agriculture and Agri-Food Canada (AAFC)",
+                  "amount": "5000000",
+                  "deadline": "30/09/2020",
+                  "regions": [
+                    "Alberta",
+                    "British Columbia",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "Northwest Territories",
+                    "Nova Scotia",
+                    "Nunavut",
+                    "Ontario",
+                    "Prince Edward Island",
+                    "Quebec",
+                    "Saskatchewan"
+                  ],
+                  "regions_more": 10,
+                  "industries": [
+                    "Tech - Biotechnology",
+                    "Food Processing",
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "This federal program will offer 50% (or 75% for underrepresented groups) of project activities up to $5,000,000 to businesses in Canada's agriculture, agri-food, and agri-based product industries to expedite sustainable innovation. The new…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1061",
+                    "admin": "https://admin.getgranted.ai/grants/1061"
+                  }
+                },
+                {
+                  "id": 1221,
+                  "name": "Water Program (CAP)",
+                  "status": "archived",
+                  "funder": "Canadian Agricultural Partnership",
+                  "amount": "25000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Alberta"
+                  ],
+                  "industries": [
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "Primary producers in Alberta can receive a maximum of $25,000 for cost-shared projects relating to either on-farm irrigation system purchases and upgrades, or to new or expanded water source developments that improve on-farm water supply.…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1221",
+                    "admin": "https://admin.getgranted.ai/grants/1221"
+                  }
+                },
+                {
+                  "id": 1089,
+                  "name": "Clean Resources - Alberta Innovates",
+                  "status": "active",
+                  "funder": "Alberta Innovates",
+                  "amount": "2000000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Ontario - Southern",
+                    "Alberta",
+                    "British Columbia",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "Northwest Territories",
+                    "Nova Scotia",
+                    "Nunavut",
+                    "Ontario",
+                    "Prince Edward Island",
+                    "Quebec"
+                  ],
+                  "regions_more": 10,
+                  "industries": [
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine",
+                    "Charity/Non-profit",
+                    "Construction",
+                    "Engineering",
+                    "Environmental - Green Technologies",
+                    "Environmental - Waste Management",
+                    "Food Processing",
+                    "Forestry"
+                  ],
+                  "industries_more": 3,
+                  "summary": "This program aims to accelerate technology development and deployment that contribute to the 2030 Innovation Target by funding up to 50% of eligible projects to a maximum of $2 million per project. The funding is open to industry,…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1089",
+                    "admin": "https://admin.getgranted.ai/grants/1089"
+                  },
+                  "gg1": {
+                    "id": "269",
+                    "status": "active"
+                  },
+                  "status_mismatch": false
+                },
+                {
+                  "id": 1660,
+                  "name": "Agriculture and Food Innovation Program",
+                  "status": "active",
+                  "funder": "Alberta Innovates",
+                  "amount": "750000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Alberta"
+                  ],
+                  "industries": [
+                    "Agriculture",
+                    "Manufacturing - Food & Beverage",
+                    "Food Processing"
+                  ],
+                  "summary": "The Agriculture and Food Innovation program, provides funding to support advancements in the industry that increase productivity, reduce inputs, lower emissions, ensure a safe food supply, and sustainably produce more with less.",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1660",
+                    "admin": "https://admin.getgranted.ai/grants/1660"
+                  }
+                },
+                {
+                  "id": 1394,
+                  "name": "Canadian Agricultural Strategic Priorities Program",
+                  "status": "active",
+                  "funder": "Government of Canada",
+                  "amount": "1000000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Alberta",
+                    "British Columbia",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "Northwest Territories",
+                    "Nova Scotia",
+                    "Nunavut",
+                    "Ontario",
+                    "Prince Edward Island",
+                    "Quebec",
+                    "Saskatchewan"
+                  ],
+                  "regions_more": 9,
+                  "industries": [
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine",
+                    "Association",
+                    "Environmental - Green Technologies",
+                    "Environmental - Waste Management",
+                    "Other",
+                    "Tech - Biotechnology",
+                    "Agriculture"
+                  ],
+                  "summary": "The Canadian Agricultural Strategic Priorities Program (CASPP) provides funding of up to 75% of eligible expenses up to $1,000,000. Typically only non-profit organizations and Indigenous groups are eligible for the program. However, if…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1394",
+                    "admin": "https://admin.getgranted.ai/grants/1394"
+                  },
+                  "gg1": {
+                    "id": "784",
+                    "status": "active"
+                  },
+                  "status_mismatch": false
+                }
+              ]
+            }
+          }
+        ],
+        "serverTools": [
+          {
+            "tool": "web_search",
+            "input": {
+              "query": "Agricultural Water Infrastructure Program Stream 2 intake"
+            },
+            "result": [
+              {
+                "type": "web_search_result",
+                "title": "Agricultural Water Infrastructure Program: water availability, storage, efficiency & sustainability - Island Social Trends",
+                "url": "https://islandsocialtrends.ca/agricultural-water-infrastructure-program-water-availability-storage-efficiency-sustainability/",
+                "encrypted_content": "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",
+                "page_age": "320 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "AWP - Stream 2 - IAF",
+                "url": "https://iafbc.ca/agriculture-water-infrastructure-program/stream-2/",
+                "encrypted_content": "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",
+                "page_age": "3 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "The Agriculture Water Infrastructure Program",
+                "url": "https://hellodarwin.com/business-aid/programs/the-agriculture-water-infrastructure-program-stream-2",
+                "encrypted_content": "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",
+                "page_age": "343 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "Agriculture Water Infrastructure Program - IAF",
+                "url": "https://iafbc.ca/agriculture-water-infrastructure-program/",
+                "encrypted_content": "ErgJCioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDOZegqtuEdnYD/VNDBoMyk7oya5A3Wa+jtunIjBe0L7ojKmBWAvh4j6C8ldtZOlw5S90kWk6TEt0eJGfI475IfjfeDUqOOm+TFJ6Np4quwj6Ne+E5cC9WsEhjyciuJcbIiKGFAJSE7kaNnmuNtWlbTh4pqFzRN99Ymbjp6VQTFBd3/PcJ4pDXoAOD8dRwWTt6NODXSqVzTxKtnMzwZ6Je+uhmz2hi162oSSEpf49HKKS9pyMFOicFd4FYOF0Ws5s01gqdxBrni3gP0RFIL5drYV03pXFUmj0PgZm6LtfsU68mvWHXWJ12Kjd2FwgYSrAVRxgmY13CaQ8GW+ORm7jGZKeqXoO+3XKRv5XKRZ+dZsoK5NQ3KYiBT/yTsQ1gcJQgEXCKxFTrgt/P1Ls22k/G6gmehKfNAeuKHrB1NL8dEe1LVBMRScaQSEjsxAQZvCFp5k+m0oGZaddzFhYTmfbGDDdhrEicGxAd182KXTiMqQzQ6K7YH9JDIFBr9wtmiJtYkTCDRRT711tRXbewWpUljguSf8Gz1cGmgVw31A6Mldqh9aTcZ1EMLpKB6Z/fMJAN77Zi2EAk9eKmiTtkR7+pfBv9dX8kk7gCChp3XK+2JyAf+YdrmTIv00IoYkHNjf3Ovs/6fJu4343yVX3nl84EUG/VUChhlig5SrLPsPksQ9jGGwgkGrOyPGYwX9giO34wun8cO1iehLRgngpqsqHTRls0dPeEKNgYakDHPeR6bS0KBY5rJJ0YbAd3D41k7Fat1v9+704HEBpz2R2XJCFDsLzd+YxOH55oTtZaPJV0tjE19818jTdr+rpJAgTEzRyVCu253R4vqNreNabKztv+w70T2auaq/gtiZ+fhHxuGPdY0VMnNG5kuaqLmHrs1uDVDFP7oIFtKDvBJgMmIyItTHiTC5M4b//3/D4nDHjxXxFfn8uyDXjFfbsMaa/LPLr90IHKaCr3bvLklatmuHdq2k8qxXge/4zF5R0I+dCbaHCGwHT7RdGQFCJNaNGLaKVxTsFOpuQu/j2lnUMc79GwS8nJMiiIzGRAJUXwD+dA9uAZly36FcOeyproe8NPBSYhibSeXUIOwdQJwClvwk4b6ewks3YNxfc6766MG4/MX4QC15DwE6BMrxszdtaf28txgrNb3bvVWUBoqeL39zds5hKyP1UjGXw3fRw/kgbAD09UIE6KrmEVkVt68nAIDCFDLHqjk5Jx/xgWxBbMbYJvm7dfWAdysEK3yE00YFyXU4sdLxszyDVjH9o+tyJFs1FCFUtEOC0nNxtdmoTOhm6foEAy6TIcPFgMS6UQGeEzGHt5yuu3cLl+Uls2MQvyV3SVaCNyMoGA1A71fKnaH5fPgRsVsWqyOWn6SzdI3Mp4tVzgvnj1VfyNc9SqW6LFtmS2nWmMuhF6SMB417Qyv+AWFFYc/FsPAWIq0uwleXMvG7e76lYKX3YaYtcSoHQCXp9aEvWohGfQgNjGacmGR/ljtStGMm+G6iT5rKwENk56JhAFmRXMsT7fjMUV0Mg/cPP6nIT3N4HKb7brC0YAw==",
+                "page_age": "3 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "B.C. helps farms with solutions for water storage - BC Gov News",
+                "url": "https://news.gov.bc.ca/releases/2025AF0023-001122",
+                "encrypted_content": "ErEICioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDAz+8iz0TYxihqm1uBoMQL3yu/vMdT9eUa6PIjCf7aCblT3j6LiKmtUPEE9mzHF+YME16UF6Df/gZERzFEpYwjrtnqXNGqUx+4DBt4kqtAd/+Tc6zI77G7lhSiiks+N6vbI6hahI0S1O/9FKykHAWCkryeMfkJmlkwaF1/D58531mnwFiylxCNQttE7PBaWKVX4ErpcjoUKsDDSCSVq3JebCp9k6HfnuQFAkO2TLbLfxd+37uUDd/KypWEOGSQxVyM75kIdND4VzeO32RNCZa4VncAqEthFFqKQ1KPvyAWVzctEArt7XsdXqqUo3BMfQgsgNGuGZ9WXfxLO1mXi+wlVepbs/h4aT+/DAKGJ4jMDHhGAGumFeM6ynr+sPZl9sye4YhXBEfeSK7HSkfMENsO6GcGRGEY7ePjtdudXBshwPDuF8peyGwP6Py8fiPlUVg3wfRkyRwDifxQf//SmSwR1grOpkG2sXTEItj4P1+o+bIrpz1ezJhJtOQ53/Uvdt0B1ELtjifpMwNaduxvQl5kfaozadNRu9CKzXjV47XScoXe9JLqa+NShKJyRQsVoQv/8BUYyKkR8Hdc8Sng56hJhyKL449upjKZcIYgGqNvyPL0MOi7SDXsj5dJ+AGsVMyR9t4Qj4eM5MEk3rEHJ2e/pGi3wuejfM7+dQKmcyMZ8NBi5mhyZWBzEwadK5qy8uCFlGdsOPnTlVxbIwBwlpvdu1Vnzo7F2Id5RbpDV2JxUAJqnu5U4tTXEOhYYXSazxEwXL5bSkO2jgOJ/Lp71hZlDtt74jTHdeXpL3kngkmmFfFJ7m+qPU5jY7U3xGOG9Fpplk/fWPg7eEvL75MrhyAjcsTUHpeBk+zUCOU1RiQKUsmu9JHmYJMAmFSqlaksbWjNwGizElB9k1x0r5pcpwIn9YqwNrMuMTOeLYrWaNuJQGRtRniTrMwoayskAmcF9kcpGOu45zMBtFFSv9AJ8D/Au0o4d6cqn4kxX4JKdQiwg+maiHbrgVjS1Vl9395odIwR0HBWrST2+449ZhXvOhGmewidB3WGo7Z+8vRMhvA6jHH7vk855L7iG3G+HZPNh6cNQ3xB0ep6JpRbcvUzF2bGqaOePECvS8nCu0DwKcJM4q49HqDjWg6xvd9Ufz4Ah1fpMNZzqZ7oHiwaeW9d3sEmf0xwAj82iOfQbMKQIYpsxVghqZ48DtRvazS/FhLlWxC0AluIZcoOFk607d97YGJ59krfV0+OymAF+oEqfPtOEFjH1gHyKjpCR3xlMBh/bJlc1wcwwUz+DGTPPjtP6InfabVUIwLzXpP7e+YX8xbqcTwD46J8wZanFs2CjOOrH4RL955SQHZwnYLyiSN0pVCtwIeW0YAw==",
+                "page_age": "321 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "Farm and Ranch Water Infrastructure Program (FRWIP)",
+                "url": "https://www.saskatchewan.ca/business/agriculture-natural-resources-and-industry/agribusiness-farmers-and-ranchers/sustainable-canadian-agricultural-partnership/programs-for-farmers-and-ranchers/farm-and-ranch-water-infrastructure-program",
+                "encrypted_content": "EsUHCioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDPqVgppGqs1GQ0TOeBoMjQnDFtFfuAOyZ6fmIjAX/ZrauYNEIea32HqsxxC65jwA7CnnHsAUm1amZ4162JgHBXUeQaWuR+0wZT1PEbUqyAbhXEJ5ZIH+qgkQ+RHeNXIBzMb6vJ/ARB6FCJPCncnwGhVUzu6MBUntDxa//8pluUTBjGiSztGFkBl+MoZOH8vD+w5cQhW8giInJwoeIsX5k2fgn++pTYwOsn18hLZliovUx08nzdUYX8qICIG0d8pnL+xD/jUevpmNdCiThlOdvNloZKOuD0/6wV5R5qegtHD8Oz+lt4av00Y4ZDl9DWWaG/LxCxg4Fdv/fx0EkKsvAuta3S1PZezvnXY10uxOA6N+THSR2fGBwuTEoDpGa1+ACrjeoOUb2291TjRUmiREeEOGn0AJ+2e2A1HwqgLMuA4Ggj6aRRJct9I6CXST6+sYajwCiCpjeuka3G0qR1veB2ru+s4eGb0G4saezZH0vLb9xRYGVoodXV3GCZRk4V9/hbVskJYCJ/+Q0CQljRGYt7MdvrVWW0CEqDBD7qbB6Uek0bEXbQ3Z/LIu18hnXxl/Hee8Cgj5r1TRu6Ysfy6mI/FYZVycFqBizGHyVBcUVuunffrFG2hU6ye2amygzwE1xBBlQgzpsBWYQ1tczFpg+Up9YvAxFCLe5jkfgQXRdzOfNe2fDH3oiPv04r4nRleU7QhG/gWTONMJDyGK4orl6KvIv7cy5ENGCpHQGMbcRRDQVAVAwaFvrAz8UxAOo/7kDld9C0B/uO9fB0ENhfqR5wduAqmLO4pnTg3BOUGSZfmdtuSPaLTgPYwUQokRlqdJRfNOvNWtIrrawwP+Yn0U4xw0ZvHjpMqMQkkZE0hnGDHcv8eagc847bvohznx8UmH3PczQnZKpKUSA9gRv9mQVcPdYT57P7EKryq4HVaqfX23kqHR48uO8r/v4UfqNCGBY8a9zQcF+ZA0DOOPDzWvrR65aXb9FA28gp75sDFGfS0FCOE+m82x1VfHkN1N1kYGCkLdVOFUYnygXjTHAiGwjiFm4xvgILbOOWuQ2Sz3PPNcEUgOcTnRt7Gk8YBzHhDfCto0wAzAFTJUI/9km1ZHl10VVLdUHn3Vbpflk078oO3z7Qw8KwyblqtG9iKO1eKhPzD9P4ylLbLlQk+ECRb5zZ+k9pEVqSJ1rD3aXzSfCVbyA/04m5Es8E1hdSkPUoLFM0OmPW0S+IwYAw==",
+                "page_age": "241 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "Agricultural Water Infrastructure Program",
+                "url": "https://grantmatch.com/hot-new-programs/agricultural-water-infrastructure-program",
+                "encrypted_content": "EqUICioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDKzZnaZVbXAQrAhaAhoMNI58gSrcUywqJ5NcIjAjJmRxNR0wZbRPgXhZnvs807XGrHXcqFQC+3D6MxR9YM730WQZERcbxf+05kR2g6MqqAc8hnbMPmNdn5kY91hLdCsxzeRCGP15AyrDGGJNWtfCd0/iVcAwCAuQpZa3/jVv2/1g6l8LQv/IR+ZqAuwy802VoDLuWWLbVUK6vLHsI+xqLpwP98SGcUavHTsGu0qOdyupP5eBWC0unNm7BLU077SdBEcFrMh/CDEjm3y3xx+qv6hLOPP2PBFQNgrFXVZVxqV6A+cm+DqMSaWft28bGsM1HaGs6ss2j5jUQQFwtFgaA0K469z8pA55363GCORhI6JqIxFwhvPyImKBNjnmdTN5A0rjBKzwPI1J+Wm6SMyRqFy3O/0cG8XYfSPTaJJJjWwPGyLmrtZCZprS1TsWHK9j1L9UbZHXLCgFSn1yKZDaT3gyTPmUd0QWAvqO5bMeQljplT03980PhnMArlnKsrmVHkeS4UkyZKYAusAvZlYCqzebr9ZpggI3YLJbX1nJ5E275F9cHD/g0BEW0ke6ENvnCPfFMFMhZbSO+JMM5GIMdQkl+DjUIIuy0KRnFTUiKJ6MWetUVCY9LcXYOXQnSWLuFoHvQU4eWWe9ICtCBnlRZDLMVionNUKlJZXw20ms/jDpwdPy73RQgjiZVbGMIUVPVJlQhaqwedypmGYu/BYJkUTrJuuKqYwozWIuw3liyWKB2MdrS/cuj5GIklFiGGcPygqHk1ncisQQIs2kreP12eTrkMysi81eVV1lwVIAw+xZcG3x9TyEDu1QLVyd6LpfekiO10XsrP/2+0oRBd6mEI5cBXVmPZ6EODxWxm0XEw87DAPbsTdMAjjoL2r6Jb3WF/BbVS41SUzvDyNvhir8KDX/dc6Loiz3eYqdjsoCfa2WXHLv4SRChCEdRQvC4GykMHAxnvhCe4FRTfsqXoybp7x1vkAQBrplVPPCbyJZ4SNm40rUYOsnc2Ut+krYUxQh4ff3x0E7nUXVqshjAA6gAzDOBsro0OXL/EJLMuyZ9E/bNndumZUCPgKQ1uHEzerUTFcz8S9tzEGV/pQm/1nVezFDutRB/coo0uNkYZe1eQ3oXXmbpilWlLL0d+sTf3OZ/WPjpzaPwMkfeGB9WzTSvOZ5e8Agy5Weo+YPR7hrJQzL5Us+kM7RfYEsf5MCLzfD0UFTHR8t63WJRG3Vul528yEcLsYEJZzqbgKYXPtoFJud02hbwNLKHk+ukK1bg+IDOuZcDCFqPMMIMszyNFxaE3c4eUPjKr81SZbbk5dbMwmZNRdyJmBYGBC9y+8cwDUxhKDt4oaf4BEYAw==",
+                "page_age": "1187 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "2020 Agricultural Water Management Plan",
+                "url": "https://files.ceqanet.lci.ca.gov/270566-1/attachment/eCT0xbjnqkcyrnjRx_ftWwFmJ9NesSzfCFhUvCiY8_iejAwb0qax7FEWMm_8dJlYyQRdpGmSvMb4FLxf0",
+                "encrypted_content": "EuMECioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDHFXpz2eDvYpWHjDJRoM8EHmH+bjteTR8ctCIjAmuQ62AeyOnZ8RnAIuGBSAi4uO2elyDjHm3kadtlSnwLS0niq6lG8ah1jZaZSUFesq5gMs1QrSnjf3nwguYdceQF8if82SeGiGgPqRT+67BsASg38BXzhuGkaGC/2UPpfWq5sU+vnOpIeUOq5bv2rtANHO7dX1xhrXcPf/mmT6sYfp1iIfhn8CpGIEYJJzUM7znFSYIkuhbxdJVUuRiCfXhL4B6HRJES4fN+9so0uqH9EthDENVRll/lKUOSk1tBuDE7fq6OUI/mYDUPrAcXUSEZYZ0jdWLiwQ4t8ErMKSoWHiCy8uO7kyuRsqj7bvFHgcQqsrB261oZlLWffuPoB7Rp8eqYPt6Prwz0K39r16gsnEj0xXz7AMtCiFV/0QjaNAtE7NAyjBpDRgS+js0mmPYCgclIDaqTxmohr6ba1uOR9G0lWRB75yuBkA/2r5SuYJqZDtxtftAcTW83MQpRLDusdwsBMyQkZVcJQ2GQ9C6Y8a7D9eHUdW/48wO8gBiXmpAxnP7VTZLRK7zL0ZOuXHMJDPqBJzzCzspU7M17Ql68cqX6xko+a10lwHvVf5KBjDrJDKwtOuTw60tg99TAhc5iNPnRpgmGIjRXSlsZKERopWuW9ycql8JqAE7zxvPq0/EMK9KN0BLr3uaFp6oMRtsfholcPh5pSGbHv8KUoirSJFXOtU85eNfoSwWlEGweo7cupWa7jWsrEYAw==",
+                "page_age": null
+              },
+              {
+                "type": "web_search_result",
+                "title": "Water Program",
+                "url": "https://www.alberta.ca/water-program",
+                "encrypted_content": "Ep0ICioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDDV9xEWwhXcxHav8hBoM6PNlbKnDgBa6bcmDIjA7rDpovU4QRX/VbLba1PSu6lHzXz2bmds88grT2+cICMaujP+Lr2AiNZrO8qL8P+IqoAePbZAHnfqGroAcLeXh6GBjHnSisdLnS23Vi+KKLrEpECC5qp1RhweBQl+3wOa0ZO5hNVIJunwpz9qrGRU+dfQPKJVqf2BeosvG6GX0XXmJZyxm5JjRhURNKoawgweWchwu1c45gXHQKZumRnvJ4K3criOUxcWh/F1z52v0YPzeK+dB5qrfgLR7IGMeRk4ycZDy9opKu7mwPGzfx45nR14iJ+wEGRZBWarIiNkgYyZ/dXei3M1d7l/gnzjpiLElSs3+4voNYDRKo+rDRfc4UGtn2GbPUUpPg2UAqais5lAcruGBr7D/bJFVANEHWJ7UenLTDA0RfQsoumYMWhTOx0N0XVbxd1Mt+wwK3esnGt45nuaGAcKFgBwrluvKIupX6S0uCknQEoaCGmRmwwsaNJUxD1974M33qChWY/o9Wh3nfMlE0eIOajv3VwMeDoqO/8CHRmb1O1rPgRYLYHO0ARak+nZEfOagLPTJhJpskK+CkYkx9AwUXkKFAwBwRmJsFPaAJiQTYzi7KcExel+gG5KcPPHVguQh1+B4xqz3Ps+oDO562grjf5DI2TF8zCjMxwqvtHyUZ6WI4YSNfRjUEa9nHKX2xiogBVozKlAVcH1nwmRerd4adIgo9seMuMioyMrFPHA7jIasTgmCGaKL+SVuOqmVwVMQKf2ZsOV6AqXtc5QamljmbyC41tou0mnwLxFfHMcnitY5xtEIq377LJvNAuQYz3MMqtpUF7pC9ty54BsfzJKYR0MyR4tN7teMJVthcqzf969Dqeh11vGGuimByVl478lq23y+SPsCHe5X9WK68Q5+6I6tHO4JTr1YaWw5alZmUcY5Gk7lXvKYx7Run2SVd/HoOy6rhW6M3Dc11QW01Yi1GTbMu5Z7inP6CT4/0Ph9d7gWmbTBsJLeNz0zJTfW9EoAka8+Em+Sh7Ei601iQLcdJkP+P0PNE9/oDKf4I4kARCXAS2WhLeYxBgdb9BpEtvhSaAT9xCVubK2P+UKtmuR/yr3IW0Ngwc6BwxHn6F6kKy6IlTNeyA1GT660rfnS/R3lGqBqbSXFe+47Ahf57hmQrJ95/VwTqYbGmCxhk+uCE+DuWRdqmATRSs9MuYYeyry9Fl8PDggTnTVmVmbJfaF2vmFxJbrJM+XTqoEY31UKz6PiExtaAt+9L7pzthK1s08OfSENjGKNBjIJ1tF+99tVuVDajsbzqWxmvnJz8iEVxleXfEjXl3OQKEsbGAM=",
+                "page_age": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 13,
+      "category": "mismatch",
+      "question": "Is the 2 Billion Trees Program still running?",
+      "conversationId": "4305bcfa-9f32-40b4-9916-b259346cfad4",
+      "agentSuccess": true,
+      "agentError": null,
+      "model": "claude-sonnet-5-5",
+      "answer": "**Short answer: it's closed to new applications and being wound down. It isn't accepting new applicants, but existing agreements are still running.**\n\n- **Official page (NRCan):** The Government of Canada will wind down the 2 Billion Trees program, as announced in the Federal Fall Budget of 2025. Existing agreements will be honoured, but the program is no longer accepting applications. The [All streams funding page](https://natural-resources.canada.ca/forests-forestry/2-billion-trees-program/2-billion-trees-program-funding-all-streams) is marked \"Closed\". Source: [2 Billion Trees Program – NRCan](https://natural-resources.canada.ca/forests-forestry/2-billion-trees-program).\n- **Existing agreements:** An NRCan spokesperson said the program will honour and continue to administer funding for existing agreements until 2031 ([Corporate Knights](https://corporateknights.com/natural-capital/canadas-2-billion-trees-program-was-troubled-its-loss-still-hurts/)).\n- **Closing date:** One third-party site says the program closed for new proposals as of January 9, 2026 ([Alberta Business Grants](https://albertabusinessgrants.ca/grants/2-billion-trees-2bt-program/)). I couldn't confirm that date on NRCan's own page.\n\n**Our records:** The [GetGranted card](https://app.getgranted.ai/grants/1384) is **archived**, but the linked GG1 record is still **active**, so the two systems disagree. This was checked against GetGranted data as of about 10:42 UTC today (Oct 5, 2026).\n\n**Related program:** [Growing Canada's Community Canopies – Tree Planting](https://app.getgranted.ai/grants/1798) (FCM) is listed as inactive, with a June 30, 2026 deadline.\n\nWould you like me to:\n1. Look for any current tree-planting or forestry programs for a specific client?\n2. Check whether the Community Canopies program has a new intake?\n3. Pull any Granted clients tied to 2BT in HubSpot?",
+      "checks": {
+        "links": {
+          "status": "pass",
+          "reason": "2 link(s), all from tool results"
+        },
+        "no_internal_names": {
+          "status": "pass",
+          "reason": "none"
+        },
+        "no_total_count": {
+          "status": "pass",
+          "reason": "none"
+        },
+        "mismatch_both_shown": {
+          "status": "pass",
+          "reason": "both statuses shown for 1384, no verdict"
+        },
+        "freshness_checked": {
+          "status": "pass",
+          "reason": "checked with web_search"
+        },
+        "no_false_absence": {
+          "status": "pass",
+          "reason": "no absence claim"
+        }
+      },
+      "failedChecks": [],
+      "grader": {
+        "pass": false,
+        "error": false,
+        "reason": "Oracle gave a verdict ('closed, being wound down') before establishing GetGranted data freshness, violating the rubric's freshness-first requirement."
+      },
+      "result": "fail",
+      "pass": false,
+      "oracleCost": 0.029109200000000002,
+      "graderCost": 0.0073349999999999995,
+      "runtimeMs": 15719,
+      "tools": [
+        "grant_data",
+        "web_search"
+      ],
+      "blocked": [],
+      "trace": {
+        "calls": [
+          {
+            "conversationId": "4305bcfa-9f32-40b4-9916-b259346cfad4",
+            "tool": "grant_data",
+            "input": {
+              "mode": "search",
+              "query": "2 Billion Trees Program",
+              "status": [
+                "active",
+                "inactive",
+                "archived",
+                "draft"
+              ]
+            },
+            "at": "2026-10-05T10:51:25.437Z",
+            "result": {
+              "success": true,
+              "mode": "search",
+              "data_as_of": "2026-10-05T10:42:34.728Z",
+              "statuses": [
+                "active",
+                "inactive",
+                "archived",
+                "draft"
+              ],
+              "total_matches": 9,
+              "returned": 9,
+              "hidden_matches": 4,
+              "results": [
+                {
+                  "id": 1384,
+                  "name": "2 Billion Trees Program",
+                  "status": "archived",
+                  "funder": "Government of Canada",
+                  "amount": "40000000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Alberta",
+                    "British Columbia",
+                    "Ontario - Central",
+                    "Ontario - Eastern",
+                    "BC- Interior (Thompson/Okanagan + Kootenay)",
+                    "BC- Lower Mainland",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "BC- Northern (Cariboo and above)",
+                    "Ontario - Northern",
+                    "Northwest Territories"
+                  ],
+                  "regions_more": 9,
+                  "industries": [
+                    "Charity/Non-profit",
+                    "Forestry"
+                  ],
+                  "summary": "The 2 Billion Trees program aims to motivate and support new tree planting projects. Over the course of 10 years, by 2031 up to $3.2 billion will be invested in tree planting efforts to support provinces, territories, third-party…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1384",
+                    "admin": "https://admin.getgranted.ai/grants/1384"
+                  },
+                  "gg1": {
+                    "id": "741",
+                    "status": "active"
+                  },
+                  "status_mismatch": true,
+                  "named_match": true
+                },
+                {
+                  "id": 1519,
+                  "name": "Enhanced Replant Program Stream 2: Wine Grape Replant",
+                  "status": "inactive",
+                  "funder": "Investment Agriculture Foundation",
+                  "amount": "500000",
+                  "deadline": "3/12/2024",
+                  "regions": [
+                    "British Columbia"
+                  ],
+                  "industries": [
+                    "Agriculture - Vineyard/Wine"
+                  ],
+                  "summary": "The Enhanced Replant Program provides direct funding up to $500,000 to support producers looking to replace damaged, diseased and low-producing vines, plants and trees with climate-resilient varieties that produce in-demand, premium fruit.…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1519",
+                    "admin": "https://admin.getgranted.ai/grants/1519"
+                  }
+                },
+                {
+                  "id": 1742,
+                  "name": "Regional Tariff Response Initiative - British Columbia",
+                  "status": "active",
+                  "funder": "Government of Canada",
+                  "amount": "10000000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "British Columbia",
+                    "BC- Interior (Thompson/Okanagan + Kootenay)",
+                    "BC- Lower Mainland",
+                    "BC- Northern (Cariboo and above)",
+                    "BC- Vancouver Island"
+                  ],
+                  "industries": [
+                    "Accounting",
+                    "Advertising/Marketing",
+                    "Agriculture",
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit",
+                    "Agriculture - Vineyard/Wine",
+                    "Alternative Medicine",
+                    "Architecture/Design",
+                    "Arts & Culture",
+                    "Association"
+                  ],
+                  "industries_more": 70,
+                  "summary": "The Regional Tariff Response Initiative (RTRI) in British Columbia is part of the Government of Canada's $3.45 billion strategy to defend Canadian jobs, industries, and supply chains from trade and tariff disruptions. The initiative helps…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1742",
+                    "admin": "https://admin.getgranted.ai/grants/1742"
+                  }
+                },
+                {
+                  "id": 1406,
+                  "name": "Canadian Agricultural Loans Act program",
+                  "status": "active",
+                  "funder": "Government of Canada",
+                  "amount": "500000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Alberta",
+                    "British Columbia",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "Northwest Territories",
+                    "Nova Scotia",
+                    "Nunavut",
+                    "Ontario",
+                    "Prince Edward Island",
+                    "Quebec",
+                    "Saskatchewan"
+                  ],
+                  "regions_more": 9,
+                  "industries": [
+                    "Agriculture - Crop",
+                    "Agriculture - Dairy",
+                    "Agriculture - Livestock",
+                    "Agriculture - Tree Fruit"
+                  ],
+                  "summary": "Eligible amount of the loan: Existing farmers - Loans to existing farmers must not exceed the lesser of 80% of the appraised value of the property for which the loan was made Beginning farmers - Loans to beginning farmers must not exceed…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1406",
+                    "admin": "https://admin.getgranted.ai/grants/1406"
+                  },
+                  "gg1": {
+                    "id": "800",
+                    "status": "active"
+                  },
+                  "status_mismatch": false
+                },
+                {
+                  "id": 1798,
+                  "name": "Growing Canada's Community Canopies (GCCC) – Tree Planting",
+                  "status": "inactive",
+                  "funder": "Federation of Canadian Municipalities (FCM)",
+                  "amount": "10000000",
+                  "deadline": "June 30, 2026",
+                  "regions": [
+                    "Alberta",
+                    "BC- Interior (Thompson/Okanagan + Kootenay)",
+                    "BC- Lower Mainland",
+                    "BC- Northern (Cariboo and above)",
+                    "BC- Vancouver Island",
+                    "British Columbia",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "Northwest Territories",
+                    "Nova Scotia",
+                    "Nunavut"
+                  ],
+                  "regions_more": 10,
+                  "industries": [
+                    "Forestry"
+                  ],
+                  "summary": "The GCCC &ndash; Tree Planting supports municipalities and eligible partners implementing large-scale tree planting projects that create long-term environmental and community benefits. Projects must focus on planting the right trees in the…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1798",
+                    "admin": "https://admin.getgranted.ai/grants/1798"
+                  }
+                },
+                {
+                  "id": 1011,
+                  "name": "(Z-COVID) COVID - EDC Business Credit Availability Program (Guarantee)",
+                  "status": "archived",
+                  "funder": "EDC",
+                  "amount": "6250000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Alberta",
+                    "British Columbia",
+                    "Manitoba",
+                    "New Brunswick",
+                    "Newfoundland and Labrador",
+                    "Northwest Territories",
+                    "Nova Scotia",
+                    "Nunavut",
+                    "Ontario",
+                    "Prince Edward Island",
+                    "Quebec",
+                    "Saskatchewan"
+                  ],
+                  "regions_more": 10,
+                  "industries": [
+                    "Tech - Animation",
+                    "Tech - Biotechnology",
+                    "Agriculture",
+                    "Manufacturing - Apparel/Textiles",
+                    "Automotive Dealers",
+                    "Construction - Supplier",
+                    "Consumer Services",
+                    "Legal",
+                    "Manufacturing",
+                    "Other",
+                    "Public Relations",
+                    "Veterinary"
+                  ],
+                  "industries_more": 69,
+                  "summary": "The EDC will guarantee 80% of new operating credit and cash flow term loans for financial institutions to extend to SMEs, up to $6.25 million. The program cap for this new loan program will be a total of $20 billion for export sector and…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1011",
+                    "admin": "https://admin.getgranted.ai/grants/1011"
+                  }
+                },
+                {
+                  "id": 1336,
+                  "name": "Ontario Automotive Modernization Program",
+                  "status": "inactive",
+                  "funder": "Government of Ontario",
+                  "amount": "100000",
+                  "deadline": "Open Until Filled",
+                  "regions": [
+                    "Nunavut"
+                  ],
+                  "industries": [
+                    "Auto Repairs & Auto Parts",
+                    "Engineering",
+                    "Manufacturing",
+                    "Tech - Biotechnology",
+                    "Architecture/Design",
+                    "Association"
+                  ],
+                  "summary": "The Ontario Automotive Modernization Program provides funding of 30% up to a maximum of $100,000 to small and medium-sized automotive suppliers in Ontario. Eligible applicants must have 2 years of financial statements, fewer than 500…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1336",
+                    "admin": "https://admin.getgranted.ai/grants/1336"
+                  },
+                  "gg1": {
+                    "id": "626",
+                    "status": "active"
+                  },
+                  "status_mismatch": true
+                },
+                {
+                  "id": 1520,
+                  "name": "Enhanced Replant Program Stream 3: Berry Replant",
+                  "status": "inactive",
+                  "funder": "Investment Agriculture Foundation",
+                  "amount": "500000",
+                  "deadline": "12/12/2024",
+                  "regions": [
+                    "British Columbia"
+                  ],
+                  "industries": [
+                    "Agriculture - Crop",
+                    "Agriculture - Tree Fruit"
+                  ],
+                  "summary": "The Enhanced Replant Program provides direct funding up to $500,000 to support producers looking to replace damaged, diseased and low-producing vines, plants and trees with climate-resilient varieties that produce in-demand, premium fruit.…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1520",
+                    "admin": "https://admin.getgranted.ai/grants/1520"
+                  }
+                },
+                {
+                  "id": 1521,
+                  "name": "Enhanced Replant Program Stream 4: Berry Removal/Renewal",
+                  "status": "inactive",
+                  "funder": "Investment Agriculture Foundation",
+                  "amount": "500000",
+                  "deadline": "12/12/2024",
+                  "regions": [
+                    "British Columbia"
+                  ],
+                  "industries": [
+                    "Agriculture - Tree Fruit"
+                  ],
+                  "summary": "The Enhanced Replant Program provides direct funding up to $500,000 to support producers looking to replace damaged, diseased and low-producing vines, plants and trees with climate-resilient varieties that produce in-demand, premium fruit.…",
+                  "links": {
+                    "app": "https://app.getgranted.ai/grants/1521",
+                    "admin": "https://admin.getgranted.ai/grants/1521"
+                  }
+                }
+              ]
+            }
+          }
+        ],
+        "serverTools": [
+          {
+            "tool": "web_search",
+            "input": {
+              "query": "2 Billion Trees Program Natural Resources Canada funding status"
+            },
+            "result": [
+              {
+                "type": "web_search_result",
+                "title": "2 Billion Trees Program - Natural Resources Canada",
+                "url": "https://natural-resources.canada.ca/forests-forestry/2-billion-trees-program",
+                "encrypted_content": "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",
+                "page_age": "203 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "2 Billion Trees Program Funding - All streams - Natural Resources Canada",
+                "url": "https://natural-resources.canada.ca/forests-forestry/2-billion-trees-program/2-billion-trees-program-funding-all-streams",
+                "encrypted_content": "EsIDCioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDPvU59/az+7GnB+4+BoMnJWx2RivZAAcc2wlIjDXnRZeJG+8LsbnDnyuM4A/aNE41ZanyRQA6mVYiv1Zz3cP3J/8Q3M5DZFDTS+Ozb0qxQJboZZSOLuukYBxbkf1M6Axkws2bcdAMubarTuuCJvmFjb0OpiNQ7t7o54m1/N7Rw5kbzwbWu57PYnK9gkwIxyx5/rnyOWCIyRr16PfvcYyzhGO+hpcOuF7YS1sL8pPjo/RmHB5DIZS/n1pd8t8B5jkGbHhirb7KsaUsYegKSYUqi0Xgl8+aNj2QVg5sCG6dW3JKi6GGt6DJn1Vwj0HN4BX4p609yO0Q4Wadd6kES2ud1p74pzQ6EP0dPi2FQMrOO+uYqyRCCxE1Fi51bvE3/yAD1aGEONsbSQ+qTg5SwRC7f0bptSb/mf86VmERGF22fiA0OJl1xVzHKrQSLhl+vTQTjFvGWq1oYVFUO5hHLzinuPRK3Upzl8Dg48uh6Bm4f8wx6hx/YMRDNrKzyfpF/gSqLJro/0s/lOORXBDCWGotfOvl5S4GAM=",
+                "page_age": null
+              },
+              {
+                "type": "web_search_result",
+                "title": "2 Billion Trees Program: Closed — Reopening & Alternatives",
+                "url": "https://hellodarwin.com/business-aid/programs/2-billion-trees-program",
+                "encrypted_content": "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",
+                "page_age": "73 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "Details on transfer payment programs over $5 million - Natural Resources Canada",
+                "url": "https://natural-resources.canada.ca/corporate/planning-reporting/departmental-results-reports/details-transfer-payment-programs-over-5-million",
+                "encrypted_content": "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",
+                "page_age": "332 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "Reports of the Commissioner of the Environment and",
+                "url": "https://www.oag-bvg.gc.ca/internet/docs/parl_cesd_202304_01_e.pdf",
+                "encrypted_content": "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",
+                "page_age": null
+              },
+              {
+                "type": "web_search_result",
+                "title": "Canada’s 2 Billion Trees program was troubled. Its loss still hurts.",
+                "url": "https://corporateknights.com/natural-capital/canadas-2-billion-trees-program-was-troubled-its-loss-still-hurts/",
+                "encrypted_content": "EvAHCioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDArGIb8f7n8J4R4XDRoMHoPC1W91SPhkhEVsIjAWuQhkLKtot/PkCedHuYsrlKCkM9ZMWtNq1U9+q9IifnU1nULIzW14ukkMQhiUNn8q8wZQocaICKDkHD7cXFcoLD6eKRmqw4cSi71PsBHuyS4XbOJKBYDLEBvWEwITOiKlmysS5K/1fRcSfw5CIlSP3jVw7bSINbqf1uP/GFpltngPpwLE5QYMAasWZvYe8zzdg7zwZoGUk2AC/wa+PwIusZj5WmEs7Uq81WpCdfB554B+KhG7mG96rjj2hgymjmcWHAGZLVuYGOghocbo/17fNAtx0RNhzIhRGv6SPGYAiLFGLNuySDQdD7scGIyDMcuUpMIEi/LmSYQDDCbcLxjuoEWGso6rpDcKZUBU9pI2GfKa802X7URknS2RIgrtvkmvYu3e8Xkko4/I7H0ogLqQRcoFt5NkdR8J0Gflzm9n+tVxynyJJozNDAnTKg2FejroSJ00bDdefw+IKF+881R+fCcJs2fM/8ahis6jmcbJL+SCAKG4T2GYXaQd5mw7jLomD+HMs4UxuhM0QDHbv20jFLrHukhHWcNQJZ9C1KV+SmlEsgM/RB/iCo8nzG7ez6iX4BLskhE3T4jqS+fp3b1V2v7mY682N4my7MP4Wm9kiTyZEn2MhNM/KbEzF6HszSHN2PQGMq2Xx7qWVW5OEAGT6ay45RFSoZ+kekfDP49SlEXMnD5iVNOZeWA/4+HOYZNg+jg1sx/46mJVROpbsJ6CnuP0M+BP90lpBl/QMsOcT70A3NTzeyiJa1h3w+hFMTR5stKw/6dWGpgvDdW1nqtCEtfiA5lZLlh88Zrjqvu1Zu1nkoL8Ujebb5QiGa4Ba5gcA6ladN6cx7oqSzVhEDiUceBBVJDuZ7f8azXBMUr/q4bjohJLAvc2xpcRL6eRLRCDuObIwq9Dx7T4ru7bFait3dCQumHz+yfi00GK84rRSregaRqe8gX/CfiZrfYFkOYsW9AImJwTDR1Bla1PjIZ1gLcUID4NjBZDoNlQ8k30u+5a/Y530jktmVBpAWpRZ3mSJ+o+l5GYooKKVUdKNAeQQVH1UomYlPTtghu0x5AAWVKG9k8WjuuGxw8G70mfw7SLwddTF76y6ihw8EwZC9NDx3Sj1eTQO3fBZSmHwa//B2cwHsf0N/nrlUBTiSeW+uNkNZPkEs/SDkxftCxWfJxgsZ24cDzGn3yyau0iw5DTCazAo690T9NDfwwy2AZ1CUzOJtRXfE09IVNUeAweVZKDDQcPcaRIGAM=",
+                "page_age": "300 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "2 Billion Trees (2BT) program - Alberta Business Grants",
+                "url": "https://albertabusinessgrants.ca/grants/2-billion-trees-2bt-program/",
+                "encrypted_content": "Ev4FCioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDHkJqMQXkTXrBXJI5BoM19cQypqFvHIgY5oUIjCNFVaHzwOXsuEN8UYhsbRe+OCG9kH1MbJ9YUfHB+dysrgUWr3duOBepB5UVgrhWB0qgQWT7D+pRIkyAANjjah1ZWchvWGRhXL7+MmdMzAmqedg5ksksk3ql2Uo1PGlpkqYq1Blv9nkSHp6wIZuNxtVIVvvuVjJesfxyjHROvAJR5XEuEWlt1HJYK4GRVsn33zPm8J6XLkQmmIlxaXMQ5KxHnpzSB6/644+jAXuqfeKHSJJbnLHZU7xrvhl0y8hn/O+cnuHpQucsp4vpavI9rHHfBbczjPEUno3Kmtl0AKnmyBkP5Q1CvsoC5K1n8wO/c7V0Im0UGhS74IwGjqBqB3Np3oBY0E2HoOzVFcA5irPNJf23YLD5OILchndomQD1/BxWxDhtn2ds4PNo4XGTAyvnPB0pHu22ow29Yf/5tDECM5YFnOnNURYM3C9PK6PvLD3SN3SSUXbd87hWOmP0hZMYIBBJjT3/QSsMd3cSGUVW9HUX6tWnBAZ8/TxThqarcXTJ8QPcJgzjIwOl7+jEsGVU1rSHXO72TGYbyAxGDR9FFt1/r1NAzeHKLHQuUso6EoTS3ULsF9uZjYnOGlv1qo61KYhpTek/meM5Ki/5V6vuufUxKHpDZmhB+6ns/rQTG5xRlnUJa5IlzII6LCDeWGdbaz3HjCMLMNUcZ1e2aeq4jv7R0hpOkmbYMbQ8fwPza11mEU2lw/VUzUJP0SFbXhe03Z62LuBKtOyET6Y0c5rzqZdOPxS5rbmvwVeAwRZ60oe2j8QFkRy8Y/m/HTMKy9f84hYwUhaRKpHVI/HzhhB0655UGsOJzs5AL76eL0gtyEJbyuI6PxufhcI6GBlQz4aj2FzDpRvRUiI3CsH/s//V+ICeoKmPZje9Mr0Y8jvLNWID5tEN8Ne8F1FZiyr7AgfrnqAUxgD",
+                "page_age": "202 days ago"
+              },
+              {
+                "type": "web_search_result",
+                "title": "2 Billion Trees Program",
+                "url": "https://reforestcollective.ca/2-billion-trees/",
+                "encrypted_content": "EuYICioIFBgCIiRmOTBjNTYyNy1iZmQ3LTRhMjQtYTZlYS00MjNhMzc2ZDE1OTkSDHLOd8X3r7I8fYnVJBoMJfLkvt7WbZ74EujbIjCnO8qZaShycSRW3HPTNpwK8eaL3ZBr65w7dczdJKkOWQOgDSBdHQKryHYkkvetgloq6Qep2hV5GcKWxhYoxVdZ8O0lZLArALur7epszR19kaXWtH/qCsqWlRpqk1XOkzEvVzKJ9SPmRbaR8NrQdZDzGl7QsysElKqW25lk9ue5IxcKhKOT382Ive1b18GG1CkavWFA33ccCTl4A/PtYIKrVpOwEcJAhZMKOaC0QMGb6WErXgMK3cLcCeFOusOHk+SNKv7ftrwJhMa82p7BEz/pPcf3pg/LOKW0jPieoVQcxD1aBXUVfV0TM0uxOdg9otqe6iFUbnkam8fcsqvm4RITo+P1Csylyl3mRH6OEGRMhYiG3kLxvX6JVFgbFBKRmdzoQE7+xfTothejdypGidBE/aG/WvQlDDBR4dUuGKdmwWs4d1dpWYqaT1k0XISrsSy9KeLaLY/oQZWRBEBeOvJ6+U+RmX3/qEcs03dOTeiqKVeZIKO7bfyLyoCPr6/S6i/wRhWZmPar32fR5EhCTosAf9dNr+UQQzC/JiHl3qXTc36dFtoFYun6YdZMVgXOju2G4OrVBl///Jjo5IG/fJnEb+OVui9ENd7QYQGwDFi4W+O+9xmdpLmqykx2uUdQweq2NynBcP/IGEdnTenWf/zkj2UZBaka6lwq5BSXJ3OsvZChsNwr+GMkAX12qlSSE/YyPgq5DRvU8F3h2Q6mPqZatLckuHoo2K/PkplzaoLisJoC6vFYx3fwH/3FwJXS1Qb9zsZyEcBCI/bFklBdQFoKFkxjCoDCPhuFPZ8mTKpWkoe5Pf+K7Tzb6MuY0x260maZteKUk2QYE0oDXRLaFLMEzXEEZjSpXwQ24H5cWvydq/z27HqDbmB8kj/2fH1zbcpxnY2E5Pvi0NFX7e2WumyGlpB94FxjQIXLGYCrQtoqyCSBOrfOE+hz0XalWR6s7r+4JjJI3U039zo3EaQ1z8vz7OXQtmxhXcSPI/4mSqKlf/FhtoHjbLo6hXyCyBz/RI4AZoBYE6+Et/f+giTYx13YkrLwT2z/cIS0a8aLbvgAjD3I2LCWJNw8cv4cPPdynCy0KNNEy2LA7gRxWN1cN3PNZqjaBU7XscQtyif41OnD8UPY7t2nRNqHx0IyHB2OrphWGLI3cL6l7Fk78zempg0Go2ow1FaN9hOb/tEoEuMY6JFkbvBUyQH65aGIkTQgAeORBybAJwnzKRyYCKA0GRsZampMjlleRkU+J518TIj/MsYnfLpyIgPUpemjRM98qxK/YnX7mbx+IqeQTNd+qMsAVdNSousttPpi0Y9cbXkgXXGNG9l0rqYcr7w0LIerkE3BEuhR0AvC+1mEYF/cPtRbeWd4VhWjaTfio+E2U6VvWOIgioaOVjwnmZViWhgD",
+                "page_age": null
+              },
+              {
+                "type": "web_search_result",
+                "title": "2 Billion Trees Program",
+                "url": "https://natural-resources.canada.ca/forest-forestry/2-billion-trees-program",
+                "encrypted_content": "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",
+                "page_age": null
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}
