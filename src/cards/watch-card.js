@@ -61,6 +61,10 @@ const PICK_ACTIONS = { 'watch.pick1': 0, 'watch.pick2': 1, 'watch.pick3': 2 };
 const HOW_TO = 'To watch a program, reply "@Oracle watch" to the post about it (or use /watch there).';
 const NOT_FOUND = 'I couldn’t tell which program that post is about. Reply "@Oracle watch <program name>" and I’ll look again.';
 
+const SETUP_FAILED = 'Sorry — I couldn’t set up that watch. Try again in a minute, or tell Chris if it keeps happening.';
+/** A live watch row with no posted card, older than this, was left by a failed setup. */
+const UNPOSTED_GRACE_MS = 2 * 60 * 1000;
+
 const BUSY = { match: 'Looking the program up…', clients: 'Checking who might fit…' };
 
 const who = (p) => (p ? { chatUserId: p.chatUserId, name: p.name ?? p.displayName ?? null } : null);
@@ -95,7 +99,23 @@ function codeOf(err) {
 
 function shortDate(at) {
   if (!at) return '';
-  return new Intl.DateTimeFormat('en-US', { timeZone: DISPLAY_TZ, month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(at));
+  const date = new Date(at);
+  // Never throw on a value that is not a date: the card must still post.
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('en-US', { timeZone: DISPLAY_TZ, month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+}
+
+/**
+ * "Closes Aug 31, 2026", or the grant's own words when it has no date
+ * ("Closes: Open Until Filled"). Null when there is nothing to say. Rows saved
+ * before deadlineText existed hold the words in `deadline`; they read the same.
+ */
+function closesLine(p, { plain = false } = {}) {
+  const when = shortDate(p?.deadline);
+  if (when) return `Closes ${plain ? when : esc(when)}`;
+  const words = clip(String(p?.deadlineText || p?.deadline || '').trim(), 60);
+  if (!words) return null;
+  return `Closes: ${plain ? words : esc(words)}`;
 }
 
 async function privateReply({ spaceName, threadName, surface, chatUserId, text }) {
@@ -165,9 +185,25 @@ export async function startWatch({
  * Everything that takes time: what program this is, whether it is already
  * watched here, the card itself, and the joining DM.
  *
+ * Any failure is told to the person privately — the press was answered long
+ * ago, so otherwise they hear nothing at all.
+ *
  * Exported so a test can drive it directly; ordinarily only startWatch calls it.
  */
-export async function setUpWatch({
+export async function setUpWatch(args = {}) {
+  const { spaceName, threadName = null, surface = 'chat_space', actor } = args;
+  const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor?.chatUserId, text });
+  try {
+    const result = await buildWatch(args);
+    if (result?.code === 'insert_failed') await reply(SETUP_FAILED);
+    return result;
+  } catch (err) {
+    await reply(SETUP_FAILED);
+    throw err;
+  }
+}
+
+async function buildWatch({
   trigger = 'mention', actor, userId = null, spaceName, threadName = null, surface = 'chat_space',
   conversationId = null, messageText = '', source = '', messageName = null, now = new Date()
 } = {}) {
@@ -219,6 +255,7 @@ export async function setUpWatch({
     url: best?.url || guess.url || null,
     // A date in the post is what a person just read; ours is the fallback.
     deadline: stated.deadline ? stated.deadline.toISOString() : (best?.deadline || null),
+    deadlineText: stated.deadline ? null : (best?.deadlineText || null),
     opensAt: stated.opensAt ? stated.opensAt.toISOString() : null,
     amount: best?.amount ?? null,
     provider: best?.provider || null,
@@ -229,7 +266,15 @@ export async function setUpWatch({
   };
 
   const threadKey = watchThreadName(spaceName, program.key);
-  const existing = await store.findLiveCard('watch', threadKey);
+  let existing = await store.findLiveCard('watch', threadKey);
+
+  // A row whose card never posted is left by a setup that failed part-way.
+  // Nobody can see it, so it must not answer "already watching": start over.
+  if (existing && !existing.message_name && now.getTime() - new Date(existing.created_at).getTime() > UNPOSTED_GRACE_MS) {
+    await store.closeCard(existing.id, 'never_posted', now);
+    console.log('👁️  Watch replacing a card that never posted');
+    existing = null;
+  }
 
   if (existing) {
     const joined = await joinWatch(existing, actor, { now });
@@ -237,6 +282,7 @@ export async function setUpWatch({
     await notePost(existing, { messageName, threadName, postText: words, now });
     await rerenderCard(existing.id);
     if (joined.added) await sendJoiningDm(existing.id, actor.chatUserId, userId);
+    else await reply(`You’re already watching ${mdToPlain(existing.data?.program?.name || existing.title || 'that program')} — the card is here: ${threadLink(existing.space_name, null)}`);
     console.log(`👁️  Watch ${joined.added ? 'joined' : 'already_watching'} — watchers: ${joined.watchers}`);
     return { ok: true, code: joined.added ? 'joined' : 'already_watching', card: existing };
   }
@@ -246,7 +292,7 @@ export async function setUpWatch({
     program,
     // "Not this one?" offers the OTHER matches; the one on the card is not an option.
     candidates: candidates.filter(c => c.key !== program.key).slice(0, 3)
-      .map(c => ({ name: c.name, key: c.key, url: c.url, deadline: c.deadline, provider: c.provider })),
+      .map(c => ({ name: c.name, key: c.key, url: c.url, deadline: c.deadline, deadlineText: c.deadlineText || null, provider: c.provider })),
     picking: false,
     posts: messageName ? [{ messageName, threadName, at: now.toISOString(), kind: 'start' }] : [],
     startedBy: { ...who(actor), userId },
@@ -274,13 +320,19 @@ export async function setUpWatch({
     return { ok: true, code: 'joined', card: live };
   }
 
-  await store.addParticipants(card.id, [
-    { chatUserId: actor.chatUserId, role: 'owner', displayName: actor.name || null }
-  ]);
+  try {
+    await store.addParticipants(card.id, [
+      { chatUserId: actor.chatUserId, role: 'owner', displayName: actor.name || null }
+    ]);
 
-  // The watch card is its own message in the space, not a reply to the post.
-  const posted = await postMessage({ spaceName, cardsV2: await renderCard(card) });
-  card = await store.updateCard(card.id, { messageName: posted });
+    // The watch card is its own message in the space, not a reply to the post.
+    const posted = await postMessage({ spaceName, cardsV2: await renderCard(card) });
+    card = await store.updateCard(card.id, { messageName: posted });
+  } catch (err) {
+    // Nothing was posted: close the row so the next /watch starts clean.
+    await store.closeCard(card.id, 'setup_failed', now).catch(() => {});
+    throw err;
+  }
 
   // Anyone who watched this program before, in this space, hears that it is back.
   const told = await dmPastWatchers(card, now);
@@ -361,7 +413,8 @@ export async function joiningMessage(card, { userId = null } = {}) {
 
   const dates = [];
   if (p.opensAt) dates.push(`Opens ${shortDate(p.opensAt)}`);
-  if (p.deadline) dates.push(`Closes ${shortDate(p.deadline)}${p.statedDeadline ? '' : ' (check the page to be sure)'}`);
+  const closes = closesLine(p, { plain: true });
+  if (closes) dates.push(`${closes}${p.statedDeadline || !shortDate(p.deadline) ? '' : ' (check the page to be sure)'}`);
   if (!dates.length) dates.push('No dates on file — check the page');
 
   const lines = [
@@ -510,6 +563,7 @@ export async function switchProgram(cardId, actor, pick, now = new Date()) {
     url: pick.url || d.program?.url || null,
     // A date someone read in the post still beats ours.
     deadline: d.program?.statedDeadline ? d.program.deadline : (pick.deadline || null),
+    deadlineText: d.program?.statedDeadline ? null : (pick.deadlineText || null),
     amount: pick.amount ?? d.program?.amount ?? null,
     provider: pick.provider || null,
     industries: pick.industries || d.program?.industries || [],
@@ -696,7 +750,8 @@ function datesLine(card) {
   const p = card.data?.program || {};
   const bits = [];
   if (p.opensAt) bits.push(`Opens ${esc(shortDate(p.opensAt))}`);
-  if (p.deadline) bits.push(`Closes ${esc(shortDate(p.deadline))}${p.statedDeadline ? '' : ' (check the page)'}`);
+  const closes = closesLine(p);
+  if (closes) bits.push(`${closes}${p.statedDeadline || !shortDate(p.deadline) ? '' : ' (check the page)'}`);
   if (!bits.length) bits.push('No dates on file — check the page');
   if (p.amount) bits.push(`Up to ${esc(String(p.amount))}`);
   return bits.join(' · ');
@@ -780,7 +835,7 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
 function digestLine(card, participants = []) {
   const p = card.data?.program || {};
   return [
-    p.deadline ? `Closes ${shortDate(p.deadline)}` : 'No dates on file',
+    closesLine(p, { plain: true }) || 'No dates on file',
     `${plural(participants.length, 'person')} watching`
   ].join(' · ');
 }

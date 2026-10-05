@@ -340,6 +340,100 @@ describe('starting a watch', () => {
 });
 
 // ============================================================================
+// DEADLINES AS OUR GRANTS TABLE WRITES THEM, AND SETUP THAT GOES WRONG
+// ============================================================================
+
+describe('deadlines that are not ISO dates', () => {
+  // No date in the post, so the card's deadline is the grants table's own.
+  const PLAIN_POST = `${PROGRAM} — worth keeping an eye on. https://granted.ca/rtri`;
+
+  test('a day/month/year deadline posts a card with the date, and reminders can count to it', async () => {
+    fakes.grants.grants[0].deadline = '31/08/2026';
+    const card = await watchThePost({ text: PLAIN_POST });
+
+    expect(card.message_name).toBeTruthy();
+    expect(card.data.program.deadline).toBe('2026-08-31T12:00:00.000Z');
+    expect(await textOf(card)).toContain('Closes Aug 31, 2026 (check the page)');
+    expect(dmsTo('spaces/DM-CHRIS')[0]).toContain('Closes Aug 31, 2026');
+  });
+
+  test('"Open Until Filled" is shown as words, not a date', async () => {
+    fakes.grants.grants[0].deadline = 'Open Until Filled';
+    const card = await watchThePost({ text: PLAIN_POST });
+
+    expect(card.message_name).toBeTruthy();
+    expect(card.data.program).toMatchObject({ deadline: null, deadlineText: 'Open Until Filled' });
+    const text = await textOf(card);
+    expect(text).toContain('Closes: Open Until Filled');
+    expect(text).not.toContain('check the page)');
+    expect(logged()).not.toMatch(/RangeError/);
+  });
+
+  test('a row saved before the fix, with words in the deadline, still renders', async () => {
+    const card = await watchThePost({ text: PLAIN_POST });
+    await fakes.store.patchCardData(card.id, { program: { ...card.data.program, deadline: 'Open Until Filled', deadlineText: undefined } });
+
+    expect(await textOf(await liveWatch())).toContain('Closes: Open Until Filled');
+  });
+});
+
+describe('already watching, and setup that fails', () => {
+  test('watching the same program again says so, with the card’s link, and posts nothing new', async () => {
+    const first = await watchThePost();
+    const again = await watchThePost({ thread: OTHER_THREAD });
+
+    expect(again.id).toBe(first.id);
+    expect(spacePosts().filter(p => p.cardsV2)).toHaveLength(1);
+    expect(dmsTo('spaces/DM-CHRIS')).toHaveLength(1);
+    const said = privateReplies().filter(([to]) => to === CHRIS).map(([, t]) => t);
+    expect(said).toContainEqual(`You’re already watching ${PROGRAM} — the card is here: https://chat.google.com/room/TEAM`);
+  });
+
+  test('a card that never posted is replaced, not answered with "already watching"', async () => {
+    const orphan = await fakes.store.insertCard({
+      cardType: 'watch', status: 'open', spaceName: SPACE, threadName: `${SPACE}/threads/watch-${KEY}`,
+      ownerChatId: CHRIS, title: PROGRAM, data: { program: { name: PROGRAM, key: KEY, deadline: 'Open Until Filled' } }
+    });
+    fakes.db.cards.get(orphan.id).created_at = new Date(Date.now() - 60 * 60 * 1000);
+
+    const card = await watchThePost();
+
+    expect(card.id).not.toBe(orphan.id);
+    expect(card.message_name).toBeTruthy();
+    expect(fakes.db.cards.get(orphan.id)).toMatchObject({ status: 'closed', closed_reason: 'never_posted' });
+    expect(privateReplies().some(([, t]) => /already watching/.test(t))).toBe(false);
+  });
+
+  test('a card still being set up a moment ago is joined, not replaced', async () => {
+    const fresh = await fakes.store.insertCard({
+      cardType: 'watch', status: 'open', spaceName: SPACE, threadName: `${SPACE}/threads/watch-${KEY}`,
+      ownerChatId: NAT, title: PROGRAM, data: { program: { name: PROGRAM, key: KEY } }
+    });
+
+    const card = await watchThePost();
+
+    expect(card.id).toBe(fresh.id);
+    expect(await watchersOf(fresh.id)).toContain(CHRIS);
+  });
+
+  test('when setup fails, the person is told in plain words and the half-made row is closed', async () => {
+    fakes.chat.failNextPost = new Error('Chat is down');
+    fakes.userChat.threads.set(THREAD, [
+      chatMessage({ id: `post${++seq}`, text: `${PROGRAM}: the intake opens October 1 and closes November 15, 2026.` })
+    ]);
+    await say({ text: 'watch' });
+
+    expect(watchCards()).toHaveLength(1);
+    expect(watchCards()[0]).toMatchObject({ status: 'closed', closed_reason: 'setup_failed' });
+    expect(privateReplies()).toContainEqual([CHRIS, 'Sorry — I couldn’t set up that watch. Try again in a minute, or tell Chris if it keeps happening.']);
+
+    // The next try starts clean.
+    const card = await watchThePost();
+    expect(card.message_name).toBeTruthy();
+  });
+});
+
+// ============================================================================
 // IN A DM, AND ANSWERING FAST
 // ============================================================================
 

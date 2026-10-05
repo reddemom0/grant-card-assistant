@@ -9,7 +9,7 @@
 
 import {
   watchIntent, stopWatchIntent, programFromPost, programKey, watchThreadName, keyFromWatchThread,
-  dateFromText, datesFromPost, closureFromPost, postMatchesProgram, dueNotices,
+  dateFromText, datesFromPost, deadlineOf, closureFromPost, postMatchesProgram, dueNotices,
   CHECK_AFTER_DAYS, DEADLINE_NOTICES
 } from '../../src/cards/watch-match.js';
 
@@ -164,5 +164,24 @@ describe('dueNotices', () => {
     const old = new Date(NOW.getTime() - (CHECK_AFTER_DAYS + 1) * DAY).toISOString();
     const { due } = dueNotices({ program: program({ deadline: inDays(60) }), createdAt: old, now: NOW });
     expect(due).toEqual([]);
+  });
+});
+
+describe('a grant’s deadline as the grants table writes it', () => {
+  test('a real date becomes noon UTC that day', () => {
+    expect(deadlineOf('31/08/2026')).toEqual({ deadline: '2026-08-31T12:00:00.000Z', deadlineText: null });
+    expect(deadlineOf('September 30, 2030')).toEqual({ deadline: '2030-09-30T12:00:00.000Z', deadlineText: null });
+  });
+
+  test('anything that is not one date is kept as words, never as a date', () => {
+    expect(deadlineOf('Open Until Filled')).toEqual({ deadline: null, deadlineText: 'Open Until Filled' });
+    expect(deadlineOf('Ouvert jusqu’à épuisement des fonds')).toEqual({ deadline: null, deadlineText: 'Ouvert jusqu’à épuisement des fonds' });
+    // Day and month could swap: shown as written, not guessed.
+    expect(deadlineOf('04/09/2026')).toEqual({ deadline: null, deadlineText: '04/09/2026' });
+  });
+
+  test('no deadline is nothing at all', () => {
+    expect(deadlineOf(null)).toEqual({ deadline: null, deadlineText: null });
+    expect(deadlineOf('  ')).toEqual({ deadline: null, deadlineText: null });
   });
 });

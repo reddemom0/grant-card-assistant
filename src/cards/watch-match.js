@@ -10,6 +10,8 @@
  * Everything here is either pure or a single read. No writes, no model.
  */
 
+import { parseDeadline } from '../tools/deadline.js';
+
 const DAY = 24 * 60 * 60 * 1000;
 
 /** How long a watch with no dates runs before Oracle asks whether to keep it. */
@@ -162,12 +164,24 @@ const scoreOf = (needle, name) => {
 };
 
 /**
+ * A grant's deadline as our grants table writes it ("31/08/2026", "Open Until
+ * Filled"). A real date becomes noon UTC, like dateFromText, so reminders can
+ * count days to it; anything else is kept as words to show, never as a date.
+ */
+export function deadlineOf(raw) {
+  const d = parseDeadline(raw);
+  if (d.kind === 'date') return { deadline: `${d.date}T12:00:00.000Z`, deadlineText: null };
+  if (d.kind === 'blank') return { deadline: null, deadlineText: null };
+  return { deadline: null, deadlineText: String(raw).trim() };
+}
+
+/**
  * Programs that look like the one in the post, best first. A single read of our
  * own grants table; the source is never named in what Oracle says.
  *
  * @param {{name: string|null, acronym: string|null}} guess - programFromPost()
  * @param {Object} [opts]
- * @returns {Promise<Array<{name, key, url, deadline, amount, provider, description, accepting}>>}
+ * @returns {Promise<Array<{name, key, url, deadline, deadlineText, amount, provider, description, accepting}>>}
  */
 export async function matchProgram(guess, { limit = 4, now = new Date() } = {}) {
   const query = [guess?.name, guess?.acronym].filter(Boolean).join(' ').trim();
@@ -182,7 +196,7 @@ export async function matchProgram(guess, { limit = 4, now = new Date() } = {}) 
         name: grant.name || null,
         key: programKey(grant.name),
         url: grant.links?.app || null,
-        deadline: grant.deadline || null,
+        ...deadlineOf(grant.deadline),
         amount: grant.amount ?? null,
         provider: grant.funder || null,
         industries: Array.isArray(grant.industries) ? grant.industries.slice(0, 3) : [],

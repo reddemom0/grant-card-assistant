@@ -66,7 +66,7 @@ export function createTrackedCardFakes() {
     intros: new Map(),
     clickSeq: 0
   };
-  const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null, failPost: null, members: new Map(), memberCalls: [] };
+  const chatState = { posts: [], patches: [], dms: new Map(), seq: 0, failPatch: null, failPost: null, failNextPost: null, members: new Map(), memberCalls: [] };
   const driveState = { docs: new Map(), calls: [], nameCalls: [], hold: null };
   const interpretState = { calls: [], impl: null };
   const hubspotState = {
@@ -559,6 +559,7 @@ export function createTrackedCardFakes() {
     module: {
       async postMessage({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null }) {
         if (chatState.failPost) throw chatState.failPost;
+        if (chatState.failNextPost) { const err = chatState.failNextPost; chatState.failNextPost = null; throw err; }
         const name = `${spaceName}/messages/m${++chatState.seq}`;
         chatState.posts.push({ name, spaceName, threadName, text, cardsV2: json(cardsV2), privateTo });
         return name;
@@ -833,6 +834,8 @@ export function createTrackedCardFakes() {
   Object.defineProperty(interpret, 'impl', { get: () => interpretState.impl, set: (v) => { interpretState.impl = v; } });
   Object.defineProperty(chat, 'failPatch', { get: () => chatState.failPatch, set: (v) => { chatState.failPatch = v; } });
   Object.defineProperty(chat, 'failPost', { get: () => chatState.failPost, set: (v) => { chatState.failPost = v; } });
+  // Only the next post fails, so whatever is said about the failure still gets through.
+  Object.defineProperty(chat, 'failNextPost', { get: () => chatState.failNextPost, set: (v) => { chatState.failNextPost = v; } });
   Object.defineProperty(drive, 'hold', { get: () => driveState.hold, set: (v) => { driveState.hold = v; } });
   Object.defineProperty(hubspot, 'failNote', { get: () => hubspotState.failNote, set: (v) => { hubspotState.failNote = v; } });
   Object.defineProperty(hubspot, 'snapshot', { get: () => hubspotState.snapshot, set: (v) => { hubspotState.snapshot = v; } });
@@ -927,6 +930,7 @@ export function createTrackedCardFakes() {
     chatState.seq = 0;
     chatState.failPatch = null;
     chatState.failPost = null;
+    chatState.failNextPost = null;
     driveState.docs.clear();
     driveState.calls.length = 0;
     driveState.nameCalls.length = 0;
