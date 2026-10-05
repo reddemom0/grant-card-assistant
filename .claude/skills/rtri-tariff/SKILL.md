@@ -49,7 +49,7 @@ Granted has seen the evidence, ☐ where it is unconfirmed or only claimed.
 
 ## Load the facts first
 
-Two files are authoritative, each for its own ground:
+Two files are Granted's reference, each for its own ground:
 
 - `PROGRAM_FACTS` — eligibility, caps, dates, and cost rules. Load it before
   answering anything substantive.
@@ -120,7 +120,7 @@ rather than relying on a remembered ID — files get added.
 for something. A template can sit in either — the team's financial forecast
 template is in Team Docs, not Application Templates.
 
-`PROGRAM_FACTS` stays the authority for program facts. If a Drive file disagrees
+`PROGRAM_FACTS` stays the reference for program facts. If a Drive file disagrees
 with it, say so and cite both; don't silently pick one.
 
 Two files in Team Docs are not general BC reference:

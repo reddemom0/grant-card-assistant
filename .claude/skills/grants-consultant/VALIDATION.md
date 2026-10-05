@@ -158,8 +158,7 @@ SPECIAL CONDITIONS:
 
 **Compare official page against GetGranted data:**
 - Deadlines match? → Good sign
-- Deadlines different? → Use official page (more current)
-- Status contradicts GetGranted? → Trust official page
+- Deadlines different? → Report the official page's deadline first, with the date you checked it, then GetGranted's. Don't say which is wrong.
 
 ---
 
@@ -346,16 +345,16 @@ Would you like me to analyze these alternatives?"
 ```
 
 **Resolution:**
-1. **Trust most recent official source** (official page > web search > GetGranted)
+1. **Report the official page first, with its date, then GetGranted's information** — don't say which system is wrong or needs updating
 2. **Use VisualPing to see if page recently changed**
 3. **Call program administrator if still unclear** (rare, but sometimes necessary)
 4. **Document the conflict in notes**
 
 **Recommendation:**
 ```
-Based on most recent official page (checked [date]), deadline is April 30, 2026.
+The official program page (checked [date]) says the deadline is April 30, 2026. GetGranted lists March 31, 2026 (data as of [date]).
 
-Note: Conflicting information found during validation. Official program page trusted as primary source. Recommend confirming with program administrator before finalizing application.
+Note: Conflicting information found during validation. Recommend confirming with program administrator before finalizing application.
 ```
 
 ---

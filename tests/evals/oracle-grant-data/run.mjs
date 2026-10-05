@@ -128,7 +128,7 @@ Reply with JSON only: {"pass": true|false, "reason": "<one line, under 30 words>
 }
 
 async function runQuestion(question) {
-  globalThis.__oracleEval = { calls: [], blocked: [], messages: [] };
+  globalThis.__oracleEval = { calls: [], blocked: [], messages: [], models: [] };
   const conversationId = randomUUID();
   let oracleCost = 0;
   const started = Date.now();
@@ -173,6 +173,8 @@ async function runQuestion(question) {
     conversationId,
     agentSuccess: !!result?.success,
     agentError: result?.success ? null : result?.error,
+    // Noted by the cost stub on every agent-loop call (stubs/api-cost-events.mjs).
+    model: [...new Set(log.models)].join(', ') || null,
     answer,
     checks,
     failedChecks,
@@ -189,6 +191,9 @@ async function runQuestion(question) {
 
 // ---------------------------------------------------------------------------
 
+/** The models Oracle answered with, as the API reported them. */
+const oracleModels = (runs) => [...new Set(runs.map(r => r.model).filter(Boolean))];
+
 function report({ runs, started, totalMs, subset }) {
   const date = new Date().toISOString().slice(0, 10);
   const passed = runs.filter(r => r.pass).length;
@@ -200,6 +205,7 @@ function report({ runs, started, totalMs, subset }) {
   L.push(`# Oracle grant-data eval — ${date}`);
   L.push('');
   L.push(`**Pass rate:** ${passed}/${runs.length} (${Math.round((100 * passed) / (runs.length || 1))}%)${subset ? ` — subset: ${[...subset].join(', ')}` : ''}`);
+  L.push(`**Oracle model:** ${oracleModels(runs).join(', ') || 'unknown'}`);
   L.push(`**Cost:** $${(oracle + grader).toFixed(2)} (Oracle $${oracle.toFixed(2)}, grader $${grader.toFixed(2)} on ${GRADER_MODEL})`);
   L.push(`**Started:** ${started.toISOString()} · **Runtime:** ${(totalMs / 60000).toFixed(1)} min`);
   L.push('');
@@ -274,7 +280,7 @@ const suffix = subset ? `-only-${[...subset].join('-')}` : '';
 const reportPath = path.join(HERE, `report-${date}${suffix}.md`);
 const runsPath = path.join(HERE, `runs-${date}${suffix}.json`);
 await writeFile(reportPath, report({ runs, started, totalMs, subset }));
-await writeFile(runsPath, JSON.stringify({ started, graderModel: GRADER_MODEL, readOnlyRejections, runs }, null, 2));
+await writeFile(runsPath, JSON.stringify({ started, oracleModels: oracleModels(runs), graderModel: GRADER_MODEL, readOnlyRejections, runs }, null, 2));
 console.log(`\n📝 Report: ${path.relative(ROOT, reportPath)}\n🗂️  Raw runs: ${path.relative(ROOT, runsPath)}`);
 await closePool();
 process.exit(0);

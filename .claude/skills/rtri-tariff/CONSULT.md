@@ -6,7 +6,7 @@ process.
 
 Load `PROGRAM_FACTS` before answering. For questions about the application form
 itself — character limits, field prompts, indicator definitions — load
-`APPLICATION_FIELDS` too. It is the authority for those.
+`APPLICATION_FIELDS` too. Use it for those.
 
 ---
 

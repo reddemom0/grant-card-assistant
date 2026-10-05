@@ -4,11 +4,12 @@
 **Funder:** Pacific Economic Development Canada (PacifiCan) — BC delivery
 **Scope of this file:** BC / PacifiCan only. Other regions (PrairiesCan etc.) are out of scope.
 
-> This file is the authority for RTRI eligibility, caps, dates, and cost rules.
+> Granted's reference for RTRI eligibility, caps, dates, and cost rules. It adds
+> context to the program's GetGranted card; it doesn't replace it.
 > Form details — field prompts, character limits, indicator definitions — are in
-> `APPLICATION_FIELDS`. Do not state a program fact that is not in this file. If
-> a question requires a fact not here, say so and name what would need
-> confirming.
+> `APPLICATION_FIELDS`. Don't state an RTRI rule that isn't in this file or on the
+> official page. If a question requires a fact not here, say so and name what
+> would need confirming.
 
 **Answering an eligibility question?** Use the Eligibility answer template in
 the overview (`SKILL.md`) — required structure, cost-window and funding lines
@@ -318,8 +319,8 @@ expenditures deemed ineligible or outside RTRI scope.
 
 Submission tab unlocks only when all other tabs are complete.
 
-Character limits for every field are in `APPLICATION_FIELDS`, which is the
-authority for them. They are not repeated here.
+Character limits for every field are in `APPLICATION_FIELDS`, which holds
+them. They are not repeated here.
 
 | Tab | Contents |
 |---|---|

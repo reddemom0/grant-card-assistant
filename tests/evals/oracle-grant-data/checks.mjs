@@ -57,14 +57,22 @@ export function checkNoTotalCount(answer) {
 
 const VERDICT = /(GG[13]\s+(?:is|looks|seems)\s+(?:correct|right|wrong|out[- ]of[- ]date|outdated|stale|accurate)|(?:correct|right|actual|true|real)\s+status\s+is|trust\s+(?:the\s+)?GG[13]|go\s+with\s+(?:the\s+)?GG[13]|GG[13]['’]?s?\s+(?:status\s+)?is\s+(?:likely|probably)\s+(?:right|correct|wrong|outdated))/i;
 
+/**
+ * Picking a side about one system: GG1, GG3, GetGranted or "the card", then within
+ * a few words "needs updating", "is out of date", "is wrong"… ("our GetGranted card
+ * is out of date", "GG1 needs updating").
+ */
+const SIDE_TAKEN = /\b(?:GG[13]|GetGranted|the card|our card)\b(?:\W+\w+){0,4}?\W+(?:needs?\s+(?:to\s+be\s+)?(?:updat(?:ing|ed)|correct(?:ing|ed)|fix(?:ing|ed))|(?:is|are|looks|seems)\s+(?:outdated|out[- ]of[- ]date|wrong|incorrect|stale|behind))\b/i;
+
 /** When a tool flagged a GG1/GG3 disagreement on a grant the answer names: both shown, no verdict. */
 export function checkMismatch(answer, trace) {
   const flagged = grantDataResults(trace).filter(r => r.status_mismatch === true);
   const text = String(answer ?? '');
   const named = flagged.filter(r => text.includes(String(r.id)) || (r.name && text.toLowerCase().includes(String(r.name).toLowerCase())));
   if (!named.length) return na(flagged.length ? 'flagged grants not named in the answer' : 'no mismatch in tool results');
-  if (!/\bGG1\b/i.test(text) || !/\bGG3\b/i.test(text)) return fail(`mismatch on ${named.map(r => r.id).join(', ')} but the answer doesn't show both GG1 and GG3`);
-  const verdict = text.match(VERDICT);
+  // GetGranted is GG3 in plain words.
+  if (!/\bGG1\b/i.test(text) || !/\b(?:GG3|GetGranted)\b/i.test(text)) return fail(`mismatch on ${named.map(r => r.id).join(', ')} but the answer doesn't show both GG1 and GG3`);
+  const verdict = text.match(VERDICT) || text.match(SIDE_TAKEN);
   if (verdict) return fail(`declares a verdict: "${verdict[0]}"`);
   return pass(`both statuses shown for ${named.map(r => r.id).join(', ')}, no verdict`);
 }
