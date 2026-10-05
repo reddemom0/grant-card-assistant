@@ -333,6 +333,12 @@ on contacts/companies/deals — a different thing.
    than "not found".
 4. **When a specific status is asked for** (for example archived), the exact-name match
    ranks first within that status.
+5. **French cards come after English ones.** A card whose name is in French — translated,
+   or marked "(French)" — is listed after every English match, in the main results and in
+   the other-status list, unless the search itself is in French. French cards are never
+   hidden: one that is the only match still shows. GetGranted has no language field, so
+   the language is read from the name (`looksFrench` in `src/tools/grant-data.js`); a name
+   mixing an English title with a French place ("Ville de Montréal") can be misread.
 
 Hidden cards are never in either list; only their count is reported. Looking up a grant
 by id or GetGranted link returns that grant at any status.

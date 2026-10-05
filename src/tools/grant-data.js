@@ -14,7 +14,8 @@
  *     (grant, program, fund, stream…) and bare numbers never match or score on
  *     their own. Ranking (rankCandidates): exact name, then the whole query as a
  *     phrase in the name, then keyword hits (name 2, card text 1), then query
- *     numbers in the name ("Stream 2" over "Stream 1"), then recency
+ *     numbers in the name ("Stream 2" over "Stream 1"), then recency; French
+ *     cards (looksFrench) after English ones unless the query itself is French
  *   - filters: regions (codes expanded; All-of-Canada grants always included),
  *     industries, grant types, funders — OR inside a filter, AND across
  *   - status defaults to active; GG3 "hide" grants only with include_hidden,
@@ -77,6 +78,32 @@ export function normalize(text) {
   return fold(text).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
+const FRENCH_MARKER = /\((?:french|fr)\)/i;
+const FRENCH_STRONG = /\bprogramme\b|\binitiative regionale\b/;
+const FRENCH_WORDS = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'aux', 'au', 'en', 'et', 'pour', 'sur', 'avec']);
+const FRENCH_ELISION = /\b[ld][’']\p{L}/iu;
+const ACCENTED_LETTER = /[à-öø-ÿœæ]/i;
+
+/**
+ * Does this grant name (or search) read as French? GG3 has no language field,
+ * so this guesses from the words; swap it for that field if GetGranted adds one.
+ *
+ * French when it carries a "(French)" / "(FR)" marker, says "programme" or
+ * "initiative régionale", or shows two weaker signs: distinct French function
+ * words (de, la, des, pour, aux…), an elision (l', d'), or an accented letter.
+ * An accent on its own is not enough — "Québec Innovation Fund" is English.
+ */
+export function looksFrench(text) {
+  const raw = String(text ?? '');
+  if (!raw.trim()) return false;
+  if (FRENCH_MARKER.test(raw)) return true;
+  const plain = fold(raw).toLowerCase();
+  if (FRENCH_STRONG.test(plain)) return true;
+  const words = new Set(plain.split(/[^a-z0-9]+/).filter(w => FRENCH_WORDS.has(w)));
+  const signs = words.size + (FRENCH_ELISION.test(raw) ? 1 : 0) + (ACCENTED_LETTER.test(raw) ? 1 : 0);
+  return signs >= 2;
+}
+
 const LINK_ID = /(?:https?:\/\/)?(?:www\.)?(?:app|admin)\.getgranted\.ai\/grants\/(\d+)/gi;
 const ONLY_IDS = /^\s*#?\d+(?:\s*[,;\s]\s*#?\d+)*\s*$/;
 
@@ -121,22 +148,26 @@ export function isClearlyNamed(nameN, { phrase, tokens }) {
 }
 
 /**
- * Rank candidate rows ({id, name_n, last_updated, name_hits, body_hits}).
+ * Rank candidate rows ({id, grant_name, name_n, last_updated, name_hits, body_hits}).
  * Exact name, then the query as a whole-word phrase in the name, then keyword
  * score, then query numbers present in the name, then newest, then id.
+ * With englishFirst, French-language cards (looksFrench) come after every
+ * English one, whatever their scores.
  */
-export function rankCandidates(rows, { phrase, numbers }) {
+export function rankCandidates(rows, { phrase, numbers }, { englishFirst = false } = {}) {
   const tier = (name) => (!phrase ? 0 : name === phrase ? 2 : padded(name).includes(padded(phrase)) ? 1 : 0);
   const numberHits = (name) => numbers.filter(n => padded(name).includes(padded(n))).length;
   return rows
     .map(r => ({
       row: r,
+      french: englishFirst && looksFrench(r.grant_name) ? 1 : 0,
       tier: tier(r.name_n ?? ''),
       score: 2 * Number(r.name_hits ?? 0) + Number(r.body_hits ?? 0),
       nums: numberHits(r.name_n ?? ''),
       updated: r.last_updated ?? ''
     }))
     .sort((a, b) =>
+      a.french - b.french ||
       b.tier - a.tier ||
       b.score - a.score ||
       b.nums - a.nums ||
@@ -347,10 +378,10 @@ async function lookupIds(ids, opts) {
  * the best-ranked — enough to say "it's there, but archived" and search again.
  * Every exact name match leads the list (even past three), labelled exact_match.
  */
-function otherStatusMatches(rows, terms) {
+function otherStatusMatches(rows, terms, rankOpts) {
   const byStatus = {};
   for (const r of rows) byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
-  const ranked = rankCandidates(rows, terms);
+  const ranked = rankCandidates(rows, terms, rankOpts);
   const isExact = (r) => Boolean(terms.phrase) && r.name_n === terms.phrase;
   const exact = ranked.filter(isExact);
   const top = [...exact, ...ranked.filter(r => !isExact(r)).slice(0, Math.max(0, OTHER_STATUS_TOP - exact.length))];
@@ -395,7 +426,9 @@ export async function searchGrantData(opts = {}) {
   const others = candidates.rows.filter(r => otherStatuses.includes(r.status));
   const namedIds = new Set(asked.filter(r => isClearlyNamed(r.name_n, terms)).map(r => Number(r.id)));
 
-  const ranked = rankCandidates(asked, terms);
+  // French cards come after English ones unless the search is itself French.
+  const rankOpts = { englishFirst: !looksFrench(opts.query) };
+  const ranked = rankCandidates(asked, terms, rankOpts);
   const rows = await details(ranked.slice(0, limit).map(r => Number(r.id)));
 
   let hiddenMatches = null;
@@ -423,7 +456,7 @@ export async function searchGrantData(opts = {}) {
     total_matches: asked.length,
     returned: results.length,
     hidden_matches: hiddenMatches,
-    ...(otherStatuses.length ? { other_status_matches: otherStatusMatches(others, terms) } : {}),
+    ...(otherStatuses.length ? { other_status_matches: otherStatusMatches(others, terms, rankOpts) } : {}),
     results
   };
 }

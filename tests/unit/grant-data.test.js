@@ -34,7 +34,8 @@ jest.unstable_mockModule('../../src/database/connection.js', () => ({
 }));
 
 const {
-  runGrantData, searchGrantData, keywordTokens, queryTerms, idsFromQuery, rankCandidates, isClearlyNamed, normalize, expandRegions, summarize
+  runGrantData, searchGrantData, keywordTokens, queryTerms, idsFromQuery, rankCandidates, isClearlyNamed, normalize, expandRegions, summarize,
+  looksFrench
 } = await import('../../src/tools/grant-data.js');
 
 const candidateQuery = () => sent.find(s => /AS name_hits/.test(s.text));
@@ -515,6 +516,107 @@ describe('active exact-name match first (ETG)', () => {
     const r = await searchGrantData({ query: 'Employer Training Grant (ETG)', status: ['active', 'inactive', 'archived', 'draft'] });
     expect(r.results.slice(0, 2).map(x => [x.id, x.named_match ?? false])).toEqual([[990, true], [1314, true]]);
     expect(r).not.toHaveProperty('other_status_matches');
+  });
+});
+
+// French cards after English ones, unless the search itself is French. The
+// names, statuses and dates are the real GG3 cards (gg3_grants, 2026-10-05).
+describe('French cards rank after English matches', () => {
+  const FRENCH = {
+    1755: 'Programme Prêt pour l’avenir',
+    1756: 'Programme Empower3D',
+    1757: 'Programme d’incitation à l’emploi des jeunes de l’Alberta',
+    1760: 'Initiative régionale de réponse aux tarifs douaniers (RTRI) -Sud de l’Ontario',
+    1761: 'Programme de partenariat technologique international',
+    1765: 'Programme de Leadership Technologique',
+    1767: 'Initiative régionale en intelligence artificielle (RAII)- Prairies'
+  };
+  const ENGLISH = {
+    1723: 'Future Ready Program',
+    1748: 'Empower3D Program',
+    1750: 'Alberta Youth Employment Incentive',
+    1714: 'Regional Tariff Response Initiative (RTRI) - Southern Ontario',
+    1393: 'International Technology Partnership Program (ITP)',
+    1419: 'Technology Leadership Program',
+    1529: 'Regional Artifical Intelligence Initiative (RAII) - Prairie Region'
+  };
+
+  test('detection: all 7 French cards, none of their English twins', () => {
+    for (const name of Object.values(FRENCH)) expect([name, looksFrench(name)]).toEqual([name, true]);
+    for (const name of Object.values(ENGLISH)) expect([name, looksFrench(name)]).toEqual([name, false]);
+  });
+
+  test('detection: markers, accents alone, and searches', () => {
+    expect(looksFrench('Alberta Manufacturing Productivity Grant (French)')).toBe(true);
+    expect(looksFrench('Canada Summer Jobs (FR)')).toBe(true);
+    expect(looksFrench('Québec Innovation Fund')).toBe(false);          // an accent alone is not French
+    expect(looksFrench('R&D Tax Credit')).toBe(false);                   // "d" from R&D is not an elision
+    for (const q of ['RAII', 'Leadership', 'RTRI', 'Empower3D', 'Regional Artificial Intelligence Initiative Prairies']) {
+      expect([q, looksFrench(q)]).toEqual([q, false]);
+    }
+    expect(looksFrench('programme de leadership technologique')).toBe(true);
+    expect(looksFrench('')).toBe(false);
+  });
+
+  const card = (id, extra = {}) => ({ id, name: FRENCH[id] ?? ENGLISH[id], ...extra });
+
+  test('"RAII": English 1529 before French 1767 (French is newer and scores the same)', async () => {
+    fixtures([card(1767, { name_hits: 1, last_updated: '2026/09/29' }), card(1529, { name_hits: 1, last_updated: '2026/09/23' })]);
+    const r = await searchGrantData({ query: 'RAII' });
+    expect(r.results.map(x => x.id)).toEqual([1529, 1767]);
+  });
+
+  test('"Leadership": English 1419 before French 1765', async () => {
+    fixtures([card(1765, { name_hits: 1, last_updated: '2026/09/29' }), card(1419, { name_hits: 1, last_updated: '2026/09/10' })]);
+    const r = await searchGrantData({ query: 'Leadership' });
+    expect(r.results.map(x => x.id)).toEqual([1419, 1765]);
+  });
+
+  test('"Regional Artificial Intelligence Initiative Prairies": English first even when French scores higher', async () => {
+    fixtures([
+      card(1767, { name_hits: 4, body_hits: 0, last_updated: '2026/09/29' }),   // score 8
+      card(1529, { name_hits: 3, body_hits: 1, last_updated: '2026/09/23' })    // score 7 ("Artifical" typo)
+    ]);
+    const r = await searchGrantData({ query: 'Regional Artificial Intelligence Initiative Prairies' });
+    expect(r.results.map(x => x.id)).toEqual([1529, 1767]);
+  });
+
+  test('"RTRI": English 1714 is inactive, so French 1760 is still the active match; 1714 is reported elsewhere', async () => {
+    fixtures([
+      card(1760, { name_hits: 1, last_updated: '2026/09/29' }),
+      { id: 1742, name: 'Regional Tariff Response Initiative (RTRI) - British Columbia', name_hits: 1, last_updated: '2026/09/01' },
+      card(1714, { name_hits: 1, last_updated: '2026/09/20', detail: { status: 'inactive' } })
+    ]);
+    const r = await searchGrantData({ query: 'RTRI' });
+    expect(r.results.map(x => x.id)).toEqual([1742, 1760]);      // English active first; French still listed
+    expect(r.other_status_matches.top.map(t => t.id)).toEqual([1714]);
+  });
+
+  test('a French card that is the only match still appears', async () => {
+    fixtures([card(1756, { name_hits: 1 })]);
+    const r = await searchGrantData({ query: 'Empower3D' });
+    expect(r.results.map(x => x.id)).toEqual([1756]);
+  });
+
+  test('a French search ranks normally: the French card it names comes first', async () => {
+    fixtures([card(1419, { name_hits: 2, last_updated: '2026/09/10' }), card(1765, { name_hits: 2, last_updated: '2026/09/29' })]);
+    const r = await searchGrantData({ query: 'Programme de Leadership Technologique' });
+    expect(r.results[0].id).toBe(1765);
+  });
+
+  test('in other status matches, French cards also come after English ones', async () => {
+    fixtures([
+      { id: 1601, name: 'Alberta Manufacturing Productivity Grant (French)', name_hits: 3, last_updated: '2026/09/30', detail: { status: 'inactive' } },
+      { id: 1600, name: 'Alberta Manufacturing Productivity Loan', name_hits: 2, last_updated: '2026/01/01', detail: { status: 'inactive' } }
+    ]);
+    const r = await searchGrantData({ query: 'Alberta Manufacturing Productivity' });
+    expect(r.other_status_matches.top.map(t => t.id)).toEqual([1600, 1601]);
+  });
+
+  test('rankCandidates is unchanged unless englishFirst is asked for', () => {
+    const rows = [cand(1767, FRENCH[1767], { name_hits: 1, last_updated: '2026/09/29' }), cand(1529, ENGLISH[1529], { name_hits: 1, last_updated: '2026/09/23' })];
+    expect(rankCandidates(rows, queryTerms('RAII')).map(r => r.id)).toEqual([1767, 1529]);
+    expect(rankCandidates(rows, queryTerms('RAII'), { englishFirst: true }).map(r => r.id)).toEqual([1529, 1767]);
   });
 });
 
