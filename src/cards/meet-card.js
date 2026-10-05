@@ -8,8 +8,11 @@
  * What it does, with rules rather than a model: read everyone's free/busy with
  * the asker's own Calendar grant, keep the times that sit inside each person's
  * working hours (assumed — no Google API exposes them — and overridable in
- * data/cards/working-hours.json), and offer the three earliest, shown in the
- * asker's own zone with a per-person mark. Calendars it could not see are named
+ * data/cards/working-hours.json), and offer the three earliest, shown in every
+ * attendee's zone with a per-person mark. A stated time ("today at 11am") is
+ * offered first when it works, with the nearest others around it. An ask to
+ * move an existing meeting is answered with fresh times; that event is never
+ * read or edited. Calendars it could not see are named
  * on the card rather than treated as free.
  *
  * Booking: the press IS the confirmation, because the card shows exactly what
@@ -36,6 +39,7 @@ import { readThread } from './track-thread.js';
 import { interpretAsk } from './interpret.js';
 import {
   parseDuration, parseWindow, findSlots, slotMarks, slotWords, slotButtonWords,
+  parseStatedTime, nearestSlots, rescheduleIntent, slotWordsAcross, workingHours,
   MIN_LEAD_MS, DEFAULT_WINDOW_DAYS
 } from './meet-slots.js';
 
@@ -79,6 +83,9 @@ const NO_PEOPLE = 'Who should be on the call? @mention them and I’ll find a ti
 // @mentioning Oracle and nobody else is a common slip. Asking the same question
 // again reads as if the mention was never seen.
 const ONLY_ORACLE = 'That’s my own account — @mention the people you want on the call.';
+const NO_RESCHEDULE = 'I can’t reschedule existing meetings — here are new times you can book instead.';
+/** How far past the window /meet keeps looking when nothing in it works. */
+const FALLBACK_DAYS = 14;
 
 const BUSY = {
   slots: 'Checking calendars…',
@@ -171,9 +178,18 @@ export async function createMeet({
 
   const requester = await resolvePerson(actor.chatUserId, { email: actor.email, displayName: actor.name, userId });
   const timeZone = await timeZoneFor(requester, now);
+
+  // "Move my call to Thursday": the existing event is never touched. Say so,
+  // then offer fresh times, read from the words after "to" when there are any.
+  const reschedule = trigger !== 'track' && rescheduleIntent(messageText);
+  const whenText = reschedule ? (/\bto\b\s+([\s\S]+)$/i.exec(messageText)?.[1] || messageText) : messageText;
+  if (reschedule) await reply(NO_RESCHEDULE);
+
   // The rules first — they are the card whenever the model step can't be used.
   let durationMinutes = parseDuration(messageText);
-  let window = parseWindow(messageText, now, timeZone);
+  let window = parseWindow(whenText, now, timeZone);
+  // A specific time is read from the ask's own words: the model's window can't carry one.
+  const stated = trigger === 'track' ? null : parseStatedTime(whenText, now, timeZone);
   let topic = topicFrom(messageText, trackCardId ? 'Call about a tracked ask' : 'Call');
   let chosenButtons = null;
 
@@ -192,7 +208,8 @@ export async function createMeet({
     if (f.title !== undefined) topic = f.title;
     // "Not stated" keeps what the rules read; only a stated value replaces it.
     if (f.durationMinutes) durationMinutes = f.durationMinutes;
-    if (f.window) window = parseWindow(f.window, now, timeZone);
+    // A reschedule ask names the old day too; the words after "to" win there.
+    if (f.window && !(reschedule && window.words)) window = parseWindow(f.window, now, timeZone);
     chosenButtons = model.buttons;
   } else if (model.code !== 'from_track_card') {
     console.log(`📅 Meet interpreter fallback — code: ${model.code}`);
@@ -207,6 +224,10 @@ export async function createMeet({
     requester: { ...who(actor), userId, email: requester?.email || actor.email || null, timeZone },
     invitees: people.map(p => ({ chatUserId: p.chatUserId, name: p.name || null, email: p.email || null })),
     slots: [],
+    stated: stated ? { at: stated.at.toISOString(), words: stated.words, fits: null, reason: null } : null,
+    reschedule,
+    fallback: false,
+    zones: [],
     unseen: [],
     noTimeZone: [],
     ignoreHours: false,
@@ -247,7 +268,7 @@ export async function createMeet({
     ok: true,
     code: null,
     card,
-    stats: `, invitees: ${people.length}, minutes: ${durationMinutes}, window: ${window.words || 'default'}, interpreted: ${model.ok ? 'yes' : 'no'}`
+    stats: `, invitees: ${people.length}, minutes: ${durationMinutes}, window: ${window.words || 'default'}, stated time: ${stated ? 'yes' : 'no'}, reschedule ask: ${reschedule ? 'yes' : 'no'}, interpreted: ${model.ok ? 'yes' : 'no'}`
   });
 }
 
@@ -262,15 +283,18 @@ async function peopleFor(card, { from, to }) {
   for (const person of wanted) {
     const row = await resolvePerson(person.chatUserId, { displayName: person.name, email: person.email });
     const email = row?.email || person.email || null;
-    // No Hub account means no calendar time zone to read: DEFAULT_TIMEZONE, and
-    // the card says so rather than pretending to know.
-    const timeZone = row?.user_id ? await timeZoneFor(row, new Date()) : DEFAULT_TZ;
-    if (!row?.user_id) noTimeZone.push(email || nameOf(person));
+    const hours = workingHours(email);
+    // The calendar's own zone first. No Hub account means none to read: then
+    // the person's zone in working-hours.json, else the default — and the
+    // card says so rather than pretending to know.
+    const timeZone = row?.user_id ? await timeZoneFor(row, new Date()) : (hours.ownZone ? hours.timeZone : (hours.timeZone || DEFAULT_TZ));
+    if (!row?.user_id && !hours.ownZone) noTimeZone.push(email || nameOf(person));
     people.push({
       chatUserId: person.chatUserId,
       name: person.name || row?.display_name || null,
       email,
       timeZone,
+      place: hours.place,
       busy: [],
       seen: true
     });
@@ -305,9 +329,20 @@ export async function fillSlots(cardId, { window = null, ignoreHours = null, now
   const d = card.data || {};
   const searchWindow = window || d.window;
   const outside = ignoreHours === null ? Boolean(d.ignoreHours) : ignoreHours;
+  // A stated time belongs to the first look only; any button looks afresh.
+  const stated = !window && ignoreHours === null && d.stated?.at ? d.stated : null;
+  const tz = d.requester?.timeZone || d.timeZone || DEFAULT_TZ;
+
+  // Busy blocks far enough out for the times around a stated one, and for the
+  // earliest times after the window when nothing in it works.
+  const readFrom = stated ? now : new Date(searchWindow.from);
+  const readTo = new Date(Math.max(
+    new Date(searchWindow.to).getTime(),
+    stated ? new Date(stated.at).getTime() + DAY : 0
+  ) + (FALLBACK_DAYS + 1) * DAY);
 
   try {
-    const { people, unseen, noTimeZone, error } = await peopleFor(card, searchWindow);
+    const { people, unseen, noTimeZone, error } = await peopleFor(card, { from: readFrom, to: readTo });
     if (error) {
       await store.patchCardData(cardId, {
         busy: null,
@@ -323,19 +358,50 @@ export async function fillSlots(cardId, { window = null, ignoreHours = null, now
       return { changed: true };
     }
 
-    const slots = findSlots({
-      durationMinutes: d.durationMinutes,
-      from: searchWindow.from,
-      to: searchWindow.to,
-      people,
-      now,
-      ignoreHours: outside
-    });
+    let slots;
+    let statedResult = null;
+    let fallback = false;
+    if (stated) {
+      const near = nearestSlots({
+        target: new Date(stated.at), durationMinutes: d.durationMinutes, people, now, ignoreHours: outside, timeZone: tz
+      });
+      slots = near.slots;
+      statedResult = { ...stated, fits: near.targetFits, reason: near.reason };
+    } else {
+      slots = findSlots({
+        durationMinutes: d.durationMinutes,
+        from: searchWindow.from,
+        to: searchWindow.to,
+        people,
+        now,
+        ignoreHours: outside
+      });
+      // Nothing in the window: the earliest times after it, said plainly.
+      if (!slots.length && !outside) {
+        slots = findSlots({
+          durationMinutes: d.durationMinutes,
+          from: searchWindow.to,
+          to: new Date(new Date(searchWindow.to).getTime() + FALLBACK_DAYS * DAY).toISOString(),
+          people,
+          now,
+          ignoreHours: false
+        });
+        fallback = slots.length > 0;
+      }
+    }
+
+    // Every attendee's zone, the asker's first, for showing each time.
+    const asker = people.find(p => p.chatUserId === d.requester?.chatUserId);
+    const zones = [asker, ...people.filter(p => p !== asker)].filter(Boolean)
+      .map(p => ({ timeZone: p.timeZone, place: p.place || null }));
 
     await store.patchCardData(cardId, {
       busy: null,
       window: searchWindow,
       ignoreHours: outside,
+      stated: statedResult,
+      fallback,
+      zones,
       slots: slots.map(slot => ({ ...slot, marks: slotMarks(slot, people) })),
       unseen,
       noTimeZone,
@@ -348,7 +414,7 @@ export async function fillSlots(cardId, { window = null, ignoreHours = null, now
       requester: { ...(d.requester || {}), timeZone: people.find(p => p.chatUserId === d.requester?.chatUserId)?.timeZone || d.requester?.timeZone },
       notice: null
     });
-    console.log(`📅 Meet slots — found: ${slots.length}, people: ${people.length}, unseen: ${unseen.length}, outside hours: ${outside}`);
+    console.log(`📅 Meet slots — found: ${slots.length}, people: ${people.length}, unseen: ${unseen.length}, outside hours: ${outside}, stated: ${statedResult ? (statedResult.fits ? 'fits' : statedResult.reason) : 'none'}, after window: ${fallback}`);
   } catch (err) {
     console.warn(`⚠️  Meet slots failed — code: ${codeOf(err)}`);
     await store.patchCardData(cardId, {
@@ -756,18 +822,47 @@ function marksLine(slot, card) {
   return bits.join(' · ');
 }
 
+/** The zones to show a time in: every attendee's, the asker's first. */
+function zonesOf(card) {
+  const d = card.data || {};
+  if (d.zones?.length) return d.zones;
+  return [{ timeZone: d.requester?.timeZone || d.timeZone || DEFAULT_TZ, place: null }];
+}
+
 function slotLines(card) {
   const d = card.data || {};
-  const tz = d.requester?.timeZone || d.timeZone || DEFAULT_TZ;
-  return (d.slots || []).map((slot, i) => `${i + 1}. ${esc(slotWords(slot, tz))} — ${marksLine(slot, card)}`);
+  const zones = zonesOf(card);
+  return (d.slots || []).map((slot, i) => `${i + 1}. ${esc(slotWordsAcross(slot, zones))} — ${marksLine(slot, card)}`);
+}
+
+const RANGE_WORDS = { today: 'today', tomorrow: 'tomorrow', 'this week': 'this week', 'next week': 'next week', 'the following week': 'the following week' };
+
+/** "today", "on Tuesday", "in the next three working days". */
+function rangeWords(words) {
+  if (!words) return 'in the next three working days';
+  if (RANGE_WORDS[words]) return RANGE_WORDS[words];
+  return `on ${words.charAt(0).toUpperCase()}${words.slice(1)}`;
+}
+
+/** The line above the times: what happened to the time asked for, or why these are later. */
+function slotsHeader(card) {
+  const d = card.data || {};
+  if (d.stated?.words && d.stated.fits !== null && d.stated.fits !== undefined) {
+    if (d.stated.fits) return `${esc(d.stated.words)} works for everyone`;
+    const why = d.stated.reason === 'hours'
+      ? 'is outside someone’s working hours'
+      : (d.stated.reason === 'past' ? 'has already passed' : 'is taken');
+    return `${esc(d.stated.words)} ${why} — the nearest times`;
+  }
+  if (d.fallback) return `No time works for everyone ${esc(rangeWords(d.window?.words))} — here are the earliest options`;
+  return 'Times everyone is free';
 }
 
 function bookedLines(card) {
   const d = card.data || {};
-  const tz = d.requester?.timeZone || d.timeZone || DEFAULT_TZ;
   const event = d.event;
   if (!event) return [];
-  const lines = [`<b>Booked</b> · ${esc(slotWords({ start: event.start, end: event.end }, tz))}`];
+  const lines = [`<b>Booked</b> · ${esc(slotWordsAcross({ start: event.start, end: event.end }, zonesOf(card)))}`];
   const invited = event.invited ? `Invites sent to ${plural(event.invited, 'person')}` : 'No invites sent';
   lines.push(event.meetLink
     ? `${invited} — <a href="${esc(event.meetLink)}">Meet link</a>`
@@ -793,7 +888,6 @@ function smallPrint(card) {
   if (d.unseen?.length) bits.push(`Couldn’t see ${d.unseen.length === 1 ? 'one calendar' : `${d.unseen.length} calendars`} — those times may not be free.`);
   if (d.noTimeZone?.length) bits.push(`No calendar time zone for ${plural(d.noTimeZone.length, 'person')} — assumed ${DEFAULT_TZ.split('/')[1]?.replace('_', ' ') || DEFAULT_TZ}.`);
   if (d.ignoreHours) bits.push('Working hours ignored on this card.');
-  else bits.push('Working hours are assumed 9–5 (data/cards/working-hours.json) — Google exposes no setting for them.');
   return bits.join(' ');
 }
 
@@ -829,7 +923,7 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
   } else {
     const slots = slotLines(card);
     sections.push({
-      header: slots.length ? 'Times everyone is free' : null,
+      header: slots.length ? slotsHeader(card) : null,
       widgets: [paragraph(slots.length
         ? slots.join('<br>')
         : (busy ? 'Checking calendars…' : 'No time in that window works for everyone — try next week, or ignore working hours.'))]
@@ -839,7 +933,8 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
   const votes = votesLine(card);
   if (votes && !d.event) sections.push({ widgets: [paragraph(votes)] });
 
-  sections.push({ widgets: [paragraph(`<i>${esc(smallPrint(card))}</i>`)] });
+  const small = smallPrint(card);
+  if (small) sections.push({ widgets: [paragraph(`<i>${esc(small)}</i>`)] });
 
   const buttons = [];
   if (live && !busy) {

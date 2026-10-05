@@ -147,7 +147,7 @@ matching Chat API command in the Cloud console.
 | Command | Card | What it does |
 |---|---|---|
 | `/track`, "@Oracle track this" | `src/cards/track-card.js` (`createTrack`) | Who has the ball on an ask, or (everyone shape) a checklist of the space |
-| `/meet`, "@Oracle find 30 min with @Name" | `src/cards/meet-card.js` (`createMeet`) | Three times everyone is free, read with the asker's Calendar grant; books one |
+| `/meet`, "@Oracle find 30 min with @Name" | `src/cards/meet-card.js` (`createMeet`) | Three times everyone is free in their own hours, read with the asker's Calendar grant; books one |
 | `/watch`, "@Oracle watch" | `src/cards/watch-card.js` (`startWatch` → `setUpWatch`) | Watches one funding program for date changes; one card per program per space |
 | `/review` | `src/cards/review-card.js` (`trackReview`) | "Track this as a review?". Oracle fills the card through the `track_review` tool |
 | `/help`, joining a space, a first DM | `src/cards/intro-card.js` (`postIntro`, `replyWithIntro`) | Fixed guide per space from `data/chat/space-guides.json`; no parsing |
@@ -199,6 +199,25 @@ matching Chat API command in the Cloud console.
   /track's "Track card posted" line ends `interpreted: yes|no, docs: N`.
 - /meet started from a /track card's Schedule call is not interpreted, since its text is
   already that card's title.
+
+**/meet times.**
+- Working hours come from `data/cards/working-hours.json`; no Google API exposes them.
+  Default 09:00–17:00 Mon–Fri; Chris (`writers@`) 10:00–22:00 with place "Barcelona".
+- Each person's zone is their own calendar's (`timeZoneFor` in `people.js`); the file's
+  `timeZone` is only for someone Oracle can't read (no Hub sign-in). A slot must fit
+  every attendee's window in their own zone; Intl handles DST.
+- A stated time ("today at 11am", `parseStatedTime` in `meet-slots.js`) is in the
+  asker's zone, read from the ask's own words (the interpreter's window can't carry a
+  time). `nearestSlots` offers it first when it works, else "11am is taken" and the
+  nearest three, same day first. Any button looks afresh without it.
+- Nothing in the window: the earliest times in the 14 days after it, headed "No time
+  works for everyone {range} — here are the earliest options".
+- Each time is shown in every attendee's zone, the asker's first
+  (`slotWordsAcross`); one zone when all share it. Buttons stay in the asker's zone.
+- An ask to move a meeting (`rescheduleIntent`) is answered "I can't reschedule
+  existing meetings — here are new times you can book instead" plus a normal card; no
+  existing event is read or edited. The booked card's own Reschedule button still moves
+  the event Oracle created from that card. See DECISIONS.md, 2026-10-05.
 
 ## Confirmation gate
 

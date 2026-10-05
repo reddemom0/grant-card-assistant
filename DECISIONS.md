@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-10-05 — /meet does not reschedule; it offers a fresh booking instead
+**What:** An ask to move an existing meeting ("move my call with @Nat to Friday") gets a private "I can't reschedule existing meetings — here are new times you can book instead" and a normal /meet card for the new day; the existing event is never read or edited. The booked card's own Reschedule button stays: it only moves the event Oracle created from that card.
+**Why:** Simpler, and avoids editing the wrong event — an ask names a meeting in words, and guessing which calendar event it means is where a wrong edit would come from.
+**Impact:** `src/cards/meet-slots.js` (`rescheduleIntent`, `meetIntent`), `src/cards/meet-card.js` (`createMeet`), `tests/unit/{meet-card,meet-slots}.test.js`, `docs/oracle.md`
+
 ## 2026-09-29 — Tracked cards read the ask with Haiku; rules become the fallback
 
 **What:** /track, /meet and /watch now send the ask to one Haiku call (`interpretAsk` in `src/cards/interpret.js`, `claude-haiku-4-5-20251001`, forced tool output, 6 s cap, no retries) before the card is built. The call returns the card's fields and which of its existing buttons fit the ask:

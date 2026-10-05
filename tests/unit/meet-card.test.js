@@ -248,6 +248,17 @@ beforeEach(() => {
   jest.spyOn(console, 'log').mockImplementation(() => {});
   jest.spyOn(console, 'warn').mockImplementation(() => {});
   jest.spyOn(console, 'error').mockImplementation(() => {});
+
+  // Only Date is fixed: the turn helpers still need real timers and setImmediate.
+  jest.useFakeTimers({
+    now: NOW,
+    doNotFake: ['hrtime', 'nextTick', 'performance', 'queueMicrotask', 'setImmediate', 'clearImmediate',
+      'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout']
+  });
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 // ============================================================================
@@ -309,7 +320,7 @@ describe('finding times', () => {
     expect(card.data.invitees.map(p => p.chatUserId)).toEqual([NAT]);
   });
 
-  test('busy time is never offered, and the times are shown in the asker’s zone', async () => {
+  test('busy time is never offered, and the times are shown in everyone’s zone', async () => {
     fakes.calendar.busy.set(EMAILS[NAT], [{ start: '2026-09-17T17:00:00Z', end: '2026-09-17T23:00:00Z' }]);
     const card = await meetWith();
 
@@ -317,7 +328,10 @@ describe('finding times', () => {
       expect(Date.parse(slot.end) <= Date.parse('2026-09-17T17:00:00Z')
         || Date.parse(slot.start) >= Date.parse('2026-09-17T23:00:00Z')).toBe(true);
     }
-    expect(await textOf(card)).toContain('PDT');
+    // Everyone is in Vancouver: one zone, named once.
+    const text = await textOf(card);
+    expect(text).toContain('Thu Sep 17 · 4:00pm Vancouver');
+    expect(text).not.toContain(' / ');
   });
 
   test('Oracle, the listener account and apps are never invited', async () => {
@@ -347,8 +361,8 @@ describe('finding times', () => {
     expect(await textOf(card)).toContain('No calendar time zone for 1 person');
   });
 
-  test('nothing fits: the card says so and offers next week and ignoring hours', async () => {
-    fakes.calendar.busy.set(EMAILS[NAT], [{ start: '2026-09-17T00:00:00Z', end: '2026-09-26T00:00:00Z' }]);
+  test('nothing fits, even after the window: the card says so and offers next week and ignoring hours', async () => {
+    fakes.calendar.busy.set(EMAILS[NAT], [{ start: '2026-09-17T00:00:00Z', end: '2026-10-10T00:00:00Z' }]);
     const card = await meetWith();
 
     expect(card.data.slots).toEqual([]);
@@ -360,7 +374,7 @@ describe('finding times', () => {
     // Free only at 19:00 local, which working hours rule out.
     fakes.calendar.busy.set(EMAILS[NAT], [
       { start: '2026-09-17T00:00:00Z', end: '2026-09-18T02:00:00Z' },
-      { start: '2026-09-18T03:00:00Z', end: '2026-09-26T00:00:00Z' }
+      { start: '2026-09-18T03:00:00Z', end: '2026-10-10T00:00:00Z' }
     ]);
     const card = await meetWith();
     expect(card.data.slots).toEqual([]);
@@ -400,6 +414,128 @@ describe('finding times', () => {
 
     expect(meetCards()).toHaveLength(1);
     expect(privateReplies().some(([, t]) => /already has a meeting card/.test(t))).toBe(true);
+  });
+});
+
+// ============================================================================
+// A STATED TIME, MOVING A MEETING, NOTHING IN THE WINDOW, EVERYONE'S ZONE
+// ============================================================================
+
+describe('a time asked for', () => {
+  test('"today at 11am" when everyone is free: 11am first, then the two nearest', async () => {
+    const card = await meetWith({ text: 'find 30 min with @Nat today at 11am' });
+
+    expect(card.data.stated).toMatchObject({ words: '11am', fits: true });
+    expect(card.data.slots.map(s => s.start)).toEqual([
+      '2026-09-17T18:00:00.000Z',   // 11:00 PDT
+      '2026-09-17T17:30:00.000Z',   // 10:30
+      '2026-09-17T18:30:00.000Z'    // 11:30
+    ]);
+    expect(await textOf(card)).toContain('11am works for everyone');
+  });
+
+  test('"today at 11am" when it is taken: says so, and offers the nearest three that day', async () => {
+    // Nat is busy 10:45–12:00 PDT.
+    fakes.calendar.busy.set(EMAILS[NAT], [{ start: '2026-09-17T17:45:00Z', end: '2026-09-17T19:00:00Z' }]);
+    const card = await meetWith({ text: 'find 30 min with @Nat today at 11am' });
+
+    expect(card.data.stated).toMatchObject({ words: '11am', fits: false, reason: 'busy' });
+    expect(card.data.slots.map(s => s.start)).toEqual([
+      '2026-09-17T17:15:00.000Z',   // 10:15, ends as Nat's meeting starts
+      '2026-09-17T19:00:00.000Z',   // 12:00
+      '2026-09-17T16:45:00.000Z'    // 9:45
+    ]);
+    const text = await textOf(card);
+    expect(text).toContain('11am is taken — the nearest times');
+    expect(text).not.toContain('11:00am');
+  });
+
+  test('a button looks afresh, without the stated time', async () => {
+    const card = await meetWith({ text: 'find 30 min with @Nat today at 11am' });
+    await press(card, 'meet.next_week', CHRIS);
+    await whenCardsIdle();
+
+    const after = await liveCard();
+    expect(after.data.stated).toBeNull();
+    expect(await textOf(after)).not.toContain('11am works');
+  });
+});
+
+describe('an ask to move a meeting', () => {
+  test('says it can’t reschedule, offers fresh times for the new day, and touches no event', async () => {
+    await say({ text: 'move my call with @Nat to Friday', mentions: [NAT] });
+    const card = await liveCard();
+
+    expect(privateReplies()).toContainEqual([CHRIS, 'I can’t reschedule existing meetings — here are new times you can book instead.']);
+    expect(card.data.reschedule).toBe(true);
+    expect(card.data.window.words).toBe('friday');
+    expect(card.data.slots.length).toBe(3);
+    for (const slot of card.data.slots) expect(slot.start.startsWith('2026-09-18')).toBe(true);
+    expect(fakes.calendar.events).toHaveLength(0);
+  });
+});
+
+describe('nothing in the window', () => {
+  test('says no time works for everyone that week, and offers the earliest after it', async () => {
+    // Nat is out until the end of Friday.
+    fakes.calendar.busy.set(EMAILS[NAT], [{ start: '2026-09-17T00:00:00Z', end: '2026-09-19T07:00:00Z' }]);
+    const card = await meetWith();
+
+    expect(card.data.fallback).toBe(true);
+    // Monday 21 September, 9:00 PDT, is the earliest.
+    expect(card.data.slots[0].start).toBe('2026-09-21T16:00:00.000Z');
+    expect(await textOf(card)).toContain('No time works for everyone this week — here are the earliest options');
+  });
+});
+
+describe('everyone’s own hours and zone', () => {
+  test('Chris in Barcelona and Nat in Vancouver: only 9am–1pm Vancouver, shown in both zones, no file path', async () => {
+    // Chris's real address carries his hours (10:00–22:00) and place in working-hours.json.
+    const was = EMAILS[CHRIS];
+    const hub = HUB.find(u => u.id === 3);
+    EMAILS[CHRIS] = 'writers@granted.ca';
+    hub.email = EMAILS[CHRIS];
+    try {
+      fakes.db.users.find(u => u.id === 3).email = EMAILS[CHRIS];
+      fakes.directory.people.set(CHRIS, { email: EMAILS[CHRIS], name: NAMES[CHRIS] });
+      fakes.calendar.zones.set(3, 'Europe/Madrid');
+
+      const card = await meetWith();
+
+      expect(card.data.zones).toEqual([
+        { timeZone: 'Europe/Madrid', place: 'Barcelona' },
+        { timeZone: TZ, place: null }
+      ]);
+      expect(card.data.slots.length).toBe(3);
+      for (const slot of card.data.slots) {
+        const start = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(slot.start));
+        const end = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(slot.end));
+        expect(start >= '09:00' && end <= '13:00').toBe(true);
+      }
+      const text = await textOf(card);
+      // The asker's zone first.
+      expect(text).toContain('Thu Sep 17 · 7:00pm Barcelona / 10:00am Vancouver');
+      expect(text).not.toContain('working-hours.json');
+      expect(text).not.toContain('data/cards');
+    } finally {
+      EMAILS[CHRIS] = was;
+      hub.email = was;
+    }
+  });
+
+  test('an all-Vancouver meeting stays in 9–5 and shows one zone', async () => {
+    const card = await meetWith({ text: 'find 30 min with @Nat tomorrow' });
+
+    expect(card.data.zones.map(z => z.timeZone)).toEqual([TZ, TZ]);
+    for (const slot of card.data.slots) {
+      const start = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(slot.start));
+      const end = new Intl.DateTimeFormat('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(slot.end));
+      expect(start >= '09:00' && end <= '17:00').toBe(true);
+    }
+    const text = await textOf(card);
+    expect(text).toContain('Fri Sep 18 · 9:00am Vancouver');
+    expect(text).not.toContain(' / ');
+    expect(text).not.toContain('working-hours.json');
   });
 });
 
