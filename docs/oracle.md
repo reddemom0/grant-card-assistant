@@ -304,7 +304,7 @@ the run-only `save_team_lesson` unless `allowedTools` names it. Oracle builds
 `oracleBaseTools` from scratch rather than reusing shared `baseTools`.
 
 **Tools on demand (Sonnet 5.5 path only).** `withToolSearch` in `src/claude/client.js`
-sends the 24 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
+sends the 44 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
 Anthropic's tool search (`tool_search_tool_bm25`), so rarely used tools stay out of the
 cached prefix until Claude searches for them. The list is the tools used in 2 or fewer
 conversations over the 30 days to 2026-09-29. `track_review` and `read_chat_attachments`
