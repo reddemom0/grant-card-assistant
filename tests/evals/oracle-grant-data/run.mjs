@@ -115,15 +115,21 @@ async function grade(question, answer, trace) {
 Grade ONLY against the rubric and expected facts. Be strict on facts, links and the rubric's explicit requirements; don't penalise style or length.
 Reply with JSON only: {"pass": true|false, "reason": "<one line, under 30 words>"}`;
   const user = `QUESTION:\n${question.question}\n\nRUBRIC:\n${question.rubric}\n\nEXPECTED FACTS (live data, ${new Date().toISOString().slice(0, 10)}):\n${JSON.stringify(question.expected)}\n\nTOOL CALLS ORACLE MADE:\n${traceForGrader(trace)}\n\nORACLE'S ANSWER:\n${answer || '(empty)'}`;
-  const res = await anthropic.messages.create({ model: GRADER_MODEL, max_tokens: 300, system, messages: [{ role: 'user', content: user }] });
+  // Room to spare: a reply cut off mid-JSON can't be read (Q19, 2026-10-05).
+  const res = await anthropic.messages.create({ model: GRADER_MODEL, max_tokens: 1024, system, messages: [{ role: 'user', content: user }] });
   const text = res.content.filter(b => b.type === 'text').map(b => b.text).join('');
   const cost = calculateRequestCost(res.usage, GRADER_MODEL);
+  // A reply that can't be read is the grader's failure, not Oracle's.
+  const graderError = (why) => ({ pass: false, error: true, reason: `grader error (${why}): ${text.slice(0, 120)}`, cost });
+  if (res.stop_reason === 'max_tokens') return graderError('reply cut off');
   const json = text.match(/\{[\s\S]*\}/);
+  if (!json) return graderError('no JSON');
   try {
-    const parsed = JSON.parse(json?.[0] ?? '');
-    return { pass: parsed.pass === true, reason: String(parsed.reason ?? '').trim(), cost };
+    const parsed = JSON.parse(json[0]);
+    if (typeof parsed.pass !== 'boolean') return graderError('no pass verdict');
+    return { pass: parsed.pass, reason: String(parsed.reason ?? '').trim(), cost };
   } catch {
-    return { pass: false, reason: `grader reply not JSON: ${text.slice(0, 120)}`, cost };
+    return graderError('JSON did not parse');
   }
 }
 
@@ -178,7 +184,10 @@ async function runQuestion(question) {
     answer,
     checks,
     failedChecks,
-    grader: { pass: graded.pass, reason: graded.reason },
+    grader: { pass: graded.pass, error: !!graded.error, reason: graded.reason },
+    // An agent failure or a failed rule check is a fail whatever the grader did;
+    // only when everything else passed does a broken grader reply mean "grader error".
+    result: !result?.success || failedChecks.length ? 'fail' : graded.error ? 'grader_error' : graded.pass ? 'pass' : 'fail',
     pass: !!result?.success && failedChecks.length === 0 && graded.pass,
     oracleCost,
     graderCost: graded.cost,
@@ -191,12 +200,16 @@ async function runQuestion(question) {
 
 // ---------------------------------------------------------------------------
 
+const RESULT_LABEL = { pass: 'PASS', fail: 'FAIL', grader_error: 'GRADER ERROR' };
+
 /** The models Oracle answered with, as the API reported them. */
 const oracleModels = (runs) => [...new Set(runs.map(r => r.model).filter(Boolean))];
 
 function report({ runs, started, totalMs, subset }) {
   const date = new Date().toISOString().slice(0, 10);
   const passed = runs.filter(r => r.pass).length;
+  const graderErrors = runs.filter(r => r.result === 'grader_error');
+  const graded = runs.length - graderErrors.length;
   const oracle = runs.reduce((a, r) => a + r.oracleCost, 0);
   const grader = runs.reduce((a, r) => a + r.graderCost, 0);
   const blocked = runs.flatMap(r => r.blocked.map(b => `Q${r.id}: ${b.tool}`));
@@ -204,7 +217,7 @@ function report({ runs, started, totalMs, subset }) {
   const L = [];
   L.push(`# Oracle grant-data eval — ${date}`);
   L.push('');
-  L.push(`**Pass rate:** ${passed}/${runs.length} (${Math.round((100 * passed) / (runs.length || 1))}%)${subset ? ` — subset: ${[...subset].join(', ')}` : ''}`);
+  L.push(`**Pass rate:** ${passed}/${graded} graded (${Math.round((100 * passed) / (graded || 1))}%)${graderErrors.length ? ` — ${graderErrors.length} grader error${graderErrors.length === 1 ? '' : 's'} (${graderErrors.map(r => `Q${r.id}`).join(', ')})` : ''}${subset ? ` — subset: ${[...subset].join(', ')}` : ''}`);
   L.push(`**Oracle model:** ${oracleModels(runs).join(', ') || 'unknown'}`);
   L.push(`**Cost:** $${(oracle + grader).toFixed(2)} (Oracle $${oracle.toFixed(2)}, grader $${grader.toFixed(2)} on ${GRADER_MODEL})`);
   L.push(`**Started:** ${started.toISOString()} · **Runtime:** ${(totalMs / 60000).toFixed(1)} min`);
@@ -216,14 +229,21 @@ function report({ runs, started, totalMs, subset }) {
   L.push('- Messages, the team-notes audit row and cost rows go to in-memory stubs; nothing reaches the messages table.');
   L.push('- Test user has no account: OAuth-backed reads (Drive, Sheets, Calendar, Chat history) are unavailable.');
   L.push('');
-  L.push('A question passes when every applicable rule check passes and the grader passes.');
+  L.push('A question passes when every applicable rule check passes and the grader passes. A grader reply that can\'t be read is a grader error, left out of the pass rate.');
   L.push('');
   L.push('| # | Category | Result | Failed checks | Grader | Cost | Tools |');
   L.push('|---|---|---|---|---|---|---|');
   for (const r of runs) {
-    L.push(`| ${r.id} | ${r.category} | ${r.pass ? 'PASS' : 'FAIL'} | ${r.failedChecks.join(', ') || '—'} | ${r.grader.pass ? 'pass' : 'fail'}: ${esc(r.grader.reason)} | $${(r.oracleCost + r.graderCost).toFixed(3)} | ${esc([...new Set(r.tools)].join(', ')) || '—'} |`);
+    L.push(`| ${r.id} | ${r.category} | ${RESULT_LABEL[r.result] ?? (r.pass ? 'PASS' : 'FAIL')} | ${r.failedChecks.join(', ') || '—'} | ${r.grader.error ? 'error' : r.grader.pass ? 'pass' : 'fail'}: ${esc(r.grader.reason)} | $${(r.oracleCost + r.graderCost).toFixed(3)} | ${esc([...new Set(r.tools)].join(', ')) || '—'} |`);
   }
-  const failures = runs.filter(r => !r.pass);
+  if (graderErrors.length) {
+    L.push('');
+    L.push('## Grader errors');
+    L.push('');
+    L.push('Every rule check passed; the grader\'s reply couldn\'t be read, so these are not scored.');
+    for (const r of graderErrors) L.push(`- **Q${r.id}** (${r.category}): ${esc(r.grader.reason)}`);
+  }
+  const failures = runs.filter(r => r.result === 'fail');
   if (failures.length) {
     L.push('');
     L.push('## Failures');
@@ -271,7 +291,7 @@ for (const q of toRun) {
   console.log(`\n▶︎ Q${q.id} [${q.category}] ${q.question}`);
   const r = await runQuestion(q);
   runs.push(r);
-  console.log(`◀︎ Q${q.id} ${r.pass ? 'PASS' : 'FAIL'} — checks failed: ${r.failedChecks.join(', ') || 'none'} — grader: ${r.grader.reason} — $${(r.oracleCost + r.graderCost).toFixed(3)}`);
+  console.log(`◀︎ Q${q.id} ${RESULT_LABEL[r.result]} — checks failed: ${r.failedChecks.join(', ') || 'none'} — grader: ${r.grader.reason} — $${(r.oracleCost + r.graderCost).toFixed(3)}`);
 }
 const totalMs = Date.now() - started.getTime();
 
