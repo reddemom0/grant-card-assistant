@@ -191,11 +191,12 @@ async function privateReply({ spaceName, threadName, surface, chatUserId, text }
  * @param {string} [p.conversationId] - the Oracle conversation, when the card is a reply to @Oracle
  * @param {string} [p.commandMessageName] - the /track or @Oracle message itself
  * @param {string} [p.askText] - words typed after /track, used when the command started the thread
+ * @param {string} [p.quotedMessageName] - the message the trigger quotes, if any
  * @param {Date} [p.now]
  */
 export async function createTrack({
   trigger, actor, userId, spaceName, threadName, surface = 'chat_space',
-  conversationId = null, commandMessageName = null, askText = null, now = new Date()
+  conversationId = null, commandMessageName = null, askText = null, quotedMessageName = null, now = new Date()
 }) {
   const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor.chatUserId, text });
   const done = (result) => {
@@ -242,6 +243,7 @@ export async function createTrack({
         threadName,
         userIds: [userId, offer?.owner_user_id],
         triggerMessageName: commandMessageName,
+        quotedMessageName,
         // Anything a person actually said is a possible ask; "ok" and "thanks"
         // are not.
         looksRight: (text) => String(text).trim().split(/\s+/).length >= 3,
@@ -780,7 +782,7 @@ export async function handleTrackMessage({ evt, user, conversationId, messageTex
   const actor = { chatUserId: evt.senderChatId, name: evt.senderDisplayName || user?.name || null, email: evt.senderEmail || null };
 
   if (intent === 'track') {
-    await createTrack({ trigger: 'mention', actor, userId: user.id, spaceName, threadName, surface, conversationId, commandMessageName: evt.messageName, now });
+    await createTrack({ trigger: 'mention', actor, userId: user.id, spaceName, threadName, surface, conversationId, commandMessageName: evt.messageName, quotedMessageName: evt.quotedMessageName || null, now });
     return true;
   }
   if (intent === 'maybe') {

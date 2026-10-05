@@ -187,7 +187,8 @@ export function normalizeChatEvent(body) {
     files: [],
     isDialogEvent: false,
     dialogEventType: null,
-    formInputs: {}
+    formInputs: {},
+    quotedMessageName: null
   };
 
   if (!body || typeof body !== 'object') return base;
@@ -236,8 +237,12 @@ export function normalizeChatEvent(body) {
     .flatMap(a => (Array.isArray(a) ? a : a ? [a] : []))
     .filter(a => !pointsToDrive(a));
 
-  // Prefer resource names; fall back to the add-on's weaker identifiers.
-  const threadId = message?.thread?.name || message?.thread?.threadKey || null;
+  // Prefer resource names; fall back to the add-on's weaker identifiers. A slash
+  // command also documents the thread on the payload itself
+  // (appCommandPayload.thread), used when the command's message has none.
+  const isCommand = container === 'appCommandPayload' || eventType === 'APP_COMMAND';
+  const commandThread = isCommand ? payload.thread?.name || null : null;
+  const threadId = message?.thread?.name || commandThread || message?.thread?.threadKey || null;
   const spaceId = space?.name || space?.displayName || null;
 
   return {
@@ -259,7 +264,7 @@ export function normalizeChatEvent(body) {
     hasAttachments: attachments.length > 0,
     attachmentCount: attachments.length,
     threadId,
-    threadIsResourceName: Boolean(message?.thread?.name),
+    threadIsResourceName: Boolean(message?.thread?.name || commandThread),
     spaceId,
     spaceIsResourceName: Boolean(space?.name),
     spaceDisplayName: space?.displayName || null,
@@ -294,7 +299,10 @@ export function normalizeChatEvent(body) {
     // Card dialogs (add-on Developer Preview; used only when TRACK_DIALOGS_ENABLED).
     isDialogEvent: payload.isDialogEvent === true,
     dialogEventType: payload.dialogEventType || null,
-    formInputs: readFormInputs(body.commonEventObject?.formInputs)
+    formInputs: readFormInputs(body.commonEventObject?.formInputs),
+    // A quote-reply: the quoted message's resource name only. Its text needs a
+    // separate read, as the person (findSubject in src/cards/subject.js).
+    quotedMessageName: message?.quotedMessageMetadata?.name || null
   };
 }
 
@@ -1203,6 +1211,13 @@ export async function handleGoogleChatEvent(req, res) {
   // card code never imports this module.
   // ==========================================================================
   if (kind === 'appcommand') {
+    // TEMP — remove once slash-command thread fields are known. Presence only,
+    // never values: which fields carry the thread, and whether it quotes.
+    {
+      const p = req.body?.chat?.appCommandPayload || req.body || {};
+      const yes = (v) => (v ? 'yes' : 'no');
+      console.log(`🧪 TEMP slash command fields — message.thread.name: ${yes(p.message?.thread?.name)}, payload.thread.name: ${yes(p.thread?.name)}, threadKey: ${yes(p.message?.thread?.threadKey)}, quoted: ${yes(p.message?.quotedMessageMetadata?.name)}`);
+    }
     let handler = null;
     try {
       await import('../cards/commands.js');

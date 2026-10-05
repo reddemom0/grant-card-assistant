@@ -115,7 +115,7 @@ const { handleCardClick, whenCardsIdle } = await import('../../src/cards/actions
 const { renderCard } = await import('../../src/cards/update.js');
 const { applyLifecycle } = await import('../../src/cards/lifecycle.js');
 const notify = await import('../../src/cards/notify.js');
-const { onStoredMessages } = await import('../../src/cards/watch-card.js');
+const { onStoredMessages, expireWatchChoices, CHOICE_NOTE } = await import('../../src/cards/watch-card.js');
 
 const SPACE = 'spaces/TEAM';
 const THREAD = `${SPACE}/threads/T1`;
@@ -139,7 +139,7 @@ function chatMessage({ id, sender = NAT, text, at = '2026-09-17T14:00:00Z', thre
   };
 }
 
-function messageBody({ text, sender = CHRIS, thread = THREAD, name = `${SPACE}/messages/in${++seq}` }) {
+function messageBody({ text, sender = CHRIS, thread = THREAD, name = `${SPACE}/messages/in${++seq}`, quoted = null }) {
   return {
     chat: {
       messagePayload: {
@@ -149,7 +149,9 @@ function messageBody({ text, sender = CHRIS, thread = THREAD, name = `${SPACE}/m
           argumentText: text,
           sender: { name: sender, displayName: NAMES[sender], email: EMAILS[sender], type: 'HUMAN' },
           thread: { name: thread },
-          annotations: [annotation(ORACLE)]
+          annotations: [annotation(ORACLE)],
+          // A quote-reply: Chat sends only the quoted message's name.
+          ...(quoted ? { quotedMessageMetadata: { name: quoted, lastUpdateTime: new Date().toISOString() } } : {})
         },
         space: { name: SPACE, displayName: 'Team', type: 'ROOM' }
       }
@@ -312,14 +314,14 @@ describe('starting a watch', () => {
     expect(privateReplies().some(([to, t]) => to === NAT && /already watching/.test(t))).toBe(true);
   });
 
-  test('a post nothing can be made of is quoted back, not guessed at', async () => {
+  test('a post that names no program: the asker is privately asked for the name, not guessed at', async () => {
     fakes.userChat.threads.set(THREAD, [chatMessage({ id: 'vague', text: 'that changed again, worth a look' })]);
     await say({ text: 'watch' });
 
     expect(watchCards()).toHaveLength(0);
     const asked = privateReplies().find(([to]) => to === CHRIS)?.[1] || '';
-    expect(asked).toContain('Which program did you mean?');
-    expect(asked).toContain('“that changed again, worth a look”');
+    expect(asked).toContain('I couldn’t tell which program that post is about');
+    expect(asked).toContain('@Oracle watch <program name>');
   });
 
   test('a program we do not have on file is still watched, from the post’s own words', async () => {
@@ -488,7 +490,7 @@ describe('in a DM', () => {
     expect(logged()).toContain('👁️  Watch subject taken from recent');
   });
 
-  test('recent chatter that names no program is quoted back, not guessed at', async () => {
+  test('recent chatter that names no program: asked for the name, not guessed at', async () => {
     fakes.userChat.threads.set(`${DM}/threads/d1`, [{
       name: `${DM}/messages/m-chat`,
       sender: { name: CHRIS, displayName: NAMES[CHRIS], type: 'HUMAN' },
@@ -501,8 +503,7 @@ describe('in a DM', () => {
     await sayInDm('watch');
 
     expect(watchCards()).toHaveLength(0);
-    const asked = fakes.chat.posts.map(p => p.text || '').find(t => /Which program did you mean/.test(t));
-    expect(asked).toContain('“thanks!”');
+    expect(fakes.chat.posts.some(p => /couldn’t tell which program/.test(p.text || ''))).toBe(true);
   });
 
   test('an empty conversation: Oracle says it cannot tell', async () => {
@@ -512,7 +513,8 @@ describe('in a DM', () => {
     expect(fakes.chat.posts.some(p => /couldn’t tell which program/.test(p.text || ''))).toBe(true);
   });
 
-  test('two programs in the last few messages: the nearest is quoted and confirmed', async () => {
+  test('two programs in the last few messages: a choice card offers both, nearest first', async () => {
+    fakes.grants.grants.push({ name: 'Canada Summer Jobs', links: { app: 'https://granted.ca/csj' }, deadline: '2027-01-15', funder: 'ESDC', status: 'active' });
     const at = (secondsAgo) => new Date(Date.now() - secondsAgo * 1000).toISOString();
     fakes.userChat.threads.set(`${DM}/threads/d1`, [{
       name: `${DM}/messages/m-old`,
@@ -529,10 +531,13 @@ describe('in a DM', () => {
 
     await sayInDm('watch');
 
-    expect(watchCards()).toHaveLength(0);
-    const asked = fakes.chat.posts.map(p => p.text || '').find(t => /Which program did you mean/.test(t));
-    expect(asked).toBeTruthy();
-    expect(asked).toContain(PROGRAM);           // the nearest one, quoted
+    expect(fakes.chat.posts.some(p => /Which program did you mean/.test(p.text || ''))).toBe(false);
+    const choice = watchCards().find(c => c.data?.choosing);
+    expect(choice.status).toBe('open');
+    expect(choice.data.choosing.choices.map(c => c.name)).toEqual([PROGRAM, 'Canada Summer Jobs']);
+    expect(await buttonsOf(choice)).toEqual([expect.stringMatching(/^Rural Transportation/), 'Canada Summer Jobs', 'None of these']);
+    // Posted as a normal card in the DM.
+    expect(fakes.chat.posts.find(p => p.cardsV2 && p.spaceName === DM)).toMatchObject({ privateTo: null });
   });
 
   test('naming the program in the message needs no looking back at all', async () => {
@@ -624,6 +629,156 @@ describe('"Not this one?"', () => {
 
     expect((await liveWatch()).data.picking).toBe(false);
     expect(privateReplies().some(([to, t]) => to === CHRIS && /watch &lt;program name&gt;|watch <program name>/.test(t))).toBe(true);
+  });
+});
+
+// ============================================================================
+// QUOTE-REPLIES AND THE CHOICE CARD
+// ============================================================================
+
+describe('a quote-reply names the post', () => {
+  test('the quoted post wins over the thread and the recent messages', async () => {
+    fakes.userChat.threads.set(THREAD, [chatMessage({ id: 'rtmf', text: 'Rural Transit Modernisation Fund: new intake https://granted.ca/rtmf' })]);
+    fakes.userChat.threads.set(OTHER_THREAD, [chatMessage({ id: 'rtri', thread: OTHER_THREAD, text: `${PROGRAM} closes November 15, 2026` })]);
+
+    await say({ text: 'watch', quoted: `${SPACE}/messages/rtri` });
+
+    expect((await liveWatch()).data.program.name).toBe(PROGRAM);
+    expect(logged()).toContain('👁️  Watch subject taken from quote');
+    // Read as the person who asked, by name.
+    expect(fakes.userChat.calls).toContainEqual({ userId: 3, get: `${SPACE}/messages/rtri` });
+  });
+
+  test('a quote that cannot be read falls back to the thread, as before', async () => {
+    fakes.userChat.threads.set(THREAD, [chatMessage({ id: 'post', text: `${PROGRAM} closes November 15, 2026` })]);
+
+    await say({ text: 'watch', quoted: `${SPACE}/messages/gone` });
+
+    expect((await liveWatch()).data.program.name).toBe(PROGRAM);
+    expect(logged()).toContain('Subject quote read failed — code: read_failed_404');
+    expect(logged()).toContain('👁️  Watch subject taken from thread');
+  });
+});
+
+describe('the choice card', () => {
+  const TWO = `${PROGRAM} closes November 15. Rural Transit Modernisation Fund opens December 1.`;
+  const choiceCards = () => watchCards().filter(c => c.data?.choosing);
+  const programCards = () => watchCards().filter(c => c.data?.program);
+
+  /** "@Oracle watch" quoting a post that names two programs. */
+  async function askWhich({ sender = CHRIS } = {}) {
+    fakes.userChat.threads.set(OTHER_THREAD, [chatMessage({ id: 'two', thread: OTHER_THREAD, text: TWO })]);
+    await say({ text: 'watch', sender, quoted: `${SPACE}/messages/two` });
+    const live = choiceCards().filter(c => c.status !== 'closed');
+    expect(live).toHaveLength(1);
+    return fakes.store.getCard(live[0].id);
+  }
+
+  test('a quote naming two programs: one public card in the thread, a button each, and "None of these"', async () => {
+    const choice = await askWhich();
+
+    expect(choice.thread_name).toBe(THREAD);
+    const cards = spacePosts().filter(p => p.cardsV2);
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ threadName: THREAD, privateTo: null });
+    expect(await buttonsOf(choice)).toEqual([
+      expect.stringMatching(/^Rural Transportation/),
+      expect.stringMatching(/^Rural Transit Modernisation/),
+      'None of these'
+    ]);
+    expect(await textOf(choice)).toContain('which program should I watch?');
+    expect(programCards()).toHaveLength(0);
+    // No private "Which program did you mean?" text any more.
+    expect(privateReplies()).toEqual([]);
+  });
+
+  test('only the asker can pick: anyone else is told privately, in the thread, and nothing changes', async () => {
+    const choice = await askWhich();
+
+    await press(choice, 'watch.choose1', NAT);
+    await whenCardsIdle();
+
+    expect(privateReplies()).toContainEqual([NAT, 'Only Chris Sentinel can pick — type /watch yourself to watch this too.']);
+    expect(fakes.chat.posts.find(p => p.privateTo === NAT)).toMatchObject({ threadName: THREAD });
+    const after = await fakes.store.getCard(choice.id);
+    expect(after.status).toBe('open');
+    expect(after.data.busy).toBeNull();
+    expect(programCards()).toHaveLength(0);
+  });
+
+  test('the asker\'s pick turns the same message into the watch card, with the joining DM', async () => {
+    const choice = await askWhich();
+    const message = choice.message_name;
+
+    await press(choice, 'watch.choose2', CHRIS);
+    await whenCardsIdle();
+
+    const watch = await liveWatch();
+    expect(watch.data.program.name).toBe('Rural Transit Modernisation Fund');
+    expect(watch.message_name).toBe(message);
+    expect((await fakes.store.getCard(choice.id)).status).toBe('closed');
+    expect(await watchersOf(watch.id)).toEqual([CHRIS]);
+    expect(await buttonsOf(watch)).toEqual(expect.arrayContaining(['Watch this', 'Stop watching']));
+    expect(cardText(fakes.chat.patches.filter(p => p.messageName === message).at(-1).cardsV2)).toContain('1 person watching');
+    expect(dmsTo('spaces/DM-CHRIS').filter(t => /You’re watching/.test(t))).toHaveLength(1);
+    // Still one card in the space: nothing new was posted.
+    expect(spacePosts().filter(p => p.cardsV2)).toHaveLength(1);
+  });
+
+  test('picking a program already watched here joins that watch, and the choice card says so', async () => {
+    const watch = await watchThePost({ sender: NAT });
+    const choice = await askWhich();
+
+    await press(choice, 'watch.choose1', CHRIS);
+    await whenCardsIdle();
+
+    expect((await liveWatch()).id).toBe(watch.id);
+    expect(await watchersOf(watch.id)).toEqual(expect.arrayContaining([NAT, CHRIS]));
+    const closed = await fakes.store.getCard(choice.id);
+    expect(closed.status).toBe('closed');
+    expect(await textOf(closed)).toContain('Joined the watch on Rural Transportation Research Initiative');
+    expect(await buttonsOf(closed)).toEqual([]);
+    expect(dmsTo('spaces/DM-CHRIS').filter(t => /You’re watching/.test(t))).toHaveLength(1);
+  });
+
+  test('"None of these" closes the card with one line', async () => {
+    const choice = await askWhich();
+
+    await press(choice, 'watch.choose_none', CHRIS);
+    await whenCardsIdle();
+
+    const closed = await fakes.store.getCard(choice.id);
+    expect(closed.status).toBe('closed');
+    expect(await textOf(closed)).toContain(CHOICE_NOTE);
+    expect(await buttonsOf(closed)).toEqual([]);
+    expect(programCards()).toHaveLength(0);
+  });
+
+  test('unanswered for 24 hours, it closes with the same line, silently', async () => {
+    const choice = await askWhich();
+    const posts = fakes.chat.posts.length;
+    const created = new Date(choice.created_at).getTime();
+
+    expect((await expireWatchChoices(new Date(created + 23 * 60 * 60 * 1000))).expired).toBe(0);
+    expect((await fakes.store.getCard(choice.id)).status).toBe('open');
+
+    expect((await expireWatchChoices(new Date(created + DAY + 60_000))).expired).toBe(1);
+    const closed = await fakes.store.getCard(choice.id);
+    expect(closed).toMatchObject({ status: 'closed', closed_reason: 'expired' });
+    expect(await textOf(closed)).toContain(CHOICE_NOTE);
+    expect(fakes.chat.posts).toHaveLength(posts);            // patched, never posted
+  });
+
+  test('a choice card is not a watch: no reminders, and posts in the space do not touch it', async () => {
+    const choice = await askWhich();
+
+    await notify.sendDueReminders(new Date(Date.now() + 200 * DAY));
+    await onStoredMessages(SPACE, [chatMessage({ id: 'later', text: TWO })]);
+
+    const after = await fakes.store.getCard(choice.id);
+    expect(after.status).toBe('open');
+    expect(after.data.pending).toBeUndefined();
+    expect(after.data.sent).toBeUndefined();
   });
 });
 

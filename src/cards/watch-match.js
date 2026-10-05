@@ -70,6 +70,42 @@ export function programFromPost(text) {
   return { name: name || null, url: urls[0] || null, acronym };
 }
 
+/**
+ * Every program a post might name, in the order they appear: labels in front of
+ * links, Title Case names and acronyms — what programFromPost looks for, but all
+ * of them. An acronym already inside a longer name from the same post ("Rural …
+ * Initiative (RTRI)") is not a second program. For offering choices, so it
+ * over-reads on purpose; the caller checks each against our grants.
+ * @returns {Array<{name: string, acronym: string|null}>}
+ */
+export function programsFromPost(text) {
+  const t = String(text || '');
+  const found = [];
+  const add = (name, at) => {
+    const value = clean(name);
+    if (value) found.push({ name: value, at });
+  };
+  for (const m of t.matchAll(/([^\n:]{3,80}):\s*https?:\/\//g)) add(m[1], m.index);
+  for (const m of t.matchAll(new RegExp(TITLE_CASE.source, 'gu'))) add(m[1], m.index);
+  const acronyms = [...t.matchAll(new RegExp(ACRONYM.source, 'g'))].map(m => ({ name: m[1], at: m.index }));
+
+  const names = found.map(f => f.name);
+  for (const a of acronyms) {
+    if (!names.some(n => n !== a.name && new RegExp(`\\b${escapeRe(a.name)}\\b`).test(n))) add(a.name, a.at);
+  }
+
+  const seen = new Set();
+  return found
+    .sort((a, b) => a.at - b.at)
+    .filter(f => {
+      const key = programKey(f.name);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map(f => ({ name: f.name, acronym: ACRONYM.exec(f.name)?.[1] || null }));
+}
+
 const clean = (v, max = 120) => {
   const s = String(v || '').replace(/\s+/g, ' ').trim().replace(/[.,;:–-]$/, '').trim();
   return s ? s.slice(0, max) : null;

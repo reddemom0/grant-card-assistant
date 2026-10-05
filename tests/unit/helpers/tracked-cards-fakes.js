@@ -903,6 +903,14 @@ export function createTrackedCardFakes() {
               const page = all.slice(start, start + pageSize);
               const next = start + pageSize < all.length ? String(start + pageSize) : undefined;
               return { data: { messages: json(page), nextPageToken: next } };
+            },
+            // One message by name — the message a quote-reply quotes.
+            get: async ({ name }) => {
+              userChatState.calls.push({ userId, get: name });
+              if (userChatState.failWith) throw userChatState.failWith;
+              const found = [...userChatState.threads.values()].flat().find(m => m.name === name);
+              if (!found) throw Object.assign(new Error('not found'), { response: { status: 404 } });
+              return { data: json(found) };
             }
           }
         }

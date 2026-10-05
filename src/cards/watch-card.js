@@ -21,9 +21,16 @@
  * Our grants table is where the dates and the description come from, and it is
  * never named in anything Oracle posts or sends.
  *
+ * When Oracle can't tell which program is meant, it asks in the thread with a
+ * choice card: a watch row in a "choosing" state (data.choosing), one button
+ * per program plus "None of these". Only the person who asked can pick; a pick
+ * turns the same message into the normal watch card. Unanswered, it lapses
+ * after 24 hours (expireWatchChoices, hourly).
+ *
  * Logs: codes and counts only.
  */
 
+import crypto from 'crypto';
 import * as store from '../database/tracked-cards-store.js';
 import { FOUNDATION_ACTIONS, markCardReply } from './registry.js';
 import { postMessage } from './chat-api.js';
@@ -32,7 +39,7 @@ import { notifyImmediate } from './notify.js';
 import { resolvePerson, timeZoneFor, localClock, isListenerChatUser } from './people.js';
 import { trackedCard, paragraph, button, esc, clip, threadLink, mdToPlain } from './render.js';
 import {
-  programFromPost, programKey, watchThreadName, matchProgram,
+  programFromPost, programsFromPost, programKey, watchThreadName, matchProgram,
   datesFromPost, closureFromPost, postMatchesProgram, dueNotices
 } from './watch-match.js';
 import { interpretAsk } from './interpret.js';
@@ -52,14 +59,30 @@ export const WATCH_ACTIONS = {
   'watch.pick2': { personal: false, label: 'picked another program' },
   'watch.pick3': { personal: false, label: 'picked another program' },
   'watch.keep': { personal: false, label: 'confirmed the watch' },
-  'watch.end': { personal: false, label: 'ended this watch' }
+  'watch.end': { personal: false, label: 'ended this watch' },
+  'watch.choose1': { personal: false, label: 'picked the program' },
+  'watch.choose2': { personal: false, label: 'picked the program' },
+  'watch.choose3': { personal: false, label: 'picked the program' },
+  'watch.choose4': { personal: false, label: 'picked the program' },
+  'watch.choose5': { personal: false, label: 'picked the program' },
+  'watch.choose_none': { personal: false, label: 'said none of these' }
 };
 
 const LABELS = { ...FOUNDATION_ACTIONS, ...WATCH_ACTIONS };
 const PICK_ACTIONS = { 'watch.pick1': 0, 'watch.pick2': 1, 'watch.pick3': 2 };
+const CHOOSE_ACTIONS = { 'watch.choose1': 0, 'watch.choose2': 1, 'watch.choose3': 2, 'watch.choose4': 3, 'watch.choose5': 4 };
+const MAX_CHOICES = 5;
+/** Program names checked against our grants per choice card, at most. */
+const MAX_CHOICE_LOOKUPS = 8;
+/** How long a choice card waits for its asker. */
+export const CHOICE_ANSWER_MS = DAY;
 
 const HOW_TO = 'To watch a program, reply "@Oracle watch" to the post about it (or use /watch there).';
 const NOT_FOUND = 'I couldn’t tell which program that post is about. Reply "@Oracle watch <program name>" and I’ll look again.';
+
+/** What a choice card says when no watch came of it: "None of these", or nobody answered. */
+export const CHOICE_NOTE = 'No watch set. Try /watch followed by the program’s name.';
+const notTheAsker = (name) => `Only ${name} can pick — type /watch yourself to watch this too.`;
 
 const SETUP_FAILED = 'Sorry — I couldn’t set up that watch. Try again in a minute, or tell Chris if it keeps happening.';
 /** A live watch row with no posted card, older than this, was left by a failed setup. */
@@ -143,10 +166,11 @@ async function privateReply({ spaceName, threadName, surface, chatUserId, text }
  * @param {string} p.spaceName
  * @param {string|null} p.threadName - the thread the post is in (not the card's own key)
  * @param {string} [p.postText] - the post's own words, when the caller has them
+ * @param {string} [p.quotedMessageName] - the message the trigger quotes, if any
  */
 export async function startWatch({
   trigger, actor, userId = null, spaceName, threadName, surface = 'chat_space',
-  conversationId = null, messageText = '', postText = '', messageName = null, now = new Date()
+  conversationId = null, messageText = '', postText = '', messageName = null, quotedMessageName = null, now = new Date()
 }) {
   const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor.chatUserId, text });
   const done = (result) => {
@@ -176,7 +200,7 @@ export async function startWatch({
   const { runInBackground } = await import('./actions.js');
   runInBackground('watch setup', () => setUpWatch({
     trigger, actor, userId, spaceName, threadName, surface, conversationId,
-    messageText, source, messageName, now
+    messageText, source, messageName, quotedMessageName, now
   }));
   return done({ ok: true, code: 'looking', stats: `, from the post: ${Boolean(postText)}` });
 }
@@ -205,21 +229,23 @@ export async function setUpWatch(args = {}) {
 
 async function buildWatch({
   trigger = 'mention', actor, userId = null, spaceName, threadName = null, surface = 'chat_space',
-  conversationId = null, messageText = '', source = '', messageName = null, now = new Date()
+  conversationId = null, messageText = '', source = '', messageName = null, quotedMessageName = null, now = new Date()
 } = {}) {
   const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor?.chatUserId, text });
   let words = source;
   let guess = await readProgram(words, now);
 
-  // No program in the trigger and none in the post above it — a DM, usually.
-  // Look at what was said just before, and quote it back if it is a guess.
+  // No program in the trigger — a quote-reply, a DM, or a post that names none.
+  // Look at what the person pointed at, or what was said just before; when that
+  // is a guess, ask which program with a choice card.
   if (!guess.name) {
-    const { findSubject, confirmSubject } = await import('./subject.js');
+    const { findSubject, quoteSubject } = await import('./subject.js');
     const found = await findSubject({
       spaceName,
       threadName,
       userIds: [userId],
       triggerMessageName: messageName,
+      quotedMessageName,
       looksRight: (text) => Boolean(programFromPost(text).name)
     });
     if (!found.ok || !found.text) {
@@ -227,10 +253,27 @@ async function buildWatch({
       console.log(`👁️  Watch subject not found — code: ${found.code || 'none'}`);
       return { ok: false, code: 'no_program' };
     }
+    const ask = (choices) => postChoiceCard({
+      choices, quote: quoteSubject(found.text), words: [words, found.text].filter(Boolean).join('\n'),
+      trigger, actor, userId, spaceName, threadName, surface, conversationId, messageName, now
+    });
     if (!found.sure) {
-      await reply(confirmSubject('program', found.text));
-      console.log(`👁️  Watch subject unclear — asked, from: ${found.from}, others: ${found.others}`);
-      return { ok: false, code: 'unclear' };
+      const texts = (found.matches?.length ? found.matches : [found.message]).map(m => m?.text);
+      const choices = await programChoices(texts, now);
+      console.log(`👁️  Watch subject unclear — from: ${found.from}, others: ${found.others}, choices: ${choices.length}`);
+      if (!choices.length) {
+        await reply(NOT_FOUND);
+        return { ok: false, code: 'no_program' };
+      }
+      return ask(choices);
+    }
+    // A quoted post that names several programs: ask which one.
+    if (found.from === 'quote') {
+      const choices = await programChoices([found.text], now);
+      if (choices.length > 1) {
+        console.log(`👁️  Watch quote names several programs — choices: ${choices.length}`);
+        return ask(choices);
+      }
     }
     words = [words, found.text].filter(Boolean).join('\n');
     guess = await readProgram(words, now);
@@ -240,6 +283,149 @@ async function buildWatch({
       return { ok: false, code: 'no_program' };
     }
   }
+
+  return placeWatch({ guess, words, trigger, actor, userId, spaceName, threadName, surface, conversationId, messageName, now });
+}
+
+/**
+ * Up to five programs the texts might be about, for a choice card: every name
+ * the rules can see, each checked against our grants. Programs we know come
+ * first, under their own names; the post's own words only when none matched.
+ */
+export async function programChoices(texts = [], now = new Date()) {
+  const seen = new Set();
+  const names = texts.flatMap(t => programsFromPost(t))
+    .filter(n => !seen.has(programKey(n.name)) && seen.add(programKey(n.name)))
+    .slice(0, MAX_CHOICE_LOOKUPS);
+  if (!names.length) return [];
+
+  const best = await Promise.all(names.map(n => matchProgram(n, { limit: 1, now })
+    .then(found => found[0] || null)
+    .catch(() => null)));
+  const choices = [];
+  const keys = new Set();
+  for (const p of best) {
+    if (!p || p.score < 50 || keys.has(p.key)) continue;
+    keys.add(p.key);
+    choices.push({
+      name: clip(p.name, TITLE_CHARS), key: p.key, url: p.url || null,
+      deadline: p.deadline || null, deadlineText: p.deadlineText || null,
+      amount: p.amount ?? null, provider: p.provider || null,
+      industries: p.industries || [], regions: p.regions || [], matched: true
+    });
+  }
+  if (!choices.length) {
+    for (const n of names) {
+      choices.push({
+        name: clip(n.name, TITLE_CHARS), key: programKey(n.name), url: null,
+        deadline: null, deadlineText: null, amount: null, provider: null,
+        industries: [], regions: [], matched: false
+      });
+    }
+  }
+  return choices.slice(0, MAX_CHOICES);
+}
+
+/**
+ * The choice card: posted in the thread for everyone to see, answered only by
+ * the person who asked. Filed under the real thread, so a refusal to someone
+ * else lands there; a newer one in the same thread replaces it.
+ */
+async function postChoiceCard({
+  choices, quote = '', words = '', trigger, actor, userId = null, spaceName, threadName = null,
+  surface = 'chat_space', conversationId = null, messageName = null, now = new Date()
+}) {
+  const threadKey = threadName || `${spaceName}/threads/watch-choose-${crypto.randomUUID().slice(0, 8)}`;
+  const previous = threadName ? await store.findLiveCard('watch', threadKey) : null;
+  if (previous?.data?.choosing) await closeChoice(previous, CHOICE_NOTE, 'replaced', now);
+
+  let card = await store.insertCard({
+    cardType: 'watch', status: 'open', spaceName, threadName: threadKey,
+    sourceMessageName: messageName, conversationId,
+    ownerChatId: actor.chatUserId, ownerUserId: userId,
+    title: 'Which program?',
+    data: {
+      surface,
+      noThread: !threadName,
+      choosing: {
+        choices,
+        askedBy: { ...who(actor), userId },
+        threadName, messageName, trigger, quote,
+        words: clip(words, 2000)
+      },
+      busy: null,
+      notice: null
+    }
+  });
+  if (!card) return { ok: false, code: 'insert_failed' };
+
+  try {
+    const posted = await postMessage({ spaceName, threadName, cardsV2: await renderCard(card) });
+    card = await store.updateCard(card.id, { messageName: posted });
+  } catch (err) {
+    await store.closeCard(card.id, 'setup_failed', now).catch(() => {});
+    throw err;
+  }
+  console.log(`👁️  Watch choice card posted — trigger: ${trigger}, choices: ${choices.length}`);
+  return { ok: true, code: 'choosing', card };
+}
+
+/** A choice card that is done: one line, closed, patched in place (no ping). */
+async function closeChoice(card, note, reason, now = new Date()) {
+  await store.patchCardData(card.id, { choiceNote: note, busy: null });
+  await store.closeCard(card.id, reason, now);
+  await rerenderCard(card.id);
+}
+
+/**
+ * The asker picked a program: the same setup as a sure match. A program already
+ * watched here is joined and the choice card says so; otherwise the choice
+ * card's message becomes the new watch card.
+ */
+export async function chooseProgram(cardId, choice, now = new Date()) {
+  const card = await store.getCard(cardId);
+  const c = card?.data?.choosing;
+  if (!card || !isLive(card) || !c) return null;
+  const actor = { chatUserId: card.owner_chat_id, name: c.askedBy?.name || null };
+  const surface = card.data?.surface || 'chat_space';
+  const failed = async () => {
+    await store.patchCardData(cardId, { busy: null });
+    await privateReply({ spaceName: card.space_name, threadName: c.threadName, surface, chatUserId: actor.chatUserId, text: SETUP_FAILED });
+  };
+  try {
+    const result = await placeWatch({
+      guess: { name: choice.name, acronym: /\b([A-Z][A-Z0-9]{2,9})\b/.exec(choice.name)?.[1] || null, url: choice.url || null },
+      words: c.words || '',
+      trigger: c.trigger || 'mention',
+      actor,
+      userId: c.askedBy?.userId ?? card.owner_user_id,
+      spaceName: card.space_name,
+      threadName: c.threadName,
+      surface,
+      conversationId: card.conversation_id,
+      messageName: c.messageName,
+      now,
+      choiceCard: card
+    });
+    if (result?.code === 'insert_failed') await failed();
+    return result;
+  } catch (err) {
+    await failed();
+    throw err;
+  }
+}
+
+/**
+ * Watch a program that is known: match it, join a live watch on it or start
+ * one, then the joining DM. From a choice card (`choiceCard`), that card's
+ * message becomes the watch card, or says which watch was joined.
+ */
+async function placeWatch({
+  guess, words = '', trigger = 'mention', actor, userId = null, spaceName, threadName = null,
+  surface = 'chat_space', conversationId = null, messageName = null, now = new Date(), choiceCard = null
+}) {
+  const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor?.chatUserId, text });
+  const joinedNote = (name) => `Joined the watch on ${mdToPlain(name || 'that program')} — its card is in the space.`;
 
   let candidates = [];
   try {
@@ -283,6 +469,7 @@ async function buildWatch({
     await rerenderCard(existing.id);
     if (joined.added) await sendJoiningDm(existing.id, actor.chatUserId, userId);
     else await reply(`You’re already watching ${mdToPlain(existing.data?.program?.name || existing.title || 'that program')} — the card is here: ${threadLink(existing.space_name, null)}`);
+    if (choiceCard) await closeChoice(choiceCard, joinedNote(existing.data?.program?.name || existing.title), 'resolved', now);
     console.log(`👁️  Watch ${joined.added ? 'joined' : 'already_watching'} — watchers: ${joined.watchers}`);
     return { ok: true, code: joined.added ? 'joined' : 'already_watching', card: existing };
   }
@@ -317,6 +504,7 @@ async function buildWatch({
     const joined = await joinWatch(live, actor, { now });
     await rerenderCard(live.id);
     if (joined.added) await sendJoiningDm(live.id, actor.chatUserId, userId);
+    if (choiceCard) await closeChoice(choiceCard, joinedNote(live.data?.program?.name || live.title), 'resolved', now);
     return { ok: true, code: 'joined', card: live };
   }
 
@@ -325,9 +513,19 @@ async function buildWatch({
       { chatUserId: actor.chatUserId, role: 'owner', displayName: actor.name || null }
     ]);
 
-    // The watch card is its own message in the space, not a reply to the post.
-    const posted = await postMessage({ spaceName, cardsV2: await renderCard(card) });
-    card = await store.updateCard(card.id, { messageName: posted });
+    if (choiceCard?.message_name) {
+      // The choice card's message becomes the watch card, in place: no second
+      // post, no ping. One message belongs to one card, so the choice card
+      // lets go of it first.
+      await store.closeCard(choiceCard.id, 'resolved', now);
+      await store.updateCard(choiceCard.id, { messageName: null });
+      card = await store.updateCard(card.id, { messageName: choiceCard.message_name });
+      await rerenderCard(card.id);
+    } else {
+      // The watch card is its own message in the space, not a reply to the post.
+      const posted = await postMessage({ spaceName, cardsV2: await renderCard(card) });
+      card = await store.updateCard(card.id, { messageName: posted });
+    }
   } catch (err) {
     // Nothing was posted: close the row so the next /watch starts clean.
     await store.closeCard(card.id, 'setup_failed', now).catch(() => {});
@@ -339,7 +537,7 @@ async function buildWatch({
   await sendJoiningDm(card.id, actor.chatUserId, userId);
   await rerenderCard(card.id);
 
-  console.log(`👁️  Watch card posted — trigger: ${trigger}, matched: ${program.matched}, deadline: ${program.deadline ? 'yes' : 'no'}, told: ${told}`);
+  console.log(`👁️  Watch card posted — trigger: ${trigger}, matched: ${program.matched}, deadline: ${program.deadline ? 'yes' : 'no'}, told: ${told}${choiceCard ? ', from a choice card' : ''}`);
   return { ok: true, code: null, card };
 }
 
@@ -486,6 +684,7 @@ async function notePost(card, { messageName, threadName, postText = '', program 
 async function handleAction({ card, actor, action, now = new Date() }) {
   const d = card.data || {};
   if (!isLive(card)) return { changed: false, ignored: 'not_open', reply: 'This watch has ended.' };
+  if (d.choosing) return handleChoice({ card, actor, action, now });
 
   if (action in PICK_ACTIONS) {
     const pick = (d.candidates || [])[PICK_ACTIONS[action]];
@@ -535,6 +734,27 @@ async function handleAction({ card, actor, action, now = new Date() }) {
     default:
       return { changed: false, ignored: 'unknown_action', reply: 'That button doesn’t do anything on this card.' };
   }
+}
+
+/** A press on a choice card. Only the person who asked can answer it. */
+async function handleChoice({ card, actor, action, now = new Date() }) {
+  const d = card.data || {};
+  if (!(action in CHOOSE_ACTIONS) && action !== 'watch.choose_none') {
+    return { changed: false, ignored: 'unknown_action', reply: 'That button doesn’t do anything on this card.' };
+  }
+  if (actor.chatUserId !== card.owner_chat_id) {
+    return { changed: false, ignored: 'not_the_asker', reply: notTheAsker(nameOf(d.choosing.askedBy)) };
+  }
+  if (action === 'watch.choose_none') {
+    await store.patchCardData(card.id, { choiceNote: CHOICE_NOTE, busy: null });
+    await store.closeCard(card.id, 'none_chosen', now);
+    return { changed: true };
+  }
+  if (d.busy) return { changed: false, ignored: 'busy', reply: 'Already setting that up — one moment.' };
+  const choice = (d.choosing.choices || [])[CHOOSE_ACTIONS[action]];
+  if (!choice) return { changed: false, ignored: 'no_such_program', reply: 'That option isn’t on the card any more.' };
+  await store.patchCardData(card.id, { busy: { text: BUSY.match, at: now.toISOString() } });
+  return { changed: true, background: () => chooseProgram(card.id, choice, now) };
 }
 
 /**
@@ -624,6 +844,7 @@ async function sendDueNotices(now = new Date()) {
 
   for (const card of await store.liveCardsOfType('watch')) {
     const d = card.data || {};
+    if (d.choosing) continue;                                   // a question, not a watch
     const { due, ends } = dueNotices({
       program: d.program || {},
       sent: d.sent || {},
@@ -698,7 +919,7 @@ async function sendDueNotices(now = new Date()) {
  * observed.
  */
 export async function onStoredMessages(spaceName, messages = [], now = new Date()) {
-  const cards = (await store.liveCardsOfType('watch')).filter(c => c.space_name === spaceName);
+  const cards = (await store.liveCardsOfType('watch')).filter(c => c.space_name === spaceName && !c.data?.choosing);
   if (!cards.length) return { matched: 0, ended: 0 };
   let matched = 0;
   let ended = 0;
@@ -742,6 +963,22 @@ export async function onStoredMessages(spaceName, messages = [], now = new Date(
   return { matched, ended };
 }
 
+/**
+ * Hourly: choice cards nobody answered in 24 hours say "No watch set…" and
+ * close. Patching notifies nobody; nothing is posted.
+ */
+export async function expireWatchChoices(now = new Date()) {
+  let expired = 0;
+  for (const card of await store.liveCardsOfType('watch')) {
+    if (!card.data?.choosing) continue;
+    if (now.getTime() - new Date(card.created_at).getTime() < CHOICE_ANSWER_MS) continue;
+    await closeChoice(card, CHOICE_NOTE, 'expired', now);
+    expired++;
+  }
+  if (expired) console.log(`👁️  Watch choice cards expired — cards: ${expired}`);
+  return { expired };
+}
+
 // ============================================================================
 // RENDER
 // ============================================================================
@@ -780,8 +1017,48 @@ function outcomeFor(d, latestClick) {
   return n.text;
 }
 
+/** The choice card: which program, one button each, and "None of these". */
+function renderChoice(card, latestClick) {
+  const d = card.data || {};
+  const c = d.choosing || {};
+  const live = isLive(card);
+  const choices = (c.choices || []).slice(0, MAX_CHOICES);
+  const sections = [];
+  if (!live || d.choiceNote) {
+    sections.push({ widgets: [paragraph(esc(d.choiceNote || CHOICE_NOTE))] });
+  } else {
+    const lines = [`${esc(nameOf(c.askedBy))}, which program should I watch?`];
+    if (c.quote) lines.push(`<i>“${esc(c.quote)}”</i>`);
+    sections.push({ widgets: [paragraph(lines.join('<br>'))] });
+    sections.push({
+      widgets: [paragraph(choices.map((p, i) => `${i + 1}. ${esc(p.name)}${p.provider ? ` · ${esc(p.provider)}` : ''}`).join('<br>'))]
+    });
+  }
+
+  const buttons = [];
+  if (live && !d.choiceNote) {
+    choices.forEach((p, i) => {
+      buttons.push(button(`${i + 1}. ${clip(mdToPlain(p.name), 28)}`, { cardId: card.id, action: `watch.choose${i + 1}` }));
+    });
+    buttons.push(button('None of these', { cardId: card.id, action: 'watch.choose_none' }));
+  }
+
+  return trackedCard({
+    card,
+    title: card.title || 'Which program?',
+    subtitle: 'Watch',
+    sections,
+    buttons,
+    latestClick,
+    labels: LABELS,
+    busy: d.busy?.text ? d.busy : null,
+    outcome: outcomeFor(d, latestClick)
+  });
+}
+
 function render(card, participants = [], latestClick = null, now = new Date()) {
   const d = card.data || {};
+  if (d.choosing) return renderChoice(card, latestClick);
   const id = card.id;
   const live = isLive(card);
   const watchers = participants.length;
@@ -864,7 +1141,8 @@ export async function handleWatchMessage({ evt, user, conversationId, messageTex
   // Chat is a network call, and this runs while the person is waiting.
   await startWatch({
     trigger: 'mention', actor, userId: user?.id || null, spaceName, threadName, surface,
-    conversationId, messageText, messageName: evt.messageName, now
+    conversationId, messageText, messageName: evt.messageName,
+    quotedMessageName: evt.quotedMessageName || null, now
   });
   return true;
 }

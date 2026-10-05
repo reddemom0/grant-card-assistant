@@ -5,7 +5,9 @@
  *                    calendar time zone, at most once per local day; then
  *                    due-date messages (track card), each sent once; then
  *                    unconfirmed /learn-this lessons older than 24 hours are
- *                    deleted and their cards updated in place (nothing posted)
+ *                    deleted and their cards updated in place (nothing posted);
+ *                    /watch choice cards unanswered for 24 hours close the
+ *                    same way
  *   daily 13:00 UTC  refresh open cards from real sources, then stale/auto-close
  *                    (before the Pacific-time digests)
  *
@@ -16,6 +18,7 @@
 import { sendDueDigests, sendDueReminders } from './notify.js';
 import { runDailyCardPass } from './lifecycle.js';
 import { expireLessonCards } from './lesson-card.js';
+import { expireWatchChoices } from './watch-card.js';
 
 function guarded(label, fn) {
   return async () => {
@@ -37,6 +40,7 @@ export function startTrackedCards(cron) {
     await sendDueDigests();
     await sendDueReminders();
     await expireLessonCards();
+    await expireWatchChoices();
   }), {
     name: 'tracked-cards-digest', timezone: 'UTC', noOverlap: true
   });

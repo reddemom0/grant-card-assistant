@@ -173,6 +173,37 @@ export async function readRecent({ spaceName, userIds = [], limit = RECENT_MESSA
   return { ok: false, code };
 }
 
+/**
+ * One message by its resource name — the message a quote-reply quotes. Read as
+ * the person who asked, like readRecent; no stored-copy fallback.
+ *
+ * @param {Object} p
+ * @param {string} p.name - spaces/X/messages/Y
+ * @param {number[]} p.userIds - whose grant to try, in order
+ * @returns {Promise<{ok: true, message: Object}|{ok: false, code: string}>}
+ */
+export async function readMessage({ name, userIds = [] }) {
+  if (!name) return { ok: false, code: 'no_message' };
+  let code = 'no_user';
+  for (const userId of [...new Set(userIds.filter(Boolean))]) {
+    try {
+      if (!(await hasChatScopes(userId)).ok) {
+        code = 'needs_reconsent';
+        continue;
+      }
+      const chat = await userChat(userId);
+      const res = await chat.spaces.messages.get({ name });
+      const message = normalizeMessage(res.data || {});
+      await fillNames([message], userId);
+      return { ok: true, message };
+    } catch (err) {
+      code = isInsufficientScopeError(err) ? 'needs_reconsent' : `read_failed_${codeOf(err)}`;
+    }
+  }
+  console.warn(`⚠️  Message read failed — code: ${code}`);
+  return { ok: false, code };
+}
+
 /** The ask: the first message of the thread. */
 export async function readAsk({ spaceName, threadName, userIds }) {
   const read = await readThread({ spaceName, threadName, userIds, pageSize: 1 });

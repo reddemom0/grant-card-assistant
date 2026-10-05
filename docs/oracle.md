@@ -201,6 +201,58 @@ matching Chat API command in the Cloud console.
 - /meet started from a /track card's Schedule call is not interpreted, since its text is
   already that card's title.
 
+**Subject finder.**
+- `findSubject` in `src/cards/subject.js` works out what /track, /watch, /review and lead
+  triage act on, read as the asker (Chat user grant). Order:
+  1. A quote-reply: the quoted message (`readMessage` in `track-thread.js`). It is taken
+     as is, `from: 'quote'`, `sure: true`.
+  2. The thread's first message.
+  3. The last five messages of the space or DM.
+- A quote is read only when its read works. Otherwise the finder logs `Subject quote read
+  failed — code: …` and carries on with steps 2 and 3.
+- It returns `matches` (every message that looked right, nearest first) alongside the
+  `others` count.
+- /track, /review and lead triage still answer an unsure result with the private
+  `confirmSubject` text. /review also accepts a quoted subject.
+
+**Quote-replies.**
+- `normalizeChatEvent` carries `quotedMessageName`.
+- googleapis 128 (`Schema$QuotedMessageMetadata`) has only the quoted message's name and
+  time, never its text, so reading it is a separate `spaces.messages.get` as the asker.
+
+**/watch choice card.**
+- When /watch can't tell the program, it posts a public card in the thread, not a private
+  question. That happens when the subject is unsure, or when a quoted post names two or more
+  programs.
+- The card is a `watch` row with `data.choosing`, filed under the real thread.
+- Choices come from `programChoices` in `watch-card.js`:
+  - `programsFromPost` in `watch-match.js` collects every labelled, Title Case or acronym
+    name;
+  - each name is checked with `matchProgram` (score 50 or more);
+  - programs we know come first under their own names, and raw post names are used only
+    when none match;
+  - at most 5.
+- No names at all → the private NOT_FOUND note ("@Oracle watch <program name>").
+- Buttons `watch.choose1–5` and "None of these" (`watch.choose_none`). Only the asker
+  (`owner_chat_id`) can press; anyone else gets a private "Only <name> can pick — type
+  /watch yourself to watch this too."
+- A pick runs the normal setup (`placeWatch`): a live watch on that program is joined and
+  the choice card says so; otherwise the choice card's message becomes the watch card in
+  place, so that watch lives in the thread rather than as its own post.
+- "None of these" closes the card with "No watch set. Try /watch followed by the program’s
+  name."
+- Unanswered for 24 hours, `expireWatchChoices` (the hourly job in `jobs.js`) closes it with
+  the same line, silently.
+- Watch reminders (`sendDueNotices`) and the stored-copy hook (`onStoredMessages`) skip
+  choice cards.
+
+**Slash-command threads (TEMP).**
+- For a slash command, `normalizeChatEvent` falls back to `appCommandPayload.thread.name`
+  when the command's message has no thread.
+- The `appcommand` branch of `handleGoogleChatEvent` in `chat-google.js` logs `🧪 TEMP
+  slash command fields — …`. It records whether each thread field and a quote are present,
+  never values. Remove it once production shows which fields arrive.
+
 **/meet times.**
 - Working hours come from `data/cards/working-hours.json`; no Google API exposes them.
   Default 09:00–17:00 Mon–Fri; Chris (`writers@`) 10:00–22:00 with place "Barcelona".

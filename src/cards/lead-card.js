@@ -149,10 +149,11 @@ function leadLabel(lead = {}) {
  * @param {string} [p.conversationId] - the Oracle conversation; the gate needs it
  * @param {string} [p.messageText] - the message the lead arrived in
  * @param {string} [p.messageName] - that message, for the card's link
+ * @param {string} [p.quotedMessageName] - the message it quotes, if any
  */
 export async function createLead({
   trigger, actor, userId = null, spaceName, threadName, surface = 'chat_space',
-  conversationId = null, messageText: triggerText = '', messageName = null, now = new Date()
+  conversationId = null, messageText: triggerText = '', messageName = null, quotedMessageName = null, now = new Date()
 }) {
   let messageText = triggerText;
   const reply = (text) => privateReply({ spaceName, threadName, surface, chatUserId: actor.chatUserId, text });
@@ -185,6 +186,7 @@ export async function createLead({
       threadName,
       userIds: [userId],
       triggerMessageName: messageName,
+      quotedMessageName,
       looksRight: (text) => {
         const seen = extractLead(text);
         return Boolean(seen.email || seen.phone);
@@ -727,7 +729,7 @@ export async function handleLeadMessage({ evt, user, conversationId, messageText
   const actor = { chatUserId: evt.senderChatId, name: evt.senderDisplayName || user?.name || null, email: evt.senderEmail || null };
   const common = {
     actor, userId: user?.id || null, spaceName, threadName, surface, conversationId,
-    messageText, messageName: evt.messageName
+    messageText, messageName: evt.messageName, quotedMessageName: evt.quotedMessageName || null
   };
 
   // A typed command for a card that already exists wins over the intent: "called:

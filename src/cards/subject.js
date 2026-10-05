@@ -1,8 +1,9 @@
 /**
  * What is this card about? — shared by /track, /watch, /review and lead triage
  *
- * In a space, a card's subject is the message it was a reply to: the thread's
- * first message. Two cases have no such message:
+ * A quote-reply names its subject outright: the quoted message wins over
+ * everything else. Otherwise, in a space, a card's subject is the message it
+ * was a reply to: the thread's first message. Two cases have no such message:
  *   - a DM, where Chat usually gives every message its own thread, so the
  *     thread's first message IS the "@Oracle …" that triggered the card;
  *   - a trigger that started a new thread in a space.
@@ -16,7 +17,7 @@
  * nothing is read that they cannot read themselves.
  */
 
-import { readAsk, readRecent, RECENT_MESSAGES } from './track-thread.js';
+import { readAsk, readRecent, readMessage, RECENT_MESSAGES } from './track-thread.js';
 import { mdToPlain, clip } from './render.js';
 
 const QUOTE_CHARS = 160;
@@ -43,6 +44,7 @@ export function quoteSubject(text) {
  * @param {string|null} p.threadName
  * @param {number[]} p.userIds - whose Chat grant to read with, in order
  * @param {string|null} p.triggerMessageName - the "@Oracle …" or command message
+ * @param {string|null} [p.quotedMessageName] - the message the trigger quotes, if any
  * @param {(text: string, message: Object) => boolean} [p.looksRight] - is this the subject?
  * @param {number} [p.limit]
  * @param {number} [p.maxAgeMs] - a fallback message older than this is quoted
@@ -51,13 +53,29 @@ export function quoteSubject(text) {
  *   else entirely.
  * @param {Date} [p.now]
  * @returns {Promise<{ok: boolean, code?: string, message?: Object, text?: string,
- *   from?: 'thread'|'recent', sure?: boolean, others?: number}>}
+ *   from?: 'quote'|'thread'|'recent', sure?: boolean, others?: number, matches?: Object[]}>}
+ *   `matches` — every message that looked right, nearest first (just the
+ *   subject when sure; empty when nothing looked right).
  */
 export async function findSubject({
-  spaceName, threadName = null, userIds = [], triggerMessageName = null,
+  spaceName, threadName = null, userIds = [], triggerMessageName = null, quotedMessageName = null,
   looksRight = () => true, limit = RECENT_MESSAGES, maxAgeMs = Infinity, now = new Date()
 } = {}) {
   if (!spaceName) return { ok: false, code: 'no_space' };
+
+  // 0. A quote-reply: the person pointed at the message themselves. It is taken
+  //    as it is — whether it looks right is the card's question, not ours.
+  if (quotedMessageName) {
+    try {
+      const read = await readMessage({ name: quotedMessageName, userIds });
+      if (read.ok && usable(read.message, triggerMessageName)) {
+        return { ok: true, message: read.message, text: read.message.text, from: 'quote', sure: true, others: 0, matches: [read.message] };
+      }
+      console.warn(`⚠️  Subject quote read failed — code: ${read.ok ? 'unusable' : read.code}`);
+    } catch (err) {
+      console.warn(`⚠️  Subject quote read failed — code: ${codeOf(err)}`);
+    }
+  }
 
   // 1. The thread's own first message, when there is one and it is not the
   //    trigger itself. This is the ordinary case in a space.
@@ -67,7 +85,7 @@ export async function findSubject({
       const read = await readAsk({ spaceName, threadName, userIds });
       if (read.ok && usable(read.ask, triggerMessageName)) {
         if (looksRight(read.ask.text, read.ask)) {
-          return { ok: true, message: read.ask, text: read.ask.text, from: 'thread', sure: true, others: 0 };
+          return { ok: true, message: read.ask, text: read.ask.text, from: 'thread', sure: true, others: 0, matches: [read.ask] };
         }
         // It is the message the card was a reply to, but it does not look like
         // what this card needs — worth falling back on, not worth acting on.
@@ -89,14 +107,14 @@ export async function findSubject({
   }
   if (!recent.ok) {
     return fromThread
-      ? { ok: true, message: fromThread, text: fromThread.text, from: 'thread', sure: false, others: 0 }
+      ? { ok: true, message: fromThread, text: fromThread.text, from: 'thread', sure: false, others: 0, matches: [] }
       : { ok: false, code: recent.code };
   }
 
   const candidates = recent.messages.filter(m => usable(m, triggerMessageName));
   if (!candidates.length) {
     return fromThread
-      ? { ok: true, message: fromThread, text: fromThread.text, from: 'thread', sure: false, others: 0 }
+      ? { ok: true, message: fromThread, text: fromThread.text, from: 'thread', sure: false, others: 0, matches: [] }
       : { ok: false, code: 'nothing_recent' };
   }
 
@@ -116,7 +134,7 @@ export async function findSubject({
   // One message that looks right is the subject. Several, or none that look
   // right, and the card quotes the nearest and asks.
   if (matching.length === 1) {
-    return { ok: true, message: matching[0], text: matching[0].text, from: 'recent', sure: true, others: 0 };
+    return { ok: true, message: matching[0], text: matching[0].text, from: 'recent', sure: true, others: 0, matches: [matching[0]] };
   }
   const nearest = matching[0] || fromThread || candidates[0];
   return {
@@ -125,7 +143,8 @@ export async function findSubject({
     text: nearest.text,
     from: 'recent',
     sure: false,
-    others: Math.max(0, (matching.length || candidates.length) - 1)
+    others: Math.max(0, (matching.length || candidates.length) - 1),
+    matches: matching
   };
 }
 

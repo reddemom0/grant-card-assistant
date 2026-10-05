@@ -303,6 +303,28 @@ describe('normalizeChatEvent reads what cards need', () => {
     body.commonEventObject.parameters = [{ key: 'cardId', value: 'x' }, { key: 'from', value: 'digest' }];
     expect(normalizeChatEvent(body).parameters).toEqual({ cardId: 'x', from: 'digest' });
   });
+
+  test('a slash command whose message has no thread takes the payload\'s own thread', () => {
+    const body = commandBody('1');
+    body.chat.appCommandPayload.thread = { name: `${SPACE}/threads/FROM_PAYLOAD` };
+    expect(normalizeChatEvent(body)).toMatchObject({
+      threadId: `${SPACE}/threads/FROM_PAYLOAD`, threadIsResourceName: true
+    });
+
+    // The message's own thread still wins when both are there.
+    body.chat.appCommandPayload.message.thread = { name: `${SPACE}/threads/FROM_MESSAGE` };
+    expect(normalizeChatEvent(body).threadId).toBe(`${SPACE}/threads/FROM_MESSAGE`);
+
+    // Neither: no thread, as before.
+    expect(normalizeChatEvent(commandBody('1'))).toMatchObject({ threadId: null, threadIsResourceName: false });
+  });
+
+  test('a quote-reply carries the quoted message\'s name; an ordinary message carries none', () => {
+    const quoting = { ...message, quotedMessageMetadata: { name: `${SPACE}/messages/QUOTED`, lastUpdateTime: '2026-10-05T10:00:00Z' } };
+    expect(normalizeChatEvent({ chat: { messagePayload: { message: quoting, space: { name: SPACE } } } }).quotedMessageName)
+      .toBe(`${SPACE}/messages/QUOTED`);
+    expect(normalizeChatEvent({ chat: { messagePayload: { message, space: { name: SPACE } } } }).quotedMessageName).toBeNull();
+  });
 });
 
 // ============================================================================

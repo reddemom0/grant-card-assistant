@@ -182,7 +182,8 @@ async function runTrackCommand(evt, deps) {
     trigger: 'command',
     actor: found.actor, userId: found.user.id,
     spaceName: found.spaceName, threadName: found.threadName, surface: found.surface,
-    commandMessageName: evt.messageName, askText
+    commandMessageName: evt.messageName, askText,
+    quotedMessageName: evt.quotedMessageName || null
   });
 }
 
@@ -211,7 +212,8 @@ async function runWatchCommand(evt, deps) {
     actor: found.actor, userId: found.user.id,
     spaceName: found.spaceName, threadName: found.threadName, surface: found.surface,
     messageText: String(evt.text || '').replace(/^\s*\/watch\b/i, '').trim(),
-    messageName: evt.messageName
+    messageName: evt.messageName,
+    quotedMessageName: evt.quotedMessageName || null
   });
 }
 
@@ -244,10 +246,12 @@ async function runReviewCommand(evt, deps) {
       threadName: found.threadName,
       userIds: [found.user.id],
       triggerMessageName: evt.messageName,
+      quotedMessageName: evt.quotedMessageName || null,
       looksRight,
       maxAgeMs: found.surface === 'chat_dm' ? Infinity : 30 * 60 * 1000
     });
-    if (seen.ok && seen.text && seen.from === 'recent') {
+    // A quoted message is the request the person pointed at.
+    if (seen.ok && seen.text && (seen.from === 'recent' || seen.from === 'quote')) {
       if (!seen.sure) {
         await postMessage({
           spaceName: found.spaceName,
