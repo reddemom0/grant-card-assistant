@@ -3,6 +3,8 @@
  *
  * One env var per update, comma-separated @granted.ca emails:
  *   PULSE_SPIKE_SUBSCRIBERS   chat spike alert (src/services/pulse-spike.js)
+ *   PULSE_ROUNDUP_SUBSCRIBERS morning roundup (src/services/pulse-roundup.js)
+ *   PULSE_DIGEST_SUBSCRIBERS  Monday weekly digest (src/services/pulse-digest.js)
  *
  * Each email resolves to Oracle's DM space with that person:
  *   users.email → users.chat_user_id (migration 028) → findDmSpace

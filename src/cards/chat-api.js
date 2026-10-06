@@ -25,16 +25,18 @@ function chatClient() {
  * Post a new message: a card, text, or both. A thread name makes it a reply in
  * that thread; without one it starts a new top-level message. `privateTo`
  * (users/NNN) makes it visible to that person and Oracle only — app
- * authentication, no attachments.
+ * authentication, no attachments. `fallbackText` is what a notification shows
+ * for a card-only message.
  * @returns {Promise<string>} the created message's resource name
  */
-export async function postMessage({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null }) {
+export async function postMessage({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null, fallbackText = null }) {
   const requestBody = {};
   if (text) {
     requestBody.text = text;
     requestBody.markupSyntax = 'MARKUP_SYNTAX_MARKDOWN';
   }
   if (cardsV2) requestBody.cardsV2 = cardsV2;
+  if (fallbackText) requestBody.fallbackText = fallbackText;
   if (threadName) requestBody.thread = { name: threadName };
   if (privateTo) requestBody.privateMessageViewer = { name: privateTo };
 

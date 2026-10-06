@@ -189,8 +189,8 @@ export function cleanReview(raw, transcript) {
   };
 }
 
-/** One forced-tool Haiku call. Returns the tool input, or throws. */
-async function callTool(createMessage, { system, user, tool, maxTokens, source }) {
+/** One forced-tool Haiku call. Returns the tool input, or throws. Also used by pulse-digest.js. */
+export async function callTool(createMessage, { system, user, tool, maxTokens, source, timeoutMs = MODEL_TIMEOUT_MS }) {
   const response = await createMessage({
     model: ROUNDUP_MODEL,
     max_tokens: maxTokens,
@@ -199,7 +199,7 @@ async function callTool(createMessage, { system, user, tool, maxTokens, source }
     tools: [tool],
     tool_choice: { type: 'tool', name: tool.name },
     messages: [{ role: 'user', content: user }]
-  }, { timeout: MODEL_TIMEOUT_MS, maxRetries: 0 });
+  }, { timeout: timeoutMs, maxRetries: 0 });
   if (response?.usage) {
     const { logAPICost } = await import('../utils/cost-logger.js');
     logAPICost({ usage: response.usage, model: ROUNDUP_MODEL, source });

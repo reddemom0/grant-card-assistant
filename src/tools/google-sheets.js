@@ -166,6 +166,41 @@ export async function appendSheetRow(userId, args) {
   }
 }
 
+/**
+ * Make a tab ready to be written from A1: cleared when it already exists,
+ * added when it doesn't. Not an agent tool — used by the Pulse weekly digest,
+ * which rewrites its "Digest YYYY-MM-DD" tab whole on every run.
+ * @param {number} userId
+ * @param {{ spreadsheet_id: string, title: string }} args
+ */
+export async function prepareSheetTab(userId, args) {
+  try {
+    const sheets = await getSheetsClient(userId);
+    const meta = await sheets.spreadsheets.get({
+      spreadsheetId: args.spreadsheet_id,
+      fields: 'sheets.properties(sheetId,title)'
+    });
+    const existing = (meta.data.sheets ?? []).find(s => s.properties?.title === args.title);
+    let sheetId;
+    if (existing) {
+      sheetId = existing.properties.sheetId;
+      await sheets.spreadsheets.values.clear({
+        spreadsheetId: args.spreadsheet_id,
+        range: `'${args.title.replace(/'/g, "''")}'`
+      });
+    } else {
+      const added = await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: args.spreadsheet_id,
+        requestBody: { requests: [{ addSheet: { properties: { title: args.title } } }] }
+      });
+      sheetId = added.data?.replies?.[0]?.addSheet?.properties?.sheetId;
+    }
+    return { success: true, data: { title: args.title, created: !existing, sheet_id: sheetId ?? null } };
+  } catch (err) {
+    return classifyError(err);
+  }
+}
+
 export async function createAdvancedBudget(title, userId, grantProgram, budgetData = null, parentFolderId = null) {
   try {
     console.log(`📊 Creating advanced budget: "${title}" for program: ${grantProgram}`);
