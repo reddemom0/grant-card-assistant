@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-10-06 — pulse_stats: Oracle-only, on-demand, built on the digest's own queries
+**What:** New read-only tool `pulse_stats` gives Oracle GetGranted usage and matching stats per Mon–Sun Vancouver week (chat users, conversations, companies that ran matches, top-10 or one grant with week-over-week change). It is Oracle-only (not `ORACLE_TOOLS`, so the orchestrator never gets it), loaded on demand via `ORACLE_DEFERRED_TOOLS`, with one phrase added to the prompt's "Searchable tools include" line.
+**Why:** It reuses `pulse-digest.js`'s collect functions (one new: `collectMatchingCompanies`) so the tool and the weekly digest never disagree; rejected always-loaded (~600–800 tokens on every Sonnet call) and a separate query layer (would drift from the digest).
+**Impact:** `src/tools/pulse-stats.js` (new), `src/services/pulse-digest.js`, `src/tools/definitions.js` (`PULSE_STATS_TOOL`), `src/tools/executor.js`, `src/claude/client.js` (`ORACLE_DEFERRED_TOOLS`), `.claude/agents/internal-oracle.md`, `tests/unit/pulse-stats.test.js`
+
 ## 2026-10-05 — /meet does not reschedule; it offers a fresh booking instead
 **What:** An ask to move an existing meeting ("move my call with @Nat to Friday") gets a private "I can't reschedule existing meetings — here are new times you can book instead" and a normal /meet card for the new day; the existing event is never read or edited. The booked card's own Reschedule button stays: it only moves the event Oracle created from that card.
 **Why:** Simpler, and avoids editing the wrong event — an ask names a meeting in words, and guessing which calendar event it means is where a wrong edit would come from.

@@ -542,6 +542,26 @@ export async function collectGrantMatches({ start, end }, runQuery = gg3OpsQuery
 }
 
 /**
+ * Companies that ran matching in the week — any match row, shown or not —
+ * counted the same way (the user when company_id is null). The denominator
+ * behind a grant's count: fewer active companies explains most drops. Used by
+ * the pulse_stats tool (src/tools/pulse-stats.js); the digest doesn't show it.
+ * @returns {Promise<null|number>} null when the ops DB isn't configured
+ */
+export async function collectMatchingCompanies({ start, end }, runQuery = gg3OpsQuery) {
+  const ex = excludeInternalUsers('user_id', 3);
+  const res = await runQuery(
+    `SELECT count(DISTINCT coalesce(company_id::text, 'u:' || user_id))::int AS companies
+       FROM match_results
+      WHERE occurred_at >= $1 AND occurred_at < $2
+        AND ${ex.clause}`,
+    [start, end, ...ex.params]
+  );
+  if (!res.configured) return null;
+  return res.rows[0]?.companies ?? 0;
+}
+
+/**
  * A grant's change against the week before, same rules as this week's count:
  * "(+1, +33% vs week before)", "(new this week)" when it had none, "(no change)".
  */

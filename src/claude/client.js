@@ -191,7 +191,8 @@ export function toolsForRun(agentType, allowedTools = null) {
 // uploads depend on them. gg3_conversations (GetGranted client chats) is new and
 // deferred from the start; its description carries the words search matches on.
 // The second batch (from search_federal_grants_records on) is the 20 least-used
-// tools still loaded over the 30 days to 2026-10-05.
+// tools still loaded over the 30 days to 2026-10-05. pulse_stats (GetGranted
+// usage and match stats) is new and deferred from the start, like gg3_conversations.
 export const ORACLE_DEFERRED_TOOLS = [
   'create_hubspot_company', 'update_hubspot_company', 'create_hubspot_contact',
   'update_hubspot_contact', 'associate_contact_with_company', 'create_hubspot_deal',
@@ -210,7 +211,8 @@ export const ORACLE_DEFERRED_TOOLS = [
   'build_mention_digest', 'read_chat_space_history', 'get_visualping_alerts',
   'search_grant_applications', 'get_grant_application',
   'list_files_in_folder', 'update_sheet_range', 'replace_google_doc_section',
-  'read_google_doc_outline'
+  'read_google_doc_outline',
+  'pulse_stats'
 ];
 
 export const TOOL_SEARCH_TOOL = { type: 'tool_search_tool_bm25_20251119', name: 'tool_search_tool_bm25' };

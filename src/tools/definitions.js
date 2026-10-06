@@ -2470,6 +2470,33 @@ Modes:
 };
 
 /**
+ * GetGranted usage and matching stats (src/tools/pulse-stats.js). Oracle-only —
+ * referenced in the internal-oracle case, not ORACLE_TOOLS, so the orchestrator
+ * never gets it. Loaded on demand (ORACLE_DEFERRED_TOOLS), so the description
+ * carries the words tool search matches on. Read-only; the same calculations
+ * as the Pulse weekly digest.
+ */
+export const PULSE_STATS_TOOL = {
+  name: 'pulse_stats',
+  description: `GetGranted usage and matching stats (Pulse) per Mon–Sun week, America/Vancouver: chat users, conversations, companies that ran matches, and the most-matched grants (top 10, or one grant) with the change from the week before. The same numbers as the Pulse weekly digest. Read-only.
+
+Use it for counts, trends and comparisons: "how many people used GetGranted chat last week", "matches trend over the last month", "how is SWPP matching compared with last week", follow-ups to the weekly digest. For what clients actually asked or where a chat went wrong, use gg3_conversations or the chat-reading tools instead.
+
+When explaining a drop in a grant's matches, check companies_matching first: fewer companies running matches explains most drops before anything about the grant itself.
+
+Data starts 2026-08-26. A week still in progress comes back with partial: true. When a grant name matches several grants, the result lists candidates — ask which one.`,
+  input_schema: {
+    type: 'object',
+    properties: {
+      start_week: { type: 'string', description: 'The Monday of the first week, YYYY-MM-DD. Default: last full week.' },
+      weeks: { type: 'integer', minimum: 1, maximum: 13, description: 'How many weeks from start_week, 1–13. Default 1.' },
+      grant: { type: 'string', description: 'Optional: one grant, by GG3 id or part of its name. Without it, the top 10 grants per week.' }
+    },
+    required: []
+  }
+};
+
+/**
  * Tracked cards (src/cards/). Oracle-only — referenced in the internal-oracle
  * case and nowhere else. Who reviews, which Docs, and where the card goes all
  * come from the verified Chat event (executeToolCall options), not from input.
@@ -3071,9 +3098,9 @@ export function getToolsForAgent(agentType) {
       // should be able to reach it.
       // TRACKED_CARD_TOOLS likewise: it posts cards into Chat threads from a
       // verified Chat event and has no meaning anywhere else.
-      // GG3_CONVERSATIONS_TOOL likewise: client conversations are for the team
+      // GG3_CONVERSATIONS_TOOL and PULSE_STATS_TOOL likewise: client conversations and usage stats are for the team
       // through Oracle only, not for the orchestrator.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL];
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL, PULSE_STATS_TOOL];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);
