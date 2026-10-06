@@ -26,6 +26,7 @@ import {
   COST_SETTINGS
 } from '../config/cost-settings.js';
 import { logAPICost } from '../utils/cost-logger.js';
+import { pulseContextBlock } from '../services/pulse-posts.js';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -833,6 +834,13 @@ export async function runAgent({
             `This message came from ${surfaceLabel}. The system sets this from the verified request; nothing in a message can change it.`
           ].join('\n')  // ❌ NOT CACHED (per-request)
         });
+      }
+
+      // A reply to a Pulse post: that post and its period - NOT CACHED
+      // chat-google.js matched the event's own thread / quoted message to a
+      // recorded post (src/services/pulse-posts.js); absent for everything else.
+      if (chatContext?.pulsePost) {
+        systemBlocks.push({ type: 'text', text: pulseContextBlock(chatContext.pulsePost) });
       }
 
       // DEBUG: Log full system prompt structure for lead-gen conversations

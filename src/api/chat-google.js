@@ -26,6 +26,7 @@ import { hubSignInUrl } from '../tools/chat-history.js';
 import { attachmentsOf, readAttachments, attachmentBlockText, unreadableLine } from '../tools/chat-attachments.js';
 import { isListenSpace } from '../chat-listen/config.js';
 import { takeCardReply, findAppCommand } from '../cards/registry.js';
+import { findPulsePost } from '../services/pulse-posts.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -582,9 +583,12 @@ async function postToChat(evt, text) {
   const chunks = splitForChat(text);
   console.log(`📤 Posting ${chunks.length} message(s) to ${evt.spaceId}`);
 
+  const created = [];
   for (const chunk of chunks) {
-    await chat.spaces.messages.create(buildMessageRequest(evt, chunk));
+    const res = await chat.spaces.messages.create(buildMessageRequest(evt, chunk));
+    created.push(res?.data || null);
   }
+  return created;
 }
 
 /**
@@ -673,6 +677,27 @@ export function postToSpace(spaceName, text) {
     { spaceId: spaceName, spaceIsResourceName: true, threadId: null, threadIsResourceName: false },
     markdownToChat(text)
   );
+}
+
+/**
+ * postToSpace, returning where the post landed — the first message's name and
+ * thread — so replies to it can be recognised (Pulse, src/services/pulse-posts.js).
+ * Long text is split as usual; only the first message is reported.
+ * @returns {Promise<{messageName: string|null, threadName: string|null}|null>} null when it failed
+ */
+export async function postToSpaceWithThread(spaceName, text) {
+  try {
+    const created = await postToChat(
+      { spaceId: spaceName, spaceIsResourceName: true, threadId: null, threadIsResourceName: false },
+      markdownToChat(text)
+    );
+    if (!created[0]?.name) return null;
+    console.log('✅ Chat reply delivered');
+    return { messageName: created[0].name, threadName: created[0].thread?.name || null };
+  } catch (err) {
+    console.error('❌ Google Chat post-back FAILED — user received nothing:', err.message);
+    return null;
+  }
 }
 
 /**
@@ -894,6 +919,18 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       }
     }
 
+    // A reply in the thread of a Pulse post (or a quote of one): give Oracle
+    // that post and its period. Matched on the event's own thread / quoted
+    // message names, within this space only. Nothing found → nothing added.
+    const pulsePost = evt.spaceIsResourceName
+      ? await findPulsePost({
+        spaceName: evt.spaceId,
+        threadName: evt.threadIsResourceName ? evt.threadId : null,
+        quotedMessageName: evt.quotedMessageName
+      })
+      : null;
+    if (pulsePost) console.log(`📣 Reply to a Pulse ${pulsePost.kind} post — its period goes in context`);
+
     const result = await runAgent({
       agentType: 'internal-oracle',
       message: messageText,
@@ -917,7 +954,8 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
         mentions: evt.mentions,
         driveFiles: evt.driveFiles,
         attachmentNames: evt.files.map(f => f.name),
-        messageText: messageText
+        messageText: messageText,
+        ...(pulsePost ? { pulsePost } : {})
       }
     });
 

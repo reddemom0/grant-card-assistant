@@ -29,7 +29,16 @@ function chatClient() {
  * for a card-only message.
  * @returns {Promise<string>} the created message's resource name
  */
-export async function postMessage({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null, fallbackText = null }) {
+export async function postMessage(args) {
+  return (await postMessageWithThread(args)).messageName;
+}
+
+/**
+ * postMessage, also returning the thread the message landed in — for posts
+ * whose replies need recognising later (Pulse, src/services/pulse-posts.js).
+ * @returns {Promise<{messageName: string|null, threadName: string|null}>}
+ */
+export async function postMessageWithThread({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null, fallbackText = null }) {
   const requestBody = {};
   if (text) {
     requestBody.text = text;
@@ -45,7 +54,7 @@ export async function postMessage({ spaceName, threadName = null, text = null, c
     ...(threadName ? { messageReplyOption: 'REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD' } : {}),
     requestBody
   });
-  return res.data?.name || null;
+  return { messageName: res.data?.name || null, threadName: res.data?.thread?.name || null };
 }
 
 /** Replace the cards on a message Oracle posted. Never notifies anyone. */

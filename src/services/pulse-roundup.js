@@ -41,6 +41,7 @@ import {
   SHEET_ENV, OWNER_ENV, sheetUrl, localDate, resolveSheetOwner, readIssueRows, writeIssues
 } from './pulse-errors-sheet.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from '../claude/tool-output.js';
+import { pulsePostRecorder } from './pulse-posts.js';
 
 export const SUBSCRIBERS_ENV = 'PULSE_ROUNDUP_SUBSCRIBERS';
 export const ROUNDUP_MODEL = 'claude-haiku-4-5-20251001';
@@ -471,11 +472,12 @@ async function defaultCreateMessage(params, opts) {
 }
 
 async function defaultDeps(env) {
-  const [{ query }, { getPulseSubscribers }, { postToSpace }, sheets] = await Promise.all([
+  const [{ query }, { getPulseSubscribers }, { postToSpaceWithThread }, sheets, { recordPulsePost }] = await Promise.all([
     import('../database/connection.js'),
     import('./pulse-subscribers.js'),
     import('../api/chat-google.js'),
-    import('../tools/google-sheets.js')
+    import('../tools/google-sheets.js'),
+    import('./pulse-posts.js')
   ]);
   return {
     collectErrors: (hours) => collectErrors(hours),
@@ -484,7 +486,8 @@ async function defaultDeps(env) {
     fetchProfile: (id) => fetchCompanyName(id, env),
     oracleQuery: query,
     getSubscribers: () => getPulseSubscribers(SUBSCRIBERS_ENV),
-    post: postToSpace,
+    post: postToSpaceWithThread,
+    recordPost: recordPulsePost,
     readSheet: sheets.readSheetRange,
     updateSheet: sheets.updateSheetRange,
     appendSheet: sheets.appendSheetRow
@@ -595,9 +598,16 @@ export async function runMorningRoundup({ now = new Date(), env = process.env, d
 
   const text = formatRoundup(issues, { sheetId, hours });
   const subscribers = await d.getSubscribers();
+  // Each delivered DM is recorded (pulse_posts), so a reply in its thread gets this roundup as context.
+  const record = d.recordPost
+    ? pulsePostRecorder({ kind: 'roundup', periodStart: new Date(now.getTime() - hours * 3600000), periodEnd: now, summary: text }, d.recordPost)
+    : null;
   let sent = 0;
   for (const s of subscribers) {
-    if (await d.post(s.dmSpace, text)) sent += 1;
+    const result = await d.post(s.dmSpace, text);
+    if (!result) continue;
+    sent += 1;
+    if (record) await record(s, result);
   }
   if (sent === 0) {
     // The claim stays: the sheet's counts are already added.

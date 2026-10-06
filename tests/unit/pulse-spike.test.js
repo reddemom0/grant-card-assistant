@@ -56,6 +56,27 @@ afterEach(() => {
   logSpy.mockRestore();
 });
 
+describe('recording the alert', () => {
+  test('each delivered alert is recorded as a spike post covering the 15 minutes', async () => {
+    const deps = makeDeps({ failures: counts(1, 1, 2), postResult: { messageName: 'spaces/DM1/messages/S1', threadName: 'spaces/DM1/threads/S1' } });
+    deps.recordPost = jest.fn(async () => true);
+    await runSpikeCheck({ now: NOW, env: ENV, deps });
+    const [space, text] = deps.post.mock.calls[0];
+    expect(deps.recordPost).toHaveBeenCalledWith({
+      kind: 'spike', isTest: false, recipientEmail: 'chris@granted.ca', spaceName: space,
+      messageName: 'spaces/DM1/messages/S1', threadName: 'spaces/DM1/threads/S1',
+      periodStart: new Date(NOW.getTime() - 15 * 60000), periodEnd: NOW, summary: text
+    });
+  });
+
+  test('below the threshold nothing is recorded', async () => {
+    const deps = makeDeps({ failures: counts(1, 0) });
+    deps.recordPost = jest.fn();
+    await runSpikeCheck({ now: NOW, env: ENV, deps });
+    expect(deps.recordPost).not.toHaveBeenCalled();
+  });
+});
+
 describe('threshold', () => {
   test('1 failure: no alert, no cooldown claim', async () => {
     const deps = makeDeps({ failures: counts(1, 0) });

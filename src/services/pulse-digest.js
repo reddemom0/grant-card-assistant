@@ -53,6 +53,7 @@ import {
 import { transcriptOf, callTool, fetchCompanyName } from './pulse-roundup.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from '../claude/tool-output.js';
 import { esc, paragraph, decorated, finalizeCards } from '../cards/render.js';
+import { recordPulsePost, pulsePostRecorder } from './pulse-posts.js';
 
 export const DIGEST_SUBSCRIBERS_ENV = 'PULSE_DIGEST_SUBSCRIBERS';
 export const TOP_GRANTS = 3;
@@ -830,17 +831,17 @@ async function defaultCreateMessage(params, opts) {
 
 /** Real dependencies. Exported for the dry-run script, which uses only the read ones. */
 export async function defaultDeps() {
-  const [{ query }, { getPulseSubscribers }, { postMessage }, sheets] = await Promise.all([
+  const [{ query }, { getPulseSubscribers }, { postMessageWithThread }, sheets] = await Promise.all([
     import('../database/connection.js'),
     import('./pulse-subscribers.js'),
     import('../cards/chat-api.js'),
     import('../tools/google-sheets.js')
   ]);
-  /** One card DM as the Chat app; true when it went through. */
+  /** One card DM as the Chat app; where it landed, or false. */
   const postCard = async (spaceName, { cardsV2, fallbackText }) => {
     try {
-      await postMessage({ spaceName, cardsV2, fallbackText });
-      return true;
+      const posted = await postMessageWithThread({ spaceName, cardsV2, fallbackText });
+      return posted.messageName ? posted : false;
     } catch (err) {
       console.error(`❌ Pulse digest: card not delivered — code: ${err?.code ?? err?.status ?? err?.name ?? 'unknown'}`);
       return false;
@@ -858,7 +859,8 @@ export async function defaultDeps() {
     post: postCard,
     readSheet: sheets.readSheetRange,
     prepareTab: sheets.prepareSheetTab,
-    updateSheet: sheets.updateSheetRange
+    updateSheet: sheets.updateSheetRange,
+    recordPost: recordPulsePost
   };
 }
 
@@ -871,16 +873,28 @@ export async function readSheetIssues(env, d) {
 }
 
 /**
- * DM each subscriber the card; the one delivery path for the Monday run and a test send.
+ * DM each subscriber the card; the one delivery path for the Monday run and a
+ * test send. `record` (optional) is told where each delivered card landed —
+ * pulse_posts, so replies in its thread get the digest as context.
  * @param {{cardsV2: Object[], fallbackText: string}} message
  * @returns {Promise<number>} sent
  */
-export async function deliverDigest(message, subscribers, post) {
+export async function deliverDigest(message, subscribers, post, record = null) {
   let sent = 0;
   for (const s of subscribers) {
-    if (await post(s.dmSpace, message)) sent += 1;
+    const result = await post(s.dmSpace, message);
+    if (!result) continue;
+    sent += 1;
+    if (record) await record(s, result);
   }
   return sent;
+}
+
+/** The recorder for one digest send: its week and the lines the card showed. Null without a recordPost dep. */
+function digestRecorder(d, deps, { sheetId = null, isTest = false } = {}) {
+  if (!deps.recordPost) return null;
+  const { start, end } = weekBounds(d.monday);
+  return pulsePostRecorder({ kind: 'digest', isTest, periodStart: start, periodEnd: end, summary: formatDigest(d, { sheetId }) }, deps.recordPost);
 }
 
 const TEST_ENV = 'PULSE_DIGEST_TEST_RECIPIENT';
@@ -896,7 +910,7 @@ export async function sendDigestTest({ email, d, sheetId = null, deps }) {
   const subscribers = await deps.lookupSubscribers(TEST_ENV, { [TEST_ENV]: String(email || '') });
   if (!subscribers.length) return { sent: 0, code: 'not_reachable' };
   const message = { cardsV2: digestCard(d, { sheetId, test: true }), fallbackText: digestFallback(d, { test: true }) };
-  const sent = await deliverDigest(message, subscribers.slice(0, 1), deps.post);
+  const sent = await deliverDigest(message, subscribers.slice(0, 1), deps.post, digestRecorder(d, deps, { sheetId, isTest: true }));
   return sent ? { sent } : { sent: 0, code: 'post_failed' };
 }
 
@@ -948,7 +962,7 @@ export async function runWeeklyDigest({ now = new Date(), env = process.env, dep
   }
 
   const message = { cardsV2: digestCard(built, { sheetId, tabGid }), fallbackText: digestFallback(built) };
-  const sent = await deliverDigest(message, await d.getSubscribers(), d.post);
+  const sent = await deliverDigest(message, await d.getSubscribers(), d.post, digestRecorder(built, d, { sheetId }));
   if (sent === 0) {
     console.warn('⚠️  Pulse digest: no subscriber could be reached — not retried this week.');
     return { status: 'undelivered', sent, tab };

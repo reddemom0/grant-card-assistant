@@ -533,6 +533,53 @@ describe('runWeeklyDigest', () => {
   });
 });
 
+describe('recording delivered digests', () => {
+  const landed = (space) => ({ messageName: `${space}/messages/1`, threadName: `${space}/threads/1` });
+
+  test('the Monday run records each recipient with the week and the lines the card showed', async () => {
+    const f = fakeDeps();
+    f.deps.post.mockImplementation(async (space) => landed(space));
+    f.deps.recordPost = jest.fn(async () => true);
+    await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps });
+    expect(f.deps.recordPost).toHaveBeenCalledTimes(1);
+    const row = f.deps.recordPost.mock.calls[0][0];
+    expect(row).toEqual(expect.objectContaining({
+      kind: 'digest', isTest: false, recipientEmail: 'chris@granted.ca', spaceName: 'spaces/dm1',
+      messageName: 'spaces/dm1/messages/1', threadName: 'spaces/dm1/threads/1'
+    }));
+    expect(row.periodStart.toISOString()).toBe('2026-09-28T07:00:00.000Z');
+    expect(row.periodEnd.toISOString()).toBe('2026-10-05T07:00:00.000Z');
+    expect(row.summary).toContain('**Most-matched grants**');
+    expect(row.summary).not.toContain(SECRET);
+  });
+
+  test('a test send is recorded as a test', async () => {
+    const f = fakeDeps();
+    f.deps.post.mockImplementation(async (space) => landed(space));
+    f.deps.recordPost = jest.fn(async () => true);
+    await D.sendDigestTest({ email: 'writers@granted.ca', d: sampleDigest(), sheetId: 'sheet123', deps: f.deps });
+    expect(f.deps.recordPost).toHaveBeenCalledWith(expect.objectContaining({ kind: 'digest', isTest: true, spaceName: 'spaces/dm9' }));
+  });
+
+  test('the dry-run path (build and print) records nothing', async () => {
+    const f = fakeDeps();
+    f.deps.recordPost = jest.fn();
+    const built = await D.buildDigest({ monday: '2026-09-28', issueRows: [], deps: f.deps });
+    D.formatDigest(built, { sheetId: 'sheet123' });
+    D.digestRows(built);
+    expect(f.deps.recordPost).not.toHaveBeenCalled();
+    expect(f.deps.post).not.toHaveBeenCalled();
+  });
+
+  test('an undelivered card is not recorded', async () => {
+    const f = fakeDeps();
+    f.deps.post.mockImplementation(async () => false);
+    f.deps.recordPost = jest.fn();
+    await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps });
+    expect(f.deps.recordPost).not.toHaveBeenCalled();
+  });
+});
+
 describe('sendDigestTest', () => {
   test('posts the test card once to that one person; no claim, no tab', async () => {
     const f = fakeDeps();

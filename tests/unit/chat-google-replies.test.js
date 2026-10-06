@@ -285,3 +285,52 @@ describe('disclosure', () => {
     expect(out).not.toContain(MESSAGE_TEXT);
   });
 });
+
+// --- replies to Pulse posts ------------------------------------------------
+describe('a reply in the thread of a Pulse post', () => {
+  const DIGEST_ROW = {
+    kind: 'digest', is_test: false,
+    period_start: '2026-09-28T07:00:00.000Z', period_end: '2026-10-05T07:00:00.000Z',
+    summary: '📊 GetGranted weekly — Sep 28 to Oct 4', created_at: '2026-10-05T15:00:01.000Z'
+  };
+  /** Pulse post lookups answer from `posts` (by space + thread); everything else is the known user. */
+  const withPosts = (posts) => mockQuery.mockImplementation(async (sql, params) => {
+    if (/FROM pulse_posts/.test(sql)) {
+      const [space, thread, quoted] = params;
+      return { rows: posts.filter(p => p.space === space && (p.thread === thread || p.message === quoted)).map(p => p.row) };
+    }
+    return { rows: [KNOWN_USER] };
+  });
+  const chatContextOf = () => mockRunAgent.mock.calls[0][0].chatContext;
+
+  test('gets the post and its week as context', async () => {
+    withPosts([{ space: 'spaces/SSS', thread: THREAD, message: 'spaces/SSS/messages/M1', row: DIGEST_ROW }]);
+    await send(IN_THREAD_SPACE);
+    const post = chatContextOf().pulsePost;
+    expect(post.kind).toBe('digest');
+    expect(post.periodStart.toISOString()).toBe('2026-09-28T07:00:00.000Z');
+    expect(post.periodEnd.toISOString()).toBe('2026-10-05T07:00:00.000Z');
+    expect(post.summary).toContain('Sep 28 to Oct 4');
+  });
+
+  test('a reply in an unrelated thread gets none', async () => {
+    withPosts([{ space: 'spaces/SSS', thread: 'spaces/SSS/threads/OTHER', message: 'spaces/SSS/messages/M1', row: DIGEST_ROW }]);
+    await send(IN_THREAD_SPACE);
+    expect(mockRunAgent).toHaveBeenCalledTimes(1);
+    expect('pulsePost' in chatContextOf()).toBe(false);
+  });
+
+  test('the same thread name in another space gets none', async () => {
+    withPosts([{ space: 'spaces/ELSEWHERE', thread: THREAD, message: 'x', row: DIGEST_ROW }]);
+    await send(IN_THREAD_SPACE);
+    expect('pulsePost' in chatContextOf()).toBe(false);
+  });
+
+  test('a quote of the post counts as replying to it', async () => {
+    withPosts([{ space: 'spaces/DDD', thread: 'spaces/DDD/threads/T0', message: 'spaces/DDD/messages/M9', row: DIGEST_ROW }]);
+    const body = chatBody({ thread: 'spaces/DDD/threads/NEW', space: { name: 'spaces/DDD', type: 'DM' } });
+    body.chat.messagePayload.message.quotedMessageMetadata = { name: 'spaces/DDD/messages/M9' };
+    await send(body);
+    expect(chatContextOf().pulsePost.kind).toBe('digest');
+  });
+});

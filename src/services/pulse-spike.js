@@ -27,6 +27,7 @@
  */
 
 import { gg3OpsQuery, isGg3OpsConfigured } from './gg3-ops-db.js';
+import { pulsePostRecorder } from './pulse-posts.js';
 
 export const ALERT_KEY = 'chat_spike';
 export const SUBSCRIBERS_ENV = 'PULSE_SPIKE_SUBSCRIBERS';
@@ -118,16 +119,18 @@ export async function releaseCooldown(now, previous, runQuery) {
 // ── The check ──────────────────────────────────────────────────────────────
 
 async function defaultDeps() {
-  const [{ query }, { getPulseSubscribers }, { postToSpace }] = await Promise.all([
+  const [{ query }, { getPulseSubscribers }, { postToSpaceWithThread }, { recordPulsePost }] = await Promise.all([
     import('../database/connection.js'),
     import('./pulse-subscribers.js'),
-    import('../api/chat-google.js')
+    import('../api/chat-google.js'),
+    import('./pulse-posts.js')
   ]);
   return {
     countFailures: () => countChatFailures(WINDOW_MINUTES),
     oracleQuery: query,
     getSubscribers: () => getPulseSubscribers(SUBSCRIBERS_ENV),
-    post: postToSpace
+    post: postToSpaceWithThread,
+    recordPost: recordPulsePost
   };
 }
 
@@ -164,9 +167,16 @@ export async function runSpikeCheck({ now = new Date(), env = process.env, deps 
 
   const text = formatSpikeAlert(counts);
   const subscribers = await d.getSubscribers();
+  // Each delivered alert is recorded (pulse_posts), so a reply in its thread gets this alert as context.
+  const record = d.recordPost
+    ? pulsePostRecorder({ kind: 'spike', periodStart: new Date(now.getTime() - WINDOW_MINUTES * 60000), periodEnd: now, summary: text }, d.recordPost)
+    : null;
   let sent = 0;
   for (const s of subscribers) {
-    if (await d.post(s.dmSpace, text)) sent += 1;
+    const result = await d.post(s.dmSpace, text);
+    if (!result) continue;
+    sent += 1;
+    if (record) await record(s, result);
   }
 
   if (sent === 0) {

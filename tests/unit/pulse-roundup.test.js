@@ -248,6 +248,25 @@ describe('the morning run', () => {
     expect(d.appendSheet).not.toHaveBeenCalled();
   });
 
+  test('each delivered DM is recorded as a roundup post covering the 24 hours', async () => {
+    const d = makeDeps({ conversations: [badChat], answers, sheetValues: SHEET_ROWS, postResult: { messageName: 'spaces/DM1/messages/R1', threadName: 'spaces/DM1/threads/R1' } });
+    d.recordPost = jest.fn(async () => true);
+    await runMorningRoundup({ now: NOW, env: ENV, deps: d });
+    const [space, text] = d.post.mock.calls[0];
+    expect(d.recordPost).toHaveBeenCalledWith({
+      kind: 'roundup', isTest: false, recipientEmail: 'chris@granted.ca', spaceName: space,
+      messageName: 'spaces/DM1/messages/R1', threadName: 'spaces/DM1/threads/R1',
+      periodStart: new Date(NOW.getTime() - 24 * 3600000), periodEnd: NOW, summary: text
+    });
+  });
+
+  test('nothing to report → nothing sent, nothing recorded', async () => {
+    const d = makeDeps({ conversations: [] });
+    d.recordPost = jest.fn();
+    await runMorningRoundup({ now: NOW, env: ENV, deps: d });
+    expect(d.recordPost).not.toHaveBeenCalled();
+  });
+
   test('a bad chat: claims the day, updates the matched row (C–E only), DMs with "known, being fixed"', async () => {
     const d = makeDeps({ conversations: [badChat], answers, sheetValues: SHEET_ROWS });
     const res = await runMorningRoundup({ now: NOW, env: ENV, deps: d });
