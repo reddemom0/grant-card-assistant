@@ -16,3 +16,7 @@ mcp-servers/gdrive/node_modules/
 *.backup
 .DS_Store
 .claude/worktrees/
+
+# Local scratch and raw eval output
+.claude/scratchpad/
+tests/evals/oracle-grant-data/runs-*.json
