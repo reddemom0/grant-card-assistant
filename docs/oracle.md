@@ -17,11 +17,8 @@ Four routes reference Oracle. Three run it.
 |---|---|---|---|
 | `POST /api/chat` | `handleChatRequest` in `src/api/chat.js` | JWT in `granted_session` cookie via `authenticateUser` | Synchronous SSE streaming. Frontend is `unified-agents.html`, slug `oracle` → `internal-oracle` |
 | `POST /api/chat/google` | `handleGoogleChatEvent` in `src/api/chat-google.js` | Google OIDC ID token, then `users` lookup by email | Acks immediately, runs headless (`res: null`) |
-| `POST /api/hubspot-webhook` | `handleHubSpotWebhook` in `src/api/hubspot-webhook.js` | Shared `HUBSPOT_WORKFLOW_TOKEN` in the URL — see below | Headless, forced Haiku, hardcoded `userId = 1` |
+| `POST /api/hubspot-webhook` | `handleHubSpotWebhook` in `src/api/hubspot-webhook.js` | Shared `HUBSPOT_WORKFLOW_TOKEN` in the URL — see below | Headless, forced Haiku, runs as the system account named by `HUBSPOT_WEBHOOK_USER_EMAIL` (`resolveWebhookUser`) |
 | `POST /api/addon/probe` | `handleAddonProbe` in `src/api/addon-probe.js` | Google OIDC | Does not reach Oracle. Disposable timeout probe — sleeps, returns a static card |
-
-**CLAUDE.md's "two distinct request paths" framing is wrong.** There are three that run
-agents, plus lead-gen.
 
 ### HubSpot webhook auth
 
@@ -33,8 +30,13 @@ open.
 HubSpot v3 signature verification is separately deferred: the real sender is a workflow
 webhook action that transmits no signature headers, only `x-hubspot-correlation-id`. So the
 token is the whole authentication story here. It is a bearer secret in a URL, and this is
-the one surface that runs Oracle headlessly as a hardcoded system user — worth knowing when
+the one surface that runs Oracle headlessly as a system user — worth knowing when
 weighing changes, but it is not an open hole.
+
+That user is the Workspace account named by `HUBSPOT_WEBHOOK_USER_EMAIL`, never a hardcoded
+ID. `resolveWebhookUser` in `src/api/hubspot-webhook.js` refuses to run when the variable is
+unset, has no `users` row, is deactivated, or has a `hubspot_owner_id` (Oracle would default
+record owners to it).
 
 ### Google Chat adapter
 
@@ -274,51 +276,63 @@ matching Chat API command in the Cloud console.
 
 ## Confirmation gate
 
-`CONFIRMATION_POLICY` in `src/tools/executor.js`, enforced pre-dispatch inside
-`executeToolCall` — a refused call never constructs a client or reaches an external API.
-Returns `requires_confirmation: true`, distinct from a generic failure.
+`GATED_TOOLS` in `src/tools/pending-actions.js`, enforced pre-dispatch inside
+`executeToolCall` (`src/tools/executor.js`). A gated call is not run: it is saved to
+`pending_actions` by `savePendingAction` (24 h expiry; a new proposal supersedes any pending
+one in the same conversation), described in code-written language by `summarizeAction`, and
+returned to the model as `awaiting_confirmation: true`. The only way it reaches its
+implementation is `runPendingAction`, which passes a `pendingActionId` that
+`executeToolCall` checks against a live row. There is no input flag to bypass it — a stray
+`confirmed` key is stripped before dispatch. If the gate itself throws (e.g. migration 025
+not applied), the tool is refused, not run.
 
-**Covers three tools only:**
-- `create_calendar_event` — gated only when `attendees` is non-empty
-- `update_calendar_event` — gated only when `attendees` is non-empty
-- `replace_google_doc_section` — gated unconditionally
+**Gated:**
+- `create_hubspot_deal`, `update_hubspot_deal`, `create_hubspot_note`,
+  `record_lead_outcome`, `merge_duplicate_companies`, `merge_duplicate_contacts`,
+  `replace_google_doc_section` — always
+- `create_calendar_event` — when `attendees` is non-empty
+- `update_calendar_event` — when `attendees` is non-empty or the event already has other
+  attendees (fetched; a failed read gates, to be safe)
 
-**HubSpot is deliberately excluded.** No HubSpot write passes through this gate.
-`create_hubspot_deal` is a prompt-only rail — the `hubspot/DEAL_CREATION` skill plus hard
-language in Oracle's prompt. Nothing in the executor enforces it.
+**Who confirms.** A message that is only a confirmation word is handled by
+`tryHandleConfirmation` in `src/api/confirmation.js`, before the model is called. Anyone in
+the conversation may confirm — a deliberate choice — and is recorded as `confirmed_by`.
+Card buttons (lead triage, review note) confirm the specific action their card shows; their
+own owner checks live in each card type's `handleAction`.
 
-**Two known limits.** It is a forcing function, not a security boundary — the model can
-send `confirmed: true` on the first call; what it guarantees is that the naive path fails
-with instructions. And the predicate only sees the input, so `update_calendar_event`
-repeats the check in `src/tools/google-calendar.js` after fetching the event.
-
-**It cannot work headlessly.** The gate lives downstream of `runAgent`, so it applies on
-every surface — but on Google Chat and the HubSpot webhook there is no human to confirm.
-A gated tool there either gets `confirmed: true` from the model or fails.
+**The one exemption.** `AUTO_APPROVED_TOOLS` lets the HubSpot webhook's system account run
+`create_hubspot_deal` / `update_hubspot_deal` unattended, logged as `auto_approved` by
+`recordAutoApproval`. Merges are never auto-approved.
 
 ## Tool loadout
 
 From the `internal-oracle` case in `getToolsForAgent` (`src/tools/definitions.js`).
-59 tools; a normal turn is sent 58, because `toolsForRun` in `src/claude/client.js` drops
+60 tools; a normal turn is sent 59, because `toolsForRun` in `src/claude/client.js` drops
 the run-only `save_team_lesson` unless `allowedTools` names it. Oracle builds
 `oracleBaseTools` from scratch rather than reusing shared `baseTools`.
 
 **Tools on demand (Sonnet 5.5 path only).** `withToolSearch` in `src/claude/client.js`
-sends the 44 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
+sends the 45 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
 Anthropic's tool search (`tool_search_tool_bm25`), so rarely used tools stay out of the
 cached prefix until Claude searches for them. The list is the tools used in 2 or fewer
 conversations over the 30 days to 2026-09-29. `track_review` and `read_chat_attachments`
 qualified but stay loaded: the review card and Chat file uploads depend on them.
-`gg3_conversations` was deferred from the start. Oracle's
+`gg3_conversations` and `pulse_stats` were deferred from the start. Oracle's
 Haiku tiers, the HubSpot webhook, and runs restricted by `allowedTools` (/learn-this,
 lesson runs) send the full list unchanged. Search results are dropped from reloaded
 history (`historyForRequest`), so a later turn searches again.
 
-Included: `SERVER_TOOLS`, `MEMORY_TOOLS`, `LOAD_SKILL_TOOL`, `ORACLE_TOOLS` (9),
-Drive (2), Dropbox read (1), `coreHubSpotTools` (18 of 36), Granola (5), Sheets
-read/write (4), Calendar (4), `create_google_doc` only, `GOOGLE_DOCS_EDIT_TOOLS` (3), and `gg3_conversations`
-(GetGranted client chats: read, search, troubleshoot, log to the Pulse errors sheet;
-`src/tools/gg3-conversations.js`).
+Included: `SERVER_TOOLS` (2), `MEMORY_TOOLS` (3), `LOAD_SKILL_TOOL`, `ORACLE_TOOLS` (9),
+Drive (3), Dropbox read (1), `coreHubSpotTools` (17 of 36), Granola (5), Sheets
+read/write (4), Calendar (4), `create_google_doc` only, `GOOGLE_DOCS_EDIT_TOOLS` (3),
+`CHAT_HISTORY_TOOLS` (4, including the run-only `save_team_lesson`), `TRACKED_CARD_TOOLS`
+(`track_review`), `gg3_conversations` (GetGranted client chats: read, search, troubleshoot,
+log to the Pulse errors sheet; `src/tools/gg3-conversations.js`), and `pulse_stats`.
+
+The three Drive tools are read-only and run as the asker: `createDriveClient` in
+`src/tools/google-drive.js` uses the service account with domain-wide delegation, subject =
+the asker's email (looked up in `executeToolCall`). With no usable service-account key they
+fail closed with "Drive access unavailable" — there is no fallback to a stored OAuth token.
 
 Excluded, with reasons in code:
 - `ANTHROPIC_MEMORY_TOOL` — wastes iterations on an empty directory. Postgres
@@ -382,7 +396,7 @@ One gap:
 - **Injection.** `runAgent` loads name, email, and owner ID into the non-cacheable identity
   block so the agent can attribute actions without asking. Wrapped in try/catch, never
   fails a turn, skipped when `userId` is null. The HubSpot webhook is *not* skipped — it
-  passes `userId = 1` and inherits whatever that row holds.
+  passes the system account from `resolveWebhookUser`, which must have no HubSpot owner ID.
 
 This is the only read of `users.hubspot_owner_id` in the codebase. Every other
 `hubspot_owner_id` hit in `src/tools/hubspot.js` is the HubSpot property of the same name
@@ -451,7 +465,6 @@ Dropbox-sourced.
 - HubSpot v3 signature verification deferred (workflow token is the only check)
 - `research/company_intelligence` skill missing on disk
 - Three of eleven users lack a usable HubSpot owner ID
-- Confirmation gate has no meaning on headless surfaces
 - Drive file reading: clearer declines for .doc, .xls, .pptx, and native Sheets and Slides
   are still to do (Stage 3 of the 2026-09-16 plan). Stages 1 and 2 are done:
   `fetchDriveFileContent` in `src/tools/google-drive.js` reads .docx (`mammoth`) and .xlsx

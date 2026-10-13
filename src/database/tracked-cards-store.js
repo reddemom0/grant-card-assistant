@@ -570,6 +570,14 @@ export async function recordDigest(chatUserId, localDate, messageName = null) {
   return r.rowCount > 0;
 }
 
+/** Give back a day's digest claim after its post failed, so a later run can retry. */
+export async function releaseDigest(chatUserId, localDate) {
+  await query(
+    'DELETE FROM tracked_card_digests WHERE chat_user_id = $1 AND local_date = $2',
+    [chatUserId, localDate]
+  );
+}
+
 // ============================================================================
 // INTROS (migration 034)
 // ============================================================================

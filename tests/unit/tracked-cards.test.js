@@ -86,6 +86,7 @@ const SPACE = 'spaces/AAA';
 const CONV = '22222222-2222-4222-8222-222222222222';
 const DOC = 'DOC_AAAAAAAAAAAA';
 const DAY = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
 
 let threadSeq = 0;
 
@@ -741,6 +742,31 @@ describe('the daily digest', () => {
 
     await notify.sendDueDigests(new Date(TORONTO_8AM.getTime() + DAY));
     expect(postsTo('spaces/DM-OWNER')).toHaveLength(2);
+  });
+
+  test('a failed post gives the day back, and the next hourly run sends it once', async () => {
+    await seedCard();
+    fakes.chat.failNextPost = new Error('Chat is down');
+    const first = await notify.sendDueDigests(TORONTO_8AM);
+    expect(first.failed).toBe(1);
+    expect(postsTo('spaces/DM-OWNER')).toHaveLength(0);
+
+    await notify.sendDueDigests(new Date(TORONTO_8AM.getTime() + HOUR));        // 09:05
+    expect(postsTo('spaces/DM-OWNER')).toHaveLength(1);
+    const later = await notify.sendDueDigests(new Date(TORONTO_8AM.getTime() + 2 * HOUR));   // 10:05
+    expect(postsTo('spaces/DM-OWNER')).toHaveLength(1);
+    expect(later.alreadySent).toBe(1);
+  });
+
+  test('a sent digest is never re-sent by the retry runs, and 11:00 is past the window', async () => {
+    await seedCard();
+    await notify.sendDueDigests(TORONTO_8AM);
+    for (const h of [1, 2]) await notify.sendDueDigests(new Date(TORONTO_8AM.getTime() + h * HOUR));
+    expect(postsTo('spaces/DM-OWNER')).toHaveLength(1);
+
+    await fakes.store.releaseDigest(OWNER, '2026-09-18');                       // even unclaimed,
+    await notify.sendDueDigests(new Date(TORONTO_8AM.getTime() + 3 * HOUR));
+    expect(postsTo('spaces/DM-OWNER')).toHaveLength(1);                          // 11:05 is not due
   });
 
   test('it groups what waits on you, what you asked for, and what went quiet', async () => {

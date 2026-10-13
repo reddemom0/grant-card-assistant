@@ -11,17 +11,26 @@ import { PDFParse, VerbosityLevel } from 'pdf-parse';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 
-// OAuth2 credentials from environment (for user access)
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_DRIVE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
-const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
-
 // Service Account credentials from environment (for knowledge base access)
 const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
+/** What every Drive tool returns when the service account can't be used. */
+const DRIVE_UNAVAILABLE = 'Drive access unavailable';
+
+function driveUnavailable(reason) {
+  console.error(`🚫 ${DRIVE_UNAVAILABLE}: ${reason}`);
+  const err = new Error(DRIVE_UNAVAILABLE);
+  err.code = 'DRIVE_AUTH_UNAVAILABLE';
+  return err;
+}
+
 /**
  * Create authenticated Google Drive client
- * Tries Service Account with domain-wide delegation first, falls back to OAuth2
+ * Service Account only, with domain-wide delegation when userEmail is given.
+ * FAILS CLOSED: with no usable key it throws "Drive access unavailable". There
+ * is deliberately no fallback to a stored OAuth refresh token — that is one
+ * person's account, and Drive calls must never act as someone other than the
+ * asker.
  * @param {string} userEmail - Optional: User email to impersonate (for domain-wide delegation)
  * @param {boolean} readOnly - If true, use read-only scopes. If false, use full drive access
  * @returns {Object} Google Drive API client
@@ -59,27 +68,12 @@ function createDriveClient(userEmail = null, readOnly = false) {
       const auth = new google.auth.GoogleAuth(authConfig);
       return google.drive({ version: 'v3', auth });
     } catch (error) {
-      console.error('Service Account auth failed:', error.message);
-      // Fall through to OAuth2
+      // Name only: a JSON.parse message quotes part of its input, i.e. the key.
+      throw driveUnavailable(`service account key could not be loaded (${error.name})`);
     }
   }
 
-  // Fall back to OAuth2 (requires valid refresh token)
-  if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET && GOOGLE_REFRESH_TOKEN) {
-    console.log('Using OAuth2 credentials for Google Drive');
-    const oauth2Client = new google.auth.OAuth2(
-      GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET
-    );
-
-    oauth2Client.setCredentials({
-      refresh_token: GOOGLE_REFRESH_TOKEN
-    });
-
-    return google.drive({ version: 'v3', auth: oauth2Client });
-  }
-
-  throw new Error('Google Drive credentials not configured. Set either GOOGLE_SERVICE_ACCOUNT_KEY or (GOOGLE_DRIVE_CLIENT_ID + GOOGLE_DRIVE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN).');
+  throw driveUnavailable('GOOGLE_SERVICE_ACCOUNT_KEY is not set');
 }
 
 /**

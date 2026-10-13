@@ -460,6 +460,10 @@ export function createTrackedCardFakes() {
       return true;
     },
 
+    async releaseDigest(chatUserId, localDate) {
+      db.digests.delete(`${chatUserId}|${localDate}`);
+    },
+
     // ---- intros (migration 034) -------------------------------------------
     async claimSpaceIntro(spaceName, kind = 'space') {
       if (!spaceName || db.intros.has(spaceName)) return false;

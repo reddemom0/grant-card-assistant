@@ -17,6 +17,8 @@ import { cardTypeOf, allCardTypes } from './types.js';
 import { button, buttonRow, decorated, paragraph, esc, clip, threadLink, mdToPlain, finalizeCards } from './render.js';
 
 export const DIGEST_HOUR = 8;
+/** Later hourly runs that still send a day's digest, e.g. after a failed post. */
+export const DIGEST_RETRY_HOURS = 2;
 
 /** The only reasons Oracle may DM someone straight away. */
 export const IMMEDIATE_KINDS = Object.freeze([
@@ -167,8 +169,9 @@ export async function renderDigest(chatUserId, digest, localDate, notice = null)
 }
 
 /**
- * Send every digest that is due: 08:xx in the person's time zone, at most once
- * per local day, never empty. Returns counts; logs one line of counts.
+ * Send every digest that is due: 08:xx in the person's time zone (retried at
+ * 09:xx and 10:xx if it didn't go out), at most once per local day, never
+ * empty. Returns counts; logs one line of counts.
  */
 export async function sendDueDigests(now = new Date()) {
   const people = await store.digestCandidates();
@@ -179,7 +182,7 @@ export async function sendDueDigests(now = new Date()) {
       const person = await resolvePerson(chatUserId);
       const timeZone = await timeZoneFor(person, now);
       const { date, hour } = localClock(now, timeZone);
-      if (hour !== DIGEST_HOUR) { counts.notDue++; continue; }
+      if (hour < DIGEST_HOUR || hour > DIGEST_HOUR + DIGEST_RETRY_HOURS) { counts.notDue++; continue; }
       if (await store.digestSent(chatUserId, date)) { counts.alreadySent++; continue; }
 
       const digest = await buildDigest(chatUserId, date, now);
@@ -188,9 +191,19 @@ export async function sendDueDigests(now = new Date()) {
       const dm = await dmSpaceFor(person, now);
       if (!dm) { counts.noDm++; continue; }
 
-      // Claim the day before posting, so a retry can never send a second digest.
+      // Claim the day before posting, so a retry can never send a second digest:
+      // once the post succeeds there is nothing left to write that could fail.
+      // A failed post gives the claim back, so the next hourly run in the
+      // window retries. Known edge: a post that errors after Chat delivered it
+      // is released too, and the retry sends a second copy.
       if (!(await store.recordDigest(chatUserId, date))) { counts.alreadySent++; continue; }
-      await postMessage({ spaceName: dm, cardsV2: await renderDigest(chatUserId, digest, date) });
+      try {
+        await postMessage({ spaceName: dm, cardsV2: await renderDigest(chatUserId, digest, date) });
+      } catch (postErr) {
+        await store.releaseDigest(chatUserId, date).catch(releaseErr =>
+          console.warn(`⚠️  Digest claim not released, today's digest is lost — code: ${codeOf(releaseErr)}`));
+        throw postErr;
+      }
       counts.sent++;
       // A completed request has now been shown once; later digests leave it out.
       await store.markCompletionShown(

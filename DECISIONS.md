@@ -12,6 +12,16 @@ Format:
 
 ---
 
+## 2026-10-13 — Drive fails closed; a failed digest post gives the day back
+**What:** `createDriveClient` (`src/tools/google-drive.js`) no longer falls back to the stored `GOOGLE_DRIVE_REFRESH_TOKEN` account: a missing or unparseable service-account key makes every Drive tool return "Drive access unavailable" and logs the error name only. `sendDueDigests` (`src/cards/notify.js`) still claims the day before posting, but now releases the claim (`releaseDigest`) when the post fails, and digests are due 08:00–10:59 local, so the next hourly run retries.
+**Why:** Drive calls must never act as anyone but the asker — groundwork for the move/rename tool. Claim-then-release keeps "never post twice" without a write after the post that could fail; rejected post-then-mark, which double-posts when the mark fails. Known edge: a post that errors after Chat delivered it is retried, sending a second copy (fix would be a Chat `requestId`).
+**Impact:** `src/tools/google-drive.js`, `src/cards/notify.js`, `src/database/tracked-cards-store.js`, `tests/unit/tracked-cards.test.js` + fakes, `docs/oracle.md`
+
+## 2026-10-13 — Known issues: flagged, deferred
+**What:** Three findings from `docs/oracle-filing-factcheck.md` are recorded, not fixed: (1) `review.hubspot` (add the outcome note) can be pressed by anyone signed in to the Hub (`confirmOutcomeNote`), while `review.hubspot_decline` is owner-only (`handleAction` in `src/cards/review-card.js`); (2) `research/company_intelligence` is registered but `.claude/skills/research-consultant/` is missing, so loading it throws; (3) a typed confirm word from anyone in the conversation runs its pending action (`tryHandleConfirmation`).
+**Why:** (3) is a deliberate earlier decision and stays; the coming Drive move tool will restrict confirmation to the asker on its own. (1) and (2) are deferred to keep the hardening pass small.
+**Impact:** none yet — `src/cards/review-card.js`, `src/tools/load-skill.js`, `src/api/confirmation.js` when picked up
+
 ## 2026-10-06 — pulse_stats: Oracle-only, on-demand, built on the digest's own queries
 **What:** New read-only tool `pulse_stats` gives Oracle GetGranted usage and matching stats per Mon–Sun Vancouver week (chat users, conversations, companies that ran matches, top-10 or one grant with week-over-week change). It is Oracle-only (not `ORACLE_TOOLS`, so the orchestrator never gets it), loaded on demand via `ORACLE_DEFERRED_TOOLS`, with one phrase added to the prompt's "Searchable tools include" line.
 **Why:** It reuses `pulse-digest.js`'s collect functions (one new: `collectMatchingCompanies`) so the tool and the weekly digest never disagree; rejected always-loaded (~600–800 tokens on every Sonnet call) and a separate query layer (would drift from the digest).
