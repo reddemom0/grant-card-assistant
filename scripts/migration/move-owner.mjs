@@ -5,9 +5,12 @@
 // Usage: node scripts/migration/move-owner.mjs <owner>@ [--fixup] [--plan <csv>] [--tag <name>]   live run
 //        node scripts/migration/move-owner.mjs <owner>@ --undo [--plan <csv>] [--tag <name>]                 reverse this owner's done actions (newest first)
 // After every live run or undo, actions are appended to the "Drive migration log" sheet (failure = warning only).
+// After every live run, a "Your moved files – <owner> – <date>" sheet is built and shared with the owner as viewer
+// (no notification email); --no-owner-sheet skips it. Failure = warning only.
 import fs from 'fs';
 import crypto from 'crypto';
 import { moveOwnerRows, countsText, appendAfterRun, vanTime, ROOT, INV, CFG, ADMIN, DRIVES, emailOf, parseCsv } from './migration-log.mjs';
+import { buildOwnerSheet } from './owner-sheet.mjs';
 const D = INV;
 const OWNER = process.argv[2], OWNER_EMAIL = emailOf(OWNER), SHORT = OWNER.replace(/@$/, '');
 const argVal = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
@@ -205,5 +208,9 @@ Each \`move\` / \`done\` line in the ledger has \`old_parents\` and \`new_parent
 `;
 fs.writeFileSync(REPORT, md);
 await logAfter(`${OWNER} ${TAG ? TAG + ' ' : ''}move`, `move-${LTAG}-report.md`);
+if (!process.argv.includes('--no-owner-sheet') && res.moved.length) {
+  try { const os_ = await buildOwnerSheet({ owner: OWNER, ledgerFile: `move-${LTAG}-ledger.jsonl`, since: RUN_START }); if (os_.url) { console.error(`owner sheet: ${os_.title} — ${os_.url} (shared with ${OWNER_EMAIL} as viewer, no email)`); fs.appendFileSync(REPORT, `\n## Sheet for ${OWNER_EMAIL}\n\n[${os_.title}](${os_.url}) — shared with ${OWNER_EMAIL} as viewer, no notification email.\n`); } else console.error(`owner sheet: ${os_.skipped}`); }
+  catch (e) { console.error(`WARNING: owner sheet not created (${e.message}); the run itself succeeded`); }
+}
 console.log(JSON.stringify({ moved: res.moved.length, skipped: res.skipped.length, failed: res.failed.length, created: created.length, sharing: res.sharing, fixups: fixups.map(x => [x.who, x.status]), calls }));
 process.exit(res.failed.length ? 1 : 0);
