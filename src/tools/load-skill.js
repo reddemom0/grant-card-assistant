@@ -111,6 +111,10 @@ const SKILL_PATHS = {
     APPLICATION_FIELDS: '.claude/skills/rtri-tariff/APPLICATION_FIELDS.md',
     BUSINESS_PLAN: '.claude/skills/rtri-tariff/BUSINESS_PLAN.md',
     BUSINESS_PLAN_TEMPLATE: '.claude/skills/rtri-tariff/BUSINESS_PLAN_TEMPLATE.md'
+  },
+  filing: {
+    overview: '.claude/skills/filing/SKILL.md',
+    reference: '.claude/skills/filing/reference.md'
   }
 };
 

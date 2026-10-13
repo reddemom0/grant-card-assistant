@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-10-13 — Filing skill: read-only answers from live Granted Files folders
+**What:** New skill `filing` (`overview` = `SKILL.md`, `reference` = `reference.md`, always both) answers "where does this go / what do I call it". It checks real folders with the new Oracle-only, deferred tool `list_granted_files_folders` (`listGrantedFilesFolders`, `src/tools/google-drive.js`): folders only, read-only, as the asker; no asker or a 403/404 means refuse, never the bare service account. Missing folders are each marked (new). The "fewer than 4 Granted people" rule covers only Meet recordings, transcripts and Gemini notes.
+**Why:** Answers must name folders that exist; moving and renaming come later behind the confirm gate. `reference.md` is the single source for types and patterns.
+**Impact:** `.claude/skills/filing/`, `src/tools/{load-skill,definitions,executor,google-drive}.js`, `src/claude/client.js`, `.claude/agents/internal-oracle.md`, `docs/oracle.md`. Known issue, deferred: `.claude/skills/CLAUDE.md` is stale (line-number anchors, April skill inventory without the newer skills).
+
 ## 2026-10-13 — Drive fails closed; a failed digest post gives the day back
 **What:** `createDriveClient` (`src/tools/google-drive.js`) no longer falls back to the stored `GOOGLE_DRIVE_REFRESH_TOKEN` account: a missing or unparseable service-account key makes every Drive tool return "Drive access unavailable" and logs the error name only. `sendDueDigests` (`src/cards/notify.js`) still claims the day before posting, but now releases the claim (`releaseDigest`) when the post fails, and digests are due 08:00–10:59 local, so the next hourly run retries.
 **Why:** Drive calls must never act as anyone but the asker — groundwork for the move/rename tool. Claim-then-release keeps "never post twice" without a write after the post that could fail; rejected post-then-mark, which double-posts when the mark fails. Known edge: a post that errors after Chat delivered it is retried, sending a second copy (fix would be a Chat `requestId`).

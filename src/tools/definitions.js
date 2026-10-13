@@ -1403,13 +1403,14 @@ Skills (skill_name — what it's for; load first):
 - granted-insights — consultant-grade strategic read on a program (fit, effort, watchouts). OVERVIEW first, then the type sub-skill plus EXEMPLAR.
 - strategy-consulting — how Granted's consultants think: discovery prep, sizing, sequencing, client conversations, red flags, timing. overview first.
 - rtri-tariff — PacifiCan Regional Tariff Response Initiative (the BC tariff program, not the R&D program also called RTRI). overview first, then PROGRAM_FACTS before stating any program fact.
+- filing — where a file goes in Granted Files and what to call it ("where does this go", "what should I name this", "where do I save"). overview + reference, always both.
 - research — not available yet (company_intelligence); don't load it.`,
   input_schema: {
     type: 'object',
     properties: {
       skill_name: {
         type: 'string',
-        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'staff-meeting-recap', 'grant-card-writing', 'grant-card-tagging', 'granted-insights', 'strategy-consulting', 'rtri-tariff'],
+        enum: ['sales', 'research', 'grants', 'canexport-writer', 'bcafe-writer', 'hubspot', 'granted-marketing', 'staff-meeting-recap', 'grant-card-writing', 'grant-card-tagging', 'granted-insights', 'strategy-consulting', 'rtri-tariff', 'filing'],
         description: 'The skill domain to load'
       },
       sub_skill: {
@@ -1426,9 +1427,10 @@ Skills (skill_name — what it's for; load first):
           'HIRING', 'TRAINING', 'RD_CAPEX', 'REPAYABLE_FUNDING', 'EXEMPLAR',
           'DISCOVERY', 'SIZING', 'SEQUENCING', 'CONVERSATIONS', 'RED_FLAGS', 'TIMING',
           'PROGRAM_FACTS', 'CONSULT', 'READINESS', 'RA_QUESTIONS', 'WRITEUP', 'APPLICATION_FIELDS',
-          'BUSINESS_PLAN', 'BUSINESS_PLAN_TEMPLATE'
+          'BUSINESS_PLAN', 'BUSINESS_PLAN_TEMPLATE',
+          'reference'
         ],
-        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), EMAILS (email drafting), LINKEDIN (LinkedIn posts), WEBINARS (webinar planning + monthly rhythm), SUCCESS_STORIES (case study drafting), PARTNERSHIPS (partner outreach), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible). For granted-insights: OVERVIEW (general strategic-insights framework + fallback output format, load first), HIRING/TRAINING/MARKET_EXPANSION/RD_CAPEX/REPAYABLE_FUNDING (type-specific consultant read — fit, effort, competitiveness, watchouts), EXEMPLAR (always load alongside the type sub-skill to anchor strategist voice). For strategy-consulting: overview (skill map + internal boundaries), DISCOVERY (call prep + client-type probes), SIZING (service-tier rightsizing), SEQUENCING (grant roadmap building), CONVERSATIONS (objection/differentiation prep), RED_FLAGS (prospect screening), TIMING (fiscal-year and apply-before-spend strategy). For rtri-tariff: overview (router, load first), PROGRAM_FACTS (the team reference for program facts — load before stating any), CONSULT (quick answers), READINESS (client readiness assessment; RA written to a Google Doc), RA_QUESTIONS (question bank loaded by READINESS at its Step 6 — not a standalone path), WRITEUP (application answers drafted section by section into a Google Doc), APPLICATION_FIELDS (field-by-field form reference loaded by WRITEUP, and by CONSULT for form questions — not a standalone path), BUSINESS_PLAN (pivot business plan drafted section by section into a Google Doc), BUSINESS_PLAN_TEMPLATE (the business plan template loaded by BUSINESS_PLAN — not a standalone path); the budget path is not yet built.'
+        description: 'Specific methodology to load. For sales: lead_farming (enrichment), linkedin_enrichment (research), data_quality (deduplication), icp_analysis (customer patterns). For grants: overview (decision tree), eligibility (qualification framework), matching (program selection), validation (status verification). For canexport-writer: overview (skills index), PROGRAM_DETAILS (program rules), APPLICATION_STRUCTURE (form sections), STAGE_1_READINESS (assessment), STAGE_1_BUDGET_GUIDE (budget guides), STAGE_1_INTERVIEW_QUESTIONS (interview questions), STAGE_2_DRAFTING (section drafting), STAGE_3_REVIEW (application review). For bcafe-writer: FINAL_REPORT (final progress report writing guide). For hubspot: DEAL_CREATION (deal creation workflow — MANDATORY before any deal write). For granted-marketing: overview (marketing overview), FOUNDATIONS (brand voice/audience), COMPANY_CONTEXT (product lines), GRANT_BLASTS (blast methodology), BLOGS (blog methodology), EMAILS (email drafting), LINKEDIN (LinkedIn posts), WEBINARS (webinar planning + monthly rhythm), SUCCESS_STORIES (case study drafting), PARTNERSHIPS (partner outreach), DATA_SOURCES (content sourcing), EXPLORATION (idea generation/weekly digests). For grant-card-writing: OVERVIEW (general rules + type detection, load first), RD/BUSINESS_ASSESSMENT/MARKET_EXPANSION/HIRING_TRAINING/SYSTEMS_PROCESSES/CAPITAL_COST/LOANS/INVESTMENT/PRIZES_CONTESTS (per-type section format rules). For grant-card-tagging: OVERVIEW (score grant programs across 13 fields × 52 genres on 0-3 scale, GG2 v2 mirror-taxonomy compatible). For granted-insights: OVERVIEW (general strategic-insights framework + fallback output format, load first), HIRING/TRAINING/MARKET_EXPANSION/RD_CAPEX/REPAYABLE_FUNDING (type-specific consultant read — fit, effort, competitiveness, watchouts), EXEMPLAR (always load alongside the type sub-skill to anchor strategist voice). For strategy-consulting: overview (skill map + internal boundaries), DISCOVERY (call prep + client-type probes), SIZING (service-tier rightsizing), SEQUENCING (grant roadmap building), CONVERSATIONS (objection/differentiation prep), RED_FLAGS (prospect screening), TIMING (fiscal-year and apply-before-spend strategy). For rtri-tariff: overview (router, load first), PROGRAM_FACTS (the team reference for program facts — load before stating any), CONSULT (quick answers), READINESS (client readiness assessment; RA written to a Google Doc), RA_QUESTIONS (question bank loaded by READINESS at its Step 6 — not a standalone path), WRITEUP (application answers drafted section by section into a Google Doc), APPLICATION_FIELDS (field-by-field form reference loaded by WRITEUP, and by CONSULT for form questions — not a standalone path), BUSINESS_PLAN (pivot business plan drafted section by section into a Google Doc), BUSINESS_PLAN_TEMPLATE (the business plan template loaded by BUSINESS_PLAN — not a standalone path); the budget path is not yet built. For filing: overview (the filing process), reference (every document type, folder rule and name format — always load with overview).'
       }
     },
     required: ['skill_name', 'sub_skill']
@@ -2497,6 +2499,28 @@ Data starts 2026-08-26. A week still in progress comes back with partial: true. 
 };
 
 /**
+ * Live folder lookup in the Granted Files shared drive for the filing skill
+ * (listGrantedFilesFolders in src/tools/google-drive.js). Oracle-only —
+ * referenced in the internal-oracle case and nowhere else. Read-only, folders
+ * only, as the asker; refuses rather than falling back to another identity.
+ * Loaded on demand (ORACLE_DEFERRED_TOOLS), so the description carries the
+ * words tool search matches on.
+ */
+export const GRANTED_FILES_FOLDERS_TOOL = {
+  name: 'list_granted_files_folders',
+  description: `List the subfolders at a path in the Granted Files shared drive, read live as the person asking. Folders only. Use it for filing questions ("where does this go", "where do I save", "what folder") to check which client, program, engagement and stage folders really exist before naming a home.
+
+Pass a path such as "Clients", "Clients/Acuva", "Clients/Acuva/CanExport", "Programs/WorkBC Wage Subsidy" or "Departments"; "" lists the top level. Each part matches an existing folder ignoring case, spacing and punctuation. When a part doesn't exist the result says found: false, names the missing part and lists what is there (siblings) — propose a (new) folder or ask about a near-miss. Read-only: it never creates, moves or renames anything.`,
+  input_schema: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'Folder path inside Granted Files, parts separated by "/". Empty for the top level.' }
+    },
+    required: ['path']
+  }
+};
+
+/**
  * Tracked cards (src/cards/). Oracle-only — referenced in the internal-oracle
  * case and nowhere else. Who reviews, which Docs, and where the card goes all
  * come from the verified Chat event (executeToolCall options), not from input.
@@ -3099,8 +3123,8 @@ export function getToolsForAgent(agentType) {
       // TRACKED_CARD_TOOLS likewise: it posts cards into Chat threads from a
       // verified Chat event and has no meaning anywhere else.
       // GG3_CONVERSATIONS_TOOL and PULSE_STATS_TOOL likewise: client conversations and usage stats are for the team
-      // through Oracle only, not for the orchestrator.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL, PULSE_STATS_TOOL];
+      // through Oracle only, not for the orchestrator. GRANTED_FILES_FOLDERS_TOOL (filing skill) likewise.
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL, PULSE_STATS_TOOL, GRANTED_FILES_FOLDERS_TOOL];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);

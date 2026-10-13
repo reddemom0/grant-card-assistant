@@ -126,7 +126,9 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
   // always openable. Explicit allowlist: create_google_drive_folder and
   // copy_template_file use the user's own OAuth tokens instead and are unaffected.
   // Note: Google Docs creation now uses userId directly with OAuth
-  const DELEGATED_DRIVE_TOOLS = ['search_google_drive', 'read_google_drive_file', 'list_files_in_folder'];
+  // list_granted_files_folders refuses outright when no email is found here:
+  // it never falls back to the bare service account.
+  const DELEGATED_DRIVE_TOOLS = ['search_google_drive', 'read_google_drive_file', 'list_files_in_folder', 'list_granted_files_folders'];
   let userEmail = null;
   if (userId && DELEGATED_DRIVE_TOOLS.includes(toolName)) {
     try {
@@ -686,6 +688,11 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
           input.limit,
           userEmail  // For domain-wide delegation
         );
+        break;
+
+      // Filing skill's live folder check. Read-only; as the asker or not at all.
+      case 'list_granted_files_folders':
+        result = await googleDrive.listGrantedFilesFolders(input.path, userEmail);
         break;
 
       // ============================================================================

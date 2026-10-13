@@ -307,17 +307,17 @@ own owner checks live in each card type's `handleAction`.
 ## Tool loadout
 
 From the `internal-oracle` case in `getToolsForAgent` (`src/tools/definitions.js`).
-60 tools; a normal turn is sent 59, because `toolsForRun` in `src/claude/client.js` drops
+61 tools; a normal turn is sent 60, because `toolsForRun` in `src/claude/client.js` drops
 the run-only `save_team_lesson` unless `allowedTools` names it. Oracle builds
 `oracleBaseTools` from scratch rather than reusing shared `baseTools`.
 
 **Tools on demand (Sonnet 5.5 path only).** `withToolSearch` in `src/claude/client.js`
-sends the 45 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
+sends the 46 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
 Anthropic's tool search (`tool_search_tool_bm25`), so rarely used tools stay out of the
 cached prefix until Claude searches for them. The list is the tools used in 2 or fewer
 conversations over the 30 days to 2026-09-29. `track_review` and `read_chat_attachments`
 qualified but stay loaded: the review card and Chat file uploads depend on them.
-`gg3_conversations` and `pulse_stats` were deferred from the start. Oracle's
+`gg3_conversations`, `pulse_stats` and `list_granted_files_folders` were deferred from the start. Oracle's
 Haiku tiers, the HubSpot webhook, and runs restricted by `allowedTools` (/learn-this,
 lesson runs) send the full list unchanged. Search results are dropped from reloaded
 history (`historyForRequest`), so a later turn searches again.
@@ -327,12 +327,19 @@ Drive (3), Dropbox read (1), `coreHubSpotTools` (17 of 36), Granola (5), Sheets
 read/write (4), Calendar (4), `create_google_doc` only, `GOOGLE_DOCS_EDIT_TOOLS` (3),
 `CHAT_HISTORY_TOOLS` (4, including the run-only `save_team_lesson`), `TRACKED_CARD_TOOLS`
 (`track_review`), `gg3_conversations` (GetGranted client chats: read, search, troubleshoot,
-log to the Pulse errors sheet; `src/tools/gg3-conversations.js`), and `pulse_stats`.
+log to the Pulse errors sheet; `src/tools/gg3-conversations.js`), `pulse_stats`, and
+`list_granted_files_folders` (`GRANTED_FILES_FOLDERS_TOOL`, for the filing skill).
 
 The three Drive tools are read-only and run as the asker: `createDriveClient` in
 `src/tools/google-drive.js` uses the service account with domain-wide delegation, subject =
 the asker's email (looked up in `executeToolCall`). With no usable service-account key they
 fail closed with "Drive access unavailable" — there is no fallback to a stored OAuth token.
+
+`list_granted_files_folders` (`listGrantedFilesFolders`, same file) is the filing skill's
+live folder check: subfolders at a path in the Granted Files shared drive
+(`GRANTED_FILES_DRIVE_ID`), folders only, paged, read-only scope, as the asker. Stricter
+than the other three: with no @granted.ca asker email it refuses rather than running as the
+bare service account, and a 403/404 is reported, never retried as another identity.
 
 Excluded, with reasons in code:
 - `ANTHROPIC_MEMORY_TOOL` — wastes iterations on an empty directory. Postgres
@@ -362,15 +369,24 @@ behaviour after prompt changes with `scripts/oracle-checks/run-honesty-checks.mj
 
 ## Skills
 
-Oracle can load **all 13** registered skills. There is no gating by agent type or role —
+Oracle can load **all 14** registered skills. There is no gating by agent type or role —
 `loadSkill` takes only `{ skill_name, sub_skill }` and validates against `SKILL_PATHS`.
 This is deliberate, so Oracle picks up new skills without enum drift.
 
 **The skill list lives only in the `load_skill` description** (`LOAD_SKILL_TOOL` in
-`src/tools/definitions.js`): all 13 skills, one line each, with the load-first and
+`src/tools/definitions.js`): all 14 skills, one line each, with the load-first and
 mandatory rules. The sub-skills are in the `sub_skill` parameter's enum and description.
 The prompt keeps only routing ("When to Load Skills") and skill-specific behaviour rules —
 don't add a skill catalogue back to it.
+
+**Filing (`filing/overview` + `filing/reference`, `.claude/skills/filing/`).** Answers "where
+does this go / what should I call it" for Granted Files: `SKILL.md` is the process,
+`reference.md` the only source for document types, folder rules and name formats (generated
+from the naming-conventions workbook). It checks real folders with
+`list_granted_files_folders` and marks any missing folder **(new)**. It does not move,
+rename or share anything — that is a later tool. Routed by a line in "When to Load Skills"
+that treats any "where does this belong / what do I call it" question as filing. The
+`SKILL.md` frontmatter also makes it show up as a Claude Code skill; that is expected.
 
 One gap:
 - **`research/company_intelligence` is broken.** It is in `SKILL_PATHS`, the enum, and the

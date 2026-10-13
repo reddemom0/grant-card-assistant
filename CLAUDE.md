@@ -78,7 +78,7 @@ reach an agent — it is a disposable timeout probe.
 
 ## Skills
 
-Thirteen registered skills, loaded at runtime via the `load_skill` tool. Any agent can load
+Fourteen registered skills, loaded at runtime via the `load_skill` tool. Any agent can load
 any skill — there is no gating by agent type or role.
 
 **Skills have five registration touchpoints. Missing one causes silent drift:**

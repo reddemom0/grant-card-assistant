@@ -442,6 +442,103 @@ export async function listFilesInFolder(folderIdOrUrl, limit = 20, userEmail = n
   }
 }
 
+/** The Granted Files shared drive (also DRIVE_ID in scripts/drive-restructure.mjs). */
+export const GRANTED_FILES_DRIVE_ID = '0AKxoOSs3WbQ0Uk9PVA';
+const FOLDER_MIME = 'application/vnd.google-apps.folder';
+const FOLDER_PAGE_LIMIT = 10;   // 10 × 1000 folders per level, far above any real level
+
+/** Folder names match ignoring case, spacing and punctuation (the filing skill's rule). */
+const folderKey = (name) => String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+
+async function childFolders(drive, parentId) {
+  const folders = [];
+  let pageToken;
+  let pages = 0;
+  do {
+    const res = await drive.files.list({
+      q: `'${parentId}' in parents and mimeType='${FOLDER_MIME}' and trashed=false`,
+      corpora: 'drive',
+      driveId: GRANTED_FILES_DRIVE_ID,
+      includeItemsFromAllDrives: true,
+      supportsAllDrives: true,
+      fields: 'nextPageToken, files(id, name)',
+      orderBy: 'name',
+      pageSize: 1000,
+      pageToken
+    });
+    folders.push(...(res.data.files || []));
+    pageToken = res.data.nextPageToken;
+  } while (pageToken && ++pages < FOLDER_PAGE_LIMIT);
+  return { folders, truncated: Boolean(pageToken) };
+}
+
+/**
+ * List the subfolders at a path in Granted Files, e.g. "Clients/Acuva/CanExport".
+ * Folders only (shortcuts and files are left out). Each path part matches an
+ * existing folder ignoring case, spacing and punctuation.
+ *
+ * READ-ONLY and FAILS CLOSED: it reads only as the asker (domain-wide
+ * delegation, drive.readonly), refuses when the asker isn't known, and never
+ * retries as the bare service account on 403/404.
+ *
+ * @param {string} folderPath - "" for the drive root, or parts joined by "/"
+ * @param {string|null} userEmail - the asker
+ */
+export async function listGrantedFilesFolders(folderPath = '', userEmail = null) {
+  if (!/^[^@\s]+@granted\.ca$/i.test(String(userEmail || ''))) {
+    console.error(`🚫 ${DRIVE_UNAVAILABLE}: Granted Files folder lookup without a known @granted.ca asker`);
+    return { success: false, error: `${DRIVE_UNAVAILABLE}: couldn't confirm who is asking, so Granted Files wasn't read.` };
+  }
+  const parts = String(folderPath || '').split('/').map(p => p.trim()).filter(Boolean);
+
+  try {
+    const drive = createDriveClient(userEmail, true);
+    let parentId = GRANTED_FILES_DRIVE_ID;
+    const resolved = [];
+
+    for (const part of parts) {
+      const { folders } = await childFolders(drive, parentId);
+      const hits = folders.filter(f => folderKey(f.name) === folderKey(part));
+      if (hits.length === 0) {
+        return {
+          success: true, found: false, drive: 'Granted Files',
+          resolved_path: resolved.join('/'), missing: part,
+          note: `No folder matching "${part}" under "${resolved.join('/') || 'Granted Files'}". Propose it as (new), or ask if a near-miss below is meant.`,
+          siblings: folders.map(f => f.name)
+        };
+      }
+      if (hits.length > 1) {
+        return {
+          success: true, found: false, drive: 'Granted Files',
+          resolved_path: resolved.join('/'), ambiguous: part,
+          note: `More than one folder matches "${part}". Ask which one.`,
+          candidates: hits.map(f => f.name)
+        };
+      }
+      resolved.push(hits[0].name);
+      parentId = hits[0].id;
+    }
+
+    const { folders, truncated } = await childFolders(drive, parentId);
+    console.log(`✓ Granted Files folders at "${resolved.join('/') || '(root)'}": ${folders.length}${truncated ? ' (truncated)' : ''}`);
+    return {
+      success: true, found: true, drive: 'Granted Files',
+      path: resolved.join('/'), truncated, count: folders.length,
+      subfolders: folders.map(f => f.name)
+    };
+  } catch (error) {
+    // No retry as anyone else: a 403/404 means the asker can't see it.
+    const status = error?.code ?? error?.response?.status;
+    console.error(`Granted Files folder lookup error — code: ${status ?? error.code ?? 'unknown'}`);
+    return {
+      success: false,
+      error: error.message === DRIVE_UNAVAILABLE
+        ? DRIVE_UNAVAILABLE
+        : `Couldn't read Granted Files as you (${status ?? 'error'}). Nothing was shown from anyone else's access.`
+    };
+  }
+}
+
 /**
  * Create a new folder in Google Drive
  * @param {string} folderName - Name for the new folder
