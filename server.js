@@ -1297,6 +1297,7 @@ async function startServer() {
     // ========================================================================
     // Each person's digest goes out when it is 08:xx in their calendar time
     // zone. The daily pass refreshes open cards and applies stale/auto-close.
+    // Digest paused unless TRACKED_CARDS_DIGEST=on (being reworked).
     // Switch off with TRACKED_CARDS_DISABLED=true. Needs migration 030.
     startTrackedCards(cron);
 

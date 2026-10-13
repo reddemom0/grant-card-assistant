@@ -11,6 +11,9 @@
  *   daily 13:00 UTC  refresh open cards from real sources, then stale/auto-close
  *                    (before the Pacific-time digests)
  *
+ * The personal 08:00 digest is paused while it is reworked: it is sent only with
+ * TRACKED_CARDS_DIGEST=on. Reminders, expiry and the daily pass are unaffected.
+ *
  * Switch off with TRACKED_CARDS_DISABLED=true. Assumes one instance, like the
  * other cron jobs in server.js. Needs migration 030.
  */
@@ -37,7 +40,7 @@ export function startTrackedCards(cron) {
     return false;
   }
   cron.schedule('5 * * * *', guarded('digest', async () => {
-    await sendDueDigests();
+    if (process.env.TRACKED_CARDS_DIGEST === 'on') await sendDueDigests();
     await sendDueReminders();
     await expireLessonCards();
     await expireWatchChoices();

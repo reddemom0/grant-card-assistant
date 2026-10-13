@@ -853,11 +853,24 @@ describe('scheduled jobs', () => {
 
   test('the scheduled jobs run the real passes', async () => {
     await seedCard();
+    process.env.TRACKED_CARDS_DIGEST = 'on';
+    try {
+      const cron = fakeCron();
+      startTrackedCards(cron);
+      await cron.jobs[0].fn();
+      await cron.jobs[1].fn();
+    } finally {
+      delete process.env.TRACKED_CARDS_DIGEST;
+    }
+    expect(logged()).toMatch(/Tracked card digests — people: 3/);
+    expect(logged()).toMatch(/Tracked cards daily pass — refreshed: 1/);
+  });
+
+  test('the personal digest is paused unless TRACKED_CARDS_DIGEST=on', async () => {
+    await seedCard();
     const cron = fakeCron();
     startTrackedCards(cron);
     await cron.jobs[0].fn();
-    await cron.jobs[1].fn();
-    expect(logged()).toMatch(/Tracked card digests — people: 3/);
-    expect(logged()).toMatch(/Tracked cards daily pass — refreshed: 1/);
+    expect(logged()).not.toMatch(/Tracked card digests/);
   });
 });
