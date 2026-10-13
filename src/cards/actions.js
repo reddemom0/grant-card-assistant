@@ -146,6 +146,12 @@ export async function handleCardClick(evt, now = new Date()) {
 
 async function pressAnswer(evt, now, startedAt) {
   const params = evt.parameters || {};
+  // Confirm / Cancel on an asker-only confirm card (a Drive move): not a
+  // tracked card, so it carries the pending action's id instead of a cardId.
+  if (params.action === 'pending.confirm' || params.action === 'pending.cancel') {
+    const { handlePendingClick } = await import('./confirm-card.js');
+    return handlePendingClick(evt);
+  }
   const { cardId, action } = params;
   if (!cardId || !UUID.test(cardId) || !action || !evt.actorChatId) {
     console.log('↩️  Tracked card click ignored — reason: missing_parameters');

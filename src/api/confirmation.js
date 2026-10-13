@@ -73,6 +73,12 @@ export async function tryHandleConfirmation({ conversationId, userId, text, agen
 
   const run = await runPendingAction({ actionId: pending.action.id, userId, agentType });
 
+  // Asker-only tools (a Drive move): someone else said "yes". Nothing ran and
+  // the proposal stays open for the person who may confirm it.
+  if (!run.ok && run.reason === 'not_allowed') {
+    return { replyText: `Only ${run.name} can confirm this.` };
+  }
+
   if (!run.ok) {
     return { replyText: "That proposal is no longer available — ask me again and I'll re-propose it." };
   }
@@ -81,7 +87,10 @@ export async function tryHandleConfirmation({ conversationId, userId, text, agen
     return { replyText: `I tried: ${run.summary}\n\nIt failed: ${run.result.error || 'unknown error'}` };
   }
 
-  return { replyText: `Done: ${run.summary}` };
+  // A Drive move returns an undo token; it goes into the saved reply so a later
+  // "undo that" can find it.
+  const undo = run.result?.undo_token ? `\n\nTo undo it, ask me to undo that move (undo token ${run.result.undo_token}).` : '';
+  return { replyText: `Done: ${run.summary}${undo}` };
 }
 
 /**

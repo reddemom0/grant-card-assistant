@@ -12,6 +12,7 @@
  */
 
 import { query } from '../database/connection.js';
+import { describe as describeMove, describeUndo } from './drive-actions.js';
 
 /** How long a proposal stays confirmable. */
 const TTL_HOURS = 24;
@@ -52,8 +53,58 @@ export const GATED_TOOLS = {
   update_calendar_event: async (input, context) => {
     if (Array.isArray(input?.attendees) && input.attendees.length > 0) return true;
     return hasExistingAttendees(input?.event_id, context?.userId);
-  }
+  },
+
+  // Moves and renames a Drive file (src/tools/drive-actions.js). Only the asker
+  // may confirm — see ASKER_ONLY_TOOLS below.
+  file_move_rename: () => true,
+  file_move_rename_undo: () => true
 };
+
+// ============================================================================
+// WHO MAY CONFIRM
+// ----------------------------------------------------------------------------
+// Every gated tool may be confirmed by anyone in the conversation (a deliberate
+// choice), EXCEPT these: a Drive move is confirmed only by the person who asked
+// for it; its undo by that same person or by Chris (DRIVE_ACTIONS_ADMIN_EMAIL).
+// Enforced in runPendingAction and declinePendingAction, so typed "yes" and
+// card buttons are held to the same rule.
+// ============================================================================
+export const ASKER_ONLY_TOOLS = new Set(['file_move_rename', 'file_move_rename_undo']);
+
+function parsedInput(action) {
+  const raw = action?.tool_input;
+  if (raw && typeof raw === 'object') return raw;
+  try { return JSON.parse(raw || '{}'); } catch { return {}; }
+}
+
+async function driveAdminUserId() {
+  const email = (process.env.DRIVE_ACTIONS_ADMIN_EMAIL || 'writers@granted.ca').trim();
+  const r = await query('SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND is_active = true', [email]);
+  return r.rows[0]?.id ?? null;
+}
+
+/**
+ * May this user confirm (or cancel) this saved action?
+ * @returns {Promise<{allowed: boolean, name?: string}>} name: who may, for the refusal
+ */
+export async function canConfirm(action, userId) {
+  if (!action || !ASKER_ONLY_TOOLS.has(action.tool_name)) return { allowed: true };
+  const allowed = [];
+  if (action.tool_name === 'file_move_rename') {
+    allowed.push(action.proposed_by);
+  } else {
+    allowed.push(parsedInput(action).asker_user_id, await driveAdminUserId().catch(() => null));
+  }
+  const ids = allowed.filter(id => id !== null && id !== undefined).map(Number);
+  if (userId !== null && userId !== undefined && ids.includes(Number(userId))) return { allowed: true };
+
+  const names = ids.length
+    ? (await query('SELECT id, name, email FROM users WHERE id = ANY($1::int[])', [ids]).catch(() => ({ rows: [] }))).rows
+    : [];
+  const label = names.map(u => u.name || u.email).filter(Boolean).join(' or ') || 'the person who asked';
+  return { allowed: false, name: label };
+}
 
 /**
  * Does this calendar event already have other people on it?
@@ -267,6 +318,14 @@ export function summarizeAction(toolName, input = {}) {
         `Everyone on the event is notified.`;
     }
 
+    // input is the plan from src/tools/drive-actions.js (PREPARE_GATED), not the
+    // model's request, so the summary is the checked move itself.
+    case 'file_move_rename':
+      return describeMove(input);
+
+    case 'file_move_rename_undo':
+      return describeUndo(input);
+
     default:
       // Unreachable for registered tools, but a new gated tool without a
       // summary must still say something true rather than throw.
@@ -333,6 +392,13 @@ export async function getPendingAction(conversationId) {
  * @returns {Promise<{ok: boolean, summary?: string, result?: Object, reason?: string}>}
  */
 export async function runPendingAction({ actionId, userId, agentType = 'internal-oracle' }) {
+  // Asker-only tools: check who is confirming before the row can be claimed.
+  const current = await query('SELECT * FROM pending_actions WHERE id = $1', [actionId]);
+  if (current.rows[0]) {
+    const gate = await canConfirm(current.rows[0], userId);
+    if (!gate.allowed) return { ok: false, reason: 'not_allowed', name: gate.name, toolName: current.rows[0].tool_name };
+  }
+
   const claimed = await query(
     `UPDATE pending_actions
         SET status = 'confirmed', confirmed_by = $2, confirmed_at = NOW()
@@ -371,6 +437,9 @@ export async function runPendingAction({ actionId, userId, agentType = 'internal
  * @returns {Promise<boolean>} false when the action was no longer pending
  */
 export async function declinePendingAction({ actionId, userId = null, chatUserId = null }) {
+  const current = await query('SELECT * FROM pending_actions WHERE id = $1', [actionId]);
+  if (current.rows[0] && !(await canConfirm(current.rows[0], userId)).allowed) return false;
+
   const declined = await query(
     `UPDATE pending_actions SET status = 'declined', result = $2
       WHERE id = $1 AND status = 'pending'

@@ -981,15 +981,40 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
 
     // A proposal saved during this turn is described to the user by code, from
     // the stored action — not by the model, which only knows it was refused.
-    const notice = await proposalNotice(conversationId, pendingBefore);
+    let notice = await proposalNotice(conversationId, pendingBefore);
 
-    if (!text && !notice) {
+    // Asker-only proposals (a Drive move or its undo) get a Confirm card that
+    // only the asker can press, instead of the "reply yes" text.
+    let cardAction = null;
+    if (notice && evt.spaceIsResourceName) {
+      const { getPendingAction } = await import('../tools/pending-actions.js');
+      const { usesConfirmCard } = await import('../cards/confirm-card.js');
+      const { action } = await getPendingAction(conversationId).catch(() => ({ action: null }));
+      if (action && usesConfirmCard(action.tool_name)) {
+        cardAction = action;
+        notice = null;
+      }
+    }
+
+    if (!text && !notice && !cardAction) {
       console.warn('⚠️  Agent produced no text blocks');
       await safePost(evt, "I finished, but didn't produce a text reply. Try rephrasing?");
       return;
     }
 
-    await safePost(evt, markdownToChat(withAttachmentNotes(attachmentNotes, `${text}${notice || ''}`.trim())));
+    if (text || notice) {
+      await safePost(evt, markdownToChat(withAttachmentNotes(attachmentNotes, `${text}${notice || ''}`.trim())));
+    }
+    if (cardAction) {
+      const { postConfirmCard } = await import('../cards/confirm-card.js');
+      const posted = await postConfirmCard({
+        spaceName: evt.spaceId,
+        threadName: evt.threadIsResourceName ? evt.threadId : null,
+        action: cardAction
+      });
+      // No card: fall back to the text, still held to the asker-only rule.
+      if (!posted) await safePost(evt, markdownToChat(`**Confirm before I run this:**\n${cardAction.summary}\n\nOnly the person who asked can reply "yes".`));
+    }
   } catch (err) {
     console.error('❌ Oracle run failed for Chat event:', err);
     await safePost(evt, `Something went wrong while I was working on that: ${err.message}`);

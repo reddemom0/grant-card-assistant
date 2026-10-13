@@ -15,7 +15,7 @@ import * as XLSX from 'xlsx';
 const GOOGLE_SERVICE_ACCOUNT_KEY = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
 
 /** What every Drive tool returns when the service account can't be used. */
-const DRIVE_UNAVAILABLE = 'Drive access unavailable';
+export const DRIVE_UNAVAILABLE = 'Drive access unavailable';
 
 function driveUnavailable(reason) {
   console.error(`🚫 ${DRIVE_UNAVAILABLE}: ${reason}`);
@@ -35,7 +35,7 @@ function driveUnavailable(reason) {
  * @param {boolean} readOnly - If true, use read-only scopes. If false, use full drive access
  * @returns {Object} Google Drive API client
  */
-function createDriveClient(userEmail = null, readOnly = false) {
+function createDriveClient(userEmail = null, readOnly = false, scopes = null) {
   // Try Service Account first (most reliable, works with domain-wide delegation)
   if (GOOGLE_SERVICE_ACCOUNT_KEY) {
     try {
@@ -43,14 +43,14 @@ function createDriveClient(userEmail = null, readOnly = false) {
 
       const authConfig = {
         credentials: serviceAccount,
-        scopes: readOnly ? [
+        scopes: scopes || (readOnly ? [
           'https://www.googleapis.com/auth/drive.readonly',
           'https://www.googleapis.com/auth/documents.readonly'
         ] : [
           'https://www.googleapis.com/auth/drive',
           'https://www.googleapis.com/auth/documents',
           'https://www.googleapis.com/auth/spreadsheets'
-        ]
+        ])
       };
 
       // If userEmail provided, use domain-wide delegation to impersonate that user
@@ -146,7 +146,7 @@ export async function searchGoogleDrive(query, fileType = 'any', limit = 10, use
  * @param {string} fileIdOrUrl - Google Drive file/folder ID or URL
  * @returns {string} File or folder ID
  */
-function extractFileId(fileIdOrUrl) {
+export function extractFileId(fileIdOrUrl) {
   // If it looks like a URL, extract the file ID
   if (fileIdOrUrl.includes('drive.google.com') || fileIdOrUrl.includes('docs.google.com')) {
     // Match patterns like:
@@ -444,13 +444,33 @@ export async function listFilesInFolder(folderIdOrUrl, limit = 20, userEmail = n
 
 /** The Granted Files shared drive (also DRIVE_ID in scripts/drive-restructure.mjs). */
 export const GRANTED_FILES_DRIVE_ID = '0AKxoOSs3WbQ0Uk9PVA';
-const FOLDER_MIME = 'application/vnd.google-apps.folder';
+/** The Granted Archive shared drive: a move source, never a destination. */
+export const GRANTED_ARCHIVE_DRIVE_ID = '0AI7O7n1jH-IoUk9PVA';
+export const FOLDER_MIME = 'application/vnd.google-apps.folder';
 const FOLDER_PAGE_LIMIT = 10;   // 10 × 1000 folders per level, far above any real level
 
 /** Folder names match ignoring case, spacing and punctuation (the filing skill's rule). */
-const folderKey = (name) => String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
+export const folderKey = (name) => String(name || '').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
 
-async function childFolders(drive, parentId) {
+const GRANTED_ASKER = /^[^@\s]+@granted\.ca$/i;
+
+/**
+ * A Drive client acting as the asker and nobody else (domain-wide delegation).
+ * Throws "Drive access unavailable" when the asker isn't a @granted.ca address
+ * or the service-account key can't be used. Read-only scopes unless `write`.
+ */
+export function delegatedDriveClient(userEmail, { write = false } = {}) {
+  if (!GRANTED_ASKER.test(String(userEmail || ''))) {
+    throw driveUnavailable('no known @granted.ca asker');
+  }
+  // Writes ask for exactly the Drive scope: delegation refuses `spreadsheets`,
+  // and one refused scope fails the whole token request.
+  return write
+    ? createDriveClient(userEmail, false, ['https://www.googleapis.com/auth/drive'])
+    : createDriveClient(userEmail, true);
+}
+
+export async function childFolders(drive, parentId) {
   const folders = [];
   let pageToken;
   let pages = 0;
@@ -484,8 +504,33 @@ async function childFolders(drive, parentId) {
  * @param {string} folderPath - "" for the drive root, or parts joined by "/"
  * @param {string|null} userEmail - the asker
  */
+/**
+ * Walk a path of folder names down from the Granted Files root. Each part
+ * matches one existing folder (folderKey). Stops at the first part that is
+ * missing or ambiguous.
+ *
+ * @returns {Promise<{names: string[], ids: string[], parentId: string,
+ *   missingAt?: number, ambiguousAt?: number, siblings?: string[], candidates?: string[]}>}
+ *   names/ids are the resolved parts; parentId the deepest resolved folder.
+ */
+export async function resolveGrantedFilesPath(drive, parts) {
+  const names = [];
+  const ids = [];
+  let parentId = GRANTED_FILES_DRIVE_ID;
+  for (let i = 0; i < parts.length; i++) {
+    const { folders } = await childFolders(drive, parentId);
+    const hits = folders.filter(f => folderKey(f.name) === folderKey(parts[i]));
+    if (hits.length === 0) return { names, ids, parentId, missingAt: i, siblings: folders.map(f => f.name) };
+    if (hits.length > 1) return { names, ids, parentId, ambiguousAt: i, candidates: hits.map(f => f.name) };
+    names.push(hits[0].name);
+    ids.push(hits[0].id);
+    parentId = hits[0].id;
+  }
+  return { names, ids, parentId };
+}
+
 export async function listGrantedFilesFolders(folderPath = '', userEmail = null) {
-  if (!/^[^@\s]+@granted\.ca$/i.test(String(userEmail || ''))) {
+  if (!GRANTED_ASKER.test(String(userEmail || ''))) {
     console.error(`🚫 ${DRIVE_UNAVAILABLE}: Granted Files folder lookup without a known @granted.ca asker`);
     return { success: false, error: `${DRIVE_UNAVAILABLE}: couldn't confirm who is asking, so Granted Files wasn't read.` };
   }
@@ -493,31 +538,27 @@ export async function listGrantedFilesFolders(folderPath = '', userEmail = null)
 
   try {
     const drive = createDriveClient(userEmail, true);
-    let parentId = GRANTED_FILES_DRIVE_ID;
-    const resolved = [];
-
-    for (const part of parts) {
-      const { folders } = await childFolders(drive, parentId);
-      const hits = folders.filter(f => folderKey(f.name) === folderKey(part));
-      if (hits.length === 0) {
-        return {
-          success: true, found: false, drive: 'Granted Files',
-          resolved_path: resolved.join('/'), missing: part,
-          note: `No folder matching "${part}" under "${resolved.join('/') || 'Granted Files'}". Propose it as (new), or ask if a near-miss below is meant.`,
-          siblings: folders.map(f => f.name)
-        };
-      }
-      if (hits.length > 1) {
-        return {
-          success: true, found: false, drive: 'Granted Files',
-          resolved_path: resolved.join('/'), ambiguous: part,
-          note: `More than one folder matches "${part}". Ask which one.`,
-          candidates: hits.map(f => f.name)
-        };
-      }
-      resolved.push(hits[0].name);
-      parentId = hits[0].id;
+    const walk = await resolveGrantedFilesPath(drive, parts);
+    const resolved = walk.names;
+    if (walk.missingAt !== undefined) {
+      const part = parts[walk.missingAt];
+      return {
+        success: true, found: false, drive: 'Granted Files',
+        resolved_path: resolved.join('/'), missing: part,
+        note: `No folder matching "${part}" under "${resolved.join('/') || 'Granted Files'}". Propose it as (new), or ask if a near-miss below is meant.`,
+        siblings: walk.siblings
+      };
     }
+    if (walk.ambiguousAt !== undefined) {
+      const part = parts[walk.ambiguousAt];
+      return {
+        success: true, found: false, drive: 'Granted Files',
+        resolved_path: resolved.join('/'), ambiguous: part,
+        note: `More than one folder matches "${part}". Ask which one.`,
+        candidates: walk.candidates
+      };
+    }
+    const parentId = walk.parentId;
 
     const { folders, truncated } = await childFolders(drive, parentId);
     console.log(`✓ Granted Files folders at "${resolved.join('/') || '(root)'}": ${folders.length}${truncated ? ' (truncated)' : ''}`);

@@ -25,6 +25,13 @@ import {
   recordAutoApproval,
   recordResult
 } from './pending-actions.js';
+
+// Gated tools whose limits are checked before the call is saved for
+// confirmation. Each returns { ok, plan } or { ok: false, reason }.
+const PREPARE_GATED = {
+  file_move_rename: async (input, ctx) => (await import('./drive-actions.js')).planFileMove(input, ctx),
+  file_move_rename_undo: async (input) => (await import('./drive-actions.js')).planUndo(input)
+};
 import * as getgrantedTools from './getgranted-tools.js';
 import * as federalGrants from './federal-grants.js';
 import * as programCards from '../utils/program-cards.js';
@@ -128,7 +135,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
   // Note: Google Docs creation now uses userId directly with OAuth
   // list_granted_files_folders refuses outright when no email is found here:
   // it never falls back to the bare service account.
-  const DELEGATED_DRIVE_TOOLS = ['search_google_drive', 'read_google_drive_file', 'list_files_in_folder', 'list_granted_files_folders'];
+  const DELEGATED_DRIVE_TOOLS = ['search_google_drive', 'read_google_drive_file', 'list_files_in_folder', 'list_granted_files_folders',
+    'file_move_rename', 'file_move_rename_undo'];
   let userEmail = null;
   if (userId && DELEGATED_DRIVE_TOOLS.includes(toolName)) {
     try {
@@ -192,6 +200,17 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             summary: summarizeAction(toolName, input)
           });
         } else if (await requiresConfirmation(toolName, input, { userId })) {
+          // Some gated tools check their limits before anything is saved: a
+          // refusal returns now, and what is saved is the checked plan.
+          const prepare = PREPARE_GATED[toolName];
+          if (prepare) {
+            const prepared = await prepare(input, { askerEmail: userEmail, askerUserId: userId });
+            if (!prepared.ok) {
+              console.warn(`🛑 ${toolName} refused before confirmation: ${prepared.reason}`);
+              return { success: false, error: prepared.reason };
+            }
+            input = prepared.plan;
+          }
           const summary = summarizeAction(toolName, input);
           const saved = await savePendingAction({
             conversationId, toolName, input, userId, summary
@@ -694,6 +713,24 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
       case 'list_granted_files_folders':
         result = await googleDrive.listGrantedFilesFolders(input.path, userEmail);
         break;
+
+      // Gated (GATED_TOOLS, asker-only): reaches here only through
+      // runPendingAction, with `input` = the plan checked by PREPARE_GATED.
+      case 'file_move_rename': {
+        const { executeFileMove } = await import('./drive-actions.js');
+        result = await executeFileMove(input, {
+          askerEmail: userEmail, confirmedBy: userId, pendingActionId: options.pendingActionId || null, conversationId
+        });
+        break;
+      }
+
+      case 'file_move_rename_undo': {
+        const { executeUndo } = await import('./drive-actions.js');
+        result = await executeUndo(input, {
+          confirmedBy: userId, pendingActionId: options.pendingActionId || null, conversationId
+        });
+        break;
+      }
 
       // ============================================================================
       // DROPBOX TOOLS

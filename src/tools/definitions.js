@@ -2521,6 +2521,41 @@ Pass a path such as "Clients", "Clients/Acuva", "Clients/Acuva/CanExport", "Prog
 };
 
 /**
+ * Drive move / rename and its undo (src/tools/drive-actions.js). Oracle-only,
+ * gated (GATED_TOOLS), confirmable only by the asker (undo: the asker or
+ * Chris). Every limit is checked in code before the confirm card is shown and
+ * again when it runs. Loaded on demand, like GRANTED_FILES_FOLDERS_TOOL.
+ */
+export const FILE_MOVE_RENAME_TOOLS = [
+  {
+    name: 'file_move_rename',
+    description: `Move one Drive file into a Granted Files folder and/or rename it, as the person asking, after they press Confirm. Use it only when the asker says yes to "Want me to move and rename it?" (filing skill), passing the Home path and Name you gave them.
+
+Limits are enforced in code: the file must be in Granted Files, Granted Archive, or the asker's own My Drive; the destination must be inside Granted Files under Clients/, Programs/ or Departments/; missing folders are created only below an existing client, program or department folder and are shown as (new) on the confirm card; folders are never moved; Granted's own HR/finance/legal files are refused. It cannot share, copy, delete or trash anything. A refusal comes back with a plain reason — pass it on, don't retry another way. When it runs, the result carries an undo token.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', description: 'The file: a Drive link or file ID.' },
+        destination_path: { type: 'string', description: 'Optional. Folder path inside Granted Files, e.g. "Departments/AI/_test" or "Clients/Acuva/CanExport/Acuva-CanExport-2026/Claims/202609".' },
+        new_name: { type: 'string', description: 'Optional. The new file name, from the filing skill. An uploaded file keeps its extension.' }
+      },
+      required: ['file']
+    }
+  },
+  {
+    name: 'file_move_rename_undo',
+    description: `Undo a move/rename made with file_move_rename: put the file back in its old folder with its old name, as the person who made the move. Needs the undo token from that move's result. Only that person or Chris can confirm it. Refused if the file has changed since. Folders the move created are left in place. It cannot share, copy, delete or trash anything.`,
+    input_schema: {
+      type: 'object',
+      properties: {
+        undo_token: { type: 'string', description: 'The undo token returned by file_move_rename.' }
+      },
+      required: ['undo_token']
+    }
+  }
+];
+
+/**
  * Tracked cards (src/cards/). Oracle-only — referenced in the internal-oracle
  * case and nowhere else. Who reviews, which Docs, and where the card goes all
  * come from the verified Chat event (executeToolCall options), not from input.
@@ -3123,8 +3158,8 @@ export function getToolsForAgent(agentType) {
       // TRACKED_CARD_TOOLS likewise: it posts cards into Chat threads from a
       // verified Chat event and has no meaning anywhere else.
       // GG3_CONVERSATIONS_TOOL and PULSE_STATS_TOOL likewise: client conversations and usage stats are for the team
-      // through Oracle only, not for the orchestrator. GRANTED_FILES_FOLDERS_TOOL (filing skill) likewise.
-      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL, PULSE_STATS_TOOL, GRANTED_FILES_FOLDERS_TOOL];
+      // through Oracle only, not for the orchestrator. GRANTED_FILES_FOLDERS_TOOL and FILE_MOVE_RENAME_TOOLS (filing skill) likewise.
+      const oracleTools = [...oracleBaseTools, LOAD_SKILL_TOOL, ...ORACLE_TOOLS, ...GOOGLE_DRIVE_TOOLS, ...DROPBOX_TOOLS, ...coreHubSpotTools, ...GRANOLA_TOOLS, ...GOOGLE_SHEETS_READWRITE_TOOLS, ...GOOGLE_CALENDAR_TOOLS, ...oracleDocsTools, ...GOOGLE_DOCS_EDIT_TOOLS, ...CHAT_HISTORY_TOOLS, ...TRACKED_CARD_TOOLS, GG3_CONVERSATIONS_TOOL, PULSE_STATS_TOOL, GRANTED_FILES_FOLDERS_TOOL, ...FILE_MOVE_RENAME_TOOLS];
       // Count derived from the actual array rather than hand-summed, so it
       // cannot drift out of sync with what is returned.
       console.log(`🔧 Agent ${agentType} using curated tool set (${oracleTools.length} tools, filesystem memory excluded)`);

@@ -293,12 +293,28 @@ not applied), the tool is refused, not run.
 - `create_calendar_event` — when `attendees` is non-empty
 - `update_calendar_event` — when `attendees` is non-empty or the event already has other
   attendees (fetched; a failed read gates, to be safe)
+- `file_move_rename`, `file_move_rename_undo` — always; see "Drive move / rename" below
+
+**Checked before saving.** `PREPARE_GATED` in `executor.js` runs a tool's own limit check
+before `savePendingAction`: a refusal returns at once with nothing saved, and what is saved
+is the checked plan, so the summary describes exactly what will run. Only the two Drive
+tools use it.
 
 **Who confirms.** A message that is only a confirmation word is handled by
 `tryHandleConfirmation` in `src/api/confirmation.js`, before the model is called. Anyone in
 the conversation may confirm — a deliberate choice — and is recorded as `confirmed_by`.
 Card buttons (lead triage, review note) confirm the specific action their card shows; their
 own owner checks live in each card type's `handleAction`.
+
+**The asker-only exception.** `ASKER_ONLY_TOOLS` (`file_move_rename`,
+`file_move_rename_undo`): `canConfirm` in `pending-actions.js` allows only the proposer of a
+move, and for an undo the original mover or Chris (`DRIVE_ACTIONS_ADMIN_EMAIL`, default
+writers@). `runPendingAction` and `declinePendingAction` enforce it before touching the row,
+so typed "yes" and buttons are held to the same rule; anyone else gets "Only <name> can
+confirm this." In Chat these proposals get a Confirm/Cancel card
+(`src/cards/confirm-card.js`, posted by `runOracleAndReply`) instead of the "reply yes" text;
+`pressAnswer` hands `pending.*` presses to it before the tracked-card lookup. Every other
+gated tool is unchanged.
 
 **The one exemption.** `AUTO_APPROVED_TOOLS` lets the HubSpot webhook's system account run
 `create_hubspot_deal` / `update_hubspot_deal` unattended, logged as `auto_approved` by
@@ -307,17 +323,18 @@ own owner checks live in each card type's `handleAction`.
 ## Tool loadout
 
 From the `internal-oracle` case in `getToolsForAgent` (`src/tools/definitions.js`).
-61 tools; a normal turn is sent 60, because `toolsForRun` in `src/claude/client.js` drops
+63 tools; a normal turn is sent 62, because `toolsForRun` in `src/claude/client.js` drops
 the run-only `save_team_lesson` unless `allowedTools` names it. Oracle builds
 `oracleBaseTools` from scratch rather than reusing shared `baseTools`.
 
 **Tools on demand (Sonnet 5.5 path only).** `withToolSearch` in `src/claude/client.js`
-sends the 46 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
+sends the 48 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
 Anthropic's tool search (`tool_search_tool_bm25`), so rarely used tools stay out of the
 cached prefix until Claude searches for them. The list is the tools used in 2 or fewer
 conversations over the 30 days to 2026-09-29. `track_review` and `read_chat_attachments`
 qualified but stay loaded: the review card and Chat file uploads depend on them.
-`gg3_conversations`, `pulse_stats` and `list_granted_files_folders` were deferred from the start. Oracle's
+`gg3_conversations`, `pulse_stats`, `list_granted_files_folders`, `file_move_rename` and
+`file_move_rename_undo` were deferred from the start. Oracle's
 Haiku tiers, the HubSpot webhook, and runs restricted by `allowedTools` (/learn-this,
 lesson runs) send the full list unchanged. Search results are dropped from reloaded
 history (`historyForRequest`), so a later turn searches again.
@@ -328,7 +345,8 @@ read/write (4), Calendar (4), `create_google_doc` only, `GOOGLE_DOCS_EDIT_TOOLS`
 `CHAT_HISTORY_TOOLS` (4, including the run-only `save_team_lesson`), `TRACKED_CARD_TOOLS`
 (`track_review`), `gg3_conversations` (GetGranted client chats: read, search, troubleshoot,
 log to the Pulse errors sheet; `src/tools/gg3-conversations.js`), `pulse_stats`, and
-`list_granted_files_folders` (`GRANTED_FILES_FOLDERS_TOOL`, for the filing skill).
+`list_granted_files_folders` (`GRANTED_FILES_FOLDERS_TOOL`), and `FILE_MOVE_RENAME_TOOLS` (2) for
+the filing skill.
 
 The three Drive tools are read-only and run as the asker: `createDriveClient` in
 `src/tools/google-drive.js` uses the service account with domain-wide delegation, subject =
@@ -340,6 +358,36 @@ live folder check: subfolders at a path in the Granted Files shared drive
 (`GRANTED_FILES_DRIVE_ID`), folders only, paged, read-only scope, as the asker. Stricter
 than the other three: with no @granted.ca asker email it refuses rather than running as the
 bare service account, and a 403/404 is reported, never retried as another identity.
+
+### Drive move / rename
+
+`file_move_rename` and `file_move_rename_undo` (`src/tools/drive-actions.js`) move one file
+and/or rename it, gated and asker-only (above). The limits are code, checked when proposed
+(`planFileMove`) and again when confirmed (`executeFileMove`):
+- **Identity:** the asker's own delegated client (`delegatedDriveClient` in `google-drive.js`);
+  writes ask for exactly the `drive` scope (delegation refuses `spreadsheets`, and one refused
+  scope fails the token). No asker, a bad key, or `tomliao@`/`payment@` → refused. No retry
+  as anyone else.
+- **Source:** a file in Granted Files or Granted Archive (`GRANTED_ARCHIVE_DRIVE_ID`), or one
+  the asker owns in their My Drive. Owned outside granted.ca, someone else's My Drive, a
+  folder or a shortcut → refused.
+- **Destination:** Granted Files under `Clients/`, `Programs/` or `Departments/`, at least one
+  level in; never the root, `Live Clients/`, `Old Files/`, `Departments/Mindfulness`,
+  Archive or a My Drive. Missing folders are created only below an existing client, program
+  or department folder, and only those the card listed as (new).
+- **Sensitive guard (strict):** `SENSITIVE_TERMS` in `src/tools/drive-sensitive.js`, whole
+  words, against the file name, the new name and every folder in its current path, plus the
+  finance owners. Client files match too ("Financial Statement-…") and are moved by hand.
+- **Never:** share, copy, delete or trash — the module has no such call.
+
+Each executed attempt writes a `drive_actions` row (migration 042: asker, file, parents and
+names before/after, paths, folders created, result, `undo_token`) and appends to the "Drive
+migration log" sheet (`DRIVE_LOG_SHEET_ID`, Log tab, Run = "Oracle") as the service account
+itself, which the sheet is shared with; a failed append is recorded in `sheet_error` and
+never fails the action. The undo token goes into the conversation ("Done: … undo token …").
+`file_move_rename_undo` restores the old parents and name **as the original mover**,
+whoever confirms; it is refused if the file changed since, and leaves created folders in
+place.
 
 Excluded, with reasons in code:
 - `ANTHROPIC_MEMORY_TOOL` — wastes iterations on an empty directory. Postgres
@@ -383,8 +431,9 @@ don't add a skill catalogue back to it.
 does this go / what should I call it" for Granted Files: `SKILL.md` is the process,
 `reference.md` the only source for document types, folder rules and name formats (generated
 from the naming-conventions workbook). It checks real folders with
-`list_granted_files_folders` and marks any missing folder **(new)**. It does not move,
-rename or share anything — that is a later tool. Routed by a line in "When to Load Skills"
+`list_granted_files_folders` and marks any missing folder **(new)**. After the answer it
+offers "Want me to move and rename it?" and calls `file_move_rename` only on a yes; the
+asker confirms on the card. Routed by a line in "When to Load Skills"
 that treats any "where does this belong / what do I call it" question as filing. The
 `SKILL.md` frontmatter also makes it show up as a Claude Code skill; that is expected.
 

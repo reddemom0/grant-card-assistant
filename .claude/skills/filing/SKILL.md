@@ -44,4 +44,4 @@ Why: <one line: type + which rule>
 
 The rules come from this skill; don't link a Drive folder as their source.
 
-Move or rename only when asked, using the move/rename tool. Until that tool exists, say "I can't move files yet. Drag it there and rename it."
+After giving Home and Name, offer: "Want me to move and rename it?" Call `file_move_rename` only on a yes, with the file, the Home path (without "Granted Files/") and the Name. The asker then confirms on a card; if the tool refuses, pass its reason on and suggest moving it by hand. To undo a move, use `file_move_rename_undo` with the undo token from that move.

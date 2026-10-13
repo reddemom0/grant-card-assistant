@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-10-13 — Drive move/rename: gated, asker-only, limits in code, undoable
+**What:** `file_move_rename` / `file_move_rename_undo` (`src/tools/drive-actions.js`) move and rename one file as the asker after a Confirm card only the asker can press (undo: the original mover or Chris). Limits are checked before the proposal is saved (`PREPARE_GATED`) and again when it runs. Logged to `drive_actions` (042) and the "Drive migration log" sheet.
+**Why:** Strict HR/finance guard (one list, `drive-sensitive.js`), even though client Financial Statements then move by hand. Undo runs as the original mover because only they had the source rights. The sheet is written by the service account itself (shared as Editor), not by delegation. Created folders are never removed — the tool has no delete. "Anyone in the conversation may confirm" stays for every other gated tool.
+**Impact:** `src/tools/{drive-actions,drive-sensitive,google-drive,pending-actions,executor,definitions}.js`, `src/cards/{confirm-card,actions}.js`, `src/api/{confirmation,chat-google}.js`, `src/claude/client.js`, `migrations/042_create_drive_actions.sql`, filing `SKILL.md`, `docs/oracle.md`
+
 ## 2026-10-13 — Filing skill: read-only answers from live Granted Files folders
 **What:** New skill `filing` (`overview` = `SKILL.md`, `reference` = `reference.md`, always both) answers "where does this go / what do I call it". It checks real folders with the new Oracle-only, deferred tool `list_granted_files_folders` (`listGrantedFilesFolders`, `src/tools/google-drive.js`): folders only, read-only, as the asker; no asker or a 403/404 means refuse, never the bare service account. Missing folders are each marked (new). The "fewer than 4 Granted people" rule covers only Meet recordings, transcripts and Gemini notes.
 **Why:** Answers must name folders that exist; moving and renaming come later behind the confirm gate. `reference.md` is the single source for types and patterns.
