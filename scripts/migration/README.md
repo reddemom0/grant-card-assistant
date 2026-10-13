@@ -1,0 +1,21 @@
+# scripts/migration
+
+Scripts for moving staff My Drive files into the Granted Files and Granted Archive shared drives, and for keeping the "Drive migration log" sheet.
+
+**No data lives here.** Drive IDs, account addresses, member lists, run labels and the approver are read from `dist/migration/config.json`. Plans, ledgers, snapshots and reports are read from and written to `dist/inventory/`. Both are gitignored. Credentials come from the service-account key in `.env` (domain-wide delegation).
+
+| Script | What it does | Writes to Drive? |
+|---|---|---|
+| `migration-log.mjs` | Shared helpers: loads the config, auth tokens, CSV/JSONL loading, Sheets calls, turns ledger lines into log rows, appends a finished run to the sheet. | Only the log sheet (append) |
+| `build-v6.mjs` | Builds the move plan from v5 + the sharing snapshot: target drive and path per file, sharing actions (restore / remove / lapse), client-owned shortcuts, Google Meet rule, destination fixes, notice data, summary. | No (local files only) |
+| `dryrun.mjs <owner>@` | Read-only dry run for one owner: re-checks each file, resolves destination folders, lists folders to create and sharing actions. Writes `dist/inventory/dryrun-<owner>.md`. | No (read-only scope) |
+| `move-owner.mjs <owner>@` | Live move for one owner: creates missing folders, moves each file as its owner, verifies by ID, applies the planned sharing actions, writes a ledger line before every change, writes a report, appends to the log sheet. `--fixup` also applies the fix-up adds. `--undo` reverses the owner's done actions from the ledger. `--plan <csv>` / `--tag <name>` run against a one-off plan with its own ledger (used for tests). | Yes: folders, moves, permission add/remove. Never trash, delete files, rename or copy. |
+| `build-log.mjs` | One-off: built the "Drive migration log" sheet and the "Dropbox migration log" file from the existing ledgers. Refuses to run again once the sheet exists (`--check` previews locally without Drive calls). | Creates the two log files |
+
+Typical order for one owner:
+
+1. `node scripts/migration/build-v6.mjs`, after any rule change.
+2. `node scripts/migration/dryrun.mjs <owner>@`, then review `dryrun-<owner>.md`.
+3. `node --network-family-autoselection-attempt-timeout=5000 scripts/migration/move-owner.mjs <owner>@`, after approval.
+
+How to read the log sheet: `dist/inventory/migration-log-README.md`.
