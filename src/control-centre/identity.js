@@ -59,3 +59,21 @@ export async function identitiesForClerkIds(clerkIds, { query = appQuery } = {})
   const { rows } = await query(IDENTITY_SQL, [ids]);
   return shapeIdentities(rows);
 }
+
+// Names only, so soft-deleted companies are kept: an old flag still needs a name.
+const COMPANY_NAMES_SQL = `
+  SELECT id, name FROM companies WHERE id = ANY($1::int[])`;
+
+/**
+ * Company names for display. The app users table holds no names or emails,
+ * so a client is shown by their company. Unknown ids are absent from the Map.
+ *
+ * @param {number[]} companyIds
+ * @returns {Promise<Map<number, string>>}
+ */
+export async function companyNamesForIds(companyIds, { query = appQuery } = {}) {
+  const ids = [...new Set((companyIds || []).filter((id) => Number.isInteger(id) && id > 0))];
+  if (ids.length === 0) return new Map();
+  const { rows } = await query(COMPANY_NAMES_SQL, [ids]);
+  return new Map(rows.map((r) => [r.id, r.name]));
+}

@@ -1,10 +1,11 @@
 # Control Centre — data layer
 
 The Control Centre reads two databases. It never writes to either one. This doc covers the
-connections, the rules that decide what counts as "live", and the known limits of the data.
-There's no UI yet.
+connections, the rules that decide what counts as "live", the Hub-side roll-ups and review
+queue, and the known limits of the data. There's no UI yet.
 
-Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`.
+Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`,
+`rollup.js`, `review-queue.js`, `review-routes.js`.
 Tests: `tests/unit/control-centre-*.test.js`.
 
 ## The two connections
@@ -218,6 +219,104 @@ node scripts/cc-rollup.mjs --backfill --write  # upsert everything into the Hub 
 A dry run is the default and writes nothing. Only `--write` touches the Hub DB. The local
 `.env` `DATABASE_URL` is the **production** Hub DB, so `--write` from a laptop writes to
 production. The script prints per-day source-row and output-row counts.
+
+## Review queue (migration 044)
+
+Staff review bad matches and bad chat answers in one queue in the Hub DB. Code:
+`review-queue.js` (logic, sweep) and `review-routes.js` (API). Diagnosis is a stub until
+step 5.
+
+### Tables
+
+| Table | What it holds |
+|---|---|
+| `cc_review_items` | One row per thing to review. `kind='match'` is keyed on `(company_id, grant_root_id)`. `kind='chat'` is keyed on `chat_turn_ref`. Both keys are partial unique indexes. |
+| `cc_review_flags` | Each flag on an item. `source_ref` is UNIQUE, so re-sweeps never double-count. `source_created_at` is the source event's own time. |
+| `cc_review_events` | The audit log. Every mutation writes one row: `created`, `flagged`, `reopened`, `diagnosed`, `status`, `owner`, `closed`. |
+
+Status runs `new` → `diagnosed` → `in_progress` → `closed`. Only `close` reaches `closed`.
+A match item can't close without `expected_match` (`should` / `shouldnt`). It's optional
+for chat.
+
+### Flags
+
+| Source | `source_ref` | `actor` |
+|---|---|---|
+| `client_thumbs_down` | the app rating's uuid | Clerk id |
+| `staff_flag` | `staff:<uuid>` | staff email |
+
+`addFlag` creates the item on its first flag and bumps `flag_count` on each new one. A
+duplicate `source_ref` changes nothing, not even on a closed item. A new flag on a
+**closed** item reopens it to `new`, sets `flagged_again`, and clears the owner, diagnosis,
+narrative, client notice and close fields. The old close stays in the events log.
+
+### Owners (`OWNER_ROUTING`)
+
+| Owner | Fixes |
+|---|---|
+| `client` | company profile |
+| `research` | grant data / card copy |
+| `chris` | tagger, engine, chat answers; **default when the cause is unclear** |
+| `jason` | app bugs |
+
+### Where client 👎s come from
+
+App `grant_recommendation_feedback_events`, the same table as `cc_daily_ratings`.
+
+- A 👎 is `rating = 'down'`. A CHECK allows only `up` / `down`.
+- `grant_root_id` is a root id.
+- The row's uuid `id` is the `source_ref`.
+- The row holds the app's integer `user_id`, so the Clerk rule (`user_…` only) is applied
+  through `users_clerk`. This drops legacy `old-u…` accounts.
+- Ratings carry no comment.
+- A 👎 later changed to 👍 stays in the queue. There's no auto-close.
+
+Chat items come only from staff flags for now. There's no client chat 👎 source.
+
+### Hourly sweep
+
+`runReviewSweep` reads 👎s newer than the latest `source_created_at` already filed, minus a
+1-hour overlap that `source_ref` dedupes. On the first run it reads every 👎. It then files
+each one as a flag and runs diagnosis on every `new` item. While `diagnose` returns `null`,
+items stay `new`.
+
+It runs hourly at :17 America/Vancouver with `noOverlap`, only when
+**`CC_REVIEW_SWEEP_ENABLED=true`** and `APP_DB_READONLY_URL` is set. Logs carry counts and
+error codes only.
+
+```
+node scripts/cc-review-sweep.mjs           # dry run: how many 👎s it would file
+node scripts/cc-review-sweep.mjs --write   # file them and diagnose
+```
+
+The dry run reads the Hub DB only for the cursor and the refs already filed. The local
+`.env` `DATABASE_URL` is **production**, so point it elsewhere before using `--write` to
+test.
+
+### API — `/api/control-centre/review`
+
+Behind `authenticateUser` + `requireAuth`. Every signed-in staff member has full access,
+with no admin check.
+
+| Route | Does |
+|---|---|
+| `GET /` | `?status=&owner=&kind=`, most recently updated first (a re-flag or any change moves an item up), with `flag_count` and `latest_comment` (max 500) |
+| `GET /:id` | item, flags and events, plus `names`: Clerk actors → company name (via `identity.js`), staff emails → Hub `users.name` |
+| `POST /flag` | staff flag `{kind, company_id, grant_root_id | chat_turn_ref, comment}`; actor is the signed-in email |
+| `PATCH /:id/status` | `{to}`; `closed` is refused (use close) |
+| `PATCH /:id/owner` | `{owner}`; `null` clears it |
+| `POST /:id/close` | `{expected_match, close_note}` |
+
+Bad input returns 400, an unknown id 404, closing twice 409. A 503 (`not_configured`)
+comes back only when the app DB is needed and unset. Client names aren't in the app DB
+(`users` has no name or email), so clients are shown by company.
+
+### Diagnosis (step 5)
+
+`diagnose(item)` returns `null` for now. Step 5 fills it in with match-explain's bad-match
+mode plus an Oracle narrative. It returns `{owner, diagnosis, narrative, client_notice}`.
+`runDiagnosis` then records those and moves the item to `diagnosed`. It runs outside the
+transaction, and the result only lands if the item is still `new`.
 
 ## Known limits
 

@@ -63,6 +63,8 @@ import { startTrackedCards } from './src/cards/jobs.js';
 import { startGg3Refresh, gg3RefreshEndpoint } from './src/services/gg3-refresh.js';
 import { controlCentreHealthEndpoint } from './src/control-centre/health.js';
 import { startControlCentreRollup } from './src/control-centre/rollup.js';
+import { startControlCentreReviewSweep } from './src/control-centre/review-queue.js';
+import controlCentreReviewRouter from './src/control-centre/review-routes.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
@@ -184,6 +186,11 @@ app.get('/api/admin/gg3-refresh', authenticateUser, requireAdmin, gg3RefreshEndp
 // Control Centre: can the Hub read the app DB and the gg3 ops DB? Admin only,
 // read-only, no secrets in the body. See docs/control-centre.md.
 app.get('/api/control-centre/health', authenticateUser, requireAdmin, controlCentreHealthEndpoint);
+
+// Control Centre review queue: bad matches and bad chat answers. Every
+// signed-in staff member has full access, so requireAuth (not requireAdmin).
+// Needs migration 044. See docs/control-centre.md.
+app.use('/api/control-centre/review', authenticateUser, requireAuth, controlCentreReviewRouter);
 
 // Database admin endpoint (diagnostics and migrations)
 import { dbAdminEndpoint } from './db-admin-endpoint.js';
@@ -1343,6 +1350,15 @@ async function startServer() {
     // the ops DB's 180-day retention. Reads both source DBs read-only. Off
     // unless CC_ROLLUP_ENABLED=true. Needs migration 043.
     startControlCentreRollup(cron);
+
+    // ========================================================================
+    // CRON JOB: Control Centre review sweep (hourly at :17)
+    // ========================================================================
+    // Files new client 👎s from the app DB as review-queue flags, then runs
+    // diagnosis on every 'new' item (a stub until step 5). Reads the app DB
+    // read-only; writes only cc_review_*. Off unless
+    // CC_REVIEW_SWEEP_ENABLED=true. Needs migration 044.
+    startControlCentreReviewSweep(cron);
 
     // ========================================================================
     // CRON JOB: GetGranted Pulse chat spike alert (every 5 minutes)
