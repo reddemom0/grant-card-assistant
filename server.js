@@ -61,6 +61,7 @@ import { startChatListen } from './src/chat-listen/jobs.js';
 import { startTrackedCards } from './src/cards/jobs.js';
 // Oracle's hourly copy of GG3 grant data (gg3_grants, migration 038)
 import { startGg3Refresh, gg3RefreshEndpoint } from './src/services/gg3-refresh.js';
+import { controlCentreHealthEndpoint } from './src/control-centre/health.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
@@ -178,6 +179,10 @@ app.get('/run-migration', authenticateUser, requireAdmin, runMigrationEndpoint);
 // same requireAdmin adminRouter uses) AND ?secret=. Read-only against GG3;
 // replaces gg3_grants.
 app.get('/api/admin/gg3-refresh', authenticateUser, requireAdmin, gg3RefreshEndpoint);
+
+// Control Centre: can the Hub read the app DB and the gg3 ops DB? Admin only,
+// read-only, no secrets in the body. See docs/control-centre.md.
+app.get('/api/control-centre/health', authenticateUser, requireAdmin, controlCentreHealthEndpoint);
 
 // Database admin endpoint (diagnostics and migrations)
 import { dbAdminEndpoint } from './db-admin-endpoint.js';
