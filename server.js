@@ -168,11 +168,11 @@ app.use((req, res, next) => {
 // ============================================================================
 
 // Migration endpoint (temporary, for Railway deployment)
-// Session required IN ADDITION to the existing ?secret= check. Both of these
-// execute arbitrary SQL from migrations/, so a leaked secret alone must not
-// be sufficient.
+// Admin session required IN ADDITION to the existing ?secret= check. Both of
+// these execute arbitrary SQL from migrations/, so a leaked secret alone must
+// not be sufficient.
 import { runMigrationEndpoint } from './run-migration-endpoint.js';
-app.get('/run-migration', authenticateUser, requireAuth, runMigrationEndpoint);
+app.get('/run-migration', authenticateUser, requireAdmin, runMigrationEndpoint);
 
 // Manual GG3 refresh (first fill and testing). Gate: an admin session (the
 // same requireAdmin adminRouter uses) AND ?secret=. Read-only against GG3;
@@ -181,21 +181,21 @@ app.get('/api/admin/gg3-refresh', authenticateUser, requireAdmin, gg3RefreshEndp
 
 // Database admin endpoint (diagnostics and migrations)
 import { dbAdminEndpoint } from './db-admin-endpoint.js';
-app.get('/db-admin', authenticateUser, requireAuth, dbAdminEndpoint);
+app.get('/db-admin', authenticateUser, requireAdmin, dbAdminEndpoint);
 
 // Import grants endpoint (for GetGranted database sync)
 import { importGrantsEndpoint } from './import-grants-endpoint.js';
-// Destructive (DELETE FROM grants) — requires BOTH a session and the secret.
-app.get('/import-grants', authenticateUser, requireAuth, importGrantsEndpoint);
+// Destructive (DELETE FROM grants) — requires BOTH an admin session and the secret.
+app.get('/import-grants', authenticateUser, requireAdmin, importGrantsEndpoint);
 
 // Search grants endpoint (for Oracle to query GetGranted database)
 import { searchGrantsEndpoint } from './search-grants-endpoint.js';
 // Exposes the curated grants table. Oracle/lead-gen no longer reach this over
 // HTTP — src/tools/getgranted-search.js calls searchGrants() in-process.
-app.get('/search-grants', authenticateUser, requireAuth, searchGrantsEndpoint);
+app.get('/search-grants', authenticateUser, requireAdmin, searchGrantsEndpoint);
 
 // Batch retag endpoint — re-tags all grants with updated eligibility fields
-app.get('/batch-retag-grants', authenticateUser, requireAuth, async (req, res) => {
+app.get('/batch-retag-grants', authenticateUser, requireAdmin, async (req, res) => {
   try {
     const receivedSecret = req.query.secret?.trim();
     const expectedSecret = process.env.JWT_SECRET?.trim();
@@ -264,7 +264,7 @@ app.get('/batch-retag-grants', authenticateUser, requireAuth, async (req, res) =
 });
 
 // Generate embeddings endpoint — re-embeds all currently_accepting grants with full text
-app.get('/generate-embeddings', authenticateUser, requireAuth, async (req, res) => {
+app.get('/generate-embeddings', authenticateUser, requireAdmin, async (req, res) => {
   try {
     // Simple secret-based auth for one-time operations (trim to handle whitespace)
     const receivedSecret = req.query.secret?.trim();
@@ -486,6 +486,19 @@ app.use('/api/auth/granola', granolaAuthRouter);
 
 // Admin endpoints (requires authentication + admin role)
 app.use('/api/admin', authenticateUser, adminRouter);
+
+// The signed-in user, for the front end. The session cookie is HttpOnly, so
+// pages read name/avatar/expiry here instead of decoding the JWT themselves.
+app.get('/api/me', authenticateUser, requireAuth, (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    name: req.user.name,
+    email: req.user.email,
+    picture: req.user.picture,
+    role: req.user.role,
+    exp: req.user.sessionExp
+  });
+});
 
 // Agent metadata
 app.get('/api/agents', authenticateUser, requireAuth, async (req, res) => {

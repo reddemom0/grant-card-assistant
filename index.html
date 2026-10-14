@@ -936,13 +936,16 @@
         // Check authentication on page load
         async function checkAuth() {
             console.log('🔍 Checking authentication...');
-            console.log('🔍 All cookies:', document.cookie);
-            const cookies = document.cookie.split(';');
-            console.log('🔍 Parsed cookies:', cookies);
-            const authToken = cookies.find(c => c.trim().startsWith('granted_session='));
-            console.log('🔍 Found auth token:', !!authToken);
+            // The session cookie is HttpOnly; ask the server instead.
+            let signedIn = false;
+            try {
+                const response = await fetch('/api/me', { credentials: 'same-origin' });
+                signedIn = response.ok;
+            } catch (e) {
+                console.error('Auth check failed:', e);
+            }
 
-            if (authToken) {
+            if (signedIn) {
                 // User is authenticated, redirect to dashboard
                 console.log('✅ User authenticated, redirecting to dashboard...');
                 window.location.href = '/dashboard';

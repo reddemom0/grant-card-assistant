@@ -76,7 +76,8 @@ export async function authenticateUser(req, res, next) {
       name: user.name,
       picture: user.picture,
       role: user.role || 'user',
-      is_active: user.is_active !== false
+      is_active: user.is_active !== false,
+      sessionExp: decoded.exp // JWT expiry (seconds), surfaced by GET /api/me
     };
 
     console.log(`🔐 Authenticated user: ${req.user.email} (ID: ${req.user.id}, Role: ${req.user.role})`);

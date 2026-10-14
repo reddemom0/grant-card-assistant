@@ -194,6 +194,8 @@ describe('the callback', () => {
     expect(cb.status).toBe(200);
     expect(cb.body).toContain('url=/oracle/new#user=');
     expect(cb.session).not.toBeNull();
+    // Page scripts must never see the session token (they use GET /api/me).
+    expect(cb.session).toMatch(/; Path=\/; HttpOnly; Secure; SameSite=Lax; /);
     // Both cookies survive: the session, and the one clearing the state.
     expect(cb.stateCookie).toMatch(/^google_login_state=;/);
     expect(cb.stateCookie).toContain('Max-Age=0');

@@ -59,7 +59,7 @@ class AgentInterface {
         console.log(`🤖 Initializing ${this.config.displayName} interface...`);
 
         // Check authentication
-        if (!this.checkAuth()) {
+        if (!(await this.checkAuth())) {
             return;
         }
 
@@ -140,57 +140,34 @@ class AgentInterface {
     }
 
     /**
-     * Check authentication status
+     * Check authentication status via GET /api/me (the session cookie is
+     * HttpOnly, so it can't be read here). Caches the user for getUserInfo().
      */
-    checkAuth() {
-        const cookies = document.cookie.split(';');
-        const authCookie = cookies.find(c => c.trim().startsWith('granted_session='));
-
-        if (!authCookie) {
-            console.log('❌ No authentication found, redirecting to login...');
-            window.location.href = '/login';
-            return false;
+    async checkAuth() {
+        try {
+            const response = await fetch('/api/me', { credentials: 'same-origin' });
+            if (response.ok) {
+                const me = await response.json();
+                if (!me.exp || me.exp * 1000 > Date.now()) {
+                    this.currentUserInfo = me;
+                    return me;
+                }
+                console.log('Session expired, redirecting to login...');
+            } else {
+                console.log('❌ No authentication found, redirecting to login...');
+            }
+        } catch (e) {
+            console.error('Auth check failed:', e);
         }
-
-        return true;
+        window.location.href = '/login';
+        return null;
     }
 
     /**
-     * Get user info from JWT token in cookie
+     * Get the signed-in user ({ name, email, picture, role, exp }) loaded by checkAuth()
      */
     getUserInfo() {
-        const cookies = document.cookie.split(';');
-        const authCookie = cookies.find(c => c.trim().startsWith('granted_session='));
-
-        if (!authCookie) {
-            console.log('No auth cookie found');
-            return null;
-        }
-
-        const token = authCookie.split('=')[1];
-        try {
-            const payload = token.split('.')[1];
-            // JWT uses base64url, convert to base64
-            const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-            // Add padding if needed
-            const padded = base64 + '==='.slice((base64.length + 3) % 4);
-            const decoded = JSON.parse(atob(padded));
-
-            // Check if token is expired
-            if (decoded.exp && decoded.exp * 1000 < Date.now()) {
-                console.log('Token expired, redirecting to login...');
-                window.location.href = '/login';
-                return null;
-            }
-
-            return decoded;
-        } catch (e) {
-            console.error('Failed to decode token:', e);
-            // Clear bad token and redirect
-            document.cookie = 'granted_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-            window.location.href = '/';
-            return null;
-        }
+        return this.currentUserInfo || null;
     }
 
     /**
@@ -1422,14 +1399,12 @@ class AgentInterface {
      */
     async logout() {
         try {
-            // Clear session cookie
-            document.cookie = 'granted_session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-
-            // Redirect to login
-            window.location.href = '/login';
+            // Clear the HttpOnly session cookie server-side
+            await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
         } catch (error) {
             console.error('Logout error:', error);
         }
+        window.location.href = '/login';
     }
 }
 

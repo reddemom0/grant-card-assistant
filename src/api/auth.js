@@ -450,11 +450,11 @@ router.get('/auth-callback', async (req, res) => {
     );
     console.log('✅ JWT token created');
 
-    // Set cookie WITHOUT HttpOnly so JavaScript can read it
-    // Note: HttpOnly would be more secure, but we need JavaScript to check auth on client side
+    // HttpOnly: page scripts never see the token. They get the signed-in user
+    // from GET /api/me, and log out through POST /api/logout.
     console.log('🔵 Setting cookie...');
     // Don't set Domain attribute - let it default to current host for proper development/production separation
-    const cookieHeader = `granted_session=${token}; Path=/; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
+    const cookieHeader = `granted_session=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${7 * 24 * 60 * 60}`;
     // append, not setHeader: setHeader would drop the state-clearing cookie
     // set at the top of this handler.
     res.append('Set-Cookie', cookieHeader);

@@ -264,15 +264,12 @@
     }
 
     // User info
-    function loadUserInfo() {
-        const cookies = document.cookie.split(';');
-        const authCookie = cookies.find(c => c.trim().startsWith('granted_session='));
-        if (!authCookie) return;
-
-        const token = authCookie.split('=')[1];
+    // The session cookie is HttpOnly, so the user comes from GET /api/me.
+    async function loadUserInfo() {
         try {
-            const payload = token.split('.')[1];
-            const userInfo = JSON.parse(atob(payload));
+            const response = await fetch('/api/me', { credentials: 'same-origin' });
+            if (!response.ok) return;
+            const userInfo = await response.json();
 
             const userName = document.getElementById('shared-user-name');
             const userAvatar = document.getElementById('shared-user-avatar');
@@ -506,8 +503,8 @@
         } catch (e) {
             console.error('[LOGOUT] Request failed:', e);
         }
-        // Best-effort client-side cookie clear in case the server response was lost.
-        document.cookie = 'granted_session=; Path=/; Max-Age=0; SameSite=Lax';
+        // No client-side fallback: the session cookie is HttpOnly, so only the
+        // server's /api/logout response can clear it.
         window.location.href = '/login';
     };
 
