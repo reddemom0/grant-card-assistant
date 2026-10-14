@@ -19,18 +19,10 @@ export async function dbAdminEndpoint(req, res) {
     const expectedSecret = (process.env.MIGRATION_SECRET || process.env.JWT_SECRET || '').trim();
     const receivedSecret = (secret || '').trim();
 
-    if (receivedSecret !== expectedSecret) {
-      // Show first/last 4 chars for debugging
-      const mask = (s) => s ? `${s.substring(0, 4)}...${s.substring(s.length - 4)}` : 'empty';
-      return res.status(401).json({
-        error: 'Unauthorized',
-        debug: {
-          receivedLength: receivedSecret.length,
-          expectedLength: expectedSecret.length,
-          receivedMask: mask(receivedSecret),
-          expectedMask: mask(expectedSecret)
-        }
-      });
+    // Plain 401: never echo any part of either secret, or its length.
+    // An empty secret never matches, even if neither env var is set.
+    if (!receivedSecret || receivedSecret !== expectedSecret) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
     // Diagnose database

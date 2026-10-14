@@ -474,8 +474,6 @@ router.get('/auth-callback', async (req, res) => {
       <head>
         <meta http-equiv="refresh" content="0;url=/oracle/new#user=${userDataEncoded}">
         <script>
-          // Verify cookie was set
-          console.log('Auth callback: Cookies after login:', document.cookie);
           // Immediate redirect as backup
           window.location.href = '/oracle/new#user=${userDataEncoded}';
         </script>
