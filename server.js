@@ -85,6 +85,7 @@ import { authenticateUser, requireAuth } from './src/middleware/auth.js';
 
 // Admin
 import adminRouter from './src/api/admin.js';
+import { requireAdmin } from './src/middleware/admin.js';
 
 // Database
 import { testConnection, getPoolStats } from './src/database/connection.js';
@@ -173,9 +174,10 @@ app.use((req, res, next) => {
 import { runMigrationEndpoint } from './run-migration-endpoint.js';
 app.get('/run-migration', authenticateUser, requireAuth, runMigrationEndpoint);
 
-// Manual GG3 refresh (first fill and testing). Same gate as /run-migration:
-// a session AND ?secret=. Read-only against GG3; replaces gg3_grants.
-app.get('/api/admin/gg3-refresh', authenticateUser, requireAuth, gg3RefreshEndpoint);
+// Manual GG3 refresh (first fill and testing). Gate: an admin session (the
+// same requireAdmin adminRouter uses) AND ?secret=. Read-only against GG3;
+// replaces gg3_grants.
+app.get('/api/admin/gg3-refresh', authenticateUser, requireAdmin, gg3RefreshEndpoint);
 
 // Database admin endpoint (diagnostics and migrations)
 import { dbAdminEndpoint } from './db-admin-endpoint.js';
@@ -417,7 +419,9 @@ app.post('/api/lead-gen/event', handleLeadGenEvent);
 // Analytics endpoint — authenticated team members only
 app.get('/api/lead-gen/analytics', authenticateUser, requireAuth, handleLeadGenAnalytics);
 
-// Admin endpoints for lead-gen dashboard — authenticated team members only
+// Admin endpoints for lead-gen dashboard — authenticated team members only.
+// Deliberate exception to "every /api/admin/* is admin-only": these back
+// /admin/conversations, which marketing@granted.ca uses without the admin role.
 app.get('/api/admin/lead-gen-conversations', authenticateUser, requireAuth, handleListLeadGenConversations);
 app.get('/api/admin/lead-gen-messages/:sessionId', authenticateUser, requireAuth, handleGetLeadGenMessages);
 app.get('/api/admin/lead-gen-stats', authenticateUser, requireAuth, handleLeadGenStats);
@@ -833,45 +837,6 @@ const serveUnifiedAgents = (req, res) => {
   res.sendFile('unified-agents.html', { root: '.' });
 };
 
-// Lead-gen public chat page
-app.get('/lead-gen*', (req, res) => {
-  res.sendFile('lead-gen.html', { root: '.' });
-});
-
-app.get('/grant-cards*', serveUnifiedAgents);
-app.get('/etg-writer*', serveUnifiedAgents);
-app.get('/bcafe-writer*', serveUnifiedAgents);
-app.get('/buybc-writer*', serveUnifiedAgents);
-app.get('/canexport-claims*', serveUnifiedAgents);
-app.get('/canexport-writer*', serveUnifiedAgents);
-app.get('/readiness-strategist*', serveUnifiedAgents);
-app.get('/oracle*', serveUnifiedAgents);
-
-app.get('/dashboard', (req, res) => {
-  // Redirect old dashboard route to Oracle
-  res.redirect('/oracle/new');
-});
-
-app.get('/metrics', (req, res) => {
-  res.sendFile('metrics.html', { root: '.' });
-});
-
-app.get('/usage', (req, res) => {
-  res.sendFile('usage.html', { root: '.' });
-});
-
-app.get('/usage-analytics', (req, res) => {
-  res.sendFile('usage-analytics.html', { root: '.' });
-});
-
-app.get('/feedback-metrics', (req, res) => {
-  res.sendFile('feedback-metrics.html', { root: '.' });
-});
-
-app.get('/agent-quality', (req, res) => {
-  res.sendFile('agent-quality.html', { root: '.' });
-});
-
 // Gates for HTML page routes. requireAuth/requireAdmin return JSON, which
 // renders as a raw blob in a browser, so these redirect or send HTML instead —
 // matching the client-side behaviour in public/js/agent-interface.js:145-155.
@@ -907,6 +872,47 @@ function requirePageAdmin(req, res, next) {
   next();
 }
 
+// Lead-gen public chat page
+app.get('/lead-gen*', (req, res) => {
+  res.sendFile('lead-gen.html', { root: '.' });
+});
+
+// Every Hub page shell below requires sign-in. Public pages are only
+// /lead-gen*, /login, and the /public and /widget static mounts.
+app.get('/grant-cards*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+app.get('/etg-writer*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+app.get('/bcafe-writer*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+app.get('/buybc-writer*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+app.get('/canexport-claims*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+app.get('/canexport-writer*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+app.get('/readiness-strategist*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+app.get('/oracle*', authenticateUser, requirePageAuth, serveUnifiedAgents);
+
+app.get('/dashboard', authenticateUser, requirePageAuth, (req, res) => {
+  // Redirect old dashboard route to Oracle
+  res.redirect('/oracle/new');
+});
+
+app.get('/metrics', authenticateUser, requirePageAuth, (req, res) => {
+  res.sendFile('metrics.html', { root: '.' });
+});
+
+app.get('/usage', authenticateUser, requirePageAuth, (req, res) => {
+  res.sendFile('usage.html', { root: '.' });
+});
+
+app.get('/usage-analytics', authenticateUser, requirePageAuth, (req, res) => {
+  res.sendFile('usage-analytics.html', { root: '.' });
+});
+
+app.get('/feedback-metrics', authenticateUser, requirePageAuth, (req, res) => {
+  res.sendFile('feedback-metrics.html', { root: '.' });
+});
+
+app.get('/agent-quality', authenticateUser, requirePageAuth, (req, res) => {
+  res.sendFile('agent-quality.html', { root: '.' });
+});
+
 // Lead-gen dashboards stay at STAFF level, not admin: marketing@granted.ca
 // needs to read prospect conversations without holding the admin role.
 // Do not tighten these to requirePageAdmin.
@@ -932,7 +938,7 @@ app.get('/login', (req, res) => {
 // Serve the landing page. This used to be handled implicitly by
 // express.static('.'); now that the static mount is scoped to /public and
 // /widget, `/` needs an explicit route or the bare domain 404s.
-app.get('/', (req, res) => {
+app.get('/', authenticateUser, requirePageAuth, (req, res) => {
   res.sendFile('index.html', { root: '.' });
 });
 
