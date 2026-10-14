@@ -62,6 +62,7 @@ import { startTrackedCards } from './src/cards/jobs.js';
 // Oracle's hourly copy of GG3 grant data (gg3_grants, migration 038)
 import { startGg3Refresh, gg3RefreshEndpoint } from './src/services/gg3-refresh.js';
 import { controlCentreHealthEndpoint } from './src/control-centre/health.js';
+import { startControlCentreRollup } from './src/control-centre/rollup.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
@@ -1333,6 +1334,15 @@ async function startServer() {
     // AI_API_BACKEND_URL and AI_API_BACKEND_TOKEN. Switch off with
     // GG3_REFRESH_DISABLED=true. Needs migration 038.
     startGg3Refresh(cron);
+
+    // ========================================================================
+    // CRON JOB: Control Centre daily roll-up (nightly 03:00 America/Vancouver)
+    // ========================================================================
+    // Upserts the last 3 days of match, view and rating history into
+    // cc_daily_matches / cc_daily_views / cc_daily_ratings, so ranges survive
+    // the ops DB's 180-day retention. Reads both source DBs read-only. Off
+    // unless CC_ROLLUP_ENABLED=true. Needs migration 043.
+    startControlCentreRollup(cron);
 
     // ========================================================================
     // CRON JOB: GetGranted Pulse chat spike alert (every 5 minutes)

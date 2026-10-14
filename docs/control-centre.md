@@ -120,6 +120,105 @@ returned with `is_live`, `live_grant_id` and `title`.
 `company_watchlist` and `company_watchlist_grants` are a separate pair. The second is empty,
 so the helper doesn't read either.
 
+## Daily roll-up tables (migration 043)
+
+The ops DB deletes match_results after 180 days. A nightly job,
+`src/control-centre/rollup.js`, copies what Control Centre needs into three Hub tables first,
+so day, week, month and year ranges keep working after the source rows are gone.
+
+`day` is always the calendar date in **America/Vancouver**. Each day is read as
+`[00:00, next 00:00)` Vancouver time, which stays correct across daylight-saving changes:
+2026-11-01 is a 25-hour day. Every table has `created_at` and `updated_at`.
+
+### `cc_daily_matches`
+**Source:** ops `match_results` + `ai_review_log`.
+**Key:** `(day, company_id, grant_id, section)`.
+
+| Column | Meaning |
+|---|---|
+| `grant_id` | grant **root** id (match_results always stores roots) |
+| `section` | track name, or `funding_matches` |
+| `times_computed` | distinct result sets that included the grant, shown or not |
+| `times_shown` | distinct result sets that showed it |
+| `best_position` | lowest **0-based** position when shown (0 = top); null if never shown |
+| `best_score` | highest `match_score` across all computed rows, not only shown rows |
+| `eligibility` | from the latest row that day |
+| `ai_review_action` | latest AI review action (`cut`, `flag`, `moved_up`, `moved_down`); null if none |
+
+A review is matched to its match row on result set, grant and `section = track`. It is
+counted on that match's day and company, even when the review itself lands just after
+midnight.
+
+### `cc_daily_views`
+**Source:** app `grant_view_sessions`.
+**Key:** `(day, company_id, grant_root_id, source)`, where `source` is
+`presentation_context->>'source'`.
+
+| Column | Meaning |
+|---|---|
+| `sessions` | grant-detail view sessions started that day |
+| `visible_seconds_capped` | total visible seconds, with each session capped at 600 s |
+| `median_visible_seconds` | median of the capped per-session seconds |
+| `users` | distinct app users |
+
+### `cc_daily_ratings`
+**Source:** app `grant_recommendation_feedback_events`.
+**Key:** `(day, company_id, grant_root_id)`.
+
+| Column | Meaning |
+|---|---|
+| `ups` | events that rated the grant up that day |
+| `downs` | events that rated it down |
+| `changed` | events that replaced an earlier rating (`previous_rating` set) |
+
+These count rating **events**, not each user's final rating.
+
+### What's excluded
+
+Exclusions are applied before aggregation. The tables keep no user ids, so excluded rows
+can't be added back later.
+
+- **Ops rows:** only real Clerk users (`user_…`) are kept. This drops the smoke, probe,
+  profile and stability test harnesses, which make up about 30% of match_results.
+- **Staff are kept.** During beta, staff and client usage are deliberately blended, so the
+  roll-up ignores `GG3_INTERNAL_USER_IDS`. Pulse still excludes staff. Because the tables
+  hold no user ids, staff rows written now can't be separated out later. If staff need to be
+  excluded in future, re-run the affected days with the filter added. Upserts never delete,
+  so keys that belong only to staff would also have to be removed by hand.
+
+### Re-runs
+
+Every write is an **upsert on the key. Nothing is ever deleted.**
+
+- Re-running a day refreshes its rows and catches rows that arrived late.
+- Re-running a day that has already aged out of the source leaves the stored rows untouched.
+- If a re-run no longer produces a key (for example, because a filter was added later), the
+  old row for that key stays.
+
+Each day is written in its own transaction. If one day fails, the error code is logged and
+the remaining days still run. Logs show days and counts only.
+
+### Schedule
+
+The job runs nightly at **03:00 America/Vancouver** and re-runs the **last 3 days**, so rows
+that arrive late are still counted. It is off unless **`CC_ROLLUP_ENABLED=true`** is set on the
+Railway service, and it also needs `APP_DB_READONLY_URL` and `GG3_OPS_DB_READONLY_URL`. It
+uses the same node-cron scheduler as gg3-refresh, with `noOverlap`, and doesn't run at
+startup.
+
+### Running it by hand: `scripts/cc-rollup.mjs`
+
+```
+node scripts/cc-rollup.mjs                     # dry run, last 7 days (default)
+node scripts/cc-rollup.mjs --days 3            # dry run, last 3 days
+node scripts/cc-rollup.mjs --backfill          # dry run, 2026-08-26 → today
+node scripts/cc-rollup.mjs --backfill --write  # upsert everything into the Hub DB
+```
+
+A dry run is the default and writes nothing. Only `--write` touches the Hub DB. The local
+`.env` `DATABASE_URL` is the **production** Hub DB, so `--write` from a laptop writes to
+production. The script prints per-day source-row and output-row counts.
+
 ## Known limits
 
 - **History starts Aug–Sep 2026.** The ops tables hold nothing earlier, so trends can't reach
