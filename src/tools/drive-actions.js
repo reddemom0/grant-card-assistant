@@ -273,6 +273,7 @@ export async function executeFileMove(plan, { askerEmail, confirmedBy = null, pe
     name: now.name_after,
     folders_created: created.map(c => c.name),
     undo_token: row?.undo_token || null,
+    action_id: row?.id || null,
     note: row?.undo_token ? 'Tell the asker it can be undone, and keep the undo token for file_move_rename_undo.' : 'Done, but the log row could not be written, so there is no undo token.'
   };
 }
@@ -369,10 +370,10 @@ export async function executeUndo(plan, { confirmedBy = null, pendingActionId = 
     return { success: false, error };
   }
 
-  await logAction({ action: 'undo', plan: now, parentsAfter, created: [], result: 'done', confirmedBy, pendingActionId, conversationId });
+  const row = await logAction({ action: 'undo', plan: now, parentsAfter, created: [], result: 'done', confirmedBy, pendingActionId, conversationId });
   await query('UPDATE drive_actions SET undone_at = NOW() WHERE id = $1', [now.undoes_action_id]).catch(err =>
     console.warn(`⚠️  drive_actions undone_at not set — code: ${err?.code ?? 'unknown'}`));
-  return { success: true, summary: describeUndo(now), file_link: now.file_link, home: now.path_after, name: now.name_after };
+  return { success: true, summary: describeUndo(now), file_link: now.file_link, home: now.path_after, name: now.name_after, action_id: row?.id || null };
 }
 
 // ============================================================================
@@ -427,7 +428,7 @@ async function logAction({ action, plan, parentsAfter, created, result, error = 
   return row;
 }
 
-function vancouverTime(d = new Date()) {
+export function vancouverTime(d = new Date()) {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit', hour12: false
@@ -437,8 +438,8 @@ function vancouverTime(d = new Date()) {
 
 // Columns: Date-time (Vancouver) | Run | Action | File name | File ID | File link |
 // Owner | From (path) | To (path) | Sharing detail | Done by | Ledger file
-function sheetRows({ action, plan, created, rowId }) {
-  const when = vancouverTime();
+export function sheetRows({ action, plan, created, rowId, when = null }) {
+  when = when || vancouverTime();
   const ledger = rowId ? `drive_actions ${rowId}` : 'drive_actions (row not written)';
   const link = id => `https://drive.google.com/open?id=${id}`;
   const rows = created.map(f => [when, 'Oracle', 'folder created', f.name, f.id, link(f.id), 'shared drive', '', plan.path_after, '', plan.asker_email, ledger]);

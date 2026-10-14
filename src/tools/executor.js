@@ -32,6 +32,8 @@ const PREPARE_GATED = {
   file_move_rename: async (input, ctx) => (await import('./drive-actions.js')).planFileMove(input, ctx),
   file_move_rename_undo: async (input) => (await import('./drive-actions.js')).planUndo(input)
 };
+// Gated tools confirmed on a card (Press Confirm), not by a typed "yes".
+const CARD_CONFIRM_TOOLS = new Set(['file_move_rename', 'file_move_rename_undo']);
 import * as getgrantedTools from './getgranted-tools.js';
 import * as federalGrants from './federal-grants.js';
 import * as programCards from '../utils/program-cards.js';
@@ -222,9 +224,13 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
             // generic failure.
             awaiting_confirmation: true,
             summary,
-            error: 'Saved, not run. This action needs a human to confirm it. ' +
-              'The system has already shown the user exactly what will happen and asked them to reply "yes" — ' +
-              'do not restate the details, do not ask again, and do not call this tool a second time.'
+            error: CARD_CONFIRM_TOOLS.has(toolName)
+              ? 'Saved, not run. A confirm card has been posted for the person who asked. ' +
+                'Tell them: "Press Confirm to run it." Do not restate the details, do not ask them to reply "yes", ' +
+                'and do not call this tool a second time.'
+              : 'Saved, not run. This action needs a human to confirm it. ' +
+                'The system has already shown the user exactly what will happen and asked them to reply "yes" — ' +
+                'do not restate the details, do not ask again, and do not call this tool a second time.'
           };
         }
       } catch (gateError) {

@@ -46,7 +46,7 @@ jest.unstable_mockModule('../../src/tools/google-docs.js', () => ({
   getUserOAuth2Client: async () => null, getDocsClient: async () => null, getDriveClient: async () => null
 }));
 jest.unstable_mockModule('../../src/api/confirmation.js', () => ({
-  tryHandleConfirmation: async () => null, currentPendingId: async () => null, proposalNotice: async () => null
+  tryHandleConfirmation: async () => null, tryHandleUndoRequest: async () => null, currentPendingId: async () => null, proposalNotice: async () => null
 }));
 jest.unstable_mockModule('../../src/claude/client.js', () => fakes.agent.module);
 jest.unstable_mockModule('../../src/database/messages.js', () => fakes.messages.module);

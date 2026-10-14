@@ -61,6 +61,7 @@ jest.unstable_mockModule('../../src/tools/google-docs.js', () => ({
 let confirmationImpl = null;
 jest.unstable_mockModule('../../src/api/confirmation.js', () => ({
   tryHandleConfirmation: async (args) => (confirmationImpl ? confirmationImpl(args) : null),
+  tryHandleUndoRequest: async () => null,
   currentPendingId: async () => null,
   proposalNotice: async () => null
 }));

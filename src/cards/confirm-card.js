@@ -32,11 +32,37 @@ function planOf(action) {
   try { return JSON.parse(raw || '{}'); } catch { return {}; }
 }
 
-/** The text that goes into the conversation after a run, so Oracle can undo later. */
+/** Reply text after a typed "yes" (the user's "yes" is in the conversation just before it). */
 export function doneText(run) {
   if (run.result?.success === false) return `I tried: ${run.summary}\n\nIt failed: ${run.result.error || 'unknown error'}`;
   const undo = run.result?.undo_token ? `\n\nTo undo it, ask me to undo that move (undo token ${run.result.undo_token}).` : '';
   return `Done: ${run.summary}${undo}`;
+}
+
+const SYSTEM_MARK = "[System event — recorded by Granted's systems, not typed by anyone]";
+
+function vancouverNow(d = new Date()) {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
+  }).formatToParts(d).map(x => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} Vancouver time`;
+}
+
+/**
+ * The note saved (role 'system') after a press on Confirm. The press happens on
+ * the card, outside the conversation, so the model would otherwise see a
+ * "Done" with nothing before it. This records it as an outside event, with the
+ * drive_actions id and undo token, so a later "undo that" has evidence.
+ */
+export function systemEventText(run, { presserName = null, at = new Date() } = {}) {
+  const who = presserName || 'The person who asked';
+  if (run.result?.success === false) {
+    return `${SYSTEM_MARK} ${who} pressed Confirm on the card at ${vancouverNow(at)}. It failed: ${String(run.result.error || 'unknown error').replace(/[.\s]+$/, '')}. Nothing changed.`;
+  }
+  const record = run.result?.action_id ? ` drive_actions record ${run.result.action_id}.` : '';
+  const undo = run.result?.undo_token ? ` Undo token ${run.result.undo_token}.` : '';
+  return `${SYSTEM_MARK} ${who} pressed Confirm on the card at ${vancouverNow(at)}. It ran: ${run.result?.summary || run.summary}${record}${undo}`;
 }
 
 /**
@@ -56,7 +82,7 @@ export function renderConfirmCard(action, { state = 'open', detail = null, asker
   }
 
   if (state === 'open') {
-    widgets.push(paragraph(`<i>Only ${esc(askerName || 'the person who asked')} can confirm.</i>`));
+    widgets.push(paragraph(`<i>Press Confirm to run it. Only ${esc(askerName || 'the person who asked')} can confirm.</i>`));
     widgets.push(buttonRow([
       button('Confirm', { action: 'pending.confirm', actionId: action.id }),
       button('Cancel', { action: 'pending.cancel', actionId: action.id })
@@ -147,9 +173,11 @@ export async function handlePendingClick(evt) {
         detail: failed ? run.result.error : (run.result?.undo_token ? 'can be undone: ask Oracle to undo it' : null),
         askerName
       });
-      // The model never saw this run: put the outcome (and the undo token) in
-      // the conversation so a later "undo that" can find it.
-      await saveMessage(action.conversation_id, 'assistant', doneText(run)).catch(() => {});
+      // The model never saw this run: record it as a system event (not as
+      // Oracle's own words) with the drive_actions id and undo token, so a
+      // later "undo that" has evidence it can trust.
+      const presserName = person?.display_name || evt.actorName || person?.email || null;
+      await saveMessage(action.conversation_id, 'system', systemEventText(run, { presserName })).catch(() => {});
     }
   } else {
     return {};

@@ -21,7 +21,7 @@ import crypto from 'crypto';
 import { runAgent } from '../claude/client.js';
 import { createConversation, saveMessage } from '../database/messages.js';
 import { query } from '../database/connection.js';
-import { tryHandleConfirmation, currentPendingId, proposalNotice } from './confirmation.js';
+import { tryHandleConfirmation, tryHandleUndoRequest, currentPendingId, proposalNotice } from './confirmation.js';
 import { hubSignInUrl } from '../tools/chat-history.js';
 import { attachmentsOf, readAttachments, attachmentBlockText, unreadableLine } from '../tools/chat-attachments.js';
 import { isListenSpace } from '../chat-listen/config.js';
@@ -785,6 +785,30 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
         await refreshCardsForConversation(conversationId);
       } catch (err) {
         console.warn(`⚠️  Tracked card refresh after confirmation failed — code: ${err?.code || err?.name || 'unknown'}`);
+      }
+      return;
+    }
+
+    // "UNDO THAT" — also caught by code. The newest undoable Drive move in this
+    // conversation becomes an undo proposal with a confirm card; the model is
+    // never asked to remember (or doubt) whether the move ran.
+    const undoRequest = await tryHandleUndoRequest({ conversationId, userId: user.id, text: messageText });
+    if (undoRequest) {
+      await saveMessage(conversationId, 'user', messageText);
+      await saveMessage(conversationId, 'assistant', undoRequest.replyText);
+      if (undoRequest.action && evt.spaceIsResourceName) {
+        await safePost(evt, markdownToChat(undoRequest.replyText));
+        const { postConfirmCard } = await import('../cards/confirm-card.js');
+        const posted = await postConfirmCard({
+          spaceName: evt.spaceId,
+          threadName: evt.threadIsResourceName ? evt.threadId : null,
+          action: undoRequest.action
+        });
+        if (!posted) await safePost(evt, markdownToChat(`**Confirm before I run this:**\n${undoRequest.action.summary}\n\nOnly the person who asked can reply "yes".`));
+      } else if (undoRequest.action) {
+        await safePost(evt, markdownToChat(`${undoRequest.replyText}\n\n**Confirm before I run this:**\n${undoRequest.action.summary}\n\nOnly the person who asked can reply "yes".`));
+      } else {
+        await safePost(evt, markdownToChat(undoRequest.replyText));
       }
       return;
     }

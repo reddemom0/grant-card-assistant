@@ -75,7 +75,7 @@ jest.unstable_mockModule('../../src/tools/google-docs.js', () => ({
   getDriveClient: async () => null
 }));
 jest.unstable_mockModule('../../src/api/confirmation.js', () => ({
-  tryHandleConfirmation: async () => null, currentPendingId: async () => null, proposalNotice: async () => null
+  tryHandleConfirmation: async () => null, tryHandleUndoRequest: async () => null, currentPendingId: async () => null, proposalNotice: async () => null
 }));
 const listened = new Set();
 jest.unstable_mockModule('../../src/chat-listen/config.js', () => ({

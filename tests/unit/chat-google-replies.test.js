@@ -67,6 +67,7 @@ jest.unstable_mockModule('../../src/database/messages.js', () => ({
 
 jest.unstable_mockModule('../../src/api/confirmation.js', () => ({
   tryHandleConfirmation: jest.fn(async () => null),
+  tryHandleUndoRequest: jest.fn(async () => null),
   currentPendingId: jest.fn(async () => null),
   proposalNotice: jest.fn(async () => null)
 }));

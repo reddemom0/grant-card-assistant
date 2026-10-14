@@ -145,6 +145,12 @@ export async function getConversationMessages(conversationId, maxMessages = 60) 
     // Parse content JSON and format for Claude API
     const messages = result.rows
       .map(row => {
+        // A 'system' row is an outside event written by code (e.g. a press on a
+        // confirm card). The API has no system turns in messages, so it goes in
+        // as a user-role text block; its text carries the "[System event …]" mark.
+        if (row.role === 'system') {
+          return { role: 'user', content: [{ type: 'text', text: String(row.content) }] };
+        }
         let content;
 
         try {

@@ -10,7 +10,8 @@
  * Anything else returns null and the caller proceeds to the agent as normal.
  */
 
-import { getPendingAction, runPendingAction } from '../tools/pending-actions.js';
+import { getPendingAction, runPendingAction, savePendingAction, summarizeAction } from '../tools/pending-actions.js';
+import { query } from '../database/connection.js';
 
 /**
  * The complete set. Deliberately short and unambiguous — every entry means
@@ -124,4 +125,59 @@ export async function proposalNotice(conversationId, previousActionId) {
   }
   if (!action || action.id === previousActionId) return null;
   return `\n\n**Confirm before I run this:**\n${action.summary}\n\nReply "yes" and I'll do exactly that.`;
+}
+
+// ============================================================================
+// "UNDO THAT" — caught by code
+// ============================================================================
+
+/**
+ * True when the ENTIRE message asks to undo the last change, e.g. "undo that",
+ * "please undo the move", "put it back". Anything longer goes to the model.
+ */
+export function isUndoRequest(text) {
+  if (typeof text !== 'string') return false;
+  const t = text.trim().toLowerCase().replace(/[.!?…]+$/u, '').replace(/\s+/g, ' ').trim()
+    .replace(/^(please|can you|could you|pls)\s+/, '').replace(/\s+please$/, '');
+  return /^(undo( (that|it|this|the (last )?move|that move|the last change|that change))?|put it back|revert (that|it|the move))$/.test(t);
+}
+
+/**
+ * Handle "undo that" without the model. Finds the newest move in this
+ * conversation that can still be undone (drive_actions), checks it with
+ * planUndo, and saves an undo proposal — the same proposal the model's
+ * file_move_rename_undo call would save. The caller posts the confirm card.
+ *
+ * @returns {Promise<null|{replyText: string, action?: Object}>} null = not an undo request
+ */
+export async function tryHandleUndoRequest({ conversationId, userId, text }) {
+  if (!isUndoRequest(text)) return null;
+
+  let row;
+  try {
+    const r = await query(
+      `SELECT id, undo_token, name_after, path_after FROM drive_actions
+        WHERE conversation_id = $1 AND action = 'move_rename' AND result = 'done' AND undone_at IS NULL
+        ORDER BY created_at DESC LIMIT 1`,
+      [conversationId]
+    );
+    row = r.rows[0];
+  } catch (err) {
+    console.error(`❌ Undo lookup failed — code: ${err?.code ?? 'unknown'}`);
+    return { replyText: "I couldn't check the record of moves just now. Nothing was changed." };
+  }
+  if (!row) {
+    return { replyText: "I can't find a move in this conversation that can still be undone. Nothing was changed." };
+  }
+
+  const { planUndo } = await import('../tools/drive-actions.js');
+  const checked = await planUndo({ undo_token: row.undo_token });
+  if (!checked.ok) return { replyText: `${checked.reason} Nothing was changed.` };
+
+  const summary = summarizeAction('file_move_rename_undo', checked.plan);
+  const action = await savePendingAction({
+    conversationId, toolName: 'file_move_rename_undo', input: checked.plan, userId, summary
+  });
+  console.log(`🗂️  Undo request caught by code — drive_actions ${row.id}, proposal ${action.id}`);
+  return { replyText: 'Here is the undo. Press Confirm to run it.', action };
 }

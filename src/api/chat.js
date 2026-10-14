@@ -15,7 +15,7 @@ import {
   saveMessage
 } from '../database/messages.js';
 import { setupSSE, sendSSE, closeSSE } from '../claude/streaming.js';
-import { tryHandleConfirmation } from './confirmation.js';
+import { tryHandleConfirmation, tryHandleUndoRequest } from './confirmation.js';
 import { isValidAgentType, getAvailableAgents } from '../agents/load-agents.js';
 import { generateAndSaveTitle } from '../utils/conversation-titles.js';
 import { filesAPI } from '../anthropic-client.js';
@@ -176,6 +176,22 @@ export async function handleChatRequest(req, res) {
 
       setupSSE(res);
       sendSSE(res, { type: 'text_delta', text: confirmation.replyText });
+      sendSSE(res, { type: 'message_complete' });
+      closeSSE(res);
+      return;
+    }
+
+    // "Undo that": caught by code too (src/api/confirmation.js). With no card in
+    // the web hub, the proposal is confirmed by a typed "yes".
+    const undoRequest = await tryHandleUndoRequest({ conversationId: convId, userId: effectiveUserId, text: message });
+    if (undoRequest) {
+      const reply = undoRequest.action
+        ? `${undoRequest.replyText.replace('Press Confirm to run it.', '')}\n\n**Confirm before I run this:**\n${undoRequest.action.summary}\n\nReply "yes" and I'll do exactly that.`.trim()
+        : undoRequest.replyText;
+      await saveMessage(convId, 'user', message);
+      await saveMessage(convId, 'assistant', reply);
+      setupSSE(res);
+      sendSSE(res, { type: 'text_delta', text: reply });
       sendSSE(res, { type: 'message_complete' });
       closeSSE(res);
       return;
