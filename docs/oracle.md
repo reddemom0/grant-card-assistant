@@ -350,13 +350,20 @@ and log_issue, which files a Control Centre chat card; `src/tools/gg3-conversati
 the filing skill.
 
 `control_centre` (`src/tools/control-centre-tools.js`) is Oracle's read-only window on the
-Control Centre (`docs/control-centre.md`), one tool with five modes: `queue_summary` (open
+Control Centre (`docs/control-centre.md`), one tool with seven modes: `queue_summary` (open
 cards by status, owner and kind; stuck = open with no change or comment for 3+ days, the board's rule; oldest open),
 `list_cards` (filters: status, owner incl. `unassigned`, kind, company name/id, grant
 name/id, `stuck_only`; at most 20), `card` (one card in full: diagnosis, evidence, flags,
 history, linked cards), `overview` (`getOverview(range)` — tiles vs the window before with the
-internal share, client-only top lists, chat) and `chat_themes` (`latestDigest()`). Every card
-in every answer carries its link, `${PUBLIC_URL}/control-centre#review/<id>`
+internal share, client-only top lists, chat), `chat_themes` (`latestDigest()`), `grants_list`
+(the Grants tab's list, `grantList(range, view)`. `view` is `all`, `most_ignored` (displayed to 3+
+clients, most "shown but never opened" first) or `not_matching` (no client matched in the range,
+"Never" first). Counts are client-only with `internal_accounts_add`, at most 50) and `grant` (one
+grant's page, `grantPage(id, range)`, by root id or part of the name: companies matched by goal
+track with the AI review's marks, tags beside card text, engagement by day, recent edits shown as
+"app user #N" because the app stores no editor names, and review cards). The grant modes share the
+tab's code and SQL. Every card in every answer carries its link, `${PUBLIC_URL}/control-centre#review/<id>`,
+and every grant carries `#grants/<id>`
 (`src/control-centre/links.js`). SELECTs and the Control Centre's own read helpers only:
 Oracle can't move, reassign or close a card. Results are wrapped as untrusted like every
 tool result.

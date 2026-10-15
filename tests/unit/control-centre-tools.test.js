@@ -251,3 +251,65 @@ describe('registration', () => {
     expect(tool.description).toMatch(/can't move, reassign or close a card/);
   });
 });
+
+describe('grants_list and grant (the Grants tab, shared code)', () => {
+  const r = (id, over = {}) => ({ grant_id: id, title: `Grant ${id}`, clients_matched: 0, opens: 0, saves: 0, cuts: 0, ignored: 0,
+    displayed_clients: 0, bounced: 0, removed: 0, open_cards: 0, last_matched: null, ...over });
+  const lists = {
+    most_ignored: { clients: [r(1301, { clients_matched: 6, displayed_clients: 6, ignored: 6, last_matched: '2026-10-14' })],
+      all: [r(1301, { clients_matched: 7, displayed_clients: 7, ignored: 7, last_matched: '2026-10-14' })] },
+    all: { clients: [r(1196, { title: 'Agricultural Clean Technology' }), r(1301)], all: [r(1196, { title: 'Agricultural Clean Technology' }), r(1301)] }
+  };
+  const grantDeps = (over = {}) => makeDeps({
+    grantList: jest.fn(async (range, view) => ({ range, view, current: { from: '2026-10-09', to: '2026-10-15' }, live_grants: 212, ...lists[view] ?? lists.all })),
+    grantPage: jest.fn(async (id) => {
+      if (id === 999) throw Object.assign(new Error('x'), { status: 404 });
+      return {
+        current: { from: '2026-10-09', to: '2026-10-15' },
+        grant: { root_id: id, title: 'Agricultural Clean Technology', grantor: 'Government of Canada' },
+        totals: { clients: r(id, { clients_matched: 5, cuts: 6 }), all: r(id, { clients_matched: 7, cuts: 8 }) },
+        tracks: [{ label: 'Build Something New', companies: [{ company_id: 81, company_name: 'Maximizer', internal: true, last_day: '2026-10-14',
+          best_position: 3, eligibility: 'Likely', ai_review: { action: 'cut', words: 'AI review cut it: wrong region', reason: 'Ontario only.' } }] }],
+        tags: { industries: ['Agriculture'], regions: ['Canada'], card: [{ section: 'Eligibility', text: 'Farmers.' }] },
+        trend: { clients: [{ day: '2026-10-14', opens: 1, saves: 0, bounces: 1, removals: 0, ignored: 2 }, { day: '2026-10-15', opens: 0, saves: 0, bounces: 0, removals: 0, ignored: 0 }] },
+        edits: [{ at: '2026-09-29T18:12:27.000Z', what: 'Started a new draft', before: 'version 3681', after: 'version 3682', who: { user_id: 3, email: null } }],
+        cards: [{ id: 7, title: 'Agricultural Clean Technology — cut for several companies (wrong region)', status: 'new', owner: null, company_internal: false }]
+      };
+    }),
+    ...over
+  }).deps;
+
+  test('grants_list: the view, client-only counts with what internal accounts add, each grant linked', async () => {
+    const d = grantDeps();
+    const out = await run({ mode: 'grants_list', view: 'most_ignored' }, d);
+    expect(d.grantList).toHaveBeenCalledWith('week', 'most_ignored');
+    expect(out).toMatchObject({ view: 'most_ignored', in_view: 1, live_grants: 212, control_centre: 'https://hub.test/control-centre#grants' });
+    expect(out.grants[0]).toMatchObject({ grant: 'Grant 1301', link: 'https://hub.test/control-centre#grants/1301', shown_never_opened: 6,
+      last_matched: '2026-10-14', internal_accounts_add: { clients_matched: 1, shown_never_opened: 1 } });
+    expect(out.definitions).toMatch(/3 seconds/);
+  });
+
+  test('grants_list: bad view or range is refused; limit caps the rows', async () => {
+    expect((await run({ mode: 'grants_list', view: 'popular' }, grantDeps())).error).toMatch(/view must be one of/);
+    expect((await run({ mode: 'grants_list', range: 'fortnight' }, grantDeps())).error).toMatch(/range must be one of/);
+    const out = await run({ mode: 'grants_list', limit: 1 }, grantDeps());
+    expect(out.grants).toHaveLength(1);
+    expect(out.more).toBe(1);
+    expect(out.grants[0].last_matched).toBe('Never');
+  });
+
+  test('grant: by id or name; tracks named first with the internal tag, edits without names, cards linked', async () => {
+    const d = grantDeps();
+    const out = await run({ mode: 'grant', grant: '1196' }, d);
+    expect(d.grantPage).toHaveBeenCalledWith(1196, 'week');
+    expect(out.control_centre).toBe('https://hub.test/control-centre#grants/1196');
+    expect(out.companies_matched_by_goal_track[0].companies[0]).toMatchObject({ company: 'Maximizer', internal_account: true, ai_review_reason: 'Ontario only.' });
+    expect(out.engagement_clients).toMatchObject({ opens: 1, bounces: 1, shown_never_opened: 2 });
+    expect(out.engagement_clients.by_day).toHaveLength(1);
+    expect(out.recent_edits[0].by).toBe('app user #3');
+    expect(out.review_cards[0].link).toBe('https://hub.test/control-centre#review/7');
+    expect((await run({ mode: 'grant', grant: 'agricultural' }, d)).grant.grant_id).toBe(1196);
+    expect((await run({ mode: 'grant', grant: 'r' }, d)).candidates).toHaveLength(2);
+    expect((await run({ mode: 'grant', grant: '999' }, d)).error).toMatch(/not live/);
+  });
+});

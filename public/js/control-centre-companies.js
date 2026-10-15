@@ -500,5 +500,12 @@
     }
   }
 
-  window.CCCompanies = { render, clearCache: () => { listCache.clear(); pageCache.clear(); feedCache.clear(); } };
+  window.CCCompanies = {
+    render,
+    clearCache: () => { listCache.clear(); pageCache.clear(); feedCache.clear(); },
+    // "Why matched?" and "Flag as bad match" for another tab's rows (the Grants
+    // tab): the button carries the grant (data-why / data-flag), the caller the company.
+    toggleWhy: (btn, companyId, helpers) => { ctx = ctx || helpers; return toggleWhy(btn, companyId); },
+    toggleFlag: (btn, companyId, helpers) => { ctx = ctx || helpers; return toggleFlag(btn, companyId); }
+  };
 })();

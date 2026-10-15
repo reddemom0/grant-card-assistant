@@ -826,3 +826,61 @@
 .co-empty-result { font-size: 13.5px; font-weight: 600; }
 .co-empty-result a { color: var(--cc-teal); }
 .rq-type-empty_track { color: var(--cc-orange-ink); background: var(--cc-orange-tint); border-color: transparent; }
+
+/* ---------- Grants tab (control-centre-grants.js) ----------
+   Mirrors the Companies tab (co-*); gr-* only where a grant differs. Orange
+   marks a sign of disinterest (ignored, bounced, removed, cut); teal is the
+   grant's own activity. */
+.gr-views { display: inline-flex; gap: 4px; margin: 16px 0 4px; padding: 3px; border: 1px solid var(--cc-rule); border-radius: 999px; background: var(--cc-paper); }
+.gr-view {
+  border: 0; background: transparent; border-radius: 999px; padding: 7px 16px; cursor: pointer;
+  font-size: 14px; font-weight: 600; color: var(--cc-grey); transition: background .15s, color .15s;
+}
+.gr-view:hover { color: var(--cc-ink); }
+.gr-view[aria-selected="true"] { background: var(--cc-card); color: var(--cc-ink); box-shadow: 0 0 0 1px var(--cc-rule); }
+.gr-grantor { font-size: 12.5px; margin-top: 2px; max-width: 420px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gr-table td:first-child { min-width: 280px; }
+.gr-table th.num button { white-space: normal; max-width: 86px; line-height: 1.25; }
+.gr-table th.num, .gr-table td.num { padding-left: 8px; }
+.gr-table td.gr-zero { color: #b3bbc0; }
+.gr-table td.gr-hot { color: var(--cc-orange-ink); font-weight: 700; }
+.gr-never { display: inline-block; font-size: 12.5px; font-weight: 700; color: var(--cc-orange-ink); background: var(--cc-orange-tint); border-radius: 999px; padding: 2px 10px; }
+
+.gr-head-tools { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; margin: 0 0 14px; font-size: 13.5px; }
+.gr-tiles { grid-template-columns: repeat(8, minmax(0, 1fr)); }
+.gr-tiles .co-tile b { font-size: 24px; }
+.gr-tile-hot { background: var(--cc-orange-tint); }
+.gr-tile-hot b { color: var(--cc-orange-ink); }
+.gr-trend, .gr-grid, .gr-tags-sec { margin-top: 20px; }
+.gr-grid { align-items: start; }
+.gr-tags .co-kv th { width: 130px; }
+.gr-notes summary { cursor: pointer; font-size: 13px; color: var(--cc-teal); margin-top: 6px; }
+.gr-notes p { font-size: 13px; line-height: 1.5; color: var(--cc-grey); margin: 6px 0 0; }
+
+/* Engagement: small multiples, one strip per measure, one bar per day. */
+.gr-strips { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; }
+.gr-strip-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; color: var(--cc-grey); margin-bottom: 6px; }
+.gr-strip-head b { font-size: 18px; color: var(--cc-ink); }
+.gr-bars { display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr)); align-items: end; gap: 2px; height: 56px; border-bottom: 1px solid var(--cc-rule); }
+.gr-bars i { display: block; height: max(var(--h), 3px); background: var(--cc-teal); border-radius: 3px 3px 0 0; }
+.gr-bars i.is-zero { height: 3px; background: var(--cc-rule); }
+.gr-strip:nth-child(3) .gr-bars i:not(.is-zero), .gr-strip:nth-child(4) .gr-bars i:not(.is-zero), .gr-strip:nth-child(5) .gr-bars i:not(.is-zero) { background: var(--cc-orange); }
+
+/* Tags beside card text. */
+.gr-compare { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 24px; }
+.gr-compare h3 { font-size: 14px; margin: 0 0 8px; color: var(--cc-grey); font-weight: 600; }
+.gr-card-text { border-left: 1px solid var(--cc-rule); padding-left: 24px; max-height: 560px; overflow: auto; }
+.gr-card-sec { border-bottom: 1px solid var(--cc-rule); padding: 8px 0; }
+.gr-card-sec summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+.gr-card-sec p { font-size: 13.5px; line-height: 1.55; margin: 8px 0 4px; white-space: pre-line; }
+
+.gr-edits { list-style: none; margin: 0; padding: 0; }
+.gr-edits li { padding: 10px 0; border-bottom: 1px solid var(--cc-rule); font-size: 13px; }
+.gr-edits li:last-child { border-bottom: 0; }
+.gr-edit-top { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; }
+.gr-edit-change { margin: 4px 0; line-height: 1.45; overflow-wrap: anywhere; }
+.gr-before { color: var(--cc-grey); text-decoration: line-through; text-decoration-color: #c5cbcf; }
+.gr-after { color: var(--cc-ink); }
+.rq-d-grant { font-size: 13px; color: var(--cc-grey); margin: 0 0 4px; }
+.rq-d-grant a { color: var(--cc-teal); font-weight: 600; }
+@media (max-width: 1100px) { .gr-tiles { grid-template-columns: repeat(4, minmax(0, 1fr)); } .gr-strips { grid-template-columns: repeat(3, minmax(0, 1fr)); } .gr-compare { grid-template-columns: minmax(0, 1fr); } .gr-card-text { border-left: 0; padding-left: 0; } }

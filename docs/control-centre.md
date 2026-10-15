@@ -7,7 +7,8 @@ of the data.
 
 Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`,
 `rollup.js`, `review-queue.js`, `review-routes.js`, `diagnosis.js`, `overview.js`,
-`overview-routes.js`. Page: `control-centre.html`, `public/js/control-centre.js`,
+`overview-routes.js`, `companies.js`, `companies-routes.js`, `grants.js`, `grants-routes.js`.
+Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`),
 `public/css/control-centre.css`.
 Tests: `tests/unit/control-centre-*.test.js`.
 
@@ -555,7 +556,8 @@ The page uses platform language, not database names:
 ### Frame and URL
 
 There are 7 tabs: Overview (the default), Inbox, Companies, Grants, Review queue, Coverage &
-changes and Chat themes. Only Overview has content; the others show a "Coming soon" card.
+changes and Chat themes. Overview, Companies, Grants and Review queue have content; the others
+show a "Coming soon" card.
 Inbox and Review queue carry a badge with the count of review items that aren't closed.
 
 All state is in the URL, so any view can be linked and the back button works:
@@ -565,12 +567,15 @@ All state is in the URL, so any view can be linked and the back button works:
 | `tab` | `overview` (omitted), `inbox`, `companies`, `grants`, `review`, `coverage`, `themes` |
 | `range` | `day`, `week` (default), `month`, `year` |
 | `company` | companies.id, only with `tab=companies` |
-| `grant` | grant **root** id, only with `tab=grants` |
+| `grant` | grant **root** id, only with `tab=grants` (rewritten to `#grants/<id>`) |
+
+Companies, Grants and Review queue keep their own state in the hash instead: `#companies/<id>`,
+`#grants/<id>`, `#grants?view=…&sort=…&dir=…&q=…`, `#review/<id>`.
 
 The last range is also kept in `localStorage['cc.range']`, in try/catch, so the page works
 without it. Search finds companies by name or id and live grants by title or root id.
-Choosing a result deep-links to the Companies or Grants tab with it selected. Every grant row
-on Overview links the same way.
+Choosing a result deep-links to the Companies or Grants tab with it selected. Every grant name
+on Overview, the Companies page and a review card's panel links to `#grants/<id>`.
 
 ### Ranges
 
@@ -902,14 +907,91 @@ read-only pool, and running them together delayed the part that matters.
   a transcript returns 503 `migration_missing`.
 - **Not done here:** the goal-question answers themselves, recomputing matches.
 
+## The Grants tab
+
+Every live grant with its matches and engagement for the range, and a page per grant.
+Code: `src/control-centre/grants.js` (reads only), `grants-routes.js` (mounted at
+`/api/control-centre/grants`, `authenticateUser` + `requireAuth`), `public/js/control-centre-grants.js`,
+the `gr-` styles. Tests: `tests/unit/control-centre-grants.test.js`.
+
+### Views (`#grants?view=`)
+
+| View | What's in it | Default order |
+|---|---|---|
+| **All grants** (`all`, default) | every live grant (212 on 2026-10-15) | most clients matched |
+| **Most ignored** (`most_ignored`) | grants **displayed** to at least **3** distinct clients in the range (`MIN_IGNORED_CLIENTS`) | most "shown but never opened" |
+| **Not matching anyone** (`not_matching`) | live grants with **no client matched** in the range | longest since the last match; **"Never"** (no match since match data starts, 2026-08-26) first |
+
+Every column sorts and the name filter also matches the root id and funder. The "Include
+internal accounts" switch is the Overview's (off by default, same stored setting): the API
+returns both variants, client-only and with internal accounts, so it switches with no refetch.
+A grant matched only to internal accounts is "not matching" with the switch off.
+
+### Definitions (per grant, for the range)
+
+| Column | Definition | Source |
+|---|---|---|
+| Clients matched | distinct companies the engine **showed** it to (`times_shown > 0`), the Overview's "matches shown" | the Overview's window rows (`loadWindowRows`: `cc_daily_matches` + live days) |
+| Card opens | grant card opens (sessions) | the same rows (`cc_daily_views` + live days) |
+| Saves | added to a watchlist | app `watchlist_grants.created_at` |
+| AI cuts | distinct companies the AI review cut it for | the roll-up's `ai_review_action = 'cut'` |
+| Shown, never opened | distinct companies it was **displayed** to on or after **2026-09-09**, with no `grant_view_sessions` row for that company and grant at any time | roll-up rows + app `grant_view_sessions` |
+| Bounced | card opens with `visible_ms` **under 3000** (`BOUNCE_MS`): 2999 counts, 3000 doesn't | app `grant_view_sessions` |
+| Removed | taken off a watchlist (`watchlist_grants.deleted_at`, a soft delete; deleted watchlists held no grants on 2026-10-15) | app |
+| Open cards | review cards about the grant that aren't closed, any kind | Hub `cc_review_items.grant_root_id` |
+| Last matched | the latest day any (client) company was shown it; "Never" when none | Hub `cc_daily_matches` all time + live days |
+
+- **Displayed vs shown.** `match_results.shown` is the engine's decision, before the AI review
+  runs. A grant the AI review cuts (`final_rank` null) never reaches the client's screen, so it
+  counts in "clients matched" (as on the Overview) but not as displayed. Displayed = shown and
+  that day's roll-up row isn't `cut`. The roll-up keeps the day's last review action, so a grant
+  shown in one run and cut in a later run the same day counts as cut. That is an approximation.
+- **Why 2026-09-09.** `grant_view_sessions` starts then (`OPENS_TRACKED_FROM`). A display
+  before it can't be called "never opened", so Year ranges don't count those.
+- Ids: `match_results.grant_id`, `ai_review_log.grant_id`, `grant_view_sessions.grant_root_id`,
+  `watchlist_grants.grant_id` and `grant_audit_logs.grant_id` are all grant **root** ids
+  (checked against `grant_roots` on 2026-10-15).
+
+### A grant's page (`#grants/<id>`)
+
+`GET /api/control-centre/grants/:id?range=`. A root with no live version returns 404.
+
+- **Header:** title, funder, type, value, deadline, version, and tiles for the counts above
+  (switch-aware).
+- **Companies matched:** the range's roll-up rows for the grant, grouped by goal track
+  (`section`; `funding_matches` = "All goals"). Each company is named first with the Internal
+  tag, and shows the last day shown, the best position, eligibility, and the AI review's mark
+  with its reason (ops `ai_review_log` for this grant, keyed to the company through its match
+  row, `GRANT_REVIEW_SQL`). Every row has the Companies tab's own **Why matched?** and **⚑ Flag
+  as bad match** (`CCCompanies.toggleWhy` / `toggleFlag`: `GET /companies/:id/why`,
+  `POST /review/flag`). Internal companies hide with the switch off.
+- **Engagement:** five small bar strips (card opens, saves, bounces, removals, shown but never
+  opened) by day over the range, by week for Year. A never-opened client counts once, on the
+  first day it was displayed.
+- **Tags and card text, side by side:** `grantTags()` and `cardSections()` (`src/tools/grant-data-modes.js`)
+  on the Hub's `gg3_grants` row: what matching reads beside what clients read.
+- **Recent edits:** the newest 30 `grant_audit_logs` rows in words, with versions by number,
+  HTML stripped and clipped to 200 characters, and tag syncs as counts. **The app DB stores no
+  editor names.** An edit shows "app user #N", plus the email when `user_email_contacts` has one
+  (1 of 14 editors on 2026-10-15).
+- **Review cards:** every card with this grant root, grant-pattern cards included, each linking
+  to `#review/<id>`.
+
+The list and page share one window load per range (`loadGrantWindow`, cached 5 minutes). The
+Overview's `ROLLED_MATCHES_SQL` also selects `section`, `best_position`, `eligibility` and
+`ai_review_action` for it; the Overview ignores them.
+
 ## Oracle: `control_centre` (read-only)
 
 `src/tools/control-centre-tools.js`, Oracle-only and deferred (found by tool search). Modes:
 `queue_summary`, `list_cards` (status, owner incl. `unassigned`, kind, company, grant,
 `stuck_only` = open with no change or comment for 3+ days, the board's rule and SQL; ≤20), `card` (one card in full: diagnosis,
 evidence — chat turns or review reasons — flags, history, linked cards), `overview`
-(`getOverview(range)`, client-only lists) and `chat_themes` (`latestDigest()`). Every card in
-every answer carries its link; companies are named first and internal accounts tagged.
+(`getOverview(range)`, client-only lists), `chat_themes` (`latestDigest()`), `grants_list`
+(`grantList(range, view)`: client-only counts with `internal_accounts_add`, ≤20 by default, max 50)
+and `grant` (`grantPage(id, range)` by root id or part of the name, trimmed). The two grant modes
+call the Grants tab's own functions, so there are no extra queries. Every card and grant in every
+answer carries its link; companies are named first and internal accounts tagged.
 SELECTs and the existing read helpers only — Oracle can't move, reassign or close a card.
 Details: `docs/oracle.md`, "Tool loadout".
 

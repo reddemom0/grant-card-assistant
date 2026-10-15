@@ -93,8 +93,11 @@ export function compare(current, previous) {
 // ---------------------------------------------------------------------------
 
 // `day::text` so the DATE never passes through a JS Date in the server's zone.
+// section / best_position / eligibility / ai_review_action are for the Grants
+// tab (grants.js); the Overview itself doesn't read them.
 export const ROLLED_MATCHES_SQL = `
-  SELECT day::text AS day, company_id, grant_id, times_computed, times_shown
+  SELECT day::text AS day, company_id, grant_id, section, times_computed, times_shown,
+         best_position, eligibility, ai_review_action
     FROM cc_daily_matches WHERE day BETWEEN $1::date AND $2::date`;
 export const ROLLED_VIEWS_SQL = `
   SELECT day::text AS day, company_id, grant_root_id, source, sessions
