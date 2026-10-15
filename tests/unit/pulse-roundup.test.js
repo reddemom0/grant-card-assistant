@@ -1,8 +1,11 @@
 /**
- * Pulse morning roundup: what counts, what flags, grouping, the DM, once a day.
+ * Pulse morning roundup (Oracle's chat-issue detector): what counts, what
+ * flags, the chat cards it files (one per issue per conversation, snapshot
+ * verbatim), the DM with card links, once a day.
  *
  * gg3-ops-db.js is the real module (its staff filter is what is being tested);
- * queries, the model, the profile route, the sheet and Chat are injected fakes.
+ * queries, the model, the profile route, the review queue and Chat are
+ * injected fakes.
  *
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest --config tests/jest.config.cjs tests/unit/pulse-roundup.test.js
  */
@@ -16,20 +19,20 @@ jest.unstable_mockModule('../../src/utils/cost-logger.js', () => ({ logAPICost: 
 
 const R = await import('../../src/services/pulse-roundup.js');
 const {
-  collectErrors, collectConversations, reviewConversation, cleanReview, transcriptOf, buildItems,
-  groupIssues, fallbackIssues, clientLabels, clientRef, formatRoundup, runMorningRoundup, startPulseRoundup,
-  missingRoundupEnv, OWNERS, _resetPulseRoundupForTests
+  collectErrors, collectConversations, reviewConversation, cleanReview, transcriptOf, cardCandidates, snapshotFor,
+  fileCards, dmCards, clientLabels, clientRef, formatRoundup, runMorningRoundup, startPulseRoundup,
+  missingRoundupEnv, OWNERS, DETECTOR_ACTOR, locateFlagged, numberedTranscript, _resetPulseRoundupForTests
 } = R;
 
 const ENV = {
   GG3_OPS_DB_READONLY_URL: process.env.GG3_OPS_DB_READONLY_URL,
   PULSE_ROUNDUP_SUBSCRIBERS: 'chris@granted.ca',
-  PULSE_ERRORS_SHEET_ID: 'sheet123',
-  PULSE_SHEET_OWNER_EMAIL: 'chris@granted.ca'
+  PUBLIC_URL: 'https://hub.test'
 };
 const NOW = new Date('2026-10-01T15:00:00Z');   // 08:00 in Vancouver
 
 const msg = (role, text) => ({ role, content: [{ type: 'text', text }] });
+const say = (text) => ({ role: 'user', content: text }); // a client message that starts a turn
 const conv = (id, userId, messages) => ({ id, userId, messages, updatedAt: NOW });
 
 /** A fake messages.create: answers each tool by name. */
@@ -45,13 +48,31 @@ function fakeModel(answers) {
   return { createMessage, calls };
 }
 
-function makeDeps({ errors = [], conversations = [], answers = {}, claimRows = [{ alert_key: 'k' }], sheetValues = [], profile = null, postResult = true } = {}) {
+/** addFlag over an in-memory queue: one card per chat_turn_ref, source_ref deduped. */
+function fakeQueue() {
+  const cards = [];
+  const flags = [];
+  const addFlag = jest.fn(async (input) => {
+    let card = cards.find(c => c.chat_turn_ref === input.chat_turn_ref);
+    const created = !card;
+    if (!card) { card = { id: 100 + cards.length, ...input, flag_count: 0, snapshot: null }; cards.push(card); }
+    if (flags.some(f => f.source_ref === input.source_ref)) return { item: card, duplicate: true, created: false, reopened: false };
+    flags.push(input);
+    card.flag_count += 1;
+    if (!card.snapshot && input.snapshot) card.snapshot = input.snapshot;
+    return { item: card, duplicate: false, created, reopened: false };
+  });
+  return { cards, flags, addFlag };
+}
+
+function makeDeps({ errors = [], conversations = [], answers = {}, claimRows = [{ alert_key: 'k' }], profile = null, postResult = true } = {}) {
   const model = fakeModel({
     conversation_review: { flags: [], take: '', owner: OWNERS[0] },
-    issues: (p) => ({ issues: [] }),
     ...answers
   });
+  const queue = fakeQueue();
   return {
+    queue,
     model,
     collectErrors: jest.fn(async () => errors),
     collectConversations: jest.fn(async () => conversations),
@@ -64,9 +85,9 @@ function makeDeps({ errors = [], conversations = [], answers = {}, claimRows = [
     }),
     getSubscribers: jest.fn(async () => [{ email: 'chris@granted.ca', dmSpace: 'spaces/DM1' }]),
     post: jest.fn(async () => postResult),
-    readSheet: jest.fn(async () => ({ success: true, data: { values: sheetValues } })),
-    updateSheet: jest.fn(async () => ({ success: true })),
-    appendSheet: jest.fn(async () => ({ success: true }))
+    addFlag: queue.addFlag,
+    companyFor: jest.fn(async (ids) => new Map(ids.map(id => [id, 135]))),
+    readMessages: jest.fn(async () => [say('why did it break?'), msg('assistant', '')])
   };
 }
 
@@ -90,7 +111,9 @@ describe('what is read', () => {
     expect(sql).toContain('FROM chat_turns');
     expect(sql).toContain('NOT (user_id = ANY($4::text[]))');
     expect(params).toEqual([24, ['error', 'max_rounds', 'no_answer'], expect.arrayContaining(['missing_message']), ['user_staff1', 'user_staff2']]);
-    expect(errors.map(e => [e.label, e.category])).toEqual([['chat broke', null], ['empty reply or refusal', 'refusal']]);
+    expect(errors.map(e => [e.label, e.category, e.issue, e.turnId])).toEqual([
+      ['chat broke', null, 'chat_broke', 't1'], ['empty reply or refusal', 'refusal', 'empty_reply', 't2']]);
+    expect(sql).toContain('turn_index');
   });
 
   test('conversations: active in the window by updated_at, staff left out, at most 50', async () => {
@@ -104,12 +127,18 @@ describe('what is read', () => {
 
   test('the transcript keeps words only: tool calls and results are dropped', () => {
     const t = transcriptOf([
-      msg('user', 'Which grants fit us?'),
+      say('Which grants fit us?'),
       { role: 'assistant', content: [{ type: 'tool_use', name: 'search', input: {} }] },
       { role: 'user', content: [{ type: 'tool_result', content: 'raw rows' }] },
-      { role: 'assistant', content: [{ type: 'text', text: 'Here are three.' }] }
+      { role: 'assistant', content: [{ type: 'text', text: 'Here are three.' }] },
+      say('And for hiring?')
     ]);
-    expect(t).toEqual([{ role: 'client', text: 'Which grants fit us?' }, { role: 'assistant', text: 'Here are three.' }]);
+    // Client messages that start a turn carry the same 0-based turn the ops DB and the diagnosis count.
+    expect(t).toEqual([
+      { role: 'client', text: 'Which grants fit us?', turn: 0 },
+      { role: 'assistant', text: 'Here are three.' },
+      { role: 'client', text: 'And for hiring?', turn: 1 }
+    ]);
   });
 });
 
@@ -141,51 +170,110 @@ describe('went badly', () => {
     expect(cleanReview({ flags: ['left_unanswered'], take: 'x', owner: OWNERS[0] }, clientLast).flags).toEqual([]);
     const assistantLast = [{ role: 'client', text: 'q' }, { role: 'assistant', text: 'a' }];
     expect(cleanReview({ flags: ['left_unanswered'], take: 'x', owner: OWNERS[0] }, assistantLast).flags).toEqual(['left_unanswered']);
-    // A chat the model found fine is no item at all.
-    expect(buildItems([], [{ ok: true, flags: [], take: '', owner: OWNERS[0], userId: 'u1' }])).toEqual([]);
+    // A chat the model found fine is no card at all.
+    expect(cardCandidates([], [{ ok: true, flags: [], take: '', owner: OWNERS[0], userId: 'u1', conversationId: 1 }])).toEqual([]);
   });
 
   test('unknown flags and owners are dropped; a failed review is reported, not thrown', async () => {
     expect(cleanReview({ flags: ['made_up', 'pushback'], take: 'x', owner: 'Steph' }, [{ role: 'client', text: 'wrong' }]))
-      .toEqual({ flags: ['pushback'], take: 'x', owner: OWNERS[0] });
+      .toEqual({ flags: ['pushback'], take: 'x', fullTake: 'x', owner: OWNERS[0] });
+    const long = 'word '.repeat(60).trim();
+    const c = cleanReview({ flags: ['pushback'], take: long, owner: OWNERS[0] }, [{ role: 'client', text: 'wrong' }]);
+    expect(c.take.length).toBeLessThanOrEqual(160);
+    expect(c.fullTake).toBe(long);
     const { createMessage } = fakeModel({ conversation_review: Object.assign(new Error('x'), { status: 529 }) });
     expect(await reviewConversation(conv(1, 'u', [msg('user', 'hi')]), createMessage)).toEqual({ ok: false, code: '529' });
   });
 });
 
-describe('grouping', () => {
-  const errors = [
-    { kind: 'error', label: 'chat broke', category: 'connection_error', userId: 'user_aaaa1111' },
-    { kind: 'error', label: 'chat broke', category: 'connection_error', userId: 'user_bbbb2222' }
-  ];
-  const reviews = [{ ok: true, flags: ['pushback'], take: 'Gave the wrong deadline', owner: 'Research (grant card data)', userId: 'user_cccc3333' }];
+describe('the flagged message', () => {
+  const t = [{ role: 'client', text: 'a', turn: 0 }, { role: 'assistant', text: 'b' }, { role: 'client', text: 'c', turn: 1 },
+    { role: 'assistant', text: 'd' }, { role: 'client', text: 'e', turn: 2 }, { role: 'assistant', text: 'f' }];
+  const review = { flags: ['pushback'], take: 'Wrong deadline', owner: OWNERS[0] };
 
-  test('the model names the issues; counts and clients are counted in code; unknown ids dropped; leftovers kept', async () => {
-    const items = buildItems(errors, reviews);
-    expect(items.map(i => [i.id, i.count])).toEqual([['e1', 2], ['c1', 1]]);
-    const { createMessage } = fakeModel({ issues: { issues: [
-      { name: 'Chat drops the connection', item_ids: ['e1', 'zz9'], take: 'Connection errors mid-answer', owner: 'Chris (AI behaviour)', existing_row: 2 },
-      { name: 'Duplicate', item_ids: ['e1'], take: 'x', owner: 'Jason (app/UI)', existing_row: 77 }
-    ] } });
-    const { issues, grouped } = await groupIssues(items, [{ row: 2, name: 'Chat times out', status: 'being fixed' }], createMessage);
-    expect(grouped).toBe('model');
-    expect(issues[0]).toMatchObject({ name: 'Chat drops the connection', count: 2, existingRow: 2 });
-    expect(issues[0].userIds.sort()).toEqual(['user_aaaa1111', 'user_bbbb2222']);
-    // e1 was already used; c1 was left out by the model and still reported.
-    expect(issues).toHaveLength(2);
-    expect(issues[1]).toMatchObject({ name: 'Went badly: pushed back', count: 1, take: 'Gave the wrong deadline', existingRow: null });
+  test('the locate call names it by its shown number; anything else falls back to the last client turn', async () => {
+    const at = async (answer) => (await locateFlagged(t, review, fakeModel({ flagged_message: answer }).createMessage));
+    expect(await at({ client_message: 2 })).toEqual({ turnIndex: 1, located: 'model' });
+    expect(await at({ client_message: 9 })).toEqual({ turnIndex: 2, located: 'fallback' });
+    expect(await at(Object.assign(new Error('x'), { status: 529 }))).toEqual({ turnIndex: 2, located: 'fallback', code: '529' });
+    expect(numberedTranscript(t)).toContain('CLIENT (message 3): e');
   });
 
-  test('when the grouping call fails, the rules group by kind and match rows by name', async () => {
-    const items = buildItems(errors, reviews);
-    const { createMessage } = fakeModel({ issues: new Error('timeout') });
-    const { issues, grouped } = await groupIssues(items, [{ row: 5, name: 'Chat broke (connection_error)' }], createMessage);
-    expect(grouped).toBe('rules');
-    expect(issues.map(i => [i.name, i.count, i.existingRow])).toEqual([
-      ['Chat broke (connection_error)', 2, 5],
-      ['Went badly: pushed back', 1, null]
+  test('the review call is unchanged (no numbers, no message field); the locate call runs only when flagged', async () => {
+    const { createMessage, calls } = fakeModel({
+      conversation_review: { flags: ['pushback'], take: 't', owner: OWNERS[0] },
+      flagged_message: { client_message: 1 }
+    });
+    const r = await reviewConversation(conv(1, 'u', [say('first'), msg('assistant', 'wrong'), say('that is wrong')]), createMessage);
+    expect(r).toMatchObject({ ok: true, flags: ['pushback'], turnIndex: 0, located: 'model' });
+    expect(calls.map((c) => c.tool_choice.name)).toEqual(['conversation_review', 'flagged_message']);
+    expect(calls[0].messages[0].content).toContain('CLIENT: that is wrong');
+    expect(calls[0].messages[0].content).not.toContain('(message');
+    expect(Object.keys(calls[0].tools[0].input_schema.properties)).toEqual(['flags', 'take', 'owner']);
+    expect(calls[1].messages[0].content).toContain('CLIENT (message 2): that is wrong');
+    expect(calls[1].messages[0].content).toContain('The problem: pushed back — t');
+
+    const fine = fakeModel({ conversation_review: { flags: [], take: '', owner: OWNERS[0] } });
+    const ok = await reviewConversation(conv(2, 'u', [say('hi'), msg('assistant', 'hello')]), fine.createMessage);
+    expect(ok).toMatchObject({ flags: [], turnIndex: null });
+    expect(fine.calls).toHaveLength(1);
+  });
+});
+
+describe('card candidates', () => {
+  const reviews = [
+    { ok: true, flags: ['repeated_question', 'pushback'], take: 'Gave the wrong deadline', owner: 'Research (grant card data)',
+      userId: 'user_cccc3333', conversationId: 7, turnIndex: 2, messages: [], updatedAt: NOW },
+    { ok: true, flags: [], take: '', owner: OWNERS[0], userId: 'user_x', conversationId: 8, turnIndex: null }
+  ];
+  const errors = [
+    { issue: 'chat_broke', label: 'chat broke', category: 'connection_error', userId: 'user_aaaa1111', conversationId: 4, turnId: 'ta', turnIndex: 1, at: NOW },
+    { issue: 'chat_broke', label: 'chat broke', category: 'connection_error', userId: 'user_aaaa1111', conversationId: 4, turnId: 'tb', turnIndex: 3, at: NOW },
+    { issue: 'empty_reply', label: 'empty reply or refusal', category: null, userId: 'user_b', conversationId: null, turnId: 'tc', turnIndex: null, at: NOW }
+  ];
+
+  test('one card per issue per conversation; the main flag names the issue; a fine chat is nothing', () => {
+    const c = cardCandidates(errors, reviews);
+    expect(c.map(x => [x.ref, x.sourceRef, x.name])).toEqual([
+      ['conv:7:pushback', 'oracle:7:pushback:t2', 'Asked again, pushed back'],
+      ['conv:4:chat_broke', 'oracle:turn:ta', 'Chat broke (connection_error)'],
+      ['conv:4:chat_broke', 'oracle:turn:tb', 'Chat broke (connection_error)'],
+      ['tc', 'oracle:turn:tc', 'Empty reply or refusal']
     ]);
-    expect(fallbackIssues([], [])).toEqual([]);
+  });
+
+  test('the snapshot is the flagged turn and the 3 before it, verbatim', () => {
+    const long = 'x'.repeat(6000);
+    const messages = [say('q0'), msg('assistant', 'a0'), say('q1'), msg('assistant', 'a1'), say('q2'), msg('assistant', 'a2'),
+      say('q3'), msg('assistant', 'a3'), say(long), msg('assistant', 'bad answer'), say('that is wrong'), msg('assistant', 'sorry')];
+    const snap = snapshotFor({ conversationId: 7, issue: 'pushback', flags: ['pushback'], take: 't', turnIndex: 4 }, messages);
+    expect(snap).toMatchObject({ source: 'oracle_detected', conversation_id: 7, issue: 'pushback', flagged_turn_index: 4 });
+    expect(snap.turns.map(x => x.turn_index)).toEqual([1, 2, 3, 4]);
+    expect(snap.turns.at(-1)).toMatchObject({ client: long, assistant: 'bad answer', flagged: true });
+    expect(snapshotFor({ turnIndex: 1 }, null)).toBeNull();
+  });
+
+  test('filing: the same issue in the same conversation is one card; a re-detected turn adds nothing', async () => {
+    const q = fakeQueue();
+    const deps = { addFlag: q.addFlag, companyFor: async () => new Map([['user_aaaa1111', 120]]), readMessages: jest.fn(async () => [say('hi'), msg('assistant', '')]) };
+    const c = cardCandidates(errors, reviews);
+    const first = await fileCards(c, deps);
+    expect(first.failed).toBe(0);
+    expect(q.cards.map(x => [x.chat_turn_ref, x.flag_count])).toEqual([['conv:7:pushback', 1], ['conv:4:chat_broke', 2], ['tc', 1]]);
+    expect(deps.readMessages).toHaveBeenCalledTimes(1); // conversation 4, read once; the review had its messages
+    expect(q.flags[1]).toMatchObject({ kind: 'chat', source: 'oracle_detected', actor: DETECTOR_ACTOR, company_id: 120, conversation_id: 4,
+      comment: 'Chat broke (connection_error): The chat failed before it finished answering.' });
+    expect(q.cards[2].snapshot).toBeNull(); // no conversation: diagnosis reads the turn itself
+    const again = await fileCards(c, deps);
+    expect(again.results.every(r => r.duplicate)).toBe(true);
+    expect(dmCards(again.results, new Map())).toEqual([]);
+  });
+
+  test('a failed filing is counted, not thrown', async () => {
+    const r = await fileCards(cardCandidates(errors.slice(0, 1), []), {
+      addFlag: async () => { throw Object.assign(new Error('x'), { code: '42P01' }); }, companyFor: async () => new Map(), readMessages: async () => null });
+    expect(r.failed).toBe(1);
+    expect(dmCards(r.results, new Map())[0]).toMatchObject({ id: null, count: 1 });
   });
 });
 
@@ -201,55 +289,56 @@ describe('client names', () => {
 });
 
 describe('the DM', () => {
-  const issue = (name, count, extra = {}) => ({ name, count, userIds: [`u${name}`], clients: [`Co ${name}`], take: `take ${name}`, owner: OWNERS[0], seenBefore: false, beingFixed: false, ...extra });
+  const card = (name, count, extra = {}) => ({ id: count * 10, name, count, userIds: [`u${name}`], client: `Co ${name}`, take: `take ${name}`,
+    owner: OWNERS[0], created: true, reopened: false, ...extra });
 
-  test('header, one line per issue (most first, at most 5), tags, and the sheet link', () => {
+  test('header, one line per card (most first, at most 5), tags, and each card link', () => {
     const text = formatRoundup([
-      issue('A', 1), issue('B', 9, { seenBefore: true }), issue('C', 3, { seenBefore: true, beingFixed: true }),
-      issue('D', 2), issue('E', 2), issue('F', 1)
-    ], { sheetId: 'sheet123' });
+      card('A', 1), card('B', 9, { created: false }), card('C', 3, { created: false, reopened: true }),
+      card('D', 2), card('E', 2), card('F', 1, { id: null })
+    ], { env: { PUBLIC_URL: 'https://hub.test/' } });
     const lines = text.split('\n');
     expect(lines[0]).toBe('☀️ GetGranted chat — last 24h: 6 issues across 6 clients.');
-    expect(lines[1]).toBe('• B — Co B — take B — Chris (AI behaviour) — seen before');
-    expect(lines[2]).toBe('• C — Co C — take C — Chris (AI behaviour) — known, being fixed');
+    expect(lines[1]).toBe('• B (9×) — Co B — take B — Chris (AI behaviour) — seen before — https://hub.test/control-centre#review/90');
+    expect(lines[2]).toBe('• C (3×) — Co C — take C — Chris (AI behaviour) — reopened — https://hub.test/control-centre#review/30');
     expect(lines.filter(l => l.startsWith('• '))).toHaveLength(5);
     expect(lines.at(-2)).toBe('…and 1 more.');
-    expect(lines.at(-1)).toBe('Full list: https://docs.google.com/spreadsheets/d/sheet123. Ask me about any of these for the conversation.');
+    expect(lines.at(-1)).toBe('All chat cards: https://hub.test/control-centre. Ask me about any of these for the conversation.');
+    expect(text).not.toMatch(/docs\.google\.com/);
   });
 
-  test('singulars, and more than three clients are summarised', () => {
-    const text = formatRoundup([{ ...issue('A', 1), userIds: ['a', 'b', 'c', 'd'], clients: ['W', 'X', 'Y', 'Z'] }], { sheetId: 's' });
-    expect(text).toContain('1 issue across 4 clients');
-    expect(text).toContain('• A — W, X, Y +1 more —');
+  test('singulars, and the production Hub when PUBLIC_URL is unset', () => {
+    const text = formatRoundup([card('A', 1)], { env: {} });
+    expect(text).toContain('1 issue across 1 client');
+    expect(text).toContain('https://grant-card-assistant-production.up.railway.app/control-centre#review/10');
   });
 });
 
 describe('the morning run', () => {
-  const badChat = conv(9, 'user_dddd4444', [msg('user', 'that is wrong'), msg('assistant', 'Sorry.')]);
+  const badChat = conv(9, 'user_dddd4444', [say('what is the CDAP deadline?'), msg('assistant', 'It closed in 2024.'), say('that is wrong')]);
   const answers = {
-    conversation_review: { flags: ['pushback'], take: 'Client said the answer was wrong', owner: 'Chris (AI behaviour)' },
-    issues: { issues: [{ name: 'Wrong answers on deadlines', item_ids: ['c1'], take: 'Deadline answers were wrong', owner: 'Research (grant card data)', existing_row: 2 }] }
+    conversation_review: { flags: ['pushback'], take: 'Client said the deadline was wrong', owner: 'Research (grant card data)' },
+    flagged_message: { client_message: 1 }
   };
-  const SHEET_ROWS = [['Wrong answers on deadlines', '2026-09-20', '2026-09-28', '4', 'Acme', 'Research (grant card data)', 'being fixed', 'Research checking', 'reported by Steph']];
 
-  test('nothing happened: no claim, no sheet, no DM', async () => {
+  test('nothing happened: no claim, no card, no DM', async () => {
     const d = makeDeps();
     expect(await runMorningRoundup({ now: NOW, env: ENV, deps: d })).toEqual({ status: 'nothing' });
     expect(d.oracleQuery).not.toHaveBeenCalled();
     expect(d.post).not.toHaveBeenCalled();
     expect(d.createMessage).not.toHaveBeenCalled();
+    expect(d.addFlag).not.toHaveBeenCalled();
   });
 
-  test('conversations that all went fine: nothing is sent or written', async () => {
-    const d = makeDeps({ conversations: [conv(1, 'u1', [msg('user', 'hi'), msg('assistant', 'hello')])] });
+  test('conversations that all went fine: nothing is filed or sent', async () => {
+    const d = makeDeps({ conversations: [conv(1, 'u1', [say('hi'), msg('assistant', 'hello')])] });
     expect(await runMorningRoundup({ now: NOW, env: ENV, deps: d })).toEqual({ status: 'nothing' });
     expect(d.post).not.toHaveBeenCalled();
-    expect(d.updateSheet).not.toHaveBeenCalled();
-    expect(d.appendSheet).not.toHaveBeenCalled();
+    expect(d.addFlag).not.toHaveBeenCalled();
   });
 
   test('each delivered DM is recorded as a roundup post covering the 24 hours', async () => {
-    const d = makeDeps({ conversations: [badChat], answers, sheetValues: SHEET_ROWS, postResult: { messageName: 'spaces/DM1/messages/R1', threadName: 'spaces/DM1/threads/R1' } });
+    const d = makeDeps({ conversations: [badChat], answers, postResult: { messageName: 'spaces/DM1/messages/R1', threadName: 'spaces/DM1/threads/R1' } });
     d.recordPost = jest.fn(async () => true);
     await runMorningRoundup({ now: NOW, env: ENV, deps: d });
     const [space, text] = d.post.mock.calls[0];
@@ -260,49 +349,64 @@ describe('the morning run', () => {
     });
   });
 
-  test('nothing to report → nothing sent, nothing recorded', async () => {
-    const d = makeDeps({ conversations: [] });
-    d.recordPost = jest.fn();
-    await runMorningRoundup({ now: NOW, env: ENV, deps: d });
-    expect(d.recordPost).not.toHaveBeenCalled();
-  });
-
-  test('a bad chat: claims the day, updates the matched row (C–E only), DMs with "known, being fixed"', async () => {
-    const d = makeDeps({ conversations: [badChat], answers, sheetValues: SHEET_ROWS });
+  test('a bad chat: claims the day, files a chat card with the verbatim turns, DMs its link', async () => {
+    const d = makeDeps({ conversations: [badChat], answers });
     const res = await runMorningRoundup({ now: NOW, env: ENV, deps: d });
-    expect(res).toEqual({ status: 'sent', issues: 1, sent: 1 });
+    expect(res).toEqual({ status: 'sent', issues: 1, sent: 1, filed: 1 });
 
     const claim = d.oracleQuery.mock.calls.find(([sql]) => sql.includes('pulse_alert_state'));
     expect(claim[1][0]).toBe('morning_roundup:2026-10-01');
-    expect(d.updateSheet).toHaveBeenCalledWith(3, { spreadsheet_id: 'sheet123', range: 'C2:E2', values: [['2026-10-01', 5, 'Acme, Co 44']] });
-    expect(d.appendSheet).not.toHaveBeenCalled();
+
+    expect(d.queue.cards).toHaveLength(1);
+    const card = d.queue.cards[0];
+    expect(card).toMatchObject({ kind: 'chat', chat_turn_ref: 'conv:9:pushback', conversation_id: 9, company_id: 135,
+      source: 'oracle_detected', source_ref: 'oracle:9:pushback:t0', actor: DETECTOR_ACTOR });
+    expect(card.snapshot).toMatchObject({ source: 'oracle_detected', flagged_turn_index: 0, issue: 'pushback',
+      turns: [{ turn_index: 0, client: 'what is the CDAP deadline?', assistant: 'It closed in 2024.', flagged: true }] });
 
     const [space, text] = d.post.mock.calls[0];
     expect(space).toBe('spaces/DM1');
     expect(text).toContain('☀️ GetGranted chat — last 24h: 1 issue across 1 client.');
-    expect(text).toContain('• Wrong answers on deadlines — Co 44 — Deadline answers were wrong — Research (grant card data) — known, being fixed');
+    expect(text).toContain('• Pushed back — Co 44 — Client said the deadline was wrong — Research (grant card data) — https://hub.test/control-centre#review/100');
     // Oracle's words only: the client's own text is never in the DM.
     expect(text).not.toContain('that is wrong');
+    // The review, then the locate call for the flagged conversation; no grouping call.
+    expect(d.model.calls.map(c => c.tool_choice.name)).toEqual(['conversation_review', 'flagged_message']);
   });
 
-  test('one send per day: an already-claimed date sends and writes nothing', async () => {
+  test('a detection already on file is not re-sent', async () => {
+    const d = makeDeps({ conversations: [badChat], answers });
+    await d.addFlag({ kind: 'chat', chat_turn_ref: 'conv:9:pushback', source: 'oracle_detected', source_ref: 'oracle:9:pushback:t0' });
+    const res = await runMorningRoundup({ now: NOW, env: ENV, deps: d });
+    expect(res).toEqual({ status: 'nothing', filed: 0 });
+    expect(d.post).not.toHaveBeenCalled();
+  });
+
+  test('one send per day: an already-claimed date files and sends nothing', async () => {
     const d = makeDeps({ conversations: [badChat], answers, claimRows: [] });
     expect(await runMorningRoundup({ now: NOW, env: ENV, deps: d })).toEqual({ status: 'already_sent' });
     expect(d.post).not.toHaveBeenCalled();
-    expect(d.updateSheet).not.toHaveBeenCalled();
+    expect(d.addFlag).not.toHaveBeenCalled();
     expect(d.createMessage).not.toHaveBeenCalled();
   });
 
-  test('without the sheet the DM still goes out; nobody reachable keeps the claim', async () => {
+  test('nobody reachable keeps the claim (the cards are filed)', async () => {
     const d = makeDeps({ conversations: [badChat], answers, postResult: false });
-    d.readSheet.mockResolvedValue({ success: false });
     const res = await runMorningRoundup({ now: NOW, env: ENV, deps: d });
-    expect(res.status).toBe('undelivered');
-    expect(d.updateSheet).not.toHaveBeenCalled();
+    expect(res).toMatchObject({ status: 'undelivered', filed: 1 });
     expect(d.oracleQuery.mock.calls.some(([sql]) => /DELETE|UPDATE pulse_alert_state/.test(sql))).toBe(false);
   });
 
-  test.each(['GG3_OPS_DB_READONLY_URL', 'PULSE_ROUNDUP_SUBSCRIBERS', 'PULSE_ERRORS_SHEET_ID', 'PULSE_SHEET_OWNER_EMAIL'])(
+  test('failed chat turns file onto the conversation\'s chat_broke card', async () => {
+    const errors = [{ kind: 'error', issue: 'chat_broke', label: 'chat broke', category: null, userId: 'user_e', conversationId: 4, turnId: 'tx', turnIndex: 0, at: NOW }];
+    const d = makeDeps({ errors });
+    await runMorningRoundup({ now: NOW, env: ENV, deps: d });
+    expect(d.queue.cards[0]).toMatchObject({ chat_turn_ref: 'conv:4:chat_broke', source_ref: 'oracle:turn:tx' });
+    expect(d.queue.cards[0].snapshot.turns[0]).toMatchObject({ client: 'why did it break?', flagged: true });
+    expect(d.readMessages).toHaveBeenCalledWith(4);
+  });
+
+  test.each(['GG3_OPS_DB_READONLY_URL', 'PULSE_ROUNDUP_SUBSCRIBERS'])(
     'missing %s: skipped, nothing read, never scheduled',
     async (key) => {
       const env = { ...ENV, [key]: '' };
@@ -314,6 +418,10 @@ describe('the morning run', () => {
       expect(cron.schedule).not.toHaveBeenCalled();
     }
   );
+
+  test('the sheet settings are no longer needed', () => {
+    expect(missingRoundupEnv({ GG3_OPS_DB_READONLY_URL: 'x', PULSE_ROUNDUP_SUBSCRIBERS: 'y' })).toEqual([]);
+  });
 
   test('scheduled at 08:00 Vancouver when configured', () => {
     expect(missingRoundupEnv(ENV)).toEqual([]);

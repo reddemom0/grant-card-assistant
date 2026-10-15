@@ -1,9 +1,20 @@
 # Oracle read-only access to the gg3-ai-service database
 
-This gives Oracle a database login that can **only read** six gg3-ai-service tables:
-`chat_turns`, `conversations`, `match_results`, `grant_events`, `grant_feedback`, `events`.
-It cannot write anything, and it cannot see any other table, including `ai_review_log`,
+This gives Oracle a database login that can **only read** seven gg3-ai-service tables:
+`chat_turns`, `conversations`, `match_results`, `grant_events`, `grant_feedback`, `events`,
+and `ai_review_log`. It cannot write anything, and it cannot see any other table, including
 `ai_review_cache`, `llm_calls` and anything added later.
+
+`ai_review_log` (the AI Final Review's cut / move / flag decisions) was added after the role
+was first created. The Control Centre reads it: the nightly roll-up and the hourly review
+sweep, which files a grant-pattern card when the review cuts one grant for the same reason
+for 3+ companies in 7 days (`docs/control-centre.md`). Oracle's chat tools never name it. On
+a role created from the original file, grant it by hand:
+`GRANT SELECT ON public.ai_review_log TO oracle_readonly;`
+
+> **Drift, checked 2026-10-15:** the live role can also read `llm_calls`, which the script
+> never granted and no Hub code reads. Revoke it when convenient:
+> `REVOKE SELECT ON public.llm_calls FROM oracle_readonly;`
 
 Files:
 - `scripts/sql/gg3-readonly-role.sql`: creates the login. You run it once, by hand.
@@ -41,8 +52,9 @@ It also refuses to run on any database that isn't gg3-ai-service's.
    SELECT has_schema_privilege('oracle_readonly', 'public', 'CREATE') AS can_create_tables;
    ```
 
-   - **Expected result:** `can_read` is true for the first six tables and false for the last
-     three. `can_write` is false everywhere.
+   - **Expected result:** `can_read` is true for the first seven tables (through
+     `ai_review_log`) and false for `ai_review_cache` and `llm_calls`. `can_write` is false
+     everywhere.
    - If `can_create_tables` is **true**, the database is on an older Postgres (version 14 or
      earlier) that lets every login create tables. Oracle's connection still can't, because
      every session is read-only. To close it completely anyway, run

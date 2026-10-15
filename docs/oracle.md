@@ -323,18 +323,18 @@ gated tool is unchanged.
 ## Tool loadout
 
 From the `internal-oracle` case in `getToolsForAgent` (`src/tools/definitions.js`).
-63 tools; a normal turn is sent 62, because `toolsForRun` in `src/claude/client.js` drops
+64 tools; a normal turn is sent 63, because `toolsForRun` in `src/claude/client.js` drops
 the run-only `save_team_lesson` unless `allowedTools` names it. Oracle builds
 `oracleBaseTools` from scratch rather than reusing shared `baseTools`.
 
 **Tools on demand (Sonnet 5.5 path only).** `withToolSearch` in `src/claude/client.js`
-sends the 48 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
+sends the 49 tools in `ORACLE_DEFERRED_TOOLS` with `defer_loading: true` and adds
 Anthropic's tool search (`tool_search_tool_bm25`), so rarely used tools stay out of the
 cached prefix until Claude searches for them. The list is the tools used in 2 or fewer
 conversations over the 30 days to 2026-09-29. `track_review` and `read_chat_attachments`
 qualified but stay loaded: the review card and Chat file uploads depend on them.
-`gg3_conversations`, `pulse_stats`, `list_granted_files_folders`, `file_move_rename` and
-`file_move_rename_undo` were deferred from the start. Oracle's
+`gg3_conversations`, `pulse_stats`, `list_granted_files_folders`, `file_move_rename`,
+`file_move_rename_undo` and `control_centre` were deferred from the start. Oracle's
 Haiku tiers, the HubSpot webhook, and runs restricted by `allowedTools` (/learn-this,
 lesson runs) send the full list unchanged. Search results are dropped from reloaded
 history (`historyForRequest`), so a later turn searches again.
@@ -344,9 +344,22 @@ Drive (3), Dropbox read (1), `coreHubSpotTools` (17 of 36), Granola (5), Sheets
 read/write (4), Calendar (4), `create_google_doc` only, `GOOGLE_DOCS_EDIT_TOOLS` (3),
 `CHAT_HISTORY_TOOLS` (4, including the run-only `save_team_lesson`), `TRACKED_CARD_TOOLS`
 (`track_review`), `gg3_conversations` (GetGranted client chats: read, search, troubleshoot,
-log to the Pulse errors sheet; `src/tools/gg3-conversations.js`), `pulse_stats`, and
+and log_issue, which files a Control Centre chat card; `src/tools/gg3-conversations.js`),
+`pulse_stats`, `control_centre` (`CONTROL_CENTRE_TOOL`, read-only, see below), and
 `list_granted_files_folders` (`GRANTED_FILES_FOLDERS_TOOL`), and `FILE_MOVE_RENAME_TOOLS` (2) for
 the filing skill.
+
+`control_centre` (`src/tools/control-centre-tools.js`) is Oracle's read-only window on the
+Control Centre (`docs/control-centre.md`), one tool with five modes: `queue_summary` (open
+cards by status, owner and kind; stuck = open with no change or comment for 3+ days, the board's rule; oldest open),
+`list_cards` (filters: status, owner incl. `unassigned`, kind, company name/id, grant
+name/id, `stuck_only`; at most 20), `card` (one card in full: diagnosis, evidence, flags,
+history, linked cards), `overview` (`getOverview(range)` — tiles vs the window before with the
+internal share, client-only top lists, chat) and `chat_themes` (`latestDigest()`). Every card
+in every answer carries its link, `${PUBLIC_URL}/control-centre#review/<id>`
+(`src/control-centre/links.js`). SELECTs and the Control Centre's own read helpers only:
+Oracle can't move, reassign or close a card. Results are wrapped as untrusted like every
+tool result.
 
 The three Drive tools are read-only and run as the asker: `createDriveClient` in
 `src/tools/google-drive.js` uses the service account with domain-wide delegation, subject =

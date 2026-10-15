@@ -195,6 +195,8 @@ export function toolsForRun(agentType, allowedTools = null) {
 // usage and match stats) is new and deferred from the start, like gg3_conversations.
 // list_granted_files_folders, file_move_rename and file_move_rename_undo (filing
 // skill) likewise; the skill names them, so search finds them.
+// control_centre (the review queue, Overview and chat themes, read-only) is new
+// and deferred from the start, like pulse_stats.
 export const ORACLE_DEFERRED_TOOLS = [
   'create_hubspot_company', 'update_hubspot_company', 'create_hubspot_contact',
   'update_hubspot_contact', 'associate_contact_with_company', 'create_hubspot_deal',
@@ -214,7 +216,8 @@ export const ORACLE_DEFERRED_TOOLS = [
   'search_grant_applications', 'get_grant_application',
   'list_files_in_folder', 'update_sheet_range', 'replace_google_doc_section',
   'read_google_doc_outline',
-  'pulse_stats', 'list_granted_files_folders', 'file_move_rename', 'file_move_rename_undo'
+  'pulse_stats', 'list_granted_files_folders', 'file_move_rename', 'file_move_rename_undo',
+  'control_centre'
 ];
 
 export const TOOL_SEARCH_TOOL = { type: 'tool_search_tool_bm25_20251119', name: 'tool_search_tool_bm25' };

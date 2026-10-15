@@ -1,13 +1,16 @@
 /**
- * Control Centre page (step 6). Overview is live; the other tabs are
+ * Control Centre page. Overview (step 6) and the Review queue (step 5c+9,
+ * public/js/control-centre-review.js) are live; the other tabs are
  * placeholders until their steps land.
  *
  * State lives in the URL — ?tab=&range=&company=&grant= — so every view is
- * deep-linkable and the back button works (pushState + popstate). The last
- * range is also remembered in localStorage when it's available.
+ * deep-linkable and the back button works (pushState + popstate). The Review
+ * queue lives in the hash: #review, #review/<id>, #review?owner=&type= (the
+ * links in Oracle's DMs and answers point there). The last range is also
+ * remembered in localStorage when it's available.
  *
- * Data: GET /api/control-centre/overview?range=…, GET /api/control-centre/search?q=…
- * Docs: docs/control-centre.md
+ * Data: GET /api/control-centre/overview?range=…, GET /api/control-centre/search?q=…,
+ * /api/control-centre/review (see the review module). Docs: docs/control-centre.md
  */
 (function () {
   'use strict';
@@ -22,7 +25,6 @@
     inbox: ['Inbox', 'Every thumbs-down and staff flag that needs a look, newest first, with its diagnosis.'],
     companies: ['Companies', "Each client's journey: the grant matches on their goal tracks, the grant cards they opened, how they rated them, what they asked."],
     grants: ['Grants', 'Each grant: how many clients it was matched to over time, who opened its grant card, and why it matched.'],
-    review: ['Review queue', 'Every flagged grant match and chat answer, with its owner, diagnosis and status.'],
     coverage: ['Coverage & changes', 'What changed in matching and why, grant cards matched widely but never opened, and thin coverage by industry.'],
     themes: ['Chat themes', 'What people ask the assistant, grouped into themes you can read through.']
   };
@@ -47,7 +49,7 @@
   function storeSet(v) { try { window.localStorage.setItem(STORE_KEY, v); } catch { /* private mode etc. */ } }
 
   // ---------------------------------------------------------------- state + URL
-  let state = { tab: 'overview', range: 'week', company: null, grant: null };
+  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '' };
   const knownNames = { company: new Map(), grant: new Map() };
   /** companies.id of internal accounts seen in any response (search, overview). */
   const internalIds = new Set();
@@ -57,27 +59,34 @@
     const p = new URLSearchParams(window.location.search);
     const id = (v) => (/^\d{1,9}$/.test(v || '') ? Number(v) : null);
     const stored = storeGet();
+    // #review, #review/<id>, #review?owner=…&type=…, #review/<id>?…
+    const hash = /^#review(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
+    const tab = hash ? 'review' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
     return {
-      tab: TABS.includes(p.get('tab')) ? p.get('tab') : 'overview',
+      tab,
       range: RANGES.includes(p.get('range')) ? p.get('range') : (RANGES.includes(stored) ? stored : 'week'),
       company: id(p.get('company')),
-      grant: id(p.get('grant'))
+      grant: id(p.get('grant')),
+      card: hash?.[1] ? Number(hash[1]) : null,
+      rq: hash?.[2] ?? ''
     };
   }
 
   function urlFor(s) {
     const p = new URLSearchParams();
-    if (s.tab !== 'overview') p.set('tab', s.tab);
+    if (s.tab !== 'overview' && s.tab !== 'review') p.set('tab', s.tab);
     p.set('range', s.range);
     if (s.tab === 'companies' && s.company) p.set('company', s.company);
     if (s.tab === 'grants' && s.grant) p.set('grant', s.grant);
-    return `${window.location.pathname}?${p}`;
+    const hash = s.tab === 'review' ? `#review${s.card ? `/${s.card}` : ''}${s.rq ? `?${s.rq}` : ''}` : '';
+    return `${window.location.pathname}?${p}${hash}`;
   }
 
   function go(next, { push = true } = {}) {
     state = { ...state, ...next };
     if (state.tab !== 'companies') state.company = null;
     if (state.tab !== 'grants') state.grant = null;
+    if (state.tab !== 'review') { state.card = null; state.rq = ''; }
     storeSet(state.range);
     const url = urlFor(state);
     if (push) window.history.pushState(state, '', url);
@@ -118,6 +127,24 @@
     return res.json();
   }
 
+  /** A write (review actions). The server's error message comes back on err.message for a 400. */
+  async function send(method, path, body) {
+    const res = await fetch(path, {
+      method, credentials: 'same-origin',
+      headers: { accept: 'application/json', 'content-type': 'application/json' },
+      body: JSON.stringify(body ?? {})
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(json.error || `HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    // Any change to the queue changes the "need action" count.
+    overviewCache.clear();
+    return json;
+  }
+
   function errorText(err) {
     if (err.status === 401) return 'Your session has expired. Sign in again to see the Control Centre.';
     if (err.status === 503) return "The Control Centre can't reach its databases right now. The read-only connection isn't configured on this server.";
@@ -133,6 +160,9 @@
 
   // ---------------------------------------------------------------- chrome
   function renderChrome(data) {
+    // The date range doesn't apply to the review queue.
+    $('#cc-range').hidden = state.tab === 'review';
+    $('#cc-period').hidden = state.tab === 'review';
     $$('#cc-range button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.range === state.range)));
     $$('#cc-tabs .cc-tab').forEach((t) => {
       const on = t.dataset.tab === state.tab;
@@ -155,7 +185,7 @@
       const action = $('#cc-action');
       action.hidden = need === 0;
       $('#cc-action-n').textContent = fmt(need);
-      action.href = urlFor({ ...state, tab: 'inbox' });
+      action.href = urlFor({ ...state, tab: 'review', card: null, rq: '' });
       $$('#cc-tabs [data-badge]').forEach((b) => { b.hidden = need === 0; b.textContent = fmt(need); });
     } else {
       period.textContent = 'Loading…';
@@ -739,10 +769,30 @@
     loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
   }
 
+  /** What the Review queue module gets from this page. */
+  const reviewCtx = {
+    esc, fmt, plural, api, send, reduceMotion,
+    state: () => state,
+    go: (next, opts) => go({ tab: 'review', ...next }, opts),
+    includeInternal: () => includeInternal,
+    setIncludeInternal: (on) => {
+      includeInternal = on;
+      try { window.localStorage.setItem(INTERNAL_KEY, on ? '1' : '0'); } catch { /* per-browser nicety */ }
+    }
+  };
+
   function render() {
     hideTip();
-    renderChrome(null);
     const panel = $('#cc-panel');
+    if (state.tab !== 'review') window.CCReview?.closeDrawer();
+    if (state.tab === 'review' && window.CCReview) {
+      loadSeq++;
+      if (!panel.querySelector('.rq')) renderChrome(null);
+      window.CCReview.render(panel, reviewCtx);
+      loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
+      return;
+    }
+    renderChrome(null);
     if (state.tab === 'overview') renderOverview(panel);
     else { loadSeq++; renderSoon(panel); }
   }
@@ -807,8 +857,10 @@
       go({ tab: next });
       $(`#cc-tabs [data-tab="${next}"]`).focus();
     });
-    $('#cc-action').addEventListener('click', (e) => { e.preventDefault(); go({ tab: 'inbox' }); });
+    $('#cc-action').addEventListener('click', (e) => { e.preventDefault(); go({ tab: 'review', card: null, rq: '' }); });
     window.addEventListener('popstate', () => { state = readUrl(); render(); });
+    // A typed or pasted #review/<id> on a page already open.
+    window.addEventListener('hashchange', () => { state = readUrl(); render(); });
     window.addEventListener('scroll', hideTip, { passive: true });
     $('#cc-tabs').addEventListener('scroll', updateTabsMore, { passive: true });
     window.addEventListener('resize', updateTabsMore, { passive: true });

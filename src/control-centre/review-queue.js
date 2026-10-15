@@ -1,19 +1,30 @@
 /**
  * Control Centre review queue (migration 044)
  *
- * One item per thing that needs a look: a bad match (company + grant root)
- * or a bad chat answer (one chat turn). Flags pile onto the item:
+ * One item per thing that needs a look: a bad match (company + grant root),
+ * a bad chat answer (one chat turn, or one issue in one conversation), or a
+ * grant pattern (the AI review cut one grant for one reason across companies,
+ * migration 047). Flags pile onto the item:
  *
  *   client_thumbs_down  a 👎 from the app DB's grant_recommendation_feedback_events,
  *                       pulled hourly by runReviewSweep (source_ref = rating id)
- *   staff_flag          POST /api/control-centre/review/flag (source_ref = staff:<uuid>)
+ *   staff_flag          POST /api/control-centre/review/flag (source_ref = staff:<uuid>),
+ *                       or Oracle's gg3_conversations log_issue
+ *   ai_review_cut       an AI Final Review cut, filed hourly by grant-patterns.js
+ *                       (source_ref = ai_review:<id>)
+ *   oracle_detected     Oracle's morning chat review, pulse-roundup.js
+ *                       (source_ref = oracle:<conversation>:<issue>:<date>)
  *
  * source_ref is UNIQUE, so a re-sweep never double-counts. A new flag on a
  * closed item reopens it to 'new' with flagged_again and clears the old
- * owner and diagnosis.
+ * owner and diagnosis — except a grant_pattern card, which reopens only on a
+ * cut that happened after it was closed; an older cut arriving late is kept
+ * as evidence and leaves it closed.
  *
  * Status: new → diagnosed → in_progress → closed. Only close() reaches
- * 'closed', and a match item can't close without expected_match.
+ * 'closed', and a match item can't close without expected_match. Closing a
+ * grant_pattern card logs a 'recheck' event on every match card linked to it
+ * (cc_review_links) and changes nothing else on them.
  *
  * Every mutation writes one cc_review_events row in the same transaction.
  *
@@ -34,11 +45,12 @@ import { query, transaction } from '../database/connection.js';
 import { appQuery, isAppDbConfigured } from './db.js';
 import { TIME_ZONE } from './rollup.js';
 import { diagnoseItem, couldNotDiagnose, MAX_DIAGNOSIS_ATTEMPTS } from './diagnosis.js';
+import { runPatternSweep } from './grant-patterns.js';
 
-export const KINDS = Object.freeze(['match', 'chat']);
+export const KINDS = Object.freeze(['match', 'chat', 'grant_pattern']);
 export const STATUSES = Object.freeze(['new', 'diagnosed', 'in_progress', 'closed']);
 export const OWNERS = Object.freeze(['client', 'research', 'chris', 'jason']);
-export const SOURCES = Object.freeze(['client_thumbs_down', 'staff_flag']);
+export const SOURCES = Object.freeze(['client_thumbs_down', 'staff_flag', 'ai_review_cut', 'oracle_detected']);
 export const EXPECTED = Object.freeze(['should', 'shouldnt']);
 
 /** Who fixes what. chris is also the default when the cause is unclear. */
@@ -101,16 +113,25 @@ export function validateFlag(input = {}) {
   if (!KINDS.includes(kind)) throw bad(`kind must be one of ${KINDS.join(', ')}`);
   if (!SOURCES.includes(source)) throw bad(`source must be one of ${SOURCES.join(', ')}`);
 
-  const out = { kind, source, company_id: null, grant_root_id: null, chat_turn_ref: null };
+  const out = { kind, source, company_id: null, grant_root_id: null, chat_turn_ref: null,
+    pattern_category: null, conversation_id: null };
+  if (input.pattern_category != null && kind !== 'grant_pattern') throw bad('pattern_category is only for grant_pattern items');
   if (kind === 'match') {
     out.company_id = requiredId(input.company_id, 'company_id');
     out.grant_root_id = requiredId(input.grant_root_id, 'grant_root_id');
+    if (input.chat_turn_ref != null) throw bad('chat_turn_ref is only for chat items');
+  } else if (kind === 'grant_pattern') {
+    out.grant_root_id = requiredId(input.grant_root_id, 'grant_root_id');
+    out.pattern_category = optionalText(input.pattern_category, 'pattern_category', MAX_REF);
+    if (!out.pattern_category) throw bad('pattern_category is required for grant_pattern items');
+    if (input.company_id != null) throw bad('company_id is not used on grant_pattern items');
     if (input.chat_turn_ref != null) throw bad('chat_turn_ref is only for chat items');
   } else {
     out.chat_turn_ref = optionalText(input.chat_turn_ref, 'chat_turn_ref', MAX_REF);
     if (!out.chat_turn_ref) throw bad('chat_turn_ref is required for chat items');
     if (input.grant_root_id != null) throw bad('grant_root_id is only for match items');
     if (input.company_id != null) out.company_id = requiredId(input.company_id, 'company_id');
+    if (input.conversation_id != null) out.conversation_id = requiredId(input.conversation_id, 'conversation_id');
   }
 
   out.source_ref = optionalText(input.source_ref, 'source_ref', MAX_REF);
@@ -121,6 +142,12 @@ export function validateFlag(input = {}) {
   out.actor = optionalText(input.actor, 'actor', MAX_REF);
   out.comment = optionalText(input.comment, 'comment');
   out.source_created_at = input.source_created_at ?? null;
+  // Evidence the filer already has (a chat card's turns). Stored only when the
+  // item has none; never accepted from the HTTP route.
+  if (input.snapshot != null && (typeof input.snapshot !== 'object' || Array.isArray(input.snapshot))) {
+    throw bad('snapshot must be an object');
+  }
+  out.snapshot = input.snapshot ?? null;
   return out;
 }
 
@@ -128,12 +155,31 @@ export function validateFlag(input = {}) {
 // SQL (Hub DB)
 // ---------------------------------------------------------------------------
 
-// No conflict target: covers both partial unique keys (match pair, chat turn).
+// No conflict target: covers all three partial unique keys (match pair, chat
+// turn, grant pattern).
 export const INSERT_ITEM_SQL = `
-  INSERT INTO cc_review_items (kind, company_id, grant_root_id, chat_turn_ref)
-  VALUES ($1, $2, $3, $4)
+  INSERT INTO cc_review_items (kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id)
+  VALUES ($1, $2, $3, $4, $5, $6)
   ON CONFLICT DO NOTHING
   RETURNING id`;
+
+export const LOCK_PATTERN_SQL = `
+  SELECT * FROM cc_review_items
+   WHERE kind = 'grant_pattern' AND grant_root_id = $1 AND pattern_category = $2
+   FOR UPDATE`;
+
+// Evidence handed in by the filer, kept only when the item has none.
+export const SET_SNAPSHOT_SQL = `
+  UPDATE cc_review_items SET snapshot = $2::jsonb, snapshot_at = NOW()
+   WHERE id = $1 AND snapshot IS NULL
+  RETURNING *`;
+
+export const LINKED_ITEMS_SQL = `
+  SELECT i.id, i.kind, i.status, i.company_id, i.grant_root_id, i.pattern_category, l.relation
+    FROM cc_review_links l
+    JOIN cc_review_items i ON i.id = CASE WHEN l.item_id = $1 THEN l.linked_item_id ELSE l.item_id END
+   WHERE l.item_id = $1 OR l.linked_item_id = $1
+   ORDER BY i.id`;
 
 export const LOCK_MATCH_SQL = `
   SELECT * FROM cc_review_items
@@ -214,21 +260,56 @@ export const INSERT_EVENT_SQL = `
   INSERT INTO cc_review_events (item_id, actor, action, from_status, to_status, detail)
   VALUES ($1, $2, $3, $4, $5, $6)`;
 
+/** Open and no activity for this many days: the board marks the card stuck. */
+export const STUCK_DAYS = 3;
+
+// "Last activity" — shared by the board (LIST_SQL) and Oracle's control_centre
+// tool so both call the same cards stuck. A card's activity is the later of
+// updated_at and its newest staff comment; comments don't move updated_at.
+// Use LAST_ACTIVITY_JOIN after `FROM cc_review_items i`.
+export const LAST_ACTIVITY_JOIN = `
+    LEFT JOIN LATERAL (
+      SELECT max(e.created_at) AS at
+        FROM cc_review_events e
+       WHERE e.item_id = i.id AND e.action = 'comment'
+    ) cm ON TRUE`;
+export const LAST_ACTIVITY = 'GREATEST(i.updated_at, cm.at)';
+/** SQL condition: open and no activity for `days` (an SQL expression) days. */
+export const stuckWhen = (days) => `(i.status <> 'closed' AND ${LAST_ACTIVITY} < now() - make_interval(days => ${days}))`;
+
+// Summaries only — never the snapshot or the full diagnosis (GET /:id has
+// those). last_activity_at is the later of updated_at and the newest staff
+// comment, so a comment resets the stuck timer without moving updated_at
+// (which orders the list and floats re-flagged cards up).
 export const LIST_SQL = `
-  SELECT i.*, lc.comment AS latest_comment, lc.created_at AS latest_comment_at
+  SELECT i.id, i.kind, i.status, i.owner, i.company_id, i.grant_root_id, i.pattern_category,
+         i.chat_turn_ref, i.conversation_id, i.flag_count, i.flagged_again, i.expected_match,
+         i.created_at, i.updated_at, i.closed_at,
+         i.diagnosis->>'verdict' AS verdict,
+         left(i.narrative, 240) AS narrative,
+         g.grant_name,
+         lc.comment AS latest_comment, lc.created_at AS latest_comment_at,
+         ${LAST_ACTIVITY} AS last_activity_at,
+         ${stuckWhen(STUCK_DAYS)} AS stuck,
+         floor(EXTRACT(EPOCH FROM (now() - ${LAST_ACTIVITY})) / 86400)::int AS idle_days
     FROM cc_review_items i
+    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id
     LEFT JOIN LATERAL (
       SELECT f.comment, f.created_at
         FROM cc_review_flags f
        WHERE f.item_id = i.id AND f.comment IS NOT NULL
        ORDER BY f.created_at DESC, f.id DESC
        LIMIT 1
-    ) lc ON TRUE
+    ) lc ON TRUE${LAST_ACTIVITY_JOIN}
    WHERE ($1::text IS NULL OR i.status = $1)
      AND ($2::text IS NULL OR i.owner = $2)
      AND ($3::text IS NULL OR i.kind = $3)
    ORDER BY i.updated_at DESC, i.id DESC
    LIMIT $4`;
+
+export const COMMENT_MAX = 4000;
+export const LINK_NAMES_SQL = 'SELECT id, grant_name FROM gg3_grants WHERE id = ANY($1::int[])';
+export const ITEM_CONVERSATION_SQL = 'SELECT kind, conversation_id, chat_turn_ref FROM cc_review_items WHERE id = $1';
 
 export const GET_ITEM_SQL = 'SELECT * FROM cc_review_items WHERE id = $1';
 export const GET_FLAGS_SQL = 'SELECT * FROM cc_review_flags WHERE item_id = $1 ORDER BY created_at, id';
@@ -291,12 +372,15 @@ export async function addFlag(input, { hubTransaction = transaction } = {}) {
   const f = validateFlag(input);
 
   return hubTransaction(async (client) => {
-    const ins = await client.query(INSERT_ITEM_SQL, [f.kind, f.company_id, f.grant_root_id, f.chat_turn_ref]);
+    const ins = await client.query(INSERT_ITEM_SQL,
+      [f.kind, f.company_id, f.grant_root_id, f.chat_turn_ref, f.pattern_category, f.conversation_id]);
     const created = ins.rows.length > 0;
 
     const locked = f.kind === 'match'
       ? await client.query(LOCK_MATCH_SQL, [f.company_id, f.grant_root_id])
-      : await client.query(LOCK_CHAT_SQL, [f.chat_turn_ref]);
+      : f.kind === 'grant_pattern'
+        ? await client.query(LOCK_PATTERN_SQL, [f.grant_root_id, f.pattern_category])
+        : await client.query(LOCK_CHAT_SQL, [f.chat_turn_ref]);
     let item = locked.rows[0];
     if (created) await logEvent(client, item.id, f.actor, 'created', null, 'new', { source: f.source });
 
@@ -307,14 +391,30 @@ export async function addFlag(input, { hubTransaction = transaction } = {}) {
     }
     const flagId = flag.rows[0].id;
 
-    const reopened = item.status === 'closed';
+    const late = item.status === 'closed' && !reopensClosed(item, f);
+    const reopened = item.status === 'closed' && !late;
     const from = item.status;
     item = (await client.query(reopened ? REOPEN_SQL : BUMP_SQL, [item.id])).rows[0];
-    await logEvent(client, item.id, f.actor, 'flagged', null, null, { source: f.source, flag_id: flagId });
+    await logEvent(client, item.id, f.actor, 'flagged', null, null,
+      { source: f.source, flag_id: flagId, ...(late ? { late_evidence: true } : {}) });
     if (reopened) await logEvent(client, item.id, f.actor, 'reopened', from, 'new', { flag_id: flagId });
+    if (f.snapshot && !item.snapshot) {
+      item = (await client.query(SET_SNAPSHOT_SQL, [item.id, JSON.stringify(f.snapshot)])).rows[0] ?? item;
+    }
 
-    return { item, duplicate: false, created, reopened, flag_id: flagId };
+    return { item, duplicate: false, created, reopened, flag_id: flagId, ...(late ? { late: true } : {}) };
   }, 'cc review addFlag');
+}
+
+/**
+ * Whether a new flag reopens a closed item. Always, except a grant_pattern
+ * card: only a cut that happened after the card was closed reopens it. An
+ * older cut that arrives late (or one with no time) is kept as evidence.
+ */
+export function reopensClosed(item, flag) {
+  if (item.kind !== 'grant_pattern') return true;
+  if (!flag.source_created_at || !item.closed_at) return false;
+  return new Date(flag.source_created_at).getTime() > new Date(item.closed_at).getTime();
 }
 
 /**
@@ -350,6 +450,24 @@ export async function setOwner(id, owner, actor, { hubTransaction = transaction 
 }
 
 /**
+ * A staff comment: one 'comment' event with the author and the text. Status,
+ * owner and updated_at are untouched; the board's stuck timer counts it as
+ * activity (LIST_SQL last_activity_at).
+ */
+export async function addComment(id, text, actor, { hubTransaction = transaction } = {}) {
+  const itemId = requiredId(id, 'id');
+  const body = typeof text === 'string' ? text.trim() : '';
+  if (!body) throw bad('text is required');
+  if (body.length > COMMENT_MAX) throw bad(`text is longer than ${COMMENT_MAX} characters`);
+  if (!actor) throw bad('a signed-in author is required');
+  return hubTransaction(async (client) => {
+    const item = await lockItem(client, itemId);
+    await logEvent(client, itemId, actor, 'comment', item.status, item.status, { text: body });
+    return { item_id: itemId, actor, text: body, status: item.status };
+  }, 'cc review addComment');
+}
+
+/**
  * Close an item. expected_match ('should' | 'shouldnt') is required for a
  * match item and optional for a chat item.
  */
@@ -369,6 +487,14 @@ export async function close(id, { expected_match, close_note } = {}, actor, { hu
     const updated = (await client.query(CLOSE_SQL, [itemId, expected_match ?? null, note, actor ?? null])).rows[0];
     await logEvent(client, itemId, actor, 'closed', item.status, 'closed',
       { expected_match: expected_match ?? null, close_note: note });
+    if (item.kind === 'grant_pattern') {
+      // Each linked match card gets a nudge; none is moved or closed.
+      const linked = (await client.query(LINKED_ITEMS_SQL, [itemId])).rows;
+      for (const l of linked) {
+        await logEvent(client, l.id, actor, 'recheck', l.status, l.status,
+          { pattern_id: itemId, message: `re-check — pattern #${itemId} was fixed` });
+      }
+    }
     return updated;
   }, 'cc review close');
 }
@@ -468,25 +594,29 @@ export async function previewDiagnoses(wouldFile = [], { hubQuery = query, diagn
     ...items.map((item) => ({ label: 'new', item })),
     ...wouldFile.map((p) => ({
       label: p.reopen ? 'would reopen' : 'would file',
-      item: { id: null, kind: 'match', company_id: p.company_id, grant_root_id: p.grant_root_id,
-        status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0 }
+      item: p.kind === 'grant_pattern'
+        ? { id: null, kind: 'grant_pattern', company_id: null, grant_root_id: p.grant_root_id, pattern_category: p.pattern_category,
+          status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0 }
+        : { id: null, kind: 'match', company_id: p.company_id, grant_root_id: p.grant_root_id,
+          status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0 },
+      cutIds: p.cut_ids ?? null
     }))
   ];
 
   const rows = [];
   let cost = 0;
-  for (const { label, item } of targets) {
-    const comments = item.id ? await flagComments(hubQuery, item.id) : [];
+  for (const { label, item, cutIds = null } of targets) {
+    const comments = item.id && item.kind !== 'grant_pattern' ? await flagComments(hubQuery, item.id) : [];
     let r;
     try {
-      r = await diagnoseFn(item, { comments, ...diagnoseCtx, logCost: null });
+      r = await diagnoseFn(item, { comments, ...diagnoseCtx, ...(cutIds ? { cutIds } : {}), logCost: null });
     } catch (err) {
       r = { ok: false, error: `threw_${err?.code ?? err?.name ?? 'error'}`, snapshotTaken: false, cost: 0 };
     }
     cost += r?.cost ?? 0;
     const base = { label, id: item.id, kind: item.kind, company_id: item.company_id,
       grant_root_id: item.grant_root_id ?? null, chat_turn_ref: item.chat_turn_ref ?? null,
-      snapshot_reused: Boolean(item.snapshot) };
+      pattern_category: item.pattern_category ?? null, snapshot_reused: Boolean(item.snapshot) };
     if (!r) { rows.push({ ...base, skipped: 'not_configured' }); continue; }
     const outcome = asOutcome(r);
     if (outcome.ok) {
@@ -494,7 +624,11 @@ export async function previewDiagnoses(wouldFile = [], { hubQuery = query, diagn
         candidate_cause: outcome.diagnosis?.candidate_cause ?? null, narrative: outcome.narrative,
         client_notice: outcome.client_notice ?? null, override: outcome.diagnosis?.owner_override ?? null,
         corrected: Boolean(outcome.diagnosis?.narrative_corrected),
-        grant: outcome.snapshot?.response?.grant_name ?? null, cost: r.cost ?? 0 });
+        grant: outcome.snapshot?.response?.grant_name ?? outcome.snapshot?.grant?.name ?? null,
+        ...(item.kind === 'grant_pattern' ? { companies: (outcome.snapshot?.cuts ?? []).map((c) => ({
+          company_id: c.company_id, company_name: c.company_name, internal: c.company_internal, reason: c.reason })) } : {}),
+        ...(outcome.diagnosis?.chat ? { chat: outcome.diagnosis.chat } : {}),
+        cost: r.cost ?? 0 });
     } else {
       const attempt = (item.diagnosis_attempts ?? 0) + 1;
       rows.push({ ...base, error: outcome.error, attempt,
@@ -520,16 +654,17 @@ export async function listItems({ status, owner, kind } = {}, { hubQuery = query
   return rows;
 }
 
-/** @returns {Promise<{item: object, flags: Array, events: Array}>} 404 if unknown. */
+/** @returns {Promise<{item: object, flags: Array, events: Array, links: Array}>} 404 if unknown. */
 export async function getItem(id, { hubQuery = query } = {}) {
   const itemId = requiredId(id, 'id');
   const { rows } = await hubQuery(GET_ITEM_SQL, [itemId]);
   if (!rows[0]) throw new ReviewQueueError(404, 'review item not found');
-  const [flags, events] = await Promise.all([
+  const [flags, events, links] = await Promise.all([
     hubQuery(GET_FLAGS_SQL, [itemId]),
-    hubQuery(GET_EVENTS_SQL, [itemId])
+    hubQuery(GET_EVENTS_SQL, [itemId]),
+    hubQuery(LINKED_ITEMS_SQL, [itemId])
   ]);
-  return { item: rows[0], flags: flags.rows, events: events.rows };
+  return { item: rows[0], flags: flags.rows, events: events.rows, links: links.rows };
 }
 
 /** Staff email → name from the Hub users table. Keys are lower-cased emails. */
@@ -580,6 +715,16 @@ export async function runReviewSweep({ write = false, preview = false, deps = {}
     filed: 0, failed: 0, diagnosed: 0, left_new: 0, written: write
   };
 
+  // Grant patterns from the AI review's cuts (grant-patterns.js). Its own
+  // failure (e.g. ops DB not configured) never stops the 👎 path.
+  const patternSweep = deps.runPatternSweep ?? runPatternSweep;
+  try {
+    summary.patterns = await patternSweep({ write, deps: { hubQuery, addFlag: flag, ...(deps.patternDeps ?? {}) }, log });
+  } catch (err) {
+    summary.patterns = { error: String(err?.code ?? err?.name ?? 'unknown') };
+    console.error(`❌ CC pattern sweep failed — code: ${summary.patterns.error}`);
+  }
+
   if (!write) {
     let existing = [];
     if (pairs.size) {
@@ -597,6 +742,13 @@ export async function runReviewSweep({ write = false, preview = false, deps = {}
         .filter((d) => [undefined, 'closed'].includes(status.get(pairKey(d.company_id, d.grant_root_id))))
         .map((d) => ({ company_id: d.company_id, grant_root_id: d.grant_root_id,
           reopen: status.get(pairKey(d.company_id, d.grant_root_id)) === 'closed' }));
+      // Pattern cards this run would create or reopen, previewed from their cuts.
+      for (const p of summary.patterns?.qualifying ?? []) {
+        if (p.action === 'file' || p.action === 'reopen') {
+          wouldFile.push({ kind: 'grant_pattern', grant_root_id: p.grant_id, pattern_category: p.category,
+            cut_ids: p.group.cuts.map((c) => c.id), reopen: p.action === 'reopen' });
+        }
+      }
       summary.preview = await (deps.previewDiagnoses ?? previewDiagnoses)(wouldFile, { hubQuery });
     }
     log(`CC review sweep (dry run): ${summary.to_file} 👎 to file → ${summary.items} items `

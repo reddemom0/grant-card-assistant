@@ -16,8 +16,8 @@
  * Without --client/--name, read and troubleshoot use the client with the most
  * recent conversation (only its ·ref is printed). log_issue is never run; a
  * search over 10 results prints "would create a sheet" instead of creating one.
- * The errors sheet is read (troubleshoot) only when PULSE_ERRORS_SHEET_ID and
- * PULSE_SHEET_OWNER_EMAIL are set and DATABASE_URL reaches Oracle's DB.
+ * Troubleshoot reads the Control Centre chat cards for those conversations
+ * when DATABASE_URL reaches Oracle's DB (read only).
  * Optional: AI_API_BACKEND_URL/_TOKEN (company names), GG3_AI_SERVICE_URL and
  * GG3_REVIEW_FEED_TOKEN (match explanations).
  *
@@ -71,9 +71,8 @@ async function mostRecentClient() {
 }
 
 async function deps() {
-  const [{ query }, sheets] = await Promise.all([
-    import('../src/database/connection.js'),
-    import('../src/tools/google-sheets.js')
+  const [{ query }] = await Promise.all([
+    import('../src/database/connection.js')
   ]);
   const { searchGrantData, GG3_VISIBLE_STATUSES } = await import('../src/tools/grant-data.js');
   const never = (what) => async () => { throw new Error(`dry run: ${what} is never written`); };
@@ -95,9 +94,8 @@ async function deps() {
       console.log(`(dry run) would create sheet "${content.title}" with ${content.tables[0].rows.length} rows in the asker's Drive`);
       return { url: '(dry run — no sheet created)', title: content.title, id: null };
     },
-    readSheet: sheets.readSheetRange,
-    updateSheet: never('the errors sheet'),
-    appendSheet: never('the errors sheet')
+    addFlag: never('the Control Centre queue'),
+    companyFor: never('the Control Centre queue')
   };
 }
 
@@ -133,7 +131,7 @@ async function main() {
     conversations: result.conversations?.length, matches: result.matches, clients: result.clients,
     grants_named: result.grants_named, matching_run: result.matching?.run ?? undefined,
     match_explanations: result.match_explanations?.map(e => e.unavailable || e.verdict?.kind),
-    errors_sheet: result.errors_sheet && (result.errors_sheet.unavailable || `${result.errors_sheet.issues.length} issues`),
+    chat_cards: result.chat_cards && (result.chat_cards.unavailable || `${result.chat_cards.length} card(s)`),
     sheet: result.sheet
   };
   console.log(JSON.stringify(summary, (k, v) => (v === undefined ? undefined : v), 2));

@@ -1,11 +1,12 @@
 /**
- * GetGranted Pulse: morning roundup
+ * GetGranted Pulse: morning roundup — Oracle's chat-issue detector
  *
  *   08:00 America/Vancouver   look back 24 hours at GetGranted chat; if
- *                             anything went wrong for a client, DM each
- *                             roundup subscriber a short grouped summary and
- *                             keep the errors sheet (pulse-errors-sheet.js)
- *                             up to date. Nothing happened → nothing is sent.
+ *                             anything went wrong for a client, file a chat
+ *                             card in the Control Centre review queue for each
+ *                             issue and DM each roundup subscriber the list,
+ *                             each with its card link. Nothing happened →
+ *                             nothing is filed or sent.
  *
  * Two sources, both in the gg3-ai-service ops DB (gg3-ops-db.js), both with
  * GetGranted staff left out (excludeInternalUsers, GG3_INTERNAL_USER_IDS):
@@ -15,33 +16,45 @@
  *   went badly   conversations active in the window (updated_at), at most 50,
  *                each read by Haiku against a fixed rubric: asked again,
  *                pushed back, asked for a person, or left after a reply that
- *                didn't answer. Leaving on its own is not a flag.
- * Then one Haiku call groups both into issues and matches them to sheet rows.
+ *                didn't answer. Leaving on its own is not a flag. For a
+ *                flagged conversation only, a second small call names the
+ *                client message whose reply went wrong (locateFlagged).
+ *
+ * Cards (src/control-centre/review-queue.js addFlag, source oracle_detected,
+ * migration 047): one chat card per issue per conversation —
+ * chat_turn_ref conv:<conversation id>:<issue>, so the same issue in the same
+ * conversation is one card. The issue is the review's main flag
+ * (ISSUE_PRIORITY), or chat_broke / empty_reply for a failed turn. Each
+ * detection is a flag keyed on the flagged turn (oracle:<conv>:<issue>:t<n>,
+ * or oracle:turn:<turn id>), so re-reviewing a conversation the next day adds
+ * nothing for a turn already filed. The card's snapshot is the flagged client
+ * message, the 3 turns before it and the assistant's reply, verbatim, frozen
+ * at filing. The hourly review sweep then diagnoses it (diagnosis.js).
  *
  * Clients are named by company through ai-api-backend's
  * GET /api/v1/ai/profile/{clerkId} (the service token gg3-refresh uses);
- * when that can't answer, "a client ·<last 4 of the id>".
+ * when that can't answer, "a client ·<last 4 of the id>". The card's
+ * company_id comes from the app DB (control-centre identity.js) when set.
  *
- * What leaves this module is Oracle's own words: issue names, one-line takes,
- * owners and client labels. Client message text goes to the model only, inside
- * the untrusted-data envelope, and is never stored, logged, posted or written.
+ * The DM carries Oracle's own words only: issue names, one-line takes, owners,
+ * client labels and card links. Client message text goes to the model inside
+ * the untrusted-data envelope and into the card's snapshot in the Hub DB (the
+ * evidence staff review); it is never logged or posted.
  *
  * Once a day: the key morning_roundup:<date> in pulse_alert_state (migration
- * 040) is claimed before anything is written or sent, and kept even if a send
- * fails — the sheet's counts are already added, so a re-run would double them.
+ * 040) is claimed before anything is filed or sent, and kept even if a send
+ * fails.
  *
- * Needs GG3_OPS_DB_READONLY_URL, PULSE_ROUNDUP_SUBSCRIBERS,
- * PULSE_ERRORS_SHEET_ID and PULSE_SHEET_OWNER_EMAIL; with any unset it is
- * never scheduled. Dry run: scripts/pulse-roundup-check.mjs.
+ * Needs GG3_OPS_DB_READONLY_URL and PULSE_ROUNDUP_SUBSCRIBERS; with either
+ * unset it is never scheduled. Dry run: scripts/pulse-roundup-check.mjs.
  */
 
 import { gg3OpsQuery, isGg3OpsConfigured, excludeInternalUsers } from './gg3-ops-db.js';
 import { BROKE_OUTCOMES, FAILED_OUTCOMES, EXCLUDED_CATEGORIES } from './pulse-spike.js';
-import {
-  SHEET_ENV, OWNER_ENV, sheetUrl, localDate, resolveSheetOwner, readIssueRows, writeIssues
-} from './pulse-errors-sheet.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from '../claude/tool-output.js';
 import { pulsePostRecorder } from './pulse-posts.js';
+import { chatTurnsAround, CONVERSATION_MESSAGES_SQL } from '../control-centre/diagnosis.js';
+import { cardLink, controlCentreUrl } from '../control-centre/links.js';
 
 export const SUBSCRIBERS_ENV = 'PULSE_ROUNDUP_SUBSCRIBERS';
 export const ROUNDUP_MODEL = 'claude-haiku-4-5-20251001';
@@ -54,11 +67,22 @@ const REVIEW_CONCURRENCY = 4;
 const MAX_TRANSCRIPT_ITEMS = 30;
 const MAX_TRANSCRIPT_CHARS = 8000;
 const TAKE_CHARS = 160;
+const FULL_TAKE_CHARS = 800;
 const NAME_CHARS = 60;
 
 export const FLAGS = ['repeated_question', 'pushback', 'asked_for_human', 'left_unanswered'];
 export const OWNERS = ['Chris (AI behaviour)', 'Research (grant card data)', 'Jason (app/UI)', 'Client follow-up'];
-const FLAG_WORDS = {
+/** A conversation with several flags is one card, keyed on the first of these it has. */
+export const ISSUE_PRIORITY = ['asked_for_human', 'pushback', 'repeated_question', 'left_unanswered'];
+export const DETECTOR_ACTOR = 'system:oracle-chat-review';
+const TZ = 'America/Vancouver';
+
+/** YYYY-MM-DD in Vancouver. */
+export function localDate(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+}
+
+export const FLAG_WORDS = {
   repeated_question: 'asked again',
   pushback: 'pushed back',
   asked_for_human: 'asked for a person',
@@ -81,13 +105,14 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * Failed chat turns in the window, staff left out.
- * @returns {Promise<null|Array<{kind: 'error', label: string, category: string|null, userId: string, conversationId: number|null, at: Date}>>}
+ * @returns {Promise<null|Array<{kind: 'error', issue: 'chat_broke'|'empty_reply', label: string, category: string|null, userId: string,
+ *                               conversationId: number|null, turnId: string, turnIndex: number|null, at: Date}>>}
  *   null when the ops DB isn't configured
  */
 export async function collectErrors(hours = WINDOW_HOURS, runQuery = gg3OpsQuery) {
   const ex = excludeInternalUsers('user_id', 4);
   const res = await runQuery(
-    `SELECT turn_id, occurred_at, conversation_id, user_id, outcome, error_category
+    `SELECT turn_id, occurred_at, conversation_id, turn_index, user_id, outcome, error_category
        FROM chat_turns
       WHERE occurred_at > now() - make_interval(hours => $1::int)
         AND outcome = ANY($2::text[])
@@ -97,14 +122,20 @@ export async function collectErrors(hours = WINDOW_HOURS, runQuery = gg3OpsQuery
     [hours, FAILED_OUTCOMES, EXCLUDED_CATEGORIES, ...ex.params]
   );
   if (!res.configured) return null;
-  return res.rows.map(r => ({
-    kind: 'error',
-    label: BROKE_OUTCOMES.includes(r.outcome) ? 'chat broke' : 'empty reply or refusal',
-    category: r.error_category || null,
-    userId: r.user_id,
-    conversationId: r.conversation_id ?? null,
-    at: r.occurred_at
-  }));
+  return res.rows.map(r => {
+    const broke = BROKE_OUTCOMES.includes(r.outcome);
+    return {
+      kind: 'error',
+      issue: broke ? 'chat_broke' : 'empty_reply',
+      label: broke ? 'chat broke' : 'empty reply or refusal',
+      category: r.error_category || null,
+      userId: r.user_id,
+      conversationId: r.conversation_id ?? null,
+      turnId: r.turn_id,
+      turnIndex: r.turn_index ?? null,
+      at: r.occurred_at
+    };
+  });
 }
 
 // ============================================================================
@@ -129,18 +160,23 @@ export async function collectConversations(hours = WINDOW_HOURS, runQuery = gg3O
 
 /**
  * The words people read: text blocks only (tool calls and results dropped),
- * the last 30 items, at most 8,000 characters.
- * @returns {Array<{role: 'client'|'assistant', text: string}>}
+ * the last 30 items, at most 8,000 characters. A client message that starts a
+ * turn (string content — the same count diagnosis.js splitTurns and the ops
+ * DB's turn_index use) carries its 0-based `turn`.
+ * @returns {Array<{role: 'client'|'assistant', text: string, turn?: number}>}
  */
 export function transcriptOf(messages) {
   const items = [];
+  let turn = -1;
   for (const m of Array.isArray(messages) ? messages : []) {
     const role = m?.role === 'user' ? 'client' : m?.role === 'assistant' ? 'assistant' : null;
     if (!role) continue;
+    const startsTurn = role === 'client' && typeof m.content === 'string';
+    if (startsTurn) turn += 1;
     const text = typeof m.content === 'string'
       ? m.content
       : (Array.isArray(m.content) ? m.content : []).filter(b => b?.type === 'text').map(b => b.text).join('\n');
-    if (String(text).trim()) items.push({ role, text: String(text).trim() });
+    if (String(text).trim()) items.push({ role, text: String(text).trim(), ...(startsTurn ? { turn } : {}) });
   }
   let kept = items.slice(-MAX_TRANSCRIPT_ITEMS);
   while (kept.length > 1 && kept.reduce((n, i) => n + i.text.length, 0) > MAX_TRANSCRIPT_CHARS) kept = kept.slice(1);
@@ -186,8 +222,65 @@ export function cleanReview(raw, transcript) {
   return {
     flags,
     take: clip(raw?.take, TAKE_CHARS),
+    // The card keeps Oracle's whole take; the DM line uses the short one.
+    fullTake: clip(raw?.take, FULL_TAKE_CHARS),
     owner: OWNERS.includes(raw?.owner) ? raw.owner : OWNERS[0]
   };
+}
+
+// Which client message went wrong — a second, small call, made only for a
+// conversation the review flagged. Kept out of the review call on purpose:
+// adding message numbers or a message field to it changed what Haiku flags
+// (2026-10-15, conversation 290: the Oct 14 left_unanswered flag disappeared).
+const LOCATE_TOOL = {
+  name: 'flagged_message',
+  description: 'The client message whose reply went wrong.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      client_message: { type: 'integer', description: 'The number in "(message N)" of that client message.' }
+    },
+    required: ['client_message']
+  }
+};
+
+const LOCATE_SYSTEM = [
+  'You are given one conversation between a client and GetGranted\'s AI grant assistant, with the client\'s messages numbered, and a problem the team found in it.',
+  'Give the number of the client message whose reply went wrong: for a question left unanswered, the question that was not answered; for pushback or a repeated question, the earlier message the bad reply answered; for a request for a person, the message that asked.',
+  UNTRUSTED_DATA_INSTRUCTION
+].join('\n');
+
+/** The transcript with each turn-starting client message numbered (1-based turn). */
+export const numberedTranscript = (transcript) => transcript
+  .map(t => `${t.role === 'client' ? `CLIENT${Number.isInteger(t.turn) ? ` (message ${t.turn + 1})` : ''}` : 'ASSISTANT'}: ${t.text}`)
+  .join('\n\n');
+
+/**
+ * The 0-based turn of the flagged client message: the one the locate call
+ * names, when it is a shown turn; otherwise the last client turn shown. A
+ * failed locate call falls back the same way and never fails the review.
+ */
+export async function locateFlagged(transcript, review, createMessage) {
+  const turns = transcript.filter(t => t.role === 'client' && Number.isInteger(t.turn)).map(t => t.turn);
+  const fallback = turns.at(-1) ?? null;
+  if (!turns.length) return { turnIndex: null, located: 'none' };
+  try {
+    const raw = await callTool(createMessage, {
+      system: LOCATE_SYSTEM,
+      user: [
+        `The problem: ${review.flags.map(f => FLAG_WORDS[f]).join(', ')} — ${review.take}`,
+        `The conversation:\n\n${wrapToolOutput('gg3_conversation', numberedTranscript(transcript))}`,
+        `Call ${LOCATE_TOOL.name} once.`
+      ].join('\n\n'),
+      tool: LOCATE_TOOL,
+      maxTokens: 50,
+      source: 'pulse-roundup-locate'
+    });
+    const named = Number.isInteger(raw?.client_message) ? raw.client_message - 1 : null;
+    return turns.includes(named) ? { turnIndex: named, located: 'model' } : { turnIndex: fallback, located: 'fallback' };
+  } catch (err) {
+    return { turnIndex: fallback, located: 'fallback', code: String(codeOf(err)) };
+  }
 }
 
 /** One forced-tool Haiku call. Returns the tool input, or throws. Also used by pulse-digest.js. */
@@ -211,12 +304,14 @@ export async function callTool(createMessage, { system, user, tool, maxTokens, s
 }
 
 /**
- * @returns {Promise<{ok: true, flags: string[], take: string, owner: string}|{ok: false, code: string}>}
+ * The review call, then — only when it flagged something — the locate call.
+ * @returns {Promise<{ok: true, flags: string[], take: string, owner: string, turnIndex: number|null, located?: string}|{ok: false, code: string}>}
  */
 export async function reviewConversation(conv, createMessage) {
   const transcript = transcriptOf(conv.messages);
-  if (!transcript.some(t => t.role === 'client')) return { ok: true, flags: [], take: '', owner: OWNERS[0] };
+  if (!transcript.some(t => t.role === 'client')) return { ok: true, flags: [], take: '', owner: OWNERS[0], turnIndex: null };
   const text = transcript.map(t => `${t.role === 'client' ? 'CLIENT' : 'ASSISTANT'}: ${t.text}`).join('\n\n');
+  let review;
   try {
     const raw = await callTool(createMessage, {
       system: REVIEW_SYSTEM,
@@ -225,10 +320,13 @@ export async function reviewConversation(conv, createMessage) {
       maxTokens: 300,
       source: 'pulse-roundup-review'
     });
-    return { ok: true, ...cleanReview(raw, transcript) };
+    review = cleanReview(raw, transcript);
   } catch (err) {
     return { ok: false, code: String(codeOf(err)) };
   }
+  if (!review.flags.length) return { ok: true, ...review, turnIndex: null };
+  const { turnIndex, located } = await locateFlagged(transcript, review, createMessage);
+  return { ok: true, ...review, turnIndex, located };
 }
 
 async function mapLimited(list, limit, fn) {
@@ -285,177 +383,154 @@ export async function clientLabels(userIds, fetchProfile) {
   return { labels, stats };
 }
 
+
 // ============================================================================
-// 4. GROUPING
+// 4. CARDS
 // ============================================================================
 
 /**
- * Items the grouping step sees: one per kind of error (label + category), one
- * per conversation that went badly. No message text.
+ * One card candidate per issue per conversation. Reviews: the main flag
+ * (ISSUE_PRIORITY) names the issue. Failed turns: one per turn, grouped onto
+ * the conversation's chat_broke / empty_reply card by their shared ref; a
+ * failed turn with no conversation keys on the turn id.
+ *
+ * @returns {Array<{ref: string, sourceRef: string, issue: string, kind: 'conversation'|'error', name: string, take: string,
+ *                  owner: string, userId: string, conversationId: number|null, turnIndex: number|null, flags: string[],
+ *                  at: Date|null, messages?: Array}>}
  */
-export function buildItems(errors, reviews) {
-  const items = [];
-  const byKind = new Map();
-  for (const e of errors) {
-    const key = `${e.label}|${e.category || ''}`;
-    let item = byKind.get(key);
-    if (!item) {
-      item = { id: `e${byKind.size + 1}`, kind: 'error', what: e.category ? `${e.label} (${e.category})` : e.label, count: 0, userIds: new Set(), take: null, owner: OWNERS[0] };
-      byKind.set(key, item);
-      items.push(item);
-    }
-    item.count += 1;
-    item.userIds.add(e.userId);
-  }
-  reviews.forEach((r, i) => {
-    if (!r.flags?.length) return;
-    items.push({
-      id: `c${i + 1}`, kind: 'conversation', what: r.flags.map(f => FLAG_WORDS[f]).join(', '),
-      flags: r.flags, count: 1, userIds: new Set([r.userId]), take: r.take, owner: r.owner
+export function cardCandidates(errors, reviews) {
+  const out = [];
+  for (const r of reviews) {
+    if (!r.flags?.length || r.conversationId == null) continue;
+    const issue = ISSUE_PRIORITY.find(f => r.flags.includes(f)) ?? r.flags[0];
+    const words = r.flags.map(f => FLAG_WORDS[f]).join(', ');
+    out.push({
+      ref: `conv:${r.conversationId}:${issue}`,
+      sourceRef: `oracle:${r.conversationId}:${issue}:t${r.turnIndex ?? 'end'}`,
+      issue, kind: 'conversation',
+      name: words.charAt(0).toUpperCase() + words.slice(1),
+      take: r.take, fullTake: r.fullTake ?? r.take, owner: r.owner, userId: r.userId, conversationId: r.conversationId,
+      turnIndex: r.turnIndex ?? null, flags: r.flags, at: r.updatedAt ?? null, messages: r.messages
     });
-  });
-  return items;
+  }
+  for (const e of errors) {
+    out.push({
+      ref: e.conversationId != null ? `conv:${e.conversationId}:${e.issue}` : e.turnId,
+      sourceRef: `oracle:turn:${e.turnId}`,
+      issue: e.issue, kind: 'error',
+      name: e.category ? `${e.label.charAt(0).toUpperCase()}${e.label.slice(1)} (${e.category})` : `${e.label.charAt(0).toUpperCase()}${e.label.slice(1)}`,
+      take: e.issue === 'chat_broke' ? 'The chat failed before it finished answering.' : 'The assistant gave an empty reply or refused.',
+      owner: OWNERS[0], userId: e.userId, conversationId: e.conversationId, turnIndex: e.turnIndex, flags: [], at: e.at
+    });
+  }
+  return out;
 }
 
-const GROUP_TOOL = {
-  name: 'issues',
-  description: 'Today\'s items grouped into issues.',
-  input_schema: {
-    type: 'object',
-    properties: {
-      issues: {
-        type: 'array',
-        items: {
-          type: 'object',
-          properties: {
-            name: { type: 'string', description: 'Short issue name, at most 8 words, e.g. "Chat times out on long answers".' },
-            item_ids: { type: 'array', items: { type: 'string' } },
-            take: { type: 'string', description: 'One plain-English line: what is going wrong.' },
-            owner: { type: 'string', enum: OWNERS },
-            existing_row: { type: ['integer', 'null'], description: 'The row number of the existing issue this is, or null when new.' }
-          },
-          required: ['name', 'item_ids', 'take', 'owner']
-        }
-      }
-    },
-    required: ['issues']
-  }
-};
-
-function issueFrom(items, { name, take, owner, existingRow = null }) {
-  const userIds = new Set();
-  for (const it of items) for (const u of it.userIds) userIds.add(u);
+/** The evidence frozen on the card: the flagged turn, the 3 before it, verbatim. */
+export function snapshotFor(candidate, messages) {
+  if (!Array.isArray(messages)) return null;
+  const around = chatTurnsAround(messages, candidate.turnIndex);
+  if (!around.ok) return null;
   return {
-    name: clip(name, NAME_CHARS),
-    count: items.reduce((n, it) => n + it.count, 0),
-    userIds: [...userIds],
-    take: clip(take, TAKE_CHARS),
-    owner: OWNERS.includes(owner) ? owner : items[0]?.owner || OWNERS[0],
-    existingRow
+    source: 'oracle_detected',
+    conversation_id: candidate.conversationId,
+    issue: candidate.issue,
+    flags: candidate.flags,
+    detector_take: candidate.fullTake ?? candidate.take,
+    ...around.body
   };
 }
 
-const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+/**
+ * File each candidate as a flag on its chat card. Never throws: a failed
+ * filing is counted and the run goes on.
+ *
+ * @returns {Promise<{results: Array<{candidate, ok: boolean, id?: number, created?: boolean, reopened?: boolean, duplicate?: boolean}>, failed: number}>}
+ */
+export async function fileCards(candidates, { addFlag, readMessages, companyFor }) {
+  const companies = await companyFor([...new Set(candidates.map(c => c.userId).filter(Boolean))]).catch(() => new Map());
+  const messageCache = new Map();
+  const messagesOf = async (c) => {
+    if (c.messages) return c.messages;
+    if (c.conversationId == null) return null;
+    if (!messageCache.has(c.conversationId)) {
+      messageCache.set(c.conversationId, await readMessages(c.conversationId).catch(() => null));
+    }
+    return messageCache.get(c.conversationId);
+  };
 
-/** Without the model: one issue per kind of error, one per kind of flag. */
-export function fallbackIssues(items, existingRows = []) {
-  const groups = new Map();
-  for (const it of items) {
-    const key = it.kind === 'error' ? it.what : `went badly: ${it.flags.map(f => FLAG_WORDS[f]).join(' + ')}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(it);
+  const results = [];
+  let failed = 0;
+  for (const c of candidates) {
+    try {
+      const r = await addFlag({
+        kind: 'chat', chat_turn_ref: c.ref, conversation_id: c.conversationId ?? undefined,
+        company_id: companies.get(c.userId) ?? undefined,
+        source: 'oracle_detected', source_ref: c.sourceRef, source_created_at: c.at ?? null,
+        actor: DETECTOR_ACTOR, comment: `${c.name}: ${c.fullTake ?? c.take}`.slice(0, 1000),
+        snapshot: snapshotFor(c, await messagesOf(c)) ?? undefined
+      });
+      results.push({ candidate: c, ok: true, id: r.item?.id, created: r.created, reopened: r.reopened, duplicate: r.duplicate });
+    } catch (err) {
+      failed += 1;
+      results.push({ candidate: c, ok: false });
+      console.error(`❌ Pulse roundup: filing a chat card failed — code: ${codeOf(err)}`);
+    }
   }
-  return [...groups.entries()].map(([key, group]) => {
-    const name = key.charAt(0).toUpperCase() + key.slice(1);
-    const row = existingRows.find(r => sameName(r.name, name));
-    const take = group.find(it => it.take)?.take || `${plural(group.reduce((n, it) => n + it.count, 0), 'time')} in the last day`;
-    return issueFrom(group, { name, take, owner: group[0].owner, existingRow: row?.row ?? null });
-  });
+  return { results, failed };
 }
+
+// ============================================================================
+// 5. THE DM
+// ============================================================================
 
 /**
- * One Haiku call: same underlying problem → one issue, matched to a sheet row
- * when it is one already there. Counts and clients are counted here, never
- * taken from the model.
+ * One line per card filed or added to this run (a detection already on file
+ * is left out), most detections first, at most MAX_LINES, each with its link.
  *
- * @returns {Promise<{issues: Object[], grouped: 'model'|'rules', code?: string}>}
+ * @param {Array<{id: number|null, name: string, client: string, take: string, owner: string, count: number,
+ *                created: boolean, reopened: boolean, userIds: string[]}>} cards
  */
-export async function groupIssues(items, existingRows, createMessage) {
-  if (!items.length) return { issues: [], grouped: 'rules' };
-  const lines = items.map(it => JSON.stringify({
-    id: it.id, kind: it.kind, what: it.what, count: it.count, clients: it.userIds.size,
-    ...(it.take ? { take: it.take } : {}), owner: it.owner
-  }));
-  const rows = existingRows.map(r => `${r.row}: ${r.name}${r.status ? ` (${r.status})` : ''}`);
-  let raw;
-  try {
-    raw = await callTool(createMessage, {
-      system: [
-        'You group today\'s GetGranted chat problems into issues for the team\'s errors sheet.',
-        'Items with the same underlying problem are one issue. Every item belongs to exactly one issue.',
-        'When an issue is one already in the sheet, give its row number as existing_row; otherwise null.',
-        'Names and takes are your own words: short, plain, no client names.'
-      ].join('\n'),
-      user: [
-        `Today's items:\n${lines.join('\n')}`,
-        rows.length ? `Issues already in the sheet (row: name):\n${rows.join('\n')}` : 'The sheet has no issues yet.',
-        `Call ${GROUP_TOOL.name} once.`
-      ].join('\n\n'),
-      tool: GROUP_TOOL,
-      maxTokens: 1500,
-      source: 'pulse-roundup-group'
-    });
-  } catch (err) {
-    return { issues: fallbackIssues(items, existingRows), grouped: 'rules', code: String(codeOf(err)) };
-  }
-
-  const byId = new Map(items.map(it => [it.id, it]));
-  const used = new Set();
-  const validRows = new Set(existingRows.map(r => r.row));
-  const issues = [];
-  for (const g of Array.isArray(raw.issues) ? raw.issues : []) {
-    const members = [...new Set(Array.isArray(g?.item_ids) ? g.item_ids.map(String) : [])]
-      .filter(id => byId.has(id) && !used.has(id));
-    if (!members.length || !String(g?.name || '').trim()) continue;
-    members.forEach(id => used.add(id));
-    issues.push(issueFrom(members.map(id => byId.get(id)), {
-      name: g.name,
-      take: g.take || byId.get(members[0]).take || '',
-      owner: g.owner,
-      existingRow: validRows.has(g.existing_row) ? g.existing_row : null
-    }));
-  }
-  // Anything the model left out is still reported.
-  const left = items.filter(it => !used.has(it.id));
-  if (left.length) issues.push(...fallbackIssues(left, existingRows));
-  return { issues, grouped: 'model' };
-}
-
-// ============================================================================
-// 6. THE DM
-// ============================================================================
-
-/** Issues sorted by count; each with `clients` (labels) and seenBefore / beingFixed. */
-export function formatRoundup(issues, { sheetId, hours = WINDOW_HOURS } = {}) {
-  const sorted = [...issues].sort((a, b) => b.count - a.count);
-  const clients = new Set(sorted.flatMap(i => i.userIds));
+export function formatRoundup(cards, { hours = WINDOW_HOURS, env = process.env } = {}) {
+  const sorted = [...cards].sort((a, b) => b.count - a.count);
+  const clients = new Set(sorted.flatMap(c => c.userIds));
   const span = hours === 24 ? '24h' : `${hours}h`;
   const lines = [`☀️ GetGranted chat — last ${span}: ${plural(sorted.length, 'issue')} across ${plural(clients.size, 'client')}.`];
-  for (const i of sorted.slice(0, MAX_LINES)) {
-    const who = i.clients.length > 3 ? `${i.clients.slice(0, 3).join(', ')} +${i.clients.length - 3} more` : i.clients.join(', ');
-    const tag = i.beingFixed ? ' — known, being fixed' : i.seenBefore ? ' — seen before' : '';
-    lines.push(`• ${i.name} — ${who} — ${i.take} — ${i.owner}${tag}`);
+  for (const c of sorted.slice(0, MAX_LINES)) {
+    const tag = c.reopened ? ' — reopened' : c.created ? '' : ' — seen before';
+    const times = c.count > 1 ? ` (${c.count}×)` : '';
+    lines.push(`• ${c.name}${times} — ${c.client} — ${c.take} — ${c.owner}${tag} — ${c.id ? cardLink(c.id, env) : '(card not filed)'}`);
   }
   if (sorted.length > MAX_LINES) lines.push(`…and ${sorted.length - MAX_LINES} more.`);
-  lines.push(`Full list: ${sheetId ? sheetUrl(sheetId) : '(errors sheet)'}. Ask me about any of these for the conversation.`);
+  lines.push(`All chat cards: ${controlCentreUrl(env)}. Ask me about any of these for the conversation.`);
   return lines.join('\n');
+}
+
+/** Filing results → one DM line per card, newly flagged this run. */
+export function dmCards(results, labels) {
+  const byCard = new Map();
+  for (const r of results) {
+    if (r.duplicate) continue;
+    const key = r.ok ? `id:${r.id}` : `ref:${r.candidate.ref}`;
+    let card = byCard.get(key);
+    if (!card) {
+      card = { id: r.ok ? r.id : null, name: r.candidate.name, take: r.candidate.take, owner: r.candidate.owner,
+        count: 0, created: false, reopened: false, userIds: [] };
+      byCard.set(key, card);
+    }
+    card.count += 1;
+    card.created ||= Boolean(r.created);
+    card.reopened ||= Boolean(r.reopened);
+    if (!card.userIds.includes(r.candidate.userId)) card.userIds.push(r.candidate.userId);
+  }
+  return [...byCard.values()].map(c => ({ ...c, client: c.userIds.map(u => labels.get(u) || clientRef(u)).join(', ') }));
 }
 
 // ============================================================================
 // THE RUN
 // ============================================================================
 
-const REQUIRED_ENV = ['GG3_OPS_DB_READONLY_URL', SUBSCRIBERS_ENV, SHEET_ENV, OWNER_ENV];
+const REQUIRED_ENV = ['GG3_OPS_DB_READONLY_URL', SUBSCRIBERS_ENV];
 
 /** The env vars the roundup needs that are unset. */
 export function missingRoundupEnv(env = process.env) {
@@ -471,13 +546,24 @@ async function defaultCreateMessage(params, opts) {
   return anthropic.messages.create(params, opts);
 }
 
+/** Clerk id → app company id, through the Control Centre's read-only app DB. Empty when not configured. */
+async function defaultCompanyFor(userIds) {
+  const { identitiesForClerkIds } = await import('../control-centre/identity.js');
+  try {
+    const ids = await identitiesForClerkIds(userIds);
+    return new Map([...ids].map(([k, v]) => [k, v.company_id]).filter(([, v]) => v != null));
+  } catch {
+    return new Map();
+  }
+}
+
 async function defaultDeps(env) {
-  const [{ query }, { getPulseSubscribers }, { postToSpaceWithThread }, sheets, { recordPulsePost }] = await Promise.all([
+  const [{ query }, { getPulseSubscribers }, { postToSpaceWithThread }, { recordPulsePost }, { addFlag }] = await Promise.all([
     import('../database/connection.js'),
     import('./pulse-subscribers.js'),
     import('../api/chat-google.js'),
-    import('../tools/google-sheets.js'),
-    import('./pulse-posts.js')
+    import('./pulse-posts.js'),
+    import('../control-centre/review-queue.js')
   ]);
   return {
     collectErrors: (hours) => collectErrors(hours),
@@ -488,17 +574,20 @@ async function defaultDeps(env) {
     getSubscribers: () => getPulseSubscribers(SUBSCRIBERS_ENV),
     post: postToSpaceWithThread,
     recordPost: recordPulsePost,
-    readSheet: sheets.readSheetRange,
-    updateSheet: sheets.updateSheetRange,
-    appendSheet: sheets.appendSheetRow
+    addFlag,
+    companyFor: defaultCompanyFor,
+    readMessages: async (conversationId) => {
+      const r = await gg3OpsQuery(CONVERSATION_MESSAGES_SQL, [conversationId]);
+      return r.rows?.[0]?.messages ?? null;
+    }
   };
 }
 
 /**
- * Steps 1–4: what happened, as issues with client labels. Writes and sends
- * nothing — the dry run is exactly this.
+ * Steps 1–3: what happened, as card candidates with client labels. Files and
+ * sends nothing — the dry run is exactly this.
  */
-export async function buildRoundup({ hours = WINDOW_HOURS, existingRows = [], deps, collected = null }) {
+export async function buildRoundup({ hours = WINDOW_HOURS, deps, collected = null }) {
   const { errors, conversations } = collected || {
     errors: await deps.collectErrors(hours),
     conversations: await deps.collectConversations(hours)
@@ -506,22 +595,20 @@ export async function buildRoundup({ hours = WINDOW_HOURS, existingRows = [], de
   if (!errors || !conversations) return null;
 
   const reviews = await mapLimited(conversations, REVIEW_CONCURRENCY, async (c) => ({
-    ...(await reviewConversation(c, deps.createMessage)), userId: c.userId
+    ...(await reviewConversation(c, deps.createMessage)),
+    userId: c.userId, conversationId: c.id, messages: c.messages, updatedAt: c.updatedAt
   }));
   const failedReviews = reviews.filter(r => !r.ok).length;
-  const items = buildItems(errors, reviews.filter(r => r.ok));
-  const grouping = await groupIssues(items, existingRows, deps.createMessage);
-  const { labels, stats } = await clientLabels(grouping.issues.flatMap(i => i.userIds), deps.fetchProfile);
-  const issues = grouping.issues.map(i => ({ ...i, clients: i.userIds.map(u => labels.get(u) || clientRef(u)) }));
+  const candidates = cardCandidates(errors, reviews.filter(r => r.ok));
+  const { labels, stats } = await clientLabels(candidates.map(c => c.userId), deps.fetchProfile);
   return {
     errors: errors.length,
     conversations: conversations.length,
     flagged: reviews.filter(r => r.ok && r.flags.length).length,
     failedReviews,
-    grouped: grouping.grouped,
-    groupCode: grouping.code || null,
     clientLookup: stats,
-    issues
+    labels,
+    candidates
   };
 }
 
@@ -541,7 +628,7 @@ export async function claimDay(date, now, runQuery) {
 /**
  * One morning run. Never throws for "not configured", "nothing happened" or
  * "already sent today".
- * @returns {Promise<{status: 'skipped'|'nothing'|'already_sent'|'no_state_table'|'sent'|'undelivered', missing?: string[], issues?: number, sent?: number}>}
+ * @returns {Promise<{status: 'skipped'|'nothing'|'already_sent'|'no_state_table'|'sent'|'undelivered', missing?: string[], issues?: number, sent?: number, filed?: number}>}
  */
 export async function runMorningRoundup({ now = new Date(), env = process.env, deps = null, hours = WINDOW_HOURS } = {}) {
   const missing = missingRoundupEnv(env);
@@ -567,36 +654,24 @@ export async function runMorningRoundup({ now = new Date(), env = process.env, d
     throw err;
   }
 
-  // The sheet is read before grouping so today's issues can match its rows.
-  // Without it the DM still goes out, just without "seen before".
-  const sheetId = env[SHEET_ENV].trim();
-  let owner = await resolveSheetOwner(env, d.oracleQuery).catch(err => ({ ok: false, code: String(codeOf(err)) }));
-  let rows = [];
-  if (owner.ok) {
-    const read = await readIssueRows({ sheetId, userId: owner.userId, read: d.readSheet });
-    if (read.ok) rows = read.rows;
-    else owner = { ok: false, code: read.code };
-  }
-  if (!owner.ok) console.warn(`⚠️  Pulse roundup: errors sheet unavailable — code: ${owner.code}`);
-
-  const built = await buildRoundup({ hours, existingRows: rows, deps: d, collected: { errors, conversations } });
+  const built = await buildRoundup({ hours, deps: d, collected: { errors, conversations } });
   if (built.failedReviews) console.warn(`⚠️  Pulse roundup: ${built.failedReviews} conversation review(s) failed`);
-  if (built.groupCode) console.warn(`⚠️  Pulse roundup: grouping fell back to rules — code: ${built.groupCode}`);
-  if (!built.issues.length) {
+  if (!built.candidates.length) {
     console.log(`📣 Pulse roundup: nothing to report — ${built.errors} errors, ${built.conversations} conversations, none went badly`);
     return { status: 'nothing' };
   }
 
-  let issues = built.issues.map(i => ({ ...i, seenBefore: false, beingFixed: false }));
-  if (owner.ok) {
-    const written = await writeIssues({
-      issues, rows, sheetId, userId: owner.userId, today, update: d.updateSheet, append: d.appendSheet
-    });
-    issues = written.issues;
-    console.log(`📋 Pulse roundup sheet: ${written.updated} updated, ${written.appended} added${written.failed ? `, ${written.failed} write(s) failed` : ''}`);
+  const filed = await fileCards(built.candidates, d);
+  const cards = dmCards(filed.results, built.labels);
+  const newlyFiled = filed.results.filter(r => r.ok && !r.duplicate).length;
+  console.log(`📋 Pulse roundup cards: ${newlyFiled} detection(s) filed on ${cards.length} card(s)`
+    + `${filed.failed ? `, ${filed.failed} failed` : ''}`);
+  if (!cards.length) {
+    console.log('📣 Pulse roundup: every detection was already on file — nothing sent');
+    return { status: 'nothing', filed: 0 };
   }
 
-  const text = formatRoundup(issues, { sheetId, hours });
+  const text = formatRoundup(cards, { hours, env });
   const subscribers = await d.getSubscribers();
   // Each delivered DM is recorded (pulse_posts), so a reply in its thread gets this roundup as context.
   const record = d.recordPost
@@ -610,12 +685,12 @@ export async function runMorningRoundup({ now = new Date(), env = process.env, d
     if (record) await record(s, result);
   }
   if (sent === 0) {
-    // The claim stays: the sheet's counts are already added.
-    console.warn(`⚠️  Pulse roundup: ${issues.length} issue(s) but no subscriber could be reached — not retried today.`);
-    return { status: 'undelivered', issues: issues.length, sent };
+    // The claim stays: the cards are already filed.
+    console.warn(`⚠️  Pulse roundup: ${cards.length} issue(s) but no subscriber could be reached — not retried today.`);
+    return { status: 'undelivered', issues: cards.length, sent, filed: newlyFiled };
   }
-  console.log(`📣 Pulse roundup: sent to ${sent} subscriber(s) — ${issues.length} issue(s), lookup ${built.clientLookup.named} named / ${built.clientLookup.ref} ref`);
-  return { status: 'sent', issues: issues.length, sent };
+  console.log(`📣 Pulse roundup: sent to ${sent} subscriber(s) — ${cards.length} issue(s), lookup ${built.clientLookup.named} named / ${built.clientLookup.ref} ref`);
+  return { status: 'sent', issues: cards.length, sent, filed: newlyFiled };
 }
 
 /** @param {Object} cron - node-cron */

@@ -10,13 +10,22 @@
  *   match item  GET {GG3_AI_SERVICE_URL}/api/v1/ai/internal/match-explain
  *               ?mode=bad_match&grant_id=&company_id=  (no track: ratings carry
  *               none). The whole JSON is the snapshot.
- *   chat item   chat_turn_ref is the ops DB chat_turns.turn_id. The snapshot is
- *               that turn and the 3 before it, read through opsQuery
- *               (oracle_readonly).
+ *   chat item   chat_turn_ref is the ops DB chat_turns.turn_id, or, for a card
+ *               Oracle's chat review filed, conv:<conversation id>:<issue>. The
+ *               snapshot is the flagged turn and the 3 before it, verbatim,
+ *               read through opsQuery (oracle_readonly). Oracle's cards arrive
+ *               with the snapshot already taken (pulse-roundup.js).
+ *   grant_pattern  the AI review cut one grant for one reason across companies
+ *               (grant-patterns.js). The snapshot is the grant's current tags
+ *               and card text (Hub gg3_grants) and the review reasons, each
+ *               company named.
  *
- * Owner routing is code, keyed on match-explain's candidate_cause. Sonnet only
+ * Owner routing is code, keyed on match-explain's candidate_cause (match),
+ * the review category (grant_pattern) or the verdict (chat). Sonnet only
  * chooses where the rule leaves a choice; anything else is overridden and the
- * override is recorded in the diagnosis.
+ * override is recorded in the diagnosis. A chat diagnosis also records what
+ * the client asked, what the assistant replied, what was wrong, what a good
+ * answer would have said and a suggested fix (diagnosis.chat).
  *
  * Missing configuration (service URL/token, ANTHROPIC_API_KEY, ops DB for a
  * chat item) returns null: the item stays 'new' and no attempt is counted, so a
@@ -87,6 +96,28 @@ export function regionBlamed(body) {
  *            ownerByVerdict?: Object, forcedVerdict?: string, needsClientNotice?: boolean}}
  */
 export function routeFor(item, snapshot) {
+  if (item.kind === 'grant_pattern') {
+    if (!snapshot?.grant) {
+      return { rule: 'bad_record', allowed: ['research'], default: 'research', verdicts: ['bad_record'], forcedVerdict: 'bad_record' };
+    }
+    // Region lists are backend grant data, so a region pattern is research's.
+    if (item.pattern_category === 'wrong_region') {
+      return {
+        rule: 'pattern_region',
+        allowed: ['research'],
+        default: 'research',
+        verdicts: ['region_list_wrong', 'card_missing_restriction'],
+        ownerByVerdict: { region_list_wrong: 'research', card_missing_restriction: 'research' }
+      };
+    }
+    return {
+      rule: 'pattern_tag',
+      allowed: ['chris', 'research'],
+      default: 'chris',
+      verdicts: ['tag_missed_restriction', 'card_missing_restriction', 'unclear'],
+      ownerByVerdict: { tag_missed_restriction: 'chris', card_missing_restriction: 'research', unclear: 'chris' }
+    };
+  }
   if (item.kind === 'chat') {
     return {
       rule: 'chat',
@@ -135,6 +166,10 @@ export function routeFor(item, snapshot) {
 // ---------------------------------------------------------------------------
 // Output validation
 // ---------------------------------------------------------------------------
+
+/** A chat diagnosis's structured fields, each required for a chat item. */
+export const CHAT_FIELDS = Object.freeze(['client_asked', 'assistant_replied', 'what_was_wrong', 'good_answer', 'suggested_fix']);
+export const CHAT_FIELD_CHARS = 800;
 
 export const NARRATIVE_MIN_SENTENCES = 2;
 export const NARRATIVE_MAX_SENTENCES = 3;
@@ -186,6 +221,16 @@ export function applyRoute(raw, route) {
   if (!route.allowed.includes(owner)) owner = route.default;
   if (proposed !== owner) notes.push(`owner ${proposed ?? 'none'} → ${owner}`);
 
+  let chat = null;
+  if (route.rule === 'chat') {
+    chat = {};
+    for (const field of CHAT_FIELDS) {
+      const v = typeof raw[field] === 'string' ? raw[field].trim() : '';
+      if (!v || v.length > CHAT_FIELD_CHARS) return { ok: false, code: `bad_model_output:${field}` };
+      chat[field] = v;
+    }
+  }
+
   let clientNotice = null;
   if (owner === 'client') {
     const notice = typeof raw.client_notice === 'string' ? raw.client_notice.trim() : '';
@@ -201,6 +246,7 @@ export function applyRoute(raw, route) {
     verdict,
     narrative,
     client_notice: clientNotice,
+    chat,
     override: notes.length ? { proposed: { owner: proposed, verdict: raw.verdict }, applied: { owner, verdict }, rule: route.rule, changes: notes } : null
   };
 }
@@ -253,7 +299,7 @@ const textOf = (content) => (typeof content === 'string'
  * content is a string (tool results are user messages with array content — the
  * same filter gg3-ai-service's turn_index counts) and runs to the next one.
  */
-export function splitTurns(messages) {
+export function splitTurns(messages, { clipChars = TURN_CHARS } = {}) {
   const turns = [];
   for (const m of Array.isArray(messages) ? messages : []) {
     if (m?.role === 'user' && typeof m.content === 'string') {
@@ -268,34 +314,73 @@ export function splitTurns(messages) {
   }
   return turns.map((t, i) => ({
     turn_index: i,
-    client: clip(t.user.trim(), TURN_CHARS),
-    assistant: clip(t.assistant.join('\n\n'), TURN_CHARS),
+    client: clip(t.user.trim(), clipChars),
+    assistant: clip(t.assistant.join('\n\n'), clipChars),
     tools_used: [...new Set(t.tools)]
   }));
 }
 
+/**
+ * Pure: the flagged turn and the PRIOR_CHAT_TURNS before it, verbatim (not
+ * clipped — clipping happens only in what the model is shown). turnIndex null
+ * means the last client turn.
+ *
+ * @returns {{ok: true, body: {flagged_turn_index: number, turns: Array}} | {ok: false, code: string}}
+ */
+export function chatTurnsAround(messages, turnIndex = null) {
+  const all = splitTurns(messages, { clipChars: Infinity });
+  if (!all.length) return { ok: false, code: 'chat_no_client_turns' };
+  const at = turnIndex == null ? all.length - 1 : turnIndex;
+  if (!all[at]) return { ok: false, code: 'chat_turn_not_in_conversation' };
+  const from = Math.max(0, at - PRIOR_CHAT_TURNS);
+  return {
+    ok: true,
+    body: {
+      flagged_turn_index: at,
+      turns: all.slice(from, at + 1).map((t) => ({ ...t, flagged: t.turn_index === at }))
+    }
+  };
+}
+
+/** conv:<conversation id>:<issue> → {conversationId, issue}, else null. */
+export function parseConversationRef(ref) {
+  const m = /^conv:(\d{1,15}):([a-z_]{1,60})$/.exec(String(ref ?? ''));
+  return m ? { conversationId: Number(m[1]), issue: m[2] } : null;
+}
+
 /** The flagged turn and the PRIOR_CHAT_TURNS before it, or a failure code. */
 export async function readChatSnapshot(ref, { opsQuery }) {
+  const conversationRef = parseConversationRef(ref);
+  if (conversationRef) {
+    // A conversation-level card that lost its snapshot (a reopen): the
+    // conversation's last client turn and the ones before it.
+    const conv = (await opsQuery(CONVERSATION_MESSAGES_SQL, [conversationRef.conversationId])).rows[0];
+    if (!conv) return { ok: false, code: 'chat_conversation_missing' };
+    const around = chatTurnsAround(conv.messages);
+    if (!around.ok) return around;
+    return { ok: true, body: { conversation_id: conversationRef.conversationId, issue: conversationRef.issue, ...around.body } };
+  }
+
   const turn = (await opsQuery(CHAT_TURN_SQL, [ref])).rows[0];
   if (!turn) return { ok: false, code: 'chat_turn_not_found' };
   if (turn.conversation_id == null || turn.turn_index == null) return { ok: false, code: 'chat_turn_unplaced' };
   const conv = (await opsQuery(CONVERSATION_MESSAGES_SQL, [turn.conversation_id])).rows[0];
   if (!conv) return { ok: false, code: 'chat_conversation_missing' };
 
-  const from = Math.max(0, turn.turn_index - PRIOR_CHAT_TURNS);
-  const all = splitTurns(conv.messages);
-  if (!all[turn.turn_index]) return { ok: false, code: 'chat_turn_not_in_conversation' };
+  const around = chatTurnsAround(conv.messages, turn.turn_index);
+  if (!around.ok) return around;
+  const from = around.body.turns[0].turn_index;
   const meta = new Map((await opsQuery(CHAT_TURN_ROWS_SQL, [turn.conversation_id, from, turn.turn_index])).rows
     .map((r) => [r.turn_index, r]));
-  const turns = all.slice(from, turn.turn_index + 1).map((t) => ({
+  const turns = around.body.turns.map((t) => ({
     ...t,
-    flagged: t.turn_index === turn.turn_index,
     outcome: meta.get(t.turn_index)?.outcome ?? null,
     surfaced_grant_ids: meta.get(t.turn_index)?.surfaced_grant_ids ?? null
   }));
   return {
     ok: true,
     body: {
+      conversation_id: turn.conversation_id,
       flagged_turn_index: turn.turn_index,
       mode: turn.mode ?? null,
       outcome: turn.outcome ?? null,
@@ -323,6 +408,21 @@ export async function takeSnapshot(item, deps) {
     return { ok: true, snapshot: { source: 'match_explain', fetched_at: now, response: r.body }, snapshotAt: now, taken: true };
   }
   if (!deps.opsQuery) return { ok: false, code: 'not_configured', notConfigured: true };
+  if (item.kind === 'grant_pattern') {
+    let r;
+    try {
+      const { patternSnapshot } = await import('./grant-patterns.js');
+      r = await (deps.patternSnapshot ?? patternSnapshot)(item, {
+        opsQuery: deps.opsQuery, cutIds: deps.cutIds ?? null,
+        ...(deps.hubQuery ? { hubQuery: deps.hubQuery } : {}), ...(deps.appQuery ? { appQuery: deps.appQuery } : {})
+      });
+    } catch (err) {
+      if (err?.name === 'NotConfiguredError') return { ok: false, code: 'not_configured', notConfigured: true };
+      return { ok: false, code: `pattern_${err?.code ?? err?.name ?? 'error'}` };
+    }
+    if (!r.ok) return r;
+    return { ok: true, snapshot: { source: 'ai_review_pattern', fetched_at: now, ...r.body }, snapshotAt: now, taken: true };
+  }
   let r;
   try {
     r = await readChatSnapshot(item.chat_turn_ref, deps);
@@ -347,13 +447,18 @@ export const DIAGNOSIS_TOOL = Object.freeze({
       owner: { type: 'string', enum: ALL_OWNERS, description: 'Who should fix it. Must be one of the owners the rules allow for this item.' },
       verdict: { type: 'string', enum: [...VERDICTS], description: 'Your judgement, from the verdicts the rules allow for this item.' },
       narrative: { type: 'string', description: '2 or 3 plain-English sentences for staff, at most 70 words: what happened and why. No jargon, codes or field names.' },
-      client_notice: { type: 'string', description: 'Only when owner is client: one sentence starting "Tell the client to:" saying exactly what to update in their profile.' }
+      client_notice: { type: 'string', description: 'Only when owner is client: one sentence starting "Tell the client to:" saying exactly what to update in their profile.' },
+      client_asked: { type: 'string', description: 'Chat items only: what the client asked in the flagged message, in one plain sentence.' },
+      assistant_replied: { type: 'string', description: 'Chat items only: what the assistant replied, in one or two plain sentences.' },
+      what_was_wrong: { type: 'string', description: 'Chat items only: what was wrong with that reply.' },
+      good_answer: { type: 'string', description: 'Chat items only: what a good answer would have said, using only facts in the evidence.' },
+      suggested_fix: { type: 'string', description: 'Chat items only: one concrete fix (prompt, tool, or grant data), for the owner.' }
     },
     required: ['owner', 'verdict', 'narrative']
   }
 });
 
-const SYSTEM = `You diagnose grant matches and chat answers that a GetGranted client or a Granted staff member flagged as wrong.
+const SYSTEM = `You diagnose grant matches, grant patterns and chat answers that a GetGranted client, a Granted staff member or an automatic review flagged as wrong.
 
 You get the evidence as data, plus the rules for this item: which owners and which verdicts are allowed. Choose only from those. The code enforces them anyway.
 
@@ -376,7 +481,9 @@ const RULE_TEXT = {
   no_constraint_tag: 'The grant passed because its recorded eligibility had no restriction on at least one point, or an automatic review disputed it. Read the card text. If the card text DOES state the restriction that should have excluded this client, verdict tag_missed_restriction (owner chris — the tagger missed it). If the card text does NOT state it, verdict card_missing_restriction (owner research — the card needs the restriction added).',
   no_constraint_region: 'The grant passed the location check, and the most suspect point is its list of regions, which comes from the grant data (not from the tagger). Owner must be research. Read the card text: if it states a narrower location than the listed regions, verdict region_list_wrong (the region list needs fixing); if it does not state one, verdict card_missing_restriction.',
   bad_record: 'The grant is missing from the grant data. Owner must be research.',
-  chat: 'A flagged chat answer. If the answer stated wrong facts about a grant (amount, deadline, eligibility, region), verdict chat_wrong_grant_facts (owner research). Otherwise chat_answer_problem (owner chris). Use unclear if you cannot tell.',
+  chat: 'A flagged chat answer. If the answer stated wrong facts about a grant (amount, deadline, eligibility, region), verdict chat_wrong_grant_facts (owner research). Otherwise chat_answer_problem (owner chris). Use unclear if you cannot tell. Also fill client_asked, assistant_replied, what_was_wrong, good_answer and suggested_fix, each short and plain, about the flagged turn (flagged: true). good_answer must use only facts in the evidence; if the right facts are not there, say what the assistant should have checked.',
+  pattern_tag: 'An automatic review removed this grant from several companies\' lists for the same reason, so the grant\'s own data is the likely problem. Some companies may be Granted\'s own internal accounts; call them internal accounts, never test accounts. Read the card text. If the card text DOES state the restriction the reviews give, verdict tag_missed_restriction (owner chris — the tagger missed it). If the card text does NOT state it, verdict card_missing_restriction (owner research — the card needs it added). If the reviews look wrong for these companies, verdict unclear (owner chris) and say why. Name the restriction and how many companies were affected.',
+  pattern_region: 'An automatic review removed this grant from several companies\' lists because of where they are. The grant\'s list of regions is grant data, not a tagger output, so owner must be research. If the card text states a narrower location than the listed regions, verdict region_list_wrong; if it does not state one, verdict card_missing_restriction.',
   unclear: 'The cause is unclear from the evidence. Owner must be chris. Say what is known and what is missing.'
 };
 
@@ -414,18 +521,48 @@ export function evidenceForMatch(body) {
   };
 }
 
-export function buildUserPrompt(item, snapshot, route, comments = []) {
-  const evidence = item.kind === 'match' ? evidenceForMatch(snapshot.response) : {
-    flagged_turn_index: snapshot.flagged_turn_index,
-    outcome: snapshot.outcome,
-    turns: snapshot.turns
+/** What the model sees of a grant-pattern snapshot. */
+export function evidenceForPattern(snapshot) {
+  const g = snapshot?.grant;
+  return {
+    review_reason_category: snapshot?.category ?? null,
+    companies_affected: snapshot?.companies ?? null,
+    of_which_internal_accounts: snapshot?.internal_companies ?? null,
+    grant: g ? {
+      name: g.name, status: g.status, listed_industries: g.industries, listed_regions: g.regions,
+      grant_types: g.grant_types, recorded_eligibility: g.eligibility_tags, tagger_notes: clip(g.tagging_notes, NOTES_CHARS)
+    } : null,
+    card_text: g ? clip((g.card ?? []).map((s) => `${s.section}:\n${s.text}`).join('\n\n'), CARD_CHARS) : null,
+    automatic_reviews: (snapshot?.cuts ?? []).slice(-REVIEW_ROWS * 2).map((c) => ({
+      date: c.date, company: c.company_name ?? 'unnamed company', internal_account: c.company_internal,
+      section: c.section, reason: c.reason, suspected_cause: c.suspected_cause
+    }))
   };
+}
+
+/** What the model sees of a chat snapshot: the stored turns, each clipped. */
+export function evidenceForChat(snapshot) {
+  return {
+    flagged_turn_index: snapshot.flagged_turn_index,
+    outcome: snapshot.outcome ?? null,
+    ...(snapshot.issue ? { issue_found_by_review: snapshot.issue } : {}),
+    turns: (snapshot.turns ?? []).map((t) => ({ ...t, client: clip(t.client, TURN_CHARS), assistant: clip(t.assistant, TURN_CHARS) }))
+  };
+}
+
+const ITEM_WORDS = { match: 'grant match', chat: 'chat answer', grant_pattern: 'grant pattern (one grant removed for the same reason across several companies)' };
+
+export function buildUserPrompt(item, snapshot, route, comments = []) {
+  const evidence = item.kind === 'match' ? evidenceForMatch(snapshot.response)
+    : item.kind === 'grant_pattern' ? evidenceForPattern(snapshot) : evidenceForChat(snapshot);
   const allowedVerdicts = route.forcedVerdict ? [route.forcedVerdict] : (route.verdicts ?? VERDICTS);
+  // A pattern card's flag comments are the review reasons, already in the evidence.
+  const notes = item.kind === 'grant_pattern' ? [] : comments;
   return [
-    `Item: a flagged ${item.kind === 'match' ? 'grant match' : 'chat answer'}.`,
+    `Item: a flagged ${ITEM_WORDS[item.kind] ?? item.kind}.`,
     `Rule: ${RULE_TEXT[route.rule]}`,
     `Allowed owners: ${route.allowed.join(', ')}. Allowed verdicts: ${allowedVerdicts.join(', ')}.`,
-    comments.length ? `Staff comments on the flag (data): ${JSON.stringify(comments.map((c) => clip(c, 500)))}` : 'No staff comment.',
+    notes.length ? `Comments on the flag (data): ${JSON.stringify(notes.map((c) => clip(c, 500)))}` : 'No comment on the flag.',
     '<evidence>',
     JSON.stringify(evidence, null, 1),
     '</evidence>',
@@ -454,7 +591,7 @@ async function defaultLogCost(args) {
 export async function callModel({ system, user, messages }, { createMessage = defaultCreateMessage, logCost } = {}) {
   const response = await createMessage({
     model: DIAGNOSIS_MODEL,
-    max_tokens: 1024, // no temperature: Sonnet 5.5 rejects it
+    max_tokens: 1500, // no temperature: Sonnet 5.5 rejects it
     system,
     tools: [DIAGNOSIS_TOOL],
     // Sonnet 5.5 rejects a forced tool_choice ('tool' / 'any'), so the system
@@ -512,7 +649,11 @@ export async function diagnoseItem(item, ctx = {}) {
     now: ctx.now,
     fetchImpl: ctx.fetchImpl,
     fetchBadMatch: ctx.fetchBadMatch,
-    opsQuery: ctx.opsQuery === undefined ? (await import('./db.js')).opsQuery : ctx.opsQuery
+    opsQuery: ctx.opsQuery === undefined ? (await import('./db.js')).opsQuery : ctx.opsQuery,
+    hubQuery: ctx.hubQuery,
+    appQuery: ctx.appQuery,
+    patternSnapshot: ctx.patternSnapshot,
+    cutIds: ctx.cutIds
   };
   if (!ctx.createMessage && !String(env.ANTHROPIC_API_KEY || '').trim()) {
     console.warn('⚠️  CC review diagnosis skipped — ANTHROPIC_API_KEY not set');
@@ -522,7 +663,7 @@ export async function diagnoseItem(item, ctx = {}) {
   const snap = await takeSnapshot(item, deps);
   if (!snap.ok) {
     if (snap.notConfigured) {
-      console.warn(`⚠️  CC review diagnosis skipped — ${item.kind === 'match' ? 'GG3_AI_SERVICE_URL / GG3_REVIEW_FEED_TOKEN' : 'ops DB'} not configured`);
+      console.warn(`⚠️  CC review diagnosis skipped — ${item.kind === 'match' ? 'GG3_AI_SERVICE_URL / GG3_REVIEW_FEED_TOKEN' : 'ops / app DB'} not configured`);
       return null;
     }
     return { ok: false, error: snap.code, snapshotTaken: false, cost: 0 };
@@ -567,6 +708,9 @@ export async function diagnoseItem(item, ctx = {}) {
       evidence: cc?.evidence ?? null,
       ...(item.kind === 'match' && snap.snapshot.response?.verdict?.kind
         ? { match_explain_verdict: snap.snapshot.response.verdict.kind } : {}),
+      ...(item.kind === 'grant_pattern' ? { pattern: { category: item.pattern_category,
+        companies: snap.snapshot.companies ?? null, internal_companies: snap.snapshot.internal_companies ?? null } } : {}),
+      ...(applied.chat ? { chat: applied.chat } : {}),
       ...(applied.override ? { owner_override: applied.override } : {}),
       ...(corrected ? { narrative_corrected: true } : {}),
       model: DIAGNOSIS_MODEL,
@@ -591,6 +735,8 @@ const PLAIN_ERRORS = [
   [/^explain_timeout/, 'the match explanation service took too long to answer'],
   [/^explain_/, 'the match explanation service failed'],
   [/^chat_turn_not_found/, "the flagged chat turn couldn't be found"],
+  [/^pattern_no_cuts/, "the automatic reviews behind this pattern couldn't be found"],
+  [/^pattern_/, "the grant data or automatic reviews couldn't be read"],
   [/^chat_/, "the flagged chat turn couldn't be read"],
   [/^ops_/, "the chat history couldn't be read"],
   [/^model_/, 'the AI model call failed'],

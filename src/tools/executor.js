@@ -860,6 +860,12 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
         break;
       }
 
+      case 'control_centre': {
+        const { runControlCentre } = await import('./control-centre-tools.js');
+        result = await runControlCentre(input);
+        break;
+      }
+
       case 'gg3_conversations': {
         const { runGg3Conversations } = await import('./gg3-conversations.js');
         result = await runGg3Conversations(input, {

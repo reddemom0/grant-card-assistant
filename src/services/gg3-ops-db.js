@@ -3,7 +3,7 @@
  *
  * A separate, small pool — never the app's own pool in src/database/connection.js.
  * It logs in as oracle_readonly (scripts/sql/gg3-readonly-role.sql), which can
- * SELECT from six tables and nothing else. On top of that, every session this
+ * SELECT from seven tables (ai_review_log included) and nothing else. On top of that, every session this
  * pool opens is forced read-only with a 15s statement timeout, so a lost role
  * setting still can't turn it into a writer.
  *
