@@ -2,10 +2,13 @@
 
 The Control Centre reads two databases. It never writes to either one. This doc covers the
 connections, the rules that decide what counts as "live", the Hub-side roll-ups and review
-queue, and the known limits of the data. There's no UI yet.
+queue, the `/control-centre` page (Overview live, other tabs coming), and the known limits
+of the data.
 
 Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`,
-`rollup.js`, `review-queue.js`, `review-routes.js`.
+`rollup.js`, `review-queue.js`, `review-routes.js`, `diagnosis.js`, `overview.js`,
+`overview-routes.js`. Page: `control-centre.html`, `public/js/control-centre.js`,
+`public/css/control-centre.css`.
 Tests: `tests/unit/control-centre-*.test.js`.
 
 ## The two connections
@@ -308,8 +311,8 @@ with no admin check.
 
 | Route | Does |
 |---|---|
-| `GET /` | `?status=&owner=&kind=`, most recently updated first (a re-flag or any change moves an item up), with `flag_count` and `latest_comment` (max 500) |
-| `GET /:id` | item, flags and events, plus `names`: Clerk actors → company name (via `identity.js`), staff emails → Hub `users.name` |
+| `GET /` | `?status=&owner=&kind=`, most recently updated first (a re-flag or any change moves an item up), with `flag_count`, `latest_comment`, and `company_name` + `company_internal` beside `company_id` (max 500). If names can't be read (app DB unset or down), the list still returns with `company_name: null` and `names_error`; `company_internal` needs no database and is always set. |
+| `GET /:id` | item (with `company_name`), flags and events, plus `names`: Clerk actors → company name (via `identity.js`), staff emails → Hub `users.name` |
 | `POST /flag` | staff flag `{kind, company_id, grant_root_id | chat_turn_ref, comment}`; actor is the signed-in email |
 | `PATCH /:id/status` | `{to}`; `closed` is refused (use close) |
 | `PATCH /:id/owner` | `{owner}`; `null` clears it |
@@ -393,10 +396,173 @@ a system prompt that requires the tool call. A reply without the call fails vali
   left alone with no attempt counted, so an unset variable can't push every card to
   `could_not_diagnose`.
 
+## The Control Centre page (step 6)
+
+`/control-centre` is behind the same page sign-in as other Hub pages
+(`authenticateUser` + `requirePageAuth`). Every signed-in staff member has full access. The
+sidebar link is in `public/js/shared-layout.js`.
+
+### Frame and URL
+
+There are 7 tabs: Overview (the default), Inbox, Companies, Grants, Review queue, Coverage &
+changes and Chat themes. Only Overview has content; the others show a "Coming soon" card.
+Inbox and Review queue carry a badge with the count of review items that aren't closed.
+
+All state is in the URL, so any view can be linked and the back button works:
+
+| Param | Values |
+|---|---|
+| `tab` | `overview` (omitted), `inbox`, `companies`, `grants`, `review`, `coverage`, `themes` |
+| `range` | `day`, `week` (default), `month`, `year` |
+| `company` | companies.id, only with `tab=companies` |
+| `grant` | grant **root** id, only with `tab=grants` |
+
+The last range is also kept in `localStorage['cc.range']`, in try/catch, so the page works
+without it. Search finds companies by name or id and live grants by title or root id.
+Choosing a result deep-links to the Companies or Grants tab with it selected. Every grant row
+on Overview links the same way.
+
+### Ranges
+
+Windows are whole **America/Vancouver** days, the same as the roll-ups. The current window
+is the N days ending today, with today counted so far. The previous window is the N days
+before it. Every number and chart compares the two.
+
+| Range | N |
+|---|---|
+| Day | 1 (today so far vs yesterday) |
+| Week | 7 |
+| Month | 30 |
+| Year | 365 |
+
+### Overview API
+
+`GET /api/control-centre/overview?range=day|week|month|year`, behind `authenticateUser` +
+`requireAuth`. It returns 400 for a bad range and 503 (`not_configured`) when a database env
+var is unset. Each range is cached in memory for **5 minutes**, and the response carries
+`generated_at` and `cached`. Code: `overview.js`.
+
+**Where the numbers come from:**
+
+- **Roll-ups:** the `cc_daily_*` tables, for every day the roll-up wrote **after that day had
+  ended** (Vancouver).
+- **Read live:** every later day — today, a day rolled while still in progress, or a day the
+  nightly job missed. These are read with the roll-up's own `readDay()` and aggregators, so
+  the exclusion rule is identical: ops rows are real Clerk users only, and staff and clients
+  are blended, never split.
+- **Live tail limit:** at most 14 days are read live. Beyond that, `sources.stale_rollup` is
+  true and the page says older days may be missing.
+
+| Metric | Definition | Source |
+|---|---|---|
+| `signups` | companies created (not deleted) with ≥1 real Clerk user | app `companies` + `company_users` + `users_clerk`, live |
+| `active_companies` | distinct companies with a match computed, a grant opened, a rating or a chat | roll-ups + chats through `identitiesForClerkIds` |
+| `matches_shown` | distinct (company, grant) pairs shown | `cc_daily_matches.times_shown > 0` |
+| `grants_opened` | grant-detail view sessions | `cc_daily_views.sessions` |
+| `ratings_up` / `ratings_down` | rating events (changed minds count again) | `cc_daily_ratings` |
+| `watchlist_adds` | `watchlist_grants` rows created, later removals included | app, live |
+| `chats` | conversations by real Clerk users with ≥1 message | ops `conversations`, live |
+
+**Distinct vs summed:** `matches_shown` and `active_companies` are distinct over the whole
+window, not a sum of the daily values.
+
+**Per metric:** `{current, previous, delta, delta_pct, series, previous_series, internal}`.
+- The series have one point per day, with empty days as 0.
+- `delta_pct` is null when previous is 0.
+- `internal: {current, previous}` is how much of the number came from internal accounts.
+  They're counted in the number itself too; the tile shows it as a sub-line ("211 matches
+  shown · 140 internal").
+
+**Also returned:**
+- `need_action`: review items that aren't closed.
+- `rankings.clients` and `rankings.all`: the same four blocks, built without and with internal
+  accounts. The page uses `clients` unless "Include internal accounts" is on. Each block holds:
+  - `most_matched`: top 10 grants by companies shown, with the change and opens.
+  - `popular`: top 10 by opens, with watchlist saves.
+  - `movers`: the biggest risers and drops in companies shown vs the previous window, plus
+    `up_count` / `down_count`.
+  - `trends.industries` / `trends.provinces`: matches and sign-ups gaining or losing. These
+    come from `company_metadata.primary_industries` / `provinces`, the engine's source.
+- `internal_accounts: [{id, name, internal: true}]`: the list, named.
+- `sources`: `last_rolled_day`, `live_days`, `stale_rollup`.
+- Grant titles come from `liveGrants()`; a grant that isn't live shows as "Grant #id".
+
+`GET /api/control-centre/search?q=` returns up to 8 companies and 8 grants as
+`{type, id, name}`. An exact id match ranks first. Companies also carry `internal`.
+
+**Cross-checked 2026-10-15** for the week Oct 9–15, against direct SQL on the source tables:
+matches shown 211 = 211, grants opened 51 = 51, active companies 15 = 15.
+
+**Company names.** Anything that shows a company names it first, with the id second, plus an
+**Internal** tag when it's an internal account (`withCompanyNames` / `companyNamesForIds` in
+`identity.js`).
+- **Pages:** search results, the selected company, and the internal-accounts list in the
+  Overview footnote.
+- **APIs:** the review queue list and item return `company_name` and `company_internal`, and
+  client actors on an item carry `internal`.
+- **Later tabs** should use the same helper.
+
+### Internal accounts
+
+`src/control-centre/internal-accounts.js` holds `INTERNAL_COMPANY_IDS`: Granted staff and test
+companies that Chris has confirmed. **Their data is kept everywhere;** the list only labels it.
+
+| Where | What happens |
+|---|---|
+| Usage tiles | Count everything. A sub-line shows how much came from internal accounts. |
+| A company's name anywhere | Shown with an **Internal** tag. |
+| Grant lists and trends (movers, most matched, most popular, shifting trends) | Left out by default, because a staff member re-editing a test profile makes grants "move" for no client reason. The **Include internal accounts** toggle above the grant lists puts them back. It's remembered per browser in `localStorage['cc.includeInternal']`, in try/catch, and switches with no refetch. |
+
+The list holds **28 companies**, all confirmed by Chris on 2026-10-15: Maximizer (#81), plus
+every company in the table below. Add an id only after Chris confirms it.
+
+**Week of Oct 9–15, clients only.** All of the previous week's (Oct 2–8) dashboard matching came
+from internal accounts. With the toggle off, every grant's "before" is 0, so the movers show 52
+risers and **no drops**. That is real: no client company was matched that week. It isn't a bug.
+Turn the toggle on to see the full picture.
+
+**How they were found** (scan of 2026-10-15, all now confirmed). The evidence:
+- **Staff:** grant views made under an internal session role (sysadm / staff). This is the app
+  DB's session role, not `users.role_id`, which is unreliable; the app DB holds no emails.
+- **High activity:** at least 5× the median over the last 30 days. The median was 3 dashboard
+  match runs and 5 grant views.
+- **Test-like name.**
+- Profile churn couldn't be measured, because the app DB keeps one profile row per company.
+
+| Company | ID | Evidence |
+|---|---|---|
+| Med tech in AB | 1 | staff: 14 views as sysadm, 7 as staff; 20 match runs in 30 days |
+| Cedar Labs 2 | 5 | staff: 12 views as sysadm; 19 match runs in 30 days |
+| Small Point Consulting | 48 | staff: 5 views as staff; 37 match runs in 30 days (4 users) |
+| Fadi's company | 51 | staff: 13 views as staff |
+| Nats Test Company | 24 | staff: 4 views as sysadm; test-like name |
+| Erics Antique Treasures | 82 | 19 match runs in 30 days; created the same day as Maximizer (#81) |
+| Granted | 7 | test-like name (our own company name) |
+| Granted Consulting | 10, 15 | test-like name (our own company name) |
+| Research Test Company | 8 | test-like name |
+| Testing Strategy | 9 | test-like name |
+| Example123 | 11 | test-like name |
+| Test123 | 13 | test-like name |
+| Nats Test Company | 18 | test-like name |
+| Research Test1 / Test2 / Test3 / Test12 | 20, 23, 27, 50 | test-like name |
+| This is Natalie's Beta 1 Test | 25 | test-like name |
+| Test Company | 33, 34, 35 | test-like name (three created within 2 seconds) |
+| Nats big test | 58 | test-like name |
+| CL Test | 71, 85 | test-like name |
+| Jades Testing Company | 73 | test-like name |
+| LouLouFry Testing | 126 | test-like name |
+
 ## Known limits
 
-- **History starts Aug–Sep 2026.** The ops tables hold nothing earlier, so trends can't reach
-  back past that.
+- **The nightly roll-up wasn't running on 2026-10-15.** The last write was 2026-10-14 06:42
+  Vancouver, a by-hand run, so Oct 14 was stored part-way through the day. The page reads such
+  days live, as described above. Once the live tail passes 14 days, ranges lose their oldest
+  days until `CC_ROLLUP_ENABLED=true` is set on Railway.
+- **Province labels are raw `company_metadata.provinces` values.** Some are sub-regions, such
+  as "BC- Interior (Thompson/Okanagan + Kootenay)", and aren't normalised.
+- **History starts Aug–Sep 2026.** The ops tables hold nothing earlier, and the roll-up
+  backfill starts 2026-08-26, so trends can't reach back past that. Month and Year comparisons
+  against earlier periods read as growth from zero.
 - **match_results keeps 180 days.** Older matches are deleted, so a long-range match history
   isn't possible from this source.
 - **`chat_turns.company_id` is mostly empty.** Resolve the company from `user_id` (Clerk) with

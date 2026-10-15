@@ -65,6 +65,7 @@ import { controlCentreHealthEndpoint } from './src/control-centre/health.js';
 import { startControlCentreRollup } from './src/control-centre/rollup.js';
 import { startControlCentreReviewSweep } from './src/control-centre/review-queue.js';
 import controlCentreReviewRouter from './src/control-centre/review-routes.js';
+import controlCentreOverviewRouter from './src/control-centre/overview-routes.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
@@ -191,6 +192,8 @@ app.get('/api/control-centre/health', authenticateUser, requireAdmin, controlCen
 // signed-in staff member has full access, so requireAuth (not requireAdmin).
 // Needs migration 044. See docs/control-centre.md.
 app.use('/api/control-centre/review', authenticateUser, requireAuth, controlCentreReviewRouter);
+// Control Centre page data: GET /overview, GET /search. Read-only, cached 5 min.
+app.use('/api/control-centre', authenticateUser, requireAuth, controlCentreOverviewRouter);
 
 // Database admin endpoint (diagnostics and migrations)
 import { dbAdminEndpoint } from './db-admin-endpoint.js';
@@ -925,6 +928,11 @@ app.get('/metrics', authenticateUser, requirePageAuth, (req, res) => {
 
 app.get('/usage', authenticateUser, requirePageAuth, (req, res) => {
   res.sendFile('usage.html', { root: '.' });
+});
+
+// Control Centre: every signed-in staff member (no admin check). docs/control-centre.md
+app.get('/control-centre', authenticateUser, requirePageAuth, (req, res) => {
+  res.sendFile('control-centre.html', { root: '.' });
 });
 
 app.get('/usage-analytics', authenticateUser, requirePageAuth, (req, res) => {

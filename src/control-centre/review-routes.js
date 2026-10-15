@@ -22,7 +22,8 @@ import express from 'express';
 import {
   ReviewQueueError, addFlag, moveStatus, setOwner, close, listItems, getItem, staffNames
 } from './review-queue.js';
-import { identitiesForClerkIds, companyNamesForIds } from './identity.js';
+import { identitiesForClerkIds, companyNamesForIds, withCompanyNames } from './identity.js';
+import { isInternalCompany } from './internal-accounts.js';
 
 const router = express.Router();
 
@@ -60,12 +61,30 @@ async function namesFor(item, flags, events) {
     for (const [id, name] of names) out.companies[id] = name;
     for (const c of clerkIds) {
       const company_id = ids.get(c)?.company_id ?? null;
-      out.actors[c] = { kind: 'client', company_id, name: company_id != null ? names.get(company_id) ?? null : null };
+      out.actors[c] = { kind: 'client', company_id, name: company_id != null ? names.get(company_id) ?? null : null,
+        internal: isInternalCompany(company_id) };
     }
   } catch (error) {
     out.error = String(error?.code || error?.name || 'unknown');
   }
   return out;
+}
+
+/**
+ * Items with `company_name` beside `company_id` (name first in the UI, id
+ * second). The app DB is only needed for names, so a names failure — or an
+ * unset APP_DB_READONLY_URL — still returns the list, names null, with
+ * `names_error`.
+ */
+export async function namedItems(items, { query } = {}) {
+  try {
+    return { items: await withCompanyNames(items, query ? { query } : {}) };
+  } catch (error) {
+    return {
+      items: items.map((i) => ({ ...i, company_name: null, company_internal: isInternalCompany(i.company_id) })),
+      names_error: String(error?.code || error?.name || 'unknown')
+    };
+  }
 }
 
 router.get('/', async (req, res) => {
@@ -74,7 +93,7 @@ router.get('/', async (req, res) => {
       status: filter(req.query.status), owner: filter(req.query.owner), kind: filter(req.query.kind)
     });
     res.set('Cache-Control', 'no-store');
-    res.json({ items });
+    res.json(await namedItems(items));
   } catch (error) {
     sendError(res, error, 'list');
   }
@@ -98,7 +117,8 @@ router.get('/:id', async (req, res) => {
     const { item, flags, events } = await getItem(req.params.id);
     const names = await namesFor(item, flags, events);
     res.set('Cache-Control', 'no-store');
-    res.json({ item, flags, events, names });
+    const company_name = item.company_id != null ? names.companies?.[item.company_id] ?? null : null;
+    res.json({ item: { ...item, company_name, company_internal: isInternalCompany(item.company_id) }, flags, events, names });
   } catch (error) {
     sendError(res, error, 'get');
   }
