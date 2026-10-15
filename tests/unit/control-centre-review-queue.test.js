@@ -13,9 +13,10 @@ import {
   validateFlag, parseId, addFlag, moveStatus, setOwner, close, diagnose, runDiagnosis,
   listItems, getItem, runReviewSweep, startControlCentreReviewSweep,
   INSERT_ITEM_SQL, LOCK_MATCH_SQL, LOCK_CHAT_SQL, LOCK_ITEM_SQL, INSERT_FLAG_SQL, BUMP_SQL,
-  REOPEN_SQL, DIAGNOSE_SQL, SET_STATUS_SQL, SET_OWNER_SQL, CLOSE_SQL, INSERT_EVENT_SQL,
-  GET_ITEM_SQL, GET_FLAGS_SQL, GET_EVENTS_SQL, NEW_ITEM_IDS_SQL, LIST_SQL,
-  SWEEP_CURSOR_SQL, KNOWN_REFS_SQL, EXISTING_MATCH_ITEMS_SQL, DOWNS_SQL, SWEEP_OVERLAP_MS
+  REOPEN_SQL, DIAGNOSE_SQL, RECORD_FAILURE_SQL, SET_STATUS_SQL, SET_OWNER_SQL, CLOSE_SQL, INSERT_EVENT_SQL,
+  GET_ITEM_SQL, GET_FLAGS_SQL, GET_EVENTS_SQL, NEW_ITEM_IDS_SQL, NEW_ITEMS_SQL, LIST_SQL,
+  SWEEP_CURSOR_SQL, KNOWN_REFS_SQL, EXISTING_MATCH_ITEMS_SQL, DOWNS_SQL, SWEEP_OVERLAP_MS,
+  previewDiagnoses
 } from '../../src/control-centre/review-queue.js';
 
 /** In-memory Hub: partial unique keys on items, UNIQUE source_ref on flags. */
@@ -39,7 +40,8 @@ function fakeHub() {
         if (clash) return { rows: [] };
         const it = { id: ++ids.item, kind, company_id, grant_root_id, chat_turn_ref, status: 'new', owner: null,
           diagnosis: null, narrative: null, client_notice: null, flagged_again: false, flag_count: 0,
-          expected_match: null, close_note: null, closed_by: null, closed_at: null };
+          expected_match: null, close_note: null, closed_by: null, closed_at: null,
+          snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null };
         items.push(it);
         return { rows: [{ id: it.id }] };
       }
@@ -61,9 +63,20 @@ function fakeHub() {
       case REOPEN_SQL:
         return update(p[0], { flag_count: byId(p[0]).flag_count + 1, status: 'new', flagged_again: true,
           owner: null, diagnosis: null, narrative: null, client_notice: null,
-          expected_match: null, close_note: null, closed_by: null, closed_at: null });
-      case DIAGNOSE_SQL:
-        return update(p[0], { owner: p[1], diagnosis: p[2], narrative: p[3], client_notice: p[4], status: 'diagnosed' });
+          expected_match: null, close_note: null, closed_by: null, closed_at: null,
+          snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null });
+      case DIAGNOSE_SQL: {
+        const it = byId(p[0]);
+        return update(p[0], { owner: p[1], diagnosis: p[2], narrative: p[3], client_notice: p[4],
+          snapshot: p[5] == null ? it.snapshot : JSON.parse(p[5]), snapshot_at: p[5] == null ? it.snapshot_at : p[6],
+          diagnosis_attempts: p[7], last_error: p[8], status: 'diagnosed' });
+      }
+      case RECORD_FAILURE_SQL: {
+        const it = byId(p[0]);
+        return update(p[0], { diagnosis_attempts: p[1], last_error: p[2],
+          snapshot: p[3] == null ? it.snapshot : JSON.parse(p[3]), snapshot_at: p[3] == null ? it.snapshot_at : p[4] });
+      }
+      case NEW_ITEMS_SQL: return { rows: items.filter((i) => i.status === 'new').map(copy) };
       case SET_STATUS_SQL: return update(p[0], { status: p[1], closed_by: null, closed_at: null });
       case SET_OWNER_SQL: return update(p[0], { owner: p[1] });
       case CLOSE_SQL:
@@ -247,15 +260,127 @@ describe('close', () => {
   });
 });
 
+// Step 5 diagnosis, driven through the real diagnose() with injected edges.
+const NARRATIVE = 'This grant was shown because its topic matched the client goals. Nothing in its eligibility excludes them.';
+const toolReply = (input) => ({
+  usage: { input_tokens: 2000, output_tokens: 150 },
+  content: [{ type: 'tool_use', name: 'record_diagnosis', input }]
+});
+const explainBody = (cause) => ({
+  grant_name: 'Grant G', candidate_cause: { cause, rule: 'r', evidence: ['why'] }, axes: [],
+  card: { eligibility_sections: 'Open to all employers.' }
+});
+function diagCtx({ body = explainBody('RANKED_ON_GENRE'), fail = null, reply } = {}) {
+  return {
+    env: { ANTHROPIC_API_KEY: 'k', GG3_AI_SERVICE_URL: 'http://svc', GG3_REVIEW_FEED_TOKEN: 't' },
+    fetchBadMatch: jest.fn(async () => (fail ? { ok: false, code: fail } : { ok: true, body })),
+    createMessage: jest.fn(async () => reply ?? toolReply({ owner: 'chris', verdict: 'ranked_on_genre', narrative: NARRATIVE })),
+    logCost: jest.fn(async () => {}),
+    opsQuery: null
+  };
+}
+
 describe('diagnosis', () => {
-  test('the stub returns null and leaves items in new', async () => {
-    expect(await diagnose({ id: 1, kind: 'match' })).toBeNull();
+  test('nothing configured → null; the item stays new and no attempt is counted', async () => {
+    expect(await diagnose({ id: 1, kind: 'match', company_id: 1, grant_root_id: 2 }, { env: {}, opsQuery: null })).toBeNull();
     const hub = fakeHub();
     const { item } = await addFlag(matchFlag(), hub.deps);
-    const r = await runDiagnosis(item.id, hub.deps);
+    const r = await runDiagnosis(item.id, { ...hub.deps, diagnoseFn: async () => null });
     expect(r.diagnosed).toBe(false);
-    expect(hub.items[0].status).toBe('new');
-    expect(hub.events.some((e) => e.action === 'diagnosed')).toBe(false);
+    expect(hub.items[0]).toMatchObject({ status: 'new', diagnosis_attempts: 0, last_error: null });
+    expect(hub.events.some((e) => e.action === 'diagnosed' || e.action === 'diagnosis_failed')).toBe(false);
+  });
+
+  test('success stores the snapshot, owner, verdict and narrative, and logs the cost', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    const ctx = diagCtx();
+    const r = await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: ctx });
+    expect(r.diagnosed).toBe(true);
+    expect(r.item).toMatchObject({ status: 'diagnosed', owner: 'chris', narrative: NARRATIVE, client_notice: null,
+      diagnosis_attempts: 0, last_error: null });
+    expect(JSON.parse(r.item.diagnosis)).toMatchObject({ verdict: 'ranked_on_genre', candidate_cause: 'RANKED_ON_GENRE', rule: 'ranked_on_genre' });
+    expect(r.item.snapshot).toMatchObject({ source: 'match_explain', response: { grant_name: 'Grant G' } });
+    expect(r.item.snapshot_at).toBeTruthy();
+    expect(ctx.fetchBadMatch).toHaveBeenCalledWith({ grantId: 1196, companyId: 81 }, expect.anything());
+    expect(ctx.logCost).toHaveBeenCalledWith(expect.objectContaining({ model: 'claude-sonnet-5-5', source: 'cc-review-diagnosis' }));
+    expect(hub.events.at(-1)).toMatchObject({ action: 'diagnosed', detail: JSON.stringify({ owner: 'chris', verdict: 'ranked_on_genre' }) });
+  });
+
+  test('a failure stays new, counts the attempt, keeps the snapshot; the retry reuses it', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    const bad = diagCtx({ reply: toolReply({ owner: 'chris', verdict: 'ranked_on_genre', narrative: 'too short' }) });
+    const r1 = await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: bad });
+    expect(r1).toMatchObject({ diagnosed: false, failed: true, error: 'bad_model_output:narrative_length' });
+    expect(hub.items[0]).toMatchObject({ status: 'new', diagnosis_attempts: 1, last_error: 'bad_model_output:narrative_length' });
+    expect(hub.items[0].snapshot).toMatchObject({ source: 'match_explain' });
+    expect(hub.events.at(-1)).toMatchObject({ action: 'diagnosis_failed', from_status: 'new', to_status: 'new' });
+
+    const good = diagCtx();
+    const r2 = await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: good });
+    expect(r2.diagnosed).toBe(true);
+    expect(good.fetchBadMatch).not.toHaveBeenCalled(); // stored snapshot reused
+    expect(r2.item).toMatchObject({ diagnosis_attempts: 1, last_error: null });
+  });
+
+  test('the third failure diagnoses as could_not_diagnose for chris, in plain words', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    const ctx = diagCtx({ fail: 'explain_422_company_not_resolved' });
+    await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: ctx });
+    await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: ctx });
+    expect(hub.items[0]).toMatchObject({ status: 'new', diagnosis_attempts: 2 });
+    const r3 = await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: ctx });
+    expect(r3).toMatchObject({ diagnosed: true, failed: true });
+    expect(r3.item).toMatchObject({ status: 'diagnosed', owner: 'chris', diagnosis_attempts: 3,
+      last_error: 'explain_422_company_not_resolved' });
+    expect(JSON.parse(r3.item.diagnosis)).toMatchObject({ verdict: 'could_not_diagnose', attempts: 3 });
+    expect(r3.item.narrative).toMatch(/couldn't find this company's profile/);
+    expect(r3.item.narrative).not.toMatch(/explain_|422/);
+    expect(ctx.createMessage).not.toHaveBeenCalled();
+  });
+
+  test('a reopen clears the snapshot and attempts, so the next diagnosis takes a fresh one', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: diagCtx() });
+    await close(item.id, { expected_match: 'should' }, 'a', hub.deps);
+    const r = await addFlag(matchFlag({ source_ref: 'rating-2' }), hub.deps);
+    expect(r.item).toMatchObject({ status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null });
+    const fresh = diagCtx({ body: explainBody('LOOKS_CORRECT'),
+      reply: toolReply({ owner: 'research', verdict: 'unclear', narrative: NARRATIVE }) });
+    const again = await runDiagnosis(item.id, { ...hub.deps, diagnoseCtx: fresh });
+    expect(fresh.fetchBadMatch).toHaveBeenCalledTimes(1);
+    expect(again.item.snapshot.response.candidate_cause.cause).toBe('LOOKS_CORRECT');
+    expect(again.item.owner).toBe('chris');
+    expect(JSON.parse(again.item.diagnosis)).toMatchObject({ verdict: 'looks_correct', owner_override: expect.any(Object) });
+  });
+
+  test('dry-run preview writes nothing and never logs cost, but reports the cost', async () => {
+    const hub = fakeHub();
+    await addFlag(matchFlag(), hub.deps);
+    const seen = [];
+    const spy = async (sql, p) => { seen.push(sql); return hub.q(sql, p); };
+    const ctx = diagCtx();
+    const out = await previewDiagnoses([{ company_id: 83, grant_root_id: 1097 }], { hubQuery: spy, diagnoseCtx: ctx });
+    expect(out.rows.map((r) => r.label)).toEqual(['new', 'would file']);
+    expect(out.rows[0]).toMatchObject({ owner: 'chris', verdict: 'ranked_on_genre', narrative: NARRATIVE });
+    expect(out.cost).toBeGreaterThan(0);
+    expect(ctx.logCost).not.toHaveBeenCalled();
+    expect(seen.every((sql) => /^\s*SELECT/i.test(sql))).toBe(true);
+    expect(hub.items[0]).toMatchObject({ status: 'new', snapshot: null, diagnosis_attempts: 0 });
+    expect(hub.events.filter((e) => e.action !== 'created' && e.action !== 'flagged')).toHaveLength(0);
+  });
+
+  test('dry-run preview shows a failure as the attempt it would be', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    hub.items[0].diagnosis_attempts = 2;
+    const out = await previewDiagnoses([], { hubQuery: hub.q, diagnoseCtx: diagCtx({ fail: 'explain_timeout' }) });
+    expect(out.rows[0]).toMatchObject({ id: item.id, error: 'explain_timeout', attempt: 3,
+      would: expect.objectContaining({ verdict: 'could_not_diagnose', owner: 'chris' }) });
+    expect(hub.items[0]).toMatchObject({ status: 'new', diagnosis_attempts: 2 });
   });
 
   test('a result sets owner/diagnosis and moves to diagnosed; an unknown owner falls back to chris', async () => {
@@ -359,7 +484,7 @@ describe('runReviewSweep', () => {
     const hub = fakeHub();
     const appQuery = jest.fn(async () => ({ rows: downs }));
     const flag = (input) => addFlag(input, hub.deps);
-    const diag = (id) => runDiagnosis(id, hub.deps);
+    const diag = (id) => runDiagnosis(id, { ...hub.deps, diagnoseFn: async () => null }); // not configured
     const deps = { hubQuery: hub.q, appQuery, addFlag: flag, runDiagnosis: diag };
 
     const first = await runReviewSweep({ write: true, deps, log: () => {} });
@@ -380,6 +505,21 @@ describe('runReviewSweep', () => {
     const appQuery = async () => ({ rows: [downs[0]] });
     const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery }, log: () => {} });
     expect(s).toMatchObject({ to_file: 1, items: 1, new_items: 0, reopened: 1 });
+  });
+
+  test('dry run with preview hands the would-file and would-reopen pairs to the preview', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag({ source_ref: 'old' }), hub.deps); // 81/1196, closed below
+    await close(item.id, { expected_match: 'should' }, 'a', hub.deps);
+    const previewDiagnoses = jest.fn(async () => ({ rows: [], cost: 0 }));
+    const appQuery = async () => ({ rows: downs });
+    const s = await runReviewSweep({ preview: true, deps: { hubQuery: hub.q, appQuery, previewDiagnoses }, log: () => {} });
+    expect(previewDiagnoses.mock.calls[0][0]).toEqual([
+      { company_id: 81, grant_root_id: 1196, reopen: true },
+      { company_id: 83, grant_root_id: 1097, reopen: false }
+    ]);
+    expect(s.preview).toEqual({ rows: [], cost: 0 });
+    expect(hub.items[0].status).toBe('closed');
   });
 });
 
