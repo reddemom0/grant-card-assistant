@@ -19,6 +19,10 @@
  *               (grant-patterns.js). The snapshot is the grant's current tags
  *               and card text (Hub gg3_grants) and the review reasons, each
  *               company named.
+ *   empty_track a goal track that showed the client nothing (Companies tab,
+ *               companies.js fileEmptyTrack). The snapshot, taken when it is
+ *               filed, is the goal, how many grants the run considered and
+ *               where they were removed, and the profile with its gaps.
  *
  * Owner routing is code, keyed on match-explain's candidate_cause (match),
  * the review category (grant_pattern) or the verdict (chat). Sonnet only
@@ -62,6 +66,7 @@ export const VERDICTS = Object.freeze([
   'bad_record',
   'chat_wrong_grant_facts',
   'chat_answer_problem',
+  'no_grants_for_goal',
   'unclear'
 ]);
 /** Set by code only, after the third failed attempt. */
@@ -96,6 +101,15 @@ export function regionBlamed(body) {
  *            ownerByVerdict?: Object, forcedVerdict?: string, needsClientNotice?: boolean}}
  */
 export function routeFor(item, snapshot) {
+  if (item.kind === 'empty_track') {
+    return {
+      rule: 'empty_track',
+      allowed: ['client', 'research', 'chris'],
+      default: 'chris',
+      verdicts: ['profile_incomplete', 'no_grants_for_goal', 'unclear'],
+      ownerByVerdict: { profile_incomplete: 'client', no_grants_for_goal: 'research', unclear: 'chris' }
+    };
+  }
   if (item.kind === 'grant_pattern') {
     if (!snapshot?.grant) {
       return { rule: 'bad_record', allowed: ['research'], default: 'research', verdicts: ['bad_record'], forcedVerdict: 'bad_record' };
@@ -407,6 +421,9 @@ export async function takeSnapshot(item, deps) {
     if (!r.ok) return { ok: false, code: r.code, notConfigured: r.code === 'not_configured' };
     return { ok: true, snapshot: { source: 'match_explain', fetched_at: now, response: r.body }, snapshotAt: now, taken: true };
   }
+  // An empty-track card's evidence is taken when it is filed; a reopened card
+  // gets a fresh one from the flag that reopened it.
+  if (item.kind === 'empty_track') return { ok: false, code: 'empty_track_no_evidence' };
   if (!deps.opsQuery) return { ok: false, code: 'not_configured', notConfigured: true };
   if (item.kind === 'grant_pattern') {
     let r;
@@ -483,6 +500,7 @@ const RULE_TEXT = {
   bad_record: 'The grant is missing from the grant data. Owner must be research.',
   chat: 'A flagged chat answer. If the answer stated wrong facts about a grant (amount, deadline, eligibility, region), verdict chat_wrong_grant_facts (owner research). Otherwise chat_answer_problem (owner chris). Use unclear if you cannot tell. Also fill client_asked, assistant_replied, what_was_wrong, good_answer and suggested_fix, each short and plain, about the flagged turn (flagged: true). good_answer must use only facts in the evidence; if the right facts are not there, say what the assistant should have checked.',
   pattern_tag: 'An automatic review removed this grant from several companies\' lists for the same reason, so the grant\'s own data is the likely problem. Some companies may be Granted\'s own internal accounts; call them internal accounts, never test accounts. Read the card text. If the card text DOES state the restriction the reviews give, verdict tag_missed_restriction (owner chris — the tagger missed it). If the card text does NOT state it, verdict card_missing_restriction (owner research — the card needs it added). If the reviews look wrong for these companies, verdict unclear (owner chris) and say why. Name the restriction and how many companies were affected.',
+  empty_track: 'A goal track showed this client no grants at all in their latest recorded match run. The evidence says how many grants were considered and at which step they were removed, and gives the client\'s profile with its gaps. If a missing or unreadable profile field explains it (for example most grants removed at eligibility on a field the profile lacks or gets wrong), verdict profile_incomplete (owner client) and write client_notice starting "Tell the client to:". If the grants for this goal simply don\'t cover the client\'s province or industry, verdict no_grants_for_goal (owner research — grant coverage). Otherwise unclear (owner chris — the engine). Say which step removed most grants, in plain words.',
   pattern_region: 'An automatic review removed this grant from several companies\' lists because of where they are. The grant\'s list of regions is grant data, not a tagger output, so owner must be research. If the card text states a narrower location than the listed regions, verdict region_list_wrong; if it does not state one, verdict card_missing_restriction.',
   unclear: 'The cause is unclear from the evidence. Owner must be chris. Say what is known and what is missing.'
 };
@@ -550,11 +568,16 @@ export function evidenceForChat(snapshot) {
   };
 }
 
-const ITEM_WORDS = { match: 'grant match', chat: 'chat answer', grant_pattern: 'grant pattern (one grant removed for the same reason across several companies)' };
+const ITEM_WORDS = {
+  match: 'grant match', chat: 'chat answer',
+  grant_pattern: 'grant pattern (one grant removed for the same reason across several companies)',
+  empty_track: 'goal track that showed the client nothing'
+};
 
 export function buildUserPrompt(item, snapshot, route, comments = []) {
   const evidence = item.kind === 'match' ? evidenceForMatch(snapshot.response)
-    : item.kind === 'grant_pattern' ? evidenceForPattern(snapshot) : evidenceForChat(snapshot);
+    : item.kind === 'grant_pattern' ? evidenceForPattern(snapshot)
+      : item.kind === 'empty_track' ? snapshot : evidenceForChat(snapshot);
   const allowedVerdicts = route.forcedVerdict ? [route.forcedVerdict] : (route.verdicts ?? VERDICTS);
   // A pattern card's flag comments are the review reasons, already in the evidence.
   const notes = item.kind === 'grant_pattern' ? [] : comments;
@@ -736,6 +759,7 @@ const PLAIN_ERRORS = [
   [/^explain_/, 'the match explanation service failed'],
   [/^chat_turn_not_found/, "the flagged chat turn couldn't be found"],
   [/^pattern_no_cuts/, "the automatic reviews behind this pattern couldn't be found"],
+  [/^empty_track_no_evidence/, 'the empty track was flagged without its evidence'],
   [/^pattern_/, "the grant data or automatic reviews couldn't be read"],
   [/^chat_/, "the flagged chat turn couldn't be read"],
   [/^ops_/, "the chat history couldn't be read"],

@@ -47,6 +47,10 @@ export function chatIssue(ref) {
  */
 export function cardTitle(item) {
   const grant = item.grant_name || (item.grant_root_id != null ? `grant #${item.grant_root_id}` : 'a grant');
+  if (item.kind === 'empty_track') {
+    const company = item.company_name || (item.company_id != null ? `company #${item.company_id}` : 'a company');
+    return `${item.goal_track || 'A goal'} track showed ${company} nothing`;
+  }
   if (item.kind === 'grant_pattern') return `${grant} — cut for several companies (${categoryWords(item.pattern_category)})`;
   if (item.kind === 'match') {
     const company = item.company_name || (item.company_id != null ? `company #${item.company_id}` : 'a company');

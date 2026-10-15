@@ -23,7 +23,6 @@
 
   const SOON = {
     inbox: ['Inbox', 'Every thumbs-down and staff flag that needs a look, newest first, with its diagnosis.'],
-    companies: ['Companies', "Each client's journey: the grant matches on their goal tracks, the grant cards they opened, how they rated them, what they asked."],
     grants: ['Grants', 'Each grant: how many clients it was matched to over time, who opened its grant card, and why it matched.'],
     coverage: ['Coverage & changes', 'What changed in matching and why, grant cards matched widely but never opened, and thin coverage by industry.'],
     themes: ['Chat themes', 'What people ask the assistant, grouped into themes you can read through.']
@@ -49,7 +48,7 @@
   function storeSet(v) { try { window.localStorage.setItem(STORE_KEY, v); } catch { /* private mode etc. */ } }
 
   // ---------------------------------------------------------------- state + URL
-  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '' };
+  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '' };
   const knownNames = { company: new Map(), grant: new Map() };
   /** companies.id of internal accounts seen in any response (search, overview). */
   const internalIds = new Set();
@@ -61,30 +60,33 @@
     const stored = storeGet();
     // #review, #review/<id>, #review?owner=…&type=…, #review/<id>?…
     const hash = /^#review(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
-    const tab = hash ? 'review' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
+    // #companies, #companies/<id>, #companies?sort=…&dir=…&q=…
+    const co = /^#companies(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
+    const tab = hash ? 'review' : co ? 'companies' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
     return {
       tab,
       range: RANGES.includes(p.get('range')) ? p.get('range') : (RANGES.includes(stored) ? stored : 'week'),
-      company: id(p.get('company')),
+      company: co ? (co[1] ? Number(co[1]) : null) : id(p.get('company')),
       grant: id(p.get('grant')),
       card: hash?.[1] ? Number(hash[1]) : null,
-      rq: hash?.[2] ?? ''
+      rq: hash?.[2] ?? '',
+      cq: co?.[2] ?? ''
     };
   }
 
   function urlFor(s) {
     const p = new URLSearchParams();
-    if (s.tab !== 'overview' && s.tab !== 'review') p.set('tab', s.tab);
+    if (s.tab !== 'overview' && s.tab !== 'review' && s.tab !== 'companies') p.set('tab', s.tab);
     p.set('range', s.range);
-    if (s.tab === 'companies' && s.company) p.set('company', s.company);
     if (s.tab === 'grants' && s.grant) p.set('grant', s.grant);
-    const hash = s.tab === 'review' ? `#review${s.card ? `/${s.card}` : ''}${s.rq ? `?${s.rq}` : ''}` : '';
+    const hash = s.tab === 'review' ? `#review${s.card ? `/${s.card}` : ''}${s.rq ? `?${s.rq}` : ''}`
+      : s.tab === 'companies' ? `#companies${s.company ? `/${s.company}` : ''}${s.cq ? `?${s.cq}` : ''}` : '';
     return `${window.location.pathname}?${p}${hash}`;
   }
 
   function go(next, { push = true } = {}) {
     state = { ...state, ...next };
-    if (state.tab !== 'companies') state.company = null;
+    if (state.tab !== 'companies') { state.company = null; state.cq = ''; }
     if (state.tab !== 'grants') state.grant = null;
     if (state.tab !== 'review') { state.card = null; state.rq = ''; }
     storeSet(state.range);
@@ -781,10 +783,30 @@
     }
   };
 
+  /** What the Companies module gets from this page. */
+  const companiesCtx = {
+    esc, fmt, plural, api, send, reduceMotion,
+    state: () => state,
+    go: (next, opts) => go({ tab: 'companies', ...next }, opts),
+    goReview: (id) => go({ tab: 'review', card: id, rq: '' }),
+    grantHref: (id) => urlFor({ ...state, tab: 'grants', grant: id }),
+    openGrant: (id, name) => { if (name) knownNames.grant.set(id, name); go({ tab: 'grants', grant: id }); },
+    includeInternal: () => includeInternal,
+    setIncludeInternal: (on) => reviewCtx.setIncludeInternal(on),
+    get reviewCtx() { return reviewCtx; }
+  };
+
   function render() {
     hideTip();
     const panel = $('#cc-panel');
     if (state.tab !== 'review') window.CCReview?.closeDrawer();
+    if (state.tab === 'companies' && window.CCCompanies) {
+      loadSeq++;
+      renderChrome(null);
+      window.CCCompanies.render(panel, companiesCtx);
+      loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
+      return;
+    }
     if (state.tab === 'review' && window.CCReview) {
       loadSeq++;
       if (!panel.querySelector('.rq')) renderChrome(null);
@@ -858,9 +880,16 @@
       $(`#cc-tabs [data-tab="${next}"]`).focus();
     });
     $('#cc-action').addEventListener('click', (e) => { e.preventDefault(); go({ tab: 'review', card: null, rq: '' }); });
-    window.addEventListener('popstate', () => { state = readUrl(); render(); });
-    // A typed or pasted #review/<id> on a page already open.
-    window.addEventListener('hashchange', () => { state = readUrl(); render(); });
+    // Back/forward, and a typed or pasted #review/<id> or #companies/<id> on a
+    // page already open. A hash change fires both events; render once.
+    const fromUrl = () => {
+      const next = readUrl();
+      if (urlFor(next) === urlFor(state) && document.querySelector('#cc-panel').childElementCount) return;
+      state = next;
+      render();
+    };
+    window.addEventListener('popstate', fromUrl);
+    window.addEventListener('hashchange', fromUrl);
     window.addEventListener('scroll', hideTip, { passive: true });
     $('#cc-tabs').addEventListener('scroll', updateTabsMore, { passive: true });
     window.addEventListener('resize', updateTabsMore, { passive: true });

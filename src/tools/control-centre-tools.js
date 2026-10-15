@@ -47,7 +47,7 @@ const EVENT_ROWS = 30;
 
 const STATUSES = ['new', 'diagnosed', 'in_progress', 'closed'];
 const OWNERS = ['client', 'research', 'chris', 'jason'];
-const KINDS = ['match', 'chat', 'grant_pattern'];
+const KINDS = ['match', 'chat', 'grant_pattern', 'empty_track'];
 
 const codeOf = (err) => err?.status ?? err?.code ?? err?.name ?? 'unknown';
 const clip = (s, n) => {
@@ -62,7 +62,7 @@ const days = (v) => (v == null ? null : Math.round(Number(v) * 10) / 10);
 // ---------------------------------------------------------------------------
 
 const CARD_COLUMNS = `
-  i.id, i.kind, i.status, i.owner, i.company_id, i.grant_root_id, i.chat_turn_ref, i.pattern_category,
+  i.id, i.kind, i.status, i.owner, i.company_id, i.grant_root_id, i.chat_turn_ref, i.pattern_category, i.goal_track,
   i.conversation_id, i.narrative, i.client_notice, i.flag_count, i.flagged_again, i.created_at, i.updated_at,
   i.closed_at, g.grant_name,
   EXTRACT(EPOCH FROM (now() - i.created_at)) / 86400 AS age_days,
@@ -237,6 +237,13 @@ export function evidenceOf(item) {
         message: t.turn_index + 1, client: clip(t.client, TURN_CHARS), assistant: clip(t.assistant, TURN_CHARS),
         ...(t.flagged ? { flagged: true } : {})
       }))
+    };
+  }
+  if (item.kind === 'empty_track') {
+    return {
+      goal: s.goal, considered: s.considered, run_at: s.run?.at ?? null,
+      where_the_grants_went: (s.removed ?? []).map((r) => ({ step: r.words, grants: r.n })),
+      profile_gaps: s.profile_gaps ?? [], other_goals: s.other_goals ?? []
     };
   }
   if (item.kind === 'grant_pattern') {
