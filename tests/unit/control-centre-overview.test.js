@@ -12,7 +12,8 @@ import {
   windowsFor, liveTail, compare, buildOverview, computeOverview, getOverview, search, shiftingTrends,
   _clearCacheForTests, OverviewError, CACHE_TTL_MS, MAX_LIVE_DAYS,
   ROLLED_MATCHES_SQL, ROLLED_VIEWS_SQL, ROLLED_RATINGS_SQL, LAST_ROLLED_SQL, NEED_ACTION_SQL,
-  SIGNUPS_SQL, WATCHLIST_ADDS_SQL, CHATS_SQL, COMPANY_METADATA_SQL, COMPANY_SEARCH_SQL
+  SIGNUPS_SQL, WATCHLIST_ADDS_SQL, CHATS_SQL, COMPANY_METADATA_SQL, COMPANY_SEARCH_SQL,
+  OPEN_SOURCES, openSourceKey, openSources
 } from '../../src/control-centre/overview.js';
 import { MATCH_SQL } from '../../src/control-centre/rollup.js';
 import { INTERNAL_COMPANY_IDS, internalCompanySet, isInternalCompany } from '../../src/control-centre/internal-accounts.js';
@@ -140,6 +141,55 @@ describe('buildOverview', () => {
     expect(r.movers).toMatchObject({ up_count: 2, down_count: 1 });
     expect(r.popular[0]).toMatchObject({ grant_id: 1516, opens: 4, saves: 1 });
     expect(o.need_action).toBe(5);
+  });
+});
+
+describe('how clients found grant cards', () => {
+  test('source values map to goal tracks / browse / chat / watchlist / other', () => {
+    expect(OPEN_SOURCES.map((s) => s.key)).toEqual(['goal_tracks', 'browse', 'chat', 'watchlist', 'other']);
+    expect(openSourceKey('suggested')).toBe('goal_tracks');
+    expect(openSourceKey('browse')).toBe('browse');
+    expect(openSourceKey('advisor')).toBe('chat');
+    expect(openSourceKey('Advisor')).toBe('chat');
+    expect(openSourceKey('watchlist')).toBe('watchlist');
+    expect(openSourceKey('direct')).toBe('other');
+    expect(openSourceKey(null)).toBe('other');
+    expect(openSourceKey('something-new')).toBe('other');
+  });
+
+  test('opens per source, this period vs previous, every source listed', () => {
+    const views = [
+      { day: '2026-10-10', source: 'suggested', sessions: 3 },
+      { day: '2026-10-11', source: 'advisor', sessions: 2 },
+      { day: '2026-10-11', source: 'direct', sessions: 1 },
+      { day: '2026-10-04', source: 'suggested', sessions: 5 },
+      { day: '2026-10-04', source: 'browse', sessions: 1 },
+      { day: '2026-09-01', source: 'browse', sessions: 9 } // outside both windows
+    ];
+    expect(openSources(views, W.current.days, W.previous.days)).toEqual([
+      { key: 'goal_tracks', label: 'Goal tracks', current: 3, previous: 5, delta: -2, delta_pct: -40 },
+      { key: 'browse', label: 'Browse', current: 0, previous: 1, delta: -1, delta_pct: -100 },
+      { key: 'chat', label: 'Chat', current: 2, previous: 0, delta: 2, delta_pct: null },
+      { key: 'watchlist', label: 'Watchlist', current: 0, previous: 0, delta: 0, delta_pct: null },
+      { key: 'other', label: 'Other (direct links)', current: 1, previous: 0, delta: 1, delta_pct: null }
+    ]);
+  });
+
+  test('in both rankings; clients-only leaves internal accounts out; sums match the opens tile', () => {
+    const o = buildOverview(W, { ...base(),
+      internalCompanies: internalCompanySet([81]),
+      views: [
+        { day: '2026-10-10', company_id: 81, grant_root_id: 1, source: 'advisor', sessions: 4 },
+        { day: '2026-10-10', company_id: 90, grant_root_id: 1, source: 'browse', sessions: 2 }
+      ] });
+    const sum = (list) => list.reduce((a, s) => a + s.current, 0);
+    expect(sum(o.rankings.all.open_sources)).toBe(o.metrics.grants_opened.current);
+    expect(o.rankings.clients.open_sources.find((s) => s.key === 'chat').current).toBe(0);
+    expect(o.rankings.all.open_sources.find((s) => s.key === 'chat').current).toBe(4);
+  });
+
+  test('the roll-up read includes source', () => {
+    expect(ROLLED_VIEWS_SQL).toMatch(/\bsource\b/);
   });
 });
 

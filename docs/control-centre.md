@@ -402,6 +402,21 @@ a system prompt that requires the tool call. A reply without the call fails vali
 (`authenticateUser` + `requirePageAuth`). Every signed-in staff member has full access. The
 sidebar link is in `public/js/shared-layout.js`.
 
+### Words on the page
+
+The page uses platform language, not database names:
+
+| Say | Not | Means |
+|---|---|---|
+| grant match | match shown | a grant card shown to a client on their goal tracks; each client counts once per grant |
+| grant cards opened | grants opened | grant-detail view sessions |
+| active clients | active companies | companies with any activity |
+| goal tracks | sections | the per-goal lists on the client dashboard |
+
+- Every chart's subtitle says in one plain sentence what a bar means.
+- Every trend value carries its unit ("+65 grant matches", "+1 sign-up").
+- Movers rows show before → now ("0 → 6") beside the change.
+
 ### Frame and URL
 
 There are 7 tabs: Overview (the default), Inbox, Companies, Grants, Review queue, Coverage &
@@ -483,6 +498,18 @@ window, not a sum of the daily values.
     `up_count` / `down_count`.
   - `trends.industries` / `trends.provinces`: matches and sign-ups gaining or losing. These
     come from `company_metadata.primary_industries` / `provinces`, the engine's source.
+  - `open_sources`: grant card opens by where they were opened from, now vs before, as
+    `{key, label, current, previous, delta, delta_pct}` for each of the five sources. The
+    source is `grant_view_sessions.presentation_context->>'source'`, kept by the roll-up.
+    Every open had one in the 60 days to 2026-10-15.
+
+    | Shown as | Source value |
+    |---|---|
+    | Goal tracks | `suggested` (always carries a goal-track list, e.g. `track-0-hire-or-train-people`) |
+    | Browse | `browse` |
+    | Chat | `advisor` |
+    | Watchlist | `watchlist` |
+    | Other (direct links) | `direct`, and anything unknown |
 - `internal_accounts: [{id, name, internal: true}]`: the list, named.
 - `sources`: `last_rolled_day`, `live_days`, `stale_rollup`.
 - Grant titles come from `liveGrants()`; a grant that isn't live shows as "Grant #id".
