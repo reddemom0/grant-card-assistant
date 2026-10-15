@@ -1,6 +1,5 @@
 /**
- * gg3-ops-db: Oracle's read-only pool on the gg3-ai-service ops DB, and the
- * internal-user exclusion helper.
+ * gg3-ops-db: Oracle's read-only pool on the gg3-ai-service ops DB.
  *
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest --config tests/jest.config.cjs tests/unit/gg3-ops-db.test.js
  */
@@ -24,8 +23,6 @@ const {
   gg3OpsQuery,
   getGg3OpsPool,
   isGg3OpsConfigured,
-  getInternalUserIds,
-  excludeInternalUsers,
   _resetGg3OpsForTests
 } = await import('../../src/services/gg3-ops-db.js');
 
@@ -37,7 +34,6 @@ beforeEach(async () => {
   poolConfigs.length = 0;
   mockPoolQuery.mockReset();
   delete process.env.GG3_OPS_DB_READONLY_URL;
-  delete process.env.GG3_INTERNAL_USER_IDS;
   warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
   errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 });
@@ -108,46 +104,10 @@ describe('configured pool', () => {
   });
 });
 
-describe('getInternalUserIds', () => {
-  test('trims, drops blanks, de-duplicates', () => {
-    process.env.GG3_INTERNAL_USER_IDS = ' user_a, ,user_b,user_a ,';
-    expect(getInternalUserIds()).toEqual(['user_a', 'user_b']);
-    expect(warnSpy).not.toHaveBeenCalled();
-  });
-
-  test('empty list is allowed and warns once', () => {
-    expect(getInternalUserIds()).toEqual([]);
-    expect(getInternalUserIds()).toEqual([]);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('excludeInternalUsers', () => {
-  test('binds ids as one array parameter at the given index', () => {
-    process.env.GG3_INTERNAL_USER_IDS = "user_a,user_b'); DROP TABLE x;--";
-    const ex = excludeInternalUsers('ct.user_id', 3);
-
-    expect(ex.clause).toBe('(ct.user_id IS NULL OR NOT (ct.user_id = ANY($3::text[])))');
-    expect(ex.params).toEqual([['user_a', "user_b'); DROP TABLE x;--"]]);
-    expect(ex.clause).not.toContain('user_a');
-    expect(ex.clause).not.toContain('DROP');
-  });
-
-  test('empty list excludes nothing', () => {
-    expect(excludeInternalUsers('user_id', 1)).toEqual({ clause: 'TRUE', params: [] });
-  });
-
-  test.each([
-    'user_id; DROP TABLE chat_turns',
-    'User_Id',
-    'a.b.c',
-    '',
-    null
-  ])('rejects unsafe column %p', (col) => {
-    expect(() => excludeInternalUsers(col, 1)).toThrow(/plain identifier/);
-  });
-
-  test.each([0, -1, 1.5, '2'])('rejects bad param index %p', (idx) => {
-    expect(() => excludeInternalUsers('user_id', idx)).toThrow(/paramIndex/);
+describe('retired staff filter', () => {
+  test('GG3_INTERNAL_USER_IDS helpers are gone (internal accounts come from identity.js internalClerkIds)', async () => {
+    const mod = await import('../../src/services/gg3-ops-db.js');
+    expect(mod.getInternalUserIds).toBeUndefined();
+    expect(mod.excludeInternalUsers).toBeUndefined();
   });
 });

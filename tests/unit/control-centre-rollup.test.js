@@ -28,7 +28,7 @@ import {
   startControlCentreRollup
 } from '../../src/control-centre/rollup.js';
 
-const ENV_KEYS = ['CC_ROLLUP_ENABLED', 'APP_DB_READONLY_URL', 'GG3_OPS_DB_READONLY_URL', 'GG3_INTERNAL_USER_IDS'];
+const ENV_KEYS = ['CC_ROLLUP_ENABLED', 'APP_DB_READONLY_URL', 'GG3_OPS_DB_READONLY_URL'];
 const saved = {};
 let logSpy, warnSpy, errorSpy;
 
@@ -168,10 +168,8 @@ describe('source SQL', () => {
     expect(REVIEW_SQL).toContain('m.section = a.track');
   });
 
-  test('staff are NOT excluded: GG3_INTERNAL_USER_IDS is ignored (blended during beta)', async () => {
-    process.env.GG3_INTERNAL_USER_IDS = 'user_staff1,user_staff2';
+  test('staff are NOT excluded (blended during beta)', async () => {
     for (const sql of [MATCH_SQL, REVIEW_SQL, VIEWS_SQL, RATINGS_SQL]) {
-      expect(sql).not.toContain('user_staff1');
       expect(sql).not.toContain('ANY(');
       expect(sql).not.toContain('$2');
     }

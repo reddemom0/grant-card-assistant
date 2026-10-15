@@ -8,8 +8,13 @@
  *                             each with its card link. Nothing happened →
  *                             nothing is filed or sent.
  *
- * Two sources, both in the gg3-ai-service ops DB (gg3-ops-db.js), both with
- * GetGranted staff left out (excludeInternalUsers, GG3_INTERNAL_USER_IDS):
+ * Two sources, both in the gg3-ai-service ops DB (gg3-ops-db.js), everyone
+ * included — internal accounts too. A card from an internal account carries the
+ * Internal tag like any other card (its company is an internal account), so the
+ * Control Centre hides it by default behind "Include internal accounts", and
+ * the DM marks it Internal. Internal accounts are the Control Centre's list
+ * (internal-accounts.js → identity.js internalClerkIds); GG3_INTERNAL_USER_IDS
+ * is retired:
  *   errors       chat_turns that failed, by the spike alert's own rules
  *                (BROKE_OUTCOMES → "chat broke", no_answer → "empty reply or
  *                refusal", EXCLUDED_CATEGORIES left out)
@@ -49,7 +54,7 @@
  * unset it is never scheduled. Dry run: scripts/pulse-roundup-check.mjs.
  */
 
-import { gg3OpsQuery, isGg3OpsConfigured, excludeInternalUsers } from './gg3-ops-db.js';
+import { gg3OpsQuery, isGg3OpsConfigured } from './gg3-ops-db.js';
 import { BROKE_OUTCOMES, FAILED_OUTCOMES, EXCLUDED_CATEGORIES } from './pulse-spike.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from '../claude/tool-output.js';
 import { pulsePostRecorder } from './pulse-posts.js';
@@ -104,22 +109,20 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 // ============================================================================
 
 /**
- * Failed chat turns in the window, staff left out.
+ * Failed chat turns in the window, everyone's (internal accounts included).
  * @returns {Promise<null|Array<{kind: 'error', issue: 'chat_broke'|'empty_reply', label: string, category: string|null, userId: string,
  *                               conversationId: number|null, turnId: string, turnIndex: number|null, at: Date}>>}
  *   null when the ops DB isn't configured
  */
 export async function collectErrors(hours = WINDOW_HOURS, runQuery = gg3OpsQuery) {
-  const ex = excludeInternalUsers('user_id', 4);
   const res = await runQuery(
     `SELECT turn_id, occurred_at, conversation_id, turn_index, user_id, outcome, error_category
        FROM chat_turns
       WHERE occurred_at > now() - make_interval(hours => $1::int)
         AND outcome = ANY($2::text[])
         AND (error_category IS NULL OR NOT (error_category = ANY($3::text[])))
-        AND ${ex.clause}
       ORDER BY occurred_at`,
-    [hours, FAILED_OUTCOMES, EXCLUDED_CATEGORIES, ...ex.params]
+    [hours, FAILED_OUTCOMES, EXCLUDED_CATEGORIES]
   );
   if (!res.configured) return null;
   return res.rows.map(r => {
@@ -142,17 +145,15 @@ export async function collectErrors(hours = WINDOW_HOURS, runQuery = gg3OpsQuery
 // 2. WENT BADLY
 // ============================================================================
 
-/** Conversations with activity in the window, newest first, staff left out. */
+/** Conversations with activity in the window, newest first, everyone's (internal accounts included). */
 export async function collectConversations(hours = WINDOW_HOURS, runQuery = gg3OpsQuery, limit = MAX_CONVERSATIONS) {
-  const ex = excludeInternalUsers('user_id', 3);
   const res = await runQuery(
     `SELECT id, user_id, messages, updated_at
        FROM conversations
       WHERE updated_at > now() - make_interval(hours => $1::int)
-        AND ${ex.clause}
       ORDER BY updated_at DESC
       LIMIT $2::int`,
-    [hours, limit, ...ex.params]
+    [hours, limit]
   );
   if (!res.configured) return null;
   return res.rows.map(r => ({ id: r.id, userId: r.user_id, messages: r.messages, updatedAt: r.updated_at }));
@@ -492,22 +493,30 @@ export async function fileCards(candidates, { addFlag, readMessages, companyFor 
  *                created: boolean, reopened: boolean, userIds: string[]}>} cards
  */
 export function formatRoundup(cards, { hours = WINDOW_HOURS, env = process.env } = {}) {
-  const sorted = [...cards].sort((a, b) => b.count - a.count);
+  // Client cards first; internal-account cards after them, marked Internal.
+  const sorted = [...cards].sort((a, b) => Number(Boolean(a.internal)) - Number(Boolean(b.internal)) || b.count - a.count);
   const clients = new Set(sorted.flatMap(c => c.userIds));
+  const internal = sorted.filter(c => c.internal).length;
   const span = hours === 24 ? '24h' : `${hours}h`;
-  const lines = [`☀️ GetGranted chat — last ${span}: ${plural(sorted.length, 'issue')} across ${plural(clients.size, 'client')}.`];
+  const lines = [`☀️ GetGranted chat — last ${span}: ${plural(sorted.length, 'issue')} across ${plural(clients.size, 'client')}`
+    + `${internal ? ` (${internal} from internal accounts)` : ''}.`];
   for (const c of sorted.slice(0, MAX_LINES)) {
     const tag = c.reopened ? ' — reopened' : c.created ? '' : ' — seen before';
     const times = c.count > 1 ? ` (${c.count}×)` : '';
-    lines.push(`• ${c.name}${times} — ${c.client} — ${c.take} — ${c.owner}${tag} — ${c.id ? cardLink(c.id, env) : '(card not filed)'}`);
+    const who = c.internal ? `${c.client} (Internal)` : c.client;
+    lines.push(`• ${c.name}${times} — ${who} — ${c.take} — ${c.owner}${tag} — ${c.id ? cardLink(c.id, env) : '(card not filed)'}`);
   }
   if (sorted.length > MAX_LINES) lines.push(`…and ${sorted.length - MAX_LINES} more.`);
   lines.push(`All chat cards: ${controlCentreUrl(env)}. Ask me about any of these for the conversation.`);
   return lines.join('\n');
 }
 
-/** Filing results → one DM line per card, newly flagged this run. */
-export function dmCards(results, labels) {
+/**
+ * Filing results → one DM line per card, newly flagged this run. A card is
+ * internal when every client on it is an internal account (`internalIds`, a
+ * Set of Clerk ids; null when the list couldn't be read — nothing is marked).
+ */
+export function dmCards(results, labels, internalIds = null) {
   const byCard = new Map();
   for (const r of results) {
     if (r.duplicate) continue;
@@ -523,7 +532,11 @@ export function dmCards(results, labels) {
     card.reopened ||= Boolean(r.reopened);
     if (!card.userIds.includes(r.candidate.userId)) card.userIds.push(r.candidate.userId);
   }
-  return [...byCard.values()].map(c => ({ ...c, client: c.userIds.map(u => labels.get(u) || clientRef(u)).join(', ') }));
+  return [...byCard.values()].map(c => ({
+    ...c,
+    client: c.userIds.map(u => labels.get(u) || clientRef(u)).join(', '),
+    internal: Boolean(internalIds && c.userIds.length && c.userIds.every(u => internalIds.has(u)))
+  }));
 }
 
 // ============================================================================
@@ -558,12 +571,13 @@ async function defaultCompanyFor(userIds) {
 }
 
 async function defaultDeps(env) {
-  const [{ query }, { getPulseSubscribers }, { postToSpaceWithThread }, { recordPulsePost }, { addFlag }] = await Promise.all([
+  const [{ query }, { getPulseSubscribers }, { postToSpaceWithThread }, { recordPulsePost }, { addFlag }, { internalClerkIds }] = await Promise.all([
     import('../database/connection.js'),
     import('./pulse-subscribers.js'),
     import('../api/chat-google.js'),
     import('./pulse-posts.js'),
-    import('../control-centre/review-queue.js')
+    import('../control-centre/review-queue.js'),
+    import('../control-centre/identity.js')
   ]);
   return {
     collectErrors: (hours) => collectErrors(hours),
@@ -576,6 +590,7 @@ async function defaultDeps(env) {
     recordPost: recordPulsePost,
     addFlag,
     companyFor: defaultCompanyFor,
+    internalIds: () => internalClerkIds(),
     readMessages: async (conversationId) => {
       const r = await gg3OpsQuery(CONVERSATION_MESSAGES_SQL, [conversationId]);
       return r.rows?.[0]?.messages ?? null;
@@ -602,6 +617,7 @@ export async function buildRoundup({ hours = WINDOW_HOURS, deps, collected = nul
   const candidates = cardCandidates(errors, reviews.filter(r => r.ok));
   const { labels, stats } = await clientLabels(candidates.map(c => c.userId), deps.fetchProfile);
   return {
+    internalIds: await internalIdsOrNull(deps),
     errors: errors.length,
     conversations: conversations.length,
     flagged: reviews.filter(r => r.ok && r.flags.length).length,
@@ -610,6 +626,21 @@ export async function buildRoundup({ hours = WINDOW_HOURS, deps, collected = nul
     labels,
     candidates
   };
+}
+
+/**
+ * The internal accounts' Clerk ids (the Control Centre list), or null when they
+ * can't be read — the DM then marks nothing Internal; the cards still carry the
+ * tag through their company.
+ */
+async function internalIdsOrNull(deps) {
+  if (!deps.internalIds) return null;
+  try {
+    return await deps.internalIds();
+  } catch (err) {
+    console.warn(`⚠️  Pulse roundup: internal accounts unavailable (code: ${err?.code || err?.name || 'unknown'}) — DM lines unmarked`);
+    return null;
+  }
 }
 
 let warnedNoStateTable = false;
@@ -662,7 +693,7 @@ export async function runMorningRoundup({ now = new Date(), env = process.env, d
   }
 
   const filed = await fileCards(built.candidates, d);
-  const cards = dmCards(filed.results, built.labels);
+  const cards = dmCards(filed.results, built.labels, built.internalIds);
   const newlyFiled = filed.results.filter(r => r.ok && !r.duplicate).length;
   console.log(`📋 Pulse roundup cards: ${newlyFiled} detection(s) filed on ${cards.length} card(s)`
     + `${filed.failed ? `, ${filed.failed} failed` : ''}`);

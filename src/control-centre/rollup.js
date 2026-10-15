@@ -16,8 +16,8 @@
  *
  * Excluded before aggregation: ops rows whose user isn't a Clerk id (smoke,
  * probe, profile, stability harnesses). GetGranted staff are deliberately
- * kept — staff and client usage are blended during beta, so
- * GG3_INTERNAL_USER_IDS is not applied here.
+ * kept — staff and client usage are blended during beta; the Overview splits
+ * internal accounts out by company when it reads.
  *
  * Logs carry the day and counts only — never ids, names or SQL params.
  *

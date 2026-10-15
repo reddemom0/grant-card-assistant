@@ -3,8 +3,7 @@
  * flags, the chat cards it files (one per issue per conversation, snapshot
  * verbatim), the DM with card links, once a day.
  *
- * gg3-ops-db.js is the real module (its staff filter is what is being tested);
- * queries, the model, the profile route, the review queue and Chat are
+ * gg3-ops-db.js is the real module; queries, the model, the profile route, the review queue and Chat are
  * injected fakes.
  *
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest --config tests/jest.config.cjs tests/unit/pulse-roundup.test.js
@@ -13,7 +12,6 @@
 import { jest } from '@jest/globals';
 
 process.env.GG3_OPS_DB_READONLY_URL = 'postgresql://oracle_readonly:x@localhost:5432/test';
-process.env.GG3_INTERNAL_USER_IDS = 'user_staff1,user_staff2';
 
 jest.unstable_mockModule('../../src/utils/cost-logger.js', () => ({ logAPICost: () => 0 }));
 
@@ -101,7 +99,7 @@ afterEach(() => spies.forEach(s => s.mockRestore()));
 // ----------------------------------------------------------------------------
 
 describe('what is read', () => {
-  test('errors: the spike alert\'s rules, staff left out, labelled', async () => {
+  test('errors: the spike alert\'s rules, everyone\'s (internal accounts too), labelled', async () => {
     const q = jest.fn(async () => ({ configured: true, rows: [
       { turn_id: 't1', occurred_at: NOW, conversation_id: 4, user_id: 'user_aaaa1111', outcome: 'max_rounds', error_category: null },
       { turn_id: 't2', occurred_at: NOW, conversation_id: 5, user_id: 'user_bbbb2222', outcome: 'no_answer', error_category: 'refusal' }
@@ -109,20 +107,20 @@ describe('what is read', () => {
     const errors = await collectErrors(24, q);
     const [sql, params] = q.mock.calls[0];
     expect(sql).toContain('FROM chat_turns');
-    expect(sql).toContain('NOT (user_id = ANY($4::text[]))');
-    expect(params).toEqual([24, ['error', 'max_rounds', 'no_answer'], expect.arrayContaining(['missing_message']), ['user_staff1', 'user_staff2']]);
+    expect(sql).not.toContain('user_id = ANY');
+    expect(params).toEqual([24, ['error', 'max_rounds', 'no_answer'], expect.arrayContaining(['missing_message'])]);
     expect(errors.map(e => [e.label, e.category, e.issue, e.turnId])).toEqual([
       ['chat broke', null, 'chat_broke', 't1'], ['empty reply or refusal', 'refusal', 'empty_reply', 't2']]);
     expect(sql).toContain('turn_index');
   });
 
-  test('conversations: active in the window by updated_at, staff left out, at most 50', async () => {
+  test('conversations: active in the window by updated_at, everyone\'s (internal accounts too), at most 50', async () => {
     const q = jest.fn(async () => ({ configured: true, rows: [] }));
     await collectConversations(24, q);
     const [sql, params] = q.mock.calls[0];
     expect(sql).toContain('updated_at > now() - make_interval(hours => $1::int)');
-    expect(sql).toContain('NOT (user_id = ANY($3::text[]))');
-    expect(params).toEqual([24, 50, ['user_staff1', 'user_staff2']]);
+    expect(sql).not.toContain('user_id = ANY');
+    expect(params).toEqual([24, 50]);
   });
 
   test('the transcript keeps words only: tool calls and results are dropped', () => {
@@ -307,6 +305,21 @@ describe('the DM', () => {
     expect(text).not.toMatch(/docs\.google\.com/);
   });
 
+  test('internal-account cards: after the client ones, marked (Internal), counted in the header', () => {
+    const text = formatRoundup([card('A', 1, { internal: true }), card('B', 1), card('C', 5, { internal: true })], { env: { PUBLIC_URL: 'https://hub.test' } });
+    const lines = text.split('\n');
+    expect(lines[0]).toBe('☀️ GetGranted chat — last 24h: 3 issues across 3 clients (2 from internal accounts).');
+    expect(lines.slice(1, 4).map(l => l.split(' — ')[1])).toEqual(['Co B', 'Co C (Internal)', 'Co A (Internal)']);
+  });
+
+  test('dmCards: internal only when every client on the card is internal; no list → nothing marked', () => {
+    const r = (ref, userId, id) => ({ ok: true, id, created: true, candidate: { ref, name: 'Pushed back', take: 't', owner: OWNERS[0], userId } });
+    const results = [r('conv:1:pushback', 'user_staff1', 1), r('conv:2:pushback', 'user_client', 2), r('conv:2:pushback', 'user_staff1', 2)];
+    const cards = dmCards(results, new Map(), new Set(['user_staff1']));
+    expect(cards.map(c => [c.id, c.internal])).toEqual([[1, true], [2, false]]);
+    expect(dmCards(results, new Map()).every(c => c.internal === false)).toBe(true);
+  });
+
   test('singulars, and the production Hub when PUBLIC_URL is unset', () => {
     const text = formatRoundup([card('A', 1)], { env: {} });
     expect(text).toContain('1 issue across 1 client');
@@ -372,6 +385,33 @@ describe('the morning run', () => {
     expect(text).not.toContain('that is wrong');
     // The review, then the locate call for the flagged conversation; no grouping call.
     expect(d.model.calls.map(c => c.tool_choice.name)).toEqual(['conversation_review', 'flagged_message']);
+  });
+
+  test('an internal account\'s chat is reviewed by the same call, filed with its company, and marked Internal in the DM', async () => {
+    const staffChat = conv(11, 'user_staff1', [say('what is the CDAP deadline?'), msg('assistant', 'It closed in 2024.'), say('that is wrong')]);
+    const d = makeDeps({ conversations: [badChat, staffChat], answers });
+    d.internalIds = jest.fn(async () => new Set(['user_staff1']));
+    d.companyFor = jest.fn(async (ids) => new Map(ids.map(id => [id, id === 'user_staff1' ? 81 : 135])));
+    const res = await runMorningRoundup({ now: NOW, env: ENV, deps: d });
+    expect(res).toMatchObject({ status: 'sent', issues: 2, filed: 2 });
+    // Both conversations went through the identical review call (same system, tool, model).
+    const reviews = d.model.calls.filter(c => c.tool_choice.name === 'conversation_review');
+    expect(reviews).toHaveLength(2);
+    const strip = ({ messages, ...rest }) => rest;
+    expect(strip(reviews[0])).toEqual(strip(reviews[1]));
+    // The card carries the internal company (the board tags it Internal through company_internal).
+    expect(d.queue.cards.map(c => [c.chat_turn_ref, c.company_id])).toEqual([['conv:9:pushback', 135], ['conv:11:pushback', 81]]);
+    const text = d.post.mock.calls[0][1];
+    expect(text).toContain('2 issues across 2 clients (1 from internal accounts).');
+    expect(text).toContain('• Pushed back — Co f1 (Internal) — ');
+  });
+
+  test('internal list unavailable: still reviews and files everything, DM lines unmarked', async () => {
+    const d = makeDeps({ conversations: [badChat], answers });
+    d.internalIds = jest.fn(async () => { throw Object.assign(new Error('x'), { code: 'ECONNREFUSED' }); });
+    const res = await runMorningRoundup({ now: NOW, env: ENV, deps: d });
+    expect(res).toMatchObject({ status: 'sent', filed: 1 });
+    expect(d.post.mock.calls[0][1]).not.toContain('Internal');
   });
 
   test('a detection already on file is not re-sent', async () => {

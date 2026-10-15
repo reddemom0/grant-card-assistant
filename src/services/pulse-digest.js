@@ -29,8 +29,13 @@
  *              migration 047): chat and grant-pattern cards flagged in the
  *              week, most flags first, each with its card link.
  *
- * Staff are left out with the roundup's own filter (excludeInternalUsers,
- * GG3_INTERNAL_USER_IDS) — nothing more.
+ * Internal accounts: the Control Centre's list (internal-accounts.js, read as
+ * Clerk ids by identity.js internalClerkIds; GG3_INTERNAL_USER_IDS is retired).
+ * Usage and grant counts include everyone, each with an "N internal" note. The
+ * themes, and the questions stored for the Control Centre, are client
+ * conversations only: internal ones never reach the theme call's input. When
+ * the list can't be read, the themes are skipped ("internal_accounts_unavailable")
+ * rather than run on a mix.
  *
  * Client and assistant text goes to the model only, inside the untrusted-data
  * envelope. What leaves this module is the model's anonymised rewrite of each
@@ -41,8 +46,7 @@
  * The themes and the rewritten questions — with who asked each — are stored
  * for the Control Centre (cc_digest_themes / cc_digest_questions, migration 046, via
  * src/control-centre/digest-themes.js) from the same model call; never a second.
- * Staff are still left out by GG3_INTERNAL_USER_IDS here, not by the Control
- * Centre's internal-accounts list (docs/control-centre.md, follow-ups). The DM goes once per
+ * Client questions only, as above. The DM goes once per
  * week: the key weekly_digest:<monday> in pulse_alert_state (migration 040)
  * is claimed before anything is written or sent.
  *
@@ -50,7 +54,8 @@
  * unset it is never scheduled. Dry run: scripts/pulse-digest-check.mjs.
  */
 
-import { gg3OpsQuery, isGg3OpsConfigured, excludeInternalUsers } from './gg3-ops-db.js';
+import { gg3OpsQuery, isGg3OpsConfigured } from './gg3-ops-db.js';
+import { INTERNAL_COMPANY_IDS } from '../control-centre/internal-accounts.js';
 import { transcriptOf, callTool, fetchCompanyName, localDate } from './pulse-roundup.js';
 import { cardTitle } from '../control-centre/card-summary.js';
 import { cardLink, controlCentreUrl } from '../control-centre/links.js';
@@ -120,27 +125,42 @@ export function weekBounds(monday) {
 // 1. USAGE
 // ============================================================================
 
-/** @returns {Promise<null|{chatUsers: number, conversations: number}>} null when the ops DB isn't configured */
-export async function collectUsage({ start, end }, runQuery = gg3OpsQuery) {
-  const exT = excludeInternalUsers('user_id', 3);
+/**
+ * Everyone's chat users and conversations in the week. With `internalIds` (a
+ * Set of internal accounts' Clerk ids) also how many of them were internal;
+ * `internal` is null without it.
+ * @returns {Promise<null|{chatUsers: number, conversations: number, internal: null|{chatUsers: number, conversations: number}}>} null when the ops DB isn't configured
+ */
+export async function collectUsage({ start, end }, runQuery = gg3OpsQuery, internalIds = null) {
+  const ids = [...(internalIds || [])];
   const users = await runQuery(
-    `SELECT count(DISTINCT user_id)::int AS n
+    `SELECT count(DISTINCT user_id)::int AS n,
+            count(DISTINCT user_id) FILTER (WHERE user_id = ANY($3::text[]))::int AS internal
        FROM chat_turns
-      WHERE occurred_at >= $1 AND occurred_at < $2
-        AND ${exT.clause}`,
-    [start, end, ...exT.params]
+      WHERE occurred_at >= $1 AND occurred_at < $2`,
+    [start, end, ids]
   );
   if (!users.configured) return null;
-  const exC = excludeInternalUsers('user_id', 3);
   const convs = await runQuery(
-    `SELECT count(*)::int AS n
+    `SELECT count(*)::int AS n,
+            count(*) FILTER (WHERE user_id = ANY($3::text[]))::int AS internal
        FROM conversations
-      WHERE updated_at >= $1 AND updated_at < $2
-        AND ${exC.clause}`,
-    [start, end, ...exC.params]
+      WHERE updated_at >= $1 AND updated_at < $2`,
+    [start, end, ids]
   );
   if (!convs.configured) return null;
-  return { chatUsers: users.rows[0]?.n ?? 0, conversations: convs.rows[0]?.n ?? 0 };
+  return {
+    chatUsers: users.rows[0]?.n ?? 0,
+    conversations: convs.rows[0]?.n ?? 0,
+    internal: internalIds
+      ? { chatUsers: users.rows[0]?.internal ?? 0, conversations: convs.rows[0]?.internal ?? 0 }
+      : null
+  };
+}
+
+/** ", 5 internal" after a count; '' when none or not known. */
+export function internalNote(n) {
+  return n ? `, ${n} internal` : '';
 }
 
 /** "5 (+2, +67%)"; the % is "—" when the week before was 0. */
@@ -203,25 +223,28 @@ export function fitBudget(exchanges, budget = EXCHANGE_BUDGET_CHARS) {
 }
 
 /**
- * Exchanges from conversations active in the week, oldest conversation first,
- * each conversation with its week's chat_turns outcome tally. Outcomes can't be
- * tied to one question (turn_index doesn't follow message positions and many
- * turns carry no conversation_id), so they travel per conversation, plus one
- * count of failed turns linked to no conversation. Text stays in memory for
- * the model only.
- * @returns {Promise<null|{exchanges: Object[], total: number, unlinkedFailed: number}>}
+ * Exchanges from CLIENT conversations active in the week, oldest conversation
+ * first, each conversation with its week's chat_turns outcome tally. Internal
+ * accounts' conversations (`internalIds`, a Set of Clerk ids) are counted in
+ * `internal` and left out of everything else — their text never reaches the
+ * model. Outcomes can't be tied to one question (turn_index doesn't follow
+ * message positions and many turns carry no conversation_id), so they travel
+ * per conversation, plus one count of client failed turns linked to no
+ * conversation. Text stays in memory for the model only.
+ * @returns {Promise<null|{exchanges: Object[], total: number, unlinkedFailed: number, internal: {conversations: number, exchanges: number}}>}
  */
-export async function collectExchanges({ start, end }, runQuery = gg3OpsQuery) {
-  const ex = excludeInternalUsers('user_id', 3);
-  const res = await runQuery(
+export async function collectExchanges({ start, end }, runQuery = gg3OpsQuery, internalIds = new Set()) {
+  const isInternal = (userId) => userId != null && internalIds.has(userId);
+  const found = await runQuery(
     `SELECT id, user_id, messages
        FROM conversations
       WHERE updated_at >= $1 AND updated_at < $2
-        AND ${ex.clause}
       ORDER BY updated_at`,
-    [start, end, ...ex.params]
+    [start, end]
   );
-  if (!res.configured) return null;
+  if (!found.configured) return null;
+  const internalRows = found.rows.filter(r => isInternal(r.user_id));
+  const res = { rows: found.rows.filter(r => !isInternal(r.user_id)) };
 
   const tallies = new Map();
   const ids = res.rows.map(r => r.id);
@@ -241,15 +264,14 @@ export async function collectExchanges({ start, end }, runQuery = gg3OpsQuery) {
     }
   }
 
-  const exU = excludeInternalUsers('user_id', 4);
   const unlinked = await runQuery(
     `SELECT count(*)::int AS n
        FROM chat_turns
       WHERE conversation_id IS NULL
         AND outcome = ANY($3::text[])
         AND occurred_at >= $1 AND occurred_at < $2
-        AND ${exU.clause}`,
-    [start, end, UNLINKED_FAILED, ...exU.params]
+        AND (user_id IS NULL OR NOT (user_id = ANY($4::text[])))`,
+    [start, end, UNLINKED_FAILED, [...internalIds]]
   );
 
   const all = res.rows.flatMap((r, i) => {
@@ -259,7 +281,15 @@ export async function collectExchanges({ start, end }, runQuery = gg3OpsQuery) {
       ...e, conversation: i + 1, userId: r.user_id ?? null, tally: tallyText(counts), turnFailed
     }));
   });
-  return { exchanges: fitBudget(all), total: all.length, unlinkedFailed: unlinked.rows?.[0]?.n ?? 0 };
+  return {
+    exchanges: fitBudget(all),
+    total: all.length,
+    unlinkedFailed: unlinked.rows?.[0]?.n ?? 0,
+    internal: {
+      conversations: internalRows.length,
+      exchanges: internalRows.reduce((n, r) => n + exchangesOf(r.messages).length, 0)
+    }
+  };
 }
 
 /** The model's input: exchanges grouped by conversation, each with its outcome tally. */
@@ -534,20 +564,24 @@ export async function summariseExchanges(asked, createMessage, { profileNames = 
 // 3. GRANTS
 // ============================================================================
 
-/** Distinct companies (the user when company_id is null) per grant, shown matches only, most first. */
-export async function collectGrantMatches({ start, end }, runQuery = gg3OpsQuery) {
-  const ex = excludeInternalUsers('user_id', 3);
+/**
+ * Distinct companies (the user when company_id is null) per grant, shown
+ * matches only, most first — everyone's, with how many were internal accounts
+ * (an internal company, or with no company an internal Clerk id).
+ */
+export async function collectGrantMatches({ start, end }, runQuery = gg3OpsQuery, internalIds = null) {
   const res = await runQuery(
-    `SELECT grant_id, count(DISTINCT coalesce(company_id::text, 'u:' || user_id))::int AS companies
+    `SELECT grant_id, count(DISTINCT coalesce(company_id::text, 'u:' || user_id))::int AS companies,
+            count(DISTINCT coalesce(company_id::text, 'u:' || user_id))
+              FILTER (WHERE company_id = ANY($3::int[]) OR (company_id IS NULL AND user_id = ANY($4::text[])))::int AS internal
        FROM match_results
       WHERE shown AND occurred_at >= $1 AND occurred_at < $2
-        AND ${ex.clause}
       GROUP BY grant_id
       ORDER BY companies DESC, grant_id`,
-    [start, end, ...ex.params]
+    [start, end, INTERNAL_COMPANY_IDS, [...(internalIds || [])]]
   );
   if (!res.configured) return null;
-  return res.rows.map(r => ({ grantId: r.grant_id, companies: r.companies }));
+  return res.rows.map(r => ({ grantId: r.grant_id, companies: r.companies, internalCompanies: r.internal ?? 0 }));
 }
 
 /**
@@ -558,13 +592,11 @@ export async function collectGrantMatches({ start, end }, runQuery = gg3OpsQuery
  * @returns {Promise<null|number>} null when the ops DB isn't configured
  */
 export async function collectMatchingCompanies({ start, end }, runQuery = gg3OpsQuery) {
-  const ex = excludeInternalUsers('user_id', 3);
   const res = await runQuery(
     `SELECT count(DISTINCT coalesce(company_id::text, 'u:' || user_id))::int AS companies
        FROM match_results
-      WHERE occurred_at >= $1 AND occurred_at < $2
-        AND ${ex.clause}`,
-    [start, end, ...ex.params]
+      WHERE occurred_at >= $1 AND occurred_at < $2`,
+    [start, end]
   );
   if (!res.configured) return null;
   return res.rows[0]?.companies ?? 0;
@@ -656,15 +688,22 @@ export async function profileCompanyNames(exchanges, fetchProfile) {
 export async function buildDigest({ monday, deps }) {
   const week = weekBounds(monday);
   const prior = weekBounds(addDays(monday, -7));
-  const usage = await deps.collectUsage(week);
-  const priorUsage = await deps.collectUsage(prior);
-  const asked = await deps.collectExchanges(week);
-  const matches = await deps.collectGrantMatches(week);
-  const priorMatches = await deps.collectGrantMatches(prior);
+  const internalIds = await internalIdsOrNull(deps);
+  const usage = await deps.collectUsage(week, internalIds);
+  const priorUsage = await deps.collectUsage(prior, internalIds);
+  // Without the internal list, client and internal questions can't be told
+  // apart: no exchanges are read and the themes say why.
+  const asked = internalIds
+    ? await deps.collectExchanges(week, internalIds)
+    : { exchanges: [], total: 0, unlinkedFailed: 0, internal: null, unavailable: true };
+  const matches = await deps.collectGrantMatches(week, internalIds);
+  const priorMatches = await deps.collectGrantMatches(prior, internalIds);
   if (!usage || !priorUsage || !asked || !matches || !priorMatches) return null;
 
   const profileNames = await profileCompanyNames(asked.exchanges, deps.fetchProfile);
-  const themes = await summariseExchanges(asked, deps.createMessage, { profileNames });
+  const themes = asked.unavailable
+    ? { status: 'failed', code: 'internal_accounts_unavailable' }
+    : await summariseExchanges(asked, deps.createMessage, { profileNames });
   return {
     monday,
     sunday: addDays(monday, 6),
@@ -672,6 +711,8 @@ export async function buildDigest({ monday, deps }) {
     priorUsage,
     exchangesTotal: asked.total,
     exchangesRead: asked.exchanges.length,
+    // Internal accounts' conversations and questions this week — counted, never read.
+    internalAsked: asked.internal ?? null,
     // Who asked each exchange (Clerk id), index = exchange id − 1. Kept for the
     // Control Centre's stored copy; never posted.
     askedBy: asked.exchanges.map(e => e.userId ?? null),
@@ -679,6 +720,17 @@ export async function buildDigest({ monday, deps }) {
     grants: await nameGrants(withPriorWeek(matches, priorMatches), deps.oracleQuery),
     errors: await queueErrors(week, deps)
   };
+}
+
+/** The internal accounts' Clerk ids, or null when they can't be read. */
+async function internalIdsOrNull(deps) {
+  if (!deps.internalIds) return null;
+  try {
+    return await deps.internalIds();
+  } catch (err) {
+    console.warn(`⚠️  Pulse digest: internal accounts unavailable — code: ${codeOf(err)}`);
+    return null;
+  }
 }
 
 async function queueErrors(week, deps) {
@@ -712,8 +764,8 @@ export function digestCard(d, { test = false, env = process.env } = {}) {
   sections.push({
     header: 'Usage',
     widgets: [
-      decorated({ top: 'Chat users', text: esc(formatChange(d.usage.chatUsers, d.priorUsage.chatUsers)) }),
-      decorated({ top: 'Conversations', text: esc(formatChange(d.usage.conversations, d.priorUsage.conversations)) })
+      decorated({ top: 'Chat users', text: esc(formatChange(d.usage.chatUsers, d.priorUsage.chatUsers) + internalNote(d.usage.internal?.chatUsers)) }),
+      decorated({ top: 'Conversations', text: esc(formatChange(d.usage.conversations, d.priorUsage.conversations) + internalNote(d.usage.internal?.conversations)) })
     ]
   });
 
@@ -728,10 +780,11 @@ export function digestCard(d, { test = false, env = process.env } = {}) {
     }
     if (d.exchangesTotal > d.exchangesRead) asked.push(line(esc(`Latest ${d.exchangesRead} of ${d.exchangesTotal} exchanges read.`)));
   }
+  if (internalAskedText(d)) asked.push(line(esc(internalAskedText(d))));
   sections.push({ header: 'What clients asked', widgets: asked });
 
   const grants = d.grants.length
-    ? d.grants.slice(0, TOP_GRANTS).map(g => line(`${esc(g.name)} — matched to ${plural(g.companies, 'company', 'companies')} ${grantChange(g.companies, g.priorCompanies)}`))
+    ? d.grants.slice(0, TOP_GRANTS).map(g => line(`${esc(g.name)} — matched to ${matchedText(g)}`))
     : [line('No grant matches this week.')];
   sections.push({ header: 'Most-matched grants', widgets: grants });
 
@@ -763,6 +816,19 @@ export function digestCard(d, { test = false, env = process.env } = {}) {
   }]);
 }
 
+/** "4 companies (2 internal) (+1, +33% vs week before)" */
+function matchedText(g) {
+  const internal = g.internalCompanies ? ` (${g.internalCompanies} internal)` : '';
+  return `${plural(g.companies, 'company', 'companies')}${internal} ${grantChange(g.companies, g.priorCompanies)}`;
+}
+
+/** "Internal accounts' 12 questions (3 conversations) left out." — '' when none. */
+function internalAskedText(d) {
+  const i = d.internalAsked;
+  if (!i?.exchanges) return '';
+  return `Internal accounts' ${plural(i.exchanges, 'question')} (${plural(i.conversations, 'conversation')}) left out.`;
+}
+
 const STATUS_WORDS = { new: 'new', diagnosed: 'diagnosed', in_progress: 'in progress', closed: 'closed' };
 const OWNER_WORDS = { client: 'client', research: 'Research', chris: 'Chris', jason: 'Jason' };
 
@@ -776,8 +842,8 @@ export function formatDigest(d, { env = process.env } = {}) {
   const lines = [`📊 GetGranted weekly — ${shortDate(d.monday)} to ${shortDate(d.sunday)}`, ''];
 
   lines.push('**Usage**');
-  lines.push(`• Chat users: ${formatChange(d.usage.chatUsers, d.priorUsage.chatUsers)}`);
-  lines.push(`• Conversations: ${formatChange(d.usage.conversations, d.priorUsage.conversations)}`, '');
+  lines.push(`• Chat users: ${formatChange(d.usage.chatUsers, d.priorUsage.chatUsers)}${internalNote(d.usage.internal?.chatUsers)}`);
+  lines.push(`• Conversations: ${formatChange(d.usage.conversations, d.priorUsage.conversations)}${internalNote(d.usage.internal?.conversations)}`, '');
 
   lines.push('**What clients asked**');
   if (d.themes.status === 'none') lines.push('No client chats this week.');
@@ -788,11 +854,12 @@ export function formatDigest(d, { env = process.env } = {}) {
     }
     if (d.exchangesTotal > d.exchangesRead) lines.push(`(Latest ${d.exchangesRead} of ${d.exchangesTotal} exchanges read.)`);
   }
+  if (internalAskedText(d)) lines.push(`(${internalAskedText(d)})`);
   lines.push('');
 
   lines.push('**Most-matched grants**');
   if (!d.grants.length) lines.push('No grant matches this week.');
-  for (const g of d.grants.slice(0, TOP_GRANTS)) lines.push(`• ${g.name} — matched to ${plural(g.companies, 'company', 'companies')} ${grantChange(g.companies, g.priorCompanies)}`);
+  for (const g of d.grants.slice(0, TOP_GRANTS)) lines.push(`• ${g.name} — matched to ${matchedText(g)}`);
   lines.push('');
 
   lines.push('**Errors this week**');
@@ -837,10 +904,11 @@ async function defaultCreateMessage(params, opts) {
 
 /** Real dependencies. Exported for the dry-run script, which uses only the read ones. */
 export async function defaultDeps() {
-  const [{ query }, { getPulseSubscribers }, { postMessageWithThread }] = await Promise.all([
+  const [{ query }, { getPulseSubscribers }, { postMessageWithThread }, { internalClerkIds }] = await Promise.all([
     import('../database/connection.js'),
     import('./pulse-subscribers.js'),
-    import('../cards/chat-api.js')
+    import('../cards/chat-api.js'),
+    import('../control-centre/identity.js')
   ]);
   /** One card DM as the Chat app; where it landed, or false. */
   const postCard = async (spaceName, { cardsV2, fallbackText }) => {
@@ -853,10 +921,11 @@ export async function defaultDeps() {
     }
   };
   return {
-    collectUsage: (w) => collectUsage(w),
-    collectExchanges: (w) => collectExchanges(w),
+    internalIds: () => internalClerkIds(),
+    collectUsage: (w, ids) => collectUsage(w, gg3OpsQuery, ids),
+    collectExchanges: (w, ids) => collectExchanges(w, gg3OpsQuery, ids),
     fetchProfile: (id) => fetchCompanyName(id),
-    collectGrantMatches: (w) => collectGrantMatches(w),
+    collectGrantMatches: (w, ids) => collectGrantMatches(w, gg3OpsQuery, ids),
     collectQueueIssues: (w) => collectQueueIssues(w, query),
     createMessage: defaultCreateMessage,
     oracleQuery: query,

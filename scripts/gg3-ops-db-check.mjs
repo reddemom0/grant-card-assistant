@@ -3,11 +3,10 @@
  * Dev-only check of Oracle's read-only access to the gg3-ai-service ops DB.
  *
  *   GG3_OPS_DB_READONLY_URL='postgresql://oracle_readonly:…' \
- *   GG3_INTERNAL_USER_IDS='user_a,user_b' \
  *   node scripts/gg3-ops-db-check.mjs
  *
  * Prints counts and PASS/FAIL only — never message text or user ids.
- *   (a) chat_turns by outcome, last 7 days, internal users excluded
+ *   (a) chat_turns by outcome, last 7 days, everyone's
  *   (b) conversations created in the last 7 days
  *   (c1) INSERT in a default session        → must be refused as read-only (25006)
  *   (c2) INSERT after SET TRANSACTION READ WRITE → must be refused by grants (42501)
@@ -20,8 +19,6 @@
 import {
   gg3OpsQuery,
   getGg3OpsPool,
-  excludeInternalUsers,
-  getInternalUserIds,
   isGg3OpsConfigured
 } from '../src/services/gg3-ops-db.js';
 
@@ -51,18 +48,15 @@ async function main() {
     process.exit(1);
   }
 
-  const internalCount = getInternalUserIds().length;
-  console.log(`GG3 ops DB check (internal users excluded: ${internalCount})\n`);
+  console.log('GG3 ops DB check\n');
 
   // (a)
-  const ex = excludeInternalUsers('user_id', 1);
   const outcomes = await gg3OpsQuery(
     `SELECT outcome, count(*)::int AS n
        FROM chat_turns
-      WHERE occurred_at > now() - interval '7 days' AND ${ex.clause}
+      WHERE occurred_at > now() - interval '7 days'
       GROUP BY outcome
-      ORDER BY n DESC`,
-    ex.params
+      ORDER BY n DESC`
   );
   console.log('(a) chat_turns by outcome, last 7 days');
   if (outcomes.rows.length === 0) console.log('      (none)');
