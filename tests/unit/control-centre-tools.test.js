@@ -99,7 +99,8 @@ describe('queue_summary', () => {
     });
     expect(r.stuck.map((c) => [c.card, c.link])).toEqual([[7, 'https://hub.test/control-centre#review/7'], [12, 'https://hub.test/control-centre#review/12']]);
     expect(r.stuck[0]).toMatchObject({ title: 'Fisheries Fund matched to Maximizer', company: 'Maximizer', internal_account: true,
-      grant: 'Fisheries Fund', days_since_change: 4.2, age_days: 5 });
+      grant: 'Fisheries Fund', days_since_activity: 4.2, age_days: 5 });
+    expect(r.stuck_definition).toBe('open with no change or comment for 3+ days');
     expect(r.stuck[1]).toMatchObject({ title: 'Fisheries Fund — cut for several companies (wrong industry)', review_reason: 'wrong industry' });
     expect(r.oldest_open.map((c) => c.card)).toEqual([12]);
   });
@@ -111,7 +112,7 @@ describe('list_cards', () => {
     const r = await run({ mode: 'list_cards', owner: 'research', stuck_only: true }, deps);
     expect(deps.hubQuery).toHaveBeenCalledWith(T.LIST_SQL, [null, 'research', null, null, null, T.STUCK_DAYS, T.LIST_MAX]);
     expect(r.count).toBe(2);
-    expect(r.filters).toEqual({ owner: 'research', stuck: 'open and unchanged for 3+ days' });
+    expect(r.filters).toEqual({ owner: 'research', stuck: 'open with no change or comment for 3+ days' });
     expect(r.cards.every((c) => c.link.startsWith('https://hub.test/control-centre#review/'))).toBe(true);
   });
 
@@ -192,6 +193,28 @@ describe('overview and chat_themes', () => {
       recent_questions: [{ question: 'Any hiring grants?', theme: 'Hiring', company: 'Maximizer', internal_account: true }] });
     const empty = makeDeps({ latestDigest: async () => null });
     expect((await run({ mode: 'chat_themes' }, empty.deps)).message).toMatch(/No weekly chat themes/);
+  });
+});
+
+describe('stuck is the board\'s rule', () => {
+  test('same SQL as the board: last activity = later of updated_at and the newest comment, 3+ days, not closed', async () => {
+    const Q = await import('../../src/control-centre/review-queue.js');
+    expect(T.STUCK_DAYS).toBe(Q.STUCK_DAYS);
+    const rule = Q.stuckWhen('$1::int');
+    expect(rule).toBe("(i.status <> 'closed' AND GREATEST(i.updated_at, cm.at) < now() - make_interval(days => $1::int))");
+    expect(T.STUCK_SQL).toContain(rule);
+    expect(T.LIST_SQL).toContain(Q.stuckWhen('$6::int'));
+    for (const sql of [T.STUCK_SQL, T.LIST_SQL, T.OLDEST_OPEN_SQL, T.CARD_SQL]) {
+      expect(sql).toContain(Q.LAST_ACTIVITY_JOIN);
+      expect(sql).toMatch(/e\.action = 'comment'/);
+      expect(sql).toContain('EXTRACT(EPOCH FROM (now() - GREATEST(i.updated_at, cm.at))) / 86400 AS idle_days');
+    }
+    // The board uses the same pieces.
+    expect(Q.LIST_SQL).toContain(Q.LAST_ACTIVITY_JOIN);
+    expect(Q.LIST_SQL).toContain(`${Q.stuckWhen(3)} AS stuck`);
+    // Longest idle first, by last activity — not updated_at alone.
+    expect(T.STUCK_SQL).toMatch(/ORDER BY GREATEST\(i\.updated_at, cm\.at\), i\.id/);
+    expect(T.STUCK_SQL).not.toMatch(/WHERE i\.status <> 'closed' AND i\.updated_at </);
   });
 });
 

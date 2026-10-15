@@ -260,21 +260,56 @@ export const INSERT_EVENT_SQL = `
   INSERT INTO cc_review_events (item_id, actor, action, from_status, to_status, detail)
   VALUES ($1, $2, $3, $4, $5, $6)`;
 
+/** Open and no activity for this many days: the board marks the card stuck. */
+export const STUCK_DAYS = 3;
+
+// "Last activity" — shared by the board (LIST_SQL) and Oracle's control_centre
+// tool so both call the same cards stuck. A card's activity is the later of
+// updated_at and its newest staff comment; comments don't move updated_at.
+// Use LAST_ACTIVITY_JOIN after `FROM cc_review_items i`.
+export const LAST_ACTIVITY_JOIN = `
+    LEFT JOIN LATERAL (
+      SELECT max(e.created_at) AS at
+        FROM cc_review_events e
+       WHERE e.item_id = i.id AND e.action = 'comment'
+    ) cm ON TRUE`;
+export const LAST_ACTIVITY = 'GREATEST(i.updated_at, cm.at)';
+/** SQL condition: open and no activity for `days` (an SQL expression) days. */
+export const stuckWhen = (days) => `(i.status <> 'closed' AND ${LAST_ACTIVITY} < now() - make_interval(days => ${days}))`;
+
+// Summaries only — never the snapshot or the full diagnosis (GET /:id has
+// those). last_activity_at is the later of updated_at and the newest staff
+// comment, so a comment resets the stuck timer without moving updated_at
+// (which orders the list and floats re-flagged cards up).
 export const LIST_SQL = `
-  SELECT i.*, lc.comment AS latest_comment, lc.created_at AS latest_comment_at
+  SELECT i.id, i.kind, i.status, i.owner, i.company_id, i.grant_root_id, i.pattern_category,
+         i.chat_turn_ref, i.conversation_id, i.flag_count, i.flagged_again, i.expected_match,
+         i.created_at, i.updated_at, i.closed_at,
+         i.diagnosis->>'verdict' AS verdict,
+         left(i.narrative, 240) AS narrative,
+         g.grant_name,
+         lc.comment AS latest_comment, lc.created_at AS latest_comment_at,
+         ${LAST_ACTIVITY} AS last_activity_at,
+         ${stuckWhen(STUCK_DAYS)} AS stuck,
+         floor(EXTRACT(EPOCH FROM (now() - ${LAST_ACTIVITY})) / 86400)::int AS idle_days
     FROM cc_review_items i
+    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id
     LEFT JOIN LATERAL (
       SELECT f.comment, f.created_at
         FROM cc_review_flags f
        WHERE f.item_id = i.id AND f.comment IS NOT NULL
        ORDER BY f.created_at DESC, f.id DESC
        LIMIT 1
-    ) lc ON TRUE
+    ) lc ON TRUE${LAST_ACTIVITY_JOIN}
    WHERE ($1::text IS NULL OR i.status = $1)
      AND ($2::text IS NULL OR i.owner = $2)
      AND ($3::text IS NULL OR i.kind = $3)
    ORDER BY i.updated_at DESC, i.id DESC
    LIMIT $4`;
+
+export const COMMENT_MAX = 4000;
+export const LINK_NAMES_SQL = 'SELECT id, grant_name FROM gg3_grants WHERE id = ANY($1::int[])';
+export const ITEM_CONVERSATION_SQL = 'SELECT kind, conversation_id, chat_turn_ref FROM cc_review_items WHERE id = $1';
 
 export const GET_ITEM_SQL = 'SELECT * FROM cc_review_items WHERE id = $1';
 export const GET_FLAGS_SQL = 'SELECT * FROM cc_review_flags WHERE item_id = $1 ORDER BY created_at, id';
@@ -412,6 +447,24 @@ export async function setOwner(id, owner, actor, { hubTransaction = transaction 
     await logEvent(client, itemId, actor, 'owner', item.status, item.status, { from: item.owner, to: owner });
     return updated;
   }, 'cc review setOwner');
+}
+
+/**
+ * A staff comment: one 'comment' event with the author and the text. Status,
+ * owner and updated_at are untouched; the board's stuck timer counts it as
+ * activity (LIST_SQL last_activity_at).
+ */
+export async function addComment(id, text, actor, { hubTransaction = transaction } = {}) {
+  const itemId = requiredId(id, 'id');
+  const body = typeof text === 'string' ? text.trim() : '';
+  if (!body) throw bad('text is required');
+  if (body.length > COMMENT_MAX) throw bad(`text is longer than ${COMMENT_MAX} characters`);
+  if (!actor) throw bad('a signed-in author is required');
+  return hubTransaction(async (client) => {
+    const item = await lockItem(client, itemId);
+    await logEvent(client, itemId, actor, 'comment', item.status, item.status, { text: body });
+    return { item_id: itemId, actor, text: body, status: item.status };
+  }, 'cc review addComment');
 }
 
 /**

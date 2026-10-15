@@ -2513,7 +2513,7 @@ export const CONTROL_CENTRE_TOOL = {
 Use it for "what's stuck with Research", "what's in the queue", "what's open for Chris", "why was grant 1196 flagged", "what happened with card 42", "how many matches this week vs last", "what are clients asking about".
 
 Modes:
-- "queue_summary": open cards by status, owner and kind; the stuck ones (open and unchanged for 3+ days) and the oldest open ones.
+- "queue_summary": open cards by status, owner and kind; the stuck ones (open with no change or comment for 3+ days) and the oldest open ones.
 - "list_cards": cards filtered by status (new, diagnosed, in_progress, closed), owner (client, research, chris, jason, unassigned), kind (match, chat, grant_pattern), company (name or id), grant (name or GG3 id), stuck_only; up to 20 (limit).
 - "card": one card in full (card_id): why it was flagged, the diagnosis and narrative, the evidence (the chat turns for a chat card, the AI review's reasons for a grant pattern), every flag, its history and linked cards.
 - "overview": the Overview for range day, week, month or year — sign-ups, active companies, matches shown, grants opened, ratings, saves, chats — each against the window before, with the internal-account share, top grants, risers and drops, and chat.
@@ -2532,7 +2532,7 @@ Modes:
       kind: { type: 'string', enum: ['match', 'chat', 'grant_pattern'], description: 'list_cards: what kind of card.' },
       company: { type: 'string', description: 'list_cards: company name or id.' },
       grant: { type: 'string', description: 'list_cards: grant name or GG3 id.' },
-      stuck_only: { type: 'boolean', description: 'list_cards: only open cards unchanged for 3+ days.' },
+      stuck_only: { type: 'boolean', description: 'list_cards: only open cards with no change or comment for 3+ days.' },
       limit: { type: 'integer', description: 'list_cards: at most this many (max 20).' },
       card_id: { type: 'integer', description: 'card: the card number (the number after #review/ in its link).' },
       range: { type: 'string', enum: ['day', 'week', 'month', 'year'], description: 'overview: the window (default week).' }

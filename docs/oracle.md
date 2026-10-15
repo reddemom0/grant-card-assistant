@@ -351,7 +351,7 @@ the filing skill.
 
 `control_centre` (`src/tools/control-centre-tools.js`) is Oracle's read-only window on the
 Control Centre (`docs/control-centre.md`), one tool with five modes: `queue_summary` (open
-cards by status, owner and kind; stuck = open and unchanged for 3+ days; oldest open),
+cards by status, owner and kind; stuck = open with no change or comment for 3+ days, the board's rule; oldest open),
 `list_cards` (filters: status, owner incl. `unassigned`, kind, company name/id, grant
 name/id, `stuck_only`; at most 20), `card` (one card in full: diagnosis, evidence, flags,
 history, linked cards), `overview` (`getOverview(range)` — tiles vs the window before with the

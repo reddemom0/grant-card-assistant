@@ -432,9 +432,11 @@ with no admin check.
 
 | Route | Does |
 |---|---|
-| `GET /` | `?status=&owner=&kind=`, most recently updated first (a re-flag or any change moves an item up), with `flag_count`, `latest_comment`, and `company_name` + `company_internal` beside `company_id` (max 500). If names can't be read (app DB unset or down), the list still returns with `company_name: null` and `names_error`; `company_internal` needs no database and is always set. |
-| `GET /:id` | item (with `company_name`), flags, events and `links` (linked cards), plus `names`: Clerk actors → company name (via `identity.js`), staff emails → Hub `users.name` |
+| `GET /` | `?status=&owner=&kind=`, most recently updated first (a re-flag or any change moves an item up). **Summaries only** — no snapshot, no full diagnosis: the card's ids, status, owner, `verdict`, `narrative` (first 240 characters), `grant_name`, `flag_count`, `flagged_again`, `latest_comment`, `title` (`cardTitle`), `stuck` and `idle_days`, and `company_name` + `company_internal` beside `company_id` (max 500). If names can't be read (app DB unset or down), the list still returns with `company_name: null` and `names_error`; `company_internal` needs no database and is always set. |
+| `GET /:id` | the full card (snapshot and diagnosis included) with `title`, `company_name`, `grant_name`; flags; events; `comments` (the `comment` events); `links` (linked cards, each titled and named); and `names`: Clerk actors → company name (via `identity.js`), staff emails → Hub `users.name`, system jobs → what they are |
+| `GET /:id/conversation` | chat cards only: the whole ops conversation as turns (`splitTurns`, verbatim), read-only through `opsQuery`. 404 for other kinds; 503 when the ops DB isn't configured |
 | `POST /flag` | staff flag `{kind, company_id, grant_root_id | chat_turn_ref, comment}`; actor is the signed-in email |
+| `POST /:id/comment` | `{text}` (1–4,000 characters): one `comment` event with the signed-in email as actor. Status, owner and `updated_at` don't change; it counts as activity for "stuck" |
 | `PATCH /:id/status` | `{to}`; `closed` is refused (use close) |
 | `PATCH /:id/owner` | `{owner}`; `null` clears it |
 | `POST /:id/close` | `{expected_match, close_note}` |
@@ -768,11 +770,57 @@ themes and 5 example questions. **Production needs 046 and then this backfill wi
 the toggle can only act on the questions linked to a company. Aligning the two rules is a
 separate decision.
 
+## The Review queue screen (step 5c+9, Part B)
+
+`public/js/control-centre-review.js` (loaded before `control-centre.js`, which hands it its
+helpers) and the `rq-` styles in `control-centre.css`. It follows the design's Review queue: one
+white frame, filter chips, four grey columns.
+
+- **Routes:** `/control-centre#review` (the board), `#review/<id>` (the board with that card's
+  panel open — the link every DM, digest and Oracle answer uses), `#review?owner=research,chris&type=chat`
+  (filters, combinable). Opening and closing a card are history entries, so Back closes it.
+  The date range doesn't apply here and is hidden.
+- **Board:** New → Diagnosed → In progress → Closed, each with its count; Closed shows the 30 most
+  recently closed. Each column scrolls on its own. A card shows its type (Match / Grant pattern /
+  Chat), title (company + grant; the grant with "Cut for several companies: <reason>"; the issue
+  + client), owner, verdict in words, flag count, "Flagged again", whether it should have matched
+  (closed match cards), its age, and the Internal tag.
+- **Stuck:** open and no activity for 3+ days — an orange left edge and "Stuck Nd". Activity is
+  the later of `updated_at` and the newest comment (`LIST_SQL` `last_activity_at`), so a comment
+  resets the timer without moving the card in the updated-first order.
+- **Filters:** owner (Client, Research, Chris, Jason, Unassigned), type, and the Overview's
+  "Include internal accounts" switch (same remembered setting). Off hides match and chat cards
+  whose company is an internal account; grant-pattern cards always show, and their evidence tags
+  the internal companies.
+- **Drag and drop (desktop):** dropping a card on another column moves it (`PATCH /:id/status`,
+  shown at once and put back if the server refuses). Dropping on Closed opens the close dialog;
+  cancelling leaves the card where it was. Below 640px the columns stack and the panel's "Move
+  to" does the same job.
+- **Panel:** header (type, status, Internal, Flagged again, owner and what they fix, verdict, flag
+  count, when flagged), the actions bar, what happened (narrative), the client notice with Copy
+  (client-owned cards), the evidence, linked cards, comments and the full history.
+  - **Match:** the eligibility checks — result, how it passed, grant requires vs client has, rows
+    the AI review disputed highlighted — the AI review's quotes and the shown history.
+  - **Grant pattern:** the companies cut (names first, Internal tagged, each with its reasons) and
+    the grant's tags now beside its card text.
+  - **Chat:** the flagged client message with the assistant's reply (highlighted) and the turns
+    before it (clamped; click to read), the five diagnosis fields, and "Show the full
+    conversation" (`GET /:id/conversation`, inline — the Hub has no conversation page).
+  - **History:** every event in words, newest first, with who (staff name, client company,
+    "the hourly review sweep", "Oracle's morning chat review") and when; a run of identical flags
+    reads as one line ("Flagged — an AI review cut ×17").
+- **Actions:** Owner (reassign), Move to (any open status; on a closed card it reopens), Close
+  card (a match card needs "Should this grant have matched this company?"; a note is optional;
+  closing a pattern card notes the re-check on its linked cards), Comment. The server records the
+  signed-in staff member on every one. After each action the board and panel reload.
+- **Badges:** the Review queue tab shows open cards from the list it just loaded; the header's
+  "N need action" link and its count now go to `#review`.
+
 ## Oracle: `control_centre` (read-only)
 
 `src/tools/control-centre-tools.js`, Oracle-only and deferred (found by tool search). Modes:
 `queue_summary`, `list_cards` (status, owner incl. `unassigned`, kind, company, grant,
-`stuck_only` = open and unchanged 3+ days; ≤20), `card` (one card in full: diagnosis,
+`stuck_only` = open with no change or comment for 3+ days, the board's rule and SQL; ≤20), `card` (one card in full: diagnosis,
 evidence — chat turns or review reasons — flags, history, linked cards), `overview`
 (`getOverview(range)`, client-only lists) and `chat_themes` (`latestDigest()`). Every card in
 every answer carries its link; companies are named first and internal accounts tagged.

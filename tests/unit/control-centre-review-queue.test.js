@@ -16,7 +16,7 @@ import {
   REOPEN_SQL, DIAGNOSE_SQL, RECORD_FAILURE_SQL, SET_STATUS_SQL, SET_OWNER_SQL, CLOSE_SQL, INSERT_EVENT_SQL,
   GET_ITEM_SQL, GET_FLAGS_SQL, GET_EVENTS_SQL, NEW_ITEM_IDS_SQL, NEW_ITEMS_SQL, LIST_SQL,
   SWEEP_CURSOR_SQL, KNOWN_REFS_SQL, EXISTING_MATCH_ITEMS_SQL, DOWNS_SQL, SWEEP_OVERLAP_MS,
-  LOCK_PATTERN_SQL, SET_SNAPSHOT_SQL, LINKED_ITEMS_SQL, reopensClosed,
+  LOCK_PATTERN_SQL, SET_SNAPSHOT_SQL, LINKED_ITEMS_SQL, reopensClosed, addComment, COMMENT_MAX, STUCK_DAYS,
   previewDiagnoses
 } from '../../src/control-centre/review-queue.js';
 import { LINK_PATTERNS_SQL, PATTERN_ITEMS_SQL } from '../../src/control-centre/grant-patterns.js';
@@ -482,6 +482,25 @@ describe('reads', () => {
     expect(LIST_SQL).toMatch(/latest_comment/);
   });
 
+  test('LIST_SQL returns summaries only: verdict, grant name, stuck — never the snapshot or full diagnosis', () => {
+    expect(LIST_SQL).not.toMatch(/i\.\*/);
+    expect(LIST_SQL).not.toMatch(/\bsnapshot\b/);
+    expect(LIST_SQL).not.toMatch(/i\.diagnosis[,\s]/);
+    expect(LIST_SQL).toMatch(/i\.diagnosis->>'verdict' AS verdict/);
+    expect(LIST_SQL).toMatch(/left\(i\.narrative, 240\) AS narrative/);
+    expect(LIST_SQL).toMatch(/LEFT JOIN gg3_grants g ON g\.id = i\.grant_root_id/);
+    expect(LIST_SQL.trim()).toMatch(/^SELECT/);
+  });
+
+  test('stuck counts comments as activity: the later of updated_at and the newest comment, open cards only', () => {
+    expect(STUCK_DAYS).toBe(3);
+    expect(LIST_SQL).toMatch(/e\.action = 'comment'/);
+    expect(LIST_SQL).toMatch(/GREATEST\(i\.updated_at, cm\.at\) AS last_activity_at/);
+    expect(LIST_SQL).toMatch(/\(i\.status <> 'closed' AND GREATEST\(i\.updated_at, cm\.at\) < now\(\) - make_interval\(days => 3\)\) AS stuck/);
+    // Ordering is untouched by comments.
+    expect(LIST_SQL).not.toMatch(/ORDER BY[^\n]*last_activity/);
+  });
+
   test('getItem returns flags and events, 404 when unknown', async () => {
     const hub = fakeHub();
     const { item } = await addFlag(matchFlag({ comment: 'wrong province' }), hub.deps);
@@ -494,6 +513,38 @@ describe('reads', () => {
 
 // The 👎 tests leave the pattern path out; it has its own tests below.
 const noPatterns = async () => ({ qualifying: [] });
+
+describe('addComment', () => {
+  test('logs one comment event with the author and text; status, owner and updated_at untouched', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    const before = { ...hub.items[0] };
+    const c = await addComment(item.id, '  Checked the card — region list is wrong.  ', 'steph@granted.ca', hub.deps);
+    expect(c).toEqual({ item_id: item.id, actor: 'steph@granted.ca', text: 'Checked the card — region list is wrong.', status: 'new' });
+    expect(hub.events.at(-1)).toMatchObject({ action: 'comment', actor: 'steph@granted.ca', from_status: 'new', to_status: 'new' });
+    expect(JSON.parse(hub.events.at(-1).detail)).toEqual({ text: 'Checked the card — region list is wrong.' });
+    expect(hub.items[0]).toEqual(before);
+  });
+
+  test('a closed card can be commented on and stays closed', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    await close(item.id, { expected_match: 'should' }, 'a@granted.ca', hub.deps);
+    await addComment(item.id, 'Confirmed with the client.', 'b@granted.ca', hub.deps);
+    expect(hub.items[0].status).toBe('closed');
+  });
+
+  test('empty, too long, no author or unknown card are refused', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(matchFlag(), hub.deps);
+    await expectStatus(addComment(item.id, '   ', 'a@granted.ca', hub.deps), 400);
+    await expectStatus(addComment(item.id, 'x'.repeat(COMMENT_MAX + 1), 'a@granted.ca', hub.deps), 400);
+    await expectStatus(addComment(item.id, 'ok', null, hub.deps), 400);
+    await expectStatus(addComment(999, 'ok', 'a@granted.ca', hub.deps), 404);
+    await expectStatus(addComment('abc', 'ok', 'a@granted.ca', hub.deps), 400);
+    expect(hub.events.filter((e) => e.action === 'comment')).toHaveLength(0);
+  });
+});
 
 describe('runReviewSweep', () => {
   const downs = [

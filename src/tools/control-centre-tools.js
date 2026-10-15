@@ -3,11 +3,13 @@
  *
  * One tool, five modes:
  *   queue_summary  the review queue at a glance: open cards by status, owner and
- *                  kind; the cards stuck longest (no change for STUCK_DAYS+) and
- *                  the oldest open ones
+ *                  kind; the cards stuck longest and the oldest open ones
  *   list_cards     cards filtered by status, owner, kind, company, grant, or
  *                  stuck only; at most LIST_MAX, most recently changed first
  *                  (stuck: longest idle first)
+ *
+ * "Stuck" is the board's rule, from the same SQL (review-queue.js): open and no
+ * activity — a change or a staff comment — for STUCK_DAYS+ days.
  *   card           one card in full: narrative, diagnosis, the evidence it was
  *                  diagnosed from (the chat turns for a chat card, the review
  *                  reasons for a grant pattern), flags, history, linked cards
@@ -32,9 +34,10 @@
 import { query as hubQueryDefault } from '../database/connection.js';
 import { cardLink, controlCentreUrl } from '../control-centre/links.js';
 import { cardTitle, categoryWords } from '../control-centre/card-summary.js';
+import { STUCK_DAYS, LAST_ACTIVITY, LAST_ACTIVITY_JOIN, stuckWhen } from '../control-centre/review-queue.js';
 
+export { STUCK_DAYS };
 export const CONTROL_CENTRE_MODES = ['queue_summary', 'list_cards', 'card', 'overview', 'chat_themes'];
-export const STUCK_DAYS = 3;
 export const LIST_MAX = 20;
 export const SUMMARY_ROWS = 8;
 const NARRATIVE_CHARS = 400;
@@ -63,7 +66,11 @@ const CARD_COLUMNS = `
   i.conversation_id, i.narrative, i.client_notice, i.flag_count, i.flagged_again, i.created_at, i.updated_at,
   i.closed_at, g.grant_name,
   EXTRACT(EPOCH FROM (now() - i.created_at)) / 86400 AS age_days,
-  EXTRACT(EPOCH FROM (now() - i.updated_at)) / 86400 AS idle_days`;
+  ${LAST_ACTIVITY} AS last_activity_at,
+  EXTRACT(EPOCH FROM (now() - ${LAST_ACTIVITY})) / 86400 AS idle_days`;
+const CARD_FROM = `
+    FROM cc_review_items i
+    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id${LAST_ACTIVITY_JOIN}`;
 
 export const COUNTS_SQL = `
   SELECT status, coalesce(owner, 'unassigned') AS owner, kind, count(*)::int AS n
@@ -71,40 +78,32 @@ export const COUNTS_SQL = `
    GROUP BY 1, 2, 3`;
 
 export const STUCK_SQL = `
-  SELECT ${CARD_COLUMNS}
-    FROM cc_review_items i
-    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id
-   WHERE i.status <> 'closed' AND i.updated_at < now() - make_interval(days => $1::int)
-   ORDER BY i.updated_at, i.id
+  SELECT ${CARD_COLUMNS}${CARD_FROM}
+   WHERE ${stuckWhen('$1::int')}
+   ORDER BY ${LAST_ACTIVITY}, i.id
    LIMIT $2`;
 
 export const OLDEST_OPEN_SQL = `
-  SELECT ${CARD_COLUMNS}
-    FROM cc_review_items i
-    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id
+  SELECT ${CARD_COLUMNS}${CARD_FROM}
    WHERE i.status <> 'closed'
    ORDER BY i.created_at, i.id
    LIMIT $1`;
 
 // $1 status, $2 owner ('unassigned' = none), $3 kind, $4 company ids, $5 grant ids, $6 stuck days (null = any), $7 limit
 export const LIST_SQL = `
-  SELECT ${CARD_COLUMNS}
-    FROM cc_review_items i
-    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id
+  SELECT ${CARD_COLUMNS}${CARD_FROM}
    WHERE ($1::text IS NULL OR i.status = $1)
      AND ($2::text IS NULL OR ($2 = 'unassigned' AND i.owner IS NULL) OR i.owner = $2)
      AND ($3::text IS NULL OR i.kind = $3)
      AND ($4::int[] IS NULL OR i.company_id = ANY($4::int[]))
      AND ($5::int[] IS NULL OR i.grant_root_id = ANY($5::int[]))
-     AND ($6::int IS NULL OR (i.status <> 'closed' AND i.updated_at < now() - make_interval(days => $6::int)))
-   ORDER BY CASE WHEN $6::int IS NULL THEN NULL ELSE i.updated_at END ASC NULLS LAST, i.updated_at DESC, i.id DESC
+     AND ($6::int IS NULL OR ${stuckWhen('$6::int')})
+   ORDER BY CASE WHEN $6::int IS NULL THEN NULL ELSE ${LAST_ACTIVITY} END ASC NULLS LAST, i.updated_at DESC, i.id DESC
    LIMIT $7`;
 
 export const CARD_SQL = `
   SELECT ${CARD_COLUMNS}, i.diagnosis, i.snapshot, i.snapshot_at, i.close_note, i.closed_by, i.expected_match,
-         i.diagnosis_attempts, i.last_error
-    FROM cc_review_items i
-    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id
+         i.diagnosis_attempts, i.last_error${CARD_FROM}
    WHERE i.id = $1`;
 
 export const GRANT_NAMES_SQL = 'SELECT id, grant_name FROM gg3_grants WHERE id = ANY($1::int[])';
@@ -141,7 +140,7 @@ export function cardRow(r, env) {
     flags: r.flag_count,
     ...(r.flagged_again ? { flagged_again: true } : {}),
     age_days: days(r.age_days),
-    days_since_change: days(r.idle_days),
+    days_since_activity: days(r.idle_days),
     narrative: clip(r.narrative, NARRATIVE_CHARS)
   };
 }
@@ -171,7 +170,7 @@ async function modeQueueSummary(input, deps) {
       o[r.owner] = { ...(o[r.owner] ?? {}), [r.status]: ((o[r.owner] ?? {})[r.status] ?? 0) + r.n };
       return o;
     }, {}),
-    stuck_definition: `open and unchanged for ${STUCK_DAYS}+ days`,
+    stuck_definition: `open with no change or comment for ${STUCK_DAYS}+ days`,
     stuck: shaped.slice(0, stuck.rows.length),
     oldest_open: shaped.slice(stuck.rows.length)
   };
@@ -218,7 +217,7 @@ async function modeListCards(input, deps) {
       ...(input.kind ? { kind: input.kind } : {}), ...(company.matched ? { company_matches: company.matched } : {}),
       ...(company.ids && !company.matched ? { company_ids: company.ids } : {}),
       ...(grant.matched ? { grant_matches: grant.matched } : {}), ...(grant.ids && !grant.matched ? { grant_ids: grant.ids } : {}),
-      ...(stuck ? { stuck: `open and unchanged for ${STUCK_DAYS}+ days` } : {})
+      ...(stuck ? { stuck: `open with no change or comment for ${STUCK_DAYS}+ days` } : {})
     },
     count: rows.length,
     ...(rows.length === limit ? { note: `Showing ${limit}; narrow the filters for the rest.` } : {}),
