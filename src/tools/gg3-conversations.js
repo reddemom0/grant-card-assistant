@@ -4,13 +4,18 @@
  * One read-only tool, four modes:
  *   read          one client's recent conversations: transcript, outcomes, grants shown
  *   search        conversations across clients whose client messages contain every term
- *   troubleshoot  read + company name + match context + match-explain + the errors
- *                 sheet's current issues. Gathers evidence only; Oracle decides.
- *   log_issue     the one write: add or update a row in the errors sheet, as
- *                 PULSE_SHEET_OWNER_EMAIL, Source "reported by <asker>". Status and
- *                 Notes on an existing row are never touched.
+ *   troubleshoot  read + company name + match context + match-explain + the
+ *                 Control Centre chat cards already on file for these
+ *                 conversations. Gathers evidence only; Oracle decides.
+ *   log_issue     the one write: file a chat card in the Control Centre review
+ *                 queue (migration 047) as a staff flag from the asker, for one
+ *                 of the client's conversations — chat_turn_ref
+ *                 conv:<conversation>:staff_report, so reports on the same
+ *                 conversation pile onto one card. The card's snapshot is the
+ *                 flagged client message, the 3 turns before it and the reply,
+ *                 verbatim. Returns the card link.
  *
- * Reads go through gg3OpsQuery (oracle_readonly; six tables). This module never
+ * Reads go through gg3OpsQuery (oracle_readonly; seven tables). This module never
  * names ai_review_log, ai_review_cache, llm_calls or tagger data: match-explain
  * runs inside gg3-ai-service and its tagger / llm fields are dropped here.
  *
@@ -27,10 +32,10 @@
 
 import { gg3OpsQuery } from '../services/gg3-ops-db.js';
 import { BROKE_OUTCOMES, FAILED_OUTCOMES } from '../services/pulse-spike.js';
-import { transcriptOf, fetchCompanyName, clientRef, OWNERS } from '../services/pulse-roundup.js';
-import {
-  SHEET_ENV, sheetUrl, localDate, resolveSheetOwner, readIssueRows, writeIssues
-} from '../services/pulse-errors-sheet.js';
+import { transcriptOf, fetchCompanyName, OWNERS, localDate } from '../services/pulse-roundup.js';
+import { chatTurnsAround } from '../control-centre/diagnosis.js';
+import { cardLink } from '../control-centre/links.js';
+import { cardTitle } from '../control-centre/card-summary.js';
 
 export const GG3_CONVERSATION_MODES = ['read', 'search', 'troubleshoot', 'log_issue'];
 export const RESOLVE_DAYS = 90;
@@ -45,7 +50,8 @@ const MAX_EXPLAIN_CALLS = 3;
 const EXPLAIN_TIMEOUT_MS = 10000;
 
 export const NAME_NOT_FOUND =
-  "I can't look clients up by company name yet. Give me the ·xxxx ref from the roundup or the errors sheet and I'll pull it up.";
+  "I can't look clients up by company name yet. Give me the ·xxxx ref from the roundup or the chat card and I'll pull it up.";
+export const STAFF_ISSUE = 'staff_report';
 
 const OUTCOME_WORDS = {
   turn_cap: 'hit the message limit',
@@ -105,7 +111,7 @@ const candidatesFrom = (rows) => rows.map(r => ({ client: shortRef(r.user_id, tr
 export async function resolveClient({ client, name }, runQuery) {
   if (client) {
     const p = parseClientRef(client);
-    if (!p) return { ok: false, reason: 'bad_ref', message: 'That client ref is not one I recognise. Use the ·xxxx ref from the roundup or the errors sheet.' };
+    if (!p) return { ok: false, reason: 'bad_ref', message: 'That client ref is not one I recognise. Use the ·xxxx ref from the roundup or the chat card.' };
     const res = p.exact
       ? await runQuery(
         `SELECT user_id, max(updated_at) AS last_active FROM conversations
@@ -470,14 +476,29 @@ export async function fetchMatchExplain({ grantId, companyId, track }, env = pro
   }
 }
 
-async function sheetIssues(deps) {
-  const sheetId = String(deps.env[SHEET_ENV] || '').trim();
-  if (!sheetId) return { ok: false, code: 'not_configured' };
-  const owner = await resolveSheetOwner(deps.env, deps.oracleQuery).catch(err => ({ ok: false, code: String(codeOf(err)) }));
-  if (!owner.ok) return { ok: false, code: owner.code };
-  const read = await readIssueRows({ sheetId, userId: owner.userId, read: deps.readSheet });
-  if (!read.ok) return { ok: false, code: read.code };
-  return { ok: true, sheetId, userId: owner.userId, rows: read.rows };
+// Hub DB, read-only: the chat cards already on file for these conversations.
+export const CHAT_CARDS_SQL = `
+  SELECT id, kind, status, owner, chat_turn_ref, conversation_id, narrative, flag_count, updated_at
+    FROM cc_review_items
+   WHERE kind = 'chat' AND conversation_id = ANY($1::int[])
+   ORDER BY updated_at DESC
+   LIMIT 20`;
+
+/** Chat cards for these conversations, each with its link. */
+async function chatCards(conversationIds, deps) {
+  if (!conversationIds.length) return { ok: true, cards: [] };
+  try {
+    const r = await deps.oracleQuery(CHAT_CARDS_SQL, [conversationIds]);
+    return {
+      ok: true,
+      cards: r.rows.map(c => ({
+        card: Number(c.id), conversation: c.conversation_id, title: cardTitle(c), status: c.status, owner: c.owner ?? null,
+        flags: c.flag_count, narrative: c.narrative ?? null, link: cardLink(c.id, deps.env)
+      }))
+    };
+  } catch (err) {
+    return { ok: false, code: String(codeOf(err)) };
+  }
 }
 
 async function modeTroubleshoot(input, deps) {
@@ -510,7 +531,7 @@ async function modeTroubleshoot(input, deps) {
     }
   }
 
-  const sheet = await sheetIssues(deps);
+  const cards = await chatCards(conversations.map(c => c.conversation).filter(Number.isInteger), deps);
   return {
     client: shortRef(who.userId),
     complaint: clip(input.complaint, 300) || null,
@@ -520,11 +541,9 @@ async function modeTroubleshoot(input, deps) {
     grants_named: grants,
     matching: match,
     match_explanations: explanations,
-    errors_sheet: sheet.ok
-      ? { issues: sheet.rows.map(r => ({ row: r.row, name: r.name, status: r.status, owner: r.owner, count: r.count })) }
-      : { unavailable: `errors sheet unavailable (${sheet.code})` },
+    chat_cards: cards.ok ? cards.cards : { unavailable: `Control Centre cards unavailable (${cards.code})` },
     owners: OWNERS,
-    next: 'Give the likely cause, owner and a suggested fix, then log it with mode "log_issue" (existing_row when it is one of the sheet issues above).'
+    next: 'Give the likely cause, owner and a suggested fix, then log it with mode "log_issue" and the conversation number (a report on a conversation that already has a card adds to that card). Share the card link.'
   };
 }
 
@@ -533,20 +552,25 @@ async function modeTroubleshoot(input, deps) {
 // ============================================================================
 
 /** The asker, from the server's own records — never from model input. */
-export async function askerName(userId, chatContext, oracleQuery) {
+export async function askerIdentity(userId, chatContext, oracleQuery) {
   if (userId) {
     try {
       const r = await oracleQuery('SELECT name, email FROM users WHERE id = $1', [userId]);
       const u = r.rows?.[0];
-      if (u?.name?.trim()) return u.name.trim();
-      if (chatContext?.senderDisplayName) return chatContext.senderDisplayName;
-      if (u?.email) return String(u.email).split('@')[0];
+      const email = u?.email ? String(u.email) : null;
+      if (u?.name?.trim()) return { name: u.name.trim(), email };
+      if (chatContext?.senderDisplayName) return { name: chatContext.senderDisplayName, email };
+      if (email) return { name: email.split('@')[0], email };
     } catch { /* fall through */ }
   }
-  return chatContext?.senderDisplayName || 'the team';
+  return { name: chatContext?.senderDisplayName || 'the team', email: null };
 }
 
-const sameName = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+export async function askerName(userId, chatContext, oracleQuery) {
+  return (await askerIdentity(userId, chatContext, oracleQuery)).name;
+}
+
+const CONVERSATION_SQL = 'SELECT id, user_id, messages FROM conversations WHERE id = $1';
 
 async function modeLogIssue(input, deps) {
   const name = clip(input.name, 60);
@@ -554,32 +578,56 @@ async function modeLogIssue(input, deps) {
   if (!name || !take) return { error: 'log_issue needs name (a short issue name) and take (the likely cause and suggested fix).' };
   if (!OWNERS.includes(input.owner)) return { error: `owner must be one of: ${OWNERS.join(', ')}.` };
 
-  const sheet = await sheetIssues(deps);
-  if (!sheet.ok) return { error: `The errors sheet is not available (${sheet.code}); nothing was logged.` };
-
-  let label = null;
-  if (input.client) {
+  // The conversation: the one named, else the client's latest.
+  let conv = null;
+  const conversationId = Number.parseInt(input.conversation_id, 10);
+  if (Number.isInteger(conversationId) && conversationId > 0) {
+    const r = await deps.runQuery(CONVERSATION_SQL, [conversationId]);
+    if (!r.configured) return { error: 'The GetGranted chat history is not available; nothing was logged.' };
+    conv = r.rows?.[0] ?? null;
+    if (!conv) return { error: `No GetGranted conversation ${conversationId}. Use a conversation number from troubleshoot.` };
+  } else if (input.client) {
     const who = await resolveClient({ client: input.client }, deps.runQuery);
-    if (who.ok) label = (await deps.fetchProfile(who.userId).catch(() => ({}))).companyName || clientRef(who.userId);
-    else if (parseClientRef(input.client)?.suffix) label = `a client ·${parseClientRef(input.client).suffix.slice(-4)}`;
+    if (!who.ok) return who;
+    const r = await deps.runQuery(
+      'SELECT id, user_id, messages FROM conversations WHERE user_id = $1 ORDER BY updated_at DESC LIMIT 1', [who.userId]);
+    conv = r.rows?.[0] ?? null;
+    if (!conv) return { error: 'That client has no conversations on record; nothing was logged.' };
+  } else {
+    return { error: 'log_issue needs the conversation number from troubleshoot (conversation_id), or the client ref.' };
   }
 
-  const byRow = sheet.rows.find(r => r.row === Number(input.existing_row));
-  const row = byRow || sheet.rows.find(r => sameName(r.name, name)) || null;
-  const asker = await askerName(deps.userId, deps.chatContext, deps.oracleQuery);
-  const written = await writeIssues({
-    issues: [{ name, count: 1, clients: label ? [label] : [], owner: input.owner, existingRow: row?.row ?? null, source: `reported by ${asker}`, notes: take }],
-    rows: sheet.rows,
-    sheetId: sheet.sheetId,
-    userId: sheet.userId,
-    today: localDate(deps.now()),
-    update: deps.updateSheet,
-    append: deps.appendSheet
-  });
-  if (written.failed) return { error: 'The errors sheet write failed; nothing was logged.' };
-  return row
-    ? { logged: 'updated', row: row.row, issue: row.name, note: 'Added to the existing issue: last seen, count and clients only. Its status and notes are unchanged.', sheet: sheetUrl(sheet.sheetId) }
-    : { logged: 'added', issue: name, source: `reported by ${asker}`, sheet: sheetUrl(sheet.sheetId) };
+  const turn = Number.isInteger(input.client_message) && input.client_message > 0 ? input.client_message - 1 : null;
+  const around = chatTurnsAround(conv.messages, turn);
+  const asker = await askerIdentity(deps.userId, deps.chatContext, deps.oracleQuery);
+  const companyId = await deps.companyFor(conv.user_id).catch(() => null);
+
+  let filed;
+  try {
+    filed = await deps.addFlag({
+      kind: 'chat',
+      chat_turn_ref: `conv:${conv.id}:${STAFF_ISSUE}`,
+      conversation_id: conv.id,
+      company_id: companyId ?? undefined,
+      source: 'staff_flag',
+      actor: asker.email || `oracle:${asker.name}`,
+      comment: `${name}: ${take} (suggested owner: ${input.owner}; reported by ${asker.name} through Oracle)`,
+      snapshot: around.ok ? { source: 'oracle_staff_report', conversation_id: conv.id, issue: STAFF_ISSUE, ...around.body } : undefined
+    });
+  } catch (err) {
+    return { error: `The Control Centre queue is not available (${codeOf(err)}); nothing was logged.` };
+  }
+  const id = filed.item?.id;
+  return {
+    logged: filed.created ? 'new card' : filed.reopened ? 'reopened card' : 'added to existing card',
+    card: id,
+    link: cardLink(id, deps.env),
+    conversation: conv.id,
+    client: shortRef(conv.user_id),
+    flagged_message: around.ok ? around.body.flagged_turn_index + 1 : null,
+    source: `reported by ${asker.name}`,
+    note: 'The card is diagnosed within the hour (owner, what went wrong, a suggested fix). Share the link.'
+  };
 }
 
 // ============================================================================
@@ -587,10 +635,11 @@ async function modeLogIssue(input, deps) {
 // ============================================================================
 
 async function defaultDeps({ userId, chatContext }) {
-  const [{ query }, sheets, { writeResultSheet }] = await Promise.all([
+  const [{ query }, { writeResultSheet }, { addFlag }, { identitiesForClerkIds }] = await Promise.all([
     import('../database/connection.js'),
-    import('./google-sheets.js'),
-    import('./grant-data-sheet.js')
+    import('./grant-data-sheet.js'),
+    import('../control-centre/review-queue.js'),
+    import('../control-centre/identity.js')
   ]);
   return {
     userId,
@@ -603,9 +652,8 @@ async function defaultDeps({ userId, chatContext }) {
     explain: (args) => fetchMatchExplain(args),
     findGrant: defaultFindGrant,
     writeSheet: writeResultSheet,
-    readSheet: sheets.readSheetRange,
-    updateSheet: sheets.updateSheetRange,
-    appendSheet: sheets.appendSheetRow
+    addFlag,
+    companyFor: async (clerkId) => (await identitiesForClerkIds([clerkId])).get(clerkId)?.company_id ?? null
   };
 }
 

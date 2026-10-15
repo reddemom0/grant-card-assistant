@@ -6,7 +6,7 @@
  * populates req.user, requireAuth is what returns 401.
  *
  *   GET    /             ?status=&owner=&kind=  most recently updated first
- *   GET    /:id          item + flags + events, with names
+ *   GET    /:id          item + flags + events + linked cards, with names
  *   POST   /flag         staff flag; actor is the signed-in email
  *   PATCH  /:id/status   {to}  ('closed' refused — use close)
  *   PATCH  /:id/owner    {owner}  (null clears)
@@ -114,11 +114,11 @@ router.post('/flag', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const { item, flags, events } = await getItem(req.params.id);
+    const { item, flags, events, links } = await getItem(req.params.id);
     const names = await namesFor(item, flags, events);
     res.set('Cache-Control', 'no-store');
     const company_name = item.company_id != null ? names.companies?.[item.company_id] ?? null : null;
-    res.json({ item: { ...item, company_name, company_internal: isInternalCompany(item.company_id) }, flags, events, names });
+    res.json({ item: { ...item, company_name, company_internal: isInternalCompany(item.company_id) }, flags, events, links, names });
   } catch (error) {
     sendError(res, error, 'get');
   }

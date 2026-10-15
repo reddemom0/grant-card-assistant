@@ -1380,20 +1380,19 @@ async function startServer() {
     // ========================================================================
     // CRON JOB: GetGranted Pulse morning roundup (08:00 America/Vancouver)
     // ========================================================================
-    // DMs PULSE_ROUNDUP_SUBSCRIBERS a grouped summary of the last 24h of client
-    // chat problems (only when there were any) and keeps the errors sheet
-    // (PULSE_ERRORS_SHEET_ID, written as PULSE_SHEET_OWNER_EMAIL) up to date.
-    // Not scheduled unless all of those and GG3_OPS_DB_READONLY_URL are set.
+    // Oracle's chat-issue detector: files a Control Centre chat card for each
+    // problem in the last 24h of client chat (migration 047) and DMs
+    // PULSE_ROUNDUP_SUBSCRIBERS the list with card links (only when there were
+    // any). Not scheduled unless that and GG3_OPS_DB_READONLY_URL are set.
     startPulseRoundup(cron);
 
     // ========================================================================
     // CRON JOB: GetGranted Pulse weekly digest (Monday 08:00 America/Vancouver)
     // ========================================================================
     // DMs PULSE_DIGEST_SUBSCRIBERS last week's usage, client question themes,
-    // most-matched grants and errors, and writes the detail to a "Digest
-    // YYYY-MM-DD" tab of the errors sheet. Always sends, once per week. Not
-    // scheduled unless the roundup's sheet settings, PULSE_DIGEST_SUBSCRIBERS
-    // and GG3_OPS_DB_READONLY_URL are set.
+    // most-matched grants and the week's Control Centre chat and grant-pattern
+    // cards, with links. Always sends, once per week. Not scheduled unless
+    // PULSE_DIGEST_SUBSCRIBERS and GG3_OPS_DB_READONLY_URL are set.
     startPulseDigest(cron);
 
     // Log A/B testing configuration for lead-gen

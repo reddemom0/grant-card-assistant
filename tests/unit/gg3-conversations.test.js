@@ -11,7 +11,7 @@ import { jest } from '@jest/globals';
 
 const {
   runGg3Conversations, parseClientRef, likeEscape, outcomeWords, grantsIn, reduceExplain,
-  windowFor, NAME_NOT_FOUND, SNIPPET_CHARS
+  windowFor, NAME_NOT_FOUND, SNIPPET_CHARS, CHAT_CARDS_SQL
 } = await import('../../src/tools/gg3-conversations.js');
 
 const NOW = new Date('2026-10-01T16:00:00Z');
@@ -36,6 +36,9 @@ function fakeOps({ resolveRows = [{ user_id: CLIENT, last_active: NOW }], convRo
     if (!configured) return { configured: false };
     if (/max\(updated_at\) AS last_active/.test(sql)) return { configured: true, rows: resolveRows };
     if (/FROM chat_turns\s+WHERE conversation_id = ANY/.test(sql)) return { configured: true, rows: turnRows };
+    if (/FROM conversations WHERE id = \$1/.test(sql)) {
+      return { configured: true, rows: params[0] === 41 ? [{ id: 41, user_id: CLIENT, messages: msgs }] : [] };
+    }
     if (/FROM conversations c/.test(sql)) return { configured: true, rows: searchRows };
     if (/FROM conversations/.test(sql)) {
       return { configured: true, rows: convRows ?? [{ id: 41, mode: 'advisor', messages: msgs, created_at: NOW, updated_at: NOW }] };
@@ -48,9 +51,22 @@ function fakeOps({ resolveRows = [{ user_id: CLIENT, last_active: NOW }], convRo
   return { q, sent };
 }
 
-const SHEET_ROWS = [
-  ['Chat times out on long answers', '2026-09-20', '2026-09-30', '3', 'Acme', 'Jason (app/UI)', 'being fixed', 'Jason on it', 'Oracle-detected']
+const CARD_ROWS = [
+  { id: 55, kind: 'chat', status: 'diagnosed', owner: 'chris', chat_turn_ref: 'conv:41:pushback', conversation_id: 41,
+    narrative: 'The client asked for wage subsidies and got a hiring grant.', flag_count: 1, updated_at: NOW }
 ];
+
+/** addFlag over one in-memory card per chat_turn_ref. */
+function fakeAddFlag() {
+  const cards = new Map();
+  return jest.fn(async (input) => {
+    const created = !cards.has(input.chat_turn_ref);
+    if (created) cards.set(input.chat_turn_ref, { id: 200 + cards.size, flag_count: 0, ...input });
+    const card = cards.get(input.chat_turn_ref);
+    card.flag_count += 1;
+    return { item: card, created, reopened: false, duplicate: false };
+  });
+}
 
 function makeDeps(over = {}) {
   const ops = over.ops || fakeOps();
@@ -59,19 +75,18 @@ function makeDeps(over = {}) {
     deps: {
       userId: 7,
       chatContext: { surface: 'chat_dm', senderDisplayName: 'Chat Name' },
-      env: { PULSE_ERRORS_SHEET_ID: 'sheet123', PULSE_SHEET_OWNER_EMAIL: 'owner@granted.ca' },
+      env: { PUBLIC_URL: 'https://hub.test' },
       now: () => NOW,
       runQuery: ops.q,
       oracleQuery: jest.fn(async (sql) => (/FROM users WHERE id/.test(sql)
         ? { rows: [{ name: 'Steph Lee', email: 'steph@granted.ca' }] }
-        : { rows: [{ id: 3 }] })),
+        : sql === CHAT_CARDS_SQL ? { rows: CARD_ROWS } : { rows: [] })),
       fetchProfile: jest.fn(async () => ({ status: 404, companyName: null })),
       explain: jest.fn(async () => ({ ok: false, code: 'not_configured' })),
       findGrant: jest.fn(async () => null),
       writeSheet: jest.fn(async (_u, c) => ({ url: 'https://sheet/x', title: c.title, id: 'x' })),
-      readSheet: jest.fn(async () => ({ success: true, data: { values: SHEET_ROWS } })),
-      updateSheet: jest.fn(async () => ({ success: true })),
-      appendSheet: jest.fn(async () => ({ success: true })),
+      addFlag: fakeAddFlag(),
+      companyFor: jest.fn(async () => 135),
       ...over.deps
     }
   };
@@ -235,7 +250,7 @@ describe('search', () => {
 describe('troubleshoot', () => {
   const runRows = [{ grant_id: 1856, section: 'Hiring', shown: false, position: null, deleted_at_stage: 'eligibility', match_score: 0.41, eligibility: 'ineligible', eligibility_reasons: ['region: BC only'] }];
 
-  test('without match-explain configured: evidence, match context, sheet issues; writes nothing', async () => {
+  test('without match-explain configured: evidence, match context, the chat cards on file; writes nothing', async () => {
     const { deps } = makeDeps({ ops: fakeOps({ runRows }) });
     const r = await run({ mode: 'troubleshoot', client: '·9xyz', complaint: 'matches made no sense', grants: ['BC Hiring Boost'] }, deps);
     expect(r.grants_named).toEqual([{ asked: 'BC Hiring Boost', id: 1856, name: 'BC Hiring Boost' }]);
@@ -244,11 +259,14 @@ describe('troubleshoot', () => {
     expect(r.matching.grants[0].places[0]).toMatchObject({ section: 'Hiring', shown: false, dropped_at: 'eligibility', reasons: ['region: BC only'] });
     expect(deps.explain).toHaveBeenCalledWith({ grantId: 1856, companyId: 9, track: 'Hiring' });
     expect(r.match_explanations).toEqual([{ grant_id: 1856, track: 'Hiring', unavailable: 'match explanation unavailable (not_configured)' }]);
-    expect(r.errors_sheet.issues[0]).toMatchObject({ row: 2, name: 'Chat times out on long answers', status: 'being fixed' });
+    expect(r.chat_cards).toEqual([{ card: 55, conversation: 41, title: 'Client pushed back on an answer', status: 'diagnosed', owner: 'chris',
+      flags: 1, narrative: CARD_ROWS[0].narrative, link: 'https://hub.test/control-centre#review/55' }]);
+    expect(deps.oracleQuery).toHaveBeenCalledWith(CHAT_CARDS_SQL, [[41]]);
+    expect(CHAT_CARDS_SQL.trim()).toMatch(/^SELECT/);
     expect(r.owners).toContain('Research (grant card data)');
     expect(r.company_note).toMatch(/not available/);
-    expect(deps.updateSheet).not.toHaveBeenCalled();
-    expect(deps.appendSheet).not.toHaveBeenCalled();
+    expect(deps.addFlag).not.toHaveBeenCalled();
+    expect(JSON.stringify(r)).not.toMatch(/errors_sheet|spreadsheets/);
   });
 
   test('match-explain answers → only the verdict and reasons reach Oracle', async () => {
@@ -288,49 +306,56 @@ describe('troubleshoot', () => {
 });
 
 describe('log_issue', () => {
-  test('new issue → appended with Source "reported by <asker>" and the take in Notes', async () => {
-    const { deps } = makeDeps({ deps: { fetchProfile: jest.fn(async () => ({ status: 200, companyName: 'Acme Bakery' })) } });
-    const r = await run({ mode: 'log_issue', name: 'Hiring grant hidden by region tag', take: 'Region tag excludes BC; fix the tag.', owner: 'Research (grant card data)', client: '·9xyz', existing_row: null }, deps);
-    expect(r).toMatchObject({ logged: 'added', source: 'reported by Steph Lee' });
-    const [, args] = deps.appendSheet.mock.calls[0];
-    expect(args.values[0]).toEqual(['Hiring grant hidden by region tag', '2026-10-01', '2026-10-01', 1, 'Acme Bakery', 'Research (grant card data)', 'new', 'Region tag excludes BC; fix the tag.', 'reported by Steph Lee']);
-    expect(deps.updateSheet).not.toHaveBeenCalled();
+  const issue = { mode: 'log_issue', name: 'Wage subsidy question misread', take: 'Answered with a hiring grant; prompt should ask which kind of support.', owner: 'Chris (AI behaviour)' };
+
+  test('files a chat card as a staff flag from the asker, with the turns verbatim, and returns the link', async () => {
+    const { deps } = makeDeps();
+    const r = await run({ ...issue, conversation_id: 41, client_message: 1 }, deps);
+    expect(r).toEqual({ logged: 'new card', card: 200, link: 'https://hub.test/control-centre#review/200', conversation: 41,
+      client: '·9xyz', flagged_message: 1, source: 'reported by Steph Lee',
+      note: expect.stringMatching(/diagnosed within the hour/) });
+    const [input] = deps.addFlag.mock.calls[0];
+    expect(input).toMatchObject({ kind: 'chat', chat_turn_ref: 'conv:41:staff_report', conversation_id: 41, company_id: 135,
+      source: 'staff_flag', actor: 'steph@granted.ca' });
+    expect(input.comment).toBe('Wage subsidy question misread: Answered with a hiring grant; prompt should ask which kind of support. (suggested owner: Chris (AI behaviour); reported by Steph Lee through Oracle)');
+    expect(input.snapshot).toMatchObject({ source: 'oracle_staff_report', conversation_id: 41, flagged_turn_index: 0 });
+    expect(input.snapshot.turns[0]).toMatchObject({ client: 'Are there hiring grants for a BC bakery?', assistant: 'Yes — BC Hiring Boost fits.', flagged: true });
+    expect(deps.companyFor).toHaveBeenCalledWith(CLIENT);
   });
 
-  test('existing issue → C–E only; status, notes and source untouched', async () => {
+  test('a second report on the same conversation adds to its card; no message number flags the last one', async () => {
     const { deps } = makeDeps();
-    const r = await run({ mode: 'log_issue', name: 'Chat timing out', take: 'Same timeout.', owner: 'Jason (app/UI)', client: '·9xyz', existing_row: 2 }, deps);
-    expect(r).toMatchObject({ logged: 'updated', row: 2 });
-    const [, args] = deps.updateSheet.mock.calls[0];
-    expect(args.range).toBe('C2:E2');
-    expect(args.values).toEqual([['2026-10-01', 4, 'Acme, a client ·9xyz']]);
-    expect(deps.appendSheet).not.toHaveBeenCalled();
+    await run({ ...issue, conversation_id: 41 }, deps);
+    const r = await run({ ...issue, name: 'Same again', conversation_id: 41 }, deps);
+    expect(r).toMatchObject({ logged: 'added to existing card', card: 200, flagged_message: 2 });
   });
 
-  test('a row number that wasn\'t read falls back to a name match', async () => {
+  test('a client ref instead of a conversation uses their latest conversation', async () => {
     const { deps } = makeDeps();
-    const r = await run({ mode: 'log_issue', name: 'chat times out on long answers', take: 't', owner: 'Jason (app/UI)', existing_row: 99 }, deps);
-    expect(r).toMatchObject({ logged: 'updated', row: 2 });
+    const r = await run({ ...issue, client: '·9xyz' }, deps);
+    expect(r).toMatchObject({ logged: 'new card', conversation: 41 });
   });
 
   test('asker comes from the users table, then Chat — never from input', async () => {
-    const { deps } = makeDeps({ deps: { oracleQuery: jest.fn(async (sql) => (/FROM users WHERE id/.test(sql) ? { rows: [{ name: '', email: 'x@granted.ca' }] } : { rows: [{ id: 3 }] })) } });
-    const r = await run({ mode: 'log_issue', name: 'New thing', take: 't', owner: 'Chris (AI behaviour)', asker: 'Someone Else' }, deps);
+    const { deps } = makeDeps({ deps: { oracleQuery: jest.fn(async (sql) => (/FROM users WHERE id/.test(sql) ? { rows: [{ name: '', email: 'x@granted.ca' }] } : { rows: [] })) } });
+    const r = await run({ ...issue, conversation_id: 41, asker: 'Someone Else' }, deps);
     expect(r.source).toBe('reported by Chat Name');
+    expect(deps.addFlag.mock.calls[0][0].actor).toBe('x@granted.ca');
   });
 
-  test('bad owner or missing take → nothing written', async () => {
+  test('bad owner, missing take, no conversation, unknown conversation → nothing filed', async () => {
     const { deps } = makeDeps();
-    expect((await run({ mode: 'log_issue', name: 'x', take: 't', owner: 'Fadi (grant card data)' }, deps)).error).toMatch(/owner must be one of/);
-    expect((await run({ mode: 'log_issue', name: 'x', owner: 'Jason (app/UI)' }, deps)).error).toMatch(/needs name/);
-    expect(deps.appendSheet).not.toHaveBeenCalled();
-    expect(deps.updateSheet).not.toHaveBeenCalled();
+    expect((await run({ ...issue, owner: 'Fadi (grant card data)', conversation_id: 41 }, deps)).error).toMatch(/owner must be one of/);
+    expect((await run({ mode: 'log_issue', name: 'x', owner: 'Jason (app/UI)', conversation_id: 41 }, deps)).error).toMatch(/needs name/);
+    expect((await run(issue, deps)).error).toMatch(/conversation number/);
+    expect((await run({ ...issue, conversation_id: 999 }, deps)).error).toMatch(/No GetGranted conversation 999/);
+    expect(deps.addFlag).not.toHaveBeenCalled();
   });
 
-  test('sheet not configured → nothing logged', async () => {
-    const { deps } = makeDeps({ deps: { env: {} } });
-    const r = await run({ mode: 'log_issue', name: 'x', take: 't', owner: 'Jason (app/UI)' }, deps);
-    expect(r.error).toMatch(/not available \(not_configured\)/);
+  test('the queue failing → nothing logged, said plainly', async () => {
+    const { deps } = makeDeps({ deps: { addFlag: jest.fn(async () => { throw Object.assign(new Error('x'), { code: '42P01' }); }) } });
+    const r = await run({ ...issue, conversation_id: 41 }, deps);
+    expect(r.error).toMatch(/not available \(42P01\); nothing was logged/);
   });
 });
 
@@ -342,7 +367,7 @@ describe('never reads review, model-call or tagger data', () => {
     await run({ mode: 'read', client: '·9xyz' }, deps);
     await run({ mode: 'search', terms: ['hiring'] }, deps);
     await run({ mode: 'troubleshoot', client: '·9xyz', grants: ['1856'] }, deps);
-    await run({ mode: 'log_issue', name: 'x', take: 't', owner: 'Jason (app/UI)', client: '·9xyz' }, deps);
+    await run({ mode: 'log_issue', name: 'x', take: 't', owner: 'Jason (app/UI)', conversation_id: 41 }, deps);
     expect(ops.sent.length).toBeGreaterThan(5);
     for (const { sql } of ops.sent) expect(sql).not.toMatch(/ai_review_log|ai_review_cache|llm_calls|tagger/i);
   });

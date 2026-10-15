@@ -12,8 +12,12 @@ import {
   routeFor, applyRoute, fetchBadMatch, splitTurns, readChatSnapshot, takeSnapshot, diagnoseItem,
   sentenceCount, wordCount, regionBlamed,
   buildUserPrompt, evidenceForMatch, plainError, couldNotDiagnose, DIAGNOSIS_TOOL, VERDICTS,
-  CHAT_TURN_SQL, CHAT_TURN_ROWS_SQL, CONVERSATION_MESSAGES_SQL, DIAGNOSIS_MODEL
+  CHAT_TURN_SQL, CHAT_TURN_ROWS_SQL, CONVERSATION_MESSAGES_SQL, DIAGNOSIS_MODEL,
+  CHAT_FIELDS, chatTurnsAround, parseConversationRef, evidenceForPattern
 } from '../../src/control-centre/diagnosis.js';
+import {
+  patternSnapshot, grantEvidence, groupCuts, qualifies, CUTS_SQL, CUTS_BY_ID_SQL, GRANT_ROW_SQL, PATTERN_FLAG_REFS_SQL
+} from '../../src/control-centre/grant-patterns.js';
 import { OWNERS } from '../../src/control-centre/review-queue.js';
 
 const NARRATIVE = 'The grant was shown because its topic matched the client goals. Its card names no restriction that excludes them.';
@@ -308,5 +312,188 @@ describe('three strikes', () => {
       owner: 'chris', verdict: 'could_not_diagnose', client_notice: null,
       diagnosis: { verdict: 'could_not_diagnose', last_error: 'explain_timeout', attempts: 3 }
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Grant patterns and the richer chat diagnosis (migration 047)
+// ---------------------------------------------------------------------------
+
+const pattern = { id: 5, kind: 'grant_pattern', grant_root_id: 1196, pattern_category: 'wrong_industry', snapshot: null };
+const CHAT_ANSWER = {
+  client_asked: 'Whether CanExport covers trade-show travel.',
+  assistant_replied: 'It said CanExport closed for the year.',
+  what_was_wrong: 'CanExport is open; the deadline quoted was last year\'s.',
+  good_answer: 'CanExport is open and covers trade-show travel up to 50%.',
+  suggested_fix: 'Have the assistant check the grant\'s status before quoting a deadline.'
+};
+
+describe('grant_pattern routing', () => {
+  test('a tag/eligibility pattern: tag missed → chris, card lacks it → research, unclear → chris', () => {
+    const route = routeFor(pattern, { grant: { name: 'G' } });
+    expect(route).toMatchObject({ rule: 'pattern_tag', allowed: ['chris', 'research'], default: 'chris' });
+    expect(applyRoute({ owner: 'research', verdict: 'tag_missed_restriction', narrative: NARRATIVE }, route)).toMatchObject({ owner: 'chris' });
+    expect(applyRoute({ owner: 'chris', verdict: 'card_missing_restriction', narrative: NARRATIVE }, route)).toMatchObject({ owner: 'research' });
+    expect(applyRoute({ owner: 'research', verdict: 'unclear', narrative: NARRATIVE }, route)).toMatchObject({ owner: 'chris' });
+    expect(applyRoute({ owner: 'chris', verdict: 'profile_incomplete', narrative: NARRATIVE }, route))
+      .toMatchObject({ verdict: 'tag_missed_restriction', owner: 'chris' });
+  });
+
+  test('a wrong_region pattern is research whatever the verdict', () => {
+    const route = routeFor({ ...pattern, pattern_category: 'wrong_region' }, { grant: { name: 'G' } });
+    expect(route).toMatchObject({ rule: 'pattern_region', allowed: ['research'] });
+    expect(applyRoute({ owner: 'chris', verdict: 'tag_missed_restriction', narrative: NARRATIVE }, route))
+      .toMatchObject({ owner: 'research', verdict: 'region_list_wrong' });
+  });
+
+  test('a grant missing from the grant data is a bad record for research', () => {
+    expect(routeFor(pattern, { grant: null })).toMatchObject({ rule: 'bad_record', forcedVerdict: 'bad_record' });
+  });
+});
+
+describe('grant_pattern snapshot', () => {
+  const cutRows = [
+    { id: '11', occurred_at: new Date('2026-10-09T10:00:00Z'), grant_id: 1196, category: 'wrong_industry', track: 'Hire', reason: 'Fishing only.', suspected_cause: 'industry_tag', clerk_id: 'user_a' },
+    { id: '12', occurred_at: new Date('2026-10-10T10:00:00Z'), grant_id: 1196, category: 'wrong_industry', track: 'Hire', reason: 'Fishing only, again.', suspected_cause: 'industry_tag', clerk_id: 'user_staff' }
+  ];
+  const grantRow = { id: 1196, grant_name: 'Fisheries Fund', status: 'Open', industries: ['Fishing'], regions: ['BC'],
+    eligibility_criteria: { extraction_notes: 'none' }, field_content: { eligibility: '<p>Commercial <b>fishing</b> only.</p>' } };
+
+  test('grant tags and card text from gg3_grants, cuts with companies named and internal tagged; reads only', async () => {
+    const hubQuery = jest.fn(async (sql) => {
+      if (sql === PATTERN_FLAG_REFS_SQL) return { rows: [{ source_ref: 'ai_review:12' }, { source_ref: 'ai_review:11' }] };
+      if (sql === GRANT_ROW_SQL) return { rows: [grantRow] };
+      throw new Error('unexpected');
+    });
+    const opsQuery = jest.fn(async (sql) => (sql === CUTS_BY_ID_SQL ? { rows: cutRows } : { rows: [] }));
+    const appQuery = jest.fn(async (sql) => (/users_clerk/.test(sql)
+      ? { rows: [{ clerk_id: 'user_a', user_id: 1, company_id: 120, is_primary: true }, { clerk_id: 'user_staff', user_id: 2, company_id: 81, is_primary: true }] }
+      : { rows: [{ id: 120, name: 'Acme' }, { id: 81, name: 'Maximizer' }] }));
+    const r = await patternSnapshot(pattern, { hubQuery, opsQuery, appQuery });
+    expect(r.ok).toBe(true);
+    expect(opsQuery).toHaveBeenCalledWith(CUTS_BY_ID_SQL, [['12', '11']]);
+    expect(r.body).toMatchObject({ category: 'wrong_industry', companies: 2, internal_companies: 1,
+      grant: { name: 'Fisheries Fund', industries: ['Fishing'], regions: ['BC'], card: [{ section: 'Eligibility', text: 'Commercial fishing only.' }] } });
+    expect(r.body.grant.links).toBeUndefined();
+    expect(r.body.cuts).toEqual([
+      expect.objectContaining({ date: '2026-10-09', company_name: 'Acme', company_internal: false, reason: 'Fishing only.' }),
+      expect.objectContaining({ date: '2026-10-10', company_name: 'Maximizer', company_internal: true })
+    ]);
+    for (const q of [hubQuery, opsQuery, appQuery]) expect(q.mock.calls.every(([sql]) => /^\s*SELECT/i.test(sql))).toBe(true);
+  });
+
+  test('the dry run passes cut ids directly; no cuts is a failure code', async () => {
+    const hubQuery = jest.fn(async () => ({ rows: [] }));
+    const r = await patternSnapshot(pattern, { hubQuery, opsQuery: async () => ({ rows: [] }), appQuery: async () => ({ rows: [] }), cutIds: ['99'] });
+    expect(r).toEqual({ ok: false, code: 'pattern_no_cuts' });
+    expect(hubQuery).not.toHaveBeenCalledWith(PATTERN_FLAG_REFS_SQL, expect.anything());
+    expect(plainError('pattern_no_cuts')).toMatch(/automatic reviews/);
+  });
+
+  test('evidence for the model names companies, never Clerk ids', () => {
+    const ev = evidenceForPattern({ category: 'wrong_industry', companies: 3, internal_companies: 1,
+      grant: grantEvidence(grantRow, { grantTags: (row) => ({ name: row.grant_name, industries: row.industries, links: {} }), cardSections: () => [{ label: 'Eligibility', text: 'Fishing only.' }] }),
+      cuts: [{ date: '2026-10-09', company_name: 'Acme', company_internal: false, reason: 'r', clerk_id: 'user_a' }] });
+    expect(ev.card_text).toBe('Eligibility:\nFishing only.');
+    expect(JSON.stringify(ev)).not.toMatch(/user_a/);
+    expect(ev.automatic_reviews[0]).toMatchObject({ company: 'Acme', internal_account: false });
+    expect(ev.of_which_internal_accounts).toBe(1);
+  });
+
+  test('groupCuts counts distinct companies only; qualifies at 3 or with an existing card', () => {
+    const g = groupCuts([
+      { id: '1', grant_id: 7, category: 'c', company_id: 1 }, { id: '2', grant_id: 7, category: 'c', company_id: 1 },
+      { id: '3', grant_id: 7, category: 'c', company_id: null }, { id: '4', grant_id: 7, category: 'c', company_id: 2 }
+    ]).get('7|c');
+    expect(g.companies).toEqual([1, 2]);
+    expect(g.cuts).toHaveLength(4);
+    expect(qualifies(g, null)).toBe(false);
+    expect(qualifies(g, { id: 1 })).toBe(true);
+    expect(qualifies({ ...g, companies: [1, 2, 3] }, null)).toBe(true);
+  });
+
+  test('CUTS_SQL reads cuts only, real Clerk users only, in the window', () => {
+    expect(CUTS_SQL).toMatch(/a\.action = 'cut'/);
+    expect(CUTS_SQL).toMatch(/LIKE 'user\\_%'/);
+    expect(CUTS_SQL).toMatch(/make_interval\(days => \$1::int\)/);
+    expect(CUTS_SQL.trim()).toMatch(/^SELECT/);
+  });
+
+  test('diagnoseItem end to end for a pattern: snapshot, research owner, pattern details recorded', async () => {
+    const createMessage = jest.fn(async () => ({ usage: { input_tokens: 10, output_tokens: 10 },
+      content: [{ type: 'tool_use', name: 'record_diagnosis', input: { owner: 'research', verdict: 'card_missing_restriction', narrative: NARRATIVE } }] }));
+    const r = await diagnoseItem(pattern, { env: { ANTHROPIC_API_KEY: 'k' }, createMessage, logCost: null, opsQuery: async () => ({ rows: [] }),
+      patternSnapshot: async () => ({ ok: true, body: { category: 'wrong_industry', companies: 4, internal_companies: 1, grant: { name: 'G', card: [] }, cuts: [] } }) });
+    expect(r).toMatchObject({ ok: true, owner: 'research', verdict: 'card_missing_restriction', snapshotTaken: true,
+      snapshot: { source: 'ai_review_pattern', companies: 4 },
+      diagnosis: { rule: 'pattern_tag', pattern: { category: 'wrong_industry', companies: 4, internal_companies: 1 } } });
+    const prompt = createMessage.mock.calls[0][0].messages[0].content;
+    expect(prompt).toMatch(/grant pattern/);
+    expect(prompt).toMatch(/No comment on the flag/);
+  });
+});
+
+describe('chat diagnosis fields', () => {
+  test('the chat rule requires every field; they are returned as chat', () => {
+    const route = routeFor(chat, {});
+    expect(applyRoute({ owner: 'chris', verdict: 'chat_answer_problem', narrative: NARRATIVE }, route))
+      .toEqual({ ok: false, code: 'bad_model_output:client_asked' });
+    expect(applyRoute({ owner: 'chris', verdict: 'chat_answer_problem', narrative: NARRATIVE, ...CHAT_ANSWER, good_answer: ' ' }, route))
+      .toEqual({ ok: false, code: 'bad_model_output:good_answer' });
+    const ok = applyRoute({ owner: 'chris', verdict: 'chat_wrong_grant_facts', narrative: NARRATIVE, ...CHAT_ANSWER }, route);
+    expect(ok).toMatchObject({ ok: true, owner: 'research', chat: CHAT_ANSWER });
+    expect(Object.keys(ok.chat)).toEqual([...CHAT_FIELDS]);
+  });
+
+  test('match items ignore the chat fields', () => {
+    expect(applyRoute({ owner: 'chris', verdict: 'ranked_on_genre', narrative: NARRATIVE }, routeFor(match, snap('RANKED_ON_GENRE'))))
+      .toMatchObject({ ok: true, chat: null });
+  });
+
+  test('the tool lists the chat fields', () => {
+    for (const f of CHAT_FIELDS) expect(DIAGNOSIS_TOOL.input_schema.properties[f]).toBeDefined();
+  });
+
+  test('diagnosis.chat is stored; a stored (Oracle) snapshot is used as is', async () => {
+    const createMessage = jest.fn(async () => ({ usage: null,
+      content: [{ type: 'tool_use', name: 'record_diagnosis', input: { owner: 'chris', verdict: 'chat_answer_problem', narrative: NARRATIVE, ...CHAT_ANSWER } }] }));
+    const stored = { source: 'oracle_detected', flagged_turn_index: 1, issue: 'pushback',
+      turns: [{ turn_index: 1, client: 'x'.repeat(5000), assistant: 'y', flagged: true }] };
+    const r = await diagnoseItem({ ...chat, chat_turn_ref: 'conv:7:pushback', snapshot: stored, snapshot_at: 't' },
+      { env: { ANTHROPIC_API_KEY: 'k' }, createMessage, logCost: null, opsQuery: async () => { throw new Error('no read'); } });
+    expect(r).toMatchObject({ ok: true, snapshotTaken: false, diagnosis: { chat: CHAT_ANSWER } });
+    const prompt = createMessage.mock.calls[0][0].messages[0].content;
+    expect(prompt).toMatch(/issue_found_by_review/);
+    expect(prompt).not.toMatch(/x{4100}/); // clipped for the model; the stored snapshot keeps it all
+  });
+});
+
+describe('conversation-level chat snapshots', () => {
+  const messages = [
+    { role: 'user', content: 'q0' }, { role: 'assistant', content: 'a0' },
+    { role: 'user', content: 'q1' }, { role: 'assistant', content: 'a1' },
+    { role: 'user', content: 'q2' }, { role: 'assistant', content: 'a2' },
+    { role: 'user', content: 'q3' }, { role: 'assistant', content: 'a3' },
+    { role: 'user', content: `q4 ${'z'.repeat(5000)}` }, { role: 'assistant', content: 'a4' }
+  ];
+
+  test('chatTurnsAround: the flagged turn and up to 3 before it, verbatim (no clipping)', () => {
+    const r = chatTurnsAround(messages, 4);
+    expect(r.body.turns.map((t) => t.turn_index)).toEqual([1, 2, 3, 4]);
+    expect(r.body.turns.at(-1)).toMatchObject({ flagged: true, assistant: 'a4' });
+    expect(r.body.turns.at(-1).client).toHaveLength(5003);
+    expect(chatTurnsAround(messages, 1).body.turns.map((t) => t.turn_index)).toEqual([0, 1]);
+    expect(chatTurnsAround(messages).body.flagged_turn_index).toBe(4);
+    expect(chatTurnsAround(messages, 9)).toEqual({ ok: false, code: 'chat_turn_not_in_conversation' });
+  });
+
+  test('a conv:<id>:<issue> ref reads the conversation, last client turn flagged', async () => {
+    expect(parseConversationRef('conv:42:pushback')).toEqual({ conversationId: 42, issue: 'pushback' });
+    expect(parseConversationRef('turn-abc')).toBeNull();
+    const opsQuery = jest.fn(async (sql) => (sql === CONVERSATION_MESSAGES_SQL ? { rows: [{ messages }] } : { rows: [] }));
+    const r = await readChatSnapshot('conv:42:pushback', { opsQuery });
+    expect(r).toMatchObject({ ok: true, body: { conversation_id: 42, issue: 'pushback', flagged_turn_index: 4 } });
+    expect(opsQuery).toHaveBeenCalledWith(CONVERSATION_MESSAGES_SQL, [42]);
+    expect(opsQuery).not.toHaveBeenCalledWith(CHAT_TURN_SQL, expect.anything());
   });
 });

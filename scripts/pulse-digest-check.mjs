@@ -7,25 +7,24 @@
  *   railway run node scripts/pulse-digest-check.mjs --week 2026-09-28 --live
  *
  * --live is NOT a dry run: it is the real Monday run for that finished week —
- * card to everyone in PULSE_DIGEST_SUBSCRIBERS, the "Digest YYYY-MM-DD" tab
- * written, the week claimed. It refuses a week already claimed (no double
- * send), a week not yet finished, and --send-to. It prints who got it and the tab.
+ * card to everyone in PULSE_DIGEST_SUBSCRIBERS, the themes stored for the
+ * Control Centre, the week claimed. It refuses a week already claimed (no
+ * double send), a week not yet finished, and --send-to. It prints who got it.
  *
  * --week is the Monday of the week to show; default is last week, as the live
  * Monday run would use. Builds the digest exactly as src/services/pulse-digest.js
  * does — usage, the one Haiku themes call, grant matches named from Oracle's
- * gg3_grants copy, the errors sheet's issues — and prints the DM and the detail
- * tab it would write.
+ * gg3_grants copy, the Control Centre chat and grant-pattern cards flagged in
+ * the week — and prints the DM it would send.
  *
- * Reads: the gg3 ops DB (GG3_OPS_DB_READONLY_URL), Oracle's DB (grant names, the
- * sheet owner's Google login) and the errors sheet. Never claims the week in
- * pulse_alert_state, never writes the sheet or its tab. Calls the model once
- * (Haiku), only when there were client chats.
+ * Reads: the gg3 ops DB (GG3_OPS_DB_READONLY_URL) and Oracle's DB (grant names,
+ * the review queue). Never claims the week in pulse_alert_state, never stores
+ * themes. Calls the model once (Haiku), only when there were client chats.
  *
  * --send-to <email> also DMs the digest card to that one person, through the
  * normal subscriber lookup and delivery (@granted.ca only; they must have
- * messaged Oracle in Chat once). Its title says it's a test, and its button
- * opens the sheet (no tab is written). Without it nothing is posted. The
+ * messaged Oracle in Chat once). Its title says it's a test. Without it
+ * nothing is posted. The
  * printout below is the plain-text form; the DM itself is the card.
  *
  * Under `railway run`, DATABASE_URL is Railway's private address, which this
@@ -42,7 +41,6 @@ if (/\.railway\.internal\b/.test(process.env.DATABASE_URL || '') && process.env.
 
 const D = await import('../src/services/pulse-digest.js');
 const { isGg3OpsConfigured, getGg3OpsPool } = await import('../src/services/gg3-ops-db.js');
-const { SHEET_ENV } = await import('../src/services/pulse-errors-sheet.js');
 
 function parseSendTo(argv) {
   const i = argv.indexOf('--send-to');
@@ -69,7 +67,7 @@ function parseWeek(argv) {
 /**
  * --live: the real Monday run for one finished week — the same runWeeklyDigest
  * the scheduler calls, with "now" set to the Monday 08:00 Vancouver after that
- * week, so the week, the claim key and the tab are exactly what the scheduler
+ * week, so the week and the claim key are exactly what the scheduler
  * would have used (the claim's timestamp records that Monday 08:00).
  */
 async function runLive(monday, deps) {
@@ -83,7 +81,6 @@ async function runLive(monday, deps) {
   // Record who each DM space belongs to and what was delivered, around the real deps.
   const emailBySpace = new Map();
   const delivered = [];
-  let tabGid = null;
   const liveDeps = {
     ...deps,
     getSubscribers: async () => {
@@ -95,11 +92,6 @@ async function runLive(monday, deps) {
       const ok = await deps.post(space, message);
       delivered.push({ email: emailBySpace.get(space) || space, ok });
       return ok;
-    },
-    prepareTab: async (userId, args) => {
-      const r = await deps.prepareTab(userId, args);
-      tabGid = r?.data?.sheet_id ?? null;
-      return r;
     }
   };
 
@@ -120,12 +112,10 @@ async function runLive(monday, deps) {
     process.exit(1);
   }
 
-  const sheetId = process.env[SHEET_ENV]?.trim() || null;
   console.log(`Live digest for the week of ${monday} — ${result.status}.`);
   console.log(`  Sent to: ${delivered.filter(d => d.ok).map(d => d.email).join(', ') || 'nobody'}`);
   const failed = delivered.filter(d => !d.ok).map(d => d.email);
   if (failed.length) console.log(`  Not delivered: ${failed.join(', ')}`);
-  console.log(`  Tab "${D.tabTitle(monday)}": ${result.tab}${result.tab === 'written' && sheetId ? ` — ${D.tabLink(sheetId, tabGid)}` : ''}`);
   console.log(`  Week claimed: ${claimKey}`);
 }
 
@@ -162,12 +152,7 @@ async function main() {
     await getGg3OpsPool().end();
     process.exit(0);
   }
-  const sheetId = process.env[SHEET_ENV]?.trim() || null;
-  const sheet = sheetId
-    ? await D.readSheetIssues(process.env, deps)
-    : { rows: null, code: 'sheet_not_configured' };
-
-  const built = await D.buildDigest({ monday, issueRows: sheet.rows, sheetCode: sheet.code, deps });
+  const built = await D.buildDigest({ monday, deps });
   if (!built) {
     console.log('GG3 ops DB: not configured.');
     process.exit(1);
@@ -178,19 +163,16 @@ async function main() {
   console.log(`  exchanges read:      ${built.exchangesRead} of ${built.exchangesTotal} (newest kept)`);
   console.log(`  themes call:         ${built.themes.status}${built.themes.code ? ` (code ${built.themes.code})` : ''}`);
   console.log(`  grants matched:      ${built.grants.length}`);
-  console.log(`  errors sheet:        ${built.errors.ok ? `${built.errors.issues.length} issue(s) this week` : `unavailable (${built.errors.code})`}`);
+  console.log(`  review queue:        ${built.errors.ok ? `${built.errors.issues.length} chat/pattern card(s) flagged this week` : `unavailable (${built.errors.code})`}`);
 
   console.log('\nWould send:\n');
-  const text = D.formatDigest(built, { sheetId });
+  const text = D.formatDigest(built);
   console.log(text.split('\n').map(l => `  ${l}`).join('\n'));
 
-  console.log(`\nWould write tab "${D.tabTitle(monday)}" (replacing it if it exists):\n`);
-  for (const row of D.digestRows(built)) console.log(`  ${row.join(' | ')}`);
-
   if (sendTo) {
-    const result = await D.sendDigestTest({ email: sendTo, d: built, sheetId, deps });
+    const result = await D.sendDigestTest({ email: sendTo, d: built, deps });
     console.log(result.sent
-      ? `\nTest DM sent to ${sendTo}. No tab written, week not claimed.`
+      ? `\nTest DM sent to ${sendTo}. Week not claimed.`
       : `\nTest DM NOT sent to ${sendTo} (${result.code}) — see any warning above: the address must be @granted.ca and the person must have messaged Oracle in Chat once.`);
   }
 

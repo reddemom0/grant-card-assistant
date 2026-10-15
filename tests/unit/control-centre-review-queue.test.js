@@ -16,15 +16,19 @@ import {
   REOPEN_SQL, DIAGNOSE_SQL, RECORD_FAILURE_SQL, SET_STATUS_SQL, SET_OWNER_SQL, CLOSE_SQL, INSERT_EVENT_SQL,
   GET_ITEM_SQL, GET_FLAGS_SQL, GET_EVENTS_SQL, NEW_ITEM_IDS_SQL, NEW_ITEMS_SQL, LIST_SQL,
   SWEEP_CURSOR_SQL, KNOWN_REFS_SQL, EXISTING_MATCH_ITEMS_SQL, DOWNS_SQL, SWEEP_OVERLAP_MS,
+  LOCK_PATTERN_SQL, SET_SNAPSHOT_SQL, LINKED_ITEMS_SQL, reopensClosed,
   previewDiagnoses
 } from '../../src/control-centre/review-queue.js';
+import { LINK_PATTERNS_SQL, PATTERN_ITEMS_SQL } from '../../src/control-centre/grant-patterns.js';
 
-/** In-memory Hub: partial unique keys on items, UNIQUE source_ref on flags. */
+/** In-memory Hub: partial unique keys on items, UNIQUE source_ref on flags, unique link pairs. */
 function fakeHub() {
   const items = [];
   const flags = [];
   const events = [];
-  let ids = { item: 0, flag: 0, event: 0 };
+  const links = [];
+  const clock = { closeAt: null };
+  let ids = { item: 0, flag: 0, event: 0, link: 0 };
   const copy = (r) => (r ? { ...r } : r);
   const one = (r) => ({ rows: r ? [copy(r)] : [] });
   const byId = (id) => items.find((i) => i.id === id);
@@ -33,12 +37,15 @@ function fakeHub() {
   async function q(sql, p = []) {
     switch (sql) {
       case INSERT_ITEM_SQL: {
-        const [kind, company_id, grant_root_id, chat_turn_ref] = p;
+        const [kind, company_id, grant_root_id, chat_turn_ref, pattern_category = null, conversation_id = null] = p;
         const clash = items.find((i) => (kind === 'match'
           ? i.kind === 'match' && i.company_id === company_id && i.grant_root_id === grant_root_id
-          : i.kind === 'chat' && i.chat_turn_ref === chat_turn_ref));
+          : kind === 'grant_pattern'
+            ? i.kind === 'grant_pattern' && i.grant_root_id === grant_root_id && i.pattern_category === pattern_category
+            : i.kind === 'chat' && i.chat_turn_ref === chat_turn_ref));
         if (clash) return { rows: [] };
-        const it = { id: ++ids.item, kind, company_id, grant_root_id, chat_turn_ref, status: 'new', owner: null,
+        const it = { id: ++ids.item, kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id,
+          status: 'new', owner: null,
           diagnosis: null, narrative: null, client_notice: null, flagged_again: false, flag_count: 0,
           expected_match: null, close_note: null, closed_by: null, closed_at: null,
           snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null };
@@ -49,6 +56,32 @@ function fakeHub() {
         return one(items.find((i) => i.kind === 'match' && i.company_id === p[0] && i.grant_root_id === p[1]));
       case LOCK_CHAT_SQL:
         return one(items.find((i) => i.kind === 'chat' && i.chat_turn_ref === p[0]));
+      case LOCK_PATTERN_SQL:
+        return one(items.find((i) => i.kind === 'grant_pattern' && i.grant_root_id === p[0] && i.pattern_category === p[1]));
+      case SET_SNAPSHOT_SQL: {
+        const it = byId(p[0]);
+        if (it.snapshot) return { rows: [] };
+        return update(p[0], { snapshot: JSON.parse(p[1]), snapshot_at: 'now' });
+      }
+      case PATTERN_ITEMS_SQL:
+        return { rows: items.filter((i) => i.kind === 'grant_pattern').map(({ id, grant_root_id, pattern_category, status, closed_at }) =>
+          ({ id, grant_root_id, pattern_category, status, closed_at })) };
+      case LINK_PATTERNS_SQL: {
+        let n = 0;
+        for (const pat of items.filter((i) => i.kind === 'grant_pattern')) {
+          for (const m of items.filter((i) => i.kind === 'match' && i.grant_root_id === pat.grant_root_id)) {
+            if (links.some((l) => l.item_id === pat.id && l.linked_item_id === m.id)) continue;
+            links.push({ id: ++ids.link, item_id: pat.id, linked_item_id: m.id, relation: 'same_grant' });
+            n += 1;
+          }
+        }
+        return { rows: [], rowCount: n };
+      }
+      case LINKED_ITEMS_SQL:
+        return { rows: links.filter((l) => l.item_id === p[0] || l.linked_item_id === p[0])
+          .map((l) => byId(l.item_id === p[0] ? l.linked_item_id : l.item_id))
+          .map((i) => ({ id: i.id, kind: i.kind, status: i.status, company_id: i.company_id, grant_root_id: i.grant_root_id,
+            pattern_category: i.pattern_category, relation: 'same_grant' })) };
       case LOCK_ITEM_SQL:
       case GET_ITEM_SQL:
         return one(byId(p[0]));
@@ -80,7 +113,8 @@ function fakeHub() {
       case SET_STATUS_SQL: return update(p[0], { status: p[1], closed_by: null, closed_at: null });
       case SET_OWNER_SQL: return update(p[0], { owner: p[1] });
       case CLOSE_SQL:
-        return update(p[0], { status: 'closed', expected_match: p[1], close_note: p[2], closed_by: p[3], closed_at: 'now' });
+        return update(p[0], { status: 'closed', expected_match: p[1], close_note: p[2], closed_by: p[3],
+          closed_at: clock.closeAt ?? new Date().toISOString() });
       case INSERT_EVENT_SQL: {
         const [item_id, actor, action, from_status, to_status, detail] = p;
         events.push({ id: ++ids.event, item_id, actor, action, from_status, to_status, detail });
@@ -104,7 +138,7 @@ function fakeHub() {
   }
 
   const deps = { hubQuery: q, hubTransaction: (cb) => cb({ query: q }) };
-  return { items, flags, events, q, deps };
+  return { items, flags, events, links, clock, q, deps };
 }
 
 const matchFlag = (over = {}) => ({
@@ -458,6 +492,9 @@ describe('reads', () => {
   });
 });
 
+// The 👎 tests leave the pattern path out; it has its own tests below.
+const noPatterns = async () => ({ qualifying: [] });
+
 describe('runReviewSweep', () => {
   const downs = [
     { id: 'r1', company_id: 81, grant_root_id: 1196, created_at: new Date('2026-10-09T16:25:53Z'), clerk_id: 'user_a' },
@@ -474,7 +511,7 @@ describe('runReviewSweep', () => {
   test('dry run counts and writes nothing', async () => {
     const hub = fakeHub();
     const appQuery = jest.fn(async () => ({ rows: [...downs, downs[0]] })); // a repeated row is counted once
-    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery }, log: () => {} });
+    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery, runPatternSweep: noPatterns }, log: () => {} });
     expect(appQuery).toHaveBeenCalledWith(DOWNS_SQL, [null]);
     expect(s).toMatchObject({ downs_read: 3, already_filed: 0, to_file: 3, items: 2, new_items: 2, written: false });
     expect(hub.items).toHaveLength(0);
@@ -485,7 +522,7 @@ describe('runReviewSweep', () => {
     const appQuery = jest.fn(async () => ({ rows: downs }));
     const flag = (input) => addFlag(input, hub.deps);
     const diag = (id) => runDiagnosis(id, { ...hub.deps, diagnoseFn: async () => null }); // not configured
-    const deps = { hubQuery: hub.q, appQuery, addFlag: flag, runDiagnosis: diag };
+    const deps = { hubQuery: hub.q, appQuery, addFlag: flag, runDiagnosis: diag, runPatternSweep: noPatterns };
 
     const first = await runReviewSweep({ write: true, deps, log: () => {} });
     expect(first).toMatchObject({ filed: 3, new_items: 2, diagnosed: 0, left_new: 2, failed: 0 });
@@ -503,7 +540,7 @@ describe('runReviewSweep', () => {
     const { item } = await addFlag(matchFlag({ source_ref: 'old' }), hub.deps);
     await close(item.id, { expected_match: 'should' }, 'a', hub.deps);
     const appQuery = async () => ({ rows: [downs[0]] });
-    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery }, log: () => {} });
+    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery, runPatternSweep: noPatterns }, log: () => {} });
     expect(s).toMatchObject({ to_file: 1, items: 1, new_items: 0, reopened: 1 });
   });
 
@@ -513,7 +550,7 @@ describe('runReviewSweep', () => {
     await close(item.id, { expected_match: 'should' }, 'a', hub.deps);
     const previewDiagnoses = jest.fn(async () => ({ rows: [], cost: 0 }));
     const appQuery = async () => ({ rows: downs });
-    const s = await runReviewSweep({ preview: true, deps: { hubQuery: hub.q, appQuery, previewDiagnoses }, log: () => {} });
+    const s = await runReviewSweep({ preview: true, deps: { hubQuery: hub.q, appQuery, previewDiagnoses, runPatternSweep: noPatterns }, log: () => {} });
     expect(previewDiagnoses.mock.calls[0][0]).toEqual([
       { company_id: 81, grant_root_id: 1196, reopen: true },
       { company_id: 83, grant_root_id: 1097, reopen: false }
@@ -548,5 +585,226 @@ describe('startControlCentreReviewSweep', () => {
     expect(startControlCentreReviewSweep(cron)).toBe(true);
     expect(cron.schedule).toHaveBeenCalledWith('17 * * * *', expect.any(Function),
       expect.objectContaining({ name: 'cc-review-sweep', noOverlap: true, timezone: 'America/Vancouver' }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Grant-pattern cards (migration 047, grant-patterns.js)
+// ---------------------------------------------------------------------------
+
+const patternFlag = (over = {}) => ({
+  kind: 'grant_pattern', grant_root_id: 1196, pattern_category: 'wrong_industry', source: 'ai_review_cut',
+  source_ref: 'ai_review:1', source_created_at: '2026-10-10T10:00:00Z', actor: 'user_a', comment: 'not their industry', ...over
+});
+
+describe('grant_pattern items', () => {
+  test('validateFlag: grant root and category required; no company or chat ref', () => {
+    expect(() => validateFlag(patternFlag({ pattern_category: undefined }))).toThrow(/pattern_category/);
+    expect(() => validateFlag(patternFlag({ grant_root_id: undefined }))).toThrow(/grant_root_id/);
+    expect(() => validateFlag(patternFlag({ company_id: 81 }))).toThrow(/company_id/);
+    expect(() => validateFlag(patternFlag({ chat_turn_ref: 't' }))).toThrow(/chat_turn_ref/);
+    expect(() => validateFlag(matchFlag({ pattern_category: 'x' }))).toThrow(/pattern_category/);
+    expect(validateFlag(patternFlag())).toMatchObject({ kind: 'grant_pattern', grant_root_id: 1196, pattern_category: 'wrong_industry', company_id: null });
+  });
+
+  test('one card per (grant, category); cuts pile on as flags', async () => {
+    const hub = fakeHub();
+    await addFlag(patternFlag(), hub.deps);
+    await addFlag(patternFlag({ source_ref: 'ai_review:2', actor: 'user_b' }), hub.deps);
+    await addFlag(patternFlag({ source_ref: 'ai_review:3', pattern_category: 'wrong_region' }), hub.deps);
+    expect(hub.items.map((i) => [i.kind, i.grant_root_id, i.pattern_category, i.flag_count]))
+      .toEqual([['grant_pattern', 1196, 'wrong_industry', 2], ['grant_pattern', 1196, 'wrong_region', 1]]);
+  });
+
+  test('closed: a cut that happened AFTER the close reopens it', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(patternFlag(), hub.deps);
+    hub.clock.closeAt = '2026-10-12T00:00:00.000Z';
+    await close(item.id, { close_note: 'card fixed' }, 'a@granted.ca', hub.deps);
+    const r = await addFlag(patternFlag({ source_ref: 'ai_review:9', source_created_at: '2026-10-13T09:00:00Z' }), hub.deps);
+    expect(r).toMatchObject({ reopened: true, item: { status: 'new', flagged_again: true, closed_at: null } });
+    expect(hub.events.at(-1)).toMatchObject({ action: 'reopened', from_status: 'closed', to_status: 'new' });
+  });
+
+  test('closed: an OLDER cut arriving late is added as evidence and does not reopen it', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(patternFlag(), hub.deps);
+    hub.clock.closeAt = '2026-10-12T00:00:00.000Z';
+    await close(item.id, { close_note: 'card fixed' }, 'a@granted.ca', hub.deps);
+    // Happened before the close, filed after it.
+    const r = await addFlag(patternFlag({ source_ref: 'ai_review:5', source_created_at: '2026-10-11T23:59:00Z' }), hub.deps);
+    expect(r).toMatchObject({ reopened: false, late: true, duplicate: false });
+    expect(hub.items[0]).toMatchObject({ status: 'closed', flagged_again: false, flag_count: 2,
+      closed_at: '2026-10-12T00:00:00.000Z', close_note: 'card fixed' });
+    expect(hub.flags.map((f) => f.source_ref)).toEqual(['ai_review:1', 'ai_review:5']);
+    expect(hub.events.some((e) => e.action === 'reopened')).toBe(false);
+    expect(JSON.parse(hub.events.at(-1).detail)).toMatchObject({ source: 'ai_review_cut', late_evidence: true });
+  });
+
+  test('reopensClosed: always for match/chat; for a pattern only after closed_at', () => {
+    const closedAt = '2026-10-12T00:00:00Z';
+    expect(reopensClosed({ kind: 'match', closed_at: closedAt }, { source_created_at: '2026-01-01' })).toBe(true);
+    expect(reopensClosed({ kind: 'chat', closed_at: closedAt }, {})).toBe(true);
+    const pat = { kind: 'grant_pattern', closed_at: closedAt };
+    expect(reopensClosed(pat, { source_created_at: '2026-10-12T00:00:01Z' })).toBe(true);
+    expect(reopensClosed(pat, { source_created_at: closedAt })).toBe(false);
+    expect(reopensClosed(pat, { source_created_at: null })).toBe(false);
+  });
+
+  test('closing a pattern card logs a recheck on each linked match card and changes nothing else on them', async () => {
+    const hub = fakeHub();
+    const m1 = (await addFlag(matchFlag(), hub.deps)).item;
+    const m2 = (await addFlag(matchFlag({ company_id: 83, source_ref: 'rating-2' }), hub.deps)).item;
+    await addFlag(matchFlag({ grant_root_id: 1516, source_ref: 'rating-3' }), hub.deps); // other grant
+    const pat = (await addFlag(patternFlag(), hub.deps)).item;
+    await hub.q(LINK_PATTERNS_SQL);
+    expect(hub.links.map((l) => [l.item_id, l.linked_item_id])).toEqual([[pat.id, m1.id], [pat.id, m2.id]]);
+    await hub.q(LINK_PATTERNS_SQL); // idempotent
+    expect(hub.links).toHaveLength(2);
+
+    const before = hub.items.filter((i) => i.kind === 'match').map((i) => ({ ...i }));
+    const closed = await close(pat.id, { close_note: 'tag fixed' }, 'a@granted.ca', hub.deps);
+    expect(closed.status).toBe('closed');
+    const rechecks = hub.events.filter((e) => e.action === 'recheck');
+    expect(rechecks.map((e) => e.item_id)).toEqual([m1.id, m2.id]);
+    expect(JSON.parse(rechecks[0].detail)).toEqual({ pattern_id: pat.id, message: `re-check — pattern #${pat.id} was fixed` });
+    expect(rechecks[0]).toMatchObject({ from_status: 'new', to_status: 'new', actor: 'a@granted.ca' });
+    expect(hub.items.filter((i) => i.kind === 'match')).toEqual(before);
+
+    const got = await getItem(m1.id, hub.deps);
+    expect(got.links).toEqual([expect.objectContaining({ id: pat.id, kind: 'grant_pattern', pattern_category: 'wrong_industry' })]);
+  });
+
+  test('a snapshot handed in is stored when the item has none, and never overwrites one', async () => {
+    const hub = fakeHub();
+    const chat = { kind: 'chat', chat_turn_ref: 'conv:7:pushback', conversation_id: 7, source: 'oracle_detected',
+      source_ref: 'oracle:7:pushback:2026-10-14', snapshot: { turns: [1] } };
+    const a = await addFlag(chat, hub.deps);
+    expect(a.item).toMatchObject({ conversation_id: 7, snapshot: { turns: [1] } });
+    await addFlag({ ...chat, source_ref: 'oracle:7:pushback:2026-10-15', snapshot: { turns: [2] } }, hub.deps);
+    expect(hub.items[0].snapshot).toEqual({ turns: [1] });
+    expect(() => validateFlag({ ...chat, snapshot: 'x' })).toThrow(/snapshot/);
+  });
+});
+
+describe('runReviewSweep → grant patterns', () => {
+  // Grant 1196 wrong_industry: 3 companies (one internal), plus an unlinked user.
+  // Grant 991 wrong_industry: 2 companies — under the threshold.
+  const cuts = [
+    { id: '11', occurred_at: '2026-10-09T10:00:00Z', grant_id: 1196, category: 'wrong_industry', track: 'Hire', reason: 'r1', clerk_id: 'user_a' },
+    { id: '12', occurred_at: '2026-10-10T10:00:00Z', grant_id: 1196, category: 'wrong_industry', track: 'Hire', reason: 'r2', clerk_id: 'user_b' },
+    { id: '13', occurred_at: '2026-10-11T10:00:00Z', grant_id: 1196, category: 'wrong_industry', track: 'Hire', reason: 'r3', clerk_id: 'user_staff' },
+    { id: '14', occurred_at: '2026-10-11T11:00:00Z', grant_id: 1196, category: 'wrong_industry', track: 'Hire', reason: 'r4', clerk_id: 'user_nolink' },
+    { id: '15', occurred_at: '2026-10-11T12:00:00Z', grant_id: 1196, category: 'wrong_industry', track: 'Grow', reason: 'r5', clerk_id: 'user_a' },
+    { id: '21', occurred_at: '2026-10-11T10:00:00Z', grant_id: 991, category: 'wrong_industry', track: 'Hire', reason: 'x', clerk_id: 'user_a' },
+    { id: '22', occurred_at: '2026-10-11T10:00:00Z', grant_id: 991, category: 'wrong_industry', track: 'Hire', reason: 'y', clerk_id: 'user_b' }
+  ];
+  const identities = async (ids) => new Map(ids.filter((id) => id !== 'user_nolink').map((id) => [id,
+    { user_id: 1, company_id: { user_a: 120, user_b: 135, user_staff: 81 }[id], company_ids: [] }]));
+
+  function setup(rows = cuts) {
+    const hub = fakeHub();
+    const opsQuery = jest.fn(async () => ({ rows }));
+    const deps = {
+      hubQuery: hub.q, appQuery: async () => ({ rows: [] }),
+      addFlag: (input) => addFlag(input, hub.deps),
+      runDiagnosis: async () => ({ diagnosed: false }),
+      patternDeps: { opsQuery, identities }
+    };
+    return { hub, opsQuery, deps };
+  }
+
+  test('files one card at 3+ distinct companies; every cut in the group is a flag; under 3 files nothing', async () => {
+    const { hub, deps } = setup();
+    const s = await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(s.patterns).toMatchObject({ cuts_read: 7, groups: 2, filed: 5, new_items: 1, failed: 0 });
+    const cards = hub.items.filter((i) => i.kind === 'grant_pattern');
+    expect(cards).toHaveLength(1);
+    expect(cards[0]).toMatchObject({ grant_root_id: 1196, pattern_category: 'wrong_industry', flag_count: 5, company_id: null });
+    expect(hub.flags.map((f) => f.source_ref)).toEqual(['ai_review:11', 'ai_review:12', 'ai_review:13', 'ai_review:14', 'ai_review:15']);
+    expect(hub.flags.every((f) => f.source === 'ai_review_cut')).toBe(true);
+    expect(hub.flags[0]).toMatchObject({ actor: 'user_a', comment: 'r1', source_created_at: '2026-10-09T10:00:00Z' });
+  });
+
+  test('an unlinked Clerk user is evidence but does not count toward the 3', async () => {
+    const two = cuts.filter((c) => c.clerk_id !== 'user_staff');
+    const { hub, deps } = setup(two);
+    await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(hub.items.filter((i) => i.kind === 'grant_pattern')).toHaveLength(0);
+  });
+
+  test('a re-run files nothing new; an existing card keeps collecting below the threshold', async () => {
+    const { hub, deps } = setup();
+    await runReviewSweep({ write: true, deps, log: () => {} });
+    const again = await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(again.patterns).toMatchObject({ filed: 0, new_items: 0 });
+    const later = [{ id: '16', occurred_at: '2026-10-14T10:00:00Z', grant_id: 1196, category: 'wrong_industry', reason: 'r6', clerk_id: 'user_a' }];
+    deps.patternDeps.opsQuery = async () => ({ rows: later });
+    const third = await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(third.patterns).toMatchObject({ filed: 1, new_items: 0 });
+    expect(hub.items.find((i) => i.kind === 'grant_pattern').flag_count).toBe(6);
+  });
+
+  test('links the pattern card to the match cards for the same grant, existing and later', async () => {
+    const { hub, deps } = setup();
+    await addFlag(matchFlag(), hub.deps); // 81 / 1196
+    const s = await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(s.patterns.linked).toBe(1);
+    await addFlag(matchFlag({ company_id: 83, source_ref: 'rating-9' }), hub.deps);
+    const s2 = await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(s2.patterns.linked).toBe(1);
+    expect(hub.links).toHaveLength(2);
+  });
+
+  test('a late older cut on a closed card stays evidence through the sweep; a newer one reopens it', async () => {
+    const { hub, deps } = setup();
+    await runReviewSweep({ write: true, deps, log: () => {} });
+    const card = hub.items.find((i) => i.kind === 'grant_pattern');
+    hub.clock.closeAt = '2026-10-12T00:00:00.000Z';
+    await close(card.id, { close_note: 'fixed' }, 'a', hub.deps);
+
+    deps.patternDeps.opsQuery = async () => ({ rows: [...cuts,
+      { id: '17', occurred_at: '2026-10-11T20:00:00Z', grant_id: 1196, category: 'wrong_industry', reason: 'late', clerk_id: 'user_b' }] });
+    const dry = await runReviewSweep({ deps, log: () => {} });
+    expect(dry.patterns.qualifying.find((q) => q.grant_id === 1196).action).toBe('add late evidence (stays closed)');
+    const late = await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(late.patterns).toMatchObject({ filed: 1, late: 1, reopened: 0 });
+    expect(hub.items.find((i) => i.id === card.id).status).toBe('closed');
+
+    deps.patternDeps.opsQuery = async () => ({ rows: [
+      { id: '18', occurred_at: '2026-10-13T08:00:00Z', grant_id: 1196, category: 'wrong_industry', reason: 'new', clerk_id: 'user_b' }] });
+    const fresh = await runReviewSweep({ write: true, deps, log: () => {} });
+    expect(fresh.patterns).toMatchObject({ filed: 1, reopened: 1 });
+    expect(hub.items.find((i) => i.id === card.id)).toMatchObject({ status: 'new', flagged_again: true });
+  });
+
+  test('dry run writes nothing and reports the action per group', async () => {
+    const { hub, deps } = setup();
+    const s = await runReviewSweep({ deps, log: () => {} });
+    expect(s.patterns.qualifying.map((q) => [q.grant_id, q.category, q.companies.length, q.action]))
+      .toEqual([[1196, 'wrong_industry', 3, 'file']]);
+    expect(hub.items).toHaveLength(0);
+    expect(hub.flags).toHaveLength(0);
+  });
+
+  test('before migration 047: the dry run still lists what it would file; a write fails', async () => {
+    const { hub, deps } = setup();
+    const missing = async (sql, p) => {
+      if (sql === PATTERN_ITEMS_SQL) throw Object.assign(new Error('column "pattern_category" does not exist'), { code: '42703' });
+      return hub.q(sql, p);
+    };
+    const dry = await runReviewSweep({ deps: { ...deps, hubQuery: missing }, log: () => {} });
+    expect(dry.patterns).toMatchObject({ note: expect.stringMatching(/047 not applied/) });
+    expect(dry.patterns.qualifying.map((q) => q.action)).toEqual(['file']);
+    const wet = await runReviewSweep({ write: true, deps: { ...deps, hubQuery: missing }, log: () => {} });
+    expect(wet.patterns).toEqual({ error: '42703' });
+    expect(hub.items).toHaveLength(0);
+  });
+
+  test('a pattern failure never stops the 👎 path', async () => {
+    const hub = fakeHub();
+    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery: async () => ({ rows: [] }),
+      runPatternSweep: async () => { throw Object.assign(new Error('x'), { code: 'not_configured' }); } }, log: () => {} });
+    expect(s).toMatchObject({ downs_read: 0, patterns: { error: 'not_configured' } });
   });
 });

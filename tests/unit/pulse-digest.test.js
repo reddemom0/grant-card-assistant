@@ -1,9 +1,9 @@
 /**
  * Pulse weekly digest: the week, the counts, the one themes call, the post,
- * the detail tab, once a week.
+ * the errors section from the Control Centre review queue, once a week.
  *
  * gg3-ops-db.js is the real module (its staff filter is what the queries use);
- * queries, the model, the sheet and Chat are injected fakes.
+ * queries, the model, the review queue and Chat are injected fakes.
  *
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest --config tests/jest.config.cjs tests/unit/pulse-digest.test.js
  */
@@ -20,8 +20,7 @@ const D = await import('../../src/services/pulse-digest.js');
 const ENV = {
   GG3_OPS_DB_READONLY_URL: process.env.GG3_OPS_DB_READONLY_URL,
   PULSE_DIGEST_SUBSCRIBERS: 'chris@granted.ca',
-  PULSE_ERRORS_SHEET_ID: 'sheet123',
-  PULSE_SHEET_OWNER_EMAIL: 'chris@granted.ca'
+  PUBLIC_URL: 'https://hub.test'
 };
 const MONDAY_RUN = new Date('2026-10-05T15:00:00Z');   // Mon 08:00 in Vancouver
 const SECRET = 'Jane Doe at Acme Widgets';                // must never leave the model call
@@ -53,9 +52,6 @@ describe('the week', () => {
     expect(D.isMonday('28-09-2026')).toBe(false);
   });
 
-  test('tab title uses the Monday', () => {
-    expect(D.tabTitle('2026-09-28')).toBe('Digest 2026-09-28');
-  });
 });
 
 describe('counts', () => {
@@ -90,15 +86,26 @@ describe('counts', () => {
     expect(await D.collectExchanges(D.weekBounds('2026-09-28'), off)).toBeNull();
   });
 
-  test('week issues come from Last seen, most-seen first', () => {
-    const rows = [
-      { name: 'Old', lastSeen: '2026-09-20', count: 9 },
-      { name: 'A', lastSeen: '2026-09-28', count: 2, status: 'new' },
-      { name: 'B', lastSeen: '2026-10-04', count: 5, status: 'being fixed' },
-      { name: 'Next week', lastSeen: '2026-10-05', count: 1 },
-      { name: 'Bad date', lastSeen: 'Oct 1', count: 3 }
-    ];
-    expect(D.weekIssues(rows, '2026-09-28').map(r => r.name)).toEqual(['B', 'A']);
+  test('errors come from the review queue: chat and grant-pattern cards flagged in the week, titled', async () => {
+    const calls = [];
+    const runQuery = async (sql, params) => {
+      calls.push({ sql, params });
+      return { rows: [
+        { id: 12, kind: 'grant_pattern', status: 'diagnosed', owner: 'research', grant_root_id: 1196, pattern_category: 'wrong_industry',
+          grant_name: 'Fisheries Fund', week_flags: 4, flag_count: 7 },
+        { id: 9, kind: 'chat', status: 'new', owner: null, chat_turn_ref: 'conv:42:pushback', week_flags: 1, flag_count: 1 }
+      ] };
+    };
+    const week = D.weekBounds('2026-09-28');
+    const out = await D.collectQueueIssues(week, runQuery);
+    expect(calls[0].sql).toBe(D.WEEK_CARDS_SQL);
+    expect(calls[0].params).toEqual([week.start, week.end]);
+    expect(D.WEEK_CARDS_SQL).toMatch(/i\.kind IN \('chat', 'grant_pattern'\)/);
+    expect(D.WEEK_CARDS_SQL.trim()).toMatch(/^SELECT/);
+    expect(out).toEqual([
+      { id: 12, kind: 'grant_pattern', title: 'Fisheries Fund — cut for several companies (wrong industry)', status: 'diagnosed', owner: 'research', weekFlags: 4, totalFlags: 7 },
+      { id: 9, kind: 'chat', title: 'Client pushed back on an answer', status: 'new', owner: null, weekFlags: 1, totalFlags: 1 }
+    ]);
   });
 });
 
@@ -310,8 +317,6 @@ describe('names, labels and takeaway length', () => {
 
 function fakeDeps({ questions = true, claimed = new Set() } = {}) {
   const posted = [];
-  const tabs = [];
-  const writes = [];
   const msg = (role, text) => ({ role, content: [{ type: 'text', text }] });
   const deps = {
     collectUsage: jest.fn(async (w) => (w.start.toISOString().startsWith('2026-09-28')
@@ -348,14 +353,11 @@ function fakeDeps({ questions = true, claimed = new Set() } = {}) {
     getSubscribers: jest.fn(async () => [{ email: 'chris@granted.ca', dmSpace: 'spaces/dm1' }]),
     lookupSubscribers: jest.fn(async (envVar, env) => (String(env[envVar]).endsWith('@granted.ca') ? [{ email: env[envVar], dmSpace: 'spaces/dm9' }] : [])),
     post: jest.fn(async (space, message) => { posted.push({ space, message }); return true; }),
-    readSheet: jest.fn(async () => ({ success: true, data: { values: [
-      ['Chat times out', '2026-09-01', '2026-10-02', '6', '', 'Jason (app/UI)', 'being fixed', '', 'Oracle-detected'],
-      ['Old issue', '2026-08-01', '2026-08-02', '9', '', 'Chris (AI behaviour)', 'done', '', 'Oracle-detected']
-    ] } })),
-    prepareTab: jest.fn(async (userId, args) => { tabs.push(args.title); return { success: true, data: { sheet_id: 777 } }; }),
-    updateSheet: jest.fn(async (userId, args) => { writes.push(args); return { success: true }; })
+    collectQueueIssues: jest.fn(async () => [
+      { id: 31, kind: 'chat', title: 'Chat broke mid-answer', status: 'in_progress', owner: 'jason', weekFlags: 6, totalFlags: 9 }
+    ])
   };
-  return { deps, posted, tabs, writes, claimed };
+  return { deps, posted, claimed };
 }
 
 const card = (m) => m.cardsV2[0].card;
@@ -403,38 +405,57 @@ describe('grant change vs the week before', () => {
       { grantId: 3, name: 'Same', companies: 3, priorCompanies: 3 },
       { grantId: 4, name: 'Fourth', companies: 1, priorCompanies: 0 }
     ] });
-    const c = D.digestCard(d, { sheetId: 'sheet123' })[0].card;
+    const c = D.digestCard(d)[0].card;
     expect(c.sections.find(s => s.header === 'Most-matched grants').widgets.map(w => w.textParagraph.text)).toEqual([
       'Up — matched to 4 companies (+1, +33% vs week before)',
       'Down — matched to 2 companies (−2, −50% vs week before)',
       'Same — matched to 3 companies (no change)'
     ]);
-    const text = D.formatDigest(d, { sheetId: 'sheet123' });
+    const text = D.formatDigest(d);
     expect(text).toContain('**Most-matched grants**');
     expect(text).toContain('• Down — matched to 2 companies (−2, −50% vs week before)');
-    expect(D.digestRows(d).find(r => r[1] === 'Fourth')).toEqual([4, 'Fourth', 1, 0, 'new this week']);
   });
 });
 
 describe('the card', () => {
   test('escapes every piece of text', () => {
     const d = sampleDigest({ themes: { status: 'ok', themes: [{ name: '<script>x</script>', takeaway: 'a & b', example: null, questions: ['q'] }], worthALook: null } });
-    const json = JSON.stringify(D.digestCard(d, { sheetId: 'sheet123' }));
+    const json = JSON.stringify(D.digestCard(d));
     expect(json).toContain('&lt;script&gt;x&lt;/script&gt;');
     expect(json).not.toContain('<script>');
     expect(json).toContain('a &amp; b');
   });
 
-  test('test sends say so in the title and the notification; the button opens the sheet when no tab id is known', () => {
+  test('test sends say so in the title and the notification; the button opens the Control Centre', () => {
     const d = sampleDigest();
-    const c = D.digestCard(d, { sheetId: 'sheet123', test: true })[0].card;
+    const c = D.digestCard(d, { test: true, env: { PUBLIC_URL: 'https://hub.test' } })[0].card;
     expect(c.header.title).toBe('🧪 Test — GetGranted weekly');
     expect(D.digestFallback(d, { test: true })).toBe('🧪 Test — GetGranted weekly — Sep 28 to Oct 4');
-    expect(c.sections.at(-1).widgets[0].buttonList.buttons[0].onClick.openLink.url).toBe('https://docs.google.com/spreadsheets/d/sheet123');
+    expect(c.sections.at(-1).widgets[0].buttonList.buttons[0]).toEqual({ text: 'Open Control Centre', onClick: { openLink: { url: 'https://hub.test/control-centre' } } });
+  });
+
+  test('errors: each card linked, its state in words; a quiet week and an unreadable queue say so', () => {
+    const env = { PUBLIC_URL: 'https://hub.test' };
+    const issues = [
+      { id: 12, title: 'Fisheries Fund — cut for <wrong> industry', status: 'in_progress', owner: 'research', weekFlags: 4 },
+      { id: 9, title: 'Client pushed back on an answer', status: 'new', owner: null, weekFlags: 1 }
+    ];
+    const c = D.digestCard(sampleDigest({ errors: { ok: true, issues } }), { env })[0].card;
+    expect(c.sections.find(s => s.header === 'Errors this week').widgets.map(w => w.textParagraph.text)).toEqual([
+      '2 cards flagged this week',
+      '<a href="https://hub.test/control-centre#review/12"><b>Fisheries Fund — cut for &lt;wrong&gt; industry</b></a> — in progress · Research — flagged 4 times this week',
+      '<a href="https://hub.test/control-centre#review/9"><b>Client pushed back on an answer</b></a> — new · no owner yet — flagged 1 time this week'
+    ]);
+    const text = D.formatDigest(sampleDigest({ errors: { ok: true, issues } }), { env });
+    expect(text).toContain('• Client pushed back on an answer — new · no owner yet — flagged 1 time this week — https://hub.test/control-centre#review/9');
+    expect(text).toContain('Control Centre: https://hub.test/control-centre');
+    expect(text).not.toMatch(/sheet/i);
+    expect(D.formatDigest(sampleDigest(), { env })).toContain('No chat or grant-pattern cards flagged this week.');
+    expect(D.formatDigest(sampleDigest({ errors: { ok: false, code: '42P01' } }), { env })).toContain('Review queue unavailable (code: 42P01).');
   });
 
   test('the plain-text form stays for the dry-run printout', () => {
-    const text = D.formatDigest(sampleDigest(), { sheetId: 'sheet123' });
+    const text = D.formatDigest(sampleDigest());
     for (const h of ['**Usage**', '**What clients asked**', '**Most-matched grants**', '**Errors this week**', '**Worth a look**']) expect(text).toContain(h);
     expect(text).toContain('Reply failed: "Is CanExport open?" — The turn errored and no reply was recorded.');
   });
@@ -477,10 +498,10 @@ describe('runWeeklyDigest — Control Centre themes store (migration 046)', () =
 });
 
 describe('runWeeklyDigest', () => {
-  test('sends one card: five sections in order, one widget per item, a button to the tab', async () => {
+  test('sends one card: five sections in order, one widget per item, a button to the Control Centre', async () => {
     const f = fakeDeps();
     const out = await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps });
-    expect(out).toEqual({ status: 'sent', sent: 1, tab: 'written' });
+    expect(out).toEqual({ status: 'sent', sent: 1 });
 
     const m = f.posted[0].message;
     expect(m.fallbackText).toBe('GetGranted weekly — Sep 28 to Oct 4');
@@ -501,23 +522,16 @@ describe('runWeeklyDigest', () => {
     ]);
     expect(JSON.stringify(m)).not.toMatch(/"header":"Grants"/);
     expect(f.deps.collectGrantMatches).toHaveBeenCalledTimes(2);
-    const grantRows = f.writes[0].values;
-    const head = grantRows.findIndex(r => r[0] === 'MOST-MATCHED GRANTS (distinct companies, shown matches)');
-    expect(grantRows[head + 1]).toEqual(['Grant ID', 'Grant', 'Companies', 'Week before', 'Change']);
-    expect(grantRows[head + 2]).toEqual([1027, 'Career Ready SWPP', 4, 3, '+1, +33% vs week before']);
-    expect(grantRows[head + 3]).toEqual([5, 'grant #5', 1, 0, 'new this week']);
-    expect(texts(section(m, 'Errors this week'))).toEqual(['1 issue seen this week', '<b>Chat times out</b> — being fixed — seen 6 times in total']);
+    expect(f.deps.collectQueueIssues).toHaveBeenCalledWith(D.weekBounds('2026-09-28'));
+    expect(texts(section(m, 'Errors this week'))).toEqual(['1 card flagged this week',
+      '<a href="https://hub.test/control-centre#review/31"><b>Chat broke mid-answer</b></a> — in progress · Jason — flagged 6 times this week']);
     expect(texts(section(m, 'Worth a look'))).toEqual(['<b>Reply failed</b><br>"Is CanExport open?"<br>The turn errored and no reply was recorded.']);
     const button = card(m).sections.at(-1).widgets[0].buttonList.buttons[0];
-    expect(button.text).toBe('Open detail sheet');
-    expect(button.onClick.openLink.url).toBe('https://docs.google.com/spreadsheets/d/sheet123/edit#gid=777');
+    expect(button).toEqual({ text: 'Open Control Centre', onClick: { openLink: { url: 'https://hub.test/control-centre' } } });
 
-    expect(f.tabs).toEqual(['Digest 2026-09-28']);
-    expect(f.writes[0].range).toBe("'Digest 2026-09-28'!A1");
-    expect(f.writes[0].value_input_option).toBe('RAW');
     expect(f.deps.createMessage).toHaveBeenCalledTimes(1);
     expect(f.deps.fetchProfile).toHaveBeenCalledTimes(1);
-    const everything = JSON.stringify(f.posted) + JSON.stringify(f.writes);
+    const everything = JSON.stringify(f.posted);
     expect(everything).not.toContain(SECRET);
     expect(everything).not.toMatch(/Jane|Doe|Acme/);
     expect(JSON.stringify(m)).not.toContain('…');
@@ -539,20 +553,20 @@ describe('runWeeklyDigest', () => {
     expect(f.claimed.has('weekly_digest:2026-09-28')).toBe(true);
   });
 
-  test('sheet unreadable → card still goes, says so, no tab, button opens the sheet', async () => {
+  test('queue unreadable → card still goes and says so', async () => {
     const f = fakeDeps();
-    f.deps.oracleQuery.mockImplementation(async (sql, params) => {
-      if (/FROM users/.test(sql)) return { rows: [] };
-      if (/gg3_grants/.test(sql)) return { rows: [] };
-      return { rows: [{ alert_key: params[0] }] };
-    });
+    f.deps.collectQueueIssues.mockRejectedValue(Object.assign(new Error('x'), { code: '42P01' }));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
     const out = await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps });
+    warn.mockRestore();
     expect(out.status).toBe('sent');
-    expect(out.tab).toBe('not_written');
-    const m = f.posted[0].message;
-    expect(texts(section(m, 'Errors this week'))).toEqual(['Errors sheet unavailable (code: owner_not_found).']);
-    expect(card(m).sections.at(-1).widgets[0].buttonList.buttons[0].onClick.openLink.url).toBe('https://docs.google.com/spreadsheets/d/sheet123');
-    expect(f.tabs).toEqual([]);
+    expect(texts(section(f.posted[0].message, 'Errors this week'))).toEqual(['Review queue unavailable (code: 42P01).']);
+  });
+
+  test('the sheet settings are no longer needed', () => {
+    expect(D.missingDigestEnv({ GG3_OPS_DB_READONLY_URL: 'x', PULSE_DIGEST_SUBSCRIBERS: 'y' })).toEqual([]);
+    expect(D.digestRows).toBeUndefined();
+    expect(D.writeDigestTab).toBeUndefined();
   });
 
   test('not configured → skipped, nothing scheduled', () => {
@@ -593,16 +607,15 @@ describe('recording delivered digests', () => {
     const f = fakeDeps();
     f.deps.post.mockImplementation(async (space) => landed(space));
     f.deps.recordPost = jest.fn(async () => true);
-    await D.sendDigestTest({ email: 'writers@granted.ca', d: sampleDigest(), sheetId: 'sheet123', deps: f.deps });
+    await D.sendDigestTest({ email: 'writers@granted.ca', d: sampleDigest(), deps: f.deps });
     expect(f.deps.recordPost).toHaveBeenCalledWith(expect.objectContaining({ kind: 'digest', isTest: true, spaceName: 'spaces/dm9' }));
   });
 
   test('the dry-run path (build and print) records nothing', async () => {
     const f = fakeDeps();
     f.deps.recordPost = jest.fn();
-    const built = await D.buildDigest({ monday: '2026-09-28', issueRows: [], deps: f.deps });
-    D.formatDigest(built, { sheetId: 'sheet123' });
-    D.digestRows(built);
+    const built = await D.buildDigest({ monday: '2026-09-28', deps: f.deps });
+    D.formatDigest(built);
     expect(f.deps.recordPost).not.toHaveBeenCalled();
     expect(f.deps.post).not.toHaveBeenCalled();
   });
@@ -617,9 +630,9 @@ describe('recording delivered digests', () => {
 });
 
 describe('sendDigestTest', () => {
-  test('posts the test card once to that one person; no claim, no tab', async () => {
+  test('posts the test card once to that one person; no claim', async () => {
     const f = fakeDeps();
-    const out = await D.sendDigestTest({ email: 'writers@granted.ca', d: sampleDigest(), sheetId: 'sheet123', deps: f.deps });
+    const out = await D.sendDigestTest({ email: 'writers@granted.ca', d: sampleDigest(), deps: f.deps });
     expect(out).toEqual({ sent: 1 });
     expect(f.posted).toHaveLength(1);
     expect(f.posted[0].space).toBe('spaces/dm9');
@@ -627,8 +640,6 @@ describe('sendDigestTest', () => {
     expect(f.posted[0].message.fallbackText).toBe('🧪 Test — GetGranted weekly — Sep 28 to Oct 4');
     expect(f.deps.lookupSubscribers).toHaveBeenCalledWith('PULSE_DIGEST_TEST_RECIPIENT', { PULSE_DIGEST_TEST_RECIPIENT: 'writers@granted.ca' });
     expect(f.deps.oracleQuery).not.toHaveBeenCalled();
-    expect(f.deps.prepareTab).not.toHaveBeenCalled();
-    expect(f.deps.updateSheet).not.toHaveBeenCalled();
     expect(f.deps.getSubscribers).not.toHaveBeenCalled();
   });
 

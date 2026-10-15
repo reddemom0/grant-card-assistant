@@ -6,8 +6,9 @@
  *                                    DM each digest subscriber one Chat card
  *                                    (cardsV2, as the Chat app): Usage, What
  *                                    clients asked, Most-matched grants, Errors this week,
- *                                    Worth a look, and a button to the week's
- *                                    tab. Always sends, even in a quiet week.
+ *                                    Worth a look, and a button to the
+ *                                    Control Centre. Always sends, even in a
+ *                                    quiet week.
  *
  * Sources:
  *   usage      gg3 ops DB: distinct chat_turns.user_id, and conversations
@@ -24,8 +25,9 @@
  *              null) per grant, shown rows only — never row counts, since every
  *              re-run repeats them. Names from Oracle's own gg3_grants copy,
  *              joined here in code (different databases).
- *   errors     the errors sheet (pulse-errors-sheet.js): issues whose Last seen
- *              is in the week. Count there is all-time, and is shown as such.
+ *   errors     the Control Centre review queue (Hub DB, cc_review_items,
+ *              migration 047): chat and grant-pattern cards flagged in the
+ *              week, most flags first, each with its card link.
  *
  * Staff are left out with the roundup's own filter (excludeInternalUsers,
  * GG3_INTERNAL_USER_IDS) — nothing more.
@@ -36,26 +38,22 @@
  * of a chat — never the original text, which is not stored, logged, posted or
  * written.
  *
- * The detail goes to a "Digest YYYY-MM-DD" tab (Monday's date) of the errors
- * sheet, rewritten whole on every run for that week. The themes and the
- * rewritten questions — with who asked each — are also stored for the Control
- * Centre (cc_digest_themes / cc_digest_questions, migration 046, via
+ * The themes and the rewritten questions — with who asked each — are stored
+ * for the Control Centre (cc_digest_themes / cc_digest_questions, migration 046, via
  * src/control-centre/digest-themes.js) from the same model call; never a second.
  * Staff are still left out by GG3_INTERNAL_USER_IDS here, not by the Control
  * Centre's internal-accounts list (docs/control-centre.md, follow-ups). The DM goes once per
  * week: the key weekly_digest:<monday> in pulse_alert_state (migration 040)
  * is claimed before anything is written or sent.
  *
- * Needs GG3_OPS_DB_READONLY_URL, PULSE_DIGEST_SUBSCRIBERS,
- * PULSE_ERRORS_SHEET_ID and PULSE_SHEET_OWNER_EMAIL; with any unset it is
- * never scheduled. Dry run: scripts/pulse-digest-check.mjs.
+ * Needs GG3_OPS_DB_READONLY_URL and PULSE_DIGEST_SUBSCRIBERS; with either
+ * unset it is never scheduled. Dry run: scripts/pulse-digest-check.mjs.
  */
 
 import { gg3OpsQuery, isGg3OpsConfigured, excludeInternalUsers } from './gg3-ops-db.js';
-import {
-  SHEET_ENV, OWNER_ENV, sheetUrl, localDate, resolveSheetOwner, readIssueRows
-} from './pulse-errors-sheet.js';
-import { transcriptOf, callTool, fetchCompanyName } from './pulse-roundup.js';
+import { transcriptOf, callTool, fetchCompanyName, localDate } from './pulse-roundup.js';
+import { cardTitle } from '../control-centre/card-summary.js';
+import { cardLink, controlCentreUrl } from '../control-centre/links.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from '../claude/tool-output.js';
 import { esc, paragraph, decorated, finalizeCards } from '../cards/render.js';
 import { recordPulsePost, pulsePostRecorder } from './pulse-posts.js';
@@ -117,7 +115,6 @@ export function weekBounds(monday) {
   return { start: vancouverMidnight(monday), end: vancouverMidnight(addDays(monday, 7)) };
 }
 
-export const tabTitle = (monday) => `Digest ${monday}`;
 
 // ============================================================================
 // 1. USAGE
@@ -609,12 +606,30 @@ export async function nameGrants(matches, oracleQuery) {
 // 4. ERRORS
 // ============================================================================
 
-/** Sheet issues last seen in the week, highest all-time count first. */
-export function weekIssues(rows, monday) {
-  const sunday = addDays(monday, 6);
-  return rows
-    .filter(r => YMD.test(r.lastSeen) && r.lastSeen >= monday && r.lastSeen <= sunday)
-    .sort((a, b) => b.count - a.count);
+// Hub DB, read-only. A flag counts in the week by when its source happened
+// (the AI review's cut, the chat turn), else when it was filed.
+export const WEEK_CARDS_SQL = `
+  SELECT i.id, i.kind, i.status, i.owner, i.grant_root_id, i.pattern_category, i.chat_turn_ref,
+         i.company_id, g.grant_name, count(f.id)::int AS week_flags, i.flag_count
+    FROM cc_review_items i
+    JOIN cc_review_flags f ON f.item_id = i.id
+    LEFT JOIN gg3_grants g ON g.id = i.grant_root_id
+   WHERE i.kind IN ('chat', 'grant_pattern')
+     AND COALESCE(f.source_created_at, f.created_at) >= $1
+     AND COALESCE(f.source_created_at, f.created_at) < $2
+   GROUP BY i.id, g.grant_name
+   ORDER BY count(f.id) DESC, i.id DESC`;
+
+/**
+ * The week's chat and grant-pattern cards from the review queue.
+ * @returns {Promise<Array<{id, kind, title, status, owner, weekFlags, totalFlags}>>}
+ */
+export async function collectQueueIssues(week, runQuery) {
+  const r = await runQuery(WEEK_CARDS_SQL, [week.start, week.end]);
+  return r.rows.map(row => ({
+    id: Number(row.id), kind: row.kind, title: cardTitle(row), status: row.status, owner: row.owner ?? null,
+    weekFlags: row.week_flags, totalFlags: row.flag_count
+  }));
 }
 
 // ============================================================================
@@ -634,12 +649,11 @@ export async function profileCompanyNames(exchanges, fetchProfile) {
 }
 
 /**
- * Everything the post and the tab need. Writes and sends nothing — the dry run
- * is exactly this.
- * @param {{monday: string, issueRows: Object[]|null, deps: Object}} args
- *   issueRows null when the errors sheet couldn't be read
+ * Everything the post needs. Writes and sends nothing — the dry run is
+ * exactly this. errors is {ok: false, code} when the queue couldn't be read.
+ * @param {{monday: string, deps: Object}} args
  */
-export async function buildDigest({ monday, issueRows, sheetCode = null, deps }) {
+export async function buildDigest({ monday, deps }) {
   const week = weekBounds(monday);
   const prior = weekBounds(addDays(monday, -7));
   const usage = await deps.collectUsage(week);
@@ -659,24 +673,27 @@ export async function buildDigest({ monday, issueRows, sheetCode = null, deps })
     exchangesTotal: asked.total,
     exchangesRead: asked.exchanges.length,
     // Who asked each exchange (Clerk id), index = exchange id − 1. Kept for the
-    // Control Centre's stored copy; never posted or written to the sheet.
+    // Control Centre's stored copy; never posted.
     askedBy: asked.exchanges.map(e => e.userId ?? null),
     themes,
     grants: await nameGrants(withPriorWeek(matches, priorMatches), deps.oracleQuery),
-    errors: issueRows ? { ok: true, issues: weekIssues(issueRows, monday) } : { ok: false, code: sheetCode || 'unavailable' }
+    errors: await queueErrors(week, deps)
   };
+}
+
+async function queueErrors(week, deps) {
+  try {
+    return { ok: true, issues: await deps.collectQueueIssues(week) };
+  } catch (err) {
+    console.warn(`⚠️  Pulse digest: review queue unavailable — code: ${codeOf(err)}`);
+    return { ok: false, code: String(codeOf(err)) };
+  }
 }
 
 const shortDate = (ymd) => new Date(`${ymd}T12:00:00Z`).toLocaleDateString('en-CA', { timeZone: 'UTC', month: 'short', day: 'numeric' });
 
 const TITLE = 'GetGranted weekly';
 const TEST_PREFIX = '🧪 Test — ';
-
-/** The sheet, opened on the week's tab when its id is known. */
-export function tabLink(sheetId, tabGid = null) {
-  if (!sheetId) return null;
-  return Number.isInteger(tabGid) ? `${sheetUrl(sheetId)}/edit#gid=${tabGid}` : sheetUrl(sheetId);
-}
 
 /** What a notification shows for the card. */
 export function digestFallback(d, { test = false } = {}) {
@@ -685,10 +702,10 @@ export function digestFallback(d, { test = false } = {}) {
 
 /**
  * The DM as one Chat card (cardsV2): a section per part of the digest, one
- * widget per item, a button to the week's tab. Every piece of text is escaped;
- * the markup is ours.
+ * widget per item, a button to the Control Centre. Every piece of text is
+ * escaped; the markup is ours.
  */
-export function digestCard(d, { sheetId = null, tabGid = null, test = false } = {}) {
+export function digestCard(d, { test = false, env = process.env } = {}) {
   const line = (html) => paragraph(html);
   const sections = [];
 
@@ -719,12 +736,12 @@ export function digestCard(d, { sheetId = null, tabGid = null, test = false } = 
   sections.push({ header: 'Most-matched grants', widgets: grants });
 
   const errors = [];
-  if (!d.errors.ok) errors.push(line(esc(`Errors sheet unavailable (code: ${d.errors.code}).`)));
-  else if (!d.errors.issues.length) errors.push(line('No errors logged this week.'));
+  if (!d.errors.ok) errors.push(line(esc(`Review queue unavailable (code: ${d.errors.code}).`)));
+  else if (!d.errors.issues.length) errors.push(line('No chat or grant-pattern cards flagged this week.'));
   else {
-    errors.push(line(`${plural(d.errors.issues.length, 'issue')} seen this week`));
+    errors.push(line(`${plural(d.errors.issues.length, 'card')} flagged this week`));
     for (const i of d.errors.issues.slice(0, TOP_ERRORS)) {
-      errors.push(line(`<b>${esc(i.name)}</b> — ${esc(i.status || 'no status')} — seen ${plural(i.count, 'time')} in total`));
+      errors.push(line(`<a href="${esc(cardLink(i.id, env))}"><b>${esc(i.title)}</b></a> — ${esc(issueState(i))} — flagged ${plural(i.weekFlags, 'time')} this week`));
     }
   }
   sections.push({ header: 'Errors this week', widgets: errors });
@@ -735,8 +752,7 @@ export function digestCard(d, { sheetId = null, tabGid = null, test = false } = 
     widgets: [line(w ? [`<b>${esc(w.label)}</b>`, `"${esc(w.question)}"`, esc(w.why)].join('<br>') : 'Nothing picked out this week.')]
   });
 
-  const url = tabLink(sheetId, tabGid);
-  if (url) sections.push({ widgets: [{ buttonList: { buttons: [{ text: 'Open detail sheet', onClick: { openLink: { url } } }] } }] });
+  sections.push({ widgets: [{ buttonList: { buttons: [{ text: 'Open Control Centre', onClick: { openLink: { url: controlCentreUrl(env) } } }] } }] });
 
   return finalizeCards([{
     cardId: `pulse-digest-${d.monday}`,
@@ -747,8 +763,16 @@ export function digestCard(d, { sheetId = null, tabGid = null, test = false } = 
   }]);
 }
 
-/** The digest as plain text — the dry run's printout. The DM is digestCard. */
-export function formatDigest(d, { sheetId } = {}) {
+const STATUS_WORDS = { new: 'new', diagnosed: 'diagnosed', in_progress: 'in progress', closed: 'closed' };
+const OWNER_WORDS = { client: 'client', research: 'Research', chris: 'Chris', jason: 'Jason' };
+
+/** "in progress · Research" — a card's state in words. */
+export function issueState(i) {
+  return [STATUS_WORDS[i.status] ?? i.status, i.owner ? OWNER_WORDS[i.owner] ?? i.owner : 'no owner yet'].join(' · ');
+}
+
+/** The digest as plain text — the dry run's printout and the stored summary. The DM is digestCard. */
+export function formatDigest(d, { env = process.env } = {}) {
   const lines = [`📊 GetGranted weekly — ${shortDate(d.monday)} to ${shortDate(d.sunday)}`, ''];
 
   lines.push('**Usage**');
@@ -772,12 +796,12 @@ export function formatDigest(d, { sheetId } = {}) {
   lines.push('');
 
   lines.push('**Errors this week**');
-  if (!d.errors.ok) lines.push(`Errors sheet unavailable (code: ${d.errors.code}).`);
-  else if (!d.errors.issues.length) lines.push('No errors logged this week.');
+  if (!d.errors.ok) lines.push(`Review queue unavailable (code: ${d.errors.code}).`);
+  else if (!d.errors.issues.length) lines.push('No chat or grant-pattern cards flagged this week.');
   else {
-    lines.push(`${plural(d.errors.issues.length, 'issue')} seen this week:`);
+    lines.push(`${plural(d.errors.issues.length, 'card')} flagged this week:`);
     for (const i of d.errors.issues.slice(0, TOP_ERRORS)) {
-      lines.push(`• ${i.name} — ${i.status || 'no status'} — seen ${plural(i.count, 'time')} in total`);
+      lines.push(`• ${i.title} — ${issueState(i)} — flagged ${plural(i.weekFlags, 'time')} this week — ${cardLink(i.id, env)}`);
     }
   }
   lines.push('');
@@ -787,68 +811,15 @@ export function formatDigest(d, { sheetId } = {}) {
   lines.push(w ? `${w.label}: "${w.question}" — ${w.why}` : 'Nothing picked out this week.');
   lines.push('');
 
-  lines.push(`Detail: ${sheetId ? sheetUrl(sheetId) : '(errors sheet)'}, tab "${tabTitle(d.monday)}".`);
+  lines.push(`Control Centre: ${controlCentreUrl(env)}`);
   return lines.join('\n');
-}
-
-/** The tab's rows, written RAW from A1. */
-export function digestRows(d, { generatedAt = new Date() } = {}) {
-  const rows = [
-    [`GetGranted weekly digest — ${d.monday} (Mon) to ${d.sunday} (Sun), America/Vancouver`],
-    [`Generated ${generatedAt.toISOString()}`],
-    ['Questions come from conversations active this week; a chat that began earlier brings its earlier questions. Each question is an AI rewrite with names and identifying details removed.'],
-    [],
-    ['USAGE'],
-    ['Metric', 'This week', 'Week before', 'Change'],
-    ['Chat users', d.usage.chatUsers, d.priorUsage.chatUsers, formatChange(d.usage.chatUsers, d.priorUsage.chatUsers)],
-    ['Conversations', d.usage.conversations, d.priorUsage.conversations, formatChange(d.usage.conversations, d.priorUsage.conversations)],
-    [],
-    ['WHAT CLIENTS ASKED'],
-    ['Theme', 'Takeaway', 'Question']
-  ];
-  if (d.themes.status === 'none') rows.push(['No client chats this week.']);
-  else if (d.themes.status === 'failed') rows.push([`Themes unavailable (code: ${d.themes.code}).`]);
-  else {
-    for (const t of d.themes.themes) {
-      rows.push([t.name, t.takeaway, '']);
-      for (const q of t.questions) rows.push(['', '', q]);
-    }
-    if (d.exchangesTotal > d.exchangesRead) rows.push([`Latest ${d.exchangesRead} of ${d.exchangesTotal} exchanges read.`]);
-  }
-  rows.push([], ['MOST-MATCHED GRANTS (distinct companies, shown matches)'], ['Grant ID', 'Grant', 'Companies', 'Week before', 'Change']);
-  if (!d.grants.length) rows.push(['No grant matches this week.']);
-  for (const g of d.grants) rows.push([g.grantId, g.name, g.companies, g.priorCompanies ?? 0, grantChange(g.companies, g.priorCompanies).replace(/^\(|\)$/g, '')]);
-
-  rows.push([], ['ERRORS THIS WEEK (from the errors sheet)'], ['Issue', 'Last seen', 'Count (all time)', 'Likely owner', 'Status']);
-  if (!d.errors.ok) rows.push([`Errors sheet unavailable (code: ${d.errors.code}).`]);
-  else if (!d.errors.issues.length) rows.push(['No errors logged this week.']);
-  else for (const i of d.errors.issues) rows.push([i.name, i.lastSeen, i.count, i.owner, i.status]);
-
-  const w = d.themes.status === 'ok' ? d.themes.worthALook : null;
-  rows.push([], ['WORTH A LOOK'], ['Kind', 'Question', 'What the reply did'], w ? [w.label, w.question, w.why] : ['Nothing picked out this week.']);
-  return rows;
-}
-
-/** Rewrite the week's tab whole. @returns {Promise<{ok: boolean, gid?: number|null, code?: string}>} */
-export async function writeDigestTab({ d, sheetId, userId, prepare, update }) {
-  const title = tabTitle(d.monday);
-  const prepared = await prepare(userId, { spreadsheet_id: sheetId, title });
-  if (!prepared?.success) return { ok: false, code: 'tab_prepare_failed' };
-  const written = await update(userId, {
-    spreadsheet_id: sheetId,
-    range: `'${title}'!A1`,
-    values: digestRows(d),
-    value_input_option: 'RAW'
-  });
-  const gid = prepared.data?.sheet_id;
-  return written?.success ? { ok: true, gid: Number.isInteger(gid) ? gid : null } : { ok: false, code: 'tab_write_failed' };
 }
 
 // ============================================================================
 // THE RUN
 // ============================================================================
 
-const REQUIRED_ENV = ['GG3_OPS_DB_READONLY_URL', DIGEST_SUBSCRIBERS_ENV, SHEET_ENV, OWNER_ENV];
+const REQUIRED_ENV = ['GG3_OPS_DB_READONLY_URL', DIGEST_SUBSCRIBERS_ENV];
 
 /** The env vars the digest needs that are unset. */
 export function missingDigestEnv(env = process.env) {
@@ -866,11 +837,10 @@ async function defaultCreateMessage(params, opts) {
 
 /** Real dependencies. Exported for the dry-run script, which uses only the read ones. */
 export async function defaultDeps() {
-  const [{ query }, { getPulseSubscribers }, { postMessageWithThread }, sheets] = await Promise.all([
+  const [{ query }, { getPulseSubscribers }, { postMessageWithThread }] = await Promise.all([
     import('../database/connection.js'),
     import('./pulse-subscribers.js'),
-    import('../cards/chat-api.js'),
-    import('../tools/google-sheets.js')
+    import('../cards/chat-api.js')
   ]);
   /** One card DM as the Chat app; where it landed, or false. */
   const postCard = async (spaceName, { cardsV2, fallbackText }) => {
@@ -887,25 +857,15 @@ export async function defaultDeps() {
     collectExchanges: (w) => collectExchanges(w),
     fetchProfile: (id) => fetchCompanyName(id),
     collectGrantMatches: (w) => collectGrantMatches(w),
+    collectQueueIssues: (w) => collectQueueIssues(w, query),
     createMessage: defaultCreateMessage,
     oracleQuery: query,
     getSubscribers: () => getPulseSubscribers(DIGEST_SUBSCRIBERS_ENV),
     lookupSubscribers: getPulseSubscribers,
     post: postCard,
-    readSheet: sheets.readSheetRange,
-    prepareTab: sheets.prepareSheetTab,
-    updateSheet: sheets.updateSheetRange,
     recordPost: recordPulsePost,
     saveThemes: async (built) => (await import('../control-centre/digest-themes.js')).saveDigestThemes(built)
   };
-}
-
-/** The errors sheet's issue rows, or why they can't be read. */
-export async function readSheetIssues(env, d) {
-  const owner = await resolveSheetOwner(env, d.oracleQuery).catch(err => ({ ok: false, code: String(codeOf(err)) }));
-  if (!owner.ok) return { owner, rows: null, code: owner.code };
-  const read = await readIssueRows({ sheetId: env[SHEET_ENV].trim(), userId: owner.userId, read: d.readSheet });
-  return read.ok ? { owner, rows: read.rows } : { owner, rows: null, code: read.code };
 }
 
 /**
@@ -927,10 +887,10 @@ export async function deliverDigest(message, subscribers, post, record = null) {
 }
 
 /** The recorder for one digest send: its week and the lines the card showed. Null without a recordPost dep. */
-function digestRecorder(d, deps, { sheetId = null, isTest = false } = {}) {
+function digestRecorder(d, deps, { env = process.env, isTest = false } = {}) {
   if (!deps.recordPost) return null;
   const { start, end } = weekBounds(d.monday);
-  return pulsePostRecorder({ kind: 'digest', isTest, periodStart: start, periodEnd: end, summary: formatDigest(d, { sheetId }) }, deps.recordPost);
+  return pulsePostRecorder({ kind: 'digest', isTest, periodStart: start, periodEnd: end, summary: formatDigest(d, { env }) }, deps.recordPost);
 }
 
 const TEST_ENV = 'PULSE_DIGEST_TEST_RECIPIENT';
@@ -938,15 +898,14 @@ const TEST_ENV = 'PULSE_DIGEST_TEST_RECIPIENT';
 /**
  * Send the digest card to one person as a test, through the normal subscriber
  * lookup (@granted.ca only, must have a DM with Oracle) and delivery. The title
- * says it's a test. Never claims the week, never touches the sheet — so the
- * button opens the sheet, not a tab.
+ * says it's a test. Never claims the week and never stores themes.
  * @returns {Promise<{sent: number, code?: 'not_reachable'|'post_failed'}>}
  */
-export async function sendDigestTest({ email, d, sheetId = null, deps }) {
+export async function sendDigestTest({ email, d, env = process.env, deps }) {
   const subscribers = await deps.lookupSubscribers(TEST_ENV, { [TEST_ENV]: String(email || '') });
   if (!subscribers.length) return { sent: 0, code: 'not_reachable' };
-  const message = { cardsV2: digestCard(d, { sheetId, test: true }), fallbackText: digestFallback(d, { test: true }) };
-  const sent = await deliverDigest(message, subscribers.slice(0, 1), deps.post, digestRecorder(d, deps, { sheetId, isTest: true }));
+  const message = { cardsV2: digestCard(d, { test: true, env }), fallbackText: digestFallback(d, { test: true }) };
+  const sent = await deliverDigest(message, subscribers.slice(0, 1), deps.post, digestRecorder(d, deps, { env, isTest: true }));
   return sent ? { sent } : { sent: 0, code: 'post_failed' };
 }
 
@@ -963,18 +922,15 @@ export async function claimWeek(monday, now, runQuery) {
 
 /**
  * One Monday run. Never throws for "not configured" or "already sent".
- * @returns {Promise<{status: 'skipped'|'already_sent'|'no_state_table'|'sent'|'undelivered', missing?: string[], sent?: number, tab?: string}>}
+ * @returns {Promise<{status: 'skipped'|'already_sent'|'no_state_table'|'sent'|'undelivered', missing?: string[], sent?: number}>}
  */
 export async function runWeeklyDigest({ now = new Date(), env = process.env, deps = null } = {}) {
   const missing = missingDigestEnv(env);
   if (missing.length || !isGg3OpsConfigured()) return { status: 'skipped', missing };
   const d = deps || await defaultDeps();
   const monday = previousWeek(now);
-  const sheetId = env[SHEET_ENV].trim();
 
-  const sheet = await readSheetIssues(env, d);
-  if (!sheet.rows) console.warn(`⚠️  Pulse digest: errors sheet unavailable — code: ${sheet.code}`);
-  const built = await buildDigest({ monday, issueRows: sheet.rows, sheetCode: sheet.code, deps: d });
+  const built = await buildDigest({ monday, deps: d });
   if (!built) return { status: 'skipped', missing: [] };
   if (built.themes.status === 'failed') console.warn(`⚠️  Pulse digest: themes call failed — code: ${built.themes.code}`);
 
@@ -998,23 +954,14 @@ export async function runWeeklyDigest({ now = new Date(), env = process.env, dep
     }
   }
 
-  let tab = 'not_written';
-  let tabGid = null;
-  if (sheet.owner?.ok) {
-    const written = await writeDigestTab({ d: built, sheetId, userId: sheet.owner.userId, prepare: d.prepareTab, update: d.updateSheet });
-    tab = written.ok ? 'written' : written.code;
-    tabGid = written.gid ?? null;
-    if (!written.ok) console.warn(`⚠️  Pulse digest: detail tab not written — code: ${written.code}`);
-  }
-
-  const message = { cardsV2: digestCard(built, { sheetId, tabGid }), fallbackText: digestFallback(built) };
-  const sent = await deliverDigest(message, await d.getSubscribers(), d.post, digestRecorder(built, d, { sheetId }));
+  const message = { cardsV2: digestCard(built, { env }), fallbackText: digestFallback(built) };
+  const sent = await deliverDigest(message, await d.getSubscribers(), d.post, digestRecorder(built, d, { env }));
   if (sent === 0) {
     console.warn('⚠️  Pulse digest: no subscriber could be reached — not retried this week.');
-    return { status: 'undelivered', sent, tab };
+    return { status: 'undelivered', sent };
   }
-  console.log(`📊 Pulse digest ${monday}: sent to ${sent} subscriber(s) — ${built.usage.chatUsers} chat users, ${built.exchangesRead} exchanges, ${built.grants.length} grants matched, tab ${tab}`);
-  return { status: 'sent', sent, tab };
+  console.log(`📊 Pulse digest ${monday}: sent to ${sent} subscriber(s) — ${built.usage.chatUsers} chat users, ${built.exchangesRead} exchanges, ${built.grants.length} grants matched, ${built.errors.ok ? built.errors.issues.length : 'no'} cards`);
+  return { status: 'sent', sent };
 }
 
 /** @param {Object} cron - node-cron */

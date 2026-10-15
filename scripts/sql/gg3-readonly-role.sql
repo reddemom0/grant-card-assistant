@@ -18,9 +18,19 @@
 -- What the role gets, and nothing else:
 --   CONNECT on this database, USAGE on schema public,
 --   SELECT on chat_turns, conversations, match_results, grant_events,
---             grant_feedback, events.
--- Never ai_review_log, ai_review_cache, llm_calls or any other table. No
--- ALTER DEFAULT PRIVILEGES, so tables added later stay invisible to it.
+--             grant_feedback, events, ai_review_log.
+-- ai_review_log (the AI Final Review's decisions) was granted after this file
+-- was first run: the Control Centre roll-up reads it, and the hourly review
+-- sweep files grant-pattern cards from its cuts (docs/control-centre.md).
+-- Oracle's chat tools (gg3-conversations.js) still never name it.
+-- Never ai_review_cache, llm_calls or any other table. No ALTER DEFAULT
+-- PRIVILEGES, so tables added later stay invisible to it.
+-- DRIFT, checked 2026-10-15: the live role can also SELECT llm_calls, which
+-- this file never granted and no Hub code reads. Revoke it by hand when
+-- convenient (see the runbook, section 1).
+--
+-- Adding ai_review_log to a role created before it was granted:
+--   GRANT SELECT ON public.ai_review_log TO oracle_readonly;
 --
 -- default_transaction_read_only is a DEFAULT: a session can switch it off.
 -- The real wall is that no INSERT/UPDATE/DELETE grant exists. Oracle's pool
@@ -65,7 +75,8 @@ GRANT SELECT ON
   public.match_results,
   public.grant_events,
   public.grant_feedback,
-  public.events
+  public.events,
+  public.ai_review_log
 TO oracle_readonly;
 
 ALTER ROLE oracle_readonly SET default_transaction_read_only = on;
