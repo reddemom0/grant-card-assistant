@@ -20,10 +20,10 @@
 
   const SOON = {
     inbox: ['Inbox', 'Every thumbs-down and staff flag that needs a look, newest first, with its diagnosis.'],
-    companies: ['Companies', "Each company's journey: what it was matched, what it opened, how it rated, what it asked."],
-    grants: ['Grants', 'Each grant: how many companies it reached over time, who opened it, and why it matched.'],
-    review: ['Review queue', 'Every flagged match and chat answer, with its owner, diagnosis and status.'],
-    coverage: ['Coverage & changes', 'What changed in matching and why, grants matched widely but never opened, and thin coverage by industry.'],
+    companies: ['Companies', "Each client's journey: the grant matches on their goal tracks, the grant cards they opened, how they rated them, what they asked."],
+    grants: ['Grants', 'Each grant: how many clients it was matched to over time, who opened its grant card, and why it matched.'],
+    review: ['Review queue', 'Every flagged grant match and chat answer, with its owner, diagnosis and status.'],
+    coverage: ['Coverage & changes', 'What changed in matching and why, grant cards matched widely but never opened, and thin coverage by industry.'],
     themes: ['Chat themes', 'What people ask the assistant, grouped into themes you can read through.']
   };
 
@@ -36,6 +36,12 @@
   const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const dayLabel = (d) => { const [, m, dd] = d.split('-').map(Number); return `${MONTHS[m - 1]} ${dd}`; };
   const span = (a, b) => (a === b ? dayLabel(a) : `${dayLabel(a)} – ${dayLabel(b)}`);
+  // Plain words for the selected range: "this week" vs "last week".
+  const NOW_WORDS = { 1: 'today', 7: 'this week', 30: 'in the last 30 days', 365: 'in the last year' };
+  const BEFORE_WORDS = { 1: 'yesterday', 7: 'last week', 30: 'the 30 days before', 365: 'the year before' };
+  const nowWords = (n) => NOW_WORDS[n] ?? `in the last ${n} days`;
+  const beforeWords = (n) => BEFORE_WORDS[n] ?? `the ${n} days before`;
+  const plural = (n, one, many = `${one}s`) => `${fmt(n)} ${Math.abs(n) === 1 ? one : many}`;
 
   function storeGet() { try { return window.localStorage.getItem(STORE_KEY); } catch { return null; } }
   function storeSet(v) { try { window.localStorage.setItem(STORE_KEY, v); } catch { /* private mode etc. */ } }
@@ -236,9 +242,9 @@
   // ---------------------------------------------------------------- tiles
   const TILES = [
     { key: 'signups', label: 'sign-ups', cls: '' },
-    { key: 'active_companies', label: 'active companies', cls: '' },
-    { key: 'matches_shown', label: 'matches shown', cls: '', hint: 'company × grant pairs shown on dashboards' },
-    { key: 'grants_opened', label: 'grants opened', cls: 'o' },
+    { key: 'active_clients', metric: 'active_companies', label: 'active clients', cls: '' },
+    { key: 'grant_matches', metric: 'matches_shown', label: 'grant matches', cls: '', hint: 'A grant card shown to a client on their goal tracks; each client counts once per grant' },
+    { key: 'cards_opened', metric: 'grants_opened', label: 'grant cards opened', cls: 'o' },
     { key: 'ratings', label: 'ratings 👍 / 👎', cls: 'y' },
     { key: 'watchlist_adds', label: 'watchlist adds', cls: 'g' },
     { key: 'chats', label: 'chats started', cls: 'y' }
@@ -280,7 +286,7 @@
     grid.className = 'cc-tiles';
     root.appendChild(grid);
     for (const t of TILES) {
-      const m = t.key === 'ratings' ? ratingsMetric(data.metrics) : data.metrics[t.key];
+      const m = t.key === 'ratings' ? ratingsMetric(data.metrics) : data.metrics[t.metric ?? t.key];
       const tile = document.createElement('div');
       tile.className = `cc-tile ${t.cls}`;
       const top = document.createElement('div'); top.className = 'cc-tile-top';
@@ -317,6 +323,9 @@
     const wrap = document.createElement('div');
     wrap.className = 'cc-div';
     const max = Math.max(1, ...rows.map((r) => Math.abs(r.value)));
+    // Labels with units ("+65 grant matches") need more room past the bar end.
+    const narrow = window.matchMedia && window.matchMedia('(max-width: 600px)').matches;
+    const reach = rows.some((r) => r.label) ? (narrow ? 18 : 28) : 44;
     const bars = [];
     for (const r of rows) {
       const row = document.createElement('div');
@@ -328,10 +337,11 @@
       const track = document.createElement('div'); track.className = 'cc-div-track';
       track.innerHTML = '<div class="cc-div-axis"></div>';
       const up = r.value >= 0;
-      const pct = (Math.abs(r.value) / max) * 44;
+      const pct = (Math.abs(r.value) / max) * reach;
       const bar = document.createElement('div'); bar.className = `cc-div-bar ${up ? 'up' : 'down'}`;
-      const val = document.createElement('div'); val.className = `cc-div-val ${up ? 'up' : 'down'}`; val.textContent = signed(r.value);
-      if (!up) { bar.style.left = '50%'; val.style.left = 'calc(50% - 30px)'; } else { val.style.left = 'calc(50% + 6px)'; }
+      const val = document.createElement('div'); val.className = `cc-div-val ${up ? 'up' : 'down'}`; val.textContent = r.label ?? signed(r.value);
+      // Down labels sit left of the bar end, right-aligned (translateX(-100%) in CSS).
+      if (!up) { bar.style.left = '50%'; val.style.left = 'calc(50% - 6px)'; } else { val.style.left = 'calc(50% + 6px)'; }
       track.append(bar, val);
       row.append(name, track);
       if (r.tip) { bindTip(name, r.tip); bindTip(track, r.tip); }
@@ -345,7 +355,7 @@
     const apply = () => bars.forEach(({ bar, val, up, pct }) => {
       bar.style.width = `${pct}%`;
       if (up) val.style.left = `calc(50% + ${pct}% + 6px)`;
-      else { bar.style.left = `${50 - pct}%`; val.style.left = `calc(${50 - pct}% - 30px)`; }
+      else { bar.style.left = `${50 - pct}%`; val.style.left = `calc(${50 - pct}% - 6px)`; }
     });
     if (reduceMotion) apply(); else requestAnimationFrame(() => requestAnimationFrame(apply));
     return wrap;
@@ -360,11 +370,12 @@
   }
 
   function renderMovers(data, nDays) {
-    const c = card('Which grants moved in matching?', `Grants shown to more or fewer companies than the previous ${nDays === 1 ? 'day' : `${nDays} days`}. Click a grant to open it.`);
+    const c = card(`Grants matched to more / fewer clients ${nowWords(nDays)}`,
+      `Each bar is how many more or fewer clients a grant was matched to than ${beforeWords(nDays)}; before → now is beside it. Click a grant to open it.`);
     c.classList.add('cc-hero');
     const { risers, drops } = data.movers;
     if (!risers.length && !drops.length) {
-      c.insertAdjacentHTML('beforeend', '<p class="cc-empty">No grant reached more or fewer companies than the period before.</p>');
+      c.insertAdjacentHTML('beforeend', `<p class="cc-empty">Every grant was matched to the same number of clients as ${beforeWords(nDays)}.</p>`);
       return c;
     }
     // Two columns on one shared scale, so a +6 and a −6 bar are the same length.
@@ -372,8 +383,8 @@
     const cols = document.createElement('div');
     cols.className = 'cc-movers';
     cols.append(
-      moverColumn(`Reached more companies · ${fmt(data.movers.up_count)}`, risers, 'up', max, 'No grant reached more companies.'),
-      moverColumn(`Reached fewer companies · ${fmt(data.movers.down_count)}`, drops, 'down', max, 'No grant reached fewer companies.')
+      moverColumn(`Matched to more clients · ${fmt(data.movers.up_count)}`, risers, 'up', max, 'No grant was matched to more clients.'),
+      moverColumn(`Matched to fewer clients · ${fmt(data.movers.down_count)}`, drops, 'down', max, 'No grant was matched to fewer clients.')
     );
     c.appendChild(cols);
     const apply = () => $$('.cc-mv-bar[data-w]', cols).forEach((b) => { b.style.setProperty('--w', b.dataset.w); });
@@ -392,11 +403,12 @@
       row.className = 'cc-mv-row';
       row.tabIndex = 0;
       row.setAttribute('role', 'link');
-      row.setAttribute('aria-label', `${g.title}: ${signed(g.change)} companies`);
+      row.setAttribute('aria-label', `${g.title}: matched to ${g.previous} then ${g.companies} clients (${signed(g.change)})`);
       const w = Math.max(4, Math.round((Math.abs(g.change) / max) * 100));
       row.innerHTML = `<span class="cc-mv-name">${esc(g.title)}</span>
-        <span class="cc-mv-track"><span class="cc-mv-bar" data-w="${w}"></span><span class="cc-mv-val">${signed(g.change)}</span></span>`;
-      bindTip(row, () => `<b>${esc(g.title)}</b><br>${fmt(g.previous)} → ${fmt(g.companies)} companies${g.opens ? ` · opened ${fmt(g.opens)}×` : ''}`);
+        <span class="cc-mv-track"><span class="cc-mv-bar" data-w="${w}"></span><span class="cc-mv-val">${signed(g.change)}</span>
+        <span class="cc-mv-ba" title="clients before → now">${fmt(g.previous)} → ${fmt(g.companies)}</span></span>`;
+      bindTip(row, () => `<b>${esc(g.title)}</b><br>Matched to ${plural(g.previous, 'client')} before, ${plural(g.companies, 'client')} now${g.opens ? `<br>Card opened ${fmt(g.opens)}×` : ''}`);
       row.addEventListener('click', () => openGrant(g));
       row.addEventListener('keydown', (e) => { if (e.key === 'Enter') openGrant(g); });
       col.appendChild(row);
@@ -421,24 +433,48 @@
   }
 
   function renderMostMatched(data, nDays) {
-    const c = card('Most matched grants', 'Grants shown to the most companies. Click a grant to open it.');
+    const c = card('Most matched grants',
+      `Each bar is how many clients the grant was matched to ${nowWords(nDays)}; Before is ${beforeWords(nDays)}. Click a grant to open it.`);
     const list = data.most_matched;
-    if (!list.length) { c.insertAdjacentHTML('beforeend', '<p class="cc-empty">No grant was shown as a match in this period.</p>'); return c; }
+    if (!list.length) { c.insertAdjacentHTML('beforeend', `<p class="cc-empty">No grant was matched to a client ${nowWords(nDays)}.</p>`); return c; }
     const max = Math.max(...list.map((g) => g.companies));
     const prevLabel = nDays === 1 ? 'Yesterday' : 'Before';
-    c.insertAdjacentHTML('beforeend', `<table class="cc-table"><thead><tr><th>Grant</th><th>Companies</th><th class="hide-sm">${prevLabel}</th><th>Change</th><th class="hide-sm">Opened</th></tr></thead><tbody>${
+    c.insertAdjacentHTML('beforeend', `<table class="cc-table"><thead><tr><th>Grant</th><th>Clients</th><th class="hide-sm">${prevLabel}</th><th>Change</th><th class="hide-sm">Card opens</th></tr></thead><tbody>${
       list.map((g) => `<tr data-href="${esc(grantLink(g.grant_id))}"><td><span class="cc-gname">${esc(g.title)}</span></td><td>${barCell(g.companies, max)}</td><td class="hide-sm cc-muted">${fmt(g.previous)}</td><td><span class="cc-chg ${g.change > 0 ? 'up' : g.change < 0 ? 'down' : ''}">${g.change === 0 ? '—' : signed(g.change)}</span></td><td class="hide-sm cc-muted">${g.opens ? `${fmt(g.opens)}×` : '—'}</td></tr>`).join('')
     }</tbody></table>`);
     bindRows($('table', c), list);
     return c;
   }
 
-  function renderPopular(data) {
-    const c = card('Most popular grants', 'Grants opened most, with how many times each was saved to a watchlist.');
+  /** Grant card opens by where the client opened them from, now vs before. */
+  function renderSources(data, nDays) {
+    const c = card('How clients found grant cards',
+      `Each bar is how many times a grant card was opened from that place ${nowWords(nDays)}; Before is ${beforeWords(nDays)}.`);
+    c.classList.add('cc-wide');
+    const list = data.open_sources || [];
+    if (!list.some((s) => s.current || s.previous)) {
+      c.insertAdjacentHTML('beforeend', `<p class="cc-empty">No grant card was opened ${nowWords(nDays)} or ${beforeWords(nDays)}.</p>`);
+      return c;
+    }
+    const total = list.reduce((a, s) => a + s.current, 0);
+    const max = Math.max(1, ...list.map((s) => Math.max(s.current, s.previous)));
+    const prevLabel = nDays === 1 ? 'Yesterday' : 'Before';
+    c.insertAdjacentHTML('beforeend', `<table class="cc-table cc-sources"><thead><tr><th>Opened from</th><th>Card opens</th><th class="hide-sm">Share</th><th>${prevLabel}</th><th>Change</th></tr></thead><tbody>${
+      list.map((s) => `<tr><td>${esc(s.label)}</td><td>${barCell(s.current, max)}</td>`
+        + `<td class="hide-sm cc-muted">${total ? `${Math.round((s.current / total) * 100)}%` : '—'}</td>`
+        + `<td class="cc-muted">${fmt(s.previous)}</td>`
+        + `<td><span class="cc-chg ${s.delta > 0 ? 'up' : s.delta < 0 ? 'down' : ''}">${s.delta === 0 ? '—' : signed(s.delta)}</span></td></tr>`).join('')
+    }</tbody></table>`);
+    return c;
+  }
+
+  function renderPopular(data, nDays) {
+    const c = card('Most opened grant cards',
+      `Each bar is how many times the grant card was opened ${nowWords(nDays)}; Saved is how often it was added to a watchlist.`);
     const list = data.popular;
-    if (!list.length) { c.insertAdjacentHTML('beforeend', '<p class="cc-empty">Nobody opened or saved a grant in this period.</p>'); return c; }
+    if (!list.length) { c.insertAdjacentHTML('beforeend', `<p class="cc-empty">No grant card was opened or saved ${nowWords(nDays)}.</p>`); return c; }
     const max = Math.max(1, ...list.map((g) => g.opens));
-    c.insertAdjacentHTML('beforeend', `<table class="cc-table"><thead><tr><th>Grant</th><th>Opened</th><th>Saved</th><th class="hide-sm">Opened before</th></tr></thead><tbody>${
+    c.insertAdjacentHTML('beforeend', `<table class="cc-table"><thead><tr><th>Grant</th><th>Card opens</th><th>Saved</th><th class="hide-sm">Opens before</th></tr></thead><tbody>${
       list.map((g) => `<tr><td><span class="cc-gname">${esc(g.title)}</span></td><td>${barCell(g.opens, max, 'y')}</td><td>${g.saves ? fmt(g.saves) : '—'}</td><td class="hide-sm cc-muted">${fmt(g.previous_opens)}</td></tr>`).join('')
     }</tbody></table>`);
     bindRows($('table', c), list);
@@ -446,7 +482,7 @@
   }
 
   const trendView = { dim: 'industries', measure: 'matches' };
-  function renderTrends(data) {
+  function renderTrends(data, nDays) {
     const toggles = document.createElement('div');
     toggles.className = 'cc-toggles';
     const mk = (key, opts) => {
@@ -454,35 +490,47 @@
       for (const [val, label] of opts) {
         const b = document.createElement('button'); b.type = 'button'; b.textContent = label;
         b.setAttribute('aria-pressed', String(trendView[key] === val));
-        b.addEventListener('click', () => { trendView[key] = val; c.replaceWith(renderTrends(data)); });
+        b.addEventListener('click', () => { trendView[key] = val; c.replaceWith(renderTrends(data, nDays)); });
         g.appendChild(b);
       }
       return g;
     };
     toggles.append(mk('dim', [['industries', 'Industries'], ['provinces', 'Provinces']]), mk('measure', [['matches', 'Matches'], ['signups', 'Sign-ups']]));
-    const c = card('Shifting trends', 'Where matches and sign-ups grew or shrank compared with the period before.');
+    const field = trendView.measure === 'matches' ? 'matches' : 'signups';
+    const unit = field === 'matches' ? ['match', 'matches'] : ['sign-up', 'sign-ups'];
+    const where = trendView.dim === 'industries' ? 'industry' : 'province';
+    const c = card('Shifting trends',
+      field === 'matches'
+        ? `Each bar is how many more or fewer grant matches clients in that ${where} got ${nowWords(nDays)} than ${beforeWords(nDays)}.`
+        : `Each bar is how many more or fewer clients in that ${where} signed up ${nowWords(nDays)} than ${beforeWords(nDays)}.`);
     c.classList.add('cc-wide');
     c.appendChild(toggles);
-    const field = trendView.measure === 'matches' ? 'matches' : 'signups';
     const rows = (data.trends[trendView.dim] || [])
       .filter((r) => r[`${field}_change`] !== 0)
       .sort((a, b) => b[`${field}_change`] - a[`${field}_change`])
-      .map((r) => ({
-        name: r.name, value: r[`${field}_change`],
-        tip: () => `<b>${esc(r.name)}</b><br>${field === 'matches' ? 'Matches' : 'Sign-ups'}: ${fmt(r[`previous_${field}`])} → ${fmt(r[field])}`
-      }));
-    if (!rows.length) c.insertAdjacentHTML('beforeend', `<p class="cc-empty">No ${trendView.dim === 'industries' ? 'industry' : 'province'} moved on ${field === 'matches' ? 'matches' : 'sign-ups'} in this period.</p>`);
+      .map((r) => {
+        const v = r[`${field}_change`];
+        return {
+          name: r.name, value: v,
+          label: `${signed(v)} ${Math.abs(v) === 1 ? unit[0] : unit[1]}`,
+          tip: () => `<b>${esc(r.name)}</b><br>${plural(r[`previous_${field}`], unit[0], unit[1])} → ${plural(r[field], unit[0], unit[1])}`
+        };
+      });
+    if (!rows.length) c.insertAdjacentHTML('beforeend', `<p class="cc-empty">No ${where} gained or lost ${unit[1]} ${nowWords(nDays)}.</p>`);
     else c.appendChild(diverging(rows));
     return c;
   }
 
   function lede(data, nDays) {
     const m = data.metrics;
-    const period = nDays === 1 ? 'yesterday' : `the previous ${nDays} days`;
     const p = document.createElement('p');
     p.className = 'cc-lede';
-    p.innerHTML = `<b>${fmt(data.movers.up_count)}</b> grants reached more companies than ${period} and <b class="down">${fmt(data.movers.down_count)}</b> reached fewer. `
-      + `<b>${fmt(m.active_companies.current)}</b> companies were active, opening grants <b>${fmt(m.grants_opened.current)}</b> times.`;
+    const up = data.movers.up_count;
+    const opens = m.grants_opened.current;
+    p.innerHTML = `<b>${fmt(up)}</b> grant ${up === 1 ? 'card was' : 'cards were'} matched to more clients than ${beforeWords(nDays)}, `
+      + `<b class="down">${fmt(data.movers.down_count)}</b> to fewer. `
+      + `<b>${fmt(m.active_companies.current)}</b> ${m.active_companies.current === 1 ? 'client was' : 'clients were'} active and opened grant cards `
+      + `<b>${fmt(opens)}</b> ${opens === 1 ? 'time' : 'times'}.`;
     return p;
   }
 
@@ -495,8 +543,9 @@
     p.textContent = 'Staff and client use combined; automated test traffic excluded. '
       + (internal.length
         ? 'Internal accounts (Granted staff and test companies) count in every tile, which shows how much came from them. '
-          + `The grant lists and trends leave them out unless "Include internal accounts" is on. `
+          + `The grant lists, card sources and trends leave them out unless "Include internal accounts" is on. `
         : '')
+      + 'A grant match is a grant card shown to a client on their goal tracks; each client counts once per grant. '
       + 'Ratings count every click, including changed minds. '
       + `History comes from the nightly roll-ups${s.last_rolled_day ? ` (latest ${dayLabel(s.last_rolled_day)})` : ''}; `
       + 'later days, including today, are read live. Updated every 5 minutes.'
@@ -543,8 +592,8 @@
     panel.appendChild(lede(view, n));
     renderTiles(panel, data);
     const row = document.createElement('div'); row.className = 'cc-grid-2 even';
-    row.append(renderMostMatched(view, n), renderPopular(view));
-    panel.append(internalToggle(panel, data), renderMovers(view, n), row, renderTrends(view), footnote(data));
+    row.append(renderMostMatched(view, n), renderPopular(view, n));
+    panel.append(internalToggle(panel, data), renderMovers(view, n), renderSources(view, n), row, renderTrends(view, n), footnote(data));
     growBars(panel);
   }
 
@@ -556,7 +605,7 @@
     const n = (data.internal_accounts || []).length;
     const bar = document.createElement('div');
     bar.className = 'cc-scope';
-    bar.innerHTML = `<span class="cc-scope-label">Grant lists and trends</span>
+    bar.innerHTML = `<span class="cc-scope-label">Grant lists, card sources and trends</span>
       <label class="cc-switch"><input type="checkbox" role="switch" ${includeInternal ? 'checked' : ''}>
       <span class="cc-switch-track" aria-hidden="true"></span><span>Include internal accounts</span></label>
       <span class="cc-scope-note">${includeInternal ? `Showing everyone, including ${fmt(n)} internal ${n === 1 ? 'account' : 'accounts'}` : `Clients only — ${fmt(n)} internal ${n === 1 ? 'account' : 'accounts'} left out`}</span>`;

@@ -96,8 +96,25 @@ export const ROLLED_MATCHES_SQL = `
   SELECT day::text AS day, company_id, grant_id, times_computed, times_shown
     FROM cc_daily_matches WHERE day BETWEEN $1::date AND $2::date`;
 export const ROLLED_VIEWS_SQL = `
-  SELECT day::text AS day, company_id, grant_root_id, sessions
+  SELECT day::text AS day, company_id, grant_root_id, source, sessions
     FROM cc_daily_views WHERE day BETWEEN $1::date AND $2::date`;
+
+/**
+ * Where a grant card was opened from: grant_view_sessions
+ * presentation_context->>'source', kept per row by the roll-up. Every open has
+ * one (none missing in the 60 days to 2026-10-15). `suggested` always carries
+ * a goal-track list ("track-0-hire-or-train-people"); `direct` is a direct
+ * link and goes to Other with anything unknown.
+ */
+export const OPEN_SOURCES = Object.freeze([
+  { key: 'goal_tracks', label: 'Goal tracks', from: ['suggested'] },
+  { key: 'browse', label: 'Browse', from: ['browse'] },
+  { key: 'chat', label: 'Chat', from: ['advisor'] },
+  { key: 'watchlist', label: 'Watchlist', from: ['watchlist'] },
+  { key: 'other', label: 'Other (direct links)', from: [] }
+]);
+const SOURCE_KEY = new Map(OPEN_SOURCES.flatMap((s) => s.from.map((f) => [f, s.key])));
+export const openSourceKey = (source) => SOURCE_KEY.get(String(source ?? '').toLowerCase()) ?? 'other';
 export const ROLLED_RATINGS_SQL = `
   SELECT day::text AS day, company_id, grant_root_id, ups, downs
     FROM cc_daily_ratings WHERE day BETWEEN $1::date AND $2::date`;
@@ -349,7 +366,24 @@ function rankings({ matches, views, signups, watchlist }, C, P, titles, metadata
     curSignups: signupsCur.keys, prevSignups: signupsPrev.keys, metadata
   });
 
-  return { most_matched, popular, movers, trends };
+  return { most_matched, popular, movers, trends, open_sources: openSources(views, C, P) };
+}
+
+/** Grant card opens per source, current vs previous window; every source listed. */
+export function openSources(views, C, P) {
+  const tally = (days) => {
+    const set = new Set(days);
+    const out = new Map(OPEN_SOURCES.map((s) => [s.key, 0]));
+    for (const r of views) {
+      if (!set.has(r.day)) continue;
+      const k = openSourceKey(r.source);
+      out.set(k, out.get(k) + (Number(r.sessions) || 0));
+    }
+    return out;
+  };
+  const cur = tally(C);
+  const prev = tally(P);
+  return OPEN_SOURCES.map(({ key, label }) => ({ key, label, ...compare(cur.get(key), prev.get(key)) }));
 }
 
 // ---------------------------------------------------------------------------

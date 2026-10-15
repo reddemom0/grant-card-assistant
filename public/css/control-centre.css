@@ -196,7 +196,8 @@
 .cc-div-bar.down { background: var(--cc-orange); }
 .cc-div-val { position: absolute; top: 7px; font-size: 13px; font-weight: 600; line-height: 18px; transition: left .6s cubic-bezier(.2, .8, .2, 1); }
 .cc-div-val.up { color: var(--cc-teal-ink); }
-.cc-div-val.down { color: var(--cc-orange-ink); }
+.cc-div-val.down { color: var(--cc-orange-ink); transform: translateX(-100%); }
+.cc-div-val { white-space: nowrap; }
 
 /* ---------- Tables with inline bars ---------- */
 .cc-table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -345,19 +346,30 @@
 .cc-mv-bar {
   --w: 0;
   display: block; height: 20px; border-radius: 4px; flex: none;
-  width: calc((100% - 44px) * var(--w) / 100);
+  width: calc((100% - 104px) * var(--w) / 100);
   background: var(--cc-teal); transition: width .6s cubic-bezier(.2, .8, .2, 1);
 }
 .cc-mv-col.down .cc-mv-bar { background: var(--cc-orange); }
 .cc-mv-val { font-size: 14px; font-weight: 700; color: var(--cc-teal-ink); flex: none; }
 .cc-mv-col.down .cc-mv-val { color: var(--cc-orange-ink); }
+.cc-mv-ba { font-size: 13px; color: var(--cc-grey); white-space: nowrap; flex: none; }
 @media (max-width: 760px) {
   .cc-movers { grid-template-columns: minmax(0, 1fr); gap: 24px; }
 }
 .cc-wide { margin-top: 20px; }
+/* Sources rows aren't links; no pointer or hover rule. */
+.cc-table.cc-sources tbody tr { cursor: default; }
+.cc-table.cc-sources tbody tr:hover { background: none; box-shadow: none; }
+.cc-table.cc-sources td:first-child { font-weight: 600; }
 /* Full-width trends: keep the names column from stretching into a gulf. */
 .cc-wide .cc-div { grid-template-columns: minmax(0, 28%) minmax(0, 1fr); }
-@media (max-width: 600px) { .cc-wide .cc-div { grid-template-columns: minmax(0, 46%) minmax(0, 1fr); } }
+/* Phone: each trend row stacks — name above, a full-width bar below — so the
+   labelled values ("+66 matches") fit. */
+@media (max-width: 600px) {
+  .cc-wide .cc-div { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .cc-wide .cc-div-name { text-align: left; padding: 8px 4px 0; }
+  .cc-wide .cc-div-track { height: 30px; }
+}
 @media (max-width: 600px) {
   .cc-card.cc-hero { padding: 20px 16px; }
   .cc-mv-name { font-size: 14px; }
