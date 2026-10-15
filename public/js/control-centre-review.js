@@ -384,6 +384,7 @@
         </div>
         <button type="button" class="rq-x" data-x aria-label="Close the card">×</button>
         <h2 id="rq-d-title">${esc(it.title)}</h2>
+        ${it.grant_root_id != null ? `<p class="rq-d-grant">Grant: <a href="#grants/${Number(it.grant_root_id)}">${esc(data.grant_name || it.grant_name || `#${it.grant_root_id}`)}</a></p>` : ''}
         <p class="rq-d-sub">${it.owner ? `Owner <b>${OWNER_WORDS[it.owner]}</b> (${OWNER_FIXES[it.owner]})` : 'No owner yet'}${verdict ? ` · ${esc(VERDICT_WORDS[verdict] || cap(words(verdict)))}` : ''} · ${ctx.plural(it.flag_count, 'flag')} · flagged ${esc(when(it.created_at))}</p>
       </div>
       <div class="rq-d-actions">

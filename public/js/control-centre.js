@@ -48,7 +48,7 @@
   function storeSet(v) { try { window.localStorage.setItem(STORE_KEY, v); } catch { /* private mode etc. */ } }
 
   // ---------------------------------------------------------------- state + URL
-  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '' };
+  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '', gq: '' };
   const knownNames = { company: new Map(), grant: new Map() };
   /** companies.id of internal accounts seen in any response (search, overview). */
   const internalIds = new Set();
@@ -62,32 +62,35 @@
     const hash = /^#review(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
     // #companies, #companies/<id>, #companies?sort=…&dir=…&q=…
     const co = /^#companies(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
-    const tab = hash ? 'review' : co ? 'companies' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
+    // #grants, #grants/<id>, #grants?view=…&sort=…&dir=…&q=… (the old ?tab=grants&grant=X lands here too)
+    const gr = /^#grants(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
+    const tab = hash ? 'review' : co ? 'companies' : gr ? 'grants' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
     return {
       tab,
       range: RANGES.includes(p.get('range')) ? p.get('range') : (RANGES.includes(stored) ? stored : 'week'),
       company: co ? (co[1] ? Number(co[1]) : null) : id(p.get('company')),
-      grant: id(p.get('grant')),
+      grant: gr ? (gr[1] ? Number(gr[1]) : null) : id(p.get('grant')),
       card: hash?.[1] ? Number(hash[1]) : null,
       rq: hash?.[2] ?? '',
-      cq: co?.[2] ?? ''
+      cq: co?.[2] ?? '',
+      gq: gr?.[2] ?? ''
     };
   }
 
   function urlFor(s) {
     const p = new URLSearchParams();
-    if (s.tab !== 'overview' && s.tab !== 'review' && s.tab !== 'companies') p.set('tab', s.tab);
+    if (s.tab !== 'overview' && s.tab !== 'review' && s.tab !== 'companies' && s.tab !== 'grants') p.set('tab', s.tab);
     p.set('range', s.range);
-    if (s.tab === 'grants' && s.grant) p.set('grant', s.grant);
     const hash = s.tab === 'review' ? `#review${s.card ? `/${s.card}` : ''}${s.rq ? `?${s.rq}` : ''}`
-      : s.tab === 'companies' ? `#companies${s.company ? `/${s.company}` : ''}${s.cq ? `?${s.cq}` : ''}` : '';
+      : s.tab === 'companies' ? `#companies${s.company ? `/${s.company}` : ''}${s.cq ? `?${s.cq}` : ''}`
+        : s.tab === 'grants' ? `#grants${s.grant ? `/${s.grant}` : ''}${s.gq && !s.grant ? `?${s.gq}` : ''}` : '';
     return `${window.location.pathname}?${p}${hash}`;
   }
 
   function go(next, { push = true } = {}) {
     state = { ...state, ...next };
     if (state.tab !== 'companies') { state.company = null; state.cq = ''; }
-    if (state.tab !== 'grants') state.grant = null;
+    if (state.tab !== 'grants') { state.grant = null; state.gq = ''; }
     if (state.tab !== 'review') { state.card = null; state.rq = ''; }
     storeSet(state.range);
     const url = urlFor(state);
@@ -796,6 +799,19 @@
     get reviewCtx() { return reviewCtx; }
   };
 
+  /** What the Grants module gets from this page. */
+  const grantsCtx = {
+    esc, fmt, plural, api, send, reduceMotion,
+    state: () => state,
+    go: (next, opts) => go({ tab: 'grants', ...next }, opts),
+    goReview: (id) => go({ tab: 'review', card: id, rq: '' }),
+    goCompany: (id) => go({ tab: 'companies', company: id, cq: '' }),
+    includeInternal: () => includeInternal,
+    setIncludeInternal: (on) => reviewCtx.setIncludeInternal(on),
+    companiesCtx,
+    get reviewCtx() { return reviewCtx; }
+  };
+
   function render() {
     hideTip();
     const panel = $('#cc-panel');
@@ -804,6 +820,13 @@
       loadSeq++;
       renderChrome(null);
       window.CCCompanies.render(panel, companiesCtx);
+      loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
+      return;
+    }
+    if (state.tab === 'grants' && window.CCGrants) {
+      loadSeq++;
+      renderChrome(null);
+      window.CCGrants.render(panel, grantsCtx);
       loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
       return;
     }
@@ -880,7 +903,7 @@
       $(`#cc-tabs [data-tab="${next}"]`).focus();
     });
     $('#cc-action').addEventListener('click', (e) => { e.preventDefault(); go({ tab: 'review', card: null, rq: '' }); });
-    // Back/forward, and a typed or pasted #review/<id> or #companies/<id> on a
+    // Back/forward, and a typed or pasted #review/<id>, #companies/<id> or #grants/<id> on a
     // page already open. A hash change fires both events; render once.
     const fromUrl = () => {
       const next = readUrl();
