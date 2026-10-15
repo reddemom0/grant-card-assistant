@@ -185,8 +185,8 @@ can't be added back later.
 
 - **Ops rows:** only real Clerk users (`user_…`) are kept. This drops the smoke, probe,
   profile and stability test harnesses, which make up about 30% of match_results.
-- **Staff are kept.** During beta, staff and client usage are deliberately blended, so the
-  roll-up ignores `GG3_INTERNAL_USER_IDS`. Pulse still excludes staff. Because the tables
+- **Staff are kept.** During beta, staff and client usage are deliberately blended; the
+  Overview splits internal accounts out by company at read time (below). Because the tables
   hold no user ids, staff rows written now can't be separated out later. If staff need to be
   excluded in future, re-run the affected days with the filter added. Upserts never delete,
   so keys that belong only to staff would also have to be removed by hand.
@@ -337,8 +337,9 @@ On 2026-10-15, 193 cuts in 7 days formed 57 grant/reason groups; 15 reached 3+ c
 ### Chat cards from Oracle's detector (migration 047)
 
 The Pulse morning roundup (08:00 Vancouver, `src/services/pulse-roundup.js`) is Oracle's
-chat-issue detector. It reads the last 24h of client chat (staff left out by
-`GG3_INTERNAL_USER_IDS`): failed `chat_turns`, and each active conversation read once by Haiku
+chat-issue detector. It reads the last 24h of **all** chat, internal accounts included (a card
+from one carries the **Internal** tag through its company, so the board hides it by default):
+failed `chat_turns`, and each active conversation read once by Haiku
 against a fixed rubric (asked again, pushed back, asked for a person, left unanswered). **The
 grouping call is gone.** For a flagged conversation only, a second small Haiku call
 (`locateFlagged`) names the client message whose reply went wrong, from a transcript with the
@@ -368,7 +369,8 @@ the right message (the client's question about the consulting engagement).
   evidence), `suggested_fix`. Owner chris by default, research for `chat_wrong_grant_facts`.
 - **The DM** lists the cards filed or added to this morning — name, client, Oracle's take,
   its suggested owner, and the card link — at most 5, then "…and N more", and ends with the
-  Control Centre link. A run where every detection was already on file sends nothing.
+  Control Centre link. Client cards come first; an internal account's card follows, its client
+  marked "(Internal)", and the header says how many came from internal accounts. A run where every detection was already on file sends nothing.
 - **Oracle's `log_issue`** (in `gg3_conversations`) files a chat card as a `staff_flag` from
   the asker for one of the client's conversations (`conv:<id>:staff_report`; repeat reports
   pile onto it), with the same verbatim snapshot, and returns the card link.
@@ -377,6 +379,13 @@ Dry runs (nothing filed, nothing sent): `node scripts/pulse-roundup-check.mjs [-
 and for one conversation with its full card and the diagnosis it would get:
 `node scripts/pulse-roundup-check.mjs --conversation <id> --diagnose` (prints client text —
 keep it in your terminal).
+
+One-time backfill: `node scripts/pulse-roundup-check.mjs --since YYYY-MM-DD
+[--show-conversation N] [--write]` runs the same detector over every conversation since that
+date, with no 50-conversation cap. It reports conversations, failed turns, detections and cards
+split client vs internal, with each internal card marked `[Internal]`, plus the cost. Cards are
+filed exactly as the daily run files them, so re-running adds nothing. It is a dry run unless
+`--write` is given, and it stops if the internal-accounts list can't be read.
 
 ### The errors sheet is retired
 
@@ -665,6 +674,14 @@ companies that Chris has confirmed. **Their data is kept everywhere;** the list 
 | Usage tiles | Count everything. A sub-line shows how much came from internal accounts. |
 | A company's name anywhere | Shown with an **Internal** tag. |
 | Grant lists and trends (movers, most matched, most popular, shifting trends) | Left out by default, because a staff member re-editing a test profile makes grants "move" for no client reason. The **Include internal accounts** toggle above the grant lists puts them back. It's remembered per browser in `localStorage['cc.includeInternal']`, in try/catch, and switches with no refetch. |
+| Pulse morning roundup (and its `--since` backfill) | Reviews every conversation. An internal account's chat card carries the **Internal** tag like any other card, and the DM marks it "(Internal)". |
+| Pulse weekly digest | Usage and most-matched counts include everyone, with "N internal" beside them. The themes, Worth a look and the stored questions use client conversations only: internal conversations never reach the theme call. If the list can't be read, the themes are skipped for that week rather than run on a mix. Oracle's `pulse_stats` returns the same counts with an `internal` share. |
+
+**Pulse uses this list too.** `identity.js` `internalClerkIds()` turns `INTERNAL_COMPANY_IDS`
+into Clerk ids through the app DB (`company_users` → `users_clerk`, live rows only, `user_…`
+ids). It is cached for an hour, and on a failed refresh it keeps the last good list. This is
+the only staff source; `GG3_INTERNAL_USER_IDS` is retired and nothing reads it. On 2026-10-15
+the 28 companies gave 39 Clerk ids, including all 8 users with a staff app role.
 
 The list holds **28 companies**, all confirmed by Chris on 2026-10-15: Maximizer (#81), plus
 every company in the table below. Add an id only after Chris confirms it.
@@ -764,11 +781,11 @@ On 2026-10-15 the only sent week was Oct 5–11. Backfilled on the local scratch
 themes and 5 example questions. **Production needs 046 and then this backfill with
 `--write`.**
 
-**Follow-up, not changed here:** the digest still leaves staff out by
-`GG3_INTERNAL_USER_IDS` (Clerk ids), while the Control Centre uses the internal-accounts list
-(companies). The stored themes are therefore already filtered by the digest's rule, and
-the toggle can only act on the questions linked to a company. Aligning the two rules is a
-separate decision.
+**Client questions only.** The digest leaves internal accounts' conversations out of the theme
+call's input, so the stored themes and questions are client-only from the next digest on. Weeks
+stored before that (including the backfilled Oct 5–11) came from a digest that read everyone:
+`GG3_INTERNAL_USER_IDS` was never set in production. The Overview's toggle still tags any
+linked internal question.
 
 ## The Review queue screen (step 5c+9, Part B)
 

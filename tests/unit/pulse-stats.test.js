@@ -11,8 +11,6 @@
 import { jest } from '@jest/globals';
 import fs from 'fs';
 
-process.env.GG3_INTERNAL_USER_IDS = '';
-
 const { runPulseStats, resolveGrant, MAX_WEEKS } = await import('../../src/tools/pulse-stats.js');
 const { getToolsForAgent } = await import('../../src/tools/definitions.js');
 const { ORACLE_DEFERRED_TOOLS } = await import('../../src/claude/client.js');
@@ -38,9 +36,9 @@ const mondayOf = (start) => Object.keys(WEEKS).find(m => {
 function fakeOps() {
   return jest.fn(async (sql, params) => {
     const w = WEEKS[mondayOf(params[0])] || { users: 0, convs: 0, matching: 0, grants: [] };
-    if (/FROM chat_turns/.test(sql)) return { configured: true, rows: [{ n: w.users }] };
-    if (/FROM conversations/.test(sql)) return { configured: true, rows: [{ n: w.convs }] };
-    if (/GROUP BY grant_id/.test(sql)) return { configured: true, rows: w.grants.map(([grant_id, companies]) => ({ grant_id, companies })) };
+    if (/FROM chat_turns/.test(sql)) return { configured: true, rows: [{ n: w.users, internal: w.users > 1 ? 1 : 0 }] };
+    if (/FROM conversations/.test(sql)) return { configured: true, rows: [{ n: w.convs, internal: w.convs > 1 ? 2 : 0 }] };
+    if (/GROUP BY grant_id/.test(sql)) return { configured: true, rows: w.grants.map(([grant_id, companies]) => ({ grant_id, companies, internal: companies > 1 ? 1 : 0 })) };
     if (/FROM match_results/.test(sql)) return { configured: true, rows: [{ companies: w.matching }] };
     throw new Error(`unexpected ops query: ${sql}`);
   });
@@ -58,9 +56,27 @@ function fakeOracle() {
   });
 }
 
-const deps = () => ({ opsQuery: fakeOps(), oracleQuery: fakeOracle(), isConfigured: () => true, now: () => NOW });
+// internalIds: null — the counts without the internal split (as when the list can't be read).
+const deps = () => ({ opsQuery: fakeOps(), oracleQuery: fakeOracle(), isConfigured: () => true, now: () => NOW, internalIds: null });
 
 describe('one week', () => {
+  test('with the internal-accounts list: everyone counted, the internal share alongside (as the digest shows it)', async () => {
+    const d = { ...deps(), internalIds: jest.fn(async () => new Set(['user_staff1'])) };
+    const out = await runPulseStats({ start_week: '2026-09-28' }, {}, d);
+    const w = out.weeks[0];
+    expect(w).toMatchObject({ chat_users: 4, conversations: 6, internal: { chat_users: 1, conversations: 2 } });
+    expect(w.grants[0]).toMatchObject({ grant_id: 1027, companies: 4, internal_companies: 1 });
+    const usageCall = d.opsQuery.mock.calls.find(([sql]) => /FROM chat_turns/.test(sql));
+    expect(usageCall[1][2]).toEqual(['user_staff1']);
+  });
+
+  test('internal list unreadable: counts still returned, no internal split', async () => {
+    const out = await runPulseStats({ start_week: '2026-09-28' }, {}, { ...deps(), internalIds: async () => { throw new Error('down'); } });
+    expect(out.success).toBe(true);
+    expect(out.weeks[0].internal).toBeUndefined();
+    expect(out.weeks[0].grants[0].internal_companies).toBeUndefined();
+  });
+
   test('usage, companies matching, top grants with names and change', async () => {
     const out = await runPulseStats({ start_week: '2026-09-28' }, {}, deps());
     expect(out.success).toBe(true);

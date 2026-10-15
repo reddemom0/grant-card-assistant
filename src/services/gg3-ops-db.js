@@ -8,7 +8,10 @@
  * setting still can't turn it into a writer.
  *
  *   GG3_OPS_DB_READONLY_URL   postgresql://oracle_readonly:…@host:port/db
- *   GG3_INTERNAL_USER_IDS     comma-separated Clerk user ids of GetGranted staff
+ *
+ * Who counts as internal (GetGranted staff and test accounts) is not decided
+ * here: it is the Control Centre's internal-accounts list, resolved to Clerk
+ * ids by identity.js internalClerkIds(). GG3_INTERNAL_USER_IDS is retired.
  *
  * Missing URL is not an error: gg3OpsQuery returns { configured: false } and
  * one warning is logged per process. Oracle never crashes over this.
@@ -31,7 +34,6 @@ const NOT_CONFIGURED_REASON = 'GG3_OPS_DB_READONLY_URL is not set';
 
 let pool = null;
 let warnedNotConfigured = false;
-let warnedNoInternalUsers = false;
 
 export function isGg3OpsConfigured() {
   return Boolean(process.env.GG3_OPS_DB_READONLY_URL?.trim());
@@ -95,57 +97,6 @@ export async function gg3OpsQuery(text, params = []) {
   }
 }
 
-/**
- * Clerk user ids of GetGranted staff, from GG3_INTERNAL_USER_IDS.
- * Trimmed, de-duplicated, blanks dropped. Empty is allowed (warns once).
- */
-export function getInternalUserIds() {
-  const ids = [...new Set(
-    (process.env.GG3_INTERNAL_USER_IDS || '')
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-  )];
-
-  if (ids.length === 0 && !warnedNoInternalUsers) {
-    warnedNoInternalUsers = true;
-    console.warn('⚠️  GG3_INTERNAL_USER_IDS is empty; Pulse counts will include GetGranted staff.');
-  }
-
-  return ids;
-}
-
-const COLUMN_RE = /^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)?$/;
-
-/**
- * A WHERE fragment that drops internal users, with the ids as ONE bound
- * parameter — they never enter the SQL text.
- *
- *   const ex = excludeInternalUsers('user_id', 2);
- *   gg3OpsQuery(`SELECT … WHERE occurred_at > $1 AND ${ex.clause}`, [since, ...ex.params]);
- *
- * @param {string} column - column holding the Clerk user id (e.g. "user_id", "ct.user_id")
- * @param {number} paramIndex - the $n this fragment's parameter will take
- * @returns {{clause: string, params: Array}} clause is "TRUE" when the list is empty
- */
-export function excludeInternalUsers(column, paramIndex) {
-  if (typeof column !== 'string' || !COLUMN_RE.test(column)) {
-    throw new Error('excludeInternalUsers: column must be a plain identifier');
-  }
-  if (!Number.isInteger(paramIndex) || paramIndex < 1) {
-    throw new Error('excludeInternalUsers: paramIndex must be a positive integer');
-  }
-
-  const ids = getInternalUserIds();
-  if (ids.length === 0) return { clause: 'TRUE', params: [] };
-
-  // IS DISTINCT FROM-style: rows with a NULL user id are kept, not dropped.
-  return {
-    clause: `(${column} IS NULL OR NOT (${column} = ANY($${paramIndex}::text[])))`,
-    params: [ids]
-  };
-}
-
 /** Test-only: close and forget the pool, reset one-time warnings. */
 export async function _resetGg3OpsForTests() {
   if (pool) {
@@ -153,5 +104,4 @@ export async function _resetGg3OpsForTests() {
   }
   pool = null;
   warnedNotConfigured = false;
-  warnedNoInternalUsers = false;
 }

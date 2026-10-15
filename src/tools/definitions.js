@@ -2481,7 +2481,7 @@ Modes:
  */
 export const PULSE_STATS_TOOL = {
   name: 'pulse_stats',
-  description: `GetGranted usage and matching stats (Pulse) per Mon–Sun week, America/Vancouver: chat users, conversations, companies that ran matches, and the most-matched grants (top 10, or one grant) with the change from the week before. The same numbers as the Pulse weekly digest. Read-only.
+  description: `GetGranted usage and matching stats (Pulse) per Mon–Sun week, America/Vancouver: chat users, conversations, companies that ran matches, and the most-matched grants (top 10, or one grant) with the change from the week before. The same numbers as the Pulse weekly digest: everyone counted, internal (GetGranted test/staff) accounts included, with their share in "internal" / internal_companies. Read-only.
 
 Use it for counts, trends and comparisons: "how many people used GetGranted chat last week", "matches trend over the last month", "how is SWPP matching compared with last week", follow-ups to the weekly digest. For what clients actually asked or where a chat went wrong, use gg3_conversations or the chat-reading tools instead.
 

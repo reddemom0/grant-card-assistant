@@ -11,7 +11,7 @@
  */
 
 import { appQuery } from './db.js';
-import { isInternalCompany } from './internal-accounts.js';
+import { isInternalCompany, INTERNAL_COMPANY_IDS } from './internal-accounts.js';
 
 const IDENTITY_SQL = `
   SELECT uc.clerk_id, uc.user_id, cu.company_id, cu."primary" AS is_primary
@@ -98,3 +98,45 @@ export async function withCompanyNames(rows, { query = appQuery } = {}) {
     company_internal: isInternalCompany(r?.company_id)
   }));
 }
+
+// ---------------------------------------------------------------------------
+// Internal accounts as Clerk ids — the one staff source for Pulse
+// ---------------------------------------------------------------------------
+
+/**
+ * Clerk users of the internal accounts (internal-accounts.js), through company
+ * users. Soft-deleted rows on either side are ignored. This is the one staff
+ * source: Pulse (roundup, digest) and the Control Centre classify the same
+ * people as internal. GG3_INTERNAL_USER_IDS is retired.
+ */
+export const INTERNAL_CLERKS_SQL = `
+  SELECT DISTINCT uc.clerk_id
+    FROM company_users cu
+    JOIN users_clerk uc ON uc.user_id = cu.user_id AND uc.deleted_at IS NULL
+   WHERE cu.deleted_at IS NULL
+     AND uc.clerk_id LIKE 'user\\_%'
+     AND cu.company_id = ANY($1::int[])`;
+
+export const INTERNAL_CLERKS_TTL_MS = 60 * 60 * 1000;
+const internalClerksCache = { at: 0, ids: null };
+
+/**
+ * @returns {Promise<Set<string>>} Clerk ids of internal-account users, cached
+ *   INTERNAL_CLERKS_TTL_MS. Throws when the app DB can't be read and nothing is
+ *   cached yet — callers decide what that means for them.
+ */
+export async function internalClerkIds({ query = appQuery, now = () => Date.now(), companyIds = INTERNAL_COMPANY_IDS } = {}) {
+  if (internalClerksCache.ids && now() - internalClerksCache.at < INTERNAL_CLERKS_TTL_MS) return internalClerksCache.ids;
+  try {
+    const { rows } = await query(INTERNAL_CLERKS_SQL, [[...companyIds]]);
+    internalClerksCache.ids = new Set(rows.map((r) => r.clerk_id));
+    internalClerksCache.at = now();
+  } catch (err) {
+    if (!internalClerksCache.ids) throw err;
+    // A stale list beats none: keep using it until the app DB answers again.
+  }
+  return internalClerksCache.ids;
+}
+
+/** Test-only. */
+export function _resetInternalClerksForTests() { internalClerksCache.at = 0; internalClerksCache.ids = null; }

@@ -5,7 +5,8 @@
  * that ran matches, and the most-matched grants (or one requested grant) with
  * the change from the week before. Every number comes from the same functions
  * the Pulse weekly digest uses (src/services/pulse-digest.js) — same rules,
- * same staff filter — so the tool and the digest never disagree.
+ * everyone counted with the internal accounts' share alongside (the Control
+ * Centre's internal-accounts list) — so the tool and the digest never disagree.
  *
  * Reads the gg3 ops DB through its read-only role (gg3-ops-db.js) and Oracle's
  * own gg3_grants copy for names. No writes, no model calls.
@@ -29,8 +30,14 @@ async function oracleQuery(text, params) {
   return query(text, params);
 }
 
+async function internalIds() {
+  const { internalClerkIds } = await import('../control-centre/identity.js');
+  return internalClerkIds();
+}
+
 const defaultDeps = {
   opsQuery: gg3OpsQuery,
+  internalIds,
   oracleQuery,
   isConfigured: isGg3OpsConfigured,
   now: () => new Date()
@@ -94,6 +101,10 @@ export async function runPulseStats(input = {}, context = {}, deps = defaultDeps
       grant = resolved.grant;
     }
 
+    // Internal accounts' Clerk ids for the "internal" counts; null (counts
+    // without the split) when the list can't be read.
+    const ids = d.internalIds ? await d.internalIds().catch(() => null) : null;
+
     // The week before the range too, so the first week has a comparison.
     const mondays = Array.from({ length: weeks }, (_, i) => addDays(start, 7 * i));
     const priorMatches = await collectGrantMatches(weekBounds(addDays(start, -7)), d.opsQuery);
@@ -105,14 +116,14 @@ export async function runPulseStats(input = {}, context = {}, deps = defaultDeps
       const bounds = weekBounds(monday);
       if (bounds.start > now) break;   // a range running into the future stops at this week
       const [usage, matching, matches] = [
-        await collectUsage(bounds, d.opsQuery),
+        await collectUsage(bounds, d.opsQuery, ids),
         await collectMatchingCompanies(bounds, d.opsQuery),
-        await collectGrantMatches(bounds, d.opsQuery)
+        await collectGrantMatches(bounds, d.opsQuery, ids)
       ];
       if (!usage || matching === null || !matches) return { success: false, error: 'GetGranted stats are not available right now.' };
       const prior = new Map(before.map(m => [m.grantId, m.companies]));
       const picked = grant
-        ? [{ grantId: grant.id, companies: matches.find(m => m.grantId === grant.id)?.companies ?? 0 }]
+        ? [{ grantId: grant.id, companies: 0, internalCompanies: 0, ...matches.find(m => m.grantId === grant.id) }]
         : matches.slice(0, TOP_GRANTS);
       raw.push({
         monday, bounds, usage, matching,
@@ -122,8 +133,8 @@ export async function runPulseStats(input = {}, context = {}, deps = defaultDeps
     }
 
     // Names in one lookup for every grant shown.
-    const ids = [...new Set(raw.flatMap(w => w.grants.map(g => g.grantId)))];
-    const names = new Map((await nameGrants(ids.map(grantId => ({ grantId })), d.oracleQuery)).map(g => [g.grantId, g.name]));
+    const grantIds = [...new Set(raw.flatMap(w => w.grants.map(g => g.grantId)))];
+    const names = new Map((await nameGrants(grantIds.map(grantId => ({ grantId })), d.oracleQuery)).map(g => [g.grantId, g.name]));
 
     return {
       success: true,
@@ -136,11 +147,13 @@ export async function runPulseStats(input = {}, context = {}, deps = defaultDeps
         partial: w.bounds.end > now,
         chat_users: w.usage.chatUsers,
         conversations: w.usage.conversations,
+        ...(w.usage.internal ? { internal: { chat_users: w.usage.internal.chatUsers, conversations: w.usage.internal.conversations } } : {}),
         companies_matching: w.matching,
         grants: w.grants.map(g => ({
           grant_id: g.grantId,
           name: grant && g.grantId === grant.id ? grant.name : names.get(g.grantId),
           companies: g.companies,
+          ...(ids ? { internal_companies: g.internalCompanies ?? 0 } : {}),
           week_before: g.priorCompanies,
           change: changeText(g.companies, g.priorCompanies)
         }))

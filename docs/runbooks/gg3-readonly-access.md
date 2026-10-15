@@ -82,51 +82,43 @@ In Oracle's Railway service (grant-card-assistant), go to **Variables** and add:
 | Variable | Value |
 |---|---|
 | `GG3_OPS_DB_READONLY_URL` | the URL from step 2 |
-| `GG3_INTERNAL_USER_IDS` | Clerk user ids of GetGranted staff, comma-separated, e.g. `user_2ab…,user_2cd…` (section 4) |
 
 Railway redeploys on save.
 - If `GG3_OPS_DB_READONLY_URL` is missing, Oracle logs one warning and carries on. It never
   crashes over this.
-- If `GG3_INTERNAL_USER_IDS` is empty, Oracle warns once and counts staff as clients.
+- Staff and test logins are not listed here (section 4).
 
 Then check it from your machine:
 
 ```
-GG3_OPS_DB_READONLY_URL='<url>' GG3_INTERNAL_USER_IDS='<ids>' node scripts/gg3-ops-db-check.mjs
+GG3_OPS_DB_READONLY_URL='<url>' node scripts/gg3-ops-db-check.mjs
 ```
 
 It prints:
-- last week's chat outcomes, with staff excluded
+- last week's chat outcomes (everyone's)
 - last week's conversation count
 - two **PASS** lines confirming writes are refused
 
 It prints no message text.
 
-## 4. Finding each staff member's Clerk user id
+## 4. Staff and test accounts
 
-No gg3 table stores emails. People are only known by their Clerk user id, which starts
-`user_`. Any of these works:
+There is no staff list to keep here. `GG3_INTERNAL_USER_IDS` is retired; remove it from
+Railway if it is still set, since nothing reads it.
 
-1. **From their own login (easiest).** The person signs in to the GetGranted app and opens the
-   browser console: right-click, **Inspect**, then **Console**. They type
-   `window.Clerk?.user?.id` and press Enter. It prints their id.
-   - If that prints `undefined`: in the same panel go to **Application**, then **Cookies**, and
-     copy the `__session` value. Paste it into a JWT decoder (e.g. jwt.io) and read the `sub`
-     field.
-2. **Clerk dashboard.** If someone has access: **Users**, search by email, copy the **User ID**.
-3. **No login available.** Have the person send one chat message at a time you note down.
-   Then find it without reading any text:
+GetGranted's own accounts are the Control Centre's internal-accounts list:
+`INTERNAL_COMPANY_IDS` in `src/control-centre/internal-accounts.js`, which holds company ids.
+Pulse turns those companies into Clerk user ids through the app DB (`company_users` →
+`users_clerk`, `src/control-centre/identity.js` `internalClerkIds()`, cached an hour), so
+anyone who joins an internal company is covered without a config change.
 
-   ```sql
-   SELECT user_id, occurred_at
-     FROM chat_turns
-    WHERE occurred_at BETWEEN timestamptz '2026-10-01 14:30 America/Vancouver' - interval '2 minutes'
-                          AND timestamptz '2026-10-01 14:30 America/Vancouver' + interval '2 minutes';
-   ```
+- **Morning roundup:** reviews every conversation. Cards from internal accounts carry the
+  Internal tag.
+- **Weekly digest:** counts everyone, with "N internal" beside each count. Its themes and
+  stored questions use client conversations only.
 
-   This is only reliable when few people are chatting.
-
-Add each id to `GG3_INTERNAL_USER_IDS`. Re-check whenever someone joins or leaves.
+To mark a new test or staff company as internal, add its id to `INTERNAL_COMPANY_IDS` (see
+`docs/control-centre.md`).
 
 ## 5. Rotate the password
 

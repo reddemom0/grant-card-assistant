@@ -6,7 +6,10 @@
  */
 
 import { jest } from '@jest/globals';
-import { identitiesForClerkIds, shapeIdentities } from '../../src/control-centre/identity.js';
+import {
+  identitiesForClerkIds, shapeIdentities, internalClerkIds, INTERNAL_CLERKS_SQL, INTERNAL_CLERKS_TTL_MS, _resetInternalClerksForTests
+} from '../../src/control-centre/identity.js';
+import { INTERNAL_COMPANY_IDS } from '../../src/control-centre/internal-accounts.js';
 import {
   ENGINE_PROFILE_SOURCE,
   companyProfile,
@@ -56,6 +59,39 @@ describe('identitiesForClerkIds', () => {
     const query = jest.fn();
     expect((await identitiesForClerkIds([], { query })).size).toBe(0);
     expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('internalClerkIds (the one staff source for Pulse)', () => {
+  beforeEach(() => _resetInternalClerksForTests());
+
+  test('the internal companies\' live Clerk users, as a Set, read once per hour', async () => {
+    let t = 1000;
+    const query = jest.fn(async () => ({ rows: [{ clerk_id: 'user_a' }, { clerk_id: 'user_b' }] }));
+    const ids = await internalClerkIds({ query, now: () => t });
+    expect(ids).toEqual(new Set(['user_a', 'user_b']));
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).toBe(INTERNAL_CLERKS_SQL);
+    expect(params).toEqual([[...INTERNAL_COMPANY_IDS]]);
+    expect(sql).toMatch(/cu\.deleted_at IS NULL/);
+    expect(sql).toMatch(/uc\.deleted_at IS NULL/);
+    expect(sql).toMatch(/clerk_id LIKE 'user\\_%'/);
+    t += INTERNAL_CLERKS_TTL_MS - 1;
+    await internalClerkIds({ query, now: () => t });
+    expect(query).toHaveBeenCalledTimes(1);
+    t += 2;
+    await internalClerkIds({ query, now: () => t });
+    expect(query).toHaveBeenCalledTimes(2);
+  });
+
+  test('a failed refresh keeps the last good list; with none it throws', async () => {
+    const down = jest.fn(async () => { throw Object.assign(new Error('x'), { code: 'ECONNREFUSED' }); });
+    await expect(internalClerkIds({ query: down })).rejects.toMatchObject({ code: 'ECONNREFUSED' });
+    let t = 0;
+    await internalClerkIds({ query: async () => ({ rows: [{ clerk_id: 'user_a' }] }), now: () => t });
+    t += INTERNAL_CLERKS_TTL_MS + 1;
+    expect(await internalClerkIds({ query: down, now: () => t })).toEqual(new Set(['user_a']));
+    expect(down).toHaveBeenCalledTimes(2);
   });
 });
 

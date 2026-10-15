@@ -2,8 +2,8 @@
  * Pulse weekly digest: the week, the counts, the one themes call, the post,
  * the errors section from the Control Centre review queue, once a week.
  *
- * gg3-ops-db.js is the real module (its staff filter is what the queries use);
- * queries, the model, the review queue and Chat are injected fakes.
+ * gg3-ops-db.js is the real module; internal accounts arrive as a Set of Clerk
+ * ids (identity.js internalClerkIds in production); queries, the model, the review queue and Chat are injected fakes.
  *
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest --config tests/jest.config.cjs tests/unit/pulse-digest.test.js
  */
@@ -11,7 +11,7 @@
 import { jest } from '@jest/globals';
 
 process.env.GG3_OPS_DB_READONLY_URL = 'postgresql://oracle_readonly:x@localhost:5432/test';
-process.env.GG3_INTERNAL_USER_IDS = 'user_staff1';
+const INTERNAL = new Set(['user_staff1']);
 
 jest.unstable_mockModule('../../src/utils/cost-logger.js', () => ({ logAPICost: () => 0 }));
 
@@ -62,22 +62,39 @@ describe('counts', () => {
     expect(D.formatChange(0, 0)).toBe('0 (±0, — vs week before)');
   });
 
-  test('grant matches count distinct companies (user when no company), shown only, staff left out', async () => {
+  test('grant matches count distinct companies (user when no company), shown only, everyone — internal share alongside', async () => {
     const calls = [];
-    const runQuery = async (sql, params) => { calls.push({ sql, params }); return { configured: true, rows: [{ grant_id: 7, companies: 2 }] }; };
-    const out = await D.collectGrantMatches(D.weekBounds('2026-09-28'), runQuery);
-    expect(out).toEqual([{ grantId: 7, companies: 2 }]);
-    expect(calls[0].sql).toMatch(/count\(DISTINCT coalesce\(company_id::text, 'u:' \|\| user_id\)\)/);
+    const runQuery = async (sql, params) => { calls.push({ sql, params }); return { configured: true, rows: [{ grant_id: 7, companies: 2, internal: 1 }] }; };
+    const out = await D.collectGrantMatches(D.weekBounds('2026-09-28'), runQuery, INTERNAL);
+    expect(out).toEqual([{ grantId: 7, companies: 2, internalCompanies: 1 }]);
+    expect(calls[0].sql).toMatch(/count\(DISTINCT coalesce\(company_id::text, 'u:' \|\| user_id\)\)::int AS companies/);
     expect(calls[0].sql).toMatch(/WHERE shown AND/);
-    expect(calls[0].params[2]).toEqual(['user_staff1']);
+    expect(calls[0].sql).not.toMatch(/NOT \(user_id/);
+    // internal = an internal company, or (no company) an internal Clerk id
+    expect(calls[0].sql).toMatch(/FILTER \(WHERE company_id = ANY\(\$3::int\[\]\) OR \(company_id IS NULL AND user_id = ANY\(\$4::text\[\]\)\)\)/);
+    expect(calls[0].params[2]).toEqual(expect.arrayContaining([81]));
+    expect(calls[0].params[3]).toEqual(['user_staff1']);
   });
 
-  test('usage reads chat_turns users and conversations by updated_at', async () => {
-    const sqls = [];
-    const runQuery = async (sql) => { sqls.push(sql); return { configured: true, rows: [{ n: 4 }] }; };
-    expect(await D.collectUsage(D.weekBounds('2026-09-28'), runQuery)).toEqual({ chatUsers: 4, conversations: 4 });
-    expect(sqls[0]).toMatch(/count\(DISTINCT user_id\)[\s\S]*FROM chat_turns/);
-    expect(sqls[1]).toMatch(/FROM conversations[\s\S]*updated_at >= \$1/);
+  test('usage counts everyone, with the internal share when the list is known', async () => {
+    const calls = [];
+    const runQuery = async (sql, params) => { calls.push({ sql, params }); return { configured: true, rows: [{ n: 7, internal: 5 }] }; };
+    expect(await D.collectUsage(D.weekBounds('2026-09-28'), runQuery, INTERNAL))
+      .toEqual({ chatUsers: 7, conversations: 7, internal: { chatUsers: 5, conversations: 5 } });
+    expect(calls[0].sql).toMatch(/count\(DISTINCT user_id\)[\s\S]*FROM chat_turns/);
+    expect(calls[1].sql).toMatch(/FROM conversations[\s\S]*updated_at >= \$1/);
+    for (const c of calls) {
+      expect(c.sql).toMatch(/FILTER \(WHERE user_id = ANY\(\$3::text\[\]\)\)/);
+      expect(c.sql).not.toMatch(/NOT \(user_id/);
+      expect(c.params[2]).toEqual(['user_staff1']);
+    }
+    expect((await D.collectUsage(D.weekBounds('2026-09-28'), runQuery)).internal).toBeNull();
+  });
+
+  test('internalNote', () => {
+    expect(D.internalNote(5)).toBe(', 5 internal');
+    expect(D.internalNote(0)).toBe('');
+    expect(D.internalNote(undefined)).toBe('');
   });
 
   test('not configured → null', async () => {
@@ -122,12 +139,20 @@ describe('exchanges', () => {
     const calls = [];
     const runQuery = async (sql, params) => {
       calls.push({ sql, params });
-      if (/FROM conversations/.test(sql)) return { configured: true, rows: [{ id: 11, user_id: 'user_a', messages: [msg('user', 'q1'), msg('assistant', 'a1')] }, { id: 12, user_id: 'user_b', messages: [msg('user', 'q2')] }] };
+      if (/FROM conversations/.test(sql)) return { configured: true, rows: [
+        { id: 11, user_id: 'user_a', messages: [msg('user', 'q1'), msg('assistant', 'a1')] },
+        { id: 13, user_id: 'user_staff1', messages: [msg('user', `staff question ${SECRET}`), msg('assistant', 'a'), msg('user', 'second staff question')] },
+        { id: 12, user_id: 'user_b', messages: [msg('user', 'q2')] }
+      ] };
       if (/GROUP BY conversation_id, outcome/.test(sql)) return { configured: true, rows: [{ conversation_id: 12, outcome: 'error', n: 1 }, { conversation_id: 12, outcome: 'completed', n: 2 }] };
       return { configured: true, rows: [{ n: 3 }] };
     };
-    const out = await D.collectExchanges(D.weekBounds('2026-09-28'), runQuery);
+    const out = await D.collectExchanges(D.weekBounds('2026-09-28'), runQuery, INTERNAL);
     expect(out.total).toBe(2);
+    // Internal accounts' conversations are counted, never passed on.
+    expect(out.internal).toEqual({ conversations: 1, exchanges: 2 });
+    expect(JSON.stringify(out.exchanges)).not.toContain('staff question');
+    expect(D.exchangesText(out)).not.toContain('staff question');
     expect(out.unlinkedFailed).toBe(3);
     expect(out.exchanges).toEqual([
       { question: 'q1', reply: 'a1', conversation: 1, userId: 'user_a', tally: '', turnFailed: false, id: 1 },
@@ -137,6 +162,7 @@ describe('exchanges', () => {
     expect(calls[1].params[2]).toEqual([11, 12]);
     expect(calls[2].sql).toMatch(/conversation_id IS NULL/);
     expect(calls[2].params[2]).toEqual(expect.arrayContaining(['error', 'max_rounds', 'no_answer', 'input_guard']));
+    expect(calls[2].sql).toMatch(/\(user_id IS NULL OR NOT \(user_id = ANY\(\$4::text\[\]\)\)\)/);
     expect(calls[2].params[3]).toEqual(['user_staff1']);
   });
 
@@ -319,16 +345,17 @@ function fakeDeps({ questions = true, claimed = new Set() } = {}) {
   const posted = [];
   const msg = (role, text) => ({ role, content: [{ type: 'text', text }] });
   const deps = {
+    internalIds: jest.fn(async () => INTERNAL),
     collectUsage: jest.fn(async (w) => (w.start.toISOString().startsWith('2026-09-28')
-      ? { chatUsers: 3, conversations: 4 } : { chatUsers: 0, conversations: 1 })),
+      ? { chatUsers: 3, conversations: 4, internal: { chatUsers: 1, conversations: 2 } } : { chatUsers: 0, conversations: 1, internal: { chatUsers: 0, conversations: 0 } })),
     collectExchanges: jest.fn(async () => (questions
-      ? { unlinkedFailed: 1, total: 2, exchanges: [
+      ? { unlinkedFailed: 1, total: 2, internal: { conversations: 2, exchanges: 5 }, exchanges: [
         { id: 1, question: `I'm ${SECRET}, hiring grants?`, reply: `Hi ${SECRET}! Here are three hiring grants for you.`, conversation: 1, userId: 'user_a', tally: '1 completed' },
         { id: 2, question: 'Is CanExport open?', reply: null, conversation: 2, tally: '1 error' }
       ] }
-      : { unlinkedFailed: 0, total: 0, exchanges: [] })),
+      : { unlinkedFailed: 0, total: 0, internal: { conversations: 0, exchanges: 0 }, exchanges: [] })),
     collectGrantMatches: jest.fn(async (w) => (w.start.toISOString().startsWith('2026-09-28')
-      ? [{ grantId: 1027, companies: 4 }, { grantId: 5, companies: 1 }]
+      ? [{ grantId: 1027, companies: 4, internalCompanies: 2 }, { grantId: 5, companies: 1, internalCompanies: 0 }]
       : [{ grantId: 1027, companies: 3 }])),
     createMessage: jest.fn(async () => ({
       content: [{
@@ -511,13 +538,19 @@ describe('runWeeklyDigest', () => {
 
     const usage = section(m, 'Usage');
     expect(usage.map(w => w.decoratedText.topLabel)).toEqual(['Chat users', 'Conversations']);
-    expect(usage[0].decoratedText.text).toBe('3 (+3, — vs week before)');
+    expect(usage[0].decoratedText.text).toBe('3 (+3, — vs week before), 1 internal');
+    expect(usage[1].decoratedText.text).toBe('4 (+3, +300% vs week before), 2 internal');
+    // The internal Clerk ids reach every collector; the themes call reads client exchanges only.
+    expect(f.deps.collectUsage).toHaveBeenCalledWith(D.weekBounds('2026-09-28'), INTERNAL);
+    expect(f.deps.collectExchanges).toHaveBeenCalledWith(D.weekBounds('2026-09-28'), INTERNAL);
+    expect(f.deps.collectGrantMatches).toHaveBeenCalledWith(D.weekBounds('2026-09-28'), INTERNAL);
     expect(texts(section(m, 'What clients asked'))).toEqual([
       '<b>Hiring</b> (1)<br>Hiring money<br><i>"I\'m [name] at [company], hiring grants?"</i>',
-      '<b>Status</b> (1)<br>Open or not<br><i>"Is CanExport open?"</i>'
+      '<b>Status</b> (1)<br>Open or not<br><i>"Is CanExport open?"</i>',
+      'Internal accounts\' 5 questions (2 conversations) left out.'
     ]);
     expect(texts(section(m, 'Most-matched grants'))).toEqual([
-      'Career Ready SWPP — matched to 4 companies (+1, +33% vs week before)',
+      'Career Ready SWPP — matched to 4 companies (2 internal) (+1, +33% vs week before)',
       'grant #5 — matched to 1 company (new this week)'
     ]);
     expect(JSON.stringify(m)).not.toMatch(/"header":"Grants"/);
@@ -535,6 +568,21 @@ describe('runWeeklyDigest', () => {
     expect(everything).not.toContain(SECRET);
     expect(everything).not.toMatch(/Jane|Doe|Acme/);
     expect(JSON.stringify(m)).not.toContain('…');
+  });
+
+  test('internal list unavailable: counts still sent, themes skipped rather than run on a mix', async () => {
+    const f = fakeDeps();
+    f.deps.internalIds = jest.fn(async () => { throw Object.assign(new Error('x'), { code: 'ECONNREFUSED' }); });
+    f.deps.saveThemes = jest.fn(async () => ({}));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const out = await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps });
+    warn.mockRestore();
+    expect(out.status).toBe('sent');
+    expect(f.deps.collectExchanges).not.toHaveBeenCalled();
+    expect(f.deps.createMessage).not.toHaveBeenCalled();
+    const m = f.posted[0].message;
+    expect(texts(section(m, 'What clients asked'))).toEqual(['Themes unavailable this week (code: internal_accounts_unavailable).']);
+    expect(f.deps.collectUsage).toHaveBeenCalledWith(D.weekBounds('2026-09-28'), null);
   });
 
   test('a quiet week still sends, with no model call', async () => {

@@ -5,8 +5,9 @@
  *
  *   node scripts/pulse-roundup-check.mjs [--hours 168]
  *       the live window: failed chat turns and conversations active in it,
- *       staff left out, each conversation read by Haiku. Prints each chat card
- *       it would file (ref, issue, flagged message) and the DM it would send.
+ *       everyone's (internal accounts too), each conversation read by Haiku.
+ *       Prints each chat card it would file (ref, issue, flagged message) and
+ *       the DM it would send, internal-account cards marked Internal.
  *
  *   node scripts/pulse-roundup-check.mjs --conversation 123 [--diagnose]
  *       one conversation, whoever it belongs to: the detector's review, the
@@ -15,9 +16,13 @@
  *       diagnosis the hourly sweep would give it (cost printed, not logged).
  *
  *   node scripts/pulse-roundup-check.mjs --since 2026-10-01 [--show-conversation 290] [--write]
- *       ONE-TIME BACKFILL. The daily detector over every client conversation
- *       active since that date (Vancouver midnight) and every failed chat turn
- *       since then — staff left out by the daily filter, no 50-conversation cap.
+ *       ONE-TIME BACKFILL. The daily detector over every conversation active
+ *       since that date (Vancouver midnight) and every failed chat turn since
+ *       then — internal accounts included, as the daily run does, and counted
+ *       apart (client vs internal); no 50-conversation cap. A card from an
+ *       internal account is filed like any other and carries the Internal tag
+ *       through its company (hidden by default in the Control Centre). Needs
+ *       the internal-accounts list (Control Centre, app DB) or it stops.
  *       Same review call (byte-identical) and the same separate flagged-message
  *       call (buildRoundup), and cards filed exactly as the daily run files them
  *       (fileCards), so the dedupe keys are the same and re-running adds nothing
@@ -130,17 +135,19 @@ async function oneConversation(id, { createMessage, diagnose }) {
 }
 
 async function window(hours, createMessage) {
+  const { internalClerkIds } = await import('../src/control-centre/identity.js');
   const built = await buildRoundup({
     hours,
     deps: {
       collectErrors: (h) => collectErrors(h),
       collectConversations: (h) => collectConversations(h),
       createMessage,
-      fetchProfile: (id) => fetchCompanyName(id)
+      fetchProfile: (id) => fetchCompanyName(id),
+      internalIds: () => internalClerkIds()
     }
   });
   const lookup = built.clientLookup;
-  console.log(`Window: last ${hours} hours (staff excluded)`);
+  console.log(`Window: last ${hours} hours (everyone, internal accounts included)`);
   console.log(`  failed chat turns:              ${built.errors}`);
   console.log(`  conversations reviewed:         ${built.conversations}${built.conversations === 50 ? ' (capped at 50)' : ''}`);
   console.log(`  went badly:                     ${built.flagged}`);
@@ -156,7 +163,7 @@ async function window(hours, createMessage) {
     console.log(`  ${c.ref}  ← ${c.sourceRef}  (${c.name}; flagged message ${c.turnIndex == null ? '—' : c.turnIndex + 1})`);
   }
   // As if every detection were new and unfiled: no Hub read in a dry run.
-  const cards = dmCards(built.candidates.map(c => ({ candidate: c, ok: false })), built.labels);
+  const cards = dmCards(built.candidates.map(c => ({ candidate: c, ok: false })), built.labels, built.internalIds);
   console.log('\nWould send (card links appear once filed):\n');
   console.log(formatRoundup(cards, { hours }).split('\n').map(l => `  ${l}`).join('\n'));
   if (hours !== WINDOW_HOURS) console.log(`\n(The live roundup looks back ${WINDOW_HOURS} hours; this run used ${hours}.)`);
@@ -168,23 +175,30 @@ async function window(hours, createMessage) {
  * collectors apply; the conversation cap is lifted.
  */
 async function backfill(args, createMessage) {
-  // The daily run leaves GetGranted staff out by GG3_INTERNAL_USER_IDS; without
-  // it a backfill would file cards for staff chats the daily run never would.
-  const { getInternalUserIds } = await import('../src/services/gg3-ops-db.js');
-  const staffFilter = getInternalUserIds().length > 0;
-  if (args.write && !staffFilter) {
-    throw Object.assign(new Error('GG3_INTERNAL_USER_IDS is empty: --write would file cards for staff chats. Set it (as on Railway) and re-run.'), { code: 'no_staff_filter' });
+  // Internal accounts are reviewed like everyone else, but the backfill reports
+  // them apart and their cards must carry the Internal tag: without the
+  // internal-accounts list (Control Centre, app DB) it stops, dry run or not.
+  const { internalClerkIds } = await import('../src/control-centre/identity.js');
+  const { isInternalCompany } = await import('../src/control-centre/internal-accounts.js');
+  let internal;
+  try {
+    internal = await internalClerkIds();
+  } catch (err) {
+    throw Object.assign(new Error(`internal-accounts list unavailable (app DB code ${err?.code ?? err?.name ?? 'unknown'}): client and internal chats can't be told apart. Check APP_DB_READONLY_URL and re-run.`), { code: 'no_internal_accounts' });
   }
   const since = vancouverMidnight(args.since);
   const hours = Math.ceil((Date.now() - since.getTime()) / 3600000);
   const t0 = Date.now();
+  let reviewed = [];
+  let failedTurns = [];
   const built = await buildRoundup({
     hours,
     deps: {
-      collectErrors: (h) => collectErrors(h),
-      collectConversations: (h) => collectConversations(h, gg3OpsQuery, 100000),
+      collectErrors: async (h) => (failedTurns = await collectErrors(h)),
+      collectConversations: async (h) => (reviewed = await collectConversations(h, gg3OpsQuery, 100000)),
       createMessage,
-      fetchProfile: (id) => fetchCompanyName(id)
+      fetchProfile: (id) => fetchCompanyName(id),
+      internalIds: async () => internal
     }
   });
   if (!built) throw Object.assign(new Error('ops DB not configured'), { code: 'ops_not_configured' });
@@ -209,15 +223,23 @@ async function backfill(args, createMessage) {
   const { companyNamesForIds } = await import('../src/control-centre/identity.js');
   const names = await companyNamesForIds([...companies.values()]).catch(() => new Map());
   const who = (userId) => { const id = companies.get(userId); return id ? `${names.get(id) ?? `company #${id}`} (${id})` : `a client ·${String(userId).slice(-4)}`; };
+  // The tag the Control Centre shows: the card's company is an internal
+  // account. With no company on file, the internal Clerk-id list decides.
+  const isInternal = (userId) => { const id = companies.get(userId); return id ? isInternalCompany(id) : internal.has(userId); };
+  const split = (list, userOf) => {
+    const n = list.filter((x) => internal.has(userOf(x))).length;
+    return `${list.length} — ${list.length - n} client, ${n} internal`;
+  };
+  const internalCards = [...cardsByRef.values()].filter((list) => isInternal(list[0].userId)).length;
 
-  console.log(`Backfill since ${args.since} (Vancouver) = ${since.toISOString()}, ${hours} hours back — ${staffFilter
-    ? `staff excluded (${getInternalUserIds().length} ids)` : 'STAFF INCLUDED: GG3_INTERNAL_USER_IDS is empty here, so these counts include GetGranted staff chats (--write refuses to run like this)'}, no conversation cap`);
-  console.log(`  conversations reviewed:         ${built.conversations}`);
+  console.log(`Backfill since ${args.since} (Vancouver) = ${since.toISOString()}, ${hours} hours back — everyone, internal accounts included `
+    + `(${internal.size} internal Clerk ids from the Control Centre's internal-accounts list), no conversation cap`);
+  console.log(`  conversations reviewed:         ${split(reviewed, (c) => c.userId)}`);
   console.log(`  reviews that failed:            ${built.failedReviews}`);
   console.log(`  went badly:                     ${built.flagged}`);
-  console.log(`  failed chat turns:              ${built.errors}`);
-  console.log(`  issues found (detections):      ${cands.length}  ${JSON.stringify(byIssue)}`);
-  console.log(`  chat cards they make:           ${cardsByRef.size} (one per issue per conversation)`);
+  console.log(`  failed chat turns:              ${split(failedTurns, (e) => e.userId)}`);
+  console.log(`  issues found (detections):      ${split(cands, (c) => c.userId)}  ${JSON.stringify(byIssue)}`);
+  console.log(`  chat cards they make:           ${cardsByRef.size} — ${cardsByRef.size - internalCards} client, ${internalCards} tagged Internal (one per issue per conversation)`);
   console.log(`  already on file:                ${knownError ? `couldn't check (code ${knownError})` : `${cands.length - fresh.length} — ${fresh.length} would be filed`}`);
   console.log(`  run time:                       ${Math.round((Date.now() - t0) / 1000)}s`);
 
@@ -225,7 +247,8 @@ async function backfill(args, createMessage) {
   for (const [ref, list] of cardsByRef) {
     const c = list[0];
     const state = list.every((x) => known.has(x.sourceRef)) ? 'on file' : list.some((x) => known.has(x.sourceRef)) ? 'partly on file' : 'new';
-    console.log(`  ${ref.padEnd(34)} ${who(c.userId).padEnd(34)} ${c.name}${list.length > 1 ? ` ×${list.length}` : ''} — ${state}`);
+    const tag = isInternal(c.userId) ? ' [Internal]' : '';
+    console.log(`  ${ref.padEnd(34)} ${(who(c.userId) + tag).padEnd(45)} ${c.name}${list.length > 1 ? ` ×${list.length}` : ''} — ${state}`);
   }
 
   if (args.show) {
@@ -236,6 +259,7 @@ async function backfill(args, createMessage) {
       const companyId = companies.get(c.userId) ?? null;
       const card = {
         kind: 'chat', chat_turn_ref: c.ref, conversation_id: c.conversationId, company_id: companyId, company: companyId ? names.get(companyId) ?? null : null,
+        internal: isInternal(c.userId),
         flag: { source: 'oracle_detected', source_ref: c.sourceRef, actor: DETECTOR_ACTOR, comment: `${c.name}: ${c.fullTake ?? c.take}`,
           already_on_file: known.has(c.sourceRef) },
         snapshot: snapshotFor(c, c.messages)
@@ -294,7 +318,7 @@ let code = 0;
 try {
   await main();
 } catch (err) {
-  console.error(`Stopped (code: ${err?.code ?? err?.status ?? err?.name ?? 'unknown'})${err?.code === 'no_staff_filter' ? ` — ${err.message}` : ''}`);
+  console.error(`Stopped (code: ${err?.code ?? err?.status ?? err?.name ?? 'unknown'})${err?.code === 'no_internal_accounts' ? ` — ${err.message}` : ''}`);
   code = 1;
 } finally {
   await closeOps();
