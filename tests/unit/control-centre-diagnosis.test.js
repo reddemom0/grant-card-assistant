@@ -328,6 +328,29 @@ const CHAT_ANSWER = {
   suggested_fix: 'Have the assistant check the grant\'s status before quoting a deadline.'
 };
 
+describe('empty_track routing', () => {
+  const empty = { id: 9, kind: 'empty_track', company_id: 135, goal_track: 'Improve Sustainability' };
+
+  test('profile gap → client with a notice; no grants for the goal → research; otherwise chris', () => {
+    const route = routeFor(empty, {});
+    expect(route).toMatchObject({ rule: 'empty_track', allowed: ['client', 'research', 'chris'], default: 'chris' });
+    expect(applyRoute({ owner: 'chris', verdict: 'profile_incomplete', narrative: NARRATIVE, client_notice: 'Tell the client to: add their revenue.' }, route))
+      .toMatchObject({ ok: true, owner: 'client', client_notice: 'Tell the client to: add their revenue.' });
+    expect(applyRoute({ owner: 'chris', verdict: 'profile_incomplete', narrative: NARRATIVE }, route)).toEqual({ ok: false, code: 'bad_model_output:client_notice' });
+    expect(applyRoute({ owner: 'chris', verdict: 'no_grants_for_goal', narrative: NARRATIVE }, route)).toMatchObject({ owner: 'research' });
+    expect(applyRoute({ owner: 'research', verdict: 'unclear', narrative: NARRATIVE }, route)).toMatchObject({ owner: 'chris' });
+  });
+
+  test('its evidence is the snapshot filed with it; without one it fails plainly, with no read', async () => {
+    const r = await takeSnapshot({ ...empty, snapshot: null }, { opsQuery: async () => { throw new Error('no read'); } });
+    expect(r).toEqual({ ok: false, code: 'empty_track_no_evidence' });
+    expect(plainError('empty_track_no_evidence')).toMatch(/without its evidence/);
+    const prompt = buildUserPrompt(empty, { goal: 'Improve Sustainability', considered: 190 }, routeFor(empty, {}));
+    expect(prompt).toMatch(/goal track that showed the client nothing/);
+    expect(prompt).toMatch(/"considered": 190/);
+  });
+});
+
 describe('grant_pattern routing', () => {
   test('a tag/eligibility pattern: tag missed → chris, card lacks it → research, unclear → chris', () => {
     const route = routeFor(pattern, { grant: { name: 'G' } });

@@ -428,7 +428,7 @@ export function openSources(views, C, P) {
 // Reads
 // ---------------------------------------------------------------------------
 
-function defaultDeps() {
+export function defaultDeps() {
   return {
     hubQuery: hubQueryDefault,
     appQuery: appQueryDefault,
@@ -450,15 +450,23 @@ async function readLiveDays(days, deps) {
   return out;
 }
 
-const shapeMetadata = (rows) => new Map(rows.map((r) => [r.company_id, {
+export const shapeMetadata = (rows) => new Map(rows.map((r) => [r.company_id, {
   industries: [...new Set((Array.isArray(r.primary_industries) ? r.primary_industries : [])
     .filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()))],
   provinces: splitProvinces(r.provinces)
 }]));
 
 /** Read everything for one range and build the payload. Uncached. */
-export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
-  const deps = { ...defaultDeps(), ...overrides };
+/**
+ * The activity rows behind a range — both windows (current and previous) —
+ * exactly as the Overview counts them: roll-ups for every day rolled after it
+ * ended, the rest read live with the roll-up's own readDay(). Shared with the
+ * Companies tab (companies.js), so a company's counts and the Overview's
+ * totals come from the same rows.
+ *
+ * @returns {Promise<{w, lastRolled, tail, matches, views, ratings, signups, watchlist, chats, chatCompany: Map<string, number|null>}>}
+ */
+export async function loadWindowRows(range, deps) {
   const w = windowsFor(range, deps.now());
   const from = w.previous.from;
   const to = w.current.to;
@@ -468,16 +476,14 @@ export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
   const tailSet = new Set(tail.days);
   const notTail = (r) => !tailSet.has(r.day);
 
-  const [rm, rv, rr, live, signups, watchlist, chats, grants, need] = await Promise.all([
+  const [rm, rv, rr, live, signups, watchlist, chats] = await Promise.all([
     deps.hubQuery(ROLLED_MATCHES_SQL, [from, to]),
     deps.hubQuery(ROLLED_VIEWS_SQL, [from, to]),
     deps.hubQuery(ROLLED_RATINGS_SQL, [from, to]),
     readLiveDays(tail.days, deps),
     deps.appQuery(SIGNUPS_SQL, [from, to]),
     deps.appQuery(WATCHLIST_ADDS_SQL, [from, to]),
-    deps.opsQuery(CHATS_SQL, [from, to]),
-    deps.liveGrants({ query: deps.appQuery }),
-    deps.hubQuery(NEED_ACTION_SQL)
+    deps.opsQuery(CHATS_SQL, [from, to])
   ]);
 
   const num = (r) => ({ ...r, times_computed: Number(r.times_computed), times_shown: Number(r.times_shown) });
@@ -487,6 +493,20 @@ export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
 
   const identities = await identitiesForClerkIds(chats.rows.map((r) => r.clerk_id), { query: deps.appQuery });
   const chatCompany = new Map([...identities].map(([clerk, v]) => [clerk, v.company_id]));
+  return { w, lastRolled, tail, matches, views, ratings, signups: signups.rows, watchlist: watchlist.rows, chats: chats.rows, chatCompany };
+}
+
+export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
+  const deps = { ...defaultDeps(), ...overrides };
+  const [rows, grants, need] = await Promise.all([
+    loadWindowRows(range, deps),
+    deps.liveGrants({ query: deps.appQuery }),
+    deps.hubQuery(NEED_ACTION_SQL)
+  ]);
+  const { w, lastRolled, tail, matches, views, ratings, chatCompany } = rows;
+  const signups = { rows: rows.signups };
+  const watchlist = { rows: rows.watchlist };
+  const chats = { rows: rows.chats };
 
   const companyIds = new Set([
     ...matches.filter((r) => r.times_shown > 0).map((r) => r.company_id),

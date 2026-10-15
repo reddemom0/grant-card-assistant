@@ -29,7 +29,7 @@
   const OWNERS = [['client', 'Client'], ['research', 'Research'], ['chris', 'Chris'], ['jason', 'Jason'], ['none', 'Unassigned']];
   const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason' };
   const OWNER_FIXES = { client: 'company profile', research: 'grant data and card text', chris: 'tagger, engine and chat answers', jason: 'the app' };
-  const TYPES = [['match', 'Match'], ['grant_pattern', 'Grant pattern'], ['chat', 'Chat']];
+  const TYPES = [['match', 'Match'], ['grant_pattern', 'Grant pattern'], ['chat', 'Chat'], ['empty_track', 'Empty track']];
   const TYPE_WORDS = Object.fromEntries(TYPES);
   const STATUS_WORDS = { new: 'New', diagnosed: 'Diagnosed', in_progress: 'In progress', closed: 'Closed' };
   const VERDICT_WORDS = {
@@ -42,6 +42,7 @@
     bad_record: 'Grant missing from the data',
     chat_wrong_grant_facts: 'Chat gave wrong grant facts',
     chat_answer_problem: 'Chat answer problem',
+    no_grants_for_goal: 'No grants cover this goal for them',
     unclear: 'Cause unclear',
     could_not_diagnose: "Couldn't diagnose"
   };
@@ -417,6 +418,7 @@
     }
     if (it.kind === 'match') return matchEvidence(s.response || {});
     if (it.kind === 'grant_pattern') return patternEvidence(s);
+    if (it.kind === 'empty_track') return emptyTrackEvidence(s);
     return chatEvidence(s, it);
   }
   const esc2 = (v) => ctx.esc(v);
@@ -456,6 +458,18 @@
     // "agnostic, industries=[]" → "agnostic, none"; a JSON list is one part.
     const parts = raw.trim().startsWith('[') ? [raw] : raw.split(/,\s(?=[a-z_]+=)/);
     return parts.map(one).join(' · ');
+  }
+
+  function emptyTrackEvidence(s) {
+    const max = Math.max(1, ...(s.removed || []).map((r) => r.n));
+    const p = s.profile;
+    return section('What the client saw', `<p><b>Nothing on “${esc2(s.goal)}”</b> in the run of ${esc2(when(s.run?.at))}${s.considered ? ` — ${ctx.fmt(s.considered)} grants considered` : ''}.</p>
+        ${s.removed?.length ? `<ul class="co-removed">${s.removed.map((r) => `<li><span class="co-removed-label">${esc2(r.words.charAt(0).toUpperCase() + r.words.slice(1))}</span><span class="co-removed-bar"><i style="--w:${(r.n / max) * 100}%"></i></span><b>${ctx.fmt(r.n)}</b></li>`).join('')}</ul>` : ''}
+        ${s.other_goals?.length ? `<p class="cc-muted">Their other goal tracks: ${s.other_goals.map((g) => `${esc2(g.goal)} (${ctx.fmt(g.shown)} shown)`).join(', ')}.</p>` : ''}`)
+      + section('Their profile', `${s.profile_gaps?.length ? `<ul class="co-gaps">${s.profile_gaps.map((g) => `<li>${esc2(g)}</li>`).join('')}</ul>` : '<p class="cc-muted">No gaps that matching relies on.</p>'}
+        ${p ? `<dl class="rq-fields"><dt>Industries</dt><dd>${esc2((p.industries || []).join(', ') || 'None')}</dd><dt>Provinces</dt><dd>${esc2((p.provinces || []).join(', ') || 'None')}</dd>
+          <dt>Company size</dt><dd>${esc2(p.company_size ?? 'None')}</dd><dt>Revenue</dt><dd>${esc2(p.revenue ?? 'None')}</dd></dl>` : ''}
+        ${s.company?.id ? `<p><a href="#companies/${s.company.id}">Open ${esc2(s.company.name)}'s company page</a></p>` : ''}`);
   }
 
   function patternEvidence(s) {
@@ -641,5 +655,15 @@
     t._h = setTimeout(() => t.classList.remove('on'), 2600);
   }
 
-  window.CCReview = { render, closeDrawer: () => closeDrawer() };
+  /**
+   * The match evidence block (eligibility checks, AI review quotes, shown
+   * history) for a match-explain bad_match response — the Companies tab's
+   * "Why matched?" uses the same table as the review panel.
+   */
+  function whyMatchedHtml(response, helpers) {
+    if (!ctx) ctx = helpers;
+    return matchEvidence(response || {});
+  }
+
+  window.CCReview = { render, closeDrawer: () => closeDrawer(), whyMatchedHtml, plainValue };
 })();

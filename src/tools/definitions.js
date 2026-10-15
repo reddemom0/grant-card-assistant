@@ -2508,13 +2508,13 @@ Data starts 2026-08-26. A week still in progress comes back with partial: true. 
  */
 export const CONTROL_CENTRE_TOOL = {
   name: 'control_centre',
-  description: `Read the Control Centre: the review queue of flagged bad grant matches, bad chat answers and grant patterns (one grant cut by the AI review for the same reason across several companies), plus the Overview numbers and the weekly client chat themes. Read-only — it can't move, reassign or close a card; point people to the card link for that.
+  description: `Read the Control Centre: the review queue of flagged bad grant matches, bad chat answers, grant patterns (one grant cut by the AI review for the same reason across several companies) and empty goal tracks (a client's goal track that showed them nothing), plus the Overview numbers and the weekly client chat themes. Read-only — it can't move, reassign or close a card; point people to the card link for that.
 
 Use it for "what's stuck with Research", "what's in the queue", "what's open for Chris", "why was grant 1196 flagged", "what happened with card 42", "how many matches this week vs last", "what are clients asking about".
 
 Modes:
 - "queue_summary": open cards by status, owner and kind; the stuck ones (open with no change or comment for 3+ days) and the oldest open ones.
-- "list_cards": cards filtered by status (new, diagnosed, in_progress, closed), owner (client, research, chris, jason, unassigned), kind (match, chat, grant_pattern), company (name or id), grant (name or GG3 id), stuck_only; up to 20 (limit).
+- "list_cards": cards filtered by status (new, diagnosed, in_progress, closed), owner (client, research, chris, jason, unassigned), kind (match, chat, grant_pattern, empty_track), company (name or id), grant (name or GG3 id), stuck_only; up to 20 (limit).
 - "card": one card in full (card_id): why it was flagged, the diagnosis and narrative, the evidence (the chat turns for a chat card, the AI review's reasons for a grant pattern), every flag, its history and linked cards.
 - "overview": the Overview for range day, week, month or year — sign-ups, active companies, matches shown, grants opened, ratings, saves, chats — each against the window before, with the internal-account share, top grants, risers and drops, and chat.
 - "chat_themes": the latest week's themes in what clients asked, with recent anonymised questions.
@@ -2529,7 +2529,7 @@ Modes:
       mode: { type: 'string', enum: ['queue_summary', 'list_cards', 'card', 'overview', 'chat_themes'] },
       status: { type: 'string', enum: ['new', 'diagnosed', 'in_progress', 'closed'], description: 'list_cards: card status.' },
       owner: { type: 'string', enum: ['client', 'research', 'chris', 'jason', 'unassigned'], description: 'list_cards: who owns the fix.' },
-      kind: { type: 'string', enum: ['match', 'chat', 'grant_pattern'], description: 'list_cards: what kind of card.' },
+      kind: { type: 'string', enum: ['match', 'chat', 'grant_pattern', 'empty_track'], description: 'list_cards: what kind of card (empty_track = a goal track that showed a client nothing).' },
       company: { type: 'string', description: 'list_cards: company name or id.' },
       grant: { type: 'string', description: 'list_cards: grant name or GG3 id.' },
       stuck_only: { type: 'boolean', description: 'list_cards: only open cards with no change or comment for 3+ days.' },

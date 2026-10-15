@@ -236,7 +236,7 @@ chat cards; Oracle reads the queue with `control_centre` (below).
 
 | Table | What it holds |
 |---|---|
-| `cc_review_items` | One row per thing to review. `kind='match'` is keyed on `(company_id, grant_root_id)`. `kind='chat'` is keyed on `chat_turn_ref`. `kind='grant_pattern'` is keyed on `(grant_root_id, pattern_category)` with no company. All three keys are partial unique indexes. |
+| `cc_review_items` | One row per thing to review. `kind='match'` is keyed on `(company_id, grant_root_id)`. `kind='chat'` is keyed on `chat_turn_ref`. `kind='grant_pattern'` is keyed on `(grant_root_id, pattern_category)` with no company. `kind='empty_track'` (048) is keyed on `(company_id, goal_track)` — a goal track that showed the client nothing, flagged from the Companies tab. All four keys are partial unique indexes. |
 | `cc_review_flags` | Each flag on an item. `source_ref` is UNIQUE, so re-sweeps never double-count. `source_created_at` is the source event's own time. |
 | `cc_review_events` | The audit log. Every mutation writes one row: `created`, `flagged`, `reopened`, `diagnosed`, `diagnosis_failed`, `status`, `owner`, `closed`, and `recheck` (on a match card, when a pattern card linked to it closes). |
 | `cc_review_links` | Related cards (047): `item_id` a grant-pattern card, `linked_item_id` a match card for the same grant root, `relation = 'same_grant'`. Unique per pair. |
@@ -815,6 +815,75 @@ white frame, filter chips, four grey columns.
   signed-in staff member on every one. After each action the board and panel reload.
 - **Badges:** the Review queue tab shows open cards from the list it just loaded; the header's
   "N need action" link and its count now go to `#review`.
+
+## The Companies tab (step 7, migration 048)
+
+**Loading:** a company page comes in two requests. `GET /:id` (`companyCore`) is the
+part you read first — the company, profile and gaps, goals, goal tracks — and the page is
+usable when it lands (about 1.0–1.4 s locally against production data). Only then is
+`GET /:id/feed` (`companyFeed`) asked for: tiles, timeline, chats, review cards (about
+1.2 s more). They are sequential on purpose: both read the app DB through its 3-connection
+read-only pool, and running them together delayed the part that matters.
+
+`src/control-centre/companies.js` (reads; the one write is the transcript view log),
+`companies-routes.js` (mounted at `/api/control-centre/companies`, `authenticateUser` +
+`requireAuth`, before the generic `/api/control-centre` router) and
+`public/js/control-centre-companies.js`.
+
+**Where the data lives (verified 2026-10-15):**
+
+| What | Where |
+|---|---|
+| Selected goals | app `goals` — `deleted_at IS NULL AND status = 'active'`; `goals.name` is a `business_goal_definitions` name (11). Archived or deleted rows are earlier goals. |
+| Goal tracks | ops `match_results.section` of the company's latest `result_set_id`. One run covers every selected goal plus `funding_matches` (shown as "All goals"). Two names differ from the goal: "Hire and Train People" → "Hire or Train People", "Improved Productivity" → "Improve Productivity" (`TRACK_ALIASES`). |
+| AI review overlay | ops `ai_review_log` by `result_set_id` + `grant_id` + `track`: a cut is marked "AI review cut: <reason in words>" with the review's sentence (cut grants the engine didn't show are listed after the shown ones); a move is "AI review moved up/down to #N". |
+| Goal-question answers | app `company_goal_field_values` — a count only. |
+| Profile | `companyProfile()` (respects `ENGINE_PROFILE_SOURCE`) plus `business_type`, `incorporation_date`. |
+| Timeline | app `companies.created_at`, `grant_view_sessions` (source → Goal tracks / Browse / Chat / Watchlist / Direct link), `grant_recommendation_feedback_events`, `watchlist_grants` (added / removed); ops match runs and the company's users' `conversations`; Hub review cards filed / closed. Newest first, 300 at most. |
+
+- **List** (`GET /?range=`): every company with a real Clerk user (the sign-up rule without
+  the date). Province and industry are the engine source. Grant matches (distinct grants
+  shown), cards opened and chats count in the page's range, from the Overview's own rows
+  (`loadWindowRows`, factored out of `computeOverview` — the Overview is unchanged). Last
+  active is any time: all-time roll-up days, the window's live days, and the latest
+  conversation. Open review cards from the Hub. Cached 5 minutes per range. Sortable by every
+  column, filterable, and the "Include internal accounts" switch hides internal accounts.
+- **Company page** (`#companies/<id>`): header and tiles (grant card views, grants
+  opened, time on grant cards, 👍 / 👎, chats — all-time); the profile as matching sees it with
+  gaps in plain words (`profileGaps`: no industry or province — those limits aren't applied;
+  a size matching can't read, e.g. "Just me"; no size; no revenue) and "also on record" values
+  where the other source differs; goals; goal tracks ("as of" the latest recorded run — never
+  recomputed); the timeline (the latest 30 events, "Show more" adds the next 30, up to 300);
+  chats; review cards linking to `#review/<id>` — the company's own, then **grant patterns
+  involving this client**: pattern cards with an AI-review cut flag whose actor is one of the
+  company's Clerk users (`PATTERN_CARDS_FOR_CLERKS_SQL`), labelled with how many of the cuts
+  were theirs.
+- **Empty goal tracks.** A track that was in the latest run but showed the client nothing is
+  shown as a finding, not a footnote: "<company> saw nothing here", how many grants were
+  considered and where they went (`RUN_STAGES_SQL`: failed eligibility, below the topic match
+  floor, badge filter, list length, per-track cap, duplicates — bars, most first). **⚑ Flag
+  empty track** files, in one click, a staff `empty_track` review card (`POST /:id/empty-track`
+  → `fileEmptyTrack`). The evidence is built server-side from the run and the profile — goal,
+  considered, removal steps, profile gaps, the client's other tracks — never from the request.
+  One card per (company, goal track) (048: `goal_track` column, kind `empty_track`, unique
+  index). A track already flagged shows its card link; one whose card was closed offers to
+  flag again (which reopens it). Diagnosis rule `empty_track`: `profile_incomplete` → client
+  (with a "Tell the client to:" notice), `no_grants_for_goal` → research, else chris.
+- **Why matched?** (`GET /:id/why?grant=`): match-explain `mode=bad_match` through
+  `fetchBadMatch` — deterministic, no LLM — trimmed to the checks, the AI review's quotes and
+  the shown history (no profile dump, no card text). Shown with the review panel's own table
+  (`CCReview.whyMatchedHtml`). 503 when match-explain isn't configured, 502 with the code when
+  it fails.
+- **Flag as bad match**: an optional note, then the existing
+  `POST /api/control-centre/review/flag` (`kind: match`) as the signed-in staff member; the
+  page shows "Filed — review card #N" (or "Added to" / "Reopened") with the link.
+- **Chats** (`GET /:id/chats/:conversationId`): the whole conversation, verbatim, only when it
+  belongs to one of this company's users (otherwise 404). Every opening is logged in
+  **`cc_transcript_views`** (migration 048, now `048_cc_companies.sql`: `conversation_id`,
+  `company_id`, `viewer` email, `viewed_at`), and each chat shows "Viewed by <name> (<date>, N×)". The page notes that
+  opening a chat is logged. Before 048 is applied the list still loads (no viewers) and opening
+  a transcript returns 503 `migration_missing`.
+- **Not done here:** the goal-question answers themselves, recomputing matches.
 
 ## Oracle: `control_centre` (read-only)
 

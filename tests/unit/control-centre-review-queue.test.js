@@ -16,7 +16,7 @@ import {
   REOPEN_SQL, DIAGNOSE_SQL, RECORD_FAILURE_SQL, SET_STATUS_SQL, SET_OWNER_SQL, CLOSE_SQL, INSERT_EVENT_SQL,
   GET_ITEM_SQL, GET_FLAGS_SQL, GET_EVENTS_SQL, NEW_ITEM_IDS_SQL, NEW_ITEMS_SQL, LIST_SQL,
   SWEEP_CURSOR_SQL, KNOWN_REFS_SQL, EXISTING_MATCH_ITEMS_SQL, DOWNS_SQL, SWEEP_OVERLAP_MS,
-  LOCK_PATTERN_SQL, SET_SNAPSHOT_SQL, LINKED_ITEMS_SQL, reopensClosed, addComment, COMMENT_MAX, STUCK_DAYS,
+  LOCK_PATTERN_SQL, LOCK_EMPTY_TRACK_SQL, SET_SNAPSHOT_SQL, LINKED_ITEMS_SQL, reopensClosed, addComment, COMMENT_MAX, STUCK_DAYS,
   previewDiagnoses
 } from '../../src/control-centre/review-queue.js';
 import { LINK_PATTERNS_SQL, PATTERN_ITEMS_SQL } from '../../src/control-centre/grant-patterns.js';
@@ -37,14 +37,16 @@ function fakeHub() {
   async function q(sql, p = []) {
     switch (sql) {
       case INSERT_ITEM_SQL: {
-        const [kind, company_id, grant_root_id, chat_turn_ref, pattern_category = null, conversation_id = null] = p;
+        const [kind, company_id, grant_root_id, chat_turn_ref, pattern_category = null, conversation_id = null, goal_track = null] = p;
         const clash = items.find((i) => (kind === 'match'
           ? i.kind === 'match' && i.company_id === company_id && i.grant_root_id === grant_root_id
           : kind === 'grant_pattern'
             ? i.kind === 'grant_pattern' && i.grant_root_id === grant_root_id && i.pattern_category === pattern_category
-            : i.kind === 'chat' && i.chat_turn_ref === chat_turn_ref));
+            : kind === 'empty_track'
+              ? i.kind === 'empty_track' && i.company_id === company_id && i.goal_track === goal_track
+              : i.kind === 'chat' && i.chat_turn_ref === chat_turn_ref));
         if (clash) return { rows: [] };
-        const it = { id: ++ids.item, kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id,
+        const it = { id: ++ids.item, kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id, goal_track,
           status: 'new', owner: null,
           diagnosis: null, narrative: null, client_notice: null, flagged_again: false, flag_count: 0,
           expected_match: null, close_note: null, closed_by: null, closed_at: null,
@@ -56,6 +58,8 @@ function fakeHub() {
         return one(items.find((i) => i.kind === 'match' && i.company_id === p[0] && i.grant_root_id === p[1]));
       case LOCK_CHAT_SQL:
         return one(items.find((i) => i.kind === 'chat' && i.chat_turn_ref === p[0]));
+      case LOCK_EMPTY_TRACK_SQL:
+        return one(items.find((i) => i.kind === 'empty_track' && i.company_id === p[0] && i.goal_track === p[1]));
       case LOCK_PATTERN_SQL:
         return one(items.find((i) => i.kind === 'grant_pattern' && i.grant_root_id === p[0] && i.pattern_category === p[1]));
       case SET_SNAPSHOT_SQL: {
@@ -646,6 +650,30 @@ describe('startControlCentreReviewSweep', () => {
 const patternFlag = (over = {}) => ({
   kind: 'grant_pattern', grant_root_id: 1196, pattern_category: 'wrong_industry', source: 'ai_review_cut',
   source_ref: 'ai_review:1', source_created_at: '2026-10-10T10:00:00Z', actor: 'user_a', comment: 'not their industry', ...over
+});
+
+describe('empty_track items', () => {
+  const emptyFlag = (over = {}) => ({ kind: 'empty_track', company_id: 135, goal_track: 'Improve Sustainability', source: 'staff_flag',
+    actor: 'x@granted.ca', snapshot: { goal: 'Improve Sustainability', considered: 190 }, ...over });
+
+  test('validateFlag: company and goal track required; no grant or chat ref; goal_track only on this kind', () => {
+    expect(() => validateFlag(emptyFlag({ goal_track: undefined }))).toThrow(/goal_track/);
+    expect(() => validateFlag(emptyFlag({ company_id: undefined }))).toThrow(/company_id/);
+    expect(() => validateFlag(emptyFlag({ grant_root_id: 1 }))).toThrow(/grant_root_id/);
+    expect(() => validateFlag(matchFlag({ goal_track: 'x' }))).toThrow(/goal_track/);
+    expect(validateFlag(emptyFlag())).toMatchObject({ kind: 'empty_track', company_id: 135, goal_track: 'Improve Sustainability' });
+  });
+
+  test('one card per (company, goal track); the evidence is stored with the first flag', async () => {
+    const hub = fakeHub();
+    const a = await addFlag(emptyFlag(), hub.deps);
+    await addFlag(emptyFlag({ snapshot: { goal: 'changed' } }), hub.deps);
+    await addFlag(emptyFlag({ goal_track: 'Grants for Startups' }), hub.deps);
+    expect(hub.items.map((i) => [i.kind, i.company_id, i.goal_track, i.flag_count])).toEqual([
+      ['empty_track', 135, 'Improve Sustainability', 2], ['empty_track', 135, 'Grants for Startups', 1]]);
+    expect(a.item.snapshot).toEqual({ goal: 'Improve Sustainability', considered: 190 });
+    expect(hub.items[0].snapshot).toEqual({ goal: 'Improve Sustainability', considered: 190 });
+  });
 });
 
 describe('grant_pattern items', () => {

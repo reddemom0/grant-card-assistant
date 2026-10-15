@@ -66,6 +66,7 @@ import { startControlCentreRollup } from './src/control-centre/rollup.js';
 import { startControlCentreReviewSweep } from './src/control-centre/review-queue.js';
 import controlCentreReviewRouter from './src/control-centre/review-routes.js';
 import controlCentreOverviewRouter from './src/control-centre/overview-routes.js';
+import controlCentreCompaniesRouter from './src/control-centre/companies-routes.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
@@ -192,6 +193,10 @@ app.get('/api/control-centre/health', authenticateUser, requireAdmin, controlCen
 // signed-in staff member has full access, so requireAuth (not requireAdmin).
 // Needs migration 044. See docs/control-centre.md.
 app.use('/api/control-centre/review', authenticateUser, requireAuth, controlCentreReviewRouter);
+// Control Centre Companies tab: client list, company page, Why matched?, chat
+// transcripts (each view logged, migration 048). Mounted before the generic
+// /api/control-centre router. See docs/control-centre.md.
+app.use('/api/control-centre/companies', authenticateUser, requireAuth, controlCentreCompaniesRouter);
 // Control Centre page data: GET /overview, GET /search. Read-only, cached 5 min.
 app.use('/api/control-centre', authenticateUser, requireAuth, controlCentreOverviewRouter);
 

@@ -4,7 +4,8 @@
  * One item per thing that needs a look: a bad match (company + grant root),
  * a bad chat answer (one chat turn, or one issue in one conversation), or a
  * grant pattern (the AI review cut one grant for one reason across companies,
- * migration 047). Flags pile onto the item:
+ * migration 047), or an empty goal track (a client's goal track showed them
+ * nothing, flagged from the Companies tab, migration 048). Flags pile onto the item:
  *
  *   client_thumbs_down  a 👎 from the app DB's grant_recommendation_feedback_events,
  *                       pulled hourly by runReviewSweep (source_ref = rating id)
@@ -47,7 +48,7 @@ import { TIME_ZONE } from './rollup.js';
 import { diagnoseItem, couldNotDiagnose, MAX_DIAGNOSIS_ATTEMPTS } from './diagnosis.js';
 import { runPatternSweep } from './grant-patterns.js';
 
-export const KINDS = Object.freeze(['match', 'chat', 'grant_pattern']);
+export const KINDS = Object.freeze(['match', 'chat', 'grant_pattern', 'empty_track']);
 export const STATUSES = Object.freeze(['new', 'diagnosed', 'in_progress', 'closed']);
 export const OWNERS = Object.freeze(['client', 'research', 'chris', 'jason']);
 export const SOURCES = Object.freeze(['client_thumbs_down', 'staff_flag', 'ai_review_cut', 'oracle_detected']);
@@ -114,11 +115,18 @@ export function validateFlag(input = {}) {
   if (!SOURCES.includes(source)) throw bad(`source must be one of ${SOURCES.join(', ')}`);
 
   const out = { kind, source, company_id: null, grant_root_id: null, chat_turn_ref: null,
-    pattern_category: null, conversation_id: null };
+    pattern_category: null, conversation_id: null, goal_track: null };
   if (input.pattern_category != null && kind !== 'grant_pattern') throw bad('pattern_category is only for grant_pattern items');
+  if (input.goal_track != null && kind !== 'empty_track') throw bad('goal_track is only for empty_track items');
   if (kind === 'match') {
     out.company_id = requiredId(input.company_id, 'company_id');
     out.grant_root_id = requiredId(input.grant_root_id, 'grant_root_id');
+    if (input.chat_turn_ref != null) throw bad('chat_turn_ref is only for chat items');
+  } else if (kind === 'empty_track') {
+    out.company_id = requiredId(input.company_id, 'company_id');
+    out.goal_track = optionalText(input.goal_track, 'goal_track', MAX_REF);
+    if (!out.goal_track) throw bad('goal_track is required for empty_track items');
+    if (input.grant_root_id != null) throw bad('grant_root_id is not used on empty_track items');
     if (input.chat_turn_ref != null) throw bad('chat_turn_ref is only for chat items');
   } else if (kind === 'grant_pattern') {
     out.grant_root_id = requiredId(input.grant_root_id, 'grant_root_id');
@@ -158,10 +166,15 @@ export function validateFlag(input = {}) {
 // No conflict target: covers all three partial unique keys (match pair, chat
 // turn, grant pattern).
 export const INSERT_ITEM_SQL = `
-  INSERT INTO cc_review_items (kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id)
-  VALUES ($1, $2, $3, $4, $5, $6)
+  INSERT INTO cc_review_items (kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id, goal_track)
+  VALUES ($1, $2, $3, $4, $5, $6, $7)
   ON CONFLICT DO NOTHING
   RETURNING id`;
+
+export const LOCK_EMPTY_TRACK_SQL = `
+  SELECT * FROM cc_review_items
+   WHERE kind = 'empty_track' AND company_id = $1 AND goal_track = $2
+   FOR UPDATE`;
 
 export const LOCK_PATTERN_SQL = `
   SELECT * FROM cc_review_items
@@ -175,7 +188,7 @@ export const SET_SNAPSHOT_SQL = `
   RETURNING *`;
 
 export const LINKED_ITEMS_SQL = `
-  SELECT i.id, i.kind, i.status, i.company_id, i.grant_root_id, i.pattern_category, l.relation
+  SELECT i.id, i.kind, i.status, i.company_id, i.grant_root_id, i.pattern_category, i.goal_track, l.relation
     FROM cc_review_links l
     JOIN cc_review_items i ON i.id = CASE WHEN l.item_id = $1 THEN l.linked_item_id ELSE l.item_id END
    WHERE l.item_id = $1 OR l.linked_item_id = $1
@@ -282,7 +295,7 @@ export const stuckWhen = (days) => `(i.status <> 'closed' AND ${LAST_ACTIVITY} <
 // comment, so a comment resets the stuck timer without moving updated_at
 // (which orders the list and floats re-flagged cards up).
 export const LIST_SQL = `
-  SELECT i.id, i.kind, i.status, i.owner, i.company_id, i.grant_root_id, i.pattern_category,
+  SELECT i.id, i.kind, i.status, i.owner, i.company_id, i.grant_root_id, i.pattern_category, i.goal_track,
          i.chat_turn_ref, i.conversation_id, i.flag_count, i.flagged_again, i.expected_match,
          i.created_at, i.updated_at, i.closed_at,
          i.diagnosis->>'verdict' AS verdict,
@@ -373,14 +386,16 @@ export async function addFlag(input, { hubTransaction = transaction } = {}) {
 
   return hubTransaction(async (client) => {
     const ins = await client.query(INSERT_ITEM_SQL,
-      [f.kind, f.company_id, f.grant_root_id, f.chat_turn_ref, f.pattern_category, f.conversation_id]);
+      [f.kind, f.company_id, f.grant_root_id, f.chat_turn_ref, f.pattern_category, f.conversation_id, f.goal_track]);
     const created = ins.rows.length > 0;
 
     const locked = f.kind === 'match'
       ? await client.query(LOCK_MATCH_SQL, [f.company_id, f.grant_root_id])
       : f.kind === 'grant_pattern'
         ? await client.query(LOCK_PATTERN_SQL, [f.grant_root_id, f.pattern_category])
-        : await client.query(LOCK_CHAT_SQL, [f.chat_turn_ref]);
+        : f.kind === 'empty_track'
+          ? await client.query(LOCK_EMPTY_TRACK_SQL, [f.company_id, f.goal_track])
+          : await client.query(LOCK_CHAT_SQL, [f.chat_turn_ref]);
     let item = locked.rows[0];
     if (created) await logEvent(client, item.id, f.actor, 'created', null, 'new', { source: f.source });
 
