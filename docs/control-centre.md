@@ -579,6 +579,71 @@ Turn the toggle on to see the full picture.
 | Jades Testing Company | 73 | test-like name |
 | LouLouFry Testing | 126 | test-like name |
 
+### Chat section (Overview)
+
+The Chat section comes after "How clients found grant cards".
+
+**Numbers** follow the range picker and the "Include internal accounts" toggle
+(`rankings.*.chat`). They're read live from the ops DB, read-only.
+
+| Number | Definition |
+|---|---|
+| chats started | conversations by real Clerk users, with ≥1 message, started in the window |
+| clients who chatted | distinct companies among those chats, linked through `identitiesForClerkIds` exactly like active clients; a chat whose Clerk id has no company is still a chat |
+| questions asked | the client's own messages in those chats: user messages with string content (tool results are array content and don't count) |
+| questions per chat | questions asked ÷ chats started, to one decimal |
+| grant cards opened from chat | grant card opens with source `advisor`, the same as Chat in "How clients found grant cards" |
+
+**What clients asked about** and **recent client questions** come from the weekly digest's
+stored themes (below). They show the **latest stored week**, labelled "Week of …", whatever
+range is picked.
+- **Themes:** each shows its count, its takeaway and how many of its questions came from
+  internal accounts.
+- **Recent questions:** follow the toggle and tag internal accounts. Rows with no client show
+  "who asked isn't recorded".
+- **Missing table:** if the table is missing (046 not applied), the section says themes can't be
+  read; the rest of the Overview is unaffected.
+
+### Digest themes (migration 046)
+
+The weekly Pulse digest (`src/services/pulse-digest.js`) stores its themes and rewritten
+questions for the Control Centre. They come from the **same** Haiku call it already makes,
+**not a second one**.
+
+| Table | One row per |
+|---|---|
+| `cc_digest_themes` | theme per digest week: `week_start` (the Monday, Vancouver), `position`, `name`, `question_count`, `takeaway`, `source` |
+| `cc_digest_questions` | rewritten question: `week_start`, `theme_position`, `question`, `question_order` (oldest first), `clerk_id`, `company_id`, `source` |
+
+- **When it writes:** after the digest claims its week, through `saveDigestThemes`
+  (`src/control-centre/digest-themes.js`). The week's rows are replaced whole, in one
+  transaction.
+- **If the write fails,** the warning code is logged and the DM still goes out.
+- **What's stored:** only the model's rewritten (anonymised) question text, never the
+  original. Questions the model didn't rewrite aren't stored.
+- **`company_id`** comes from the Clerk id via the app DB. It's null when the app DB isn't
+  available, and the Clerk id is kept either way.
+
+**Backfill: `scripts/cc-backfill-digest-themes.mjs`** (a dry run by default; `--write` stores).
+It parses each sent digest's `pulse_posts.summary`, with no model call:
+- **What it can recover:** theme name, count and takeaway, plus the **one example question per
+  theme** the summary carries.
+- **What it can't:** no client ids exist there, so backfilled questions are unlinked
+  (`source = 'backfill_summary'`).
+- **What it skips:** the full question list for a past week is only in that week's Google
+  Sheet tab (also without client ids), so it isn't backfilled. A week the live digest already
+  stored is never overwritten.
+
+On 2026-10-15 the only sent week was Oct 5–11. Backfilled on the local scratch DB, it gives 5
+themes and 5 example questions. **Production needs 046 and then this backfill with
+`--write`.**
+
+**Follow-up, not changed here:** the digest still leaves staff out by
+`GG3_INTERNAL_USER_IDS` (Clerk ids), while the Control Centre uses the internal-accounts list
+(companies). The stored themes are therefore already filtered by the digest's rule, and
+the toggle can only act on the questions linked to a company. Aligning the two rules is a
+separate decision.
+
 ## Known limits
 
 - **The nightly roll-up wasn't running on 2026-10-15.** The last write was 2026-10-14 06:42

@@ -468,6 +468,96 @@
     return c;
   }
 
+  /** Chat: the range's numbers (toggle applies), then the latest digest week's themes and questions. */
+  function renderChat(view, data, nDays) {
+    const c = card('Chat', `Each number counts chats clients started ${nowWords(nDays)}, compared with ${beforeWords(nDays)}.`);
+    c.classList.add('cc-wide');
+    const s = view.chat;
+    if (s) {
+      const stats = [
+        ['chats started', s.chats_started],
+        ['clients who chatted', s.clients_chatted],
+        ['questions asked', s.questions_asked, 'Each message a client typed in a chat started this period'],
+        ['questions per chat', s.avg_questions_per_chat, 'Questions asked ÷ chats started', true],
+        ['grant cards opened from chat', s.cards_opened_from_chat]
+      ];
+      const grid = document.createElement('div');
+      grid.className = 'cc-chat-stats';
+      for (const [label, m, hint, decimal] of stats) {
+        const cell = document.createElement('div');
+        cell.className = 'cc-chat-stat';
+        const num = document.createElement('div');
+        num.className = 'cc-chat-num';
+        num.textContent = decimal ? m.current.toFixed(1) : fmt(m.current);
+        const chip = document.createElement('span');
+        chip.className = `cc-delta ${m.delta > 0 ? 'up' : m.delta < 0 ? 'down' : ''}`;
+        chip.textContent = m.delta === 0 ? 'no change' : `${m.delta > 0 ? '+' : '−'}${decimal ? Math.abs(m.delta).toFixed(1) : fmt(Math.abs(m.delta))}`;
+        bindTip(chip, () => `${beforeWords(nDays)[0].toUpperCase()}${beforeWords(nDays).slice(1)}: <b>${decimal ? m.previous.toFixed(1) : fmt(m.previous)}</b>`);
+        const lab = document.createElement('div');
+        lab.className = 'cc-label';
+        lab.textContent = label;
+        if (hint) lab.title = hint;
+        const top = document.createElement('div');
+        top.className = 'cc-tile-top';
+        top.append(num, chip);
+        cell.append(top, lab);
+        grid.appendChild(cell);
+      }
+      c.appendChild(grid);
+    }
+    c.appendChild(renderAsked(data.asked, data.asked_error));
+    return c;
+  }
+
+  function renderAsked(asked, error) {
+    const box = document.createElement('div');
+    box.className = 'cc-asked';
+    if (!asked) {
+      box.innerHTML = `<h3 class="cc-asked-head">What clients asked about</h3><p class="cc-empty">${
+        error ? 'Themes couldn\'t be read right now.' : 'No weekly digest has stored its themes yet. They appear here after the next Monday digest.'}</p>`;
+      return box;
+    }
+    const week = span(asked.week_start, asked.week_end);
+    const backfill = asked.source === 'backfill_summary';
+    box.innerHTML = `<h3 class="cc-asked-head">What clients asked about <span class="cc-week">Week of ${esc(week)}</span></h3>
+      <p class="cc-sub">Each bar is how many client questions the weekly digest placed in that theme. It always shows the latest digest week, whatever range is picked above.</p>`;
+    const max = Math.max(1, ...asked.themes.map((t) => t.count));
+    const list = document.createElement('div');
+    list.className = 'cc-themes';
+    for (const t of asked.themes) {
+      const row = document.createElement('div');
+      row.className = 'cc-theme';
+      row.innerHTML = `<div class="cc-theme-name">${esc(t.name)}</div>
+        <div class="cc-bar"><span class="b" data-w="${Math.max(4, Math.round((t.count / max) * 56))}"></span>${plural(t.count, 'question')}</div>
+        <div class="cc-theme-take">${esc(t.takeaway || '')}${t.internal_count ? ` <span class="cc-muted">(${plural(t.internal_count, 'question')} from internal accounts)</span>` : ''}</div>`;
+      list.appendChild(row);
+    }
+    box.appendChild(list);
+
+    const qs = (asked.recent_questions || []).filter((q) => includeInternal || !q.company_internal).slice(0, 8);
+    const qh = document.createElement('div');
+    qh.innerHTML = `<h3 class="cc-asked-head cc-recent-head">Recent client questions</h3>
+      <p class="cc-sub">Each line is a client's question as the weekly digest rewrote it, with names and details taken out${
+        backfill ? '. This week was recovered from the digest\'s summary, so it shows one example per theme and who asked isn\'t recorded.' : '; newest first.'}</p>`;
+    box.appendChild(qh);
+    if (!qs.length) {
+      box.insertAdjacentHTML('beforeend', `<p class="cc-empty">${includeInternal ? 'No rewritten questions stored for this week.' : 'Every stored question this week came from an internal account. Turn on "Include internal accounts" to see them.'}</p>`);
+      return box;
+    }
+    const ul = document.createElement('ul');
+    ul.className = 'cc-questions';
+    for (const q of qs) {
+      const who = q.company_id != null
+        ? `${esc(q.company_name || `Company #${q.company_id}`)}${q.company_internal ? ' <span class="cc-tag-internal">Internal</span>' : ''} <span class="cc-muted">#${q.company_id}</span>`
+        : `<span class="cc-muted">${q.linked ? 'client not linked to a company' : 'who asked isn\'t recorded'}</span>`;
+      const li = document.createElement('li');
+      li.innerHTML = `<p class="cc-q">“${esc(q.text)}”</p><p class="cc-q-meta">${q.theme ? `<span class="chip">${esc(q.theme)}</span>` : ''}${who}</p>`;
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
+    return box;
+  }
+
   function renderPopular(data, nDays) {
     const c = card('Most opened grant cards',
       `Each bar is how many times the grant card was opened ${nowWords(nDays)}; Saved is how often it was added to a watchlist.`);
@@ -593,7 +683,7 @@
     renderTiles(panel, data);
     const row = document.createElement('div'); row.className = 'cc-grid-2 even';
     row.append(renderMostMatched(view, n), renderPopular(view, n));
-    panel.append(internalToggle(panel, data), renderMovers(view, n), renderSources(view, n), row, renderTrends(view, n), footnote(data));
+    panel.append(internalToggle(panel, data), renderMovers(view, n), renderSources(view, n), renderChat(view, data, n), row, renderTrends(view, n), footnote(data));
     growBars(panel);
   }
 

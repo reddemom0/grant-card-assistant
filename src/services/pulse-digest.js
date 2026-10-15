@@ -37,7 +37,12 @@
  * written.
  *
  * The detail goes to a "Digest YYYY-MM-DD" tab (Monday's date) of the errors
- * sheet, rewritten whole on every run for that week. The DM goes once per
+ * sheet, rewritten whole on every run for that week. The themes and the
+ * rewritten questions — with who asked each — are also stored for the Control
+ * Centre (cc_digest_themes / cc_digest_questions, migration 046, via
+ * src/control-centre/digest-themes.js) from the same model call; never a second.
+ * Staff are still left out by GG3_INTERNAL_USER_IDS here, not by the Control
+ * Centre's internal-accounts list (docs/control-centre.md, follow-ups). The DM goes once per
  * week: the key weekly_digest:<monday> in pulse_alert_state (migration 040)
  * is claimed before anything is written or sent.
  *
@@ -481,12 +486,19 @@ export function cleanThemes(raw, exchanges, { profileNames = [] } = {}) {
       name: own(fitName(t.name)),
       takeaway: own(fitSentences(t.takeaway, TAKEAWAY_WORDS)),
       example: exampleId ? textOf(exampleId) : null,
-      questions: ids.map(textOf)
+      questions: ids.map(textOf),
+      // For the Control Centre's stored copy: each REWRITTEN question with its
+      // exchange id (which says who asked). Unrewritten ones are never stored.
+      items: ids.filter(id => rewritten.has(id)).map(id => ({ id, text: rewritten.get(id) }))
     });
   }
   const left = Array.from({ length: count }, (_, i) => i + 1).filter(id => !used.has(id));
   if (left.length) {
-    themes.push({ name: 'Other', takeaway: 'Questions not placed in a theme.', example: rewritten.has(left[0]) ? textOf(left[0]) : null, questions: left.map(textOf) });
+    themes.push({
+      name: 'Other', takeaway: 'Questions not placed in a theme.', example: rewritten.has(left[0]) ? textOf(left[0]) : null,
+      questions: left.map(textOf),
+      items: left.filter(id => rewritten.has(id)).map(id => ({ id, text: rewritten.get(id) }))
+    });
   }
 
   const w = raw?.worth_a_look;
@@ -646,6 +658,9 @@ export async function buildDigest({ monday, issueRows, sheetCode = null, deps })
     priorUsage,
     exchangesTotal: asked.total,
     exchangesRead: asked.exchanges.length,
+    // Who asked each exchange (Clerk id), index = exchange id − 1. Kept for the
+    // Control Centre's stored copy; never posted or written to the sheet.
+    askedBy: asked.exchanges.map(e => e.userId ?? null),
     themes,
     grants: await nameGrants(withPriorWeek(matches, priorMatches), deps.oracleQuery),
     errors: issueRows ? { ok: true, issues: weekIssues(issueRows, monday) } : { ok: false, code: sheetCode || 'unavailable' }
@@ -880,7 +895,8 @@ export async function defaultDeps() {
     readSheet: sheets.readSheetRange,
     prepareTab: sheets.prepareSheetTab,
     updateSheet: sheets.updateSheetRange,
-    recordPost: recordPulsePost
+    recordPost: recordPulsePost,
+    saveThemes: async (built) => (await import('../control-centre/digest-themes.js')).saveDigestThemes(built)
   };
 }
 
@@ -970,6 +986,16 @@ export async function runWeeklyDigest({ now = new Date(), env = process.env, dep
       return { status: 'no_state_table' };
     }
     throw err;
+  }
+
+  // The Control Centre's stored copy of the themes (migration 046), from the
+  // call already made — never a second one. A failure here never stops the DM.
+  if (built.themes.status === 'ok' && d.saveThemes) {
+    try {
+      await d.saveThemes(built);
+    } catch (err) {
+      console.warn(`⚠️  Pulse digest: themes not stored for the Control Centre — code: ${codeOf(err)}`);
+    }
   }
 
   let tab = 'not_written';
