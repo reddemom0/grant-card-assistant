@@ -30,7 +30,7 @@ const v5 = v5all.filter(r => (r.plan === 'sorted' || r.plan === 'archive') && !m
 const slashNames = [...new Set([...inv.values()].filter(x => x.is_folder === 'true' && x.name.includes('/')).map(x => x.name.trim()))];
 const slashFolderByPath = new Map([...inv.values()].filter(x => x.is_folder === 'true' && x.name.includes('/')).map(x => [x.path, x.name.trim()]));
 const parentOf = id => { const v = inv.get(id); return v ? (v.path.endsWith('/' + v.name) ? v.path.slice(0, -(v.name.length + 1)) : v.path) : ''; };
-const destFixes = { staff: [], webinar: [], slash: new Map(), amp: 0 };
+const destFixes = { staff: [], webinar: [], slash: new Map(), amp: 0, rehome: [], repeat: [], repeatSegs: new Map(), trim: 0, fileSlash: 0 };
 function fixDest(path, r) {
   let d = path; const before = d; const id = r.drive_file_id; const parent = parentOf(id); const name = inv.get(id)?.name || '';
   if (/&amp;/.test(d)) { d = d.replace(/&amp;/g, '&'); destFixes.amp++; }
@@ -54,19 +54,55 @@ function fixDest(path, r) {
   const own = []; { const parts = parent.split('/'); for (let i = 1; i <= parts.length; i++) { const pre = parts.slice(0, i).join('/'); if (slashFolderByPath.has(pre)) own.push(slashFolderByPath.get(pre)); } }
   for (const n of slashNames) if (parent.includes('/' + n + '/') || parent.endsWith('/' + n)) own.push(n);
   for (const n of [...new Set(own)].sort((a, b) => b.length - a.length)) { const fixed = n.replace(/\//g, '-'); const idx = d.indexOf(n); if (idx >= 0 && (idx === 0 || d[idx - 1] === '/') && (idx + n.length === d.length || d[idx + n.length] === '/')) { d = d.slice(0, idx) + fixed + d.slice(idx + n.length); destFixes.slash.set(`${n} → ${fixed}`, (destFixes.slash.get(`${n} → ${fixed}`) || 0) + 1); } }
-  return d;
+  return PATH_FIX_OWNERS.has(r.owner) ? programFixes(d, r) : d;
+}
+// Program-path fixes (approved 2026-10-14), only for owners in config.pathFixOwners:
+// 1. Programs/<P>/…Projects by Year/<year>/<client folder>/… → Clients/<Client>/<P>/<year>/… (client names from config.clientRehome)
+// 2. Below the year, drop a folder that repeats the program (or its short form) already in the path. No other flattening.
+const PATH_FIX_OWNERS = new Set(CFG.pathFixOwners || []);
+const REHOME = CFG.clientRehome?.map || {};
+const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+const YEAR = /^(19|20)\d\d$/;
+const REHOME_RX = /^Programs\/([^/]+)\/(?:.*\/)?[^/]*Projects by Year\/((?:19|20)\d\d)\/([^/]+)(\/.*)?$/;
+const programForms = prog => { const f = new Set([norm(prog), norm(prog.split('(')[0]), norm((prog.match(/\(([^)]*)\)/) || [])[1] || '')]); for (const part of prog.split(/\s+[-–]\s+/)) f.add(norm(part)); f.delete(''); return f; };
+function programFixes(path, r) {
+  let d = path;
+  const m = d.match(REHOME_RX);
+  if (m) {
+    const to = REHOME[m[3].trim()];
+    if (!to) throw new Error(`no approved client mapping for "${m[3]}" (${r.owner})`);
+    d = ['Clients', to.client, m[1], m[2], ...(to.sub ? [to.sub] : [])].join('/') + (m[4] || '');
+    destFixes.rehome.push({ owner: r.owner, from: path, to: d });
+  }
+  const s = d.split('/');
+  if (s[0] === 'Clients' || s[0] === 'Programs') {
+    const yi = s.findIndex(x => YEAR.test(x.trim()));
+    if (yi >= 2) {
+      const prog = s[yi - 1], forms = programForms(prog), pn = norm(prog);
+      const kept = s.slice(yi + 1).filter(seg => { const n = norm(seg); const drop = forms.has(n) || (n.length >= 4 && pn.startsWith(n)); if (drop) destFixes.repeatSegs.set(`${seg} (under ${prog})`, (destFixes.repeatSegs.get(`${seg} (under ${prog})`) || 0) + 1); return !drop; });
+      const out = [...s.slice(0, yi + 1), ...kept].join('/');
+      if (out !== d) { destFixes.repeat.push({ owner: r.owner, from: d, to: out }); d = out; }
+    }
+  }
+  let segs = d.split("/").map(x => x.trim());   // no leading/trailing spaces in folder names
+  const fname = inv.get(r.drive_file_id)?.name || "";   // a file name with "/" must not become folders
+  if (fname.includes("/")) { const parts = fname.split("/").map(x => x.trim()); for (let i = 1; i < segs.length; i++) { const tail = segs.slice(i); if (tail.length < parts.length && tail.every((x, k) => x === parts[k])) { segs = segs.slice(0, i); destFixes.fileSlash++; break; } } }
+  const trimmed = segs.join("/");
+  if (trimmed !== d) destFixes.trim++;
+  return trimmed;
 }
 
 const GF = CFG.drives.sorted, GA = CFG.drives.archive;
 // drive memberships from the read-only lookups, kept in config
 const MEMBERS = Object.fromEntries(Object.entries(CFG.driveMembers).map(([k, v]) => [k, new Set(v.map(x => x.toLowerCase()))]));
 const REMOVE = new Set(CFG.removeAccounts.map(x => x.toLowerCase()));
+const NO_RESTORE = new Set((CFG.noRestoreAccounts || []).map(x => x.toLowerCase()));   // never restore access for these (direct shares still travel)
 const CUTOFF = CFG.restoreCutoff;
 const SA = /\.iam\.gserviceaccount\.com$/i;
 const outside = p => (p.type === 'user' || p.type === 'group') ? !(DOMAIN_RE.test(p.who) || SA.test(p.who)) : p.type === 'domain' ? (p.who || '').toLowerCase() !== DOMAIN : false;
 const modOf = id => (inv.get(id)?.modified_time || '').slice(0, 10);
 
-const plan = [], lapse = [], stats = { restore: 0, removeDirect: 0, dropsOnMove: 0, lapseOld: 0, lapseLink: 0, shortcut: 0 };
+const plan = [], lapse = [], stats = { restore: 0, removeDirect: 0, dropsOnMove: 0, lapseOld: 0, lapseLink: 0, shortcut: 0, noRestore: 0 };
 const restoreBy = new Map(), restoreDom = new Map(), removeBy = new Map();
 for (const r of v5) {
   const s = snap.get(r.drive_file_id);
@@ -84,6 +120,7 @@ for (const r of v5) {
     for (const [k, x] of byWho) {
       if (REMOVE.has(k)) { if (x.direct) { acts.push(`remove:${x.who}`); stats.removeDirect++; } else stats.dropsOnMove++; removeBy.set(k, (removeBy.get(k) || { direct: 0, drops: 0 })); removeBy.get(k)[x.direct ? 'direct' : 'drops']++; continue; }
       if (x.direct) continue;                                   // direct share travels with the file
+      if (NO_RESTORE.has(k)) { stats.noRestore++; continue; }
       if (x.type === 'anyone') { lapse.push({ id: r.drive_file_id, name, owner: r.owner, who: 'anyone with the link', role: x.role, reason: 'parent-only link' }); stats.lapseLink++; continue; }
       if (recent) { acts.push(`add:${x.who}:${x.role}`); stats.restore++; restoreBy.set(x.who, (restoreBy.get(x.who) || 0) + 1); const dom = x.type === 'domain' ? x.who : x.who.split('@')[1]; restoreDom.set(dom, (restoreDom.get(dom) || 0) + 1); }
       else { lapse.push({ id: r.drive_file_id, name, owner: r.owner, who: x.who, role: x.role, reason: mod ? `inherited; last modified ${mod} (over 12 months)` : 'inherited; no modified date' }); stats.lapseOld++; }
@@ -99,7 +136,7 @@ const bad = v5all.filter(r => r.plan !== 'sorted' && r.plan !== 'archive' && ids
 if (plan.length + meetStay.size + v6Excluded.size !== v5all.filter(r => r.plan === 'sorted' || r.plan === 'archive').length) throw new Error('meet/exclusion count mismatch');
 if (plan.some(p => /&amp;/.test(p.target_path))) throw new Error('&amp; left in a destination');
 if (bad.length) throw new Error(`excluded/held/stays rows in plan: ${bad.length}`);
-for (const p of plan) for (const a of p.sharing_actions.split(';').filter(Boolean)) if (a.startsWith('add:')) { const who = a.split(':')[1].toLowerCase(); if (REMOVE.has(who)) throw new Error(`add for removed account ${who}`); if (!p.modified || p.modified < CUTOFF) throw new Error(`add on old/undated file ${p.file_id}`); }
+for (const p of plan) for (const a of p.sharing_actions.split(';').filter(Boolean)) if (a.startsWith('add:')) { const who = a.split(':')[1].toLowerCase(); if (REMOVE.has(who) || NO_RESTORE.has(who)) throw new Error(`add for removed or no-restore account ${who}`); if (!p.modified || p.modified < CUTOFF) throw new Error(`add on old/undated file ${p.file_id}`); }
 
 // ---- fix-up for files already moved
 const fix = []; const wstats = { add: 0, remove: 0, alreadyGone: 0, lapse: 0, roleAssumed: 0 };
@@ -138,7 +175,7 @@ const notice = Object.keys(counts).filter(o => ![...HELD, ...ALREADY_MOVED].incl
 
 // ---- write
 const cell = x => { const s = String(x ?? ''); return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-const csv = (file, cols, rows) => fs.writeFileSync(file, [cols.join(','), ...rows.map(r => cols.map(c => cell(r[c])).join(','))].join('\n') + '\n');
+const csv = (file, cols, rows) => { fs.writeFileSync(file + '.tmp', [cols.join(','), ...rows.map(r => cols.map(c => cell(r[c])).join(','))].join('\n') + '\n'); fs.renameSync(file + '.tmp', file); };
 csv(`${D}/move-plan-v6.csv`, ['file_id', 'owner', 'owner_email', 'name', 'target_drive', 'target_path', 'action', 'sharing_actions', 'plan', 'modified'], plan);
 csv(`${D}/move-plan-v6-lapse.csv`, ['id', 'owner', 'name', 'who', 'role', 'reason'], lapse);
 csv(`${D}/${F.writersFixup}`, ['file_id', 'file_name', 'location_now', 'action', 'who', 'role', 'reason'], fix);
@@ -236,4 +273,4 @@ ${[...REMOVE].map(k => { const x = removeBy.get(k) || { direct: 0, drops: 0 }; r
 \`move-plan-v6.csv\` (${plan.length} rows), \`move-plan-v6-lapse.csv\` (${lapse.length}), \`${F.writersFixup}\` (${fix.length}), \`notice-data.csv\` (${notice.length} people).
 `;
 fs.writeFileSync(`${D}/move-plan-v6-summary.md`, md);
-console.log(JSON.stringify({ staffFix: destFixes.staff.length, webinarFix: destFixes.webinar.length, webinars: [...new Set(destFixes.webinar.map(x => x.to))], amp: destFixes.amp, slash: [...destFixes.slash], v6Excluded: v6Excluded.size, budgetScan: budgetScan.length, meetStay: meetStay.size, meetByOwner: [...meetStay.values()].reduce((m, x) => (m[x.owner] = (m[x.owner] || 0) + 1, m), {}), writersMeet: wMeet.length, writersMeetFail: wMeet.filter(x => x.fails).length, rows: plan.length, stats, wstats, notice: notice.map(n => n.owner), need }));
+console.log(JSON.stringify({ rehome: destFixes.rehome.length, repeatDrop: destFixes.repeat.length, repeatSegs: [...destFixes.repeatSegs], trimmed: destFixes.trim, fileSlash: destFixes.fileSlash, staffFix: destFixes.staff.length, webinarFix: destFixes.webinar.length, webinars: [...new Set(destFixes.webinar.map(x => x.to))], amp: destFixes.amp, slash: [...destFixes.slash], v6Excluded: v6Excluded.size, budgetScan: budgetScan.length, meetStay: meetStay.size, meetByOwner: [...meetStay.values()].reduce((m, x) => (m[x.owner] = (m[x.owner] || 0) + 1, m), {}), writersMeet: wMeet.length, writersMeetFail: wMeet.filter(x => x.fails).length, rows: plan.length, stats, wstats, notice: notice.map(n => n.owner), need }));

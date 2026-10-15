@@ -10,15 +10,19 @@
 import fs from 'fs';
 import crypto from 'crypto';
 import { moveOwnerRows, countsText, appendAfterRun, vanTime, ROOT, INV, CFG, ADMIN, DRIVES, emailOf, parseCsv } from './migration-log.mjs';
-import { buildOwnerSheet } from './owner-sheet.mjs';
+import { buildOwnerSheet, addTabsToOwnerSheet, existingOwnerSheet } from './owner-sheet.mjs';
 const D = INV;
 const OWNER = process.argv[2], OWNER_EMAIL = emailOf(OWNER), SHORT = OWNER.replace(/@$/, '');
 const argVal = k => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : null; };
+const GF_ONLY = process.argv.includes('--granted-files-only');   // Granted Files moves + shortcuts only; no archive rows
+const GA_ONLY = process.argv.includes('--archive-only');          // Granted Archive moves only
+const MAX_FAIL = argVal('--max-failures') != null ? Number(argVal('--max-failures')) : Infinity;   // stop the run after more than N failures
 const TAG = argVal('--tag'), PLAN_FILE = argVal('--plan') || `${D}/${CFG.files.v6}`;   // --plan/--tag: for tests or one-off batches
 const LTAG = TAG ? `${SHORT}-${TAG}` : SHORT;
 const LEDGER = `${D}/move-${LTAG}-ledger.jsonl`, REPORT = `${D}/move-${LTAG}-report.md`;
 const load = p => { const it = parseCsv(fs.readFileSync(p, 'utf8')); const h = it.next().value; const o = []; for (const r of it) if (r.length > 1) o.push(Object.fromEntries(h.map((k, i) => [k, r[i]]))); return o; };
-const plan = (PLAN_FILE.startsWith('/') ? (() => { const it = parseCsv(fs.readFileSync(PLAN_FILE, 'utf8')); const h = it.next().value; const o = []; for (const r of it) if (r.length > 1) o.push(Object.fromEntries(h.map((k, i) => [k, r[i]]))); return o; })() : load(PLAN_FILE)).filter(r => r.owner === OWNER);
+const plan = (PLAN_FILE.startsWith('/') ? (() => { const it = parseCsv(fs.readFileSync(PLAN_FILE, 'utf8')); const h = it.next().value; const o = []; for (const r of it) if (r.length > 1) o.push(Object.fromEntries(h.map((k, i) => [k, r[i]]))); return o; })() : load(PLAN_FILE)).filter(r => r.owner === OWNER && (!GF_ONLY || r.action === 'shortcut' || r.target_drive.startsWith(CFG.drives.sorted.name)) && (!GA_ONLY || (r.action === 'move' && r.target_drive.startsWith(CFG.drives.archive.name))));
+if (GF_ONLY && GA_ONLY) { console.error('--granted-files-only and --archive-only cannot be combined'); process.exit(2); }
 const RUN_START = new Date().toISOString();
 const UNDO = process.argv.includes('--undo');
 const srcFolder = new Map(load(`${D}/${CFG.files.v5}`).filter(r => r.owner === OWNER).map(r => [r.drive_file_id, r.source_folder]));
@@ -135,8 +139,32 @@ if (UNDO) {
 
 // ---------------------------------------------------------------- main
 const already = new Set(readLedger().filter(x => x.type === 'move' && x.status === 'done').map(x => x.id));
-const res = { moved: [], skipped: [], failed: [], sharing: [] }; let consecutive = 0;
+const alreadyShortcut = new Set(readLedger().filter(x => x.type === 'shortcut' && x.status === 'done').map(x => x.id));
+const res = { moved: [], shortcuts: [], skipped: [], failed: [], sharing: [], stopped: false }; let consecutive = 0;
+const failedTooMany = () => { if (res.failed.length > MAX_FAIL) { res.stopped = true; console.error(`STOP: more than ${MAX_FAIL} failures`); return true; } return false; };
+const SHORTCUT = 'application/vnd.google-apps.shortcut';
 for (const r of plan) {
+  if (r.action === 'shortcut') {
+    // Client-owned file: it stays where it is; a shortcut to it goes at the target folder (created as the owner).
+    if (alreadyShortcut.has(r.file_id)) { res.skipped.push({ r, reason: 'shortcut already made (ledger)' }); continue; }
+    const t = await call(OWNER_EMAIL, 'GET', `/files/${r.file_id}?supportsAllDrives=true&fields=id,name,trashed,mimeType`, 'files.get (shortcut target)');
+    const skipS = reason => { res.skipped.push({ r, reason }); ledger({ type: 'skip', id: r.file_id, reason }); };
+    if (t.__error) { skipS(`cannot read the file (${t.status})`); continue; }
+    if (t.trashed) { skipS('trashed'); continue; }
+    const driveName = r.target_drive.replace(/ \(.*\)$/, '');
+    let dest; try { dest = await resolveDest(driveName, r.target_path); } catch (e) { res.failed.push({ r, reason: e.message }); ledger({ type: 'shortcut', status: 'failed', id: r.file_id, reason: e.message }); if (failedTooMany()) break; continue; }
+    const q = new URLSearchParams({ corpora: 'drive', driveId: DRIVES[driveName], includeItemsFromAllDrives: 'true', supportsAllDrives: 'true', q: `'${dest}' in parents and mimeType = '${SHORTCUT}' and trashed = false`, fields: 'files(id,shortcutDetails(targetId))', pageSize: '1000' });
+    const existing = await call(ADMIN, 'GET', `/files?${q}`, 'files.list (shortcuts)');
+    if ((existing.files || []).some(x => x.shortcutDetails?.targetId === r.file_id)) { skipS('a shortcut to it is already in that folder'); continue; }
+    ledger({ type: 'shortcut', status: 'intent', id: r.file_id, new_parent: dest, drive: driveName, dest: r.target_path });
+    const c = await call(OWNER_EMAIL, 'POST', `/files?supportsAllDrives=true&fields=id,name,parents,driveId,webViewLink`, 'files.create (shortcut)', { name: t.name, mimeType: SHORTCUT, parents: [dest], shortcutDetails: { targetId: r.file_id } });
+    const okS = !c.__error && JSON.stringify(c.parents) === JSON.stringify([dest]) && c.driveId === DRIVES[driveName];
+    if (!okS) { const reason = c.__error ? `create ${c.status} ${c.body}` : `verify mismatch ${JSON.stringify(c)}`; ledger({ type: 'shortcut', status: 'failed', id: r.file_id, reason: reason.slice(0, 300) }); res.failed.push({ r, reason }); if (failedTooMany()) break; continue; }
+    ledger({ type: 'shortcut', status: 'done', id: r.file_id, shortcut_id: c.id, new_parent: dest, drive: driveName, dest: r.target_path });
+    res.shortcuts.push({ r, link: c.webViewLink, drive: driveName });
+    await sleep(120);
+    continue;
+  }
   if (r.action !== 'move') { res.skipped.push({ r, reason: `action ${r.action} (not in this run)` }); continue; }
   if (already.has(r.file_id)) { res.skipped.push({ r, reason: 'already moved (ledger)' }); continue; }
   const f = await call(OWNER_EMAIL, 'GET', `/files/${r.file_id}?supportsAllDrives=true&fields=id,name,owners(emailAddress),parents,trashed,driveId,mimeType`, 'files.get (check)');
@@ -146,12 +174,12 @@ for (const r of plan) {
   if (f.trashed) { skip('trashed'); continue; } if (f.driveId) { skip('already in a shared drive'); continue; }
   if (s?.parent_id && (f.parents || [])[0] !== s.parent_id) { skip('moved since the snapshot'); continue; }
   const driveName = r.target_drive.replace(/ \(.*\)$/, '');
-  let dest; try { dest = await resolveDest(driveName, r.target_path); } catch (e) { res.failed.push({ r, reason: e.message }); ledger({ type: 'move', status: 'failed', id: r.file_id, reason: e.message }); if (++consecutive >= 10) break; continue; }
+  let dest; try { dest = await resolveDest(driveName, r.target_path); } catch (e) { res.failed.push({ r, reason: e.message }); ledger({ type: 'move', status: 'failed', id: r.file_id, reason: e.message }); if (failedTooMany() || ++consecutive >= 10) break; continue; }
   ledger({ type: 'move', status: 'intent', id: r.file_id, old_parents: f.parents, new_parent: dest, drive: driveName, dest: r.target_path });
   const u = await call(OWNER_EMAIL, 'PATCH', `/files/${r.file_id}?addParents=${dest}&removeParents=${(f.parents || []).join(',')}&supportsAllDrives=true&fields=id,parents,driveId`, 'files.update (move)', {});
   const v = u.__error ? null : await call(ADMIN, 'GET', `/files/${r.file_id}?supportsAllDrives=true&fields=id,name,parents,driveId,webViewLink`, 'files.get (verify)');
   const ok = v && !v.__error && JSON.stringify(v.parents) === JSON.stringify([dest]) && v.driveId === DRIVES[driveName];
-  if (!ok) { const reason = u.__error ? `update ${u.status} ${u.body}` : `verify mismatch ${JSON.stringify(v)}`; ledger({ type: 'move', status: 'failed', id: r.file_id, reason: reason.slice(0, 300) }); res.failed.push({ r, reason }); if (++consecutive >= 10) { console.error('STOP: 10 consecutive failures'); break; } continue; }
+  if (!ok) { const reason = u.__error ? `update ${u.status} ${u.body}` : `verify mismatch ${JSON.stringify(v)}`; ledger({ type: 'move', status: 'failed', id: r.file_id, reason: reason.slice(0, 300) }); res.failed.push({ r, reason }); if (failedTooMany()) break; if (++consecutive >= 10) { console.error('STOP: 10 consecutive failures'); break; } continue; }
   ledger({ type: 'move', status: 'done', id: r.file_id, old_parents: f.parents, new_parent: dest, drive: driveName, dest: r.target_path });
   res.moved.push({ r, link: v.webViewLink, drive: driveName }); consecutive = 0;
   for (const a of (r.sharing_actions || '').split(';').filter(Boolean)) {
@@ -179,6 +207,7 @@ Run ${new Date().toISOString()} from \`${PLAN_FILE.split('/').pop()}\`. Files mo
 
 | | Files |
 |---|---|
+| Shortcuts made (client-owned files stay put) | ${res.shortcuts.length} |
 | Moved and verified by ID | ${res.moved.length} (Granted Files ${res.moved.filter(m => m.drive === 'Granted Files').length}, Granted Archive ${res.moved.filter(m => m.drive === 'Granted Archive').length}) |
 | Skipped | ${res.skipped.length} |
 | Failed | ${res.failed.length} |
@@ -208,9 +237,12 @@ Each \`move\` / \`done\` line in the ledger has \`old_parents\` and \`new_parent
 `;
 fs.writeFileSync(REPORT, md);
 await logAfter(`${OWNER} ${TAG ? TAG + ' ' : ''}move`, `move-${LTAG}-report.md`);
-if (!process.argv.includes('--no-owner-sheet') && res.moved.length) {
-  try { const os_ = await buildOwnerSheet({ owner: OWNER, ledgerFile: `move-${LTAG}-ledger.jsonl`, since: RUN_START }); if (os_.url) { console.error(`owner sheet: ${os_.title} — ${os_.url} (shared with ${OWNER_EMAIL} as viewer, no email)`); fs.appendFileSync(REPORT, `\n## Sheet for ${OWNER_EMAIL}\n\n[${os_.title}](${os_.url}) — shared with ${OWNER_EMAIL} as viewer, no notification email.\n`); } else console.error(`owner sheet: ${os_.skipped}`); }
+if (!process.argv.includes('--no-owner-sheet') && (res.moved.length || res.shortcuts.length)) {
+  try { const sheetArgs = { owner: OWNER, ledgerFile: `move-${LTAG}-ledger.jsonl`, since: RUN_START, drives: GF_ONLY ? [CFG.drives.sorted.name] : GA_ONLY ? [CFG.drives.archive.name] : null };
+    const prev = existingOwnerSheet(`move-${LTAG}-ledger.jsonl`);   // one sheet per owner: a later run adds its tab to the earlier sheet
+    const os_ = prev ? await addTabsToOwnerSheet({ ...sheetArgs, sheetId: prev.id }) : await buildOwnerSheet(sheetArgs);
+    if (os_.url) { console.error(`owner sheet: ${os_.title} — ${os_.url} (${os_.added ? `tab added: ${Object.keys(os_.counts).join(', ')}` : `shared with ${OWNER_EMAIL} as viewer, no email`})`); fs.appendFileSync(REPORT, `\n## Sheet for ${OWNER_EMAIL}\n\n[${os_.title}](${os_.url}) — shared with ${OWNER_EMAIL} as viewer, no notification email.\n`); } else console.error(`owner sheet: ${os_.skipped}`); }
   catch (e) { console.error(`WARNING: owner sheet not created (${e.message}); the run itself succeeded`); }
 }
-console.log(JSON.stringify({ moved: res.moved.length, skipped: res.skipped.length, failed: res.failed.length, created: created.length, sharing: res.sharing, fixups: fixups.map(x => [x.who, x.status]), calls }));
-process.exit(res.failed.length ? 1 : 0);
+console.log(JSON.stringify({ owner: OWNER, moved: res.moved.length, shortcuts: res.shortcuts.length, skipped: res.skipped.length, skippedReasons: res.skipped.reduce((m, x) => (m[x.reason.replace(/\(.*\)/, '').trim()] = (m[x.reason.replace(/\(.*\)/, '').trim()] || 0) + 1, m), {}), failed: res.failed.length, failures: res.failed.map(x => `${x.r.name}: ${String(x.reason).slice(0, 160)}`), stopped: res.stopped, sharingSummary: res.sharing.reduce((m, x) => (m[`${x.action.split(':')[0]}:${x.status}`] = (m[`${x.action.split(':')[0]}:${x.status}`] || 0) + 1, m), {}), created: created.length, sharing: res.sharing, fixups: fixups.map(x => [x.who, x.status]), calls }));
+process.exit(res.stopped ? 4 : res.failed.length ? 1 : 0);
