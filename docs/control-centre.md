@@ -220,11 +220,11 @@ A dry run is the default and writes nothing. Only `--write` touches the Hub DB. 
 `.env` `DATABASE_URL` is the **production** Hub DB, so `--write` from a laptop writes to
 production. The script prints per-day source-row and output-row counts.
 
-## Review queue (migration 044)
+## Review queue (migrations 044, 045)
 
 Staff review bad matches and bad chat answers in one queue in the Hub DB. Code:
-`review-queue.js` (logic, sweep) and `review-routes.js` (API). Diagnosis is a stub until
-step 5.
+`review-queue.js` (logic, sweep), `diagnosis.js` (step 5 diagnosis) and
+`review-routes.js` (API).
 
 ### Tables
 
@@ -232,7 +232,10 @@ step 5.
 |---|---|
 | `cc_review_items` | One row per thing to review. `kind='match'` is keyed on `(company_id, grant_root_id)`. `kind='chat'` is keyed on `chat_turn_ref`. Both keys are partial unique indexes. |
 | `cc_review_flags` | Each flag on an item. `source_ref` is UNIQUE, so re-sweeps never double-count. `source_created_at` is the source event's own time. |
-| `cc_review_events` | The audit log. Every mutation writes one row: `created`, `flagged`, `reopened`, `diagnosed`, `status`, `owner`, `closed`. |
+| `cc_review_events` | The audit log. Every mutation writes one row: `created`, `flagged`, `reopened`, `diagnosed`, `diagnosis_failed`, `status`, `owner`, `closed`. |
+
+Migration 045 adds the diagnosis columns to `cc_review_items`: `snapshot` (the frozen
+evidence), `snapshot_at`, `diagnosis_attempts` (default 0) and `last_error`.
 
 Status runs `new` → `diagnosed` → `in_progress` → `closed`. Only `close` reaches `closed`.
 A match item can't close without `expected_match` (`should` / `shouldnt`). It's optional
@@ -248,7 +251,8 @@ for chat.
 `addFlag` creates the item on its first flag and bumps `flag_count` on each new one. A
 duplicate `source_ref` changes nothing, not even on a closed item. A new flag on a
 **closed** item reopens it to `new`, sets `flagged_again`, and clears the owner, diagnosis,
-narrative, client notice and close fields. The old close stays in the events log.
+narrative, client notice, close fields, snapshot and diagnosis attempts — so the next
+diagnosis takes a fresh snapshot. The old close stays in the events log.
 
 ### Owners (`OWNER_ROUTING`)
 
@@ -272,26 +276,30 @@ App `grant_recommendation_feedback_events`, the same table as `cc_daily_ratings`
 - A 👎 later changed to 👍 stays in the queue. There's no auto-close.
 
 Chat items come only from staff flags for now. There's no client chat 👎 source.
+`chat_turn_ref` is the ops DB `chat_turns.turn_id` of the flagged turn.
 
 ### Hourly sweep
 
 `runReviewSweep` reads 👎s newer than the latest `source_created_at` already filed, minus a
 1-hour overlap that `source_ref` dedupes. On the first run it reads every 👎. It then files
-each one as a flag and runs diagnosis on every `new` item. While `diagnose` returns `null`,
-items stay `new`.
+each one as a flag and runs diagnosis on every `new` item (see Diagnosis below).
 
 It runs hourly at :17 America/Vancouver with `noOverlap`, only when
 **`CC_REVIEW_SWEEP_ENABLED=true`** and `APP_DB_READONLY_URL` is set. Logs carry counts and
 error codes only.
 
 ```
-node scripts/cc-review-sweep.mjs           # dry run: how many 👎s it would file
-node scripts/cc-review-sweep.mjs --write   # file them and diagnose
+node scripts/cc-review-sweep.mjs                # dry run: what it would file + each item's proposed diagnosis
+node scripts/cc-review-sweep.mjs --counts-only  # dry run, counts only (no snapshot, no Sonnet call)
+node scripts/cc-review-sweep.mjs --write        # file them and diagnose
 ```
 
-The dry run reads the Hub DB only for the cursor and the refs already filed. The local
-`.env` `DATABASE_URL` is **production**, so point it elsewhere before using `--write` to
-test.
+The dry run **writes nothing**: no Hub row and no `api_cost_events` row. It reads the Hub DB
+(cursor, filed refs, `new` items), the app DB, match-explain and, for chat items, the ops
+DB. It also calls Sonnet once per item: every `new` item, plus each pair it would file or
+reopen. It prints each item's owner, verdict, narrative and client notice, and the
+total Sonnet cost (priced, not logged). The local `.env` `DATABASE_URL` is **production**,
+so point it elsewhere before using `--write` to test.
 
 ### API — `/api/control-centre/review`
 
@@ -311,12 +319,79 @@ Bad input returns 400, an unknown id 404, closing twice 409. A 503 (`not_configu
 comes back only when the app DB is needed and unset. Client names aren't in the app DB
 (`users` has no name or email), so clients are shown by company.
 
-### Diagnosis (step 5)
+### Diagnosis (step 5, migration 045)
 
-`diagnose(item)` returns `null` for now. Step 5 fills it in with match-explain's bad-match
-mode plus an Oracle narrative. It returns `{owner, diagnosis, narrative, client_notice}`.
-`runDiagnosis` then records those and moves the item to `diagnosed`. It runs outside the
-transaction, and the result only lands if the item is still `new`.
+Each `new` item gets one diagnosis per sweep. Code: `diagnosis.js` (never writes);
+`runDiagnosis` in `review-queue.js` records the outcome in one transaction, and only if the
+item is still `new`.
+
+**1. Snapshot — the frozen evidence.** It's taken once, the first time the item is
+diagnosed, and stored in `snapshot` / `snapshot_at`. Retries reuse it. A reopen clears it,
+so the next diagnosis takes a fresh one.
+
+| Kind | Snapshot |
+|---|---|
+| match | `GET {GG3_AI_SERVICE_URL}/api/v1/ai/internal/match-explain?mode=bad_match&grant_id=&company_id=` with `GG3_REVIEW_FEED_TOKEN`, with no track because ratings carry none. The whole JSON is stored: per-check results and how each passed, recorded runs, the AI review's notes, the card's eligibility text and a deterministic `candidate_cause` (gg3-ai-service `match-explain.md`, "Bad-match mode"). |
+| chat | The flagged ops `chat_turns` row and the 3 user turns before it, cut from `conversations.messages`. A turn starts at a string-content user message, the same count as `turn_index`. Read through `opsQuery` (`oracle_readonly`). |
+
+**2. Owner routing — code decides, Sonnet only chooses where the rule allows.**
+
+| Case | Owner | Verdict |
+|---|---|---|
+| `PROFILE_GAP` | client | `profile_incomplete`, plus a `client_notice` starting "Tell the client to:" (required) |
+| `RANKED_ON_GENRE` | chris | `ranked_on_genre` |
+| `LOOKS_CORRECT` | chris | `looks_correct`. The owner confirms and closes it as should-match. |
+| `NO_CONSTRAINT_TAG`, region check most suspect | research | `region_list_wrong` (the card states a narrower location than the listed regions) or `card_missing_restriction`. The region list is backend grant data, not a tagger output, so it never goes to chris. "Most suspect" means match-explain's first `lenient_axes` entry is `province`, e.g. the AI review blamed the region. |
+| `NO_CONSTRAINT_TAG`, otherwise | chris or research | Sonnet reads the card text. If the card states the restriction the tags missed, it's `tag_missed_restriction` → chris (tagger). If the card doesn't state it, it's `card_missing_restriction` → research. |
+| grant missing (`BAD_RECORD`) | research | `bad_record` |
+| chat item | chris; research only for `chat_wrong_grant_facts` | `chat_answer_problem` / `chat_wrong_grant_facts` / `unclear` |
+| anything else (no cause, `not_passing_now`, a language twin, an unknown cause) | chris | any |
+
+When the rule ties owner to verdict, the verdict decides. An owner or verdict the rule
+doesn't allow is replaced, and `diagnosis.owner_override` records what was proposed and
+what was applied. A `client_notice` is kept only when the owner is client.
+
+**3. Sonnet call.** One per item: `claude-sonnet-5-5` with the tool `record_diagnosis`
+returning `{owner, verdict, narrative, client_notice}`. Sonnet 5.5 rejects a forced
+`tool_choice` (`tool` / `any`) and `temperature`, so the call uses `tool_choice: auto` with
+a system prompt that requires the tool call. A reply without the call fails validation
+(`bad_model_output:no_tool_call`) and is retried.
+
+- The prompt gets the rule, the allowed owners and verdicts, staff flag comments, and a
+  trimmed snapshot wrapped as data in `<evidence>`. The full snapshot stays in the DB.
+- Validation:
+  - the narrative must be 2–3 sentences, at most 70 words and at least 40 characters. Dots
+    in abbreviations like "B.C.", "U.S.", "e.g." and "Inc." don't end a sentence;
+  - the verdict must be from the list;
+  - a client notice is required for client.
+- **One corrective retry, same attempt:** a narrative over 3 sentences or 70 words is handed
+  back once as a rejected tool result ("must be 2 or 3 sentences and at most 70 words…").
+  - If the second reply passes, it's used, and `diagnosis.narrative_corrected` is set.
+  - If not, the attempt fails as `bad_model_output:narrative_too_long`.
+  - Any other bad output fails the attempt at once.
+  - Both calls' cost is counted.
+- Stored on success:
+  - `diagnosis` = `{verdict, rule, candidate_cause, candidate_rule, evidence, owner_override?, model, snapshot_at}`, plus `match_explain_verdict` for match items when match-explain returned one;
+  - `narrative` and `client_notice` go in their columns.
+- Status becomes `diagnosed`, with a `diagnosed` event carrying `{owner, verdict}`.
+- Cost is logged to `api_cost_events` with source `cc-review-diagnosis`, in write mode only.
+
+**4. Failures.**
+
+- What counts as a failure: a match-explain error (including a 422), an unreadable chat
+  turn, a model error, or unusable model output.
+  - The item stays `new`; `diagnosis_attempts` goes up by 1 and `last_error` gets the code.
+  - The snapshot is kept if it was taken, and a `diagnosis_failed` event is logged.
+  - The next sweep retries. Failures don't change `updated_at`, so retries don't float the
+    item up the list.
+- **The third failure** moves the item to `diagnosed`:
+  - owner chris, verdict `could_not_diagnose`;
+  - the narrative names the error in plain words ("…the match explanation service
+    couldn't find this company's profile. Please check it by hand.").
+- **Missing configuration is not a failure.** This covers no `GG3_AI_SERVICE_URL` /
+  `GG3_REVIEW_FEED_TOKEN`, no `ANTHROPIC_API_KEY`, or no ops DB for a chat item. The item is
+  left alone with no attempt counted, so an unset variable can't push every card to
+  `could_not_diagnose`.
 
 ## Known limits
 

@@ -20,6 +20,11 @@
  * Writes only the Hub DB. The app DB is read through db.js (read-only).
  * Logs carry counts and error codes only — never ids, names or comments.
  *
+ * Diagnosis (step 5, migration 045): diagnose() freezes the evidence, routes
+ * to an owner and has Sonnet write the narrative (diagnosis.js); runDiagnosis
+ * records it. A failure leaves the item 'new' and counts an attempt; the third
+ * failure diagnoses it as could_not_diagnose for chris.
+ *
  * Hourly sweep: only when CC_REVIEW_SWEEP_ENABLED=true. CLI:
  * scripts/cc-review-sweep.mjs. Routes: review-routes.js. Docs: docs/control-centre.md.
  */
@@ -28,6 +33,7 @@ import { randomUUID } from 'node:crypto';
 import { query, transaction } from '../database/connection.js';
 import { appQuery, isAppDbConfigured } from './db.js';
 import { TIME_ZONE } from './rollup.js';
+import { diagnoseItem, couldNotDiagnose, MAX_DIAGNOSIS_ATTEMPTS } from './diagnosis.js';
 
 export const KINDS = Object.freeze(['match', 'chat']);
 export const STATUSES = Object.freeze(['new', 'diagnosed', 'in_progress', 'closed']);
@@ -159,14 +165,29 @@ export const REOPEN_SQL = `
      SET flag_count = flag_count + 1, status = 'new', flagged_again = TRUE,
          owner = NULL, diagnosis = NULL, narrative = NULL, client_notice = NULL,
          expected_match = NULL, close_note = NULL, closed_by = NULL, closed_at = NULL,
+         snapshot = NULL, snapshot_at = NULL, diagnosis_attempts = 0, last_error = NULL,
          updated_at = NOW()
    WHERE id = $1
   RETURNING *`;
 
+// $6/$7: a snapshot taken on this attempt (NULL keeps the stored one).
 export const DIAGNOSE_SQL = `
   UPDATE cc_review_items
      SET owner = $2, diagnosis = $3, narrative = $4, client_notice = $5,
+         snapshot = CASE WHEN $6::jsonb IS NULL THEN snapshot ELSE $6::jsonb END,
+         snapshot_at = CASE WHEN $6::jsonb IS NULL THEN snapshot_at ELSE $7::timestamptz END,
+         diagnosis_attempts = $8, last_error = $9,
          status = 'diagnosed', updated_at = NOW()
+   WHERE id = $1
+  RETURNING *`;
+
+// A failed attempt. Status stays 'new' and updated_at is left alone, so an
+// hourly retry doesn't float the item to the top of the list.
+export const RECORD_FAILURE_SQL = `
+  UPDATE cc_review_items
+     SET diagnosis_attempts = $2, last_error = $3,
+         snapshot = CASE WHEN $4::jsonb IS NULL THEN snapshot ELSE $4::jsonb END,
+         snapshot_at = CASE WHEN $4::jsonb IS NULL THEN snapshot_at ELSE $5::timestamptz END
    WHERE id = $1
   RETURNING *`;
 
@@ -213,6 +234,7 @@ export const GET_ITEM_SQL = 'SELECT * FROM cc_review_items WHERE id = $1';
 export const GET_FLAGS_SQL = 'SELECT * FROM cc_review_flags WHERE item_id = $1 ORDER BY created_at, id';
 export const GET_EVENTS_SQL = 'SELECT * FROM cc_review_events WHERE item_id = $1 ORDER BY created_at, id';
 export const NEW_ITEM_IDS_SQL = "SELECT id FROM cc_review_items WHERE status = 'new' ORDER BY id";
+export const NEW_ITEMS_SQL = "SELECT * FROM cc_review_items WHERE status = 'new' ORDER BY id";
 
 export const STAFF_NAMES_SQL = 'SELECT lower(email) AS email, name FROM users WHERE lower(email) = ANY($1::text[])';
 
@@ -356,46 +378,131 @@ export async function close(id, { expected_match, close_note } = {}, actor, { hu
 // ---------------------------------------------------------------------------
 
 /**
- * Work out why an item went wrong and who should fix it.
+ * Work out why an item went wrong and who should fix it: snapshot, owner
+ * routing and Sonnet narrative (diagnosis.js). Never writes.
  *
- * TODO(step 5): fill this in. For a match item, run match-explain's bad-match
- * mode for (company_id, grant_root_id); for a chat item, read the turn. Then
- * have Oracle write the narrative and the client-facing notice, and pick an
- * owner from OWNER_ROUTING (DEFAULT_OWNER when the cause is unclear).
- *
- * @returns {Promise<null | {owner: string, diagnosis: object, narrative: string, client_notice: string}>}
- *          null leaves the item in 'new' for the next sweep.
+ * @returns {Promise<null | {ok: true, owner, verdict, diagnosis, narrative, client_notice, snapshot, snapshotAt, snapshotTaken, cost}
+ *                         | {ok: false, error, snapshot?, snapshotAt?, snapshotTaken, cost}>}
+ *          null when something is not configured: the item stays 'new', no attempt counted.
  */
-export async function diagnose(item) {
-  return null;
+export async function diagnose(item, ctx = {}) {
+  return diagnoseItem(item, ctx);
 }
+
+/** Older diagnoseFn results ({owner, diagnosis, narrative, client_notice}) count as a success. */
+function asOutcome(result) {
+  return 'ok' in result ? result : { ok: true, ...result };
+}
+
+const flagComments = async (hubQuery, itemId) =>
+  (await hubQuery(GET_FLAGS_SQL, [itemId])).rows.map((f) => f.comment).filter(Boolean).slice(-5);
 
 /**
  * Diagnose one 'new' item and record the result. diagnose() runs outside the
- * transaction (step 5 will make it slow); the result only lands if the item
- * is still 'new' when it comes back.
+ * transaction (it is slow); the result only lands if the item is still 'new'
+ * when it comes back.
  *
- * @returns {Promise<{item: object|null, diagnosed: boolean}>}
+ *   success          → 'diagnosed'; owner, diagnosis, narrative, client_notice set;
+ *                      snapshot stored if this attempt took it
+ *   failure, < 3rd   → stays 'new'; diagnosis_attempts + 1, last_error set;
+ *                      snapshot stored if taken, so retries reuse it
+ *   failure, 3rd     → 'diagnosed', owner chris, verdict could_not_diagnose
+ *   null             → nothing changes (not configured)
+ *
+ * @returns {Promise<{item: object|null, diagnosed: boolean, failed?: boolean, error?: string}>}
  */
-export async function runDiagnosis(id, { hubQuery = query, hubTransaction = transaction, diagnoseFn = diagnose, actor = SWEEP_ACTOR } = {}) {
+export async function runDiagnosis(id, { hubQuery = query, hubTransaction = transaction, diagnoseFn = diagnose, actor = SWEEP_ACTOR, diagnoseCtx = {} } = {}) {
   const itemId = requiredId(id, 'id');
   const { rows } = await hubQuery(GET_ITEM_SQL, [itemId]);
   const item = rows[0];
   if (!item || item.status !== 'new') return { item: item ?? null, diagnosed: false };
 
-  const result = await diagnoseFn(item);
+  const result = await diagnoseFn(item, { comments: await flagComments(hubQuery, itemId), ...diagnoseCtx });
   if (!result) return { item, diagnosed: false };
+  const outcome = asOutcome(result);
+  const snapshot = outcome.snapshotTaken && outcome.snapshot ? JSON.stringify(outcome.snapshot) : null;
+  const snapshotAt = snapshot ? outcome.snapshotAt ?? new Date().toISOString() : null;
 
-  const owner = OWNERS.includes(result.owner) ? result.owner : DEFAULT_OWNER;
   return hubTransaction(async (client) => {
     const current = await lockItem(client, itemId);
     if (current.status !== 'new') return { item: current, diagnosed: false };
-    const updated = (await client.query(DIAGNOSE_SQL, [itemId, owner,
-      result.diagnosis == null ? null : JSON.stringify(result.diagnosis),
-      result.narrative ?? null, result.client_notice ?? null])).rows[0];
-    await logEvent(client, itemId, actor, 'diagnosed', 'new', 'diagnosed', { owner });
-    return { item: updated, diagnosed: true };
+
+    if (outcome.ok) {
+      const owner = OWNERS.includes(outcome.owner) ? outcome.owner : DEFAULT_OWNER;
+      const updated = (await client.query(DIAGNOSE_SQL, [itemId, owner,
+        outcome.diagnosis == null ? null : JSON.stringify(outcome.diagnosis),
+        outcome.narrative ?? null, outcome.client_notice ?? null,
+        snapshot, snapshotAt, current.diagnosis_attempts ?? 0, null])).rows[0];
+      await logEvent(client, itemId, actor, 'diagnosed', 'new', 'diagnosed',
+        { owner, verdict: outcome.verdict ?? outcome.diagnosis?.verdict ?? null });
+      return { item: updated, diagnosed: true };
+    }
+
+    const attempts = (current.diagnosis_attempts ?? 0) + 1;
+    const error = String(outcome.error ?? 'unknown').slice(0, MAX_REF);
+    if (attempts >= MAX_DIAGNOSIS_ATTEMPTS) {
+      const give = couldNotDiagnose(error, attempts);
+      const updated = (await client.query(DIAGNOSE_SQL, [itemId, give.owner, JSON.stringify(give.diagnosis),
+        give.narrative, null, snapshot, snapshotAt, attempts, error])).rows[0];
+      await logEvent(client, itemId, actor, 'diagnosed', 'new', 'diagnosed',
+        { owner: give.owner, verdict: give.verdict, attempts, error });
+      return { item: updated, diagnosed: true, failed: true, error };
+    }
+    const updated = (await client.query(RECORD_FAILURE_SQL, [itemId, attempts, error, snapshot, snapshotAt])).rows[0];
+    await logEvent(client, itemId, actor, 'diagnosis_failed', 'new', 'new', { attempt: attempts, error });
+    return { item: updated, diagnosed: false, failed: true, error };
   }, 'cc review diagnose');
+}
+
+/**
+ * Dry-run diagnosis: what each item WOULD get, without writing anything — no
+ * Hub write and no api_cost_events row (cost is computed, not logged). Covers
+ * every 'new' item plus the pairs the sweep would file (no item yet) or reopen.
+ *
+ * @param {Array<{company_id: number, grant_root_id: number, reopen?: boolean}>} [wouldFile]
+ * @returns {Promise<{rows: Array, cost: number}>}
+ */
+export async function previewDiagnoses(wouldFile = [], { hubQuery = query, diagnoseFn = diagnose, diagnoseCtx = {} } = {}) {
+  const items = (await hubQuery(NEW_ITEMS_SQL)).rows;
+  const targets = [
+    ...items.map((item) => ({ label: 'new', item })),
+    ...wouldFile.map((p) => ({
+      label: p.reopen ? 'would reopen' : 'would file',
+      item: { id: null, kind: 'match', company_id: p.company_id, grant_root_id: p.grant_root_id,
+        status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0 }
+    }))
+  ];
+
+  const rows = [];
+  let cost = 0;
+  for (const { label, item } of targets) {
+    const comments = item.id ? await flagComments(hubQuery, item.id) : [];
+    let r;
+    try {
+      r = await diagnoseFn(item, { comments, ...diagnoseCtx, logCost: null });
+    } catch (err) {
+      r = { ok: false, error: `threw_${err?.code ?? err?.name ?? 'error'}`, snapshotTaken: false, cost: 0 };
+    }
+    cost += r?.cost ?? 0;
+    const base = { label, id: item.id, kind: item.kind, company_id: item.company_id,
+      grant_root_id: item.grant_root_id ?? null, chat_turn_ref: item.chat_turn_ref ?? null,
+      snapshot_reused: Boolean(item.snapshot) };
+    if (!r) { rows.push({ ...base, skipped: 'not_configured' }); continue; }
+    const outcome = asOutcome(r);
+    if (outcome.ok) {
+      rows.push({ ...base, owner: outcome.owner, verdict: outcome.verdict ?? outcome.diagnosis?.verdict ?? null,
+        candidate_cause: outcome.diagnosis?.candidate_cause ?? null, narrative: outcome.narrative,
+        client_notice: outcome.client_notice ?? null, override: outcome.diagnosis?.owner_override ?? null,
+        corrected: Boolean(outcome.diagnosis?.narrative_corrected),
+        grant: outcome.snapshot?.response?.grant_name ?? null, cost: r.cost ?? 0 });
+    } else {
+      const attempt = (item.diagnosis_attempts ?? 0) + 1;
+      rows.push({ ...base, error: outcome.error, attempt,
+        would: attempt >= MAX_DIAGNOSIS_ATTEMPTS ? couldNotDiagnose(outcome.error, attempt) : 'stay new, retry next sweep',
+        cost: r.cost ?? 0 });
+    }
+  }
+  return { rows, cost };
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +551,7 @@ export async function staffNames(emails, { hubQuery = query } = {}) {
  * Dry run unless write is true: it reads the Hub only for the cursor and the
  * already-filed refs, and reports what it would file.
  */
-export async function runReviewSweep({ write = false, deps = {}, log = console.log } = {}) {
+export async function runReviewSweep({ write = false, preview = false, deps = {}, log = console.log } = {}) {
   const hubQuery = deps.hubQuery ?? query;
   const app = deps.appQuery ?? appQuery;
   const flag = deps.addFlag ?? addFlag;
@@ -474,12 +581,23 @@ export async function runReviewSweep({ write = false, deps = {}, log = console.l
   };
 
   if (!write) {
+    let existing = [];
     if (pairs.size) {
       const vals = [...pairs.values()];
-      const existing = (await hubQuery(EXISTING_MATCH_ITEMS_SQL,
+      existing = (await hubQuery(EXISTING_MATCH_ITEMS_SQL,
         [vals.map((d) => d.company_id), vals.map((d) => d.grant_root_id)])).rows;
       summary.new_items = pairs.size - existing.length;
       summary.reopened = existing.filter((r) => r.status === 'closed').length;
+    }
+    if (preview) {
+      // Existing 'new' items are previewed from the Hub; here only pairs with no
+      // item yet, or whose closed item this sweep would reopen.
+      const status = new Map(existing.map((r) => [pairKey(r.company_id, r.grant_root_id), r.status]));
+      const wouldFile = [...pairs.values()]
+        .filter((d) => [undefined, 'closed'].includes(status.get(pairKey(d.company_id, d.grant_root_id))))
+        .map((d) => ({ company_id: d.company_id, grant_root_id: d.grant_root_id,
+          reopen: status.get(pairKey(d.company_id, d.grant_root_id)) === 'closed' }));
+      summary.preview = await (deps.previewDiagnoses ?? previewDiagnoses)(wouldFile, { hubQuery });
     }
     log(`CC review sweep (dry run): ${summary.to_file} 👎 to file → ${summary.items} items `
       + `(${summary.new_items} new, ${summary.reopened} reopened); ${summary.already_filed} already filed`);
