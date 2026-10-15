@@ -1,0 +1,516 @@
+/**
+ * Control Centre Overview (step 6): one read-only payload behind
+ * GET /api/control-centre/overview?range=day|week|month|year.
+ *
+ * Windows are whole America/Vancouver days, the same boundaries as the
+ * roll-ups. The current window is the N days ending today (today counts so
+ * far); the previous window is the N days before it. N = 1 / 7 / 30 / 365.
+ *
+ * Where each number comes from:
+ *   matches, opens, ratings   the cc_daily_* roll-ups for every day the job wrote
+ *                             after that day had ended; every later day (today,
+ *                             a day rolled while still in progress, a day the
+ *                             job missed) is read live with the roll-up's own readDay() and
+ *                             aggregators, so the exclusion rule is identical
+ *                             (ops rows: real Clerk users only; staff and
+ *                             clients blended, never split).
+ *   sign-ups                  app companies created that have a real Clerk user
+ *   watchlist adds            app watchlist_grants created (later removals kept)
+ *   chats                     ops conversations by real Clerk users with ≥1 message
+ *   active companies          any company with a match computed, a grant opened,
+ *                             a rating or a chat in the window
+ *
+ * Distinct counts (matches shown = company × grant pairs; active companies)
+ * are distinct over the whole window, not a sum of the daily values.
+ *
+ * Reads only: the Hub (roll-ups, review items), the app and ops DBs through
+ * db.js. Cached per range for CACHE_TTL_MS. Logs carry codes and counts only.
+ */
+
+import { query as hubQueryDefault } from '../database/connection.js';
+import { appQuery as appQueryDefault, opsQuery as opsQueryDefault } from './db.js';
+import { TIME_ZONE, vancouverDay, addDays, dayRange, readDay, aggregateMatches, aggregateViews, aggregateRatings } from './rollup.js';
+import { liveGrants as liveGrantsDefault, splitProvinces } from './live-sources.js';
+import { identitiesForClerkIds, companyNamesForIds } from './identity.js';
+import { INTERNAL_COMPANY_IDS, internalCompanySet, isInternalCompany } from './internal-accounts.js';
+
+export const RANGE_DAYS = Object.freeze({ day: 1, week: 7, month: 30, year: 365 });
+export const DEFAULT_RANGE = 'week';
+export const CACHE_TTL_MS = 5 * 60 * 1000;
+/** At most this many un-rolled days are read live; older gaps mark the roll-up stale. */
+export const MAX_LIVE_DAYS = 14;
+export const TOP_N = 10;
+export const MOVERS_N = 8;
+export const TREND_N = 8;
+
+export class OverviewError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.name = 'OverviewError';
+    this.status = status;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Range maths
+// ---------------------------------------------------------------------------
+
+/**
+ * @returns {{range, days, current: {from, to, days: string[]}, previous: {from, to, days: string[]}, today}}
+ */
+export function windowsFor(range, now = new Date()) {
+  const n = RANGE_DAYS[range];
+  if (!n) throw new OverviewError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+  const today = vancouverDay(now);
+  const curFrom = addDays(today, -(n - 1));
+  const prevTo = addDays(curFrom, -1);
+  const prevFrom = addDays(prevTo, -(n - 1));
+  return {
+    range,
+    days: n,
+    today,
+    current: { from: curFrom, to: today, days: dayRange(curFrom, today) },
+    previous: { from: prevFrom, to: prevTo, days: dayRange(prevFrom, prevTo) }
+  };
+}
+
+/** Days of [from, to] that the roll-up hasn't written, newest MAX_LIVE_DAYS of them. */
+export function liveTail(from, to, lastRolled) {
+  const start = lastRolled && lastRolled >= from ? addDays(lastRolled, 1) : from;
+  if (start > to) return { days: [], stale: false };
+  const all = dayRange(start, to);
+  return { days: all.slice(-MAX_LIVE_DAYS), stale: all.length > MAX_LIVE_DAYS };
+}
+
+export function compare(current, previous) {
+  const delta = current - previous;
+  return { current, previous, delta, delta_pct: previous > 0 ? Math.round((delta / previous) * 1000) / 10 : null };
+}
+
+// ---------------------------------------------------------------------------
+// SQL (all reads)
+// ---------------------------------------------------------------------------
+
+// `day::text` so the DATE never passes through a JS Date in the server's zone.
+export const ROLLED_MATCHES_SQL = `
+  SELECT day::text AS day, company_id, grant_id, times_computed, times_shown
+    FROM cc_daily_matches WHERE day BETWEEN $1::date AND $2::date`;
+export const ROLLED_VIEWS_SQL = `
+  SELECT day::text AS day, company_id, grant_root_id, sessions
+    FROM cc_daily_views WHERE day BETWEEN $1::date AND $2::date`;
+export const ROLLED_RATINGS_SQL = `
+  SELECT day::text AS day, company_id, grant_root_id, ups, downs
+    FROM cc_daily_ratings WHERE day BETWEEN $1::date AND $2::date`;
+// The latest day the roll-up wrote AFTER the day had ended (Vancouver). A day
+// rolled while still in progress — a by-hand run at 06:00, or a nightly run
+// that then stopped — holds only part of its rows, so it is read live instead.
+// Upserts set updated_at = NOW(), so a later complete run makes it count.
+export const LAST_ROLLED_SQL = `
+  SELECT max(day)::text AS day FROM (
+    SELECT day, max(updated_at) AS written FROM cc_daily_matches GROUP BY day
+    UNION ALL SELECT day, max(updated_at) FROM cc_daily_views GROUP BY day
+    UNION ALL SELECT day, max(updated_at) FROM cc_daily_ratings GROUP BY day) x
+   WHERE written >= (day + 1)::timestamp AT TIME ZONE '${TIME_ZONE}'`;
+export const NEED_ACTION_SQL = "SELECT count(*)::int AS n FROM cc_review_items WHERE status <> 'closed'";
+
+// [from 00:00, to+1 00:00) Vancouver; the row's day computed by the same cast
+// the comparison uses, so a row and its window always agree.
+const between = (col) =>
+  `${col} >= ($1::date)::timestamp AT TIME ZONE '${TIME_ZONE}'
+     AND ${col} < ($2::date + 1)::timestamp AT TIME ZONE '${TIME_ZONE}'`;
+const dayOf = (col) => `to_char(${col}::timestamptz AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM-DD')`;
+
+// A sign-up is a company with at least one real Clerk user (legacy imports and
+// test companies have none).
+export const SIGNUPS_SQL = `
+  SELECT ${dayOf('c.created_at')} AS day, c.id AS company_id
+    FROM companies c
+   WHERE c.deleted_at IS NULL
+     AND ${between('c.created_at')}
+     AND EXISTS (
+       SELECT 1 FROM company_users cu
+         JOIN users_clerk uc ON uc.user_id = cu.user_id AND uc.deleted_at IS NULL
+        WHERE cu.company_id = c.id AND cu.deleted_at IS NULL
+          AND uc.clerk_id LIKE 'user\\_%')`;
+
+export const WATCHLIST_ADDS_SQL = `
+  SELECT ${dayOf('wg.created_at')} AS day, wg.grant_id AS grant_root_id, w.company_id
+    FROM watchlist_grants wg
+    LEFT JOIN watchlists w ON w.id = wg.watchlist_id
+   WHERE ${between('wg.created_at')}`;
+
+export const CHATS_SQL = `
+  SELECT ${dayOf('created_at')} AS day, user_id AS clerk_id
+    FROM conversations
+   WHERE ${between('created_at')}
+     AND user_id LIKE 'user\\_%'
+     AND jsonb_array_length(messages) > 0`;
+
+export const COMPANY_METADATA_SQL = `
+  SELECT DISTINCT ON (company_id) company_id, primary_industries, provinces
+    FROM company_metadata
+   WHERE company_id = ANY($1::int[])
+   ORDER BY company_id, id DESC`;
+
+// ---------------------------------------------------------------------------
+// Assembly (pure)
+// ---------------------------------------------------------------------------
+
+const zeroSeries = (days) => new Map(days.map((d) => [d, 0]));
+const seriesOut = (map) => [...map.entries()].map(([day, value]) => ({ day, value }));
+
+/** Sum of `pick(row)` per day, over the window's days (empty days stay 0). */
+function sumMetric(rows, days, pick) {
+  const set = new Set(days);
+  const series = zeroSeries(days);
+  let total = 0;
+  for (const r of rows) {
+    if (!set.has(r.day)) continue;
+    const v = Number(pick(r)) || 0;
+    series.set(r.day, series.get(r.day) + v);
+    total += v;
+  }
+  return { total, series };
+}
+
+/** Distinct `keyOf(row)` per day and over the whole window. */
+function distinctMetric(rows, days, keyOf) {
+  const set = new Set(days);
+  const perDay = new Map(days.map((d) => [d, new Set()]));
+  const all = new Set();
+  for (const r of rows) {
+    if (!set.has(r.day)) continue;
+    const k = keyOf(r);
+    if (k == null) continue;
+    perDay.get(r.day).add(k);
+    all.add(k);
+  }
+  return { total: all.size, series: new Map([...perDay].map(([d, s]) => [d, s.size])), keys: all };
+}
+
+function metric(cur, prev) {
+  return { ...compare(cur.total, prev.total), series: seriesOut(cur.series), previous_series: seriesOut(prev.series) };
+}
+
+const pairKey = (r) => (r.company_id == null ? null : `${r.company_id}:${r.grant_id}`);
+
+/** grant → Set(company) shown, in a window. */
+function companiesShownByGrant(matches, days) {
+  const set = new Set(days);
+  const out = new Map();
+  for (const r of matches) {
+    if (!set.has(r.day) || !(r.times_shown > 0) || r.company_id == null) continue;
+    if (!out.has(r.grant_id)) out.set(r.grant_id, new Set());
+    out.get(r.grant_id).add(r.company_id);
+  }
+  return out;
+}
+
+function countBy(rows, days, keyField, pick = () => 1) {
+  const set = new Set(days);
+  const out = new Map();
+  for (const r of rows) {
+    if (!set.has(r.day)) continue;
+    out.set(r[keyField], (out.get(r[keyField]) ?? 0) + (Number(pick(r)) || 0));
+  }
+  return out;
+}
+
+const titleOf = (titles, id) => titles.get(id) ?? `Grant #${id}`;
+
+/** Industries / provinces gaining or losing matches and sign-ups. */
+export function shiftingTrends({ curPairs, prevPairs, curSignups, prevSignups, metadata }) {
+  const dims = { industries: (m) => m?.industries ?? [], provinces: (m) => m?.provinces ?? [] };
+  const out = {};
+  for (const [dim, labelsOf] of Object.entries(dims)) {
+    const acc = new Map();
+    const bump = (company, field) => {
+      for (const label of labelsOf(metadata.get(company))) {
+        if (!acc.has(label)) acc.set(label, { name: label, matches: 0, previous_matches: 0, signups: 0, previous_signups: 0 });
+        acc.get(label)[field] += 1;
+      }
+    };
+    for (const k of curPairs) bump(Number(k.split(':')[0]), 'matches');
+    for (const k of prevPairs) bump(Number(k.split(':')[0]), 'previous_matches');
+    for (const c of curSignups) bump(c, 'signups');
+    for (const c of prevSignups) bump(c, 'previous_signups');
+    out[dim] = [...acc.values()]
+      .map((x) => ({ ...x, matches_change: x.matches - x.previous_matches, signups_change: x.signups - x.previous_signups }))
+      .filter((x) => x.matches_change !== 0 || x.signups_change !== 0)
+      .sort((a, b) => Math.abs(b.matches_change) - Math.abs(a.matches_change)
+        || Math.abs(b.signups_change) - Math.abs(a.signups_change) || a.name.localeCompare(b.name))
+      .slice(0, TREND_N);
+  }
+  return out;
+}
+
+/**
+ * Pure: everything read → the Overview payload.
+ *
+ * Internal accounts (`internalCompanies`, a Set of companies.id — see
+ * internal-accounts.js) are counted everywhere; nothing is thrown away.
+ *   - Every tile counts them, and `metrics.*.internal` says how much of the
+ *     number came from them.
+ *   - The grant rankings and trends are built twice: `rankings.clients`
+ *     without internal accounts (the page default) and `rankings.all` with
+ *     them, so the "Include internal accounts" toggle switches with no refetch.
+ */
+export function buildOverview(w, data) {
+  const { matches, views, ratings, signups, watchlist, chats, chatCompany, titles, metadata, needAction,
+    internalCompanies = new Set() } = data;
+  const C = w.current.days;
+  const P = w.previous.days;
+  const chatRows = chats.map((r) => ({ ...r, company_id: chatCompany.get(r.clerk_id) ?? null }));
+  const isInternal = (r) => internalCompanies.has(r.company_id);
+
+  const all = { matches, views, ratings, signups, watchlist, chats: chatRows };
+  const only = (keep) => Object.fromEntries(Object.entries(all).map(([k, rows]) => [k, rows.filter(keep)]));
+
+  const metrics = tileMetrics(all, C, P);
+  const internal = tileMetrics(only(isInternal), C, P);
+  for (const [key, m] of Object.entries(metrics)) {
+    m.internal = { current: internal[key].current, previous: internal[key].previous };
+  }
+
+  return {
+    range: w.range,
+    time_zone: TIME_ZONE,
+    current: { from: w.current.from, to: w.current.to },
+    previous: { from: w.previous.from, to: w.previous.to },
+    today_partial: true,
+    metrics,
+    need_action: needAction,
+    rankings: {
+      clients: rankings(only((r) => !isInternal(r)), C, P, titles, metadata),
+      all: rankings(all, C, P, titles, metadata)
+    }
+  };
+}
+
+/** The usage tiles over a set of rows (current vs previous window). */
+function tileMetrics({ matches, views, ratings, signups, watchlist, chats }, C, P) {
+  const activityRows = [
+    ...matches.filter((r) => r.times_computed > 0),
+    ...views, ...ratings, ...chats
+  ].map((r) => ({ day: r.day, company_id: r.company_id }));
+  const shown = matches.filter((r) => r.times_shown > 0);
+  const both = (fn) => metric(fn(C), fn(P));
+  return {
+    signups: both((d) => distinctMetric(signups, d, (r) => r.company_id)),
+    active_companies: both((d) => distinctMetric(activityRows, d, (r) => r.company_id)),
+    matches_shown: both((d) => distinctMetric(shown, d, pairKey)),
+    grants_opened: both((d) => sumMetric(views, d, (r) => r.sessions)),
+    ratings_up: both((d) => sumMetric(ratings, d, (r) => r.ups)),
+    ratings_down: both((d) => sumMetric(ratings, d, (r) => r.downs)),
+    watchlist_adds: both((d) => sumMetric(watchlist, d, () => 1)),
+    chats: both((d) => sumMetric(chats, d, () => 1))
+  };
+}
+
+/** Most matched, popular, movers and shifting trends over a set of rows. */
+function rankings({ matches, views, signups, watchlist }, C, P, titles, metadata) {
+  const shown = matches.filter((r) => r.times_shown > 0);
+  const pairsCur = distinctMetric(shown, C, pairKey);
+  const pairsPrev = distinctMetric(shown, P, pairKey);
+  const signupsCur = distinctMetric(signups, C, (r) => r.company_id);
+  const signupsPrev = distinctMetric(signups, P, (r) => r.company_id);
+
+  // Per grant
+  const shownCur = companiesShownByGrant(matches, C);
+  const shownPrev = companiesShownByGrant(matches, P);
+  const opensCur = countBy(views, C, 'grant_root_id', (r) => r.sessions);
+  const opensPrev = countBy(views, P, 'grant_root_id', (r) => r.sessions);
+  const savesCur = countBy(watchlist, C, 'grant_root_id');
+  const grantIds = new Set([...shownCur.keys(), ...shownPrev.keys(), ...opensCur.keys(), ...savesCur.keys()]);
+  const grants = [...grantIds].map((id) => ({
+    grant_id: id,
+    title: titleOf(titles, id),
+    companies: shownCur.get(id)?.size ?? 0,
+    previous: shownPrev.get(id)?.size ?? 0,
+    opens: opensCur.get(id) ?? 0,
+    previous_opens: opensPrev.get(id) ?? 0,
+    saves: savesCur.get(id) ?? 0
+  })).map((g) => ({ ...g, change: g.companies - g.previous }));
+
+  const byId = (a, b) => a.grant_id - b.grant_id;
+  const most_matched = grants.filter((g) => g.companies > 0)
+    .sort((a, b) => b.companies - a.companies || b.opens - a.opens || byId(a, b)).slice(0, TOP_N);
+  const popular = grants.filter((g) => g.opens + g.saves > 0)
+    .sort((a, b) => b.opens - a.opens || b.saves - a.saves || byId(a, b)).slice(0, TOP_N);
+  const movers = {
+    risers: grants.filter((g) => g.change > 0).sort((a, b) => b.change - a.change || b.companies - a.companies || byId(a, b)).slice(0, MOVERS_N),
+    drops: grants.filter((g) => g.change < 0).sort((a, b) => a.change - b.change || b.previous - a.previous || byId(a, b)).slice(0, MOVERS_N),
+    up_count: grants.filter((g) => g.change > 0).length,
+    down_count: grants.filter((g) => g.change < 0).length
+  };
+
+  const trends = shiftingTrends({
+    curPairs: pairsCur.keys, prevPairs: pairsPrev.keys,
+    curSignups: signupsCur.keys, prevSignups: signupsPrev.keys, metadata
+  });
+
+  return { most_matched, popular, movers, trends };
+}
+
+// ---------------------------------------------------------------------------
+// Reads
+// ---------------------------------------------------------------------------
+
+function defaultDeps() {
+  return {
+    hubQuery: hubQueryDefault,
+    appQuery: appQueryDefault,
+    opsQuery: opsQueryDefault,
+    readDay,
+    liveGrants: liveGrantsDefault,
+    now: () => new Date()
+  };
+}
+
+async function readLiveDays(days, deps) {
+  const out = { matches: [], views: [], ratings: [] };
+  for (const day of days) {
+    const raw = await deps.readDay(day, { ops: deps.opsQuery, app: deps.appQuery });
+    out.matches.push(...aggregateMatches(raw.matches, raw.reviews));
+    out.views.push(...aggregateViews(raw.views));
+    out.ratings.push(...aggregateRatings(raw.ratings));
+  }
+  return out;
+}
+
+const shapeMetadata = (rows) => new Map(rows.map((r) => [r.company_id, {
+  industries: [...new Set((Array.isArray(r.primary_industries) ? r.primary_industries : [])
+    .filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()))],
+  provinces: splitProvinces(r.provinces)
+}]));
+
+/** Read everything for one range and build the payload. Uncached. */
+export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
+  const deps = { ...defaultDeps(), ...overrides };
+  const w = windowsFor(range, deps.now());
+  const from = w.previous.from;
+  const to = w.current.to;
+
+  const lastRolled = (await deps.hubQuery(LAST_ROLLED_SQL)).rows[0]?.day ?? null;
+  const tail = liveTail(from, to, lastRolled);
+  const tailSet = new Set(tail.days);
+  const notTail = (r) => !tailSet.has(r.day);
+
+  const [rm, rv, rr, live, signups, watchlist, chats, grants, need] = await Promise.all([
+    deps.hubQuery(ROLLED_MATCHES_SQL, [from, to]),
+    deps.hubQuery(ROLLED_VIEWS_SQL, [from, to]),
+    deps.hubQuery(ROLLED_RATINGS_SQL, [from, to]),
+    readLiveDays(tail.days, deps),
+    deps.appQuery(SIGNUPS_SQL, [from, to]),
+    deps.appQuery(WATCHLIST_ADDS_SQL, [from, to]),
+    deps.opsQuery(CHATS_SQL, [from, to]),
+    deps.liveGrants({ query: deps.appQuery }),
+    deps.hubQuery(NEED_ACTION_SQL)
+  ]);
+
+  const num = (r) => ({ ...r, times_computed: Number(r.times_computed), times_shown: Number(r.times_shown) });
+  const matches = [...rm.rows.filter(notTail).map(num), ...live.matches];
+  const views = [...rv.rows.filter(notTail), ...live.views];
+  const ratings = [...rr.rows.filter(notTail), ...live.ratings];
+
+  const identities = await identitiesForClerkIds(chats.rows.map((r) => r.clerk_id), { query: deps.appQuery });
+  const chatCompany = new Map([...identities].map(([clerk, v]) => [clerk, v.company_id]));
+
+  const companyIds = new Set([
+    ...matches.filter((r) => r.times_shown > 0).map((r) => r.company_id),
+    ...signups.rows.map((r) => r.company_id)
+  ].filter((id) => Number.isInteger(id)));
+  const metadata = companyIds.size
+    ? shapeMetadata((await deps.appQuery(COMPANY_METADATA_SQL, [[...companyIds]])).rows)
+    : new Map();
+
+  const internalIds = deps.internalCompanyIds ?? INTERNAL_COMPANY_IDS;
+  const payload = buildOverview(w, {
+    matches, views, ratings,
+    signups: signups.rows, watchlist: watchlist.rows, chats: chats.rows, chatCompany,
+    titles: new Map(grants.map((g) => [g.root_id, g.title])),
+    metadata,
+    needAction: need.rows[0]?.n ?? 0,
+    internalCompanies: internalCompanySet(internalIds)
+  });
+  // Names first, id second, wherever a company is shown. A names failure
+  // never fails the overview.
+  const names = await companyNamesForIds([...internalIds], { query: deps.appQuery }).catch(() => new Map());
+  return {
+    ...payload,
+    internal_accounts: internalIds.map((id) => ({ id, name: names.get(id) ?? null, internal: true })),
+    sources: {
+      last_rolled_day: lastRolled,
+      live_days: tail.days,
+      stale_rollup: tail.stale
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Cache
+// ---------------------------------------------------------------------------
+
+const cache = new Map();
+
+/** The payload for a range, from cache when it is under CACHE_TTL_MS old. */
+export async function getOverview(range = DEFAULT_RANGE, overrides = {}) {
+  if (!RANGE_DAYS[range]) throw new OverviewError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+  const now = (overrides.now ?? (() => new Date()))();
+  const hit = cache.get(range);
+  if (hit && now.getTime() - hit.at < CACHE_TTL_MS) return { ...(await hit.promise), cached: true };
+
+  const promise = computeOverview(range, overrides).then((p) => ({ ...p, generated_at: now.toISOString() }));
+  cache.set(range, { at: now.getTime(), promise });
+  try {
+    return { ...(await promise), cached: false };
+  } catch (err) {
+    cache.delete(range); // never cache a failure
+    throw err;
+  }
+}
+
+export function _clearCacheForTests() {
+  cache.clear();
+  grantCache.value = null;
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+export const SEARCH_LIMIT = 8;
+export const COMPANY_SEARCH_SQL = `
+  SELECT id, name FROM companies
+   WHERE deleted_at IS NULL AND (id = $1 OR name ILIKE $2 ESCAPE '\\')
+   ORDER BY (id = $1) DESC, name
+   LIMIT ${SEARCH_LIMIT}`;
+
+const grantCache = { value: null, at: 0 };
+
+/** Companies by name or id, live grants by title or root id. */
+export async function search(q, overrides = {}) {
+  const deps = { ...defaultDeps(), ...overrides };
+  const text = String(q ?? '').trim().slice(0, 100);
+  if (text.length < 1) return { companies: [], grants: [] };
+  const asId = /^\d{1,9}$/.test(text) ? Number(text) : -1;
+  const like = `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+
+  const now = deps.now().getTime();
+  if (!grantCache.value || now - grantCache.at > CACHE_TTL_MS) {
+    grantCache.value = await deps.liveGrants({ query: deps.appQuery });
+    grantCache.at = now;
+  }
+  const needle = text.toLowerCase();
+  const grants = grantCache.value
+    .filter((g) => g.root_id === asId || String(g.title ?? '').toLowerCase().includes(needle))
+    .sort((a, b) => (b.root_id === asId) - (a.root_id === asId) || String(a.title).localeCompare(String(b.title)))
+    .slice(0, SEARCH_LIMIT)
+    .map((g) => ({ type: 'grant', id: g.root_id, name: g.title }));
+
+  const { rows } = await deps.appQuery(COMPANY_SEARCH_SQL, [asId, like]);
+  return {
+    companies: rows.map((r) => ({ type: 'company', id: r.id, name: r.name || `Company #${r.id}`, internal: isInternalCompany(r.id) })),
+    grants
+  };
+}

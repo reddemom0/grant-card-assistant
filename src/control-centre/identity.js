@@ -11,6 +11,7 @@
  */
 
 import { appQuery } from './db.js';
+import { isInternalCompany } from './internal-accounts.js';
 
 const IDENTITY_SQL = `
   SELECT uc.clerk_id, uc.user_id, cu.company_id, cu."primary" AS is_primary
@@ -76,4 +77,24 @@ export async function companyNamesForIds(companyIds, { query = appQuery } = {}) 
   if (ids.length === 0) return new Map();
   const { rows } = await query(COMPANY_NAMES_SQL, [ids]);
   return new Map(rows.map((r) => [r.id, r.name]));
+}
+
+/**
+ * Rows that carry a company_id, each given `company_name` (null when the
+ * company has no row or no id) and `company_internal` (true for a confirmed
+ * internal account, internal-accounts.js — shown as an "Internal" tag).
+ * Anything shown to staff names the company first and keeps the id second.
+ * One batched query.
+ *
+ * @template {{company_id?: number|null}} T
+ * @param {T[]} rows
+ * @returns {Promise<Array<T & {company_name: string|null, company_internal: boolean}>>}
+ */
+export async function withCompanyNames(rows, { query = appQuery } = {}) {
+  const names = await companyNamesForIds((rows || []).map((r) => r?.company_id), { query });
+  return (rows || []).map((r) => ({
+    ...r,
+    company_name: r?.company_id != null ? names.get(r.company_id) ?? null : null,
+    company_internal: isInternalCompany(r?.company_id)
+  }));
 }
