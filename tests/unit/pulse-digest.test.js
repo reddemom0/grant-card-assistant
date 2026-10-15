@@ -440,6 +440,42 @@ describe('the card', () => {
   });
 });
 
+describe('runWeeklyDigest — Control Centre themes store (migration 046)', () => {
+  test('stores the built themes, with who asked each rewritten question, from the same call', async () => {
+    const f = fakeDeps();
+    f.deps.saveThemes = jest.fn(async () => ({ themes: 2, questions: 2 }));
+    const out = await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps });
+    expect(out.status).toBe('sent');
+    expect(f.deps.createMessage).toHaveBeenCalledTimes(1); // no second model call
+    const built = f.deps.saveThemes.mock.calls[0][0];
+    expect(built.monday).toBe('2026-09-28');
+    expect(built.askedBy).toEqual(['user_a', null]);
+    expect(built.themes.themes.map(t => t.items)).toEqual([
+      [{ id: 1, text: 'I\'m [name] at [company], hiring grants?' }],
+      [{ id: 2, text: 'Is CanExport open?' }]
+    ]);
+    // never the original question text
+    expect(JSON.stringify(built.themes.themes.map(t => t.items))).not.toContain(SECRET);
+  });
+
+  test('a store failure never stops the DM', async () => {
+    const f = fakeDeps();
+    f.deps.saveThemes = jest.fn(async () => { throw Object.assign(new Error('x'), { code: '42P01' }); });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const out = await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps });
+    expect(out.status).toBe('sent');
+    expect(warn.mock.calls.flat().join(' ')).toMatch(/themes not stored for the Control Centre — code: 42P01/);
+    warn.mockRestore();
+  });
+
+  test('an already-sent week stores nothing', async () => {
+    const f = fakeDeps({ claimed: new Set(['weekly_digest:2026-09-28']) });
+    f.deps.saveThemes = jest.fn();
+    expect((await D.runWeeklyDigest({ now: MONDAY_RUN, env: ENV, deps: f.deps })).status).toBe('already_sent');
+    expect(f.deps.saveThemes).not.toHaveBeenCalled();
+  });
+});
+
 describe('runWeeklyDigest', () => {
   test('sends one card: five sections in order, one widget per item, a button to the tab', async () => {
     const f = fakeDeps();

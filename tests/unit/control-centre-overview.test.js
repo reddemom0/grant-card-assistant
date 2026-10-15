@@ -13,7 +13,7 @@ import {
   _clearCacheForTests, OverviewError, CACHE_TTL_MS, MAX_LIVE_DAYS,
   ROLLED_MATCHES_SQL, ROLLED_VIEWS_SQL, ROLLED_RATINGS_SQL, LAST_ROLLED_SQL, NEED_ACTION_SQL,
   SIGNUPS_SQL, WATCHLIST_ADDS_SQL, CHATS_SQL, COMPANY_METADATA_SQL, COMPANY_SEARCH_SQL,
-  OPEN_SOURCES, openSourceKey, openSources
+  OPEN_SOURCES, openSourceKey, openSources, chatStats
 } from '../../src/control-centre/overview.js';
 import { MATCH_SQL } from '../../src/control-centre/rollup.js';
 import { INTERNAL_COMPANY_IDS, internalCompanySet, isInternalCompany } from '../../src/control-centre/internal-accounts.js';
@@ -141,6 +141,56 @@ describe('buildOverview', () => {
     expect(r.movers).toMatchObject({ up_count: 2, down_count: 1 });
     expect(r.popular[0]).toMatchObject({ grant_id: 1516, opens: 4, saves: 1 });
     expect(o.need_action).toBe(5);
+  });
+});
+
+describe('chat numbers', () => {
+  const chats = [
+    { day: '2026-10-10', company_id: 90, questions: 3 },
+    { day: '2026-10-11', company_id: 90, questions: 1 },
+    { day: '2026-10-12', company_id: null, questions: 2 }, // Clerk id with no company: a chat, not a client
+    { day: '2026-10-04', company_id: 91, questions: 4 }
+  ];
+  const views = [
+    { day: '2026-10-10', source: 'advisor', sessions: 2 },
+    { day: '2026-10-10', source: 'browse', sessions: 5 },
+    { day: '2026-10-03', source: 'advisor', sessions: 1 }
+  ];
+
+  test('chats, clients who chatted, questions, average, cards opened from chat — now vs before', () => {
+    expect(chatStats(chats, views, W.current.days, W.previous.days)).toEqual({
+      chats_started: { current: 3, previous: 1, delta: 2, delta_pct: 200 },
+      clients_chatted: { current: 1, previous: 1, delta: 0, delta_pct: 0 },
+      questions_asked: { current: 6, previous: 4, delta: 2, delta_pct: 50 },
+      avg_questions_per_chat: { current: 2, previous: 4, delta: -2, delta_pct: -50 },
+      cards_opened_from_chat: { current: 2, previous: 1, delta: 1, delta_pct: 100 }
+    });
+  });
+
+  test('no chats → zeros, no division by zero', () => {
+    expect(chatStats([], [], W.current.days, W.previous.days).avg_questions_per_chat).toEqual({ current: 0, previous: 0, delta: 0, delta_pct: null });
+  });
+
+  test('in both rankings; clients-only leaves internal accounts out', () => {
+    const o = buildOverview(W, { ...base(),
+      internalCompanies: internalCompanySet([81]),
+      chats: [{ day: '2026-10-10', clerk_id: 'user_staff', questions: 5 }, { day: '2026-10-10', clerk_id: 'user_c', questions: 1 }],
+      chatCompany: new Map([['user_staff', 81], ['user_c', 90]]) });
+    expect(o.rankings.all.chat.questions_asked.current).toBe(6);
+    expect(o.rankings.clients.chat.questions_asked.current).toBe(1);
+    expect(o.rankings.clients.chat.clients_chatted.current).toBe(1);
+  });
+
+  test('questions are the client\'s own messages (string content), not tool results', () => {
+    expect(CHATS_SQL).toMatch(/m->>'role' = 'user' AND jsonb_typeof\(m->'content'\) = 'string'/);
+  });
+
+  test('a missing themes table never fails the overview', async () => {
+    _clearCacheForTests();
+    const d = { ...deps(), latestDigest: async () => { throw Object.assign(new Error('x'), { code: '42P01' }); } };
+    const o = await computeOverview('week', d);
+    expect(o.asked).toBeNull();
+    expect(o.asked_error).toBe('42P01');
   });
 });
 

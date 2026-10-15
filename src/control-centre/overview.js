@@ -33,6 +33,7 @@ import { TIME_ZONE, vancouverDay, addDays, dayRange, readDay, aggregateMatches, 
 import { liveGrants as liveGrantsDefault, splitProvinces } from './live-sources.js';
 import { identitiesForClerkIds, companyNamesForIds } from './identity.js';
 import { INTERNAL_COMPANY_IDS, internalCompanySet, isInternalCompany } from './internal-accounts.js';
+import { latestDigest } from './digest-themes.js';
 
 export const RANGE_DAYS = Object.freeze({ day: 1, week: 7, month: 30, year: 365 });
 export const DEFAULT_RANGE = 'week';
@@ -156,8 +157,12 @@ export const WATCHLIST_ADDS_SQL = `
     LEFT JOIN watchlists w ON w.id = wg.watchlist_id
    WHERE ${between('wg.created_at')}`;
 
+// questions = the client's own messages in the chat (string-content user
+// messages; tool results are user messages with array content and don't count).
 export const CHATS_SQL = `
-  SELECT ${dayOf('created_at')} AS day, user_id AS clerk_id
+  SELECT ${dayOf('created_at')} AS day, user_id AS clerk_id, id AS conversation_id,
+         (SELECT count(*) FROM jsonb_array_elements(messages) m
+           WHERE m->>'role' = 'user' AND jsonb_typeof(m->'content') = 'string')::int AS questions
     FROM conversations
    WHERE ${between('created_at')}
      AND user_id LIKE 'user\\_%'
@@ -324,8 +329,41 @@ function tileMetrics({ matches, views, ratings, signups, watchlist, chats }, C, 
   };
 }
 
-/** Most matched, popular, movers and shifting trends over a set of rows. */
-function rankings({ matches, views, signups, watchlist }, C, P, titles, metadata) {
+/**
+ * The Chat section's numbers over a set of rows, current vs previous window.
+ * A chat is a conversation started in the window; its questions are the
+ * client's messages in it. Clients are companies, linked through the Clerk
+ * identity exactly as for active clients (chats with no company aren't counted
+ * as a client but are still chats).
+ */
+export function chatStats(chats, views, C, P) {
+  const one = (days) => {
+    const set = new Set(days);
+    const rows = chats.filter((r) => set.has(r.day));
+    const questions = rows.reduce((a, r) => a + (Number(r.questions) || 0), 0);
+    return {
+      chats: rows.length,
+      clients: new Set(rows.map((r) => r.company_id).filter((id) => id != null)).size,
+      questions,
+      avg: rows.length ? Math.round((questions / rows.length) * 10) / 10 : 0,
+      fromChat: views.filter((r) => set.has(r.day) && openSourceKey(r.source) === 'chat')
+        .reduce((a, r) => a + (Number(r.sessions) || 0), 0)
+    };
+  };
+  const cur = one(C);
+  const prev = one(P);
+  const avg = compare(cur.avg, prev.avg);
+  return {
+    chats_started: compare(cur.chats, prev.chats),
+    clients_chatted: compare(cur.clients, prev.clients),
+    questions_asked: compare(cur.questions, prev.questions),
+    avg_questions_per_chat: { ...avg, delta: Math.round(avg.delta * 10) / 10 },
+    cards_opened_from_chat: compare(cur.fromChat, prev.fromChat)
+  };
+}
+
+/** Most matched, popular, movers, shifting trends, card sources and chat over a set of rows. */
+function rankings({ matches, views, signups, watchlist, chats }, C, P, titles, metadata) {
   const shown = matches.filter((r) => r.times_shown > 0);
   const pairsCur = distinctMetric(shown, C, pairKey);
   const pairsPrev = distinctMetric(shown, P, pairKey);
@@ -366,7 +404,7 @@ function rankings({ matches, views, signups, watchlist }, C, P, titles, metadata
     curSignups: signupsCur.keys, prevSignups: signupsPrev.keys, metadata
   });
 
-  return { most_matched, popular, movers, trends, open_sources: openSources(views, C, P) };
+  return { most_matched, popular, movers, trends, open_sources: openSources(views, C, P), chat: chatStats(chats, views, C, P) };
 }
 
 /** Grant card opens per source, current vs previous window; every source listed. */
@@ -470,8 +508,20 @@ export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
   // Names first, id second, wherever a company is shown. A names failure
   // never fails the overview.
   const names = await companyNamesForIds([...internalIds], { query: deps.appQuery }).catch(() => new Map());
+  // What clients asked: the latest week the digest stored (migration 046). It
+  // follows the digest's Mon–Sun weeks, not the range picker. A missing table
+  // or a read error never fails the overview.
+  let asked = null;
+  let askedError = null;
+  try {
+    asked = await (deps.latestDigest ?? latestDigest)({ hubQuery: deps.hubQuery, appQuery: deps.appQuery });
+  } catch (err) {
+    askedError = String(err?.code ?? err?.name ?? 'unknown');
+  }
   return {
     ...payload,
+    asked,
+    ...(askedError ? { asked_error: askedError } : {}),
     internal_accounts: internalIds.map((id) => ({ id, name: names.get(id) ?? null, internal: true })),
     sources: {
       last_rolled_day: lastRolled,

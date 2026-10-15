@@ -225,6 +225,43 @@
 .cc-chg.down { color: var(--cc-orange-ink); }
 .cc-muted { color: var(--cc-grey); }
 
+/* ---------- Chat ---------- */
+.cc-chat-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 26px; }
+.cc-chat-stat { background: var(--cc-paper); border-radius: 10px; padding: 14px 14px 12px; min-width: 0; }
+.cc-chat-num { font-size: 30px; font-weight: 700; line-height: 1; letter-spacing: -.01em; }
+.cc-asked { border-top: 1px solid var(--cc-rule); padding-top: 20px; }
+.cc-asked-head { font-size: 16px; font-weight: 700; margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.cc-recent-head { margin-top: 26px; }
+.cc-week {
+  font-size: 12.5px; font-weight: 700; color: var(--cc-teal-ink); background: var(--cc-teal-tint);
+  padding: 3px 10px; border-radius: 999px;
+}
+.cc-themes { display: grid; gap: 2px; }
+.cc-theme {
+  display: grid; grid-template-columns: minmax(0, 1.1fr) 150px minmax(0, 2fr); gap: 14px; align-items: baseline;
+  padding: 9px 0; border-bottom: 1px solid var(--cc-rule); font-size: 14px;
+}
+.cc-theme:last-child { border-bottom: 0; }
+.cc-theme-name { font-weight: 600; }
+.cc-theme .cc-bar { justify-content: flex-start; white-space: nowrap; }
+.cc-theme-take { color: var(--cc-grey); line-height: 1.5; }
+.cc-questions { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px; }
+.cc-questions li { border-left: 3px solid var(--cc-rule); padding: 2px 0 2px 12px; }
+.cc-q { margin: 0 0 4px; font-size: 14.5px; line-height: 1.45; }
+.cc-q-meta { margin: 0; font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cc-q-meta .chip {
+  font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px;
+  background: var(--cc-teal-tint); color: var(--cc-teal-ink);
+}
+.cc-q-meta .cc-tag-internal { margin-left: 0; }
+@media (max-width: 1180px) { .cc-chat-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .cc-chat-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cc-theme { grid-template-columns: minmax(0, 1fr) auto; }
+  .cc-theme-take { grid-column: 1 / -1; }
+  .cc-questions { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ---------- Internal accounts ---------- */
 .cc-internal { font-size: 12.5px; color: var(--cc-grey); margin-top: 2px; }
 .cc-internal:empty { display: none; }
