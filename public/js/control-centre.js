@@ -24,7 +24,6 @@
   const SOON = {
     inbox: ['Inbox', 'Every thumbs-down and staff flag that needs a look, newest first, with its diagnosis.'],
     grants: ['Grants', 'Each grant: how many clients it was matched to over time, who opened its grant card, and why it matched.'],
-    coverage: ['Coverage & changes', 'What changed in matching and why, grant cards matched widely but never opened, and thin coverage by industry.'],
     themes: ['Chat themes', 'What people ask the assistant, grouped into themes you can read through.']
   };
 
@@ -48,7 +47,7 @@
   function storeSet(v) { try { window.localStorage.setItem(STORE_KEY, v); } catch { /* private mode etc. */ } }
 
   // ---------------------------------------------------------------- state + URL
-  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '', gq: '' };
+  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '', gq: '', industry: null, vq: '' };
   const knownNames = { company: new Map(), grant: new Map() };
   /** companies.id of internal accounts seen in any response (search, overview). */
   const internalIds = new Set();
@@ -64,7 +63,10 @@
     const co = /^#companies(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
     // #grants, #grants/<id>, #grants?view=…&sort=…&dir=…&q=… (the old ?tab=grants&grant=X lands here too)
     const gr = /^#grants(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
-    const tab = hash ? 'review' : co ? 'companies' : gr ? 'grants' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
+    // #coverage, #coverage?view=not_matching, #coverage/industry/<name>
+    const cv = /^#coverage(?:\/industry\/([^?]+))?(?:\?(.*))?$/.exec(window.location.hash);
+    const decoded = (v) => { try { return decodeURIComponent(v); } catch { return null; } };
+    const tab = hash ? 'review' : co ? 'companies' : gr ? 'grants' : cv ? 'coverage' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
     return {
       tab,
       range: RANGES.includes(p.get('range')) ? p.get('range') : (RANGES.includes(stored) ? stored : 'week'),
@@ -73,17 +75,20 @@
       card: hash?.[1] ? Number(hash[1]) : null,
       rq: hash?.[2] ?? '',
       cq: co?.[2] ?? '',
-      gq: gr?.[2] ?? ''
+      gq: gr?.[2] ?? '',
+      industry: cv?.[1] ? decoded(cv[1]) : null,
+      vq: cv?.[2] ?? ''
     };
   }
 
   function urlFor(s) {
     const p = new URLSearchParams();
-    if (s.tab !== 'overview' && s.tab !== 'review' && s.tab !== 'companies' && s.tab !== 'grants') p.set('tab', s.tab);
+    if (!['overview', 'review', 'companies', 'grants', 'coverage'].includes(s.tab)) p.set('tab', s.tab);
     p.set('range', s.range);
     const hash = s.tab === 'review' ? `#review${s.card ? `/${s.card}` : ''}${s.rq ? `?${s.rq}` : ''}`
       : s.tab === 'companies' ? `#companies${s.company ? `/${s.company}` : ''}${s.cq ? `?${s.cq}` : ''}`
-        : s.tab === 'grants' ? `#grants${s.grant ? `/${s.grant}` : ''}${s.gq && !s.grant ? `?${s.gq}` : ''}` : '';
+        : s.tab === 'grants' ? `#grants${s.grant ? `/${s.grant}` : ''}${s.gq && !s.grant ? `?${s.gq}` : ''}`
+          : s.tab === 'coverage' ? `#coverage${s.industry ? `/industry/${encodeURIComponent(s.industry)}` : ''}${s.vq ? `?${s.vq}` : ''}` : '';
     return `${window.location.pathname}?${p}${hash}`;
   }
 
@@ -91,6 +96,7 @@
     state = { ...state, ...next };
     if (state.tab !== 'companies') { state.company = null; state.cq = ''; }
     if (state.tab !== 'grants') { state.grant = null; state.gq = ''; }
+    if (state.tab !== 'coverage') { state.industry = null; state.vq = ''; }
     if (state.tab !== 'review') { state.card = null; state.rq = ''; }
     storeSet(state.range);
     const url = urlFor(state);
@@ -757,7 +763,7 @@
   }
 
   async function renderSoon(panel) {
-    const [title, what] = SOON[state.tab];
+    const [title, what] = SOON[state.tab] ?? [state.tab, ""];
     const sel = state.tab === 'companies' && state.company ? ['company', state.company]
       : state.tab === 'grants' && state.grant ? ['grant', state.grant] : null;
     panel.innerHTML = `<div class="cc-soon"><span class="pill">Coming soon</span><h2>${esc(title)}</h2><p>${esc(what)}</p>
@@ -812,6 +818,18 @@
     get reviewCtx() { return reviewCtx; }
   };
 
+  /** What the Coverage & changes module gets from this page. */
+  const coverageCtx = {
+    esc, fmt, plural, api, send, reduceMotion,
+    state: () => state,
+    go: (next, opts) => go({ tab: 'coverage', ...next }, opts),
+    goGrant: (id, name) => { if (name) knownNames.grant.set(id, name); go({ tab: 'grants', grant: id }); },
+    goCompany: (id) => go({ tab: 'companies', company: id, cq: '' }),
+    goReview: (id) => go({ tab: 'review', card: id, rq: '' }),
+    includeInternal: () => includeInternal,
+    setIncludeInternal: (on) => reviewCtx.setIncludeInternal(on)
+  };
+
   function render() {
     hideTip();
     const panel = $('#cc-panel');
@@ -827,6 +845,13 @@
       loadSeq++;
       renderChrome(null);
       window.CCGrants.render(panel, grantsCtx);
+      loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
+      return;
+    }
+    if (state.tab === 'coverage' && window.CCCoverage) {
+      loadSeq++;
+      renderChrome(null);
+      window.CCCoverage.render(panel, coverageCtx);
       loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
       return;
     }
@@ -903,7 +928,7 @@
       $(`#cc-tabs [data-tab="${next}"]`).focus();
     });
     $('#cc-action').addEventListener('click', (e) => { e.preventDefault(); go({ tab: 'review', card: null, rq: '' }); });
-    // Back/forward, and a typed or pasted #review/<id>, #companies/<id> or #grants/<id> on a
+    // Back/forward, and a typed or pasted #review/<id>, #companies/<id>, #grants/<id> or #coverage/… on a
     // page already open. A hash change fires both events; render once.
     const fromUrl = () => {
       const next = readUrl();
