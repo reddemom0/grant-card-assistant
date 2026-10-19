@@ -11,7 +11,7 @@ import { jest } from '@jest/globals';
 
 const {
   runGg3Conversations, parseClientRef, likeEscape, outcomeWords, grantsIn, reduceExplain,
-  windowFor, NAME_NOT_FOUND, SNIPPET_CHARS, CHAT_CARDS_SQL
+  windowFor, vancouverMidnight, NAME_NOT_FOUND, SNIPPET_CHARS, CHAT_CARDS_SQL, SEARCH_TURNS_SQL, GRANT_NAMES_SQL
 } = await import('../../src/tools/gg3-conversations.js');
 
 const NOW = new Date('2026-10-01T16:00:00Z');
@@ -29,11 +29,12 @@ const msgs = [
 ];
 
 /** A runQuery fake that answers by SQL shape and records every statement. */
-function fakeOps({ resolveRows = [{ user_id: CLIENT, last_active: NOW }], convRows, turnRows = [], searchRows = [], runRows = [], configured = true } = {}) {
+function fakeOps({ resolveRows = [{ user_id: CLIENT, last_active: NOW }], convRows, turnRows = [], searchRows = [], searchTurnRows = [], runRows = [], configured = true } = {}) {
   const sent = [];
   const q = jest.fn(async (sql, params) => {
     sent.push({ sql, params });
     if (!configured) return { configured: false };
+    if (sql === SEARCH_TURNS_SQL) return { configured: true, rows: searchTurnRows };
     if (/max\(updated_at\) AS last_active/.test(sql)) return { configured: true, rows: resolveRows };
     if (/FROM chat_turns\s+WHERE conversation_id = ANY/.test(sql)) return { configured: true, rows: turnRows };
     if (/FROM conversations WHERE id = \$1/.test(sql)) {
@@ -50,6 +51,9 @@ function fakeOps({ resolveRows = [{ user_id: CLIENT, last_active: NOW }], convRo
   });
   return { q, sent };
 }
+
+/** Oracle's local GG3 copy (gg3_grants). */
+const GRANT_NAMES = { 1742: 'Regional Tariff Response Initiative - British Columbia', 1314: 'Employer Training Grant (ETG)', 1099: 'WorkBC Wage Subsidy Program' };
 
 const CARD_ROWS = [
   { id: 55, kind: 'chat', status: 'diagnosed', owner: 'chris', chat_turn_ref: 'conv:41:pushback', conversation_id: 41,
@@ -78,9 +82,11 @@ function makeDeps(over = {}) {
       env: { PUBLIC_URL: 'https://hub.test' },
       now: () => NOW,
       runQuery: ops.q,
-      oracleQuery: jest.fn(async (sql) => (/FROM users WHERE id/.test(sql)
+      oracleQuery: jest.fn(async (sql, params) => (/FROM users WHERE id/.test(sql)
         ? { rows: [{ name: 'Steph Lee', email: 'steph@granted.ca' }] }
-        : sql === CHAT_CARDS_SQL ? { rows: CARD_ROWS } : { rows: [] })),
+        : sql === CHAT_CARDS_SQL ? { rows: CARD_ROWS }
+          : sql === GRANT_NAMES_SQL ? { rows: params[0].filter(id => GRANT_NAMES[id]).map(id => ({ id, grant_name: GRANT_NAMES[id] })) }
+            : { rows: [] })),
       fetchProfile: jest.fn(async () => ({ status: 404, companyName: null })),
       explain: jest.fn(async () => ({ ok: false, code: 'not_configured' })),
       findGrant: jest.fn(async () => null),
@@ -134,6 +140,28 @@ describe('read', () => {
     expect(resolve.params).toEqual([90, 4, '9xyz']);
   });
 
+  test('since 2026-10-02 the cards come from conversations.grant_ids, named from the GG3 copy', async () => {
+    const newer = [
+      { role: 'user', content: 'Any tariff help?' },
+      { role: 'assistant', content: 'The Regional Tariff Response Initiative may fit.' }
+    ];
+    const { deps } = makeDeps({
+      ops: fakeOps({ convRows: [{ id: 289, mode: 'advisor', messages: newer, grant_ids: [1742, 4242], created_at: NOW, updated_at: NOW }] })
+    });
+    const r = await run({ mode: 'read', client: '·9xyz' }, deps);
+    expect(r.conversations[0].grants_shown).toEqual(['Regional Tariff Response Initiative - British Columbia (1742)', 'grant 4242']);
+    expect(deps.oracleQuery).toHaveBeenCalledWith(GRANT_NAMES_SQL, [[1742, 4242]]);
+  });
+
+  test('the GG3 copy unavailable → names from the conversation, else the id', async () => {
+    const { deps } = makeDeps({
+      ops: fakeOps({ convRows: [{ id: 41, mode: 'advisor', messages: msgs, grant_ids: [1856, 9], created_at: NOW, updated_at: NOW }] }),
+      deps: { oracleQuery: jest.fn(async () => { throw new Error('hub down'); }) }
+    });
+    const r = await run({ mode: 'read', client: '·9xyz' }, deps);
+    expect(r.conversations[0].grants_shown).toEqual(['BC Hiring Boost (1856)', 'grant 9']);
+  });
+
   test('full Clerk id matches exactly', async () => {
     const { deps, ops } = makeDeps();
     await run({ mode: 'read', client: CLIENT }, deps);
@@ -185,7 +213,7 @@ describe('company names', () => {
 describe('search', () => {
   const row = (i, extra = {}) => ({
     id: 100 + i, user_id: `user_2client${String(i).padStart(4, '0')}`, mode: 'advisor', updated_at: NOW, failed: i % 2 === 0,
-    client_text: `${'Earlier question. '.repeat(5)}Do you have hiring grants for students? (${i})`, ...extra
+    client_messages: [`${'Earlier question. '.repeat(5)}Do you have hiring grants for students? (${i})`], grant_ids: [], ...extra
   });
 
   test('every term must be in client messages; default window is the last 7 days', async () => {
@@ -208,7 +236,7 @@ describe('search', () => {
   test('failed_only adds the chat_turns condition', async () => {
     const { deps, ops } = makeDeps({ ops: fakeOps({ searchRows: [] }) });
     await run({ mode: 'search', terms: ['broke'], days: 1, failed_only: true }, deps);
-    expect(ops.sent[0].sql.match(/FROM chat_turns t/g)).toHaveLength(2);
+    expect(ops.sent[0].sql.match(/t\.outcome = ANY/g)).toHaveLength(2);
   });
 
   test('more than 10 → 10 inline and the full list in a sheet in the asker\'s Drive', async () => {
@@ -221,7 +249,7 @@ describe('search', () => {
     const [userId, content] = deps.writeSheet.mock.calls[0];
     expect(userId).toBe(7);
     expect(content.tables[0].rows).toHaveLength(14);
-    expect(content.tables[0].columns.map(c => c.label)).toEqual(['Client', 'Last active', 'Mode', 'Chat failed', 'What they asked']);
+    expect(content.tables[0].columns.map(c => c.label)).toEqual(['Client', 'Active in window', 'Mode', 'Chat failed', 'What they asked', 'Cards on the matching message']);
   });
 
   test('a sheet failure still returns the inline rows', async () => {
@@ -240,9 +268,73 @@ describe('search', () => {
     expect(ops.sent).toHaveLength(0);
   });
 
+  test('cards per matching message from chat_turns; the whole conversation\'s from grant_ids', async () => {
+    const loan = row(1, {
+      id: 289, client_messages: ['Show me equipment funding programs for my company', 'What about loan programs'], grant_ids: [1742]
+    });
+    const eligible = row(2, { id: 283, client_messages: ['What grants am I most eligible for?'], grant_ids: [1314, 1099] });
+    const untracked = row(3, { id: 150, client_messages: ['loan or grant for students?'], grant_ids: [], legacy_grant_ids: [1099] });
+    const { deps, ops } = makeDeps({
+      ops: fakeOps({
+        searchRows: [loan, eligible, untracked],
+        searchTurnRows: [
+          { conversation_id: 289, turn_index: 0, occurred_at: new Date('2026-10-13T17:54:18Z'), surfaced_grant_ids: [1742] },
+          { conversation_id: 289, turn_index: 1, occurred_at: new Date('2026-10-13T17:54:41Z'), surfaced_grant_ids: [] },
+          { conversation_id: 283, turn_index: 0, occurred_at: new Date('2026-10-12T00:18:04Z'), surfaced_grant_ids: [1314, 1099] }
+        ]
+      })
+    });
+    const r = await run({ mode: 'search', terms: ['loan'] }, deps);
+    const by = Object.fromEntries(r.results.map(x => [x.conversation, x]));
+    expect(by[289].matching_messages).toEqual([{ client_message: 2, at: '2026-10-13 10:54', cards: 'none' }]);
+    expect(by[289].cards_in_conversation).toEqual(['Regional Tariff Response Initiative - British Columbia (1742)']);
+    expect(by[150].matching_messages).toEqual([{ client_message: 1, cards: 'not recorded' }]);
+    expect(by[150].cards_in_conversation).toEqual(['WorkBC Wage Subsidy Program (1099)']);
+    expect(ops.sent.find(x => x.sql === SEARCH_TURNS_SQL).params).toEqual([[289, 283, 150]]);
+
+    const r2 = await run({ mode: 'search', terms: ['eligible'] }, deps);
+    const e = r2.results.find(x => x.conversation === 283);
+    expect(e.matching_messages).toEqual([{
+      client_message: 1, at: '2026-10-11 17:18', cards: ['Employer Training Grant (ETG) (1314)', 'WorkBC Wage Subsidy Program (1099)']
+    }]);
+    expect(r2.results.every(x => x.cards_on_match === undefined)).toBe(true);
+  });
+
+  test('from/to are Vancouver days: a Saturday-evening chat is Saturday, not Sunday UTC', async () => {
+    const w = windowFor({ from: '2026-10-10', to: '2026-10-10' }, NOW);
+    expect(w.since).toEqual(new Date('2026-10-10T07:00:00Z'));
+    expect(w.until).toEqual(new Date('2026-10-11T07:00:00Z'));
+    const saturdayEvening = new Date('2026-10-11T03:30:00Z'); // 20:30 Saturday in Vancouver
+    expect(saturdayEvening >= w.since && saturdayEvening < w.until).toBe(true);
+    const sundayEarly = new Date('2026-10-11T07:30:00Z'); // 00:30 Sunday in Vancouver
+    expect(sundayEarly < w.until).toBe(false);
+    expect(vancouverMidnight('2026-11-15')).toEqual(new Date('2026-11-15T08:00:00Z')); // PST
+
+    const { deps, ops } = makeDeps({ ops: fakeOps({ searchRows: [row(1, { active_at: saturdayEvening, updated_at: saturdayEvening })] }) });
+    const r = await run({ mode: 'search', terms: ['hiring'], from: '2026-10-10', to: '2026-10-10' }, deps);
+    expect(ops.sent[0].params.slice(0, 2)).toEqual([w.since, w.until]);
+    expect(r).toMatchObject({ from: '2026-10-10', to: '2026-10-10' });
+    expect(r.results[0].date).toBe('2026-10-10');
+  });
+
+  test('a chat that carries on past the window still matches, dated by its turn in the window', async () => {
+    const { deps, ops } = makeDeps({
+      ops: fakeOps({
+        searchRows: [row(1, { active_at: new Date('2026-10-13T17:54:41Z'), updated_at: new Date('2026-10-16T22:00:00Z') })]
+      })
+    });
+    const r = await run({ mode: 'search', terms: ['hiring'], from: '2026-10-13', to: '2026-10-13' }, deps);
+    const { sql } = ops.sent[0];
+    expect(sql).toContain('t.occurred_at >= $1 AND t.occurred_at < $2');
+    expect(sql).not.toMatch(/updated_at < \$2/);
+    expect(sql).toContain('c.created_at < $2');
+    expect(sql).toMatch(/ORDER BY coalesce\(s\.active_at, s\.updated_at\) DESC/);
+    expect(r.results[0]).toMatchObject({ conversation: 101, date: '2026-10-13' });
+  });
+
   test('windows are capped at 90 days', () => {
     const w = windowFor({ from: '2026-01-01', to: '2026-09-30' }, NOW);
-    expect(w.until).toEqual(new Date('2026-10-01T00:00:00Z'));
+    expect(w.until).toEqual(new Date('2026-10-01T07:00:00Z'));
     expect((w.until - w.since) / 864e5).toBe(90);
   });
 });
@@ -384,6 +476,11 @@ describe('helpers', () => {
     const g = grantsIn(msgs);
     expect(g.names.get(77)).toBe('CanExport SMEs');
     expect(g.shown).toEqual(['BC Hiring Boost (1856)']);
+  });
+
+  test('legacy tile calls then the grant_ids column, first seen, no repeats, valid ids only', () => {
+    expect(grantsIn(msgs, [1856, 77, 0, 'x', 77]).ids).toEqual([1856, 77]);
+    expect(grantsIn([], [1742]).shown).toEqual(['grant 1742']);
   });
 
   test('unknown mode', async () => {
