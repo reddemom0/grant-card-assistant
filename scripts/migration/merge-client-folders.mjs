@@ -12,14 +12,17 @@
 //                      every change; verifies by ID; appends the run to the Drive migration log.
 //          --verify    read-only walk after --go; writes client-merge-certain-after-go.md.
 //          --undo      reverses the ledger's done actions (untrash, then move back). Created Archive folders stay.
-//          [--groups <json>] default dist/inventory/client-merge-certain-groups.json   [--include-shortcuts]
+//          [--tag <prefix>]  output/ledger prefix, default client-merge-certain   [--run "<log run label>"]
+//          [--groups <json>] default dist/inventory/<tag>-groups.json   [--include-shortcuts]
+// A group may have several sources; they merge into the keeper in order, each planned against the keeper as it will
+// look after the earlier sources are in.
 import fs from 'fs';
 import { INV, CFG, ADMIN, token, tally, callTally, vanTime, appendAfterRun, countsText } from './migration-log.mjs';
 
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
 const GO = args.includes('--go'), UNDO = args.includes('--undo'), VERIFY = args.includes('--verify'), WITH_SC = args.includes('--include-shortcuts');
-const GROUPS = opt('--groups') || `${INV}/client-merge-certain-groups.json`;
-const TAG = 'client-merge-certain', RUN = 'client merge – certain';
+const TAG = opt('--tag') || 'client-merge-certain', RUN = opt('--run') || 'client merge – certain';
+const GROUPS = opt('--groups') || `${INV}/${TAG}-groups.json`;
 const PLAN = `${INV}/${TAG}-plan.json`, REPORT = `${INV}/${TAG}-dryrun.md`, AFTER = `${INV}/${TAG}-after-go.md`, LEDGER = `${TAG}-ledger.jsonl`, L = `${INV}/${LEDGER}`;
 const GF = CFG.drives.sorted, GA = CFG.drives.archive, ARCH_ROOT = 'Merge duplicates';
 const FOLDER = 'application/vnd.google-apps.folder', SHORTCUT = 'application/vnd.google-apps.shortcut', RO = 'https://www.googleapis.com/auth/drive.readonly';
@@ -68,8 +71,11 @@ const filesIn = n => { let c = 0; walkAll(n, x => { if (x !== n && x.mimeType !=
 const shortcutsIn = n => { const o = []; walkAll(n, x => { if (x.mimeType === SHORTCUT) o.push(x.path); }); return o; };
 
 // ---------- dry run ----------
+const srcs = g => (g.sources || [g.source]).map(x => x.path).join(' + ');
+const repath = (n, path) => { n.path = path; n.children.forEach(c => repath(c, `${path}/${c.name}`)); };
 function planGroup(g, S, K) {
-  const actions = [], notes = [];
+  const actions = [], notes = [], src = S.path;
+  const land = (c, k) => { k.children.push(c); repath(c, `${k.path}/${c.name}`); };   // later sources see it in the keeper
   const merge = (s, k, rel, depth) => {
     for (const c of s.children) {
       if (c.mimeType === FOLDER) {
@@ -77,12 +83,12 @@ function planGroup(g, S, K) {
         const twin = twins.find(x => x.name === c.name) || twins[0];
         if (twins.length > 1) notes.push(`${c.path}: ${twins.length} matching keeper subfolders; merging into "${twin.name}"`);
         if (twin) { actions.push({ type: 'merge-folder', id: c.id, path: c.path, into: twin.id, intoPath: twin.path }); merge(c, twin, `${rel}/${c.name}`, depth + 1); }
-        else actions.push({ type: 'move', kind: 'folder', id: c.id, name: c.name, from: s.id, fromPath: c.path, to: k.id, toPath: `${k.path}/${c.name}`, files: filesIn(c), can: c.caps.canMoveItemWithinDrive !== false });
+        else { actions.push({ type: 'move', kind: 'folder', id: c.id, name: c.name, from: s.id, fromPath: c.path, to: k.id, toPath: `${k.path}/${c.name}`, files: filesIn(c), src, can: c.caps.canMoveItemWithinDrive !== false }); land(c, k); }
       } else {
         const same = k.children.filter(x => x.mimeType !== FOLDER && normName(x.name) === normName(c.name));
         const ident = c.md5 && same.find(x => x.md5 === c.md5);
-        if (ident) actions.push({ type: 'archive', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, archRel: `${ARCH_ROOT}/${K.name}${rel}`, toPath: `${ARCH_ROOT}/${K.name}${rel}/${c.name}`, twin: ident.id, can: c.caps.canMoveItemOutOfDrive !== false });
-        else actions.push({ type: 'move', kind: c.mimeType === SHORTCUT ? 'shortcut' : 'file', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, to: k.id, toPath: `${k.path}/${c.name}`, cls: same.length ? 'same-name-diff' : 'new', twin: same[0]?.id || null, files: 1, can: c.caps.canMoveItemWithinDrive !== false });
+        if (ident) actions.push({ type: 'archive', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, archRel: `${ARCH_ROOT}/${K.name}${rel}`, toPath: `${ARCH_ROOT}/${K.name}${rel}/${c.name}`, twin: ident.id, src, can: c.caps.canMoveItemOutOfDrive !== false });
+        else { actions.push({ type: 'move', kind: c.mimeType === SHORTCUT ? 'shortcut' : 'file', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, to: k.id, toPath: `${k.path}/${c.name}`, cls: same.length ? 'same-name-diff' : 'new', twin: same[0]?.id || null, files: 1, src, can: c.caps.canMoveItemWithinDrive !== false }); land(c, k); }
       }
     }
     actions.push({ type: 'trash', id: s.id, path: s.path, depth, can: s.caps?.canTrash !== false });
@@ -94,23 +100,29 @@ function planGroup(g, S, K) {
 async function dry() {
   const G = JSON.parse(fs.readFileSync(GROUPS, 'utf8')).groups, out = [];
   for (const [i, g] of G.entries()) {
-    const src = g.sources[0];
     const kMeta = await api('GET', `/files/${g.keeper.id}?supportsAllDrives=true&fields=${FIELDS}`, null, 'files.get');
-    const sMeta = await api('GET', `/files/${src.id}?supportsAllDrives=true&fields=${FIELDS}`, null, 'files.get');
-    const K = await tree(g.keeper.id, g.keeper.path), S = await tree(src.id, src.path);
-    S.caps = sMeta.capabilities || {};
-    const { actions, notes } = planGroup(g, S, K);
-    const blockers = [], checks = [];
-    if (kMeta.trashed || sMeta.trashed) blockers.push('keeper or source is trashed');
-    if (kMeta.name !== g.keeper.path.split('/').pop() || sMeta.name !== src.path.split('/').pop()) blockers.push(`name changed since the audit (keeper "${kMeta.name}", source "${sMeta.name}")`);
+    const K = await tree(g.keeper.id, g.keeper.path), keeperFiles = filesIn(K);
+    const actions = [], notes = [], blockers = [], checks = [], sources = [];
+    if (kMeta.trashed) blockers.push('keeper is trashed');
+    if (kMeta.name !== g.keeper.path.split('/').pop()) blockers.push(`keeper name changed since the review (now "${kMeta.name}")`);
+    const kProg = new Set(K.children.filter(c => c.mimeType === FOLDER).map(c => normF(c.name)));
+    for (const src of g.sources) {
+      const sMeta = await api('GET', `/files/${src.id}?supportsAllDrives=true&fields=${FIELDS}`, null, 'files.get');
+      const S = await tree(src.id, src.path); S.caps = sMeta.capabilities || {};
+      if (sMeta.trashed) blockers.push(`${src.path} is trashed`);
+      if (sMeta.name !== src.path.split('/').pop()) blockers.push(`name changed since the review ("${src.path}" is now "${sMeta.name}")`);
+      const sc = shortcutsIn(S); if (sc.length) blockers.push(`${sc.length} shortcut(s): ${sc.join('; ')}${WITH_SC ? ' (moving them: --include-shortcuts)' : ''}`);
+      const sProg = S.children.filter(c => c.mimeType === FOLDER).map(c => normF(c.name));
+      if (sProg.length && !sProg.some(p => kProg.has(p))) checks.push(`${src.path}: no program subfolder in common with the keeper`);
+      sources.push({ id: src.id, path: src.path, files: filesIn(S) });
+      const r = planGroup(g, S, K); actions.push(...r.actions); notes.push(...r.notes);
+    }
     for (const a of actions) if (a.can === false) blockers.push(`writers@ cannot ${a.type === 'trash' ? 'trash' : 'move'} ${a.fromPath || a.path}`);
-    const sc = shortcutsIn(S); if (sc.length) blockers.push(`${sc.length} shortcut(s): ${sc.join('; ')}${WITH_SC ? ' (moving them: --include-shortcuts)' : ''}`);
     if (g.match === 'plural') checks.push('plural-type name match — confirm same client');
-    const sProg = S.children.filter(c => c.mimeType === FOLDER).map(c => normF(c.name)), kProg = new Set(K.children.filter(c => c.mimeType === FOLDER).map(c => normF(c.name)));
-    if (sProg.length && !sProg.some(p => kProg.has(p))) checks.push('no program subfolder in common with the keeper');
-    const rename = g.proposedKeeper && g.proposedKeeper !== g.keeper.path ? `rename proposed: ${g.keeper.path} → ${g.proposedKeeper}` : null;
-    const t = { sourceFiles: filesIn(S), moved: actions.filter(a => a.type === 'move').reduce((s, a) => s + a.files, 0), archived: actions.filter(a => a.type === 'archive').length };
-    out.push({ i: i + 1, keeper: { id: g.keeper.id, path: g.keeper.path, files: filesIn(K) }, source: { id: src.id, path: src.path, files: t.sourceFiles }, match: g.match, actions, notes, blockers, checks, rename, totals: t, held: blockers.some(b => !b.includes('shortcut') || !WITH_SC) });
+    const pn = g.proposedName || (g.proposedKeeper && g.proposedKeeper !== g.keeper.path ? g.proposedKeeper.split('/').pop() : '');
+    const rename = pn ? `rename proposed (separate step, not in this run): ${g.keeper.path} → Clients/${pn}` : null;
+    const t = { sourceFiles: sources.reduce((s, x) => s + x.files, 0), moved: actions.filter(a => a.type === 'move').reduce((s, a) => s + a.files, 0), archived: actions.filter(a => a.type === 'archive').length };
+    out.push({ i: i + 1, gid: g.gid ?? i + 1, keeper: { id: g.keeper.id, path: g.keeper.path, files: keeperFiles }, sources, source: sources[0], match: g.match, actions, notes, blockers, checks, rename, totals: t, held: blockers.some(b => !b.includes('shortcut') || !WITH_SC) });
     process.stderr.write(`\r${i + 1}/${G.length}`);
   }
   console.error('');
@@ -118,7 +130,7 @@ async function dry() {
   const n = (g, f) => g.actions.filter(f).length;
   const tot = out.reduce((m, g) => { m.src += g.totals.sourceFiles; m.mv += g.totals.moved; m.ar += g.totals.archived; return m; }, { src: 0, mv: 0, ar: 0 });
   const calls = callTally();
-  const md = `# Client merge – certain groups — dry run
+  const md = `# ${RUN} — dry run
 
 Built ${vanTime(new Date().toISOString())} (Vancouver). Read-only (drive.readonly, GETs only): ${Object.entries(calls).map(([k, v]) => `${k} ×${v}`).join('; ')}. Nothing was moved.
 
@@ -126,21 +138,21 @@ Built ${vanTime(new Date().toISOString())} (Vancouver). Read-only (drive.readonl
 
 | # | Keeper (files) | Source (files) | Files moved | Folders moved whole | Subfolder merges | Same name, diff content | Identical → Archive | Folders to trash | Status |
 |---|---|---|---|---|---|---|---|---|---|
-${out.map(g => `| ${g.i} | ${esc(g.keeper.path)} (${g.keeper.files}) | ${esc(g.source.path)} (${g.source.files}) | ${n(g, a => a.type === 'move' && a.kind !== 'folder')} | ${n(g, a => a.type === 'move' && a.kind === 'folder')} (${g.actions.filter(a => a.type === 'move' && a.kind === 'folder').reduce((s, a) => s + a.files, 0)} files) | ${n(g, a => a.type === 'merge-folder')} | ${n(g, a => a.cls === 'same-name-diff')} | ${g.totals.archived} | ${n(g, a => a.type === 'trash')} | ${g.held ? '**held**' : g.checks.length ? 'check' : 'ready'} |`).join('\n')}
+${out.map(g => `| ${g.i} | ${esc(g.keeper.path)} (${g.keeper.files}) | ${(g.sources || [g.source]).map(x => `${esc(x.path)} (${x.files})`).join(' + ')} | ${n(g, a => a.type === 'move' && a.kind !== 'folder')} | ${n(g, a => a.type === 'move' && a.kind === 'folder')} (${g.actions.filter(a => a.type === 'move' && a.kind === 'folder').reduce((s, a) => s + a.files, 0)} files) | ${n(g, a => a.type === 'merge-folder')} | ${n(g, a => a.cls === 'same-name-diff')} | ${g.totals.archived} | ${n(g, a => a.type === 'trash')} | ${g.held ? '**held**' : g.checks.length ? 'check' : 'ready'} |`).join('\n')}
 
 ## Blockers (${out.filter(g => g.blockers.length).length} groups)
 
-${out.filter(g => g.blockers.length).map(g => `- **${g.i}. ${esc(g.keeper.path)} ← ${esc(g.source.path)}**: ${g.blockers.map(esc).join('; ')}`).join('\n') || 'None.'}
+${out.filter(g => g.blockers.length).map(g => `- **${g.i}. ${esc(g.keeper.path)} ← ${esc(srcs(g))}**: ${g.blockers.map(esc).join('; ')}`).join('\n') || 'None.'}
 
 ## To check — same client? (${out.filter(g => g.checks.length).length} groups; not blocked)
 
-${out.filter(g => g.checks.length).map(g => `- ${g.i}. ${esc(g.keeper.path)} ← ${esc(g.source.path)}: ${g.checks.join('; ')}`).join('\n') || 'None.'}
+${out.filter(g => g.checks.length).map(g => `- ${g.i}. ${esc(g.keeper.path)} ← ${esc(srcs(g))}: ${g.checks.join('; ')}`).join('\n') || 'None.'}
 
 ## Rename proposed (not done in this run)
 
 ${out.filter(g => g.rename).map(g => `- ${esc(g.rename)}`).join('\n') || 'None — the audit proposed each keeper\'s current name.'}
 
-${out.map(g => `## ${g.i}. ${esc(g.keeper.path)} ← ${esc(g.source.path)}
+${out.map(g => `## ${g.i}. ${esc(g.keeper.path)} ← ${esc(srcs(g))}
 
 Totals: ${g.totals.sourceFiles} source files = ${g.totals.moved} moved + ${g.totals.archived} archived ${g.totals.sourceFiles === g.totals.moved + g.totals.archived ? '✓' : '✗'}.${g.notes.length ? `\nNotes: ${g.notes.map(esc).join('; ')}` : ''}
 
@@ -196,7 +208,7 @@ async function go() {
   const P = JSON.parse(fs.readFileSync(PLAN, 'utf8')), RUN_START = new Date().toISOString(), rows = [], created = [], res = [];
   const alreadyDone = new Set(fs.existsSync(L) ? fs.readFileSync(L, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(x => x.status === 'done' && ['move', 'archive-duplicate', 'trash-folder'].includes(x.type)).map(x => x.id) : []);
   for (const g of P.groups) {
-    const r = { group: `${g.i}. ${g.keeper.path} ← ${g.source.path}`, moved: 0, movedFiles: 0, archived: 0, trashed: 0, skipped: [], failed: [] }; res.push(r);
+    const r = { group: `${g.i}. ${g.keeper.path} ← ${srcs(g)}`, moved: 0, movedFiles: 0, archived: 0, trashed: 0, skipped: [], failed: [] }; res.push(r);
     if (g.held && !(P.includeShortcuts || WITH_SC)) { r.skipped.push(`held: ${g.blockers.join('; ')}`); continue; }
     for (const a0 of g.actions.filter(a => a.type === 'archive' || a.type === 'move')) {
       if (alreadyDone.has(a0.id)) continue;   // done by an earlier --go
@@ -206,7 +218,7 @@ async function go() {
         let destPath = a.type === 'archive' ? `${GA.name}/${a.toPath}` : `${GF.name}/${a.toPath}`;
         let why = await move(a, dest, destPath, g.i, rows);
         if (why?.redirect === 'archive') {
-          const rel = a.fromPath.split('/').slice(0, -1).join('/').slice(g.source.path.length);
+          const rel = a.fromPath.split('/').slice(0, -1).join('/').slice((a.src || g.source.path).length);
           a = { ...a, type: 'archive', archRel: `${ARCH_ROOT}/${g.keeper.path.split('/').pop()}${rel}`, toPath: `${ARCH_ROOT}/${g.keeper.path.split('/').pop()}${rel}/${a.name}`, twin: why.twin, shortcutDup: true };
           dest = await archFolder(a.archRel, created); destPath = `${GA.name}/${a.toPath}`;
           why = await move(a, dest, destPath, g.i, rows);
@@ -247,14 +259,14 @@ async function verify() {
     const notUnder = done.filter(x => x.type === 'move' && !inK.has(x.id)).map(x => x.from_path);
     const archived = done.filter(x => x.type === 'archive-duplicate');
     const archOk = []; for (const x of archived) { const f = await api('GET', `/files/${x.id}?supportsAllDrives=true&fields=parents,driveId,trashed`, null, 'files.get'); archOk.push(f.driveId === GA.id && (f.parents || []).includes(x.new_parent) && !f.trashed); }
-    const src = await api('GET', `/files/${g.source.id}?supportsAllDrives=true&fields=trashed`, null, 'files.get');
+    let srcTrashed = true; for (const x of g.sources || [g.source]) srcTrashed = (await api('GET', `/files/${x.id}?supportsAllDrives=true&fields=trashed`, null, 'files.get')).trashed && srcTrashed;
     const now = filesIn(K);
-    out.push({ g, before: g.keeper.files, movedIn, now, countOk: now === g.keeper.files + movedIn, notUnder, archived: archived.length, archOk: archOk.every(Boolean), sourceTrashed: !!src.trashed, held: g.held && !done.length });
+    out.push({ g, before: g.keeper.files, movedIn, now, countOk: now === g.keeper.files + movedIn, notUnder, archived: archived.length, archOk: archOk.every(Boolean), sourceTrashed: !!srcTrashed, held: g.held && !done.length });
     process.stderr.write(`\r${g.i}/${P.groups.length}`);
   }
   console.error('');
   const ok = r => r.held || (r.countOk && !r.notUnder.length && r.archOk && r.sourceTrashed);
-  const md = `# Client merge – certain groups — after go
+  const md = `# ${RUN} — after go
 
 Built ${vanTime(new Date().toISOString())} (Vancouver). Fresh read-only walk (drive.readonly, GETs only): ${Object.entries(callTally()).map(([k, v]) => `${k} ×${v}`).join('; ')}.
 
