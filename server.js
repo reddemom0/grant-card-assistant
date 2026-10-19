@@ -92,6 +92,7 @@ import testEmailHandler from './api/test-email.js';
 // Authentication
 import authRouter from './src/api/auth.js';
 import granolaAuthRouter from './src/api/granola-auth.js';
+import gmailAuthRouter from './src/api/gmail-auth.js';
 import { authenticateUser, requireAuth } from './src/middleware/auth.js';
 
 // Admin
@@ -514,6 +515,8 @@ app.post('/api/feedback-tagging', authenticateUser, feedbackTaggingHandler);
 // Authentication endpoints
 app.use('/api', authRouter);
 app.use('/api/auth/granola', granolaAuthRouter);
+// Opt-in Gmail consent for allowlisted users (GMAIL_CONSENT_ALLOWLIST); not part of sign-in.
+app.use('/api/auth/gmail', gmailAuthRouter);
 
 // Admin endpoints (requires authentication + admin role)
 app.use('/api/admin', authenticateUser, adminRouter);

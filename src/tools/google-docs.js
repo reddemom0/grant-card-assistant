@@ -45,9 +45,12 @@ async function saveUserOAuthTokens(userId, tokens) {
   const { query } = await import('../database/connection.js');
   const tokenExpiry = tokens.expiry_date ? new Date(tokens.expiry_date) : null;
 
+  // Google can rotate the refresh token on a refresh. Keep the new one, or the
+  // stored token goes stale and background jobs (which have no sign-in to fall
+  // back on) lose access. COALESCE: no new token never erases the stored one.
   await query(
-    'UPDATE users SET google_access_token = $1, google_token_expiry = $2 WHERE id = $3',
-    [tokens.access_token, tokenExpiry, userId]
+    'UPDATE users SET google_access_token = $1, google_token_expiry = $2, google_refresh_token = COALESCE($3, google_refresh_token) WHERE id = $4',
+    [tokens.access_token, tokenExpiry, tokens.refresh_token || null, userId]
   );
 }
 

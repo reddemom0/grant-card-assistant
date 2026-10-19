@@ -35,7 +35,14 @@
     },
     "stephanie": {
       "name": "Stephanie Sang",
+      "email": "ssang@granted.ca",
       "booking_link": "https://meetings.hubspot.com/ssang1",
+      "meeting_links": {
+        "15": "https://meetings.hubspot.com/stephsang/15min-granted-fit-check",
+        "20": "https://meetings.hubspot.com/stephsang/quarterly",
+        "30": "https://meetings.hubspot.com/ssang1",
+        "40": "https://meetings.hubspot.com/stephsang/grantchat"
+      },
       "industries": [
         "Accounting",
         "Advertising/Marketing",

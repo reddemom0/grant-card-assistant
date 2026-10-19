@@ -611,6 +611,60 @@ A scheduled job, not a chat surface: `src/services/ruk-briefings.js`, `briefing-
   - Fresh Is Best, 5 goals: 25.9¢ matching + 5.0¢ writing = 30.9¢. Peterson check-in (no goals, unreviewed matches): 0.2¢ + 5.7¢ = 5.9¢ (2026-10-19).
 - **To turn on:** apply migration 049, confirm `GG3_AI_SERVICE_URL` / `GG3_REVIEW_FEED_TOKEN` on the service, then set `RUK_BRIEFINGS_ENABLED=true`. Optionally set `RUK_BRIEFINGS_OWNER_EMAIL` (default `rukshaar@granted.ca`).
 
+## Gmail (opt-in, per user)
+
+Stage 1 groundwork for the Steph morning brief. Nothing calls the reader yet, and it is
+not an agent tool: there is no schema in `definitions.js` and no executor dispatch.
+
+- **Consent.** `src/api/gmail-auth.js`, mounted at `/api/auth/gmail`. It is a separate
+  incremental-authorization link, **never part of sign-in**: `src/api/auth.js` and its scope
+  list are unchanged. It is open only to emails in `GMAIL_CONSENT_ALLOWLIST`; unset means
+  nobody.
+  - **Scopes:** it requests exactly `gmail.readonly` + `gmail.compose`, with
+    `include_granted_scopes=true`. Google therefore returns one token covering the user's
+    earlier grants plus Gmail, and their later ordinary sign-ins keep Gmail.
+  - **Callback checks:** `/api/auth/gmail/callback` checks the user-keyed state
+    (`src/utils/gmail-consent-state.js`), the account (it must be the signed-in user's own
+    mailbox), the allowlist and both scopes. Only then does it store the tokens on `users`
+    and stamp `users.gmail_connected_at` (migration 050).
+  - **Registration:** the callback URL must be registered on the OAuth client in Google
+    Cloud Console.
+- **Connected** = `gmail_connected_at` is set **and** both scopes are in
+  `google_granted_scopes` (`hasGmailScopes` in `src/tools/gmail.js`, modelled on
+  `hasChatScopes`). The scopes alone don't count, because `include_granted_scopes` carries
+  them forward without a deliberate opt-in.
+- **Reader** (`src/tools/gmail.js`), acting as the user via `getUserOAuth2Client`. Every
+  entry point checks the connection first.
+  - `listThreadsSince`: covers INBOX, "Former staff" and "Notifications". It runs one list
+    per label, because `labelIds` is an AND, and merges the results. A missing label is
+    reported, not fatal.
+  - `getThread`: headers and plain-text bodies; attachments are listed by name only.
+  - `replyState`: pure. It reports whether the user replied after the latest inbound
+    message; drafts never count.
+  - `createDraftReply`: a threaded draft to the latest inbound sender. Header values are
+    stripped of CR/LF.
+- **No-send rule.** The module can reach only five Gmail methods (`labels.list`,
+  `threads.list`, `threads.get`, `drafts.create`, `getProfile`), through a frozen facade,
+  and the raw client never leaves the file. `gmail.compose`, the narrowest scope that
+  allows drafts, **also permits sending**, so Google does not enforce this.
+  `tests/unit/gmail.test.js` does: a source scan fails on any send, modify, trash, delete,
+  label-write, settings or watch call. Steph reviews and sends every draft herself.
+- **Refresh tokens.** `saveUserOAuthTokens` (`google-docs.js`) now persists a refresh token
+  Google rotates, using COALESCE so a refresh without one never erases the stored token.
+  It applies to every user. Before this fix a rotated token was dropped, which would
+  eventually strand background jobs.
+- **Style.** Steph's voice guide is `.claude/skills/steph-writing-voice/voice-guide.md`. It
+  is deliberately **not** registered with `load_skill` (any agent can load any registered
+  skill) and not named `SKILL.md`, so Claude Code doesn't list it either. Its only way in
+  is `loadStyleGuide(email)` (`src/services/style-guides.js`), which returns it for
+  `ssang@granted.ca` only.
+- **Meeting links.** `getMeetingLink(email, minutes)` (`src/services/meeting-links.js`)
+  reads `meeting_links` on the consultant's entry in `consultant-routing.json`, by exact
+  length. Steph has 15, 20, 30 and 40 minutes. `booking_link` is unchanged.
+- **match-lead client.** `src/services/match-lead-client.js` calls gg3-ai-service
+  `POST /api/v1/ai/internal/match-lead` with `GG3_AI_SERVICE_URL` + `GG3_REVIEW_FEED_TOKEN`.
+  It never throws and has no callers yet.
+
 ## Behavior worth knowing
 
 - **Model routing is per-message, not per-agent.** `getQueryConfig` in
