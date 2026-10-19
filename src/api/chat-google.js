@@ -27,6 +27,7 @@ import { attachmentsOf, readAttachments, attachmentBlockText, unreadableLine } f
 import { isListenSpace } from '../chat-listen/config.js';
 import { takeCardReply, findAppCommand } from '../cards/registry.js';
 import { findPulsePost } from '../services/pulse-posts.js';
+import { findBriefingPost } from '../services/briefing-posts.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -723,7 +724,9 @@ function ackThenPost(res, evt, reason, reply) {
  * Run Oracle and post the result. Runs after the HTTP ack, so it must never
  * throw into the void: every path ends in a message to the user.
  */
-async function runOracleAndReply(evt, user, conversationId, messageText) {
+// Exported only so scripts can replay one message through the real handler
+// (pre-call briefing reply test); the webhook path is unchanged.
+export async function runOracleAndReply(evt, user, conversationId, messageText) {
   const startedAt = Date.now();
   // START MARKER. An ack with no matching "finished"/"failed" line means the
   // process died mid-run — otherwise silence here is impossible.
@@ -955,6 +958,18 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
       : null;
     if (pulsePost) console.log(`📣 Reply to a Pulse ${pulsePost.kind} post — its period goes in context`);
 
+    // Same for a reply in the thread of a pre-call briefing DM (or a quote of
+    // it): give Oracle that briefing and the facts it was written from
+    // (src/services/briefing-posts.js). Nothing found → nothing added.
+    const briefingPost = !pulsePost && evt.spaceIsResourceName
+      ? await findBriefingPost({
+        spaceName: evt.spaceId,
+        threadName: evt.threadIsResourceName ? evt.threadId : null,
+        quotedMessageName: evt.quotedMessageName
+      })
+      : null;
+    if (briefingPost) console.log(`📋 Reply to a pre-call briefing (${briefingPost.meetingType}, matched by ${briefingPost.matchedBy}) — the briefing goes in context`);
+
     const result = await runAgent({
       agentType: 'internal-oracle',
       message: messageText,
@@ -979,7 +994,8 @@ async function runOracleAndReply(evt, user, conversationId, messageText) {
         driveFiles: evt.driveFiles,
         attachmentNames: evt.files.map(f => f.name),
         messageText: messageText,
-        ...(pulsePost ? { pulsePost } : {})
+        ...(pulsePost ? { pulsePost } : {}),
+        ...(briefingPost ? { briefingPost } : {})
       }
     });
 

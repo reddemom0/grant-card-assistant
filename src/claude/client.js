@@ -27,6 +27,7 @@ import {
 } from '../config/cost-settings.js';
 import { logAPICost } from '../utils/cost-logger.js';
 import { pulseContextBlock } from '../services/pulse-posts.js';
+import { briefingContextBlock } from '../services/briefing-posts.js';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -848,6 +849,13 @@ export async function runAgent({
       // recorded post (src/services/pulse-posts.js); absent for everything else.
       if (chatContext?.pulsePost) {
         systemBlocks.push({ type: 'text', text: pulseContextBlock(chatContext.pulsePost) });
+      }
+
+      // A reply in a pre-call briefing DM's thread: that briefing and its facts - NOT CACHED
+      // chat-google.js matched the event's thread / quoted message to a recorded
+      // briefing DM (src/services/briefing-posts.js); absent for everything else.
+      if (chatContext?.briefingPost) {
+        systemBlocks.push({ type: 'text', text: briefingContextBlock(chatContext.briefingPost) });
       }
 
       // DEBUG: Log full system prompt structure for lead-gen conversations

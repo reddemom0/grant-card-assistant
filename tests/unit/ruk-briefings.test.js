@@ -72,12 +72,16 @@ function deps(over = {}) {
     env: { GG3_AI_SERVICE_URL: 'https://gg3.test/', GG3_REVIEW_FEED_TOKEN: 'tok' },
     createMessage: jest.fn(async () => ({
       usage: { input_tokens: 10000, output_tokens: 2000 },
-      content: [{ type: 'tool_use', name: 'write_briefing', input: { summary_lines: ['Elmwood discovery', 'Ask about hiring'], markdown: '# Elmwood — Discovery\n- **ASK** — revenue?' } }]
+      content: [{ type: 'tool_use', name: 'write_briefing', input: {
+        dm: { who: 'Pat Elm · Owner · Abbotsford, BC', what_we_know: ['Steel fabrication, 20–49 staff', 'Hiring 2 welders'],
+          ask_first: ['**ASK** — what was revenue last year?'], grants_to_raise: [{ name: 'WILWorks Skilled Trades', reason: 'youth trades hire' }] },
+        markdown: '# Elmwood — Discovery\n- **ASK** — revenue?' } }]
     })),
     logCost: jest.fn(),
     createDoc: jest.fn(async () => ({ id: 'doc1', url: 'https://docs.google.com/document/d/doc1/edit', createdFolders: 0 })),
     findDm: jest.fn(async () => 'spaces/DM1'),
-    postMessage: jest.fn(async () => 'spaces/DM1/messages/1'),
+    postThread: jest.fn(async () => ({ messageName: 'spaces/DM1/messages/1', threadName: 'spaces/DM1/threads/T1' })),
+    recordPost: jest.fn(async () => true),
     query: jest.fn(async (sql, params) => {
       if (/FROM users/.test(sql)) return { rows: [{ id: 105, email: 'rukshaar@granted.ca', chat_user_id: 'users/9' }] };
       if (/INSERT INTO pre_call_briefings/.test(sql)) {
@@ -416,7 +420,8 @@ describe('writing', () => {
     expect(params.tool_choice).toEqual({ type: 'auto' });
     expect(params.system).toMatch(/## 1\. Business overview/);
     expect(d.logCost).toHaveBeenCalledWith(expect.objectContaining({ source: 'ruk-briefing' }));
-    expect(w.summaryLines).toHaveLength(2);
+    expect(w.dm.what_we_know).toHaveLength(2);
+    expect(params.tools[0].input_schema.required).toEqual(['dm', 'markdown']);
     expect(w.costUsd).toBeCloseTo(0.04);
   });
 
@@ -454,7 +459,13 @@ describe('the daily run', () => {
     expect(d.createDoc).toHaveBeenCalledWith(expect.objectContaining({
       ownerEmail: 'rukshaar@granted.ca', folderParts: ['Pre-Call Briefings', 'Ruk'], name: '2026-10-20 – Elmwood Groups – Discovery'
     }));
-    expect(d.postMessage.mock.calls[0][0].text).toMatch(/docs\.google\.com/);
+    expect(d.postThread.mock.calls[0][1]).toMatch(/<https:\/\/docs\.google\.com\/document\/d\/doc1\/edit\|Open full briefing>/);
+    // Recorded as the daily run's (not a test) post, with the thread it landed in.
+    expect(d.recordPost).toHaveBeenCalledWith(expect.objectContaining({ eventId: 'evt1', isTest: false,
+      spaceName: 'spaces/DM1', threadName: 'spaces/DM1/threads/T1', messageName: 'spaces/DM1/messages/1' }));
+    expect(d.recordPost.mock.calls[0][0].facts).not.toHaveProperty('_deals');
+    const done = d.query.mock.calls.find(c => /SET status = 'done'/.test(c[0]));
+    expect(done[1].slice(5)).toEqual(['spaces/DM1', 'spaces/DM1/threads/T1', 'spaces/DM1/messages/1']);
     expect(d._rows.get('evt1')).toBe('done');
 
     const second = await R.runRukBriefings({ now: NOW, env: {}, deps: d });
@@ -474,7 +485,8 @@ describe('the daily run', () => {
     const d = runDeps({ createDoc: jest.fn(async () => { throw err; }) });
     const r = await R.runRukBriefings({ now: NOW, env: {}, deps: d });
     expect(r).toMatchObject({ built: 0, failed: 1 });
-    expect(d.postMessage).not.toHaveBeenCalled();
+    expect(d.postThread).not.toHaveBeenCalled();
+    expect(d.recordPost).not.toHaveBeenCalled();
     expect(d._rows.get('evt1')).toBe('failed');
     const failCall = d.query.mock.calls.find(c => /SET status = 'failed'/.test(c[0]));
     expect(failCall[1][1]).toBe('drive_write_denied');
@@ -549,3 +561,75 @@ describe('Drive', () => {
     expect(html).toContain('<a href="https://x.ca">l</a>');
   });
 });
+
+describe('the DM: short, bulleted, its own thread', () => {
+  const meeting = { type: 'discovery', date: '2026-10-20', event: { id: 'e1', start: '2026-10-20T13:15:00-07:00' } };
+  const briefing = (dm) => ({ companyName: 'Fresh Is Best', docName: 'x', markdown: '# x', facts: { a: 1, _deals: [1] }, dm: R.cleanDm(dm) });
+
+  test('format: title with day and Vancouver time, who, three sections, link, reply hint', () => {
+    const text = R.dmText(briefing({
+      who: 'George Morfidis · role not on file · Kamloops, BC',
+      what_we_know: ['Food manufacturer since 1999', '20–49 staff, $5M–$10M revenue', 'First-time applicant', 'a fourth fact'],
+      ask_first: ['**ASK** — revenue in each of the last 2 years?', 'Which roles are the 3–5 hires?', 'Equipment budget?'],
+      grants_to_raise: [{ name: 'Food Processor PPP', reason: 'equipment upgrade' }, { name: 'WILWorks', reason: 'youth trades hire' }]
+    }), 'https://docs.google.com/document/d/D/edit', meeting);
+    expect(text).toBe([
+      '*Fresh Is Best — Discovery, Tue 20 Oct, 13:15*',
+      'George Morfidis · role not on file · Kamloops, BC',
+      '',
+      '*What we know*',
+      '• Food manufacturer since 1999',
+      '• 20–49 staff, $5M–$10M revenue',
+      '• First-time applicant',
+      '',
+      '*Ask first*',
+      '• revenue in each of the last 2 years?',
+      '• Which roles are the 3–5 hires?',
+      '• Equipment budget?',
+      '',
+      '*Grants to raise*',
+      '• Food Processor PPP — equipment upgrade',
+      '• WILWorks — youth trades hire',
+      '',
+      '<https://docs.google.com/document/d/D/edit|Open full briefing>',
+      '_Reply here with any question about this client._'
+    ].join('\n'));
+  });
+
+  test('never more than 15 lines, long items clipped', () => {
+    const long = 'x'.repeat(400);
+    const text = R.dmText(briefing({ who: long, what_we_know: [long, long, long], ask_first: [long, long, long],
+      grants_to_raise: [1, 2, 3].map(i => ({ name: `G${i}`, reason: long })) }), 'u', meeting);
+    const lines = text.split('\n').filter(Boolean);
+    expect(lines.length).toBeLessThanOrEqual(15);
+    expect(Math.max(...lines.map(l => l.length))).toBeLessThanOrEqual(150);
+  });
+
+  test('check-in: open deals needing action replace grants when there are any', () => {
+    const ci = { ...meeting, type: 'check_in' };
+    const withDeals = R.dmText(briefing({ who: 'w', what_we_know: ['k'], ask_first: ['a'],
+      grants_to_raise: [{ name: 'G', reason: 'r' }], open_deals_action: ['CanExport — unclear — ask Delpreet Kaur'] }), 'u', ci);
+    expect(withDeals).toContain('*Open deals needing action*\n• CanExport — unclear — ask Delpreet Kaur');
+    expect(withDeals).not.toContain('Grants to raise');
+    expect(withDeals.split('\n')[0]).toBe('*Fresh Is Best — Check-in, Tue 20 Oct, 13:15*');
+    const noDeals = R.dmText(briefing({ who: 'w', what_we_know: ['k'], ask_first: ['a'], grants_to_raise: [{ name: 'G', reason: 'r' }] }), 'u', ci);
+    expect(noDeals).toContain('*Grants to raise*\n• G — r');
+  });
+
+  test("model text can't break Chat formatting: * _ ~ and <> are taken out", () => {
+    const text = R.dmText(briefing({ who: 'A <b> *bold* _x_', what_we_know: ['**ASK** — revenue?'], ask_first: ['<http://x|y>'] }), 'U', meeting);
+    expect(text).toContain('\nA b bold x\n');
+    expect(text).toContain('• revenue?');
+    expect(text).toContain('• http://x|y');
+  });
+
+  test('a test send records the thread as is_test and never touches the claim table', async () => {
+    const d = deps();
+    const r = await R.deliverBriefing(briefing({ who: 'w', what_we_know: [], ask_first: [] }),
+      { ownerEmail: 'rukshaar@granted.ca', dmChatUserId: 'users/1', meeting, recipientEmail: 'writers@granted.ca', isTest: true }, d);
+    expect(r.post).toEqual({ spaceName: 'spaces/DM1', messageName: 'spaces/DM1/messages/1', threadName: 'spaces/DM1/threads/T1' });
+    expect(d.recordPost).toHaveBeenCalledWith(expect.objectContaining({ isTest: true, recipientEmail: 'writers@granted.ca', eventId: 'e1' }));
+    expect(d.query).not.toHaveBeenCalled();
+  });
+});
+
