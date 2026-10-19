@@ -8,8 +8,8 @@ of the data.
 Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`,
 `rollup.js`, `review-queue.js`, `review-routes.js`, `diagnosis.js`, `overview.js`,
 `overview-routes.js`, `companies.js`, `companies-routes.js`, `grants.js`, `grants-routes.js`,
-`coverage.js`, `coverage-routes.js`, `industry-vocabulary.js`.
-Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`, `-coverage`),
+`coverage.js`, `coverage-routes.js`, `industry-vocabulary.js`, `chat-daily.js`, `chat-themes.js`, `chat-routes.js`.
+Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`, `-coverage`, `-chat`),
 `public/css/control-centre.css`.
 Tests: `tests/unit/control-centre-*.test.js`.
 
@@ -557,8 +557,7 @@ The page uses platform language, not database names:
 ### Frame and URL
 
 There are 7 tabs: Overview (the default), Inbox, Companies, Grants, Review queue, Coverage &
-changes and Chat themes. Overview, Companies, Grants, Review queue and Coverage & changes have
-content; the others show a "Coming soon" card.
+changes and Chat themes. Every tab but Inbox has content; Inbox shows a "Coming soon" card.
 Inbox and Review queue carry a badge with the count of review items that aren't closed.
 
 All state is in the URL, so any view can be linked and the back button works:
@@ -572,7 +571,8 @@ All state is in the URL, so any view can be linked and the back button works:
 
 Companies, Grants, Review queue and Coverage keep their own state in the hash instead: `#companies/<id>`,
 `#grants/<id>`, `#grants?view=…&sort=…&dir=…&q=…`, `#review/<id>`, `#coverage`,
-`#coverage?view=not_matching`, `#coverage/industry/<name>` (URL-encoded, a main or specific industry).
+`#coverage?view=not_matching`, `#coverage/industry/<name>` (URL-encoded, a main or specific industry),
+`#chat`, `#chat?q=…&company=…&from=…&to=…&cards=…&sort=left_after`, `#chat/<conversation id>`.
 
 The last range is also kept in `localStorage['cc.range']`, in try/catch, so the page works
 without it. Search finds companies by name or id and live grants by title or root id.
@@ -1075,6 +1075,113 @@ live grants on 2026-10-19). Edit history starts 2026-03-05, publishing history 2
 | Empty-track cards | Hub `cc_review_items` (none filed on 2026-10-19) |
 | Changes | app `grant_audit_logs`, `grants`, `statuses` (scope 1) |
 
+## The Chat themes tab (migration 049)
+
+What clients ask GetGranted's assistant, what goes unanswered, what they want that GetGranted
+doesn't offer, which grants come up, how chat is doing, and what clients do next. Code:
+`src/control-centre/chat-daily.js` (the nightly pass and its two card rules),
+`chat-themes.js` (reads; the one write is the transcript view log), `chat-routes.js` (mounted at
+`/api/control-centre/chat`, `authenticateUser` + `requireAuth`: `GET /?range=`, `GET /search`,
+`GET /:conversationId`), `public/js/control-centre-chat.js`, the `ch-` styles. Tests:
+`tests/unit/control-centre-chat.test.js`.
+
+### The daily chat review (`chat-daily.js`)
+
+**When:** 08:30 America/Vancouver, after the 08:00 morning roundup, over the **previous Vancouver
+day**. Off unless **`CC_CHAT_DAILY_ENABLED=true`**; needs `APP_DB_READONLY_URL`,
+`GG3_OPS_DB_READONLY_URL` and `ANTHROPIC_API_KEY`. A day is claimed by inserting its
+`cc_chat_daily_runs` row, so it runs once. **It is a separate job and a separate Haiku call: the
+roundup's review call is unchanged** (`pulse-roundup.js` is not edited); the roundup's chat cards
+are read as signals.
+
+**What it reads (read-only):** every client message of the day (a `chat_turns` row in the day,
+or, for a chat `chat_turns` never recorded, every turn of a conversation last active that day),
+real Clerk users only, **internal accounts included** (as the roundup; the Themes section shows
+clients only). Per message: the client's text, the reply's text, the cards shown on that reply
+(`chat_turns.surfaced_grant_ids`; legacy `surface_grant_tiles` for old chats), the grants the
+tools returned, whether it searched (`search_grants` / `lookup_grant_by_name`) and how many
+results, whether the turn failed, and the roundup's flags on that turn
+(`oracle:<conv>:<issue>:t<n>`).
+
+**The call:** one Haiku call (`claude-haiku-4-5-20251001`) per day, split at 40,000 characters
+(three calls on the busiest day so far). Per message it returns the question **rewritten without
+names or identifying details** (only this is stored, never the client's words), a theme (it
+reuses a list: a broad seed list, the themes of the last 30 days and the latest digest's),
+`funding_ask`, `answer` (answered / partly / not_answered), `asked_for_person`, an unmet need
+(null or a label, reusing the stored ones) and which of the cards shown the reply itself said
+don't fit.
+
+**Cost:** measured on 2026-10-19 over the last 30 days: 70,762 input + 10,754 output tokens =
+**$0.12 for 30 days** (68 chats), about **$0.004 a day**; the busiest day (Oct 13: 25 chats, 57
+messages) cost $0.05. Logged to `api_cost_events` as `cc-chat-daily` by the nightly run.
+
+**Stored** (Hub, migration 049 — **not yet applied to production**):
+
+| Table | One row per |
+|---|---|
+| `cc_chat_daily_runs` | day run: status (`running`, `done`, `failed`, `empty`), counts, tokens, `cost_usd`, cards filed |
+| `cc_chat_questions` | client message (`conversation_id`, `turn_index`): `question` (rewritten), `theme`, `funding_ask`, `answer`, `unanswered_reason`, `unmet_need`, `cards_shown`, `cards_recorded`, `grants_named`, `rejected_shown`, `search_status`, `search_results`, `turn_failed` |
+
+A day's rows are replaced whole when it runs again.
+
+### Definitions
+
+| Term | Definition |
+|---|---|
+| **Unanswered** | decided in code (`unansweredReason`), the first that applies: **no answer** — the turn failed (chat broke or empty reply) or the reply didn't answer; **asked for a person** — the roundup's `asked_for_human` on that turn, or the model said so and the client's words match `HUMAN_ASK`; **left after a bad reply** — it's the client's last message in the chat and the reply only partly answered, or the roundup flagged that turn `left_unanswered` / `pushback` / `repeated_question` |
+| **Unmet need** | the client asked for something GetGranted doesn't offer — loans, SR&ED or tax credits, consulting or application writing, a grant it doesn't carry — whatever the reply said |
+| **Funding ask** | the client asked for funding, grants, loans, tax credits or funding programs |
+| **Grant card / mention** | a card is `chat_turns.surfaced_grant_ids` for that reply; a mention is a grant the turn's tools returned whose full name the reply contains, without a card |
+| **24-hour outcome** | a chat is followed by an action when the chat's company opened a grant card (any source; "from chat" = source `advisor`), saved to a watchlist or created a goal, from the chat's first message to **24 hours after its last** (`OUTCOME_HOURS`). Chats whose Clerk id has no company aren't in the share. App naive timestamps are read as UTC |
+
+### Two chat-card rules
+
+Filed by the daily pass through `addFlag` like the roundup's cards: `kind 'chat'`, source
+`oracle_detected`, actor `system:oracle-chat-review`, **one card per chat per issue**
+(`conv:<conversation>:<issue>`), one flag per message (`oracle:<conv>:<issue>:t<turn>`, so a
+re-run adds nothing), `company_id` from the app DB (internal accounts get the Internal tag), and a
+verbatim snapshot (`chatTurnsAround`) with `rule_evidence`.
+
+| Issue | Fires when | Diagnosis (owner chris, verdict set by code) |
+|---|---|---|
+| `no_cards_for_funding_ask` | a funding ask whose reply showed **no** grant card. Only when `chat_turns` recorded the turn (cards unknown never fires it) | `chat_did_not_search` (no search ran), `chat_search_found_nothing` (a search returned nothing) or `chat_results_not_shown` (a search found grants, none carded) |
+| `card_for_rejected_grant` | a card was shown for a grant the reply itself said doesn't fit | `chat_carded_rejected_grant`, the grants listed with links |
+
+`diagnosis.js` `routeFor` forces the verdict from `rule_evidence`; Sonnet still writes the
+narrative and the five chat fields. The 30-day dry run on 2026-10-19 found 7 chats for the first
+(#289's "What about loan programs" — `chat_did_not_search`) and 6 for the second.
+
+**By hand:** `scripts/cc-chat-daily.mjs` — dry run by default (`--days N`, `--since YYYY-MM-DD`,
+`--save rows.json`): prints themes, unanswered groups, unmet needs, every card it would file (and
+whether it's already on file) and the priced cost, writing nothing (the Hub session is
+read-only). `--write` (or `--load rows.json --write`) stores the rows and files the cards into the
+Hub `DATABASE_URL` points at; a non-local URL is refused without `--allow-production`.
+
+### The seven sections
+
+Range picker and "Include internal accounts" as on the other tabs (both variants from the API);
+**Themes is always clients only.** Every company links to `#companies/<id>`, grant to
+`#grants/<id>`, card to `#review/<id>`, chat to `#chat/<id>`.
+
+1. **Themes:** questions per theme in the range vs the window before, an 8-week trend strip,
+   example rewritten questions with their chats.
+2. **Unanswered questions:** groups by theme, sortable by volume or "left after"; each lists its
+   chats (company first, the reason) and the grants involved (shown and named).
+3. **Unmet needs:** groups by label with counts and example questions.
+4. **Grants discussed in chat:** per grant, replies that showed it as a card vs only mentioned it,
+   and chats — live from the ops DB over the range.
+5. **Chat health:** chats, client messages, grant cards per chat, failed replies, and the two new
+   card types' counts with each card linked.
+6. **Chat outcomes:** the 24-hour shares above.
+7. **Chat search:** any word in client messages and assistant text (text blocks only — never tool
+   calls or tool output); filters: company (name or id), from / to (Vancouver days; a chat counts
+   when a message falls in them; default the last 30 days), cards shown / none, and the internal
+   switch. At most 50 chats. A result opens `#chat/<id>`: the whole chat, verbatim, each reply
+   with its grant card names and the daily review's reading of the message. **Every opening is
+   logged** in `cc_transcript_views` (048), as on the Companies tab.
+
+Before 049 is applied, sections 1–3 say the nightly review isn't set up and 4–7 still load.
+
 ## Oracle: `control_centre` (read-only)
 
 `src/tools/control-centre-tools.js`, Oracle-only and deferred (found by tool search). Modes:
@@ -1086,7 +1193,9 @@ evidence — chat turns or review reasons — flags, history, linked cards), `ov
 `grant` (`grantPage(id, range)` by root id or part of the name, trimmed), `coverage`
 (`coverage(range)`: the industry table, view `all` or `not_matching`, or one `industry` in full;
 the breakdowns; client-only with `internal_accounts_add`) and `changes` (`changes(range)`, ≤20 per
-list). The grant and coverage modes call their tab's own functions, so there are no extra queries. Every card and grant in every
+list), `unanswered`, `unmet_needs`, `chat_outcomes` (`chatOverview(range)`) and `chat_search`
+(`chatSearch`); `chat_themes` adds the daily themes when given a range. The grant, coverage and
+chat modes call their tab's own functions, so there are no extra queries. Every card and grant in every
 answer carries its link; companies are named first and internal accounts tagged.
 SELECTs and the existing read helpers only — Oracle can't move, reassign or close a card.
 Details: `docs/oracle.md`, "Tool loadout".

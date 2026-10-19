@@ -24,7 +24,6 @@
   const SOON = {
     inbox: ['Inbox', 'Every thumbs-down and staff flag that needs a look, newest first, with its diagnosis.'],
     grants: ['Grants', 'Each grant: how many clients it was matched to over time, who opened its grant card, and why it matched.'],
-    themes: ['Chat themes', 'What people ask the assistant, grouped into themes you can read through.']
   };
 
   // ---------------------------------------------------------------- helpers
@@ -47,7 +46,7 @@
   function storeSet(v) { try { window.localStorage.setItem(STORE_KEY, v); } catch { /* private mode etc. */ } }
 
   // ---------------------------------------------------------------- state + URL
-  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '', gq: '', industry: null, vq: '' };
+  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '', gq: '', industry: null, vq: '', chat: null, hq: '' };
   const knownNames = { company: new Map(), grant: new Map() };
   /** companies.id of internal accounts seen in any response (search, overview). */
   const internalIds = new Set();
@@ -66,7 +65,9 @@
     // #coverage, #coverage?view=not_matching, #coverage/industry/<name>
     const cv = /^#coverage(?:\/industry\/([^?]+))?(?:\?(.*))?$/.exec(window.location.hash);
     const decoded = (v) => { try { return decodeURIComponent(v); } catch { return null; } };
-    const tab = hash ? 'review' : co ? 'companies' : gr ? 'grants' : cv ? 'coverage' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
+    // #chat, #chat/<conversation id>, #chat?q=…&company=…&from=…&to=…&cards=…&sort=…
+    const ch = /^#chat(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
+    const tab = hash ? 'review' : co ? 'companies' : gr ? 'grants' : cv ? 'coverage' : ch ? 'themes' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
     return {
       tab,
       range: RANGES.includes(p.get('range')) ? p.get('range') : (RANGES.includes(stored) ? stored : 'week'),
@@ -77,18 +78,21 @@
       cq: co?.[2] ?? '',
       gq: gr?.[2] ?? '',
       industry: cv?.[1] ? decoded(cv[1]) : null,
-      vq: cv?.[2] ?? ''
+      vq: cv?.[2] ?? '',
+      chat: ch?.[1] ? Number(ch[1]) : null,
+      hq: ch?.[2] ?? ''
     };
   }
 
   function urlFor(s) {
     const p = new URLSearchParams();
-    if (!['overview', 'review', 'companies', 'grants', 'coverage'].includes(s.tab)) p.set('tab', s.tab);
+    if (!['overview', 'review', 'companies', 'grants', 'coverage', 'themes'].includes(s.tab)) p.set('tab', s.tab);
     p.set('range', s.range);
     const hash = s.tab === 'review' ? `#review${s.card ? `/${s.card}` : ''}${s.rq ? `?${s.rq}` : ''}`
       : s.tab === 'companies' ? `#companies${s.company ? `/${s.company}` : ''}${s.cq ? `?${s.cq}` : ''}`
         : s.tab === 'grants' ? `#grants${s.grant ? `/${s.grant}` : ''}${s.gq && !s.grant ? `?${s.gq}` : ''}`
-          : s.tab === 'coverage' ? `#coverage${s.industry ? `/industry/${encodeURIComponent(s.industry)}` : ''}${s.vq ? `?${s.vq}` : ''}` : '';
+          : s.tab === 'coverage' ? `#coverage${s.industry ? `/industry/${encodeURIComponent(s.industry)}` : ''}${s.vq ? `?${s.vq}` : ''}`
+            : s.tab === 'themes' ? `#chat${s.chat ? `/${s.chat}` : ''}${s.hq && !s.chat ? `?${s.hq}` : ''}` : '';
     return `${window.location.pathname}?${p}${hash}`;
   }
 
@@ -97,6 +101,7 @@
     if (state.tab !== 'companies') { state.company = null; state.cq = ''; }
     if (state.tab !== 'grants') { state.grant = null; state.gq = ''; }
     if (state.tab !== 'coverage') { state.industry = null; state.vq = ''; }
+    if (state.tab !== 'themes') { state.chat = null; state.hq = ''; }
     if (state.tab !== 'review') { state.card = null; state.rq = ''; }
     storeSet(state.range);
     const url = urlFor(state);
@@ -830,6 +835,18 @@
     setIncludeInternal: (on) => reviewCtx.setIncludeInternal(on)
   };
 
+  /** What the Chat themes module gets from this page. */
+  const chatCtx = {
+    esc, fmt, plural, api, send, reduceMotion,
+    state: () => state,
+    go: (next, opts) => go({ tab: 'themes', ...next }, opts),
+    goGrant: (id, name) => { if (name) knownNames.grant.set(id, name); go({ tab: 'grants', grant: id }); },
+    goCompany: (id) => go({ tab: 'companies', company: id, cq: '' }),
+    goReview: (id) => go({ tab: 'review', card: id, rq: '' }),
+    includeInternal: () => includeInternal,
+    setIncludeInternal: (on) => reviewCtx.setIncludeInternal(on)
+  };
+
   function render() {
     hideTip();
     const panel = $('#cc-panel');
@@ -845,6 +862,13 @@
       loadSeq++;
       renderChrome(null);
       window.CCGrants.render(panel, grantsCtx);
+      loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
+      return;
+    }
+    if (state.tab === 'themes' && window.CCChat) {
+      loadSeq++;
+      renderChrome(null);
+      window.CCChat.render(panel, chatCtx);
       loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
       return;
     }
@@ -928,7 +952,7 @@
       $(`#cc-tabs [data-tab="${next}"]`).focus();
     });
     $('#cc-action').addEventListener('click', (e) => { e.preventDefault(); go({ tab: 'review', card: null, rq: '' }); });
-    // Back/forward, and a typed or pasted #review/<id>, #companies/<id>, #grants/<id> or #coverage/… on a
+    // Back/forward, and a typed or pasted #review/<id>, #companies/<id>, #grants/<id>, #coverage/… or #chat/<id> on a
     // page already open. A hash change fires both events; render once.
     const fromUrl = () => {
       const next = readUrl();
