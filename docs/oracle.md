@@ -531,6 +531,46 @@ on contacts/companies/deals — a different thing.
 Hidden cards are never in either list; only their count is reported. Looking up a grant
 by id or GetGranted link returns that grant at any status.
 
+## Pre-call briefings (Ruk)
+
+A scheduled job, not a chat surface: `src/services/ruk-briefings.js`, `briefing-gather.js`, `briefing-drive.js`; migration 049; registered in `server.js` beside the Pulse jobs. Design: the "Ruk pre-call briefings" Google doc (settled 1, 14 and 19 Oct 2026). **Off unless `RUK_BRIEFINGS_ENABLED=true`**; `0 8 * * 1-5` America/Vancouver, `noOverlap`.
+
+- **Which meetings.** It reads Ruk's own calendar with her stored OAuth (`listCalendarEvents(105, …)`, `calendar.events` scope — no delegation), for the **next business day**: weekends are the only non-business days, and Friday covers Monday. It keeps events with an attendee outside granted.ca whom `leadCrmSnapshot` finds as a contact or company; otherwise the title's company hint is searched as a name. The type comes from the title (`discovery` / `quarterly|check-in`; `renewal` is skipped). When the title says neither, a closed-won deal makes it a check-in, and anything else is a discovery. Closed-won is read from the pipeline stage's own metadata (`getDealStageLabels`), not the stage-id regex in `mapLeadDeal`, which can't read numeric stage ids.
+- **Once per meeting.** `pre_call_briefings.event_id` is the claim: `INSERT … ON CONFLICT DO UPDATE … WHERE` the row is failed and over 30 minutes old, or building and over 2 hours old, `RETURNING`. The only rows it can take are new ones and those two retries, so two server copies can't both build the same meeting. The table holds no attendee address and no briefing text.
+- **Gather.** Read-only throughout.
+  - *Discovery:* calculator answers (HubSpot contact fields + `latestLeadGenSession`), HubSpot contact, company and notes, and the website (`extractCompanyBackgroundFromWebsite`, now exported, behind a public-http(s)-only URL guard).
+  - *Check-in:* the company's deals (`getDealsForCompany`), with stage and owner resolved to names; notes, logged emails and logged calls per deal (up to 8 deals); and the company's own notes, calls and emails. The strategy meeting is the newest logged call that mentions strategy, else the newest call.
+  - Emails come **only** from what is logged to the deal or company: `getLoggedEmails` has no fallback to contacts, unlike `getProjectEmailHistory`.
+- **Match.** `toPreviewProfile` → gg3-ai-service `POST /api/v1/ai/internal/match-preview` (`GG3_AI_SERVICE_URL` + `GG3_REVIEW_FEED_TOKEN`, the same pair match-explain uses; 180s), i.e. the real engine plus the AI review.
+  - **Province** comes from `locateCompany`: first the HubSpot company address fields (state, postal code, street address, city), then the website's home, `/contact`, `/contact-us`, `/locations`, `/about` and `/about-us` pages. On the pages it counts province names, ", BC"-style abbreviations and postal codes, and keeps provinces mentioned at least half as often as the top one. Only after both fail does the calculator session's own location count. `facts.location` records the source.
+  - Industries are humanized from the HubSpot enums. Goals come from the calculator's "what do you spend it on" and its budgets.
+  - **No calculator session → its HubSpot contact fields are ignored entirely.** HubSpot fills an unanswered field with 0 or blank, and the prompt is told not to mention the calculator. A 0 on the company record counts as unknown too.
+  - **Fallback** when the profile still has no province or industry, the call fails, or the service isn't configured: `searchGrantData` (keyword search), filtered by `reliableFallback`.
+    - It drops any grant whose deadline has passed by the meeting date.
+    - It drops any grant restricted to provinces the company isn't confirmed to be in; with no confirmed province, that means every province-restricted grant.
+    - The writer is told to drop anything it would itself call a weak or conditional fit.
+    - If fewer than 2 survive, in code or after the writer, the whole section is the one line "No reliable matches yet — confirm location and plans on the call."
+    - Otherwise one italic line says the matches are keyword-only, and why.
+  - Check-in matches drop programs the client already has a deal for.
+- **Write.** One Sonnet 5.5 call: no temperature, `tool_choice: auto`, and the prompt requires `write_briefing({summary_lines, markdown})`. The discovery and check-in outlines are copied from the design doc. Gaps are marked **ASK**, each grant gets one fit line written by Oracle (the AI review gives no reason for plain keeps), each "couldn't check" note becomes an **ASK**, and an unclear open deal reads "unclear — ask <deal owner>". Cost is logged as `ruk-briefing`.
+- **Deliver.**
+  - The Doc is created **as Ruk** through domain-wide delegation, `drive` scope only (`delegatedDriveClient(…, {write:true})`). It goes in Granted Files › Pre-Call Briefings › Ruk, created on first use; an ambiguous folder match is refused. The Doc is HTML uploaded and converted by Drive, so no Docs scope is needed. Name: `YYYY-MM-DD – Company – Discovery|Check-in`.
+  - Then a DM: `findDmSpace` + `postMessage`, with 2–3 summary lines and the link.
+  - If the Doc fails, no DM is sent and the row is marked failed. If there is no DM space, the row is still done, with `error_code = no_dm_space`.
+  - It never writes to HubSpot or to the calendar event.
+- **Dry run.** `node scripts/ruk-briefing-dryrun.mjs "<title>" [--date YYYY-MM-DD] [--deliver --dm-to <user>]`.
+  - It prints the gathered facts, the profile, the matches, the briefing and the cost, and never claims the meeting.
+  - `--deliver` refuses without `--dm-to`, so a test can't DM Ruk by accident.
+  - `--dm-to` takes an exact email (always unambiguous) or a name or local part. A name that matches several accounts narrows to the one with a Chat DM, else it refuses.
+  - The output names which HubSpot contact and company were matched, and how: contact by attendee email or phone; company by contact association, domain or title name. It also lists every province source checked.
+  - Locally, run it as `railway run …` with the public `DATABASE_URL`. The local `.env` has no `GOOGLE_CLIENT_ID/SECRET`, so Ruk's calendar token can't refresh without Railway's env, and Railway's `DATABASE_URL` is an internal host.
+  - It sends the Sonnet cost to no log; the website read's Haiku call still logs its own ~0.05¢ under `lead-gen-extraction`.
+- **Cost.**
+  - A discovery briefing with keyword-fallback matches: ~2–3¢ (Elmwood dry runs, 2026-10-19).
+  - Elmwood is the thin-lead case: no HubSpot address, a 78-character JS-rendered site with no location, and no calculator session. So its section is the one-line fallback.
+  - The engine path adds ~9–15¢: 8.8¢ for a one-goal profile, live.
+- **To turn on:** apply migration 049, confirm `GG3_AI_SERVICE_URL` / `GG3_REVIEW_FEED_TOKEN` on the service, then set `RUK_BRIEFINGS_ENABLED=true`. Optionally set `RUK_BRIEFINGS_OWNER_EMAIL` (default `rukshaar@granted.ca`).
+
 ## Behavior worth knowing
 
 - **Model routing is per-message, not per-agent.** `getQueryConfig` in

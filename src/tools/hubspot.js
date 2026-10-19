@@ -5321,7 +5321,7 @@ const LEAD_CONTACT_PROPERTIES = [
 ];
 
 const LEAD_COMPANY_PROPERTIES = ['name', 'domain', 'industry', 'numberofemployees', 'annualrevenue',
-  'lifecyclestage', 'hubspot_owner_id', 'city', 'state', 'createdate'];
+  'lifecyclestage', 'hubspot_owner_id', 'city', 'state', 'createdate', 'address', 'zip', 'country'];
 
 const LEAD_DEAL_PROPERTIES = ['dealname', 'dealstage', 'pipeline', 'amount', 'closedate',
   'grant_type', 'hubspot_owner_id', 'closed_lost_reason'];
@@ -5373,6 +5373,9 @@ function mapLeadCompany(c) {
     ownerId: p.hubspot_owner_id || null,
     city: p.city || null,
     province: p.state || null,
+    address: p.address || null,
+    postalCode: p.zip || null,
+    country: p.country || null,
     createDate: p.createdate || null
   };
 }
@@ -5498,6 +5501,7 @@ export async function leadCrmSnapshot({ email, phone, company, domain } = {}) {
   const associated = contact ? await leadAssociations(client, 'contacts', contact.id) : { companies: [], deals: [] };
   const dealIds = [...associated.deals];
   let found = null;
+  let companyFoundBy = null;
 
   try {
     if (associated.companies.length) {
@@ -5506,7 +5510,7 @@ export async function leadCrmSnapshot({ email, phone, company, domain } = {}) {
         inputs: associated.companies.slice(0, 1).map(id => ({ id }))
       });
       const hit = res.data?.results?.[0];
-      if (hit) found = mapLeadCompany(hit);
+      if (hit) { found = mapLeadCompany(hit); companyFoundBy = 'contact_association'; }
     }
     if (!found && (domain || company)) {
       const clean = String(domain || '').toLowerCase().replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/.*$/, '');
@@ -5521,6 +5525,7 @@ export async function leadCrmSnapshot({ email, phone, company, domain } = {}) {
       const hit = res.data?.results?.[0];
       if (hit) {
         found = mapLeadCompany(hit);
+        companyFoundBy = clean ? 'domain' : 'name';
         if (!contact) {
           const ofCompany = await leadAssociations(client, 'companies', found.id);
           dealIds.push(...ofCompany.deals);
@@ -5554,6 +5559,7 @@ export async function leadCrmSnapshot({ email, phone, company, domain } = {}) {
     foundBy,
     phoneMatches,
     company: found,
+    companyFoundBy,
     deals,
     failed: [...new Set(failed)]
   };
@@ -5637,4 +5643,171 @@ export async function recordLeadOutcome(input = {}) {
     note_id: noteResult.note_id || null,
     ...(noteResult.success ? {} : { error: noteResult.error })
   };
+}
+
+// ============================================================================
+// PRE-CALL BRIEFING READS (src/services/ruk-briefings.js)
+//
+// Read-only, and like the lead triage reads above they log counts and codes
+// only — never a name, an address or a body. Every function returns
+// {success:false, error} rather than throwing, so one missing part of a
+// briefing never stops the rest.
+// ============================================================================
+
+const STAGE_LABELS_TTL_MS = 60 * 60 * 1000;
+let stageLabelsCache = null;
+
+/**
+ * Deal stage id → { label, pipeline, closed, won }, across every deal pipeline,
+ * from /crm/v3/pipelines/deals. Cached for an hour.
+ *
+ * `won` is the stage's own metadata (closed with probability 1), not the stage
+ * id: these pipelines use numeric stage ids, which `mapLeadDeal`'s
+ * /closedwon/ test cannot read.
+ */
+export async function getDealStageLabels({ now = Date.now() } = {}) {
+  if (stageLabelsCache && now - stageLabelsCache.at < STAGE_LABELS_TTL_MS) {
+    return { success: true, stages: stageLabelsCache.stages };
+  }
+  if (!HUBSPOT_TOKEN) return { success: false, error: 'HubSpot access token not configured', stages: {} };
+  try {
+    const res = await createHubSpotClient().get('/crm/v3/pipelines/deals');
+    const stages = {};
+    for (const pipeline of res.data?.results || []) {
+      for (const s of pipeline.stages || []) {
+        const closed = String(s.metadata?.isClosed) === 'true';
+        stages[s.id] = {
+          label: s.label || s.id,
+          pipeline: pipeline.label || pipeline.id,
+          closed,
+          won: closed && Number(s.metadata?.probability) === 1
+        };
+      }
+    }
+    stageLabelsCache = { at: now, stages };
+    console.log(`🗂️  HubSpot deal stages loaded — ${Object.keys(stages).length}`);
+    return { success: true, stages };
+  } catch (err) {
+    const status = err?.response?.status;
+    return { success: false, error: `HubSpot pipelines read failed (${status || err?.code || 'error'})`, stages: {} };
+  }
+}
+
+/** Test-only: forget the cached stage labels. */
+export function _resetDealStageLabelsForTests() {
+  stageLabelsCache = null;
+}
+
+/** Ids of the `toType` records associated with one record (v4 associations). */
+async function associatedIds(client, fromType, id, toType, limit) {
+  const res = await client.get(`/crm/v4/objects/${fromType}/${id}/associations/${toType}`, { params: { limit: 500 } });
+  return (res.data?.results || []).map(r => String(r.toObjectId)).filter(Boolean).slice(0, limit);
+}
+
+/**
+ * Every deal associated with a company (up to `limit`), mapped like the lead
+ * triage deals plus `lastModified`. Stage ids are left raw; resolve them with
+ * getDealStageLabels.
+ */
+export async function getDealsForCompany(companyId, limit = 25) {
+  if (!HUBSPOT_TOKEN) return { success: false, error: 'HubSpot access token not configured', deals: [] };
+  if (!companyId) return { success: true, deals: [] };
+  try {
+    const client = createHubSpotClient();
+    const ids = await associatedIds(client, 'companies', companyId, 'deals', limit);
+    if (ids.length === 0) return { success: true, deals: [] };
+    const res = await client.post('/crm/v3/objects/deals/batch/read', {
+      properties: [...LEAD_DEAL_PROPERTIES, 'hs_lastmodifieddate'],
+      inputs: ids.map(id => ({ id }))
+    });
+    const deals = (res.data?.results || []).map(d => ({
+      ...mapLeadDeal(d),
+      lastModified: d.properties?.hs_lastmodifieddate || null
+    }));
+    console.log(`💼 HubSpot company deals — ${deals.length}`);
+    return { success: true, deals };
+  } catch (err) {
+    const status = err?.response?.status;
+    return { success: false, error: `HubSpot company deals read failed (${status || err?.code || 'error'})`, deals: [] };
+  }
+}
+
+const CALL_PROPERTIES = ['hs_call_title', 'hs_call_body', 'hs_timestamp', 'hs_call_disposition',
+  'hs_call_direction', 'hs_call_duration', 'hubspot_owner_id'];
+const EMAIL_PROPERTIES = ['hs_email_subject', 'hs_email_text', 'hs_timestamp', 'hs_email_direction',
+  'hs_email_from_email', 'hs_email_to_email'];
+
+/** Batch-read engagements associated with a record, newest first. */
+async function associatedEngagements(objectType, recordId, kind, properties, limit) {
+  const client = createHubSpotClient();
+  const ids = await associatedIds(client, objectType, recordId, kind, 100);
+  if (ids.length === 0) return [];
+  const res = await client.post(`/crm/v3/objects/${kind}/batch/read`, {
+    properties,
+    inputs: ids.map(id => ({ id }))
+  });
+  return (res.data?.results || [])
+    .sort((a, b) => new Date(b.properties?.hs_timestamp || 0) - new Date(a.properties?.hs_timestamp || 0))
+    .slice(0, limit);
+}
+
+/**
+ * Calls LOGGED in HubSpot against a record (`companies`, `deals` or
+ * `contacts`), newest first. The body is HubSpot's own call notes (HTML).
+ */
+export async function getLoggedCalls(objectType, recordId, limit = 10) {
+  if (!HUBSPOT_TOKEN) return { success: false, error: 'HubSpot access token not configured', calls: [] };
+  if (!recordId) return { success: true, calls: [] };
+  try {
+    const rows = await associatedEngagements(objectType, recordId, 'calls', CALL_PROPERTIES, limit);
+    const calls = rows.map(c => {
+      const p = c.properties || {};
+      return {
+        id: c.id,
+        title: p.hs_call_title || null,
+        body: p.hs_call_body || '',
+        timestamp: p.hs_timestamp || null,
+        disposition: p.hs_call_disposition || null,
+        direction: p.hs_call_direction || null,
+        durationMs: numberOrNull(p.hs_call_duration),
+        ownerId: p.hubspot_owner_id || null
+      };
+    });
+    console.log(`📞 HubSpot logged calls (${objectType}) — ${calls.length}`);
+    return { success: true, calls };
+  } catch (err) {
+    const status = err?.response?.status;
+    return { success: false, error: `HubSpot calls read failed (${status || err?.code || 'error'})`, calls: [] };
+  }
+}
+
+/**
+ * Emails LOGGED in HubSpot against exactly this record — deliberately no
+ * fallback to the record's contacts (getProjectEmailHistory has one), so a
+ * briefing only ever sees what was logged to the deal or company. Bodies are
+ * clipped to 1,500 characters.
+ */
+export async function getLoggedEmails(objectType, recordId, limit = 10) {
+  if (!HUBSPOT_TOKEN) return { success: false, error: 'HubSpot access token not configured', emails: [] };
+  if (!recordId) return { success: true, emails: [] };
+  try {
+    const rows = await associatedEngagements(objectType, recordId, 'emails', EMAIL_PROPERTIES, limit);
+    const emails = rows.map(e => {
+      const p = e.properties || {};
+      return {
+        id: e.id,
+        subject: p.hs_email_subject || null,
+        text: String(p.hs_email_text || '').slice(0, 1500),
+        timestamp: p.hs_timestamp || null,
+        direction: p.hs_email_direction || null,
+        from: p.hs_email_from_email || null,
+        to: p.hs_email_to_email || null
+      };
+    });
+    console.log(`✉️  HubSpot logged emails (${objectType}) — ${emails.length}`);
+    return { success: true, emails };
+  } catch (err) {
+    const status = err?.response?.status;
+    return { success: false, error: `HubSpot emails read failed (${status || err?.code || 'error'})`, emails: [] };
+  }
 }

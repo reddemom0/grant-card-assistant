@@ -72,6 +72,7 @@ import controlCentreCoverageRouter from './src/control-centre/coverage-routes.js
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
+import { startRukBriefings } from './src/services/ruk-briefings.js';
 import { startPulseDigest } from './src/services/pulse-digest.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
 // the number is known — see src/api/addon-probe.js.
@@ -1403,6 +1404,16 @@ async function startServer() {
     // cards, with links. Always sends, once per week. Not scheduled unless
     // PULSE_DIGEST_SUBSCRIBERS and GG3_OPS_DB_READONLY_URL are set.
     startPulseDigest(cron);
+
+    // ========================================================================
+    // CRON JOB: Ruk's pre-call briefings (Mon–Fri 08:00 America/Vancouver)
+    // ========================================================================
+    // Reads Ruk's calendar for the next business day, builds a briefing for
+    // each discovery call / quarterly check-in with a HubSpot-known attendee,
+    // files it in Granted Files › Pre-Call Briefings › Ruk and DMs her the
+    // link. Never writes HubSpot or calendar events. Off unless
+    // RUK_BRIEFINGS_ENABLED=true. Needs migration 049.
+    startRukBriefings(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';
