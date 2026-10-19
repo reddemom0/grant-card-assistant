@@ -29,6 +29,7 @@ import {
   defaultGatherDeps, gatherDiscovery, gatherCheckIn, closedWonSource, matchGrants, toPreviewProfile, NO_RELIABLE_MATCHES_LINE
 } from './briefing-gather.js';
 import { createBriefingDoc, markdownToHtml } from './briefing-drive.js';
+import { recordBriefingPost } from './briefing-posts.js';
 
 export const BRIEFING_MODEL = 'claude-sonnet-5-5';
 export const COST_SOURCE = 'ruk-briefing';
@@ -174,7 +175,8 @@ export const CLAIM_SQL = `
 
 export const COMPLETE_SQL = `
   UPDATE pre_call_briefings
-     SET status = 'done', doc_url = $2, match_source = $3, cost_usd = $4, error_code = $5, completed_at = NOW()
+     SET status = 'done', doc_url = $2, match_source = $3, cost_usd = $4, error_code = $5,
+         space_name = $6, thread_name = $7, message_name = $8, completed_at = NOW()
    WHERE event_id = $1`;
 
 export const FAIL_SQL = `
@@ -198,13 +200,24 @@ export const BRIEFING_TOOL = {
   input_schema: {
     type: 'object',
     properties: {
-      summary_lines: {
-        type: 'array', items: { type: 'string' }, minItems: 2, maxItems: 3,
-        description: '2–3 short plain lines for the Chat DM: who, what the call is, and the one thing to focus on.'
+      dm: {
+        type: 'object',
+        description: 'The short Chat DM that points Ruk at the briefing. Plain text, no markdown. See "THE CHAT DM" in the instructions.',
+        properties: {
+          who: { type: 'string', description: 'One line: contact name · role · city, province. Write "role not on file" for a missing role.' },
+          what_we_know: { type: 'array', items: { type: 'string' }, maxItems: 3 },
+          ask_first: { type: 'array', items: { type: 'string' }, maxItems: 3 },
+          grants_to_raise: {
+            type: 'array', maxItems: 3,
+            items: { type: 'object', properties: { name: { type: 'string' }, reason: { type: 'string' } }, required: ['name', 'reason'] }
+          },
+          open_deals_action: { type: 'array', items: { type: 'string' }, maxItems: 3 }
+        },
+        required: ['who', 'what_we_know', 'ask_first']
       },
       markdown: { type: 'string', description: 'The whole briefing, in the markdown subset described in the instructions.' }
     },
-    required: ['summary_lines', 'markdown']
+    required: ['dm', 'markdown']
   }
 };
 
@@ -224,7 +237,15 @@ RULES — every one matters:
 - "location" says where the company's province came from (HubSpot address or website). Use it for the province and cite it.
 - No preamble, no sign-off, no advice to Ruk about how to run a call.
 - Markdown subset only: "#", "##", "###" headings, "- " bullets (two spaces before "- " for a sub-bullet), "1. " numbered items, **bold**, *italic*. No tables, no code, no horizontal rules.
-- You MUST respond by calling the write_briefing tool exactly once. Do not answer in plain text.`;
+- You MUST respond by calling the write_briefing tool exactly once. Do not answer in plain text.
+
+THE CHAT DM ("dm" in the tool call) — a few seconds' read on a phone, taken from the briefing you wrote, plain text (no markdown, no brackets for sources):
+- who: "Name · role · City, Province" (write "role not on file" when there is none).
+- what_we_know: at most 3 bullets, each one short clause — the facts that matter most for this call.
+- ask_first: the 3 most important **ASK** questions from the briefing, as short questions.
+- grants_to_raise: at most 3 of the grants you kept in the briefing, in the briefing's order, each with a reason of a few words. Empty if the briefing shows "No reliable matches".
+- open_deals_action (check-in only): at most 3 open deals that need action, each "deal — what's needed" (use "unclear — ask <owner>" exactly as in the briefing). Empty if none.
+- Each item under ~120 characters.`;
 
 export const DISCOVERY_PROMPT = `${COMMON_RULES}
 
@@ -325,8 +346,7 @@ export async function writeBriefing({ type, facts, matches, meetingDate }, { cre
     err.costUsd = cost;
     throw err;
   }
-  const summaryLines = (Array.isArray(input.summary_lines) ? input.summary_lines : []).map(String).filter(Boolean).slice(0, 3);
-  return { markdown: input.markdown.trim(), summaryLines, costUsd: cost, usage };
+  return { markdown: input.markdown.trim(), dm: cleanDm(input.dm), costUsd: cost, usage };
 }
 
 // ---------------------------------------------------------------------------
@@ -351,7 +371,7 @@ export async function buildBriefing(meeting, deps) {
     profile,
     matches,
     markdown: written.markdown,
-    summaryLines: written.summaryLines,
+    dm: written.dm,
     costUsd: matches.costUsd + written.costUsd,
     costs: { matching: matches.costUsd, writing: written.costUsd }
   };
@@ -363,29 +383,127 @@ export function docName(date, company, type) {
   return `${date} – ${clean} – ${type === 'check_in' ? 'Check-in' : 'Discovery'}`;
 }
 
-/** The Chat DM: the summary lines and the link. */
-export function dmText(briefing, url) {
-  const lines = briefing.summaryLines.length ? briefing.summaryLines : [briefing.docName];
-  return [`*Pre-call briefing — ${briefing.docName}*`, ...lines, url].join('\n');
+// ---------------------------------------------------------------------------
+// The Chat DM — short, bulleted, its own thread per meeting
+// ---------------------------------------------------------------------------
+
+const DM_ITEM_CHARS = 140;
+const list = (v, n) => (Array.isArray(v) ? v : []).map(x => (typeof x === 'string' ? x.trim() : x)).filter(Boolean).slice(0, n);
+
+/** The model's dm block, bounded: at most 3 of each, strings only. */
+export function cleanDm(dm = {}) {
+  return {
+    who: typeof dm?.who === 'string' ? dm.who.trim() : '',
+    what_we_know: list(dm?.what_we_know, 3).map(String),
+    ask_first: list(dm?.ask_first, 3).map(String),
+    grants_to_raise: list(dm?.grants_to_raise, 3)
+      .filter(g => g && typeof g.name === 'string' && g.name.trim())
+      .map(g => ({ name: g.name.trim(), reason: String(g.reason || '').trim() })),
+    open_deals_action: list(dm?.open_deals_action, 3).map(String)
+  };
 }
 
-/** File the Doc as the owner, then DM. The Doc failing means no DM. */
-export async function deliverBriefing(briefing, { ownerEmail, dmChatUserId }, deps) {
+/**
+ * One bullet line, clipped so the whole message stays short. The DM uses Chat's
+ * own formatting, where * _ ~ toggle styles and <…> is a link, so those are
+ * taken out of the model's text (and a leading "ASK —").
+ */
+const clip = (s, n = DM_ITEM_CHARS) => {
+  const t = String(s).replace(/\s+/g, ' ').trim()
+    .replace(/^\**ASK\**\s*[—-]\s*/i, '')
+    .replace(/[*_~`]/g, '').replace(/[<>]/g, '');
+  return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t;
+};
+
+/** "Tue 20 Oct, 13:15" in Vancouver time, from the calendar event start. */
+export function meetingWhen(start) {
+  const d = new Date(start);
+  if (Number.isNaN(d.getTime())) return '';
+  const part = (o) => new Intl.DateTimeFormat('en-GB', { timeZone: TZ, ...o }).format(d);
+  return `${part({ weekday: 'short' })} ${part({ day: 'numeric' })} ${part({ month: 'short' })}, ${part({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })}`;
+}
+
+export const DM_MAX_LINES = 15;
+
+/**
+ * The DM, in Chat's OWN text formatting (posted without MARKUP_SYNTAX_MARKDOWN,
+ * so every "\n" is a line break): *bold*, _italic_, <url|label>.
+ *
+ *   *Company — Discovery, Tue 20 Oct, 13:15*
+ *   who
+ *
+ *   *What we know*        ≤3 "• " bullets
+ *
+ *   *Ask first*           ≤3
+ *
+ *   *Grants to raise*     ≤3 (a check-in with open deals needing action shows
+ *                         *Open deals needing action* instead)
+ *
+ *   <doc url|Open full briefing>
+ *   _Reply here with any question about this client._
+ *
+ * Blank lines separate sections. At most DM_MAX_LINES non-blank lines: over
+ * budget drops the last "what we know" bullet (keeping one), then the last
+ * grant/deal. Empty sections are left out.
+ */
+export function dmText(briefing, url, meeting) {
+  const dm = { ...(briefing.dm || cleanDm({})) };
+  const action = meeting?.type === 'check_in' && dm.open_deals_action?.length ? 'open_deals_action' : 'grants_to_raise';
+  const count = () => 3 + (dm.who ? 1 : 0)
+    + ['what_we_know', 'ask_first', action].reduce((n, k) => n + (dm[k]?.length ? dm[k].length + 1 : 0), 0);
+  dm.what_we_know = [...(dm.what_we_know || [])];
+  dm[action] = [...(dm[action] || [])];
+  while (count() > DM_MAX_LINES && dm.what_we_know.length > 1) dm.what_we_know.pop();
+  while (count() > DM_MAX_LINES && dm[action].length > 1) dm[action].pop();
+
+  const type = meeting?.type === 'check_in' ? 'Check-in' : 'Discovery';
+  const when = meetingWhen(meeting?.event?.start);
+  const company = clip(briefing.companyName, 80);
+  const blocks = [[`*${company} — ${type}${when ? `, ${when}` : ''}*`, ...(dm.who ? [clip(dm.who)] : [])]];
+  const section = (title, items) => {
+    if (items.length) blocks.push([`*${title}*`, ...items.map(it => `• ${clip(it)}`)]);
+  };
+  section('What we know', dm.what_we_know);
+  section('Ask first', dm.ask_first);
+  if (action === 'open_deals_action') section('Open deals needing action', dm.open_deals_action);
+  else section('Grants to raise', dm.grants_to_raise.map(g => (g.reason ? `${g.name} — ${g.reason}` : g.name)));
+  blocks.push([`<${url}|Open full briefing>`, '_Reply here with any question about this client._']);
+  return blocks.map(b => b.join('\n')).join('\n\n');
+}
+
+/**
+ * File the Doc as the owner, then DM as a NEW THREAD and record where it landed
+ * (briefing_posts) so a reply in that thread gets this briefing as context.
+ * The Doc failing means no DM. `isTest` marks a --dm-to send.
+ * @returns {Promise<{doc, dm: 'sent'|'no_dm_space'|'dm_failed', text: string, post: {spaceName, messageName, threadName}|null}>}
+ */
+export async function deliverBriefing(briefing, { ownerEmail, dmChatUserId, meeting, recipientEmail = null, isTest = false }, deps) {
   const doc = await deps.createDoc({ ownerEmail, folderParts: FOLDER_PARTS, name: briefing.docName, html: markdownToHtml(briefing.markdown) });
+  const text = dmText(briefing, doc.url, meeting);
   let dm = 'sent';
+  let post = null;
   try {
     const space = dmChatUserId ? await deps.findDm(dmChatUserId) : null;
     if (!space) {
       dm = 'no_dm_space';
       console.warn('⚠️  Briefing DM skipped — the recipient has no DM with Oracle yet (they need to message Oracle once)');
     } else {
-      await deps.postMessage({ spaceName: space, text: dmText(briefing, doc.url) });
+      const landed = await deps.postThread(space, text);
+      if (!landed?.messageName) {
+        dm = 'dm_failed';
+      } else {
+        post = { spaceName: space, messageName: landed.messageName, threadName: landed.threadName || null };
+        await deps.recordPost({
+          eventId: meeting?.event?.id, meetingDate: meeting?.date, meetingType: meeting?.type, companyName: briefing.companyName,
+          isTest, recipientEmail, ...post, docUrl: doc.url, markdown: briefing.markdown, facts: withoutInternal(briefing.facts)
+        });
+      }
     }
   } catch (err) {
     dm = 'dm_failed';
     console.warn(`⚠️  Briefing DM failed — code: ${err?.code || err?.name || 'unknown'}`);
   }
-  return { doc, dm };
+  return { doc, dm, text, post };
 }
 
 // ---------------------------------------------------------------------------
@@ -399,7 +517,11 @@ export function defaultDeps() {
     query: async (...a) => (await import('../database/connection.js')).query(...a),
     createDoc: (args) => createBriefingDoc(args),
     findDm: async (id) => (await import('../cards/chat-api.js')).findDmSpace(id),
-    postMessage: async (args) => (await import('../cards/chat-api.js')).postMessage(args),
+    // A new thread per briefing, in Chat's own formatting (markdown: false — under
+    // Markdown the line breaks collapse); returns {messageName, threadName}.
+    postThread: async (space, text) => (await import('../cards/chat-api.js'))
+      .postMessageWithThread({ spaceName: space, text, markdown: false }),
+    recordPost: (row) => recordBriefingPost(row),
     createMessage: defaultCreateMessage,
     logCost: (args) => import('../utils/cost-logger.js').then(m => m.logAPICost(args)).catch(() => undefined)
   };
@@ -442,8 +564,9 @@ export async function runRukBriefings({ now = new Date(), env = process.env, dep
     try {
       const b = await buildBriefing(m, deps);
       cost = b.costUsd;
-      const { doc, dm } = await deliverBriefing(b, { ownerEmail, dmChatUserId: owner.chat_user_id }, deps);
-      await deps.query(COMPLETE_SQL, [m.event.id, doc.url, b.matches.source, cost.toFixed(4), dm === 'sent' ? null : dm]);
+      const { doc, dm, post } = await deliverBriefing(b, { ownerEmail, dmChatUserId: owner.chat_user_id, meeting: m, recipientEmail: ownerEmail }, deps);
+      await deps.query(COMPLETE_SQL, [m.event.id, doc.url, b.matches.source, cost.toFixed(4), dm === 'sent' ? null : dm,
+        post?.spaceName ?? null, post?.threadName ?? null, post?.messageName ?? null]);
       out.built += 1;
       out.dm[dm] = (out.dm[dm] || 0) + 1;
     } catch (err) {

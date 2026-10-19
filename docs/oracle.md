@@ -579,12 +579,26 @@ A scheduled job, not a chat surface: `src/services/ruk-briefings.js`, `briefing-
 - **Write.** One Sonnet 5.5 call: no temperature, `tool_choice: auto`, and the prompt requires `write_briefing({summary_lines, markdown})`. The discovery and check-in outlines are copied from the design doc. Gaps are marked **ASK**, each grant gets one fit line written by Oracle (the AI review gives no reason for plain keeps), each "couldn't check" note becomes an **ASK**, and an unclear open deal reads "unclear — ask <deal owner>". Cost is logged as `ruk-briefing`.
 - **Deliver.**
   - The Doc is created **as Ruk** through domain-wide delegation, `drive` scope only (`delegatedDriveClient(…, {write:true})`). It goes in Granted Files › Pre-Call Briefings › Ruk, created on first use; an ambiguous folder match is refused. The Doc is HTML uploaded and converted by Drive, so no Docs scope is needed. Name: `YYYY-MM-DD – Company – Discovery|Check-in`.
-  - Then a DM: `findDmSpace` + `postMessage`, with 2–3 summary lines and the link.
+  - Then a **short DM posted as its own thread**, built in code (`dmText`) from the writer's `dm` block. It is posted through `postMessageWithThread({ …, markdown: false })` (`src/cards/chat-api.js`), i.e. in **Chat's own text formatting, not `MARKUP_SYNTAX_MARKDOWN`**: under Markdown a single `\n` is a soft break, and the first version rendered as one paragraph. Every other Oracle message keeps the Markdown default.
+    - The layout is `*bold*` / `_italic_`, with blank lines between sections and one `• ` bullet per line:
+      - `*Company — Discovery|Check-in, Tue 20 Oct, 13:15*` (event start, Vancouver time), then who · role · location;
+      - `*What we know*` (≤3), `*Ask first*` (≤3 of the briefing's ASKs), `*Grants to raise*` (≤3, name — reason). A check-in shows `*Open deals needing action*` instead when there are any;
+      - `<doc url|Open full briefing>`, then `_Reply here with any question about this client._`
+    - At most 15 non-blank lines (`DM_MAX_LINES`; "What we know", then grants, are trimmed first). Each item is clipped to ~140 characters, with `* _ ~ \` < >` taken out of the model's text so it can't break the formatting.
+  - Every DM sent is recorded in **`briefing_posts`** (049): space, thread and message names, the briefing markdown and the gathered facts (without `_` internals), with `is_test` for `--dm-to` sends. The daily run also writes `space_name` / `thread_name` / `message_name` on its `pre_call_briefings` row. A missing table warns once, and the DM still goes.
   - If the Doc fails, no DM is sent and the row is marked failed. If there is no DM space, the row is still done, with `error_code = no_dm_space`.
   - It never writes to HubSpot or to the calendar event.
+- **Replies in a briefing thread** (the `pulse_posts` pattern).
+  - `chat-google.js`, beside the Pulse lookup: `findBriefingPost({ spaceName, threadName, quotedMessageName })` matches a reply in the DM's thread, **or a quote of it**, to its `briefing_posts` row. It returns `matchedBy` (`thread` | `quote`), which is logged.
+    - **The reply arrow in a DM sends a quote, not a thread reply.** The message starts a NEW thread and carries `quotedMessageMetadata.name` = the briefing DM's message name (`quoteType: REPLY`); live-checked 2026-10-19. So `message_name` is stored alongside `thread_name` (in `briefing_posts`, and on `pre_call_briefings`), and either one finds the briefing.
+  - `client.js` then adds `briefingContextBlock` as a non-cached system block: the briefing and its facts (wrapped untrusted), plus rules: a few lines, cite sources the way the briefing does, "not on file" rather than guess, and "couldn't check" items are unconfirmed.
+  - Each thread is already its own conversation (`conversationIdForEvent`). Messages outside briefing threads find no row, so nothing changes for them.
+  - `runOracleAndReply` is exported only so a script can replay one message through the real handler.
+  - **Live replies need migration 049 applied and this code deployed.**
 - **Dry run.** `node scripts/ruk-briefing-dryrun.mjs "<title>" [--date YYYY-MM-DD] [--deliver --dm-to <user>]`.
   - It prints the gathered facts, the profile, the matches, the briefing and the cost, and never claims the meeting.
   - `--deliver` refuses without `--dm-to`, so a test can't DM Ruk by accident.
+  - It prints the DM exactly as it will post (the link is filled in on `--deliver`). A `--deliver` send is recorded in `briefing_posts` as `is_test`, so its thread is replyable, but it never writes `pre_call_briefings`.
   - `--company "<name>"` picks the meeting by the matched HubSpot company (case-insensitive contains). Use it for booking-link meetings, whose titles are all alike; with a title too, both must match, and an ambiguous pick lists the candidates and stops.
   - `--dm-to` takes an exact email (always unambiguous) or a name or local part. A name that matches several accounts narrows to the one with a Chat DM, else it refuses.
   - The output names which HubSpot contact and company were matched, and how: contact by attendee email or phone; company by contact association, domain or title name. It also lists every province source checked.

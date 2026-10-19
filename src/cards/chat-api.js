@@ -38,11 +38,15 @@ export async function postMessage(args) {
  * whose replies need recognising later (Pulse, src/services/pulse-posts.js).
  * @returns {Promise<{messageName: string|null, threadName: string|null}>}
  */
-export async function postMessageWithThread({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null, fallbackText = null }) {
+export async function postMessageWithThread({ spaceName, threadName = null, text = null, cardsV2 = null, privateTo = null, fallbackText = null, markdown = true }) {
   const requestBody = {};
   if (text) {
     requestBody.text = text;
-    requestBody.markupSyntax = 'MARKUP_SYNTAX_MARKDOWN';
+    // markdown: false sends Chat's own text formatting instead (every "\n" is a
+    // line break, *bold*, _italic_, <url|label>). Under Markdown a single
+    // newline is a soft break, so line-by-line text collapses into one
+    // paragraph. Only the pre-call briefing DM opts out (src/services/ruk-briefings.js).
+    if (markdown) requestBody.markupSyntax = 'MARKUP_SYNTAX_MARKDOWN';
   }
   if (cardsV2) requestBody.cardsV2 = cardsV2;
   if (fallbackText) requestBody.fallbackText = fallbackText;

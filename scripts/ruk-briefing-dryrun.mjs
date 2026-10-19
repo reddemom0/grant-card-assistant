@@ -22,6 +22,9 @@
  *       refuses without --dm-to, so a test cannot DM Ruk by accident; pass
  *       "--dm-to rukshaar" to send her the real DM.
  *
+ * A --deliver send posts the DM as its own thread and records it in
+ * briefing_posts with is_test = true, so a reply in that thread gets the
+ * briefing as context (migration 049; skipped with a warning if not applied).
  * Never claims the meeting in pre_call_briefings, so the daily run still builds
  * it. Never writes HubSpot or the calendar. The Sonnet cost is priced and
  * printed, not logged; the website read's Haiku call logs its own small cost to
@@ -35,7 +38,7 @@
 
 import 'dotenv/config';
 import {
-  defaultDeps, findMeetings, buildBriefing, deliverBriefing, nextBusinessDay, localDate, staffUser, withoutInternal,
+  defaultDeps, findMeetings, buildBriefing, deliverBriefing, dmText, nextBusinessDay, localDate, staffUser, withoutInternal,
   DEFAULT_OWNER_EMAIL, FOLDER_PARTS
 } from '../src/services/ruk-briefings.js';
 import { getPool } from '../src/database/connection.js';
@@ -149,17 +152,23 @@ async function main() {
   hr(`Briefing — ${b.docName}`);
   console.log(b.markdown);
 
-  hr('DM summary');
-  console.log(b.summaryLines.join('\n'));
+  hr('DM (as it will post; the link is filled in on --deliver)');
+  console.log(dmText(b, '<Doc link>', m));
 
   hr('Cost');
   console.log(`matching $${b.costs.matching.toFixed(4)} + writing $${b.costs.writing.toFixed(4)} = $${b.costUsd.toFixed(4)}  (website Haiku read logged separately)`);
 
   if (args.deliver) {
     hr('Deliver');
-    const { doc, dm } = await deliverBriefing(b, { ownerEmail, dmChatUserId: dmUser.chat_user_id }, deps);
+    // A test send: recorded in briefing_posts as is_test (so a reply in its
+    // thread gets the briefing), never claimed in pre_call_briefings.
+    const { doc, dm, post, text: sent } = await deliverBriefing(b, {
+      ownerEmail, dmChatUserId: dmUser.chat_user_id, meeting: m, recipientEmail: dmUser.email, isTest: true
+    }, deps);
     console.log(`Doc: ${doc.url}  (Granted Files › ${FOLDER_PARTS.join(' › ')}; ${doc.createdFolders} folder(s) created)`);
-    console.log(`DM to ${dmUser.email}: ${dm}`);
+    console.log(`DM to ${dmUser.email}: ${dm}${post ? ` — new thread ${post.threadName}` : ''}`);
+    console.log('Raw text sent (JSON, so every \\n shows):');
+    console.log(JSON.stringify(sent));
   }
 }
 
