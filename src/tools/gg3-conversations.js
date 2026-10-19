@@ -36,6 +36,7 @@ import { transcriptOf, fetchCompanyName, OWNERS, localDate } from '../services/p
 import { chatTurnsAround } from '../control-centre/diagnosis.js';
 import { cardLink } from '../control-centre/links.js';
 import { cardTitle } from '../control-centre/card-summary.js';
+import { TIME_ZONE, vancouverDay, addDays } from '../control-centre/rollup.js';
 
 export const GG3_CONVERSATION_MODES = ['read', 'search', 'troubleshoot', 'log_issue'];
 export const RESOLVE_DAYS = 90;
@@ -150,8 +151,16 @@ function notConfigured() {
 // READ
 // ============================================================================
 
-/** Grant names the conversation's tools returned, and the ids shown as tiles. */
-export function grantsIn(messages) {
+/** Positive integer ids, first-seen order, no repeats. */
+const uniqueIds = (ids) => [...new Set((Array.isArray(ids) ? ids : []).map(Number).filter(n => Number.isInteger(n) && n > 0))];
+
+/**
+ * Grant names the conversation's tools returned, and the ids shown as tiles:
+ * legacy surface_grant_tiles calls (before 2026-10-02) followed by the
+ * conversations.grant_ids column (server-chosen tiles since then) — the same
+ * merge gg3-ai-service's conversations GET does (mergeGrantIds).
+ */
+export function grantsIn(messages, grantIds = []) {
   const names = new Map();
   const shown = [];
   const note = (g) => {
@@ -176,11 +185,30 @@ export function grantsIn(messages) {
       }
     }
   }
-  const ids = [...new Set(shown.filter(Number.isInteger))];
+  const ids = uniqueIds([...shown, ...(Array.isArray(grantIds) ? grantIds : [])]);
   return {
     names,
-    shown: ids.map(id => (names.has(id) ? `${names.get(id)} (${id})` : `grant ${id}`))
+    ids,
+    shown: ids.map(id => grantLabel(id, names))
   };
+}
+
+const grantLabel = (id, ...nameMaps) => {
+  const name = nameMaps.map(m => m?.get(id)).find(Boolean);
+  return name ? `${name} (${id})` : `grant ${id}`;
+};
+
+export const GRANT_NAMES_SQL = 'SELECT id, grant_name FROM gg3_grants WHERE id = ANY($1::int[])';
+
+/** Names from Oracle's local GG3 copy. An empty map when it can't be read: labels fall back. */
+export async function grantNames(ids, oracleQuery) {
+  const out = new Map();
+  if (!ids.length || !oracleQuery) return out;
+  try {
+    const r = await oracleQuery(GRANT_NAMES_SQL, [ids]);
+    for (const g of r.rows || []) if (g.grant_name) out.set(Number(g.id), String(g.grant_name));
+  } catch { /* labels fall back to the conversation's own names, then the id */ }
+  return out;
 }
 
 function capTranscript(transcript) {
@@ -212,9 +240,9 @@ async function outcomesFor(convIds, runQuery) {
 }
 
 /** The client's recent conversations, newest first. */
-export async function readConversations(userId, { days = 30, limit = 3 } = {}, runQuery) {
+export async function readConversations(userId, { days = 30, limit = 3 } = {}, runQuery, oracleQuery = null) {
   const res = await runQuery(
-    `SELECT id, mode, messages, created_at, updated_at
+    `SELECT id, mode, messages, grant_ids, created_at, updated_at
        FROM conversations
       WHERE user_id = $1
         AND updated_at > now() - make_interval(days => $2::int)
@@ -223,9 +251,12 @@ export async function readConversations(userId, { days = 30, limit = 3 } = {}, r
     [userId, days, limit]);
   const rows = res.rows || [];
   const outcomes = await outcomesFor(rows.map(r => r.id), runQuery);
+  const grants = new Map(rows.map(r => [r.id, grantsIn(r.messages, r.grant_ids)]));
+  const local = await grantNames(uniqueIds([...grants.values()].flatMap(g => g.ids)), oracleQuery);
   return rows.map(r => {
     const messages = Array.isArray(r.messages) ? r.messages : [];
     const failures = outcomes.get(r.id) || [];
+    const g = grants.get(r.id);
     return {
       conversation: r.id,
       started: iso(r.created_at),
@@ -233,7 +264,7 @@ export async function readConversations(userId, { days = 30, limit = 3 } = {}, r
       mode: r.mode || null,
       client_messages: messages.filter(m => m?.role === 'user' && typeof m.content === 'string').length,
       problems: failures.length ? failures : 'none recorded',
-      grants_shown: grantsIn(messages).shown,
+      grants_shown: g.ids.map(id => grantLabel(id, local, g.names)),
       ...capTranscript(transcriptOf(messages)),
       _messages: messages
     };
@@ -255,7 +286,7 @@ async function modeRead(input, deps) {
   const who = await resolveClient(input, deps.runQuery);
   if (!who.ok) return who;
   const days = clampInt(input.days, 30, MAX_DAYS);
-  const conversations = await readConversations(who.userId, { days, limit: clampInt(input.limit, 3, 5) }, deps.runQuery);
+  const conversations = await readConversations(who.userId, { days, limit: clampInt(input.limit, 3, 5) }, deps.runQuery, deps.oracleQuery);
   return {
     client: shortRef(who.userId),
     ...(await companyFor(who.userId, deps)),
@@ -269,13 +300,31 @@ async function modeRead(input, deps) {
 // SEARCH
 // ============================================================================
 
-/** Date window: from/to (YYYY-MM-DD, to inclusive) or the last `days`. At most MAX_DAYS. */
+const vancouverClock = new Intl.DateTimeFormat('sv-SE', {
+  timeZone: TIME_ZONE, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'
+});
+
+/** "YYYY-MM-DD HH:MM" in Vancouver. */
+export const vancouverTime = (d) => (d ? vancouverClock.format(new Date(d)) : null);
+
+/** 00:00 Vancouver on a YYYY-MM-DD day. DST switches at 02:00, so midnight is always UTC−7 or UTC−8. */
+export function vancouverMidnight(day) {
+  for (const h of ['07', '08']) {
+    const d = new Date(`${day}T${h}:00:00Z`);
+    if (vancouverTime(d) === `${day} 00:00`) return d;
+  }
+  return new Date(`${day}T08:00:00Z`);
+}
+
+/**
+ * Date window: from/to (YYYY-MM-DD Vancouver days, to inclusive) or the last
+ * `days` × 24 hours. At most MAX_DAYS.
+ */
 export function windowFor({ from, to, days }, now = new Date()) {
   const day = /^\d{4}-\d{2}-\d{2}$/;
-  const end = day.test(String(to || '')) ? new Date(`${to}T00:00:00Z`) : null;
-  if (end) end.setUTCDate(end.getUTCDate() + 1);
+  const end = day.test(String(to || '')) ? vancouverMidnight(addDays(to, 1)) : null;
   const until = end || now;
-  let since = day.test(String(from || '')) ? new Date(`${from}T00:00:00Z`) : new Date(until.getTime() - clampInt(days, 7, MAX_DAYS) * 864e5);
+  let since = day.test(String(from || '')) ? vancouverMidnight(from) : new Date(until.getTime() - clampInt(days, 7, MAX_DAYS) * 864e5);
   if (until - since > MAX_DAYS * 864e5) since = new Date(until.getTime() - MAX_DAYS * 864e5);
   return { since, until };
 }
@@ -289,6 +338,61 @@ export function snippetFor(text, terms) {
   }).concat(t.length)));
   const start = Math.max(0, at - 40);
   return clip(`${start > 0 ? '…' : ''}${t.slice(start)}`, SNIPPET_CHARS);
+}
+
+// Per-turn tiles: chat_turns.surfaced_grant_ids, keyed by turn_index (the
+// client's string messages, counted from 0 — the same count as splitTurns).
+export const SEARCH_TURNS_SQL = `
+  SELECT conversation_id, turn_index, occurred_at, surfaced_grant_ids
+    FROM chat_turns
+   WHERE conversation_id = ANY($1::int[]) AND turn_index IS NOT NULL
+   ORDER BY occurred_at`;
+const MAX_MATCHING_MESSAGES = 3;
+
+/**
+ * For each search row: the grant cards the whole conversation showed
+ * (legacy surface_grant_tiles ids, then conversations.grant_ids) and, for each
+ * client message containing a term, when it was sent and the cards shown on
+ * that turn — "none" when the turn showed none, "not recorded" when the turn
+ * has no chat_turns row.
+ */
+async function searchCards(rows, terms, deps) {
+  const out = new Map();
+  if (!rows.length) return out;
+  const turns = new Map();
+  const t = await deps.runQuery(SEARCH_TURNS_SQL, [rows.map(r => r.id)]);
+  for (const x of t.rows || []) {
+    if (!turns.has(x.conversation_id)) turns.set(x.conversation_id, new Map());
+    turns.get(x.conversation_id).set(Number(x.turn_index), x);
+  }
+  const lower = terms.map(s => s.toLowerCase());
+  const shaped = rows.map(r => {
+    const messages = Array.isArray(r.client_messages) ? r.client_messages : [];
+    const matching = messages
+      .map((text, i) => ({ text: String(text ?? '').toLowerCase(), i }))
+      .filter(({ text }) => lower.some(w => text.includes(w)))
+      .slice(0, MAX_MATCHING_MESSAGES)
+      .map(({ i }) => {
+        const turn = turns.get(r.id)?.get(i);
+        return { i, at: turn ? turn.occurred_at : null, ids: turn ? uniqueIds(turn.surfaced_grant_ids) : null };
+      });
+    return { id: r.id, matching, conversation: uniqueIds([...(r.legacy_grant_ids || []), ...(r.grant_ids || [])]) };
+  });
+  const names = await grantNames(uniqueIds(shaped.flatMap(s => [...s.conversation, ...s.matching.flatMap(m => m.ids || [])])), deps.oracleQuery);
+  const label = (ids) => (ids == null ? 'not recorded' : ids.length ? ids.map(id => grantLabel(id, names)) : 'none');
+  for (const s of shaped) {
+    const matching = s.matching.map(m => ({
+      client_message: m.i + 1,
+      ...(m.at ? { at: vancouverTime(m.at) } : {}),
+      cards: label(m.ids)
+    }));
+    out.set(s.id, {
+      matching_messages: matching,
+      cards_in_conversation: label(s.conversation),
+      cards_on_match: matching.map(m => `message ${m.client_message}: ${Array.isArray(m.cards) ? m.cards.join(', ') : m.cards}`).join('; ')
+    });
+  }
+  return out;
 }
 
 async function modeSearch(input, deps) {
@@ -308,37 +412,59 @@ async function modeSearch(input, deps) {
   const failedExpr = `EXISTS (SELECT 1 FROM chat_turns t WHERE t.conversation_id = c.id AND t.outcome = ANY($${params.length}::text[]))`;
   params.push(SEARCH_LIMIT);
 
+  // In the window = a turn happened in it (chat_turns.occurred_at), so a chat
+  // that carried on afterwards still counts. Conversations with no turn rows
+  // (chat_turns starts 2026-08-26 and missed some until mid-October) count when
+  // their lifespan overlaps the window. updated_at >= since holds either way
+  // and keeps the scan on recent rows.
   const res = await deps.runQuery(
-    `SELECT c.id, c.user_id, c.mode, c.updated_at, ${failedExpr} AS failed,
-            left((SELECT string_agg(m->>'content', E'\\n') FROM jsonb_array_elements(c.messages) m
-                   WHERE m->>'role' = 'user' AND jsonb_typeof(m->'content') = 'string'), 20000) AS client_text
-       FROM conversations c
-      WHERE c.updated_at >= $1 AND c.updated_at < $2
-        AND ${termClauses.join('\n        AND ')}
-        ${input.failed_only ? `AND ${failedExpr}` : ''}
-      ORDER BY c.updated_at DESC
-      LIMIT $${params.length}::int`,
+    `SELECT * FROM (
+       SELECT c.id, c.user_id, c.mode, c.updated_at, c.grant_ids, ${failedExpr} AS failed,
+              (SELECT jsonb_agg(g)
+                 FROM jsonb_array_elements(c.messages) m,
+                      jsonb_array_elements(CASE jsonb_typeof(m->'content') WHEN 'array' THEN m->'content' ELSE '[]'::jsonb END) b,
+                      jsonb_array_elements(CASE jsonb_typeof(b->'input'->'grantIds') WHEN 'array' THEN b->'input'->'grantIds' ELSE '[]'::jsonb END) g
+                WHERE m->>'role' = 'assistant' AND b->>'type' = 'tool_use' AND b->>'name' = 'surface_grant_tiles') AS legacy_grant_ids,
+              (SELECT max(t.occurred_at) FROM chat_turns t
+                WHERE t.conversation_id = c.id AND t.occurred_at >= $1 AND t.occurred_at < $2) AS active_at,
+              (SELECT coalesce(jsonb_agg(left(m->>'content', 20000) ORDER BY i), '[]'::jsonb)
+                 FROM jsonb_array_elements(c.messages) WITH ORDINALITY x(m, i)
+                WHERE m->>'role' = 'user' AND jsonb_typeof(m->'content') = 'string') AS client_messages
+         FROM conversations c
+        WHERE c.updated_at >= $1
+          AND (EXISTS (SELECT 1 FROM chat_turns t
+                        WHERE t.conversation_id = c.id AND t.occurred_at >= $1 AND t.occurred_at < $2)
+               OR (NOT EXISTS (SELECT 1 FROM chat_turns t WHERE t.conversation_id = c.id)
+                   AND c.created_at < $2))
+          AND ${termClauses.join('\n          AND ')}
+          ${input.failed_only ? `AND ${failedExpr}` : ''}
+     ) s
+     ORDER BY coalesce(s.active_at, s.updated_at) DESC
+     LIMIT $${params.length}::int`,
     params);
   if (!res.configured) return notConfigured();
 
+  const cards = await searchCards(res.rows, terms, deps);
   const rows = res.rows.map(r => ({
     client: shortRef(r.user_id),
     conversation: r.id,
-    date: isoDay(r.updated_at),
+    date: vancouverDay(r.active_at || r.updated_at),
     mode: r.mode || '',
     failed: r.failed ? 'yes' : 'no',
-    asked: snippetFor(r.client_text, terms)
+    asked: snippetFor((Array.isArray(r.client_messages) ? r.client_messages : []).join('\n'), terms),
+    ...cards.get(r.id)
   }));
   const clients = new Set(res.rows.map(r => r.user_id)).size;
   const out = {
     terms,
-    from: isoDay(since),
-    to: isoDay(new Date(until.getTime() - 1)),
+    from: vancouverDay(since),
+    to: vancouverDay(new Date(until.getTime() - 1)),
+    dates_in: 'Vancouver time',
     ...(input.failed_only ? { failed_only: true } : {}),
     matches: rows.length,
     clients,
     ...(rows.length === SEARCH_LIMIT ? { note: `Stopped at ${SEARCH_LIMIT} conversations; narrow the dates or add a term.` } : {}),
-    results: rows.slice(0, INLINE_ROWS)
+    results: rows.slice(0, INLINE_ROWS).map(({ cards_on_match, ...r }) => r)
   };
   if (rows.length > INLINE_ROWS) {
     try {
@@ -346,7 +472,7 @@ async function modeSearch(input, deps) {
         title: `Oracle – GetGranted conversations – ${clip(terms.join(', '), 40)} – ${localDate(deps.now())}`,
         about: [
           ['Searched for', terms.join(' AND ')],
-          ['Dates', `${out.from} to ${out.to}`],
+          ['Dates (Vancouver)', `${out.from} to ${out.to}`],
           ['Failed chats only', input.failed_only ? 'yes' : 'no'],
           ['Conversations', String(rows.length)],
           ['Clients', String(clients)],
@@ -355,11 +481,12 @@ async function modeSearch(input, deps) {
         tables: [{
           title: 'Conversations',
           columns: [
-            { key: 'client', label: 'Client' }, { key: 'date', label: 'Last active' },
+            { key: 'client', label: 'Client' }, { key: 'date', label: 'Active in window' },
             { key: 'mode', label: 'Mode' }, { key: 'failed', label: 'Chat failed' },
-            { key: 'asked', label: 'What they asked' }
+            { key: 'asked', label: 'What they asked' },
+            { key: 'cards_on_match', label: 'Cards on the matching message' }
           ],
-          rows
+          rows: rows.map(({ matching_messages, cards_in_conversation, ...r }) => r)
         }]
       });
     } catch (err) {
@@ -505,7 +632,7 @@ async function modeTroubleshoot(input, deps) {
   const who = await resolveClient(input, deps.runQuery);
   if (!who.ok) return who;
   const days = clampInt(input.days, 14, MAX_DAYS);
-  const conversations = await readConversations(who.userId, { days, limit: 3 }, deps.runQuery);
+  const conversations = await readConversations(who.userId, { days, limit: 3 }, deps.runQuery, deps.oracleQuery);
   const convNames = new Map();
   for (const c of conversations) for (const [id, name] of grantsIn(c._messages).names) convNames.set(id, name);
 

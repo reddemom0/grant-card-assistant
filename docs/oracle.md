@@ -349,6 +349,15 @@ and log_issue, which files a Control Centre chat card; `src/tools/gg3-conversati
 `list_granted_files_folders` (`GRANTED_FILES_FOLDERS_TOOL`), and `FILE_MOVE_RENAME_TOOLS` (2) for
 the filing skill.
 
+`gg3_conversations` grant cards: gg3-ai-service removed the `surface_grant_tiles` tool on
+2026-10-02 and now stores tiles itself. The conversation's cards are legacy `surface_grant_tiles`
+calls followed by `conversations.grant_ids` (`grantsIn`). The cards on one reply come from
+`chat_turns.surfaced_grant_ids` by `turn_index`; "not recorded" means that turn has no row
+(`chat_turns` starts 2026-08-26 and has gaps until mid-October). Names come from `gg3_grants`
+(`grantNames`). Search from/to are Vancouver days (`windowFor`). A conversation is in the
+window when one of its `chat_turns` falls inside it; a conversation with no turn rows is in the
+window when its created_at to updated_at span overlaps it.
+
 `control_centre` (`src/tools/control-centre-tools.js`) is Oracle's read-only window on the
 Control Centre (`docs/control-centre.md`), one tool with seven modes: `queue_summary` (open
 cards by status, owner and kind; stuck = open with no change or comment for 3+ days, the board's rule; oldest open),
