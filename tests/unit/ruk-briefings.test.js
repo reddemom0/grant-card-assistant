@@ -141,21 +141,37 @@ describe('which meetings', () => {
     const won = deps({ listEvents: jest.fn(async () => ({ success: true, events: [ev] })),
       crmSnapshot: jest.fn(async () => crm({ deals: [{ id: 'd1', stage: 's_won' }] })) });
     expect((await R.findMeetings({ ownerUserId: 1, ownerEmail: 'rukshaar@granted.ca', date: '2026-10-20' }, won)).meetings[0])
-      .toMatchObject({ type: 'check_in', typeFrom: 'hubspot' });
+      .toMatchObject({ type: 'check_in', typeFrom: 'hubspot_contact' });
     const lead = deps({ listEvents: jest.fn(async () => ({ success: true, events: [ev] })),
       crmSnapshot: jest.fn(async () => crm({ deals: [{ id: 'd1', stage: 's_lost' }] })) });
     expect((await R.findMeetings({ ownerUserId: 1, ownerEmail: 'rukshaar@granted.ca', date: '2026-10-20' }, lead)).meetings[0].type).toBe('discovery');
+  });
+
+  test('Step 1: a won deal on the COMPANY makes it a check-in when the contact has none', async () => {
+    const ev = { ...EVENT, title: '30 min meeting with Rukshaar Ali' };
+    const d = deps({ listEvents: jest.fn(async () => ({ success: true, events: [ev] })),
+      crmSnapshot: jest.fn(async () => crm({ deals: [] })),
+      dealsForCompany: jest.fn(async () => ({ success: true, deals: [{ id: 'd9', stage: 's_won' }] })) });
+    const m = (await R.findMeetings({ ownerUserId: 1, ownerEmail: 'rukshaar@granted.ca', date: '2026-10-20' }, d)).meetings[0];
+    expect(m).toMatchObject({ type: 'check_in', typeFrom: 'hubspot_company' });
+    expect(d.dealsForCompany).toHaveBeenCalledWith('co1');
+    const none = deps({ listEvents: jest.fn(async () => ({ success: true, events: [ev] })), crmSnapshot: jest.fn(async () => crm({ deals: [] })) });
+    expect((await R.findMeetings({ ownerUserId: 1, ownerEmail: 'rukshaar@granted.ca', date: '2026-10-20' }, none)).meetings[0])
+      .toMatchObject({ type: 'discovery', typeFrom: 'hubspot_no_won_deal' });
   });
 });
 
 describe('profile and matching', () => {
   test('maps HubSpot + calculator facts into the match-preview shape', () => {
-    const p = G.toPreviewProfile({ company_name: 'Elmwood', calculator: crm().contact.calculator, company: crm().company,
-      website: { description: 'Steel', location: 'Abbotsford, BC' } });
+    const calculator = G.decodeCalculator(crm().contact.calculator);
+    const p = G.toPreviewProfile({ company_name: 'Elmwood', calculator, company: crm().company,
+      location: { provinces: ['British Columbia'] },
+      industry: { industries: ['Manufacturing', 'Food/Beverage (Manufacturing)', 'Machinery'] },
+      website: { description: 'Steel' } });
     expect(p.regions).toEqual(['British Columbia']);
-    expect(p.industries).toEqual(['Manufacturing', 'Manufacturing Food Beverage', 'Machinery']);
+    expect(p.industries).toEqual(['Manufacturing', 'Food/Beverage (Manufacturing)', 'Machinery']);
     expect(p.business_goals).toEqual(['Hire or Train People', 'Domestic Growth']);
-    expect(p.employee_count).toBe('20');
+    expect(p.employee_count).toBe('20-49');
   });
 
   test('a calculator 0 is "unanswered", not a headcount', () => {
@@ -239,7 +255,7 @@ describe('profile and matching', () => {
     expect(f.calculator).toBeNull();
     expect(f.gaps).toContain('no_calculator_session');
     const p = G.toPreviewProfile(f);
-    expect(p.industries).toEqual(['Machinery', 'Manufacturing']); // company + website only
+    expect(p.industries).toEqual(['Manufacturing', 'Machinery']); // HubSpot company industry only
     expect(p.business_goals).toEqual([]);
     expect(R.DISCOVERY_PROMPT).toMatch(/If "calculator" is null[^\n]*do not mention the calculator/);
   });
@@ -270,17 +286,122 @@ describe('check-in facts', () => {
     const d = deps({
       dealsForCompany: jest.fn(async () => ({ success: true, deals: [
         { id: 'd1', name: 'CanExport', stage: 's_open', ownerId: 'o2', open: true },
-        { id: 'd2', name: 'BCAIP', stage: 's_won', ownerId: 'o1', open: false }
+        { id: 'd2', name: 'BCAIP', stage: 's_won', ownerId: 'o1', open: false, closeDate: '2026-03-01' }
       ] })),
       calls: jest.fn(async (type) => ({ success: true, calls: type === 'companies'
         ? [{ title: 'Strategy meeting', body: 'Plan: CanExport then BCAIP', timestamp: '2026-07-01T00:00:00Z', ownerId: 'o1' }] : [] }))
     });
-    const f = await G.gatherCheckIn({ crm: crm() }, d);
-    expect(f.deals.find(x => x.id === 'd1')).toMatchObject({ stage: 'Application submitted', closed: false, owner: 'Delpreet K' });
-    expect(f.deals.find(x => x.id === 'd2')).toMatchObject({ won: true, owner: 'Steph Lee' });
+    const f = await G.gatherCheckIn({ crm: crm(), meetingDate: '2026-10-20' }, d);
+    expect(f.deals_open_pending[0]).toMatchObject({ id: 'd1', stage: 'Application submitted', closed: false, owner: 'Delpreet K' });
+    expect(f.deals_approved_last_12_months[0]).toMatchObject({ id: 'd2', won: true, owner: 'Steph Lee' });
+    expect(f.industry).toMatchObject({ source: 'hubspot', canonical: ['Manufacturing'] });
     expect(f.strategy_call).toMatchObject({ title: 'Strategy meeting', date: '2026-07-01' });
     // Emails come only from what is logged to the deal or the company.
     expect(d.emails.mock.calls.map(c => c[0]).sort()).toEqual(['companies', 'deals', 'deals']);
+  });
+});
+
+describe('Step 2: check-in deal groups', () => {
+  const D = (id, o) => ({ id, name: id, closed: true, won: false, stage: 'Not approved', close_date: null, last_modified: null, ...o });
+  test('open → open-pending; won in 12 months → approved; lost/abandoned left out; older counted in one line', () => {
+    const g = G.groupDeals([
+      D('open1', { closed: false, stage: 'Submitted' }),
+      D('won_recent', { won: true, stage: 'Approved', close_date: '2026-02-01' }),
+      D('lost_recent', { stage: 'Not approved', close_date: '2026-05-01' }),
+      D('aband_recent', { stage: 'Abandoned', close_date: '2026-06-01' }),
+      D('won_old', { won: true, stage: 'Approved', close_date: '2023-07-01' }),
+      D('won_old2', { won: true, stage: 'Approved', last_modified: '2024-01-01' }),
+      D('lost_old', { stage: 'Lost', close_date: '2023-01-01' }),
+      D('aband_old', { stage: 'Abandoned', close_date: '2022-12-01' }),
+      D('closed_nodate', { won: true, stage: 'Approved' })
+    ], '2026-10-20');
+    expect(g.open_pending.map(d => d.id)).toEqual(['open1']);
+    expect(g.approved_last_12_months.map(d => d.id)).toEqual(['won_recent']);
+    expect(g.older_summary).toBe('Older than 12 months: 3 approved, 1 lost, 1 abandoned.');
+  });
+  test('the 12-month line is relative to the meeting date', () => {
+    const g = G.groupDeals([D('w', { won: true, close_date: '2025-10-21' }), D('x', { won: true, close_date: '2025-10-19' })], '2026-10-20');
+    expect(g.approved_last_12_months.map(d => d.id)).toEqual(['w']);
+    expect(g.older_summary).toBe('Older than 12 months: 1 approved.');
+  });
+  test('the full deal list never reaches the writer', () => {
+    expect(R.withoutInternal({ a: 1, _deals: [1], calculator: { revenue: 'x', _trainingBudgetMin: 5 } }))
+      .toEqual({ a: 1, calculator: { revenue: 'x' } });
+    expect(R.CHECK_IN_PROMPT).toMatch(/Lost and abandoned deals are deliberately not in these lists/);
+  });
+});
+
+describe('Step 3: grant order and cap', () => {
+  test('round-robin by review rank across tracks, deduped, capped at 8 candidates', () => {
+    const sel = (prefix, n) => Array.from({ length: n }, (_, i) => ({ grant_id: `${prefix}${i + 1}`, name: `${prefix}${i + 1}`, requirement_notes: [] }));
+    const tracks = [
+      { goal: 'Hire or Train People', review_status: 'ready', selected: sel('H', 5) },
+      { goal: 'Domestic Growth', review_status: 'ready', selected: [{ grant_id: 'H1', name: 'H1' }, ...sel('D', 4)] }
+    ];
+    const out = G.rankEngineGrants(tracks);
+    expect(out.map(g => g.name)).toEqual(['H1', 'H2', 'D1', 'H3', 'D2', 'H4', 'D3', 'H5']);
+    expect(out).toHaveLength(G.ENGINE_CANDIDATES);
+    expect(out[0]).toMatchObject({ review_rank: 1, goal: 'Hire or Train People' });
+  });
+  test('the writer is told: drop ruled-out grants, show 5, one ASK each', () => {
+    for (const p of [R.DISCOVERY_PROMPT, R.CHECK_IN_PROMPT]) {
+      expect(p).toMatch(/LEAVE OUT any grant a known fact already rules out/);
+      expect(p).toMatch(/show the first 5 that remain/);
+      expect(p).toMatch(/at most ONE sub-bullet "\*\*ASK\*\* — …"/);
+    }
+  });
+});
+
+describe('Step 4: calculator decoding', () => {
+  test('revenue code, employee lower bound, budgets, industry codes, derived fields', () => {
+    const c = G.decodeCalculator({ revenue: '5', employees: 20, trainingBudget: 5000, expansionBudget: 0,
+      industry: 'MANUFACTURING_FOOD_BEVERAGE', forProfit: 'no', existedAYear: 'yes', spendOn: 'hiring' });
+    expect(c).toMatchObject({
+      revenue: '$5 million to $10 million', revenue_band: '$5M-$10M',
+      employees: '20 – 49', employees_band: '20-49',
+      training_budget: 'Under $10K', expansion_budget: null,
+      derived_not_asked: { non_profit: false, existed_a_year: true }
+    });
+    expect(c.industry).toHaveLength(1);
+    expect(c.industry[0]).not.toMatch(/_/);
+  });
+  test('every revenue code and unanswered values', () => {
+    expect(['1', '2', '3', '4', '6'].map(x => G.decodeRevenue(x).band)).toEqual(['Pre-revenue', 'Under $500K', '$500K-$2.5M', '$2.5M-$5M', '$10M+']);
+    expect(G.decodeRevenue('0')).toBeNull();
+    expect(G.decodeRevenue('')).toBeNull();
+    expect(G.decodeCalculator({ employees: 1 }).employees_band).toBe('1');          // "Just me"
+    expect(G.decodeCalculator({ employees: 0 }).employees).toBeNull();
+    expect(G.decodeCalculator({ expansionBudget: 100000 }).expansion_budget).toBe('$100K+');
+  });
+  test('the engine profile gets the band, not the code', () => {
+    const p = G.toPreviewProfile({ calculator: G.decodeCalculator({ revenue: '5', employees: 20 }), location: { provinces: ['British Columbia'] },
+      industry: { industries: ['Manufacturing'] } });
+    expect(p).toMatchObject({ annual_revenue: '$5M-$10M', employee_count: '20-49' });
+  });
+  test('the writer is told the derived fields are not answers', () => {
+    expect(R.DISCOVERY_PROMPT).toMatch(/derived_not_asked" was NOT answered by the client/);
+  });
+});
+
+describe('Step 5: industry lookup', () => {
+  test('HubSpot first; website only when HubSpot has none', async () => {
+    const pages = jest.fn(async () => ['General contractor. Construction management, renovations and construction of homes. Construction since 1990.']);
+    expect(await G.industryFor({ companyIndustry: 'Food Processing', pages })).toMatchObject({ source: 'hubspot', canonical: ['Manufacturing'] });
+    expect(pages).not.toHaveBeenCalled();
+    expect(await G.industryFor({ companyIndustry: null, pages })).toMatchObject({ source: 'website', industries: ['Construction'] });
+    expect(await G.industryFor({ companyIndustry: null, pages: async () => ['We build great things'] })).toMatchObject({ source: 'none', industries: [] });
+  });
+  test('the site is fetched once for both the province and the industry', async () => {
+    const d = deps({ fetchPage: jest.fn(async () => 'Construction contractor in Burnaby, BC. Construction and renovation.') });
+    const f = await G.gatherCheckIn({ crm: crm({ company: true }), meetingDate: '2026-10-20' }, {
+      ...d, dealsForCompany: jest.fn(async () => ({ success: true, deals: [] }))
+    });
+    expect(f.industry.source).toBe('hubspot'); // the fixture company has an industry
+    const bare = await G.gatherCheckIn({ crm: { ...crm(), company: { ...crm().company, industry: null, province: null, city: null } },
+      meetingDate: '2026-10-20' }, d);
+    expect(bare.industry).toMatchObject({ source: 'website', industries: ['Construction'] });
+    expect(bare.location).toMatchObject({ provinces: ['British Columbia'], source: 'website' });
+    expect(d.fetchPage).toHaveBeenCalledTimes(G.SITE_PATHS.length);
   });
 });
 

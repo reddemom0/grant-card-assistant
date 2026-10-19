@@ -26,7 +26,7 @@
 
 import { calculateRequestCost } from '../config/cost-settings.js';
 import {
-  defaultGatherDeps, gatherDiscovery, gatherCheckIn, hasClosedWonDeal, matchGrants, toPreviewProfile, NO_RELIABLE_MATCHES_LINE
+  defaultGatherDeps, gatherDiscovery, gatherCheckIn, closedWonSource, matchGrants, toPreviewProfile, NO_RELIABLE_MATCHES_LINE
 } from './briefing-gather.js';
 import { createBriefingDoc, markdownToHtml } from './briefing-drive.js';
 
@@ -143,8 +143,16 @@ export async function findMeetings({ ownerUserId, ownerEmail, date }, deps) {
     }
     if (!crm) { skip('not_in_hubspot'); continue; }
 
-    const type = titleType ?? ((await hasClosedWonDeal(crm.deals, deps)) ? 'check_in' : 'discovery');
-    meetings.push({ event, type, typeFrom: titleType ? 'title' : 'hubspot', crm, attendeeEmail, date });
+    // Title first; else a closed-won deal on the contact OR the matched company
+    // makes it a check-in (a client's won deals usually sit on the company).
+    let type = titleType;
+    let typeFrom = 'title';
+    if (!type) {
+      const won = await closedWonSource(crm, deps);
+      type = won ? 'check_in' : 'discovery';
+      typeFrom = won || 'hubspot_no_won_deal';
+    }
+    meetings.push({ event, type, typeFrom, crm, attendeeEmail, date });
   }
   return { meetings, skipped };
 }
@@ -206,11 +214,13 @@ RULES — every one matters:
 - Use ONLY the facts in the <facts> JSON. Never invent, infer or round up a fact. If something is not in the facts, it is a gap.
 - Pre-fill each question with what is known, and say where it came from in brackets: (calculator), (HubSpot), (website), (HubSpot note, 2026-09-14). Prefer the calculator, then HubSpot, then the website.
 - Mark every gap with **ASK** followed by the question Ruk should ask, e.g. "**ASK** — how many people do they plan to hire this year?". Gaps are the point: they are what she spends the call on.
-- Grants: for each grant in "matches", one line — the grant name in bold, then ONE line on why it fits this company, written from the facts (the matching engine gives no reason for most of them, so you write it). Then, for each entry in that grant's "couldnt_check", a sub-bullet "**ASK** — …" turning the requirement into a question for the client.
+- Grants: "matches" are in the matching engine's order. First LEAVE OUT any grant a known fact already rules out — a location, service-area, province, ownership or sector requirement that the facts contradict (e.g. a service area that excludes the company's known city). Then show the first 5 that remain, in the given order: the grant name in bold, then ONE line on why it fits this company, written from the facts (the matching engine gives no reason for most of them, so you write it). Under it at most ONE sub-bullet "**ASK** — …": the single "couldnt_check" requirement that most decides whether the grant applies, as a question for the client. If none remain, the grant section is ONLY the line "${NO_RELIABLE_MATCHES_LINE}".
 - If "match_note" is set, put it in italics directly under the grant heading, word for word.
 - If "no_reliable_matches" is true, the grant section is ONLY this one line, word for word: "${NO_RELIABLE_MATCHES_LINE}"
 - If "match_source" is "search" (keyword search, not the matching engine): leave out every grant you would call a weak, possible or conditional fit — keep only grants that plainly fit this company on the facts. If fewer than 2 remain, the grant section is ONLY the one line "${NO_RELIABLE_MATCHES_LINE}" (and no match_note).
 - If "calculator" is null, there is no calculator session: do not mention the calculator or any calculator field at all.
+- "calculator.derived_not_asked" was NOT answered by the client — Granted's form filled it in (non_profit from the industry chosen; existed_a_year from revenue and headcount). Never present it as their answer; non_profit false just means the form assumed for-profit.
+- "industry" says where the industry came from ("hubspot" or "website"); cite it.
 - "location" says where the company's province came from (HubSpot address or website). Use it for the province and cite it.
 - No preamble, no sign-off, no advice to Ruk about how to run a call.
 - Markdown subset only: "#", "##", "###" headings, "- " bullets (two spaces before "- " for a sub-bullet), "1. " numbered items, **bold**, *italic*. No tables, no code, no horizontal rules.
@@ -246,8 +256,12 @@ THIS IS A QUARTERLY CHECK-IN with an existing client. Structure it exactly like 
 
 ## Internal prep
 - **Plan from the strategy meeting** — from "strategy_call" (the call logged in HubSpot): the plan that was agreed, with its date. If there is none, **ASK**.
-- **Applied / approved / open-pending** — every deal in "deals", grouped under those three words by its stage, pipeline, closed and won fields. One bullet per deal: name, stage, amount if known, owner.
-- **Open deals — what's needed** — for EACH open deal: do we need anything from the client, or are we waiting on the government? Decide ONLY from that deal's stage, its notes and its emails. If they do not make it clear, write exactly "unclear — ask <the deal's owner name>". Never guess. If the owner is unknown, write "unclear — owner not set in HubSpot".
+- **Applied / approved / open-pending** — exactly three parts, already grouped for you:
+  - **Open-pending** — every deal in "deals_open_pending" (its stage says whether it is applied, in review, etc.): name, stage, amount if known, owner. If empty, "None open."
+  - **Approved (last 12 months)** — every deal in "deals_approved_last_12_months": name, amount if known, close date. If empty, "None in the last 12 months."
+  - Then "deals_older_summary" as one plain line, word for word, if it is set.
+  Lost and abandoned deals are deliberately not in these lists — do not mention them.
+- **Open deals — what's needed** — for EACH deal in "deals_open_pending": do we need anything from the client, or are we waiting on the government? Decide ONLY from that deal's stage, its notes and its emails. If they do not make it clear, write exactly "unclear — ask <the deal's owner name>". Never guess. If the owner is unknown, write "unclear — owner not set in HubSpot".
 
 ## Client questions
 Pre-fill each from the facts, **ASK** where unknown:
@@ -260,6 +274,13 @@ Pre-fill each from the facts, **ASK** where unknown:
 
 ## New grant matches
 The grants in "matches", as described in the rules. These already exclude programs the client has a deal for.`;
+
+/** Drop "_"-prefixed keys (internal: raw lower bounds, the full deal list) before the writer sees the facts. */
+export function withoutInternal(v) {
+  if (Array.isArray(v)) return v.map(withoutInternal);
+  if (!v || typeof v !== 'object') return v;
+  return Object.fromEntries(Object.entries(v).filter(([k]) => !k.startsWith('_')).map(([k, x]) => [k, withoutInternal(x)]));
+}
 
 let anthropic = null;
 async function defaultCreateMessage(params, opts) {
@@ -279,7 +300,7 @@ async function defaultCreateMessage(params, opts) {
 export async function writeBriefing({ type, facts, matches, meetingDate }, { createMessage = defaultCreateMessage, logCost } = {}) {
   const payload = {
     meeting_date: meetingDate,
-    ...facts,
+    ...withoutInternal(facts),
     match_source: matches.source,
     match_note: matches.note,
     no_reliable_matches: Boolean(matches.noReliableMatches),
@@ -315,12 +336,12 @@ export async function writeBriefing({ type, facts, matches, meetingDate }, { cre
 /** Build one briefing for a matched meeting. Paid (match + Sonnet); writes nothing but cost logs. */
 export async function buildBriefing(meeting, deps) {
   const facts = meeting.type === 'check_in'
-    ? await gatherCheckIn({ crm: meeting.crm }, deps)
+    ? await gatherCheckIn({ crm: meeting.crm, meetingDate: meeting.date }, deps)
     : await gatherDiscovery({ crm: meeting.crm, attendeeEmail: meeting.attendeeEmail }, deps);
   const companyName = facts.company_name || companyHintFromTitle(meeting.event.title) || 'Unknown company';
   facts.company_name = companyName;
   const profile = toPreviewProfile(facts);
-  const matches = await matchGrants(profile, { excludeDeals: meeting.type === 'check_in' ? facts.deals : [], meetingDate: meeting.date }, deps);
+  const matches = await matchGrants(profile, { excludeDeals: meeting.type === 'check_in' ? facts._deals : [], meetingDate: meeting.date }, deps);
   const written = await writeBriefing({ type: meeting.type, facts, matches, meetingDate: meeting.date },
     { createMessage: deps.createMessage, logCost: deps.logCost });
   return {

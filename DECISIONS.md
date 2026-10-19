@@ -12,6 +12,21 @@ Format:
 
 ---
 
+## 2026-10-19 — Pre-call briefings: content rules from the sample review
+**What:** When the title doesn't say the type, a closed-won deal on the contact OR the matched company → check-in. Check-in deals are grouped in code: open → open-pending; won within 12 months of the meeting → approved; recent lost/abandoned left out; anything older is one counted line. Grants: engine/AI-review order (round-robin across goal tracks), writer drops any grant a known fact rules out, max 5, max one ASK each. Calculator fields are decoded (revenue code 1–6 → band, employee/budget lower bounds → bands, 0 = unanswered, industry codes → labels; non-profit and existed-a-year marked "derived, not asked"). Industry: HubSpot first, else the website pages (same fetch as the province lookup) scored onto gg3's 12 canonical industries.
+**Why:** Samples typed client meetings as discovery, filed lost deals as "Applied", ran to 8 grants with two ASKs each (incl. a TACC-area grant for Kamloops), sent revenue code "5" raw, and skipped matching for a company with no HubSpot industry.
+**Impact:** `src/services/{ruk-briefings,briefing-gather}.js`, `scripts/ruk-briefing-dryrun.mjs` (`--company`), `tests/unit/ruk-briefings.test.js`, `docs/oracle.md`
+
+## 2026-10-19 — Pre-call briefings: matching path and thin-lead fallback
+**What:** Matches come from gg3-ai-service `POST /api/v1/ai/internal/match-preview` (engine + AI review, no persistence; `GG3_AI_SERVICE_URL` + `GG3_REVIEW_FEED_TOKEN`). Only when the profile has no province or industry (after HubSpot address → website lookups), or the call fails, does Oracle's keyword search run — kept only for grants with an open deadline and no unconfirmed province restriction, and replaced by "No reliable matches yet — confirm location and plans on the call." if fewer than 2 survive.
+**Why:** Design decision (real engine in v1). The first Elmwood run showed raw keyword hits (Ontario-only, expired, unrelated) are worse than none.
+**Impact:** `src/services/briefing-gather.js`; gg3-ai-service route is Step A (its own DECISIONS entry)
+
+## 2026-10-19 — Pre-call briefings: once per meeting, filed as Ruk, off by default
+**What:** `pre_call_briefings` (migration 049) keyed by calendar event id is the build claim (`INSERT … ON CONFLICT DO UPDATE … WHERE` failed >30 min / building >2 h `RETURNING`), so a second run or server copy never builds twice; it stores no attendee address or briefing text. Docs are created AS Ruk by domain-wide delegation (`drive` scope only) in Granted Files › Pre-Call Briefings › Ruk; no Doc → no DM. The job runs 08:00 Vancouver Mon–Fri only with `RUK_BRIEFINGS_ENABLED=true` (default off). Never writes HubSpot or calendar events.
+**Why:** Ruk's own token has only `drive.file` (can't see the shared drive) and the move tool's guard refuses non-client paths; delegation as the person is the Drive rule (`drive-actions.js`). Off by default until Chris reviews samples and Ruk confirms timing.
+**Impact:** `migrations/049_pre_call_briefings.sql`, `src/services/{ruk-briefings,briefing-drive}.js`, `server.js`
+
 ## 2026-10-13 — Drive move/rename: gated, asker-only, limits in code, undoable
 **What:** `file_move_rename` / `file_move_rename_undo` (`src/tools/drive-actions.js`) move and rename one file as the asker after a Confirm card only the asker can press (undo: the original mover or Chris). Limits are checked before the proposal is saved (`PREPARE_GATED`) and again when it runs. Logged to `drive_actions` (042) and the "Drive migration log" sheet.
 **Why:** Strict HR/finance guard (one list, `drive-sensitive.js`), even though client Financial Statements then move by hand. Undo runs as the original mover because only they had the source rights. The sheet is written by the service account itself (shared as Editor), not by delegation. Created folders are never removed — the tool has no delete. "Anyone in the conversation may confirm" stays for every other gated tool.
