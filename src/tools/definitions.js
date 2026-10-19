@@ -2508,9 +2508,9 @@ Data starts 2026-08-26. A week still in progress comes back with partial: true. 
  */
 export const CONTROL_CENTRE_TOOL = {
   name: 'control_centre',
-  description: `Read the Control Centre: the review queue of flagged bad grant matches, bad chat answers, grant patterns (one grant cut by the AI review for the same reason across several companies) and empty goal tracks (a client's goal track that showed them nothing), plus the Overview numbers, the weekly client chat themes, and the Grants tab (every live grant's matches and engagement, and one grant's page). Read-only — it can't move, reassign or close a card; point people to the card link for that.
+  description: `Read the Control Centre: the review queue of flagged bad grant matches, bad chat answers, grant patterns (one grant cut by the AI review for the same reason across several companies) and empty goal tracks (a client's goal track that showed them nothing), plus the Overview numbers, the weekly client chat themes, the Grants tab (every live grant's matches and engagement, and one grant's page) and the Coverage & changes tab (where the grant catalogue is thin by industry, province, goal track and grant vs loan; what changed in the catalogue). Read-only — it can't move, reassign or close a card; point people to the card link for that.
 
-Use it for "what's stuck with Research", "what's in the queue", "what's open for Chris", "why was grant 1196 flagged", "what happened with card 42", "how many matches this week vs last", "what are clients asking about", "which grants do clients ignore", "which grants aren't matching anyone", "who is grant 1196 matched to and how does it do".
+Use it for "what's stuck with Research", "what's in the queue", "what's open for Chris", "why was grant 1196 flagged", "what happened with card 42", "how many matches this week vs last", "what are clients asking about", "which grants do clients ignore", "which grants aren't matching anyone", "who is grant 1196 matched to and how does it do", "which industries are thin", "what do we have for agriculture clients", "which grants were added or closed this month", "which live grants are past their deadline".
 
 Modes:
 - "queue_summary": open cards by status, owner and kind; the stuck ones (open with no change or comment for 3+ days) and the oldest open ones.
@@ -2520,6 +2520,8 @@ Modes:
 - "chat_themes": the latest week's themes in what clients asked, with recent anonymised questions.
 - "grants_list": the Grants tab for a range (day, week, month, year) and view: "all" (every live grant, most clients matched first), "most_ignored" (displayed to 3+ clients, most "shown but never opened" first), "not_matching" (no client matched in the range, longest since last match first, "Never" for none). Per grant: clients matched, grant card opens, watchlist saves, AI-review cuts, shown but never opened, bounced (opened under 3 seconds), removed from watchlists, open review cards — clients only, with what internal accounts add. Up to 20 (limit, max 50).
 - "grant": one grant's page (grant: GG3 id or part of its name; range): companies matched by goal track with the AI review's marks, its tags beside its card text, engagement by day, recent edits, its review cards.
+- "coverage": the Coverage tab for a range (default month). view "all": every main industry — live grants restricted to it, grants open to every industry, clients, clients who ran matching, average grant matches per client, wrong-industry AI-review cuts, thin (2+ clients ran matching and under 3 matches on average) — plus live grants and goal-track gaps by province, by goal track and grant type, and grant vs loan. view "not_matching": industries whose clients ran matching and got zero grant matches (a real coverage gap), industries whose clients haven't run matching yet in the range (not a coverage gap — don't call it one), and industries with no restricted grants at all. industry (a main or specific industry, e.g. "Agriculture" or "Tech - AI"): that industry in full — its specific industries, restricted grants, clients and the grants cut for wrong industry. Catalogue counts are today's; matches and cuts follow the range. Some sector-specific grants are tagged as open to every industry (tagger fix pending): say so when coverage looks good.
+- "changes": what changed in the catalogue in a range (default month): grants that went live, closed or were removed, edited grants (who and what), live grants whose deadline has passed (flagged only), deadlines in the next 30 days.
 
 - Every card and grant comes with its link: always give the link with each card or grant you mention, and name companies before ids. Say when a company is an internal account.
 - Owners: research = grant data or card text; chris = tagger, engine or chat answers; client = the company's profile; jason = the app. Say owners in those plain words.
@@ -2528,7 +2530,7 @@ Modes:
   input_schema: {
     type: 'object',
     properties: {
-      mode: { type: 'string', enum: ['queue_summary', 'list_cards', 'card', 'overview', 'chat_themes', 'grants_list', 'grant'] },
+      mode: { type: 'string', enum: ['queue_summary', 'list_cards', 'card', 'overview', 'chat_themes', 'grants_list', 'grant', 'coverage', 'changes'] },
       status: { type: 'string', enum: ['new', 'diagnosed', 'in_progress', 'closed'], description: 'list_cards: card status.' },
       owner: { type: 'string', enum: ['client', 'research', 'chris', 'jason', 'unassigned'], description: 'list_cards: who owns the fix.' },
       kind: { type: 'string', enum: ['match', 'chat', 'grant_pattern', 'empty_track'], description: 'list_cards: what kind of card (empty_track = a goal track that showed a client nothing).' },
@@ -2536,9 +2538,10 @@ Modes:
       grant: { type: 'string', description: 'list_cards / grant: grant name or GG3 id.' },
       stuck_only: { type: 'boolean', description: 'list_cards: only open cards with no change or comment for 3+ days.' },
       limit: { type: 'integer', description: 'list_cards: at most this many (max 20); grants_list: at most this many (default 20, max 50).' },
-      view: { type: 'string', enum: ['all', 'most_ignored', 'not_matching'], description: 'grants_list: which list (default all).' },
+      view: { type: 'string', enum: ['all', 'most_ignored', 'not_matching'], description: 'grants_list: which list (default all); coverage: all or not_matching (default all).' },
+      industry: { type: 'string', description: 'coverage: one main or specific industry to show in full.' },
       card_id: { type: 'integer', description: 'card: the card number (the number after #review/ in its link).' },
-      range: { type: 'string', enum: ['day', 'week', 'month', 'year'], description: 'overview / grants_list / grant: the window (default week).' }
+      range: { type: 'string', enum: ['day', 'week', 'month', 'year'], description: 'overview / grants_list / grant: the window (default week); coverage / changes: default month.' }
     },
     required: ['mode']
   }

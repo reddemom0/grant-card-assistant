@@ -68,6 +68,7 @@ import controlCentreReviewRouter from './src/control-centre/review-routes.js';
 import controlCentreOverviewRouter from './src/control-centre/overview-routes.js';
 import controlCentreCompaniesRouter from './src/control-centre/companies-routes.js';
 import controlCentreGrantsRouter from './src/control-centre/grants-routes.js';
+import controlCentreCoverageRouter from './src/control-centre/coverage-routes.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
@@ -199,6 +200,7 @@ app.use('/api/control-centre/review', authenticateUser, requireAuth, controlCent
 // /api/control-centre router. See docs/control-centre.md.
 app.use('/api/control-centre/companies', authenticateUser, requireAuth, controlCentreCompaniesRouter);
 app.use('/api/control-centre/grants', authenticateUser, requireAuth, controlCentreGrantsRouter);
+app.use('/api/control-centre/coverage', authenticateUser, requireAuth, controlCentreCoverageRouter);
 // Control Centre page data: GET /overview, GET /search. Read-only, cached 5 min.
 app.use('/api/control-centre', authenticateUser, requireAuth, controlCentreOverviewRouter);
 

@@ -7,8 +7,9 @@ of the data.
 
 Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`,
 `rollup.js`, `review-queue.js`, `review-routes.js`, `diagnosis.js`, `overview.js`,
-`overview-routes.js`, `companies.js`, `companies-routes.js`, `grants.js`, `grants-routes.js`.
-Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`),
+`overview-routes.js`, `companies.js`, `companies-routes.js`, `grants.js`, `grants-routes.js`,
+`coverage.js`, `coverage-routes.js`, `industry-vocabulary.js`.
+Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`, `-coverage`),
 `public/css/control-centre.css`.
 Tests: `tests/unit/control-centre-*.test.js`.
 
@@ -556,8 +557,8 @@ The page uses platform language, not database names:
 ### Frame and URL
 
 There are 7 tabs: Overview (the default), Inbox, Companies, Grants, Review queue, Coverage &
-changes and Chat themes. Overview, Companies, Grants and Review queue have content; the others
-show a "Coming soon" card.
+changes and Chat themes. Overview, Companies, Grants, Review queue and Coverage & changes have
+content; the others show a "Coming soon" card.
 Inbox and Review queue carry a badge with the count of review items that aren't closed.
 
 All state is in the URL, so any view can be linked and the back button works:
@@ -569,8 +570,9 @@ All state is in the URL, so any view can be linked and the back button works:
 | `company` | companies.id, only with `tab=companies` |
 | `grant` | grant **root** id, only with `tab=grants` (rewritten to `#grants/<id>`) |
 
-Companies, Grants and Review queue keep their own state in the hash instead: `#companies/<id>`,
-`#grants/<id>`, `#grants?view=…&sort=…&dir=…&q=…`, `#review/<id>`.
+Companies, Grants, Review queue and Coverage keep their own state in the hash instead: `#companies/<id>`,
+`#grants/<id>`, `#grants?view=…&sort=…&dir=…&q=…`, `#review/<id>`, `#coverage`,
+`#coverage?view=not_matching`, `#coverage/industry/<name>` (URL-encoded, a main or specific industry).
 
 The last range is also kept in `localStorage['cc.range']`, in try/catch, so the page works
 without it. Search finds companies by name or id and live grants by title or root id.
@@ -981,6 +983,98 @@ The list and page share one window load per range (`loadGrantWindow`, cached 5 m
 Overview's `ROLLED_MATCHES_SQL` also selects `section`, `best_position`, `eligibility` and
 `ai_review_action` for it; the Overview ignores them.
 
+## The Coverage & changes tab
+
+Where the grant catalogue is thin, and what changed in it. Code: `src/control-centre/coverage.js`
+(reads only), `coverage-routes.js` (mounted at `/api/control-centre/coverage`, `authenticateUser` +
+`requireAuth`: `GET /?range=` and `GET /changes?range=`, each cached 5 minutes),
+`industry-vocabulary.js`, `public/js/control-centre-coverage.js`, the `cv-` styles. Tests:
+`tests/unit/control-centre-coverage.test.js`, `tests/unit/control-centre-industry-vocabulary.test.js`.
+
+**Coverage is a snapshot of today's catalogue** (live grants and their tags, clients' profiles).
+Grant matches, AI-review cuts, goal-track gaps and changes follow the range. The "Include internal
+accounts" switch is the Overview's (off by default); the API returns both variants.
+
+**The tagging caveat, shown above the table:** "Some sector-specific grants are currently tagged as
+open to every industry (tagger fix pending), so some industries may look better covered than they
+are." The engine also gates 8 agnostic-tagged grants through their applicant classes; the tab
+counts them by tag level only, as open to every industry.
+
+### Industry table
+
+One row per main industry (the engine's 12), each expanding into its specific industries. A row
+expands to list its restricted grants (restricted first, then the grants open to every industry,
+collapsed), its clients, and the grants cut for wrong industry. Every grant links to `#grants/<id>`
+and every client to `#companies/<id>`.
+
+| Column | Definition |
+|---|---|
+| Restricted grants | live grants tagged `umbrella` or `specific` with a token that maps to this main industry; a specific row counts grants tagged with that exact token |
+| Open to every industry | live grants tagged `agnostic` (the same for every row) |
+| Clients | companies with a real Clerk user whose profile industry maps here, today. A profile value that is a main name ("Software") counts in "<Main>, general"; a value that maps to nothing goes in "Not mapped" |
+| Ran matching | those clients with any match row in the range |
+| Avg grant matches | distinct grants shown in the range ÷ clients who ran matching (dormant clients aren't averaged in as 0, or nearly every industry would read thin) |
+| Wrong-industry cuts | distinct (company, grant) pairs the AI review cut with category `wrong_industry` in the range, for these clients; a client in two main industries counts in both. Click it for the grants and how many clients each was cut for |
+| **Thin** | at least `THIN_MIN_CLIENTS` (2) clients ran matching and the average is under `THIN_MAX_AVG` (3) |
+
+**Not matching** (`#coverage?view=not_matching`): industries — main or specific — with clients but
+zero grant matches in the range, split in two:
+- **Ran matching, got zero matches** (`ran_zero`): at least one client ran matching in the range and
+  the engine showed none of them a grant. A real coverage gap. Most clients who ran matching first.
+- **Haven't run matching yet** (`not_run`): clients, but none ran matching in the range. Not a
+  coverage gap: there's nothing to judge yet. Most clients first.
+
+Then (b) industries with no restricted grants at
+all, only grants open to every industry, shown whether or not they have clients (main industries,
+and specific ones grouped under their main).
+
+The engine judges industry by **main** industry (`evaluateIndustryMatch` compares main sets), so a
+specific row is a finer view of the same grants, not a finer gate.
+
+### Breakdowns
+
+- **By province:** live grants limited to the province (sub-regions roll up by prefix, "BC- …" →
+  British Columbia), grants open across Canada ("All of Canada", or every province listed), clients
+  (a Canada-wide client counts everywhere), average matches, and goal-track gaps.
+- **By goal type:** goal tracks from each client's **latest matching run in the range** (ops
+  `match_results.section`): grants shown on the track in the range, clients, average shown, and
+  **gaps** — a track that showed 0 (**empty**) or 1–2 (**few**, under `FEW_GRANTS`). Each gap names the
+  client and links its empty-track card (`cc_review_items kind='empty_track'`) when one is filed;
+  otherwise it points to the company page's "Flag empty track". Then the catalogue's grant-type
+  labels (`gg3_grants.grant_type`, split by `splitGrantTypes`). The two aren't joined: which grant
+  types feed which goal track is the engine's decision.
+- **Grant vs loan:** from the grant-type label "Loan": grants, loans only, grant and loan, not
+  tagged. No goal track asks for a loan, so there's no client signal to mark gaps with.
+
+### Changes
+
+| List | Definition |
+|---|---|
+| Added | a `version.publish` in the range whose new version is `active` and whose previous version wasn't (or there was none), still live |
+| Closed | a publish or `status.amend` from `active` to another status in the range, not live now |
+| Removed | `grant.delete` in the range, or the live version soft-deleted in the range |
+| Edited | every grant with `grant_audit_logs` rows in the range except `version.fork*` (unpublished drafts): count, kinds in words (`shapeEdits`), last editor as "app user #N" plus email when known |
+| Deadline passed | a live grant whose `grants.deadline` parses to a day before today (Vancouver). **Flagged only; no card is filed** |
+| Due soon | a deadline from today to 30 days ahead, whatever the range |
+
+`version.publish` stores `grants.id` values (previous → new live version), so a transition is the
+two versions' statuses. Deadlines are free text: ISO, DD/MM/YYYY, "May 27, 2026", "6 November
+2026", "1st December 2026" parse; "Open Until Filled" and French text are "no date" (184 of 212
+live grants on 2026-10-19). Edit history starts 2026-03-05, publishing history 2026-07-02.
+
+### Data sources (checked 2026-10-19)
+
+| What | Where |
+|---|---|
+| Grant industry tag | Hub `gg3_grants.eligibility_criteria->'industry'`: `restriction_level` (agnostic / umbrella / specific) and `industries[]`. 208 of 212 live grants are in the copy (122 agnostic, 80 umbrella, 6 specific); the rest show as not in the copy. |
+| Industry vocabulary | `industry-vocabulary.js`, **a copy** of gg3-ai-service `src/lib/matching/vocabulary.ts` (`CANONICAL_INDUSTRIES`, `GRANT_INDUSTRY_TO_CANONICAL`, `PROFILE_INDUSTRY_ALIASES`) at 9f3d489. The Hub can't read it anywhere else (app `tags` has the 84 tokens but parents only for Agriculture and Manufacturing). The vocabulary test fails when the copy and the sibling repo disagree, and is skipped when the sibling repo isn't on disk. |
+| Client industry and province | app `company_metadata.primary_industries` / `provinces`, the engine's source; a profile value maps like the engine's `normalizeProfileIndustry` (alias, main name, token) |
+| Matches | the Overview's window rows (`loadWindowRows`) |
+| Wrong-industry cuts | ops `ai_review_log` (`action='cut'`, `category='wrong_industry'`), keyed to the company through its match row. **Starts 2026-09-22**, so a Year range is partial |
+| Goal tracks | ops `match_results`, each company's latest run in the range |
+| Empty-track cards | Hub `cc_review_items` (none filed on 2026-10-19) |
+| Changes | app `grant_audit_logs`, `grants`, `statuses` (scope 1) |
+
 ## Oracle: `control_centre` (read-only)
 
 `src/tools/control-centre-tools.js`, Oracle-only and deferred (found by tool search). Modes:
@@ -989,8 +1083,10 @@ Overview's `ROLLED_MATCHES_SQL` also selects `section`, `best_position`, `eligib
 evidence — chat turns or review reasons — flags, history, linked cards), `overview`
 (`getOverview(range)`, client-only lists), `chat_themes` (`latestDigest()`), `grants_list`
 (`grantList(range, view)`: client-only counts with `internal_accounts_add`, ≤20 by default, max 50)
-and `grant` (`grantPage(id, range)` by root id or part of the name, trimmed). The two grant modes
-call the Grants tab's own functions, so there are no extra queries. Every card and grant in every
+`grant` (`grantPage(id, range)` by root id or part of the name, trimmed), `coverage`
+(`coverage(range)`: the industry table, view `all` or `not_matching`, or one `industry` in full;
+the breakdowns; client-only with `internal_accounts_add`) and `changes` (`changes(range)`, ≤20 per
+list). The grant and coverage modes call their tab's own functions, so there are no extra queries. Every card and grant in every
 answer carries its link; companies are named first and internal accounts tagged.
 SELECTs and the existing read helpers only — Oracle can't move, reassign or close a card.
 Details: `docs/oracle.md`, "Tool loadout".

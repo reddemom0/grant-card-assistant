@@ -1,7 +1,7 @@
 /**
  * control_centre — Oracle's read-only window on the Control Centre
  *
- * One tool, seven modes:
+ * One tool, nine modes:
  *   queue_summary  the review queue at a glance: open cards by status, owner and
  *                  kind; the cards stuck longest and the oldest open ones
  *   list_cards     cards filtered by status, owner, kind, company, grant, or
@@ -20,9 +20,15 @@
  *                  not_matching): client-only counts with the internal share
  *   grant          one grant's page: companies matched by goal track, tags vs
  *                  card text, engagement, recent edits, review cards
+ *   coverage       the Coverage & changes tab's industry table (view all or
+ *                  not_matching; one industry in full with `industry`), with
+ *                  the province / goal-track / grant-vs-loan breakdowns
+ *   changes        what changed in the catalogue in the range: went live,
+ *                  closed or removed, edited, deadlines passed and due soon
  *
  * The grant modes call the Grants tab's own functions (grants.js grantList /
- * grantPage), so the tab and Oracle share every definition and query.
+ * grantPage), and the coverage modes the Coverage tab's (coverage.js coverage /
+ * changes), so the tabs and Oracle share every definition and query.
  *
  * Every card in every answer carries its link (/control-centre#review/<id>);
  * every answer carries the Control Centre link.
@@ -44,7 +50,8 @@ import { cardTitle, categoryWords } from '../control-centre/card-summary.js';
 import { STUCK_DAYS, LAST_ACTIVITY, LAST_ACTIVITY_JOIN, stuckWhen } from '../control-centre/review-queue.js';
 
 export { STUCK_DAYS };
-export const CONTROL_CENTRE_MODES = ['queue_summary', 'list_cards', 'card', 'overview', 'chat_themes', 'grants_list', 'grant'];
+export const CONTROL_CENTRE_MODES = ['queue_summary', 'list_cards', 'card', 'overview', 'chat_themes', 'grants_list', 'grant', 'coverage', 'changes'];
+export const CHANGES_MAX = 20;
 export const GRANTS_LIST_DEFAULT = 20;
 export const GRANTS_LIST_MAX = 50;
 const GRANT_VIEWS = ['all', 'most_ignored', 'not_matching'];
@@ -498,24 +505,132 @@ async function modeGrant(input, deps) {
 }
 
 // ---------------------------------------------------------------------------
+// Coverage & changes
+// ---------------------------------------------------------------------------
+
+const COVERAGE_VIEWS = ['all', 'not_matching'];
+const COVERAGE_DEFINITIONS = 'Counts are clients only; internal_accounts_add is what Granted\'s own internal accounts add on top. '
+  + 'restricted_grants = live grants whose industry tag restricts them to this industry (the engine gates by main industry). '
+  + 'open_to_every_industry = live grants tagged agnostic (the same for every row). clients = companies whose profile industry maps here, today. '
+  + 'avg_grant_matches = grants shown in the range per client who ran matching. thin = at least 2 clients ran matching and the average is under 3. '
+  + 'wrong_industry_cuts = grants the AI review removed for wrong industry from these clients (one per client and grant; AI-review data starts 2026-09-22).';
+
+/** One industry row in words, clients-only, with what internal accounts add. */
+function industryOut(r, withInternal, env, { full = false, grants = {}, names = {} } = {}) {
+  const internal = {};
+  if (withInternal) {
+    for (const [k, out] of [['clients', 'clients'], ['ran_matching', 'ran_matching'], ['wrong_industry_cuts', 'wrong_industry_cuts']]) {
+      const extra = (withInternal[k] ?? 0) - (r[k] ?? 0);
+      if (extra > 0) internal[out] = extra;
+    }
+  }
+  const grantOut = (id) => ({ grant: grants[id]?.title ?? `Grant #${id}`, grant_id: id, link: grantLink(id, env) });
+  return {
+    industry: r.industry, level: r.level, ...(r.main && r.level === 'specific' ? { main_industry: r.main } : {}),
+    link: `${controlCentreUrl(env)}#coverage/industry/${encodeURIComponent(r.industry)}`,
+    restricted_grants: r.restricted, open_to_every_industry: r.open_to_all, clients: r.clients, ran_matching: r.ran_matching,
+    avg_grant_matches: r.avg_matches, thin: r.thin, wrong_industry_cuts: r.wrong_industry_cuts,
+    ...(Object.keys(internal).length ? { internal_accounts_add: internal } : {}),
+    ...(full ? {
+      restricted_grant_list: r.restricted_ids.map(grantOut),
+      cut_grants: r.cut_grants.map((c) => ({ ...grantOut(c.grant_id), clients_cut: c.clients })),
+      client_list: r.client_ids.map((id) => ({ company: names[id]?.name ?? `company #${id}`, company_id: id })),
+      ...(r.specifics?.length ? { specific_industries: r.specifics.map((s) => industryOut(s, null, env)) } : {})
+    } : {})
+  };
+}
+
+async function modeCoverage(input, deps) {
+  const range = input.range ?? 'month';
+  if (!RANGES.includes(range)) return { error: `range must be one of: ${RANGES.join(', ')}.` };
+  const view = input.view ?? 'all';
+  if (!COVERAGE_VIEWS.includes(view)) return { error: `view must be one of: ${COVERAGE_VIEWS.join(', ')}.` };
+  const c = await deps.coverage(range);
+  const rows = c.clients_variant.industries;
+  const allFlat = new Map(c.all_variant.industries.flatMap((r) => [r, ...r.specifics]).map((r) => [r.industry, r]));
+  const base = {
+    control_centre: `${controlCentreUrl(deps.env)}#coverage${view === 'not_matching' ? '?view=not_matching' : ''}`,
+    range, window: c.current, view, definitions: COVERAGE_DEFINITIONS, tagging_note: c.note,
+    catalogue: { live_grants: c.catalogue.live_grants, restricted: c.catalogue.restricted, open_to_every_industry: c.catalogue.open_to_all,
+      not_in_hub_copy: c.catalogue.not_in_hub_copy.length }
+  };
+  if (input.industry) {
+    const want = String(input.industry).trim().toLowerCase();
+    const flat = rows.flatMap((r) => [r, ...r.specifics]);
+    const hit = flat.find((r) => r.industry.toLowerCase() === want) ?? flat.find((r) => r.industry.toLowerCase().includes(want));
+    if (!hit) return { error: `No industry called "${input.industry}". Main industries: ${rows.map((r) => r.industry).join(', ')}.` };
+    return { ...base, industry: industryOut(hit, allFlat.get(hit.industry), deps.env, { full: true, grants: c.grants, names: c.clients }) };
+  }
+  if (view === 'not_matching') {
+    const nm = deps.applyCoverageView(rows, 'not_matching');
+    return {
+      ...base,
+      // A real coverage gap: clients ran matching and the engine found them nothing.
+      ran_matching_got_zero_matches: nm.ran_zero.map((r) => industryOut(r, allFlat.get(r.industry), deps.env)),
+      // Not a coverage gap: these clients haven't run matching in the range.
+      not_run_matching_yet: nm.not_run.map((r) => industryOut(r, allFlat.get(r.industry), deps.env)),
+      no_restricted_grants: nm.no_restricted.map((x) => ({
+        main_industry: x.row.industry, main_has_no_restricted_grants: x.main_has_none,
+        specific_industries_with_none: x.specifics.map((s) => ({ industry: s.industry, clients: s.clients }))
+      }))
+    };
+  }
+  const b = c.clients_variant.breakdowns;
+  return {
+    ...base,
+    industries: rows.map((r) => industryOut(r, allFlat.get(r.industry), deps.env)),
+    by_province: b.province.map((p) => ({ province: p.province, province_only_grants: p.restricted, national_grants: p.national, clients: p.clients,
+      avg_grant_matches: p.avg_matches, empty_goal_tracks: p.empty_tracks, few_goal_tracks: p.few_tracks })),
+    by_goal_track: b.goal_tracks.map((t) => ({ goal_track: t.label, grants_shown_on_track: t.grants_shown_on_track, clients: t.clients,
+      empty: t.empty_tracks, few: t.few_tracks,
+      gaps: t.gaps.slice(0, 10).map((g) => ({ company: c.clients[g.company_id]?.name ?? `company #${g.company_id}`, company_id: g.company_id,
+        shown: g.shown, ...(g.card ? { empty_track_card: g.card.link } : {}) })) })),
+    by_grant_type: b.grant_types.map((t) => ({ grant_type: t.type, live_grants: t.live_grants })),
+    grant_vs_loan: { grants: b.funding.grant, loans_only: b.funding.loan, grant_and_loan: b.funding.both, not_tagged: b.funding.untagged }
+  };
+}
+
+async function modeChanges(input, deps) {
+  const range = input.range ?? 'month';
+  if (!RANGES.includes(range)) return { error: `range must be one of: ${RANGES.join(', ')}.` };
+  const ch = await deps.changes(range);
+  const cap = (rows, shape) => ({ count: rows.length, grants: rows.slice(0, CHANGES_MAX).map(shape),
+    ...(rows.length > CHANGES_MAX ? { more: rows.length - CHANGES_MAX } : {}) });
+  const g = (r) => ({ grant: r.title, grant_id: r.grant_id, link: grantLink(r.grant_id, deps.env) });
+  return {
+    control_centre: `${controlCentreUrl(deps.env)}#coverage`,
+    range, window: ch.current,
+    added: cap(ch.added, (r) => ({ ...g(r), went_live: r.at })),
+    closed: cap(ch.closed, (r) => ({ ...g(r), closed: r.at, now: r.status })),
+    removed: cap(ch.removed, (r) => ({ ...g(r), removed: r.at })),
+    edited: cap(ch.edited, (r) => ({ ...g(r), edits: r.edits, kinds: r.kinds, last_edit: r.last_at,
+      last_by: `app user #${r.last_by.user_id}${r.last_by.email ? ` (${r.last_by.email})` : ''}` })),
+    deadline_passed_still_live: cap(ch.deadline_passed, (r) => ({ ...g(r), deadline: r.deadline_text })),
+    deadlines_next_30_days: cap(ch.due_soon, (r) => ({ ...g(r), deadline: r.deadline })),
+    note: 'Deadline problems are flagged only; no review card is filed. Drafts that weren\'t published aren\'t edits. Editor names aren\'t stored in the app database.'
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Entry
 // ---------------------------------------------------------------------------
 
 async function defaultDeps() {
-  const [{ getItem }, { getOverview, search }, { latestDigest }, { withCompanyNames, identitiesForClerkIds, companyNamesForIds }, { isInternalCompany }, { grantList, grantPage }] = await Promise.all([
+  const [{ getItem }, { getOverview, search }, { latestDigest }, { withCompanyNames, identitiesForClerkIds, companyNamesForIds }, { isInternalCompany }, { grantList, grantPage }, { coverage, changes, applyCoverageView }] = await Promise.all([
     import('../control-centre/review-queue.js'),
     import('../control-centre/overview.js'),
     import('../control-centre/digest-themes.js'),
     import('../control-centre/identity.js'),
     import('../control-centre/internal-accounts.js'),
-    import('../control-centre/grants.js')
+    import('../control-centre/grants.js'),
+    import('../control-centre/coverage.js')
   ]);
   return { env: process.env, hubQuery: hubQueryDefault, getItem, getOverview, search, latestDigest, withCompanyNames,
-    identitiesForClerkIds, companyNamesForIds, isInternalCompany, grantList, grantPage };
+    identitiesForClerkIds, companyNamesForIds, isInternalCompany, grantList, grantPage, coverage, changes, applyCoverageView };
 }
 
 const MODES = { queue_summary: modeQueueSummary, list_cards: modeListCards, card: modeCard, overview: modeOverview, chat_themes: modeChatThemes,
-  grants_list: modeGrantsList, grant: modeGrant };
+  grants_list: modeGrantsList, grant: modeGrant, coverage: modeCoverage, changes: modeChanges };
 
 /**
  * @param {Object} input - tool input

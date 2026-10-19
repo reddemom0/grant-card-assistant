@@ -359,7 +359,7 @@ window when one of its `chat_turns` falls inside it; a conversation with no turn
 window when its created_at to updated_at span overlaps it.
 
 `control_centre` (`src/tools/control-centre-tools.js`) is Oracle's read-only window on the
-Control Centre (`docs/control-centre.md`), one tool with seven modes: `queue_summary` (open
+Control Centre (`docs/control-centre.md`), one tool with nine modes: `queue_summary` (open
 cards by status, owner and kind; stuck = open with no change or comment for 3+ days, the board's rule; oldest open),
 `list_cards` (filters: status, owner incl. `unassigned`, kind, company name/id, grant
 name/id, `stuck_only`; at most 20), `card` (one card in full: diagnosis, evidence, flags,
@@ -370,9 +370,17 @@ clients, most "shown but never opened" first) or `not_matching` (no client match
 "Never" first). Counts are client-only with `internal_accounts_add`, at most 50) and `grant` (one
 grant's page, `grantPage(id, range)`, by root id or part of the name: companies matched by goal
 track with the AI review's marks, tags beside card text, engagement by day, recent edits shown as
-"app user #N" because the app stores no editor names, and review cards). The grant modes share the
-tab's code and SQL. Every card in every answer carries its link, `${PUBLIC_URL}/control-centre#review/<id>`,
-and every grant carries `#grants/<id>`
+"app user #N" because the app stores no editor names, and review cards), `coverage` (the Coverage &
+changes tab, `coverage(range)`, default month: per main industry the live grants restricted to it,
+grants open to every industry, clients, clients who ran matching, average grant matches, thin, and
+wrong-industry AI-review cuts, plus province / goal-track / grant-type / grant-vs-loan breakdowns;
+`view` `not_matching` gives the Not matching lists through `applyCoverageView`: ran matching but got
+zero matches (a coverage gap), not run matching yet (not a gap), and no restricted grants; `industry`
+gives one main or specific industry in full, with its grants, clients and cut grants; client-only
+with `internal_accounts_add`, and the tagging caveat always included) and `changes`
+(`changes(range)`: went live, closed, removed, edited with "app user #N", deadline passed and due
+in 30 days; at most 20 per list). The grant and coverage modes share their tab's code and SQL. Every card in every answer carries its link, `${PUBLIC_URL}/control-centre#review/<id>`,
+every grant carries `#grants/<id>` and every industry `#coverage/industry/<name>`
 (`src/control-centre/links.js`). SELECTs and the Control Centre's own read helpers only:
 Oracle can't move, reassign or close a card. Results are wrapped as untrusted like every
 tool result.
