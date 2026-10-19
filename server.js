@@ -69,6 +69,8 @@ import controlCentreOverviewRouter from './src/control-centre/overview-routes.js
 import controlCentreCompaniesRouter from './src/control-centre/companies-routes.js';
 import controlCentreGrantsRouter from './src/control-centre/grants-routes.js';
 import controlCentreCoverageRouter from './src/control-centre/coverage-routes.js';
+import controlCentreChatRouter from './src/control-centre/chat-routes.js';
+import { startChatDaily } from './src/control-centre/chat-daily.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
@@ -202,6 +204,9 @@ app.use('/api/control-centre/review', authenticateUser, requireAuth, controlCent
 app.use('/api/control-centre/companies', authenticateUser, requireAuth, controlCentreCompaniesRouter);
 app.use('/api/control-centre/grants', authenticateUser, requireAuth, controlCentreGrantsRouter);
 app.use('/api/control-centre/coverage', authenticateUser, requireAuth, controlCentreCoverageRouter);
+// Chat themes tab: daily-pass themes / unanswered / unmet needs (migration 049), live chat health,
+// outcomes and search; opening a transcript is logged (cc_transcript_views).
+app.use('/api/control-centre/chat', authenticateUser, requireAuth, controlCentreChatRouter);
 // Control Centre page data: GET /overview, GET /search. Read-only, cached 5 min.
 app.use('/api/control-centre', authenticateUser, requireAuth, controlCentreOverviewRouter);
 
@@ -1395,6 +1400,15 @@ async function startServer() {
     // PULSE_ROUNDUP_SUBSCRIBERS the list with card links (only when there were
     // any). Not scheduled unless that and GG3_OPS_DB_READONLY_URL are set.
     startPulseRoundup(cron);
+
+    // ========================================================================
+    // CRON JOB: Control Centre daily chat grouping pass (08:30 America/Vancouver)
+    // ========================================================================
+    // After the roundup: one Haiku pass over yesterday's client messages
+    // (themes, unanswered, unmet needs, funding asks), stored for the Chat
+    // themes tab (migration 049), plus two chat-card rules. Off unless
+    // CC_CHAT_DAILY_ENABLED=true; needs the app and ops DBs and ANTHROPIC_API_KEY.
+    startChatDaily(cron);
 
     // ========================================================================
     // CRON JOB: GetGranted Pulse weekly digest (Monday 08:00 America/Vancouver)

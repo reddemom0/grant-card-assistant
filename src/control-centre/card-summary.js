@@ -29,7 +29,9 @@ export const ISSUE_WORDS = Object.freeze({
   repeated_question: 'Client had to ask again',
   left_unanswered: 'Question left unanswered',
   chat_broke: 'Chat broke mid-answer',
-  empty_reply: 'Empty reply or refusal'
+  empty_reply: 'Empty reply or refusal',
+  no_cards_for_funding_ask: 'Funding ask, no grant cards shown',
+  card_for_rejected_grant: 'Card shown for a grant the reply ruled out'
 });
 
 export const categoryWords = (c) => CATEGORY_WORDS[c] ?? String(c ?? '').replace(/_/g, ' ');

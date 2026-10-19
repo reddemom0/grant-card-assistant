@@ -359,7 +359,7 @@ window when one of its `chat_turns` falls inside it; a conversation with no turn
 window when its created_at to updated_at span overlaps it.
 
 `control_centre` (`src/tools/control-centre-tools.js`) is Oracle's read-only window on the
-Control Centre (`docs/control-centre.md`), one tool with nine modes: `queue_summary` (open
+Control Centre (`docs/control-centre.md`), one tool with thirteen modes: `queue_summary` (open
 cards by status, owner and kind; stuck = open with no change or comment for 3+ days, the board's rule; oldest open),
 `list_cards` (filters: status, owner incl. `unassigned`, kind, company name/id, grant
 name/id, `stuck_only`; at most 20), `card` (one card in full: diagnosis, evidence, flags,
@@ -379,8 +379,15 @@ zero matches (a coverage gap), not run matching yet (not a gap), and no restrict
 gives one main or specific industry in full, with its grants, clients and cut grants; client-only
 with `internal_accounts_add`, and the tagging caveat always included) and `changes`
 (`changes(range)`: went live, closed, removed, edited with "app user #N", deadline passed and due
-in 30 days; at most 20 per list). The grant and coverage modes share their tab's code and SQL. Every card in every answer carries its link, `${PUBLIC_URL}/control-centre#review/<id>`,
-every grant carries `#grants/<id>` and every industry `#coverage/industry/<name>`
+in 30 days; at most 20 per list), and four Chat themes modes over `chat-themes.js`:
+`unanswered` and `unmet_needs` (the daily chat review's rows, migration 049, through
+`chatOverview(range)`; unanswered groups sortable by "left after"), `chat_outcomes` (the 24-hour
+outcome shares, chat health with the two daily-pass card types, the most discussed grants) and
+`chat_search` (`chatSearch`: a word across client and assistant text, with company, dates, cards
+and `include_internal`). `chat_themes` keeps the weekly digest's fields and, with `range`, adds
+the daily themes. Chat counts are client-only unless `include_internal`. The grant, coverage and
+chat modes share their tab's code and SQL. Every card in every answer carries its link, `${PUBLIC_URL}/control-centre#review/<id>`,
+every grant carries `#grants/<id>`, every industry `#coverage/industry/<name>` and every chat `#chat/<id>`
 (`src/control-centre/links.js`). SELECTs and the Control Centre's own read helpers only:
 Oracle can't move, reassign or close a card. Results are wrapped as untrusted like every
 tool result.

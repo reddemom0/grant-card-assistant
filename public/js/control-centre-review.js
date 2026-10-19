@@ -42,6 +42,10 @@
     bad_record: 'Grant missing from the data',
     chat_wrong_grant_facts: 'Chat gave wrong grant facts',
     chat_answer_problem: 'Chat answer problem',
+    chat_did_not_search: "Chat didn't search",
+    chat_search_found_nothing: 'Chat searched, found nothing',
+    chat_results_not_shown: 'Chat found grants, showed no cards',
+    chat_carded_rejected_grant: 'Card shown for a grant the reply ruled out',
     no_grants_for_goal: 'No grants cover this goal for them',
     unclear: 'Cause unclear',
     could_not_diagnose: "Couldn't diagnose"
