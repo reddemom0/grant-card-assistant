@@ -291,7 +291,7 @@ async function runIntakeCategorization(sessionId, prospectDataFromForm) {
  * Returns: { description, industry, location, estimated_team_size, products_services }
  * or null if extraction fails or times out.
  */
-async function extractCompanyBackgroundFromWebsite(websiteUrl, sessionId) {
+export async function extractCompanyBackgroundFromWebsite(websiteUrl, sessionId) {
   if (!websiteUrl) return null;
 
   console.log(`🌐 Background: Fetching ${websiteUrl} for session ${sessionId}...`);
