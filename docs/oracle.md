@@ -665,6 +665,112 @@ not an agent tool: there is no schema in `definitions.js` and no executor dispat
   `POST /api/v1/ai/internal/match-lead` with `GG3_AI_SERVICE_URL` + `GG3_REVIEW_FEED_TOKEN`.
   It never throws and has no callers yet.
 
+## Morning brief (Steph)
+
+`src/services/steph-brief.js`. On weekdays at 08:00 America/Vancouver (the Ruk schedule),
+one Chat card in Steph's DM lists the inbox threads she hasn't answered. Each item gets a
+one- or two-line assessment, an in-thread Gmail **draft** saved in her mailbox, and a Done
+button.
+
+- **Gate:** `STEPH_BRIEF_ENABLED` must be exactly `true`. The run also needs her Gmail
+  connected (see the Gmail section) and migration 051. If `gmail_connected_at` is null,
+  the run is skipped and **nothing is posted**.
+- **Window:** since the last completed real run, capped at 4 days. With no earlier run,
+  the last 24 h, or 72 h on a Monday. Each run also re-fetches the threads of items still
+  open from earlier briefs.
+- **Triage** (`steph-brief-triage.js`, pure):
+  - automated mail is skipped: List-Unsubscribe, Precedence, no-reply senders;
+  - one sender's threads form one item;
+  - nudges (a second unanswered inbound, or follow-up phrasing) go to the top of their
+    group, labelled "2nd nudge · 6 days";
+  - Drive notifications are kept only for an @mention, a comment assigned to her, or a
+    share that asks her something, grouped per document.
+- **Groups** (`steph-brief-classify.js`): Clients → Partners → Leads (most mature first) →
+  Team (finance first, then urgency) → Government, with Docs last.
+  - Fixed rules: government domains are Government, closed-won HubSpot contacts are
+    Clients, and @granted.ca senders are Team.
+  - One batched Haiku call sorts the rest.
+  - An internal email about a closed-won company is a Client.
+  - Vendor pitches and "other" are skipped and counted in the footer.
+- **No reply needed:** the same Haiku call flags FYIs, closing thank-yous, cc-only mail and
+  similar. Those items stay on the card with their assessment, marked "no reply needed",
+  with no context lookup and no draft. A failed or unreadable verdict counts as needs-reply.
+- **Context and draft** (`steph-brief-context.js`), up to `STEPH_BRIEF_MAX_DRAFTS` (15)
+  items per run. The rest keep the Haiku assessment and are marked "no draft".
+  - **Clients:** one headless Oracle run **as Steph**, with a `chat_dm` chatContext so
+    `read_chat_space_history` works.
+    - **Pinned** to `claude-sonnet-5-5` through `forceModel`, whatever the email says.
+      `getQueryConfigForModel` gives it Oracle's adaptive thinking and effort settings.
+    - **Capped** at `ORACLE_MAX_ITERATIONS` (8) tool loops, and the prompt asks for at most
+      6 tool calls, HubSpot first.
+    - `allowedTools` is set to `READ_ONLY_TOOLS`: no write tools and no Gmail tool.
+  - **Everyone else:** context is gathered in code, then **one drafting call with no
+    tools**, pinned to `claude-haiku-4-5-20251001`. The voice guide and rules form a
+    cached system block.
+    - **Leads:** `lookupLead`, the calculator answers and estimate,
+      `extractCompanyBackgroundFromWebsite`, and gg3 `match-lead` via
+      `match-lead-client.js`. An `insufficient_profile` reply is noted on the card.
+      **The stored calculator tier never reaches the prompt or the card**: `withoutTier`
+      strips it.
+    - **Partners:** the HubSpot contact or company already fetched by classification.
+    - **Team:** the thread only.
+    - **Government:** the thread only. When Haiku flags a question about a named
+      program's rules, a GetGranted lookup (`searchGrantData`) is added.
+  - **Timeouts** (180 s): the client run is aborted through `runAgent`'s `abortSignal`,
+    which stops it before the next model call or tool execution. The job then **awaits**
+    the run, so the call already in flight still reports its cost, and saves a holding
+    reply.
+  - **Voice and links:** the voice comes from `loadStyleGuide`. Meeting links come from
+    `meetingLinksFor` (`meeting_link_use` in `consultant-routing.json`): leads 15, clients
+    and partners 30 or 40, and never the 20-minute quarterly link.
+  - **Code guards** (`guardDraft`): a link the category may not offer is removed. An
+    unconfirmed price, timeline or approval turns the draft into a holding reply, with a
+    card note saying why.
+- **Drafts:** the job calls `createDraftReply`, never Oracle, on the item's latest
+  thread. If the thread already holds a draft, Steph's or ours, no new draft is made.
+  **Nothing is ever sent.** `tests/unit/gmail.test.js` scans every brief file for send,
+  modify, trash, delete, label, filter and settings calls.
+- **State** (migration 051): `steph_brief_runs` holds the daily claim. The partial unique
+  index `(owner_email, local_date) WHERE NOT is_test` gives the same re-claim rule as
+  `pre_call_briefings`. `steph_brief_items` tracks each item as open, done or auto_done,
+  carried across days.
+  - Unticked, unreplied items carry over as "from yesterday" or "N days".
+  - An item becomes auto_done once she has replied, and the footer says how many.
+  - Done and auto_done items come back only when new mail arrives after they were closed.
+  - Docs items have no reply signal, so they stay open until Done.
+  - An item whose thread failed to load is never auto-ticked.
+- **Card** (`src/cards/brief-card.js`): not a tracked card. Its Done button runs through
+  the `brief.*` branch at the top of `pressAnswer` (`actions.js`), next to `pending.*`.
+  Only the run's recipient can press it. The press updates the row, answers
+  `updateMessageResponse` with the rebuilt card, and patches the message with
+  `patchCard`. Buttons carry the run id, so Done on an old brief re-renders that brief.
+  The card shows at most 40 items, then "N more".
+- **Manual trigger:** `POST /api/admin/steph-brief-run?secret=…`. It needs an admin
+  session plus `MIGRATION_SECRET` (or `JWT_SECRET`), the same gate as gg3-refresh.
+  - **Dry run (the default):** reads her mail and makes the drafting calls and client
+    Oracle runs, which cost money. It adds the comparison drafts. It creates **no drafts** and writes only `is_test` rows. Her real item state is
+    untouched. The card goes to the **caller's** DM, with each draft shown for review.
+  - **`dry_run=0`:** a real run, through the daily claim.
+  - It answers 202, or 409 with the reason when a check fails.
+- **Cost** (every cent attributable):
+  - **Per item:** `steph_brief_items` stores the model, `cost_usd`, the four token
+    counts, tool calls, `tools_used`, web searches and the Oracle `conversation_id`.
+    `cost_usd` includes the website lookup and the $0.01 web-search fee, which
+    `calculateRequestCost` doesn't price.
+  - **Per run:** `steph_brief_runs.cost_usd` holds the total, and `counts.cost` the
+    breakdown: classify, drafting, Oracle, website, search fees and comparison.
+  - **Tagging:** every brief row in `api_cost_events` carries `metadata.brief_run_id` and
+    `metadata.is_dry_run` (Oracle through `runAgent`'s `costMetadata`), so
+    `SUM(cost_usd) … WHERE metadata->>'brief_run_id' = '<id>'` is the run's model
+    spend. The website lookup is tagged `session: steph-brief:<id>`.
+  - **Dry-run card:** shows each draft's model and cost and, at the bottom, the run
+    total. The real card shows no money.
+- **Dry-run comparison:** for up to 3 Lead or Client items, a dry run also drafts with the
+  other model and shows it under the main draft, each with its cost. Leads get a
+  "Sonnet version": one Sonnet call on the same context. Clients get a "Haiku version":
+  one Haiku call on the thread plus HubSpot. This never happens on a real run.
+- **Logs:** counts and codes only.
+
 ## Behavior worth knowing
 
 - **Model routing is per-message, not per-agent.** `getQueryConfig` in

@@ -91,6 +91,40 @@ describe('no-send guard', () => {
   });
 });
 
+// ── The hard rule, for the morning brief (Stage 2) ──────────────────────────
+describe('no-send guard: morning brief code', () => {
+  const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
+  const FILES = [
+    'src/services/steph-brief.js', 'src/services/steph-brief-triage.js', 'src/services/steph-brief-classify.js',
+    'src/services/steph-brief-context.js', 'src/cards/brief-card.js', 'src/api/steph-brief-run.js'
+  ];
+  const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  // What the brief may take from gmail.js: reads, the reply check, drafts. Nothing else exists there, but the
+  // list is explicit so a future gmail.js export can't be picked up silently.
+  const ALLOWED_GMAIL = new Set(['listThreadsSince', 'getThread', 'replyState', 'createDraftReply', 'hasGmailScopes', 'addressOf']);
+
+  test.each(FILES)('%s: no send / modify / trash / delete / label / filter / settings call', (file) => {
+    const code = strip(readFileSync(join(ROOT, file), 'utf8'));
+    for (const re of [/messages\s*\.\s*send\b/, /drafts\s*\.\s*send\b/, /\[\s*['"`]send['"`]\s*\]/, /\.\s*(batchModify|modify|trash|untrash|batchDelete)\s*\(/,
+      /messages\s*\.\s*(insert|import|delete)\b/, /threads\s*\.\s*(modify|trash|delete)\b/, /labels\s*\.\s*(create|update|patch|delete)\b/,
+      /users\s*\.\s*settings\b/, /\bforward\w*\s*\(/i, /filters\s*\.\s*create\b/]) {
+      expect(code).not.toMatch(re);
+    }
+  });
+  test.each(FILES)('%s: never builds its own Gmail client', (file) => {
+    const code = strip(readFileSync(join(ROOT, file), 'utf8'));
+    expect(code).not.toMatch(/google\s*\.\s*gmail\s*\(/);
+    expect(code).not.toMatch(/gmail\.googleapis\.com/);
+    expect(code).not.toMatch(/from\s+['"]googleapis['"]/);
+  });
+  test.each(FILES)('%s: uses only the allowed gmail.js functions', (file) => {
+    const code = strip(readFileSync(join(ROOT, file), 'utf8'));
+    const named = [...code.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][./]*tools\/gmail\.js['"]/g)].flatMap(m => m[1].split(',').map(s => s.trim().split(/\s+as\s+/)[0]).filter(Boolean));
+    const viaDynamic = [...code.matchAll(/\(await\s+gmail\(\)\)\.(\w+)/g)].map(m => m[1]);
+    for (const name of [...named, ...viaDynamic]) expect(ALLOWED_GMAIL.has(name)).toBe(true);
+  });
+});
+
 // ── Reply detection ─────────────────────────────────────────────────────────
 describe('replyState', () => {
   const parse = (msgs) => ({ messages: msgs.map(m => G.parseMessage(rawMessage(m), ME)) });

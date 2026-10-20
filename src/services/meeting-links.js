@@ -48,3 +48,21 @@ export function getMeetingLink(email, minutes, data = routing()) {
   if (!Number.isInteger(n)) return null;
   return listMeetingLinks(email, data)[n] ?? null;
 }
+
+/**
+ * The links a draft may offer this kind of correspondent, as { minutes: url },
+ * from the consultant's `meeting_link_use` allowlist (e.g. leads → 15 only;
+ * clients and partners → 30 or 40). A category not listed gets none, and a
+ * length not in the allowlist is never offered — Steph's 20-minute
+ * "quarterly" link is in no list on purpose.
+ * @param {string} email
+ * @param {string} category - client | partner | lead | team | government | docs
+ * @returns {Record<number, string>}
+ */
+export function meetingLinksFor(email, category, data = routing()) {
+  const consultant = consultantFor(email, data);
+  const allowed = consultant?.meeting_link_use?.[category];
+  if (!Array.isArray(allowed)) return {};
+  const all = listMeetingLinks(email, data);
+  return Object.fromEntries(allowed.map(Number).filter(m => all[m]).map(m => [m, all[m]]));
+}

@@ -291,7 +291,9 @@ async function runIntakeCategorization(sessionId, prospectDataFromForm) {
  * Returns: { description, industry, location, estimated_team_size, products_services }
  * or null if extraction fails or times out.
  */
-export async function extractCompanyBackgroundFromWebsite(websiteUrl, sessionId) {
+// `onUsage` (optional) receives the Haiku call's usage — for a caller that
+// accounts its own spend (the morning brief). Lead-gen callers don't pass it.
+export async function extractCompanyBackgroundFromWebsite(websiteUrl, sessionId, { onUsage } = {}) {
   if (!websiteUrl) return null;
 
   console.log(`🌐 Background: Fetching ${websiteUrl} for session ${sessionId}...`);
@@ -365,6 +367,9 @@ Return ONLY the JSON object, no additional text.`;
         source: 'lead-gen-extraction',
         metadata: { session: sessionId }
       });
+      if (typeof onUsage === 'function') {
+        try { onUsage(extractionResponse.usage, 'claude-haiku-4-5-20251001'); } catch { /* accounting only */ }
+      }
     }
 
     const extractedText = extractionResponse.content[0].text.trim();

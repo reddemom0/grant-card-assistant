@@ -339,7 +339,15 @@ export async function runAgent({
   chatContext = null,
   // Optional list of tool names this run may use (e.g. a /learn-this run, which
   // may only read and save a lesson). Absent: the agent's full tool set.
-  allowedTools = null
+  allowedTools = null,
+  // Headless callers with a time budget (the morning brief): when aborted, the
+  // loop stops before the next model call or tool execution and returns
+  // { success: false, error: 'aborted' }. The model call already in flight is
+  // allowed to finish, so its usage is still logged and counted.
+  abortSignal = null,
+  // Extra api_cost_events metadata for every agent-loop cost row of this run
+  // (e.g. { brief_run_id, is_dry_run }), so a caller can sum its own spend.
+  costMetadata = null
 }) {
   console.log('\n' + '='.repeat(80));
   console.log(`🤖 Running agent: ${agentType}`);
@@ -711,6 +719,10 @@ export async function runAgent({
     let userMessageSaved = false; // Track whether the initial user message has been persisted
 
     while (loopCount < MAX_AGENT_LOOPS) {
+      if (abortSignal?.aborted) {
+        console.log(`⏹️  Agent run aborted before iteration ${loopCount + 1}`);
+        return { success: false, error: 'aborted', iterations: loopCount };
+      }
       loopCount++;
       console.log(`\n${'─'.repeat(80)}`);
       console.log(`🔄 Agent loop iteration ${loopCount}/${MAX_AGENT_LOOPS}`);
@@ -977,6 +989,7 @@ export async function runAgent({
       if (fullResponse.usage) {
         const usage = fullResponse.usage;
         const cost = logAPICost({
+          ...(costMetadata ? { metadata: costMetadata } : {}),
           usage,
           model: MODEL,
           source: 'agent-loop',
@@ -1001,7 +1014,13 @@ export async function runAgent({
         // Call cost callback if provided (for cost tracking in lead-gen)
         if (onCostCalculated && typeof onCostCalculated === 'function') {
           try {
-            await onCostCalculated(cost);
+            // Second argument for callers that account per run (the morning
+            // brief): this iteration's usage and the tools it asked for.
+            // One-argument callbacks (lead-gen) ignore it.
+            const toolNames = (fullResponse.content || [])
+              .filter(b => b.type === 'tool_use' || b.type === 'server_tool_use')
+              .map(b => b.name);
+            await onCostCalculated(cost, { usage, model: MODEL, toolNames });
           } catch (callbackError) {
             console.error('⚠️  Cost callback error:', callbackError.message);
           }
@@ -1110,6 +1129,10 @@ export async function runAgent({
       // CASE 2: Tool use required
       if (fullResponse.stop_reason === 'tool_use') {
         console.log('🔧 Agent requested tool use');
+        if (abortSignal?.aborted) {
+          console.log(`⏹️  Agent run aborted before tool execution (iteration ${loopCount})`);
+          return { success: false, error: 'aborted', iterations: loopCount };
+        }
 
         // Thinking blocks go back exactly as received — see assistantTurnForToolLoop
         messages.push({

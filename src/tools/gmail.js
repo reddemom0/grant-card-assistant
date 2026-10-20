@@ -180,6 +180,9 @@ export function parseMessage(msg, userEmail) {
     date: header(headers, 'Date'),
     message_id: header(headers, 'Message-ID') || header(headers, 'Message-Id'),
     references: header(headers, 'References'),
+    // Bulk-mail signals, for the morning brief's automated filter.
+    list_unsubscribe: header(headers, 'List-Unsubscribe'),
+    precedence: header(headers, 'Precedence'),
     internal_date: Number(msg.internalDate) || 0,
     labels,
     is_draft: labels.includes('DRAFT'),

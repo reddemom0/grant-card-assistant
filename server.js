@@ -75,6 +75,8 @@ import { startChatDaily } from './src/control-centre/chat-daily.js';
 import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
 import { startRukBriefings } from './src/services/ruk-briefings.js';
+import { startStephBrief } from './src/services/steph-brief.js';
+import { stephBriefRunEndpoint } from './src/api/steph-brief-run.js';
 import { startPulseDigest } from './src/services/pulse-digest.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
 // the number is known — see src/api/addon-probe.js.
@@ -190,6 +192,12 @@ app.get('/run-migration', authenticateUser, requireAdmin, runMigrationEndpoint);
 // same requireAdmin adminRouter uses) AND ?secret=. Read-only against GG3;
 // replaces gg3_grants.
 app.get('/api/admin/gg3-refresh', authenticateUser, requireAdmin, gg3RefreshEndpoint);
+
+// Manual trigger for Steph's morning brief. Same gate as gg3-refresh: an admin
+// session AND ?secret=. dry_run=1 (default) creates no Gmail drafts and posts
+// the card to the caller's own DM; dry_run=0 is a real run through the daily
+// claim. Needs migration 051.
+app.post('/api/admin/steph-brief-run', authenticateUser, requireAdmin, (req, res) => stephBriefRunEndpoint(req, res));
 
 // Control Centre: can the Hub read the app DB and the gg3 ops DB? Admin only,
 // read-only, no secrets in the body. See docs/control-centre.md.
@@ -1431,6 +1439,12 @@ async function startServer() {
     // link. Never writes HubSpot or calendar events. Off unless
     // RUK_BRIEFINGS_ENABLED=true. Needs migration 049.
     startRukBriefings(cron);
+
+    // Steph's 08:00 morning brief: her unanswered inbox triaged into one Chat
+    // card with a Done button per item and an in-thread Gmail DRAFT saved for
+    // each (never sent). Off unless STEPH_BRIEF_ENABLED=true; needs her Gmail
+    // connected (/api/auth/gmail) and migration 051.
+    startStephBrief(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';

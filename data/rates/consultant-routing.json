@@ -43,6 +43,11 @@
         "30": "https://meetings.hubspot.com/ssang1",
         "40": "https://meetings.hubspot.com/stephsang/grantchat"
       },
+      "meeting_link_use": {
+        "lead": [15],
+        "client": [30, 40],
+        "partner": [30, 40]
+      },
       "industries": [
         "Accounting",
         "Advertising/Marketing",

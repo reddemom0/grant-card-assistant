@@ -351,6 +351,9 @@ export function getQueryConfig(message, agentType, conversationMemories = null) 
 export function getQueryConfigForModel(model, overrides = {}) {
   // Determine if this is Haiku or Sonnet
   const isHaiku = model.includes('haiku');
+  // Sonnet 5.5 rejects a temperature and a budget_tokens thinking config;
+  // forcing it gets the same settings classifier-routed Oracle runs use.
+  const oracleSonnet = model === ORACLE_SONNET.model;
 
   return {
     complexity: isHaiku ? 'simple' : 'complex',
@@ -358,6 +361,7 @@ export function getQueryConfigForModel(model, overrides = {}) {
     thinking: isHaiku ? undefined : { type: 'enabled', budget_tokens: 10000 },
     maxTokens: isHaiku ? 8000 : 16000,
     temperature: isHaiku ? 0.3 : 1.0,
+    ...(oracleSonnet ? ORACLE_SONNET : {}),
     maxIterations: overrides.maxIterations || (isHaiku ? 6 : 50),
 
     metadata: {
