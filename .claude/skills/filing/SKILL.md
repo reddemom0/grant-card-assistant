@@ -9,7 +9,7 @@ Give every file a **home** (folder path) and a **name**. Every type, pattern and
 
 **Load `filing/reference` first** (`load_skill(skill_name="filing", sub_skill="reference")`), before answering anything.
 
-**Never file here:** `Active Clients/` (a leftover; everything client is under `Clients/`), `Live Clients/` (shortcuts only), `Departments/Mindfulness` (legacy, not a department), `Old Files/` (stays as-is; unclear old material goes to the separate Granted Archive drive).
+**Never file here:** `Active Clients/` (shortcuts to live clients only; everything client is under `Clients/`), `Old Files/` (stays as-is; unclear old material goes to the separate Granted Archive drive), `Departments/Mindfulness` (legacy, not a department), `Review/` (an internal working folder), `Pre-Call Briefings/` (owned by Oracle's scheduled jobs).
 
 ## 1. Identify the file
 
@@ -19,9 +19,11 @@ Work out four things: **type** (exactly as spelled in reference.md), **client**,
 
 ## 2. Find the home
 
-- Look up the type's **Home** in reference.md and build the full path: `Clients/{Client}/{Program}/{Engagement}/…` for client work, `Programs/{Program}/…` for program material, `Departments/{DEPT}` for internal work.
-- **Check the live folders** with `list_granted_files_folders`, one level at a time, as far down as the facts you already have go (e.g. check `Clients` for the client even while the program is still unknown, and check any name the asker gave): `Clients` (or `Programs`, `Departments`), then `Clients/{Client}`, then `Clients/{Client}/{Program}` for the engagement level. It reads Granted Files as the asker. Use the existing folder whose name matches, ignoring case, spacing and punctuation. If an engagement folder already exists as a bare year (e.g. `2026`), use it. If the tool refuses or fails, say you couldn't check the live folders; don't present a path as existing.
+- Look up the type's **Home** in reference.md and build the full path: `Clients/{Client}/{Program}/{YYYY}/…` for program work, `Clients/{Client}/General/{YYYY}/` for client work tied to no program (grant planners, readiness assessments, business info), `Programs/{Program}/…` for program material, `Departments/{DEPT}` for internal work. `{Program}` in a path is the standard folder name from the program table; the year folder is a bare `YYYY`.
+- **Check the live folders** with `list_granted_files_folders`, one level at a time, as far down as the facts you already have go (e.g. check `Clients` for the client even while the program is still unknown, and check any name the asker gave): `Clients` (or `Programs`, `Departments`), then `Clients/{Client}`, then `Clients/{Client}/{Program}` for the year level. It reads Granted Files as the asker. Use the existing folder whose name matches, ignoring case, spacing and punctuation. A client is also found by the start of its name: when the result says it matched by prefix (e.g. "Caliber" → `Caliber Projects`), use the folder it names and tell the asker which one it is. If the tool refuses or fails, say you couldn't check the live folders; don't present a path as existing.
+- **Stage folders:** if the year folder already has a variant of the stage (e.g. `Reimb` for Reimbursements; aliases in reference.md), reuse it. Create a new stage folder only with the standard name.
 - **No match:** say so and propose each missing folder's name, marked **(new)**. A near-miss is not a match; ask.
+- **Can't place it:** if the client or program still isn't clear after asking, propose `Clients/_Unsorted` as the Home and say why.
 - **Not Granted Files:**
   - Granted's own HR, payroll, finance or legal material → "This doesn't go in Granted Files. Ask Chris or Nat."
   - Google Meet recordings, transcripts and Gemini notes from calls with fewer than 4 Granted people, unless it's a webinar or staff meeting → they stay with the owner. This doesn't apply to notes someone writes themselves; file those by the internal-doc pattern.
@@ -30,7 +32,7 @@ Work out four things: **type** (exactly as spelled in reference.md), **client**,
 
 ## 3. Name it
 
-Fill the type's **Pattern** from reference.md with the facts from step 1. Follow the format rules: hyphens, Type → When → Who → Program, the date formats, no version words. Keep the asker's own key words where the pattern leaves room (e.g. a topic or vendor), so the file stays recognizable.
+Fill the type's **Pattern** from reference.md with the facts from step 1. Follow the format rules: hyphens, Type → When → Who → Program (the program's short code), the date formats, no version words. The patterns are for new files; existing files are never renamed just to match. Keep the asker's own key words where the pattern leaves room (e.g. a topic or vendor), so the file stays recognizable.
 
 **Done when** the name matches the pattern exactly and has no placeholders left.
 

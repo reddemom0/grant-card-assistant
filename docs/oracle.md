@@ -416,7 +416,7 @@ and/or rename it, gated and asker-only (above). The limits are code, checked whe
   the asker owns in their My Drive. Owned outside granted.ca, someone else's My Drive, a
   folder or a shortcut → refused.
 - **Destination:** Granted Files under `Clients/`, `Programs/` or `Departments/`, at least one
-  level in; never the root, `Live Clients/`, `Old Files/`, `Departments/Mindfulness`,
+  level in; never the root, `Active Clients/`, `Old Files/`, `Departments/Mindfulness`,
   Archive or a My Drive. Missing folders are created only below an existing client, program
   or department folder, and only those the card listed as (new).
 - **Sensitive guard (strict):** `SENSITIVE_TERMS` in `src/tools/drive-sensitive.js`, whole
@@ -445,6 +445,34 @@ Excluded, with reasons in code:
 case. That is deliberate. They are kept out of `ORACLE_TOOLS` and `GOOGLE_DOCS_TOOLS`
 because those get spread into `ALL_TOOLS`, which would hand the orchestrator calendar-write
 and document-rewrite repo-wide.
+
+## Filing taxonomy
+
+The rules live in the `filing` skill (`.claude/skills/filing/SKILL.md` for the steps,
+`reference.md` for every type, pattern, folder rule and the program table), loaded on demand
+with `load_skill`. They describe Granted Files as it is after the October 2026 cleanup
+(Chris's decisions of 20 Oct 2026 in `DECISIONS.md`):
+- **Client paths:** `Clients/{Client}/{Program}/{YYYY}/…`, the year a bare `YYYY` (season or
+  intake subfolders allowed under it). No `{Client}-{Program}-{Year}` folders.
+- **`General/`:** the official client-level folder for work tied to no program, with year
+  folders (plus `Undated`). Grant Planners live in `Clients/{Client}/General/{YYYY}/`; new
+  ones are named `Grant Planner-{Client}-{YYYY}`, existing ones keep their names.
+- **Stage folders:** Application, Approval Docs, Claims (`{YYYYMM}` inside), Reimbursements,
+  Paystubs, Reporting, Hiring. Oracle reuses an existing variant (`Reimb`, `Reimbursment`…)
+  and creates new ones with the standard name only.
+- **Programs:** folders use the standard folder name (the `Programs/` names); file names use
+  the short code from the program table. Codes marked "(proposed)" await Chris's check.
+- **Not filing targets:** `Active Clients/` (shortcuts to live clients only), `Old Files/`,
+  `Departments/Mindfulness`, `Review/`, `Pre-Call Briefings/`. `Clients/_Unsorted` is the
+  fallback after asking; `Programs/*/_Unfiled` holds unsorted program material.
+
+**Client prefix match.** `listGrantedFilesFolders` calls `resolveGrantedFilesPath` with
+`{ clientPrefix: true }`: when a client under `Clients/` has no exact `folderKey` match, a
+single folder whose key starts with the typed key is used and reported in
+`matched_by_prefix` ("Caliber" → "Caliber Projects"); several are returned as ambiguous; an
+exact match always wins. `planFileMove` (`drive-actions.js`) and the Ruk briefing job
+(`briefing-drive.js`) don't pass the option and keep exact matching, so a move or a created
+folder never lands on a prefix guess.
 
 ## Prompt
 

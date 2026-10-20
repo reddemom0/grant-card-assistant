@@ -12,6 +12,23 @@ Format:
 
 ---
 
+## 2026-10-20 — Filing rules match Granted Files after the October cleanup
+**What:** Chris's 10 filing decisions, written into the `filing` skill:
+1. **Grant Planners:** in `Clients/{Client}/General/{YYYY}/`; new ones `Grant Planner-{Client}-{YYYY}`; existing ones not renamed.
+2. **`General/`:** an official client-level folder (year folders plus `Undated`) for work tied to no program: planners, readiness assessments, business info and licences.
+3. **Year folders:** a bare `YYYY`; the `{Client}-{Program}-{Year}` rule is dropped. Season or intake subfolders are allowed under the year.
+4. **Stage folders:** standard names Application, Approval Docs, Claims (`{YYYYMM}` inside), Reimbursements, Paystubs, Reporting, Hiring. Reuse an existing variant (`Reimbursement`, `Reim`, `Reimb`, `Reimbursment`, `*Reimbursements`); create new ones with the standard name only.
+5. **`Active Clients/`:** shortcuts to live clients only, never filed into. "Live Clients" references removed.
+6. **Programs:** reference.md has a table of standard folder names (the `Programs/` names plus client-only programs such as Workplace Accessibility Grant) and short codes. Folders use the full name, file names the code. Invented codes are marked "(proposed)".
+7. **HR and finance:** their files stay out of Granted Files. `Departments/HR` and `FINANCE` are pending a move to Granted Archive.
+8. **Other areas:** `Clients/_Unsorted` (fallback after asking), `Programs/*/_Unfiled` (unsorted program material), `Review/` (internal, not a target), `Pre-Call Briefings/` (Oracle's jobs, not a target).
+9. **Old fact-check:** `docs/oracle-filing-factcheck.md` is marked superseded and kept.
+10. **File names:** Type-When-Who-Program for new files only; existing files are never renamed to match.
+
+Plus: the folder lookup finds a client by the start of its name.
+**Why:** The October cleanup left the drive and the skill out of step (all 4,252 year folders are bare years, about 500 of 537 planners sit in `General/`, and there is no "Live Clients"). 68 client folders were also renamed, so old short names need to keep working in the lookup. The prefix match is opt-in and client-level only, so moves and the briefing job keep exact matching.
+**Impact:** `.claude/skills/filing/{SKILL,reference}.md`, `src/tools/google-drive.js` (`resolveGrantedFilesPath` `clientPrefix`, `listGrantedFilesFolders`), `src/tools/definitions.js` (tool examples), `docs/oracle.md`, `docs/oracle-filing-factcheck.md`
+
 ## 2026-10-20 — Steph brief card fixes from dry run 2: security alerts, cc-only, model-written summaries
 **What:**
 - **Security alerts:** automated notices (Workspace "Suspicious login", new sign-in) get their own `security` type: "Security alert", one line, suggest IT/admin, Start here "have IT check it today". Only a person asking for payment details, a payment or wire, or credentials keeps "Verify by phone first".

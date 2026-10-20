@@ -2569,7 +2569,7 @@ export const GRANTED_FILES_FOLDERS_TOOL = {
   name: 'list_granted_files_folders',
   description: `List the subfolders at a path in the Granted Files shared drive, read live as the person asking. Folders only. Use it for filing questions ("where does this go", "where do I save", "what folder") to check which client, program, engagement and stage folders really exist before naming a home.
 
-Pass a path such as "Clients", "Clients/Acuva", "Clients/Acuva/CanExport", "Programs/WorkBC Wage Subsidy" or "Departments"; "" lists the top level. Each part matches an existing folder ignoring case, spacing and punctuation. When a part doesn't exist the result says found: false, names the missing part and lists what is there (siblings) — propose a (new) folder or ask about a near-miss. Read-only: it never creates, moves or renames anything.`,
+Pass a path such as "Clients", "Clients/Caliber Projects", "Clients/Caliber Projects/CanExport", "Programs/WorkBC Wage Subsidy" or "Departments"; "" lists the top level. Each part matches an existing folder ignoring case, spacing and punctuation. A client is also found by the start of its name ("Clients/Caliber" finds "Caliber Projects"); the result then says which folder matched (matched_by_prefix), and several matches come back as ambiguous. When a part doesn't exist the result says found: false, names the missing part and lists what is there (siblings) — propose a (new) folder or ask about a near-miss. Read-only: it never creates, moves or renames anything.`,
   input_schema: {
     type: 'object',
     properties: {
@@ -2595,7 +2595,7 @@ Limits are enforced in code: the file must be in Granted Files, Granted Archive,
       type: 'object',
       properties: {
         file: { type: 'string', description: 'The file: a Drive link or file ID.' },
-        destination_path: { type: 'string', description: 'Optional. Folder path inside Granted Files, e.g. "Departments/AI/_test" or "Clients/Acuva/CanExport/Acuva-CanExport-2026/Claims/202609".' },
+        destination_path: { type: 'string', description: 'Optional. Folder path inside Granted Files, e.g. "Departments/AI/_test" or "Clients/Caliber Projects/CanExport/2026/Claims/202609".' },
         new_name: { type: 'string', description: 'Optional. The new file name, from the filing skill. An uploaded file keeps its extension.' }
       },
       required: ['file']

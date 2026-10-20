@@ -493,7 +493,7 @@ export async function childFolders(drive, parentId) {
 }
 
 /**
- * List the subfolders at a path in Granted Files, e.g. "Clients/Acuva/CanExport".
+ * List the subfolders at a path in Granted Files, e.g. "Clients/Caliber Projects/CanExport".
  * Folders only (shortcuts and files are left out). Each path part matches an
  * existing folder ignoring case, spacing and punctuation.
  *
@@ -509,24 +509,38 @@ export async function childFolders(drive, parentId) {
  * matches one existing folder (folderKey). Stops at the first part that is
  * missing or ambiguous.
  *
+ * clientPrefix (opt-in, lookup only): a client folder directly under Clients/
+ * with no exact match falls back to folders whose folderKey starts with the
+ * typed key ("Caliber" → "Caliber Projects"). One hit is used and recorded in
+ * prefixMatches; several are ambiguous. An exact match always wins. The move
+ * and briefing callers leave it off and keep exact matching.
+ *
  * @returns {Promise<{names: string[], ids: string[], parentId: string,
- *   missingAt?: number, ambiguousAt?: number, siblings?: string[], candidates?: string[]}>}
+ *   missingAt?: number, ambiguousAt?: number, siblings?: string[], candidates?: string[],
+ *   prefixMatches?: {at: number, typed: string, matched: string}[]}>}
  *   names/ids are the resolved parts; parentId the deepest resolved folder.
  */
-export async function resolveGrantedFilesPath(drive, parts) {
+export async function resolveGrantedFilesPath(drive, parts, { clientPrefix = false } = {}) {
   const names = [];
   const ids = [];
+  const prefixMatches = [];
+  const withPrefixes = r => (prefixMatches.length ? { ...r, prefixMatches } : r);
   let parentId = GRANTED_FILES_DRIVE_ID;
   for (let i = 0; i < parts.length; i++) {
     const { folders } = await childFolders(drive, parentId);
-    const hits = folders.filter(f => folderKey(f.name) === folderKey(parts[i]));
-    if (hits.length === 0) return { names, ids, parentId, missingAt: i, siblings: folders.map(f => f.name) };
-    if (hits.length > 1) return { names, ids, parentId, ambiguousAt: i, candidates: hits.map(f => f.name) };
+    const key = folderKey(parts[i]);
+    let hits = folders.filter(f => folderKey(f.name) === key);
+    if (hits.length === 0 && clientPrefix && i === 1 && folderKey(names[0]) === folderKey('Clients') && key) {
+      hits = folders.filter(f => folderKey(f.name).startsWith(key));
+      if (hits.length === 1) prefixMatches.push({ at: i, typed: parts[i], matched: hits[0].name });
+    }
+    if (hits.length === 0) return withPrefixes({ names, ids, parentId, missingAt: i, siblings: folders.map(f => f.name) });
+    if (hits.length > 1) return withPrefixes({ names, ids, parentId, ambiguousAt: i, candidates: hits.map(f => f.name) });
     names.push(hits[0].name);
     ids.push(hits[0].id);
     parentId = hits[0].id;
   }
-  return { names, ids, parentId };
+  return withPrefixes({ names, ids, parentId });
 }
 
 export async function listGrantedFilesFolders(folderPath = '', userEmail = null) {
@@ -538,13 +552,16 @@ export async function listGrantedFilesFolders(folderPath = '', userEmail = null)
 
   try {
     const drive = createDriveClient(userEmail, true);
-    const walk = await resolveGrantedFilesPath(drive, parts);
+    const walk = await resolveGrantedFilesPath(drive, parts, { clientPrefix: true });
     const resolved = walk.names;
+    const prefix = walk.prefixMatches?.length
+      ? { matched_by_prefix: walk.prefixMatches.map(m => ({ typed: m.typed, matched: m.matched })), prefix_note: walk.prefixMatches.map(m => `Matched "${m.typed}" to "${m.matched}".`).join(' ') }
+      : {};
     if (walk.missingAt !== undefined) {
       const part = parts[walk.missingAt];
       return {
         success: true, found: false, drive: 'Granted Files',
-        resolved_path: resolved.join('/'), missing: part,
+        resolved_path: resolved.join('/'), missing: part, ...prefix,
         note: `No folder matching "${part}" under "${resolved.join('/') || 'Granted Files'}". Propose it as (new), or ask if a near-miss below is meant.`,
         siblings: walk.siblings
       };
@@ -553,7 +570,7 @@ export async function listGrantedFilesFolders(folderPath = '', userEmail = null)
       const part = parts[walk.ambiguousAt];
       return {
         success: true, found: false, drive: 'Granted Files',
-        resolved_path: resolved.join('/'), ambiguous: part,
+        resolved_path: resolved.join('/'), ambiguous: part, ...prefix,
         note: `More than one folder matches "${part}". Ask which one.`,
         candidates: walk.candidates
       };
@@ -564,7 +581,7 @@ export async function listGrantedFilesFolders(folderPath = '', userEmail = null)
     console.log(`✓ Granted Files folders at "${resolved.join('/') || '(root)'}": ${folders.length}${truncated ? ' (truncated)' : ''}`);
     return {
       success: true, found: true, drive: 'Granted Files',
-      path: resolved.join('/'), truncated, count: folders.length,
+      path: resolved.join('/'), ...prefix, truncated, count: folders.length,
       subfolders: folders.map(f => f.name)
     };
   } catch (error) {
