@@ -12,6 +12,17 @@ Format:
 
 ---
 
+## 2026-10-20 — Steph brief card redesign: Start here, consequence order, counts-only footer
+**What:** The brief card is rebuilt to read in about 90 seconds:
+- **Top:** "Good morning, Steph" with the date and counts (this fixes "Invalid Date": pg returns `DATE` as a JS Date), then a fixed explainer, then **Start here** (the top 1–2 by `rankItems`: verify-by-phone first, then deadlines, money, follow-ups, each with what happens if it waits).
+- **Groups:** consequence-ordered with counts. Clients, leads and promises in full detail (what's going on, draft says or before you send, checked sources, Open draft); the rest on one line.
+- **Overflow:** the 10 most urgent in layout, then "+N more".
+- **Footer:** counts only, covered and kept out of the way. FYIs are counted, not listed.
+
+The data the card needs is stored per item (migration 053).
+**Why:** The inbox-manager digest format calls for headline, then consequence ranking, then filed mail as counts. The old card was a flat list. Start here uses fixed rules, not a model call: the inputs (badges, due dates, urgency, nudges) already exist, and a template reason can't invent a consequence. "+N more" is capped at 30 rows because Chat cards top out at 100 widgets. Promise badges now read "You promised to …".
+**Impact:** `src/cards/brief-card.js`, new `src/services/steph-brief-rank.js`, data-only edits in `src/services/steph-brief{,-context,-classify,-promises,-triage}.js`, `migrations/053_steph_brief_card.sql`, `docs/oracle.md`, tests `brief-card`, `steph-brief`, `steph-brief-triage`, `steph-brief-pieces`, `gmail`
+
 ## 2026-10-20 — Steph brief triage behaviours from the inbox-manager review
 **What:** Six triage changes and four hardening rules, taken from Anthropic's inbox-manager skill (SKILL.md, triage_rules.md, gotchas.md):
 - **Window:** a 14-day reading window replaces "since the last run".

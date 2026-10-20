@@ -288,7 +288,8 @@ describe('decideItemType', () => {
   });
   test('promise and unsure groups have card labels and an order', () => {
     expect(T.GROUP_ORDER[0]).toBe('promise');
-    expect(T.GROUP_ORDER.indexOf('other')).toBeLessThan(T.GROUP_ORDER.indexOf('docs'));
+    expect(T.GROUP_ORDER).toEqual(['promise', 'client', 'partner', 'lead', 'team', 'government', 'docs', 'other']);
+    expect(T.GROUP_LABELS.docs).toBe('Docs that need you');
     expect(T.GROUP_LABELS.promise).toBe('Your promises');
     expect(T.GROUP_LABELS.other).toBe('Not sure if this needs you');
   });

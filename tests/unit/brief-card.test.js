@@ -34,73 +34,203 @@ function db(items, run = {}) {
 const press = (o = {}) => ({ parameters: { action: 'brief.done', runId: '5', itemId: IDS[0] }, actorChatId: 'users/steph', messageName: 'spaces/x/messages/1', ...o });
 const texts = (cards) => JSON.stringify(cards);
 
-describe('renderBrief', () => {
-  const items = [
-    ITEM({ id: IDS[1], category: 'lead', sender: 'Lee Lead', subject: 'Funding?', facts_line: 'Calculator: revenue $500K–$1M · est. $45,000' }),
-    ITEM({ id: IDS[0], nudge: 2, first_inbound_at: new Date(Date.now() - 6 * 864e5), carry: 'from yesterday' }),
-    ITEM({ id: IDS[2], category: 'team', state: 'done', sender: 'Tom', subject: 'Invoice' })
-  ];
-  const cards = K.renderBrief({ id: 5, local_date: '2026-10-20', counts: { automated: 4, vendor: 2, auto_done: 1 } }, items);
-  const t = texts(cards);
+// ── Rendering ───────────────────────────────────────────────────────────────
+const NOW = Date.parse('2026-10-20T15:00:00Z');
+const DAY = 864e5;
+const RUN = (o = {}) => ({ id: 5, local_date: new Date(2026, 9, 20), is_test: false, owner_email: 'ssang@granted.ca', counts: {}, ...o });
+const render = (items, run = RUN(), opts = {}) => K.renderBrief(run, items, { now: NOW, ...opts });
+const card = (cards) => cards[0].card;
+const headers = (cards) => card(cards).sections.map(sec => sec.header).filter(Boolean);
+const decos = (cards) => card(cards).sections.flatMap(sec => sec.widgets).filter(w => w.decoratedText).map(w => w.decoratedText);
+const buttonsOf = (cards) => card(cards).sections.flatMap(sec => sec.widgets).filter(w => w.buttonList).map(w => w.buttonList.buttons);
+const footerLines = (cards) => card(cards).sections.at(-1).widgets.map(w => w.textParagraph?.text || '');
+let n = 0;
+const ID = () => `00000000-0000-4000-8000-${String(++n).padStart(12, '0')}`;
+const it = (o) => ITEM({ id: ID(), state: 'open', draft_ids: [], nudge: 0, first_inbound_at: new Date(NOW - DAY), thread_ids: [`t${n}`], item_type: 'mail', sources: [], ...o });
 
-  test('groups in card order with counts; header names the day', () => {
-    expect(t.indexOf('Clients (1)')).toBeLessThan(t.indexOf('Leads (1)'));
-    expect(t.indexOf('Leads (1)')).toBeLessThan(t.indexOf('Team (1)'));
-    expect(cards[0].card.header.title).toBe('Morning brief · Tue, Oct 20');
-    expect(cards[0].card.header.subtitle).toBe('2 to answer · 3 drafts saved');
+describe('header and explainer', () => {
+  test('the brief\'s local date — from a pg Date or a string — never "Invalid Date"', () => {
+    expect(K.briefDate(new Date(2026, 9, 20))).toBe('Tue Oct 20');
+    expect(K.briefDate('2026-10-20')).toBe('Tue Oct 20');
+    expect(K.briefDate('2026-10-20T00:00:00.000Z')).toBe('Tue Oct 20');
+    expect(JSON.stringify(render([it({})]))).not.toContain('Invalid Date');
   });
-  test('nudge, carry-over, draft marker and lead facts on open items', () => {
-    expect(t).toContain('2nd nudge · 6 days');
-    expect(t).toContain('from yesterday');
-    expect(t).toContain('draft saved');
-    expect(t).toContain('est. $45,000');
+  test('"Good morning, Steph" · date · N need you · M drafted; dry run marked', () => {
+    const items = [it({ draft_ids: ['d'], draft_message_id: 'm1' }), it({}), it({ state: 'done' }), it({ no_reply: true })];
+    expect(card(render(items)).header).toEqual({ title: 'Good morning, Steph', subtitle: 'Tue Oct 20 · 2 emails need you · 1 reply drafted' });
+    expect(card(render([it({ draft_preview: 'x' })], RUN({ is_test: true }))).header.title).toBe('DRY RUN — Good morning, Steph');
   });
-  test('Done buttons on open items only; done items struck through', () => {
-    const buttons = [];
-    JSON.stringify(cards, (k, v) => { if (k === 'button' && v?.text) buttons.push(v); return v; });
-    expect(buttons).toHaveLength(2);
-    expect(buttons[0].onClick.action.parameters).toEqual(expect.arrayContaining([{ key: 'action', value: 'brief.done' }, { key: 'runId', value: '5' }]));
-    expect(t).toContain('✅ <s>');
-  });
-  test('footer counts skipped and auto-ticked mail', () => {
-    expect(t).toContain('1 ticked off — you replied.');
-    expect(t).toContain('4 automated · 2 vendor pitches skipped.');
-  });
-  test('an empty brief says so', () => {
-    expect(texts(K.renderBrief({ id: 1, local_date: '2026-10-20' }, []))).toContain('Nothing unanswered');
-  });
-  test('item cap with "N more"', () => {
-    const many = Array.from({ length: K.MAX_ITEMS + 3 }, (_, i) => ITEM({ id: `${i}`, sender: `S${i}` }));
-    expect(texts(K.renderBrief({ id: 1, local_date: '2026-10-20' }, many))).toContain('3 more not shown.');
-  });
-  test('dry run: header says so, drafts shown, none saved', () => {
-    const c = K.renderBrief({ id: 2, local_date: '2026-10-20', is_test: true }, [ITEM({ id: IDS[0], draft_ids: [], draft_preview: 'Arie,\n\nHello' })]);
-    expect(c[0].card.header.title).toMatch(/^DRY RUN/);
-    expect(texts(c)).toContain('Hello');
-    expect(texts(c)).toContain('draft (dry run — not saved)');
-  });
-  test('dry run: per-draft model + cost, the comparison, and the run total at the bottom', () => {
-    const c = K.renderBrief({ id: 2, local_date: '2026-10-20', is_test: true, counts: { cost: { classify: 0.0012, drafting: 0.009, oracle: 0.41, website: 0.002, search_fees: 0.02, compare: 0.05, total: 0.4922 } } },
-      [ITEM({ id: IDS[0], draft_ids: [], draft_preview: 'Arie,\n\nHello', model: 'claude-sonnet-5-5', cost_usd: 0.41,
-        compare: { label: 'Haiku version', model: 'claude-haiku-4-5-20251001', draft: 'Arie,\n\nHi there', cost_usd: 0.004 } })]);
-    const t = texts(c);
-    expect(t).toContain('Draft · Sonnet · $0.410');
-    expect(t).toContain('Haiku version · Haiku · $0.0040');
-    expect(t).toContain('Hi there');
-    const footer = c[0].card.sections.at(-1).widgets[0].textParagraph.text;
-    expect(footer).toContain('Run cost $0.492 — classify $0.0012 · drafts $0.0090 · Oracle $0.410 · web lookups $0.0020 · search fees $0.020 · comparison $0.050');
-  });
-  test('the real card shows no cost, and marks no-reply items', () => {
-    const c = K.renderBrief({ id: 3, local_date: '2026-10-20', counts: { cost: { total: 1 } } }, [ITEM({ id: IDS[0], no_reply: true, draft_ids: [], model: 'x', cost_usd: 0.4 })]);
-    expect(texts(c)).not.toContain('Run cost');
-    expect(texts(c)).not.toContain('$0.4');
-    expect(texts(c)).toContain('no reply needed');
-  });
-  test('user text is escaped', () => {
-    const c = K.renderBrief({ id: 1, local_date: '2026-10-20' }, [ITEM({ id: IDS[0], subject: '<script>x</script>' })]);
-    expect(texts(c)).not.toContain('<script>');
+  test('the explainer, word for word, first', () => {
+    const first = card(render([it({})])).sections[0].widgets[0].textParagraph.text;
+    expect(first).toContain('Each item is an email waiting on you. I read the thread, checked HubSpot, Drive, Granola and Chat, and saved a reply in your Gmail drafts. Open it, edit, send. Replying ticks it off here automatically. Press Done if you handled it another way.');
   });
 });
+
+describe('Start here', () => {
+  const startText = (cards) => card(cards).sections.find(sec => /Start here/.test(sec.header || ''))?.widgets[0].textParagraph.text || '';
+  test('"Verify by phone first" always first, even against an overdue promise and a 3rd follow-up', () => {
+    const items = [
+      it({ category: 'promise', item_type: 'promise', sender: 'Ricky', badge: 'You promised to send the budget · due Mon, Oct 19 (1 day ago)', due_on: '2026-10-19' }),
+      it({ category: 'client', sender: 'Nudger', nudge: 3, first_inbound_at: new Date(NOW - 9 * DAY) }),
+      it({ category: 'other', item_type: 'safety', sender: 'Accounts', badge: 'Verify by phone first' })
+    ];
+    const text = startText(render(items));
+    expect(text.indexOf('Accounts')).toBeLessThan(text.indexOf('Ricky'));
+    expect(text).toContain('Verify it by phone before anything moves');
+    expect(text).toContain("Then <b>Ricky</b> — you said you'd send the budget by Mon, Oct 19; it's 1 day late.");
+    expect(text).not.toContain('Nudger');                                // at most 2
+  });
+  test('then the soonest deadline, then money, then follow-ups; nothing urgent → no Start here', () => {
+    const R = await_import_rank();
+    const ranked = R.rankItems([
+      it({ sender: 'Follow', nudge: 2 }),
+      it({ sender: 'Money', finance: true }),
+      it({ category: 'team', item_type: 'bill', sender: 'BillLate', badge: 'Bill · $90 due Oct 31', due_on: '2026-10-31' }),
+      it({ category: 'promise', item_type: 'promise', sender: 'PromiseSoon', badge: 'You promised to call · due today', due_on: '2026-10-20' }),
+      it({ sender: 'Today', urgency: 3 })
+    ], { today: '2026-10-20', now: NOW }).map(r => r.item.sender);
+    expect(ranked).toEqual(['PromiseSoon', 'Today', 'BillLate', 'Money', 'Follow']);
+    expect(startText(render([it({}), it({})]))).toBe('');
+  });
+  test('reasons say what happens if it waits', () => {
+    const R = await_import_rank();
+    const reason = (o) => R.urgencyOf(it(o), { today: '2026-10-20', now: NOW }).reason;
+    expect(reason({ item_type: 'bill', badge: 'Bill · $1,250.00 due Oct 31, 2026', due_on: '2026-10-31' })).toBe('$1,250.00 is due Sat, Oct 31; late after that');
+    expect(reason({ item_type: 'unhappy' })).toBe('an unhappy client; a call today stops it escalating');
+    expect(reason({ nudge: 2, first_inbound_at: new Date(NOW - 6 * DAY) })).toBe('2nd follow-up in 6 days; another day risks losing them');
+    expect(reason({ urgency: 3 })).toBe('they need an answer today');
+  });
+});
+
+describe('groups and layout', () => {
+  test('order and "Label · n" headers', () => {
+    const cats = ['other', 'docs', 'government', 'team', 'lead', 'partner', 'client', 'promise'];
+    const h = headers(render(cats.map(c => it({ category: c, item_type: c === 'promise' ? 'promise' : 'mail' }))));
+    expect(h.filter(x => !/Start here/.test(x))).toEqual(['Your promises · 1', 'Clients · 1', 'Partners · 1', 'Leads · 1', 'Team · 1', 'Government programs · 1', 'Docs that need you · 1', 'Not sure if this needs you · 1']);
+  });
+  test('Clients, Leads, promises in full detail: who, what\'s going on, draft says, checked; others one line', () => {
+    const cards = render([
+      it({ category: 'client', sender: 'Arie Vos', company: 'Vos Logistics', subject: 'Renewal', assessment: 'Renewal unsigned; e-contract expired Friday.',
+        draft_ids: ['d'], draft_message_id: 'm1', draft_text: "Arie,\n\nThe renewal came back unsigned. If you're good to go, I'll retrigger it.", sources: ['HubSpot', 'Drive'] }),
+      it({ category: 'partner', sender: 'Pat', subject: 'Webinar', assessment: 'Wants a co-host for Nov 12.' })
+    ]);
+    const [full, one] = decos(cards);
+    expect(full.text).toContain('<b>Arie Vos, Vos Logistics</b> — Renewal');
+    expect(full.text).toContain("<b>What's going on:</b> Renewal unsigned; e-contract expired Friday.");
+    expect(full.text).toContain('<b>Draft says:</b> The renewal came back unsigned.');
+    expect(full.text).toContain('Checked HubSpot, Drive');
+    expect(one.text).toBe('<b>Pat</b> — Wants a co-host for Nov 12. <font color="#5f6368">· No draft</font>');
+    expect(one.text).not.toContain("What's going on");
+  });
+  test('"Before you send" for holding replies; "No draft — why" for safety, sensitive, bill, unsure, promise', () => {
+    const held = decos(render([it({ category: 'client', held: true, draft_ids: ['d'], draft_message_id: 'm', note: 'Unclear: whether the decision letter arrived — ask Ruk.' })]))[0];
+    expect(held.topLabel).toContain('Holding reply · check first');
+    expect(held.text).toContain('<b>Before you send:</b> whether the decision letter arrived — ask Ruk.');
+    const why = (o) => decos(render([it({ category: 'client', ...o })]))[0].text;
+    expect(why({ item_type: 'safety', badge: 'Verify by phone first' })).toContain('<b>No draft</b> — verify the request by phone first');
+    expect(why({ item_type: 'sensitive', badge: 'Sensitive · write this yourself' })).toContain('<b>No draft</b> — write this one yourself');
+    expect(why({ category: 'promise', item_type: 'promise', badge: 'You promised to x · due today' })).toContain("<b>No draft</b> — the facts to keep this promise aren't in the thread");
+    expect(why({})).toContain("<b>No draft</b> — past today's draft limit");
+  });
+  test('every badge', () => {
+    const top = (o) => decos(render([it(o)], RUN(), {}))[0].topLabel;
+    expect(top({ nudge: 2, first_inbound_at: new Date(NOW - 6 * DAY) })).toBe('2nd follow-up · 6 days');
+    expect(top({ carry: 'from yesterday' })).toBe('From yesterday');
+    expect(top({ carry: '3 days' })).toBe('Waiting 3 days');
+    expect(top({ sent_to: 'Patty Lim' })).toBe('Sent to Patty Lim');
+    expect(top({ item_type: 'unhappy', badge: 'Unhappy client · call recommended', draft_ids: ['d'] })).toBe('Unhappy client · call recommended');
+    expect(top({ item_type: 'sensitive', badge: 'Sensitive · write this yourself' })).toBe('Sensitive · write this yourself');
+    expect(top({ category: 'partner', item_type: 'safety', badge: 'Verify by phone first' })).toBe('Verify by phone first');
+    expect(top({ category: 'promise', item_type: 'promise', badge: 'You promised to send the budget · due today' })).toBe('You promised to send the budget · due today');
+    expect(top({ held: true, draft_ids: ['d'] })).toBe('Holding reply · check first');
+    expect(top({})).toBeUndefined();
+  });
+  test('Open draft with a saved draft, Open email without, Open doc for Drive items; Done everywhere open', () => {
+    const b = buttonsOf(render([
+      it({ category: 'client', draft_ids: ['d'], draft_message_id: '18f2a9c0' , thread_ids: ['th1'] }),
+      it({ category: 'partner', thread_ids: ['th2'] }),
+      it({ category: 'docs', item_key: 'doc:1AbCdEfGhIjKlMnOpQrStUvWxYz012345', thread_ids: ['th3'] })
+    ]));
+    expect(b[0].map(x => x.text)).toEqual(['Open draft', 'Done']);
+    expect(b[0][0].onClick.openLink.url).toBe('https://mail.google.com/mail/u/ssang%40granted.ca/#drafts?compose=18f2a9c0');
+    expect(b[1].map(x => x.text)).toEqual(['Open email', 'Done']);
+    expect(b[1][0].onClick.openLink.url).toBe('https://mail.google.com/mail/u/ssang%40granted.ca/#all/th2');
+    expect(b[2].map(x => x.text)).toEqual(['Open doc', 'Done']);
+    expect(b[2][0].onClick.openLink.url).toBe('https://drive.google.com/open?id=1AbCdEfGhIjKlMnOpQrStUvWxYz012345');
+    const doneParams = b[0][1].onClick.action.parameters;
+    expect(doneParams).toEqual(expect.arrayContaining([{ key: 'action', value: 'brief.done' }, { key: 'runId', value: '5' }]));
+  });
+  test('one-line safety items keep "Verify by phone first" and the lookalike note; owner suggestion on no-draft lines', () => {
+    const [safety, bill] = decos(render([
+      it({ category: 'partner', item_type: 'safety', badge: 'Verify by phone first', note: "Sender domain acme.co looks like acme.com but isn't." }),
+      it({ category: 'team', item_type: 'bill', badge: 'Bill · $90 due Oct 31', owner_hint: 'Tom (finance)' })
+    ]));
+    expect(safety.topLabel).toBe('Verify by phone first');
+    expect(safety.text).toContain("⚠️ Sender domain acme.co looks like acme.com but isn't.");
+    expect(bill.text).toContain('No draft; suggest Tom (finance)');
+  });
+  test('done items are struck through, without buttons', () => {
+    const cards = render([it({ state: 'done' }), it({})]);
+    expect(JSON.stringify(cards)).toContain('✅ <s>');
+    expect(buttonsOf(cards)).toHaveLength(1);
+  });
+});
+
+describe('length cap', () => {
+  test('more than 10: the 10 most urgent in layout, then "+N more" rows with an open link and Done', () => {
+    const items = Array.from({ length: 14 }, (_, i) => it({ category: 'partner', sender: `S${i}`, subject: `Subj ${i}`, nudge: i < 3 ? 2 : 0 }));
+    items.push(it({ category: 'other', item_type: 'safety', badge: 'Verify by phone first', sender: 'Fraud' }));
+    const cards = render(items);
+    const sections = card(cards).sections;
+    const more = sections.find(sec => /^\+\d+ more$/.test(sec.header || ''));
+    expect(more.header).toBe('+5 more');
+    expect(more.widgets).toHaveLength(5);
+    expect(more.widgets[0].decoratedText.text).toMatch(/<b>S\d+<\/b> — Subj \d+ · <a href="https:\/\/mail\.google\.com\/mail\/u\/ssang%40granted\.ca\/#all\/t\d+">Open email<\/a>/);
+    expect(more.widgets[0].decoratedText.button.text).toBe('Done');
+    const shown = sections.filter(sec => sec !== more).flatMap(sec => sec.widgets).filter(w => w.decoratedText).map(w => w.decoratedText.text);
+    expect(shown.some(t => t.includes('Fraud'))).toBe(true);                 // the urgent ones stay in layout
+    expect(shown.filter(t => /<b>S[012]<\/b>/.test(t))).toHaveLength(3);    // follow-ups outrank the rest
+    const widgets = sections.reduce((a, sec) => a + sec.widgets.length, 0);
+    expect(widgets).toBeLessThan(100);
+  });
+  test('an empty brief says so', () => {
+    expect(JSON.stringify(render([]))).toContain('Nothing waiting on you in the last 14 days.');
+  });
+});
+
+describe('footer', () => {
+  test('covered and kept-out counts, never itemised; FYIs counted, not listed', () => {
+    const cards = render([it({ sender: 'Visible' }), it({ sender: 'Fyi Person', no_reply: true }), it({ sender: 'Fyi Two', no_reply: true })],
+      RUN({ counts: { covered: [{ by: 'Ruk Ali', threads: 2 }, { by: 'Tom', threads: 1 }], automated: 9, handled: 3, notifications_dropped: 2, vendor: 4, former_staff_kept_out: 5, auto_done: 1 } }));
+    const lines = footerLines(cards).join('\n');
+    expect(lines).toContain('Covered by colleagues: Ruk Ali (2), Tom (1).');
+    expect(lines).toContain('Kept out of your way: 14 notifications, 4 sales pitches, 2 FYIs (no reply needed), 5 emails to former staff.');
+    expect(JSON.stringify(cards)).not.toContain('Fyi Person');
+  });
+  test('zero parts are dropped; no covered line when none', () => {
+    const lines = footerLines(render([it({})], RUN({ counts: { vendor: 1 } }))).join('\n');
+    expect(lines).toBe('<font color="#5f6368">Kept out of your way: 1 sales pitch.</font>');
+    expect(K.keptOutLine({}, 0)).toBeNull();
+    expect(K.coveredLine({ covered: [] })).toBeNull();
+  });
+  test('no money on real runs; the cost line stays on dry runs', () => {
+    const counts = { cost: { classify: 0.0012, drafting: 0.009, oracle: 0.41, website: 0.002, search_fees: 0.02, compare: 0.05, total: 0.4922 } };
+    expect(JSON.stringify(render([it({ draft_ids: ['d'], cost_usd: 0.4, model: 'claude-sonnet-5-5' })], RUN({ counts })))).not.toMatch(/\$0\.4|Run cost/);
+    const dry = render([it({ draft_preview: 'Arie,\n\nHello', model: 'claude-sonnet-5-5', cost_usd: 0.41,
+      compare: { label: 'Haiku version', model: 'claude-haiku-4-5-20251001', draft: 'Arie,\n\nHi there', cost_usd: 0.004 } })], RUN({ is_test: true, counts }));
+    const t = JSON.stringify(dry);
+    expect(t).toContain('Run cost $0.492 — classify $0.0012 · drafts $0.0090 · Oracle $0.410 · web lookups $0.0020 · search fees $0.020 · comparison $0.050');
+    expect(t).toContain('Draft · Sonnet · $0.410');
+    expect(t).toContain('Haiku version · Haiku · $0.0040');
+  });
+  test('user text is escaped', () => {
+    expect(JSON.stringify(render([it({ subject: '<script>x</script>' })]))).not.toContain('<script>');
+  });
+});
+
+// rank helpers, loaded once (top-level await is fine in ESM tests)
+const RANK = await import('../../src/services/steph-brief-rank.js');
+function await_import_rank() { return RANK; }
 
 describe('handleBriefClick', () => {
   test('the recipient presses Done: state updated, card rebuilt and returned, message patched', async () => {

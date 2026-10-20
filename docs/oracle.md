@@ -673,7 +673,7 @@ one- or two-line assessment, an in-thread Gmail **draft** saved in her mailbox, 
 button.
 
 - **Gate:** `STEPH_BRIEF_ENABLED` must be exactly `true`. The run also needs her Gmail
-  connected (see the Gmail section) and migrations 051 and 052. If `gmail_connected_at` is
+  connected (see the Gmail section) and migrations 051–053. If `gmail_connected_at` is
   null, the run is skipped and **nothing is posted**.
 - **Window:** the last 14 days (`READ_DAYS`). That covers every thread still unanswered by
   her whose latest inbound arrived in that time; new mail from the last 48 h is inside it
@@ -798,12 +798,46 @@ button.
   - Done and auto_done items come back only when new mail arrives after they were closed.
   - Docs items have no reply signal, so they stay open until Done.
   - An item whose thread failed to load is never auto-ticked.
-- **Card** (`src/cards/brief-card.js`): not a tracked card. Its Done button runs through
-  the `brief.*` branch at the top of `pressAnswer` (`actions.js`), next to `pending.*`.
-  Only the run's recipient can press it. The press updates the row, answers
-  `updateMessageResponse` with the rebuilt card, and patches the message with
-  `patchCard`. Buttons carry the run id, so Done on an old brief re-renders that brief.
-  The card shows at most 40 items, then "N more".
+- **Card** (`src/cards/brief-card.js`), laid out to read in about 90 seconds (inbox-manager
+  `digest_format.md`):
+  - **Header:** "Good morning, Steph", then the date, "N emails need you" and "M replies
+    drafted". The date comes from `local_date` via `ymd`, because pg returns `DATE` as a
+    JS Date. That fixed the old "Invalid Date".
+  - **Explainer:** a fixed sentence every day saying what an item is and what Done means.
+  - **Start here:** the 1–2 most urgent items, each with what happens if it waits.
+    `rankItems` in `steph-brief-rank.js` (pure, no model) decides the order:
+    "Verify by phone first" always first; then deadlines (promises, bills, needs an answer
+    today, soonest first); then money or an unhappy client; then follow-ups.
+  - **Groups:** Your promises → Clients → Partners → Leads → Team → Government → Docs that
+    need you → Not sure if this needs you, each headed "Label · n".
+  - **Full detail** for promises, clients and leads:
+    - badges;
+    - "**Sender, Company** — subject";
+    - "What's going on";
+    - one of "Draft says" (its first sentence), "Before you send" (for a holding
+      reply, from its Unclear note), or "No draft — why";
+    - "Checked <sources>";
+    - Open draft (`#drafts?compose=<messageId>`) or Open email (`#all/<threadId>`),
+      plus Done.
+  - **One line** for the other groups: badge, **sender**, summary, "No draft; suggest
+    <owner>". Safety items keep the badge and the lookalike note. Docs get Open doc.
+  - **Badges:** follow-up count, "From yesterday" or "Waiting N days", "Sent to <ex-staff>",
+    "Holding reply · check first", and the Task A type badges.
+  - **Length cap:** past the 10 most urgent, a "+N more" section has one row per item
+    (sender, subject, open link, Done). It's capped at 30 rows to stay under Chat's
+    100-widget limit.
+  - **Footer, counts only:**
+    - "Covered by colleagues: <name> (n)";
+    - "Kept out of your way: X notifications, Y sales pitches, Z FYIs (no reply needed),
+      W emails to former staff". FYIs are counted here, not listed;
+    - dry runs add the cost line beneath. Real runs show no money.
+  - **Data the card reads** (migration 053, data only): `urgency`, `finance`, `due_on`,
+    `held`, `sources`, `draft_message_id`, `company`, `sent_to`.
+  - **Done** works as before. It is not a tracked card: it runs through the `brief.*`
+    branch at the top of `pressAnswer` (`actions.js`), next to `pending.*`, and only the
+    run's recipient can press it. The press updates the row, answers
+    `updateMessageResponse` with the rebuilt card, and patches the message. Buttons carry
+    the run id, so Done on an old brief re-renders that brief.
 - **Manual trigger:** `POST /api/admin/steph-brief-run?secret=…`. It needs an admin
   session plus `MIGRATION_SECRET` (or `JWT_SECRET`), the same gate as gg3-refresh.
   - **Dry run (the default):** reads her mail and makes the drafting calls and client

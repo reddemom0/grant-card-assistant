@@ -111,7 +111,8 @@ export function duePromiseItems(promises, threadsById, { today }) {
       item_key: `promise:${p.thread.id}`,
       category: 'promise',
       item_type: 'promise',
-      badge: `You promised ${p.what} · due ${whenLabel(p.due_date, today)}`,
+      // "what" is a verb phrase ("send the budget"): "You promised to send the budget".
+      badge: `You promised ${/^to /i.test(p.what) ? '' : 'to '}${p.what} · due ${whenLabel(p.due_date, today)}`,
       draft: p.confirmable ? 'promise' : 'none',
       sender: to,
       sender_address: toAddress,

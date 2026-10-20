@@ -43,9 +43,9 @@ describe('promises', () => {
     const items = P.duePromiseItems(promises, new Map([['t1', t1], ['t2', t2], ['t3', { id: 't3', messages: [] }]]), { today: '2026-10-20' });
     expect(items).toHaveLength(1);
     expect(items[0]).toMatchObject({ item_key: 'promise:t1', item_type: 'promise', category: 'promise', draft: 'none',
-      badge: 'You promised send the budget · due Wed, Oct 14 (6 days ago)', sender: 'Ricky Cedar', sender_address: 'ricky@cedar.ca' });
+      badge: 'You promised to send the budget · due Wed, Oct 14 (6 days ago)', sender: 'Ricky Cedar', sender_address: 'ricky@cedar.ca' });
     const today = P.duePromiseItems([{ ...promises[0], due_date: '2026-10-20', confirmable: true }], new Map([['t1', t1]]), { today: '2026-10-20' });
-    expect(today[0]).toMatchObject({ badge: 'You promised send the budget · due today', draft: 'promise' });
+    expect(today[0]).toMatchObject({ badge: 'You promised to send the budget · due today', draft: 'promise' });
   });
   test('extraction keeps only well-formed promises; no candidates → no call', async () => {
     const calls = [];

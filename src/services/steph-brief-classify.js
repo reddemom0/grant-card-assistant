@@ -155,7 +155,8 @@ export async function classifyItems(items, deps) {
     const is_bill = v.is_bill === true || billByCode;
     const sensitivity = ['unhappy', 'legal', 'dispute', 'negotiation', 'refund'].includes(v.sensitivity) ? v.sensitivity : null;
     if (is_bill && (category === 'vendor' || category === 'handled' || category === 'other')) category = 'team';
-    const typed = decideItemType({ category, safety, lookalike, sensitivity, is_bill, bill: is_bill && latest ? billSummary(latest) : null });
+    const bill = is_bill && latest ? billSummary(latest) : null;
+    const typed = decideItemType({ category, safety, lookalike, sensitivity, is_bill, bill });
     const lookalikeNote = lookalike
       ? (lookalike.similar === false
         ? `Sender domain ${lookalike.sender} doesn't match HubSpot (known: ${lookalike.known}).`
@@ -168,8 +169,12 @@ export async function classifyItems(items, deps) {
       lookalike,
       sensitivity,
       is_bill,
+      bill,
       ...typed,
       safety_note: lookalikeNote,
+      // For the card's "<Sender>, <Company>" line.
+      company: item.crm?.company?.name || item.crm?.contact?.company
+        || (typeof v.claimed_company === 'string' && v.claimed_company.trim() ? v.claimed_company.trim().slice(0, 80) : null),
       assessment: typeof v.assessment === 'string' ? v.assessment.trim().slice(0, 300) : null,
       about_company: v.about_company || null,
       finance: item.finance || v.finance === true,

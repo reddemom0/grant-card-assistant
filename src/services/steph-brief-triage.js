@@ -18,10 +18,11 @@ const DAY_MS = 24 * 3600 * 1000;
 
 /**
  * Card order. 'promise' (commitments she made that are due) leads — ranked by
- * consequence, not arrival. 'other' holds mail triage wasn't sure about
- * (surfaced, never dropped). 'docs' (Drive notifications) goes last.
+ * consequence, not arrival. 'docs' (Drive notifications that ask something
+ * of her) come next to last; 'other' — mail triage wasn't sure about,
+ * surfaced and never dropped — is last.
  */
-export const GROUP_ORDER = Object.freeze(['promise', 'client', 'partner', 'lead', 'team', 'government', 'other', 'docs']);
+export const GROUP_ORDER = Object.freeze(['promise', 'client', 'partner', 'lead', 'team', 'government', 'docs', 'other']);
 
 export const GROUP_LABELS = Object.freeze({
   promise: 'Your promises',
@@ -30,8 +31,8 @@ export const GROUP_LABELS = Object.freeze({
   lead: 'Leads',
   team: 'Team',
   government: 'Government programs',
-  other: 'Not sure if this needs you',
-  docs: 'Docs & comments'
+  docs: 'Docs that need you',
+  other: 'Not sure if this needs you'
 });
 
 /** How many days back the brief reads; older unanswered mail is left to the Stage 3 catch-up. */

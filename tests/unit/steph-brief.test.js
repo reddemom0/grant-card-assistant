@@ -60,7 +60,8 @@ function fakeDb({ connected = true, chrisConnected = false } = {}) {
         no_reply: p[19], model: p[20], cost_usd: p[21], input_tokens: p[22], output_tokens: p[23],
         cache_read_tokens: p[24], cache_write_tokens: p[25], tool_calls: p[26], tools_used: p[27], web_searches: p[28],
         conversation_id: p[29], compare: p[30], item_type: p[31], badge: p[32],
-        draft_text: p[33] ?? prev?.draft_text ?? null, draft_text_at: p[34] ?? prev?.draft_text_at ?? null
+        draft_text: p[33] ?? prev?.draft_text ?? null, draft_text_at: p[34] ?? prev?.draft_text_at ?? null,
+        urgency: p[35], finance: p[36], due_on: p[37], held: p[38], sources: p[39], draft_message_id: p[40], company: p[41], sent_to: p[42]
       };
       items.set(key, row);
       return { rows: [{ id: row.id }] };
@@ -96,11 +97,11 @@ const msg = (o) => ({ id: `m${++seq}`, from: 'Arie Client <arie@client.ca>', rep
   message_id: `<${seq}@x>`, references: '', ...o });
 const mine = (o) => msg({ from: `Steph <${ME}>`, labels: ['SENT'], from_user: true, ...o });
 
-function mailbox(threads) {
+function mailbox(threads, { formerStaff = [] } = {}) {
   const store = new Map(threads.map(t => [t.id, t]));
   return {
     store,
-    listThreadsSince: jest.fn(async () => ({ threads: [...store.keys()].map(id => ({ id })), missingLabels: [] })),
+    listThreadsSince: jest.fn(async () => ({ threads: [...store.keys()].map(id => ({ id, labels: formerStaff.includes(id) ? ['INBOX', 'Former staff'] : ['INBOX'] })), missingLabels: [] })),
     getThread: jest.fn(async (_u, id) => { if (!store.has(id)) throw new Error('gone'); return structuredClone(store.get(id)); })
   };
 }
@@ -114,7 +115,7 @@ function deps(mb, db, over = {}) {
     hasGmailScopes: jest.fn(async () => ({ ok: true })),
     listThreadsSince: mb.listThreadsSince,
     getThread: mb.getThread,
-    createDraftReply: jest.fn(async (_u, threadId) => ({ draftId: `d-${threadId}` })),
+    createDraftReply: jest.fn(async (_u, threadId) => ({ draftId: `d-${threadId}`, messageId: `m-${threadId}` })),
     findDm: jest.fn(async (chatId) => `spaces/dm-${chatId.split('/')[1]}`),
     postCard: jest.fn(async () => ({ messageName: 'spaces/x/messages/1' })),
     renderCard: async (runId, q) => { const l = await loadBriefCard(runId, q); return renderBrief(l.run, l.items); },
@@ -191,11 +192,11 @@ describe('runStephBrief', () => {
     expect(d.postCard).toHaveBeenCalledTimes(1);
     expect(d.postCard.mock.calls[0][0]).toBe('spaces/dm-steph');
     const text = cardText(d);
-    expect(text.indexOf('Clients (1)')).toBeGreaterThan(-1);
-    expect(text.indexOf('Clients (1)')).toBeLessThan(text.indexOf('Leads (1)'));
-    expect(text).toContain('draft saved');
-    expect(text).toContain('1 automated');
-    expect(text).toContain('1 vendor pitches');
+    expect(text.indexOf('Clients · 1')).toBeGreaterThan(-1);
+    expect(text.indexOf('Clients · 1')).toBeLessThan(text.indexOf('Leads · 1'));
+    expect(text).toContain('Draft says:');
+    expect(text).toContain('#drafts?compose=m-tc');
+    expect(text).toContain('Kept out of your way: 1 notification, 1 sales pitch.');
     expect(d.createDraftReply).toHaveBeenCalledTimes(2);
     expect(db.runs[0].status).toBe('done');
   });
@@ -248,7 +249,7 @@ describe('runStephBrief', () => {
     const r = await B.runStephBrief({ now: NOW, env: { STEPH_BRIEF_MAX_DRAFTS: '1' }, deps: d });
     expect(d.runAgent).toHaveBeenCalledTimes(1);
     expect(r.no_draft_cap).toBe(1);
-    expect(cardText(d)).toContain('no draft');
+    expect(cardText(d)).toContain('No draft');
     expect(cardText(d)).toContain('Haiku says hello.');
   });
 
@@ -319,8 +320,8 @@ describe('runStephBrief', () => {
     const items = [...db.items.values()];
     expect(items.find(i => i.item_key === 'arie@client.ca').state).toBe('auto_done');
     const text = cardText(d);
-    expect(text).toContain('from yesterday');
-    expect(text).toContain('1 ticked off — you replied.');
+    expect(text).toContain('From yesterday');
+    expect(text).toContain('1 ticked off since the last brief — you replied.');
     expect(text).not.toContain('Arie Client');
   });
 
@@ -336,7 +337,7 @@ describe('runStephBrief', () => {
     mb.store.get('tc').messages.push(msg({ internal_date: NOW.getTime() + 1.5 * DAY, body: 'Following up on this.' }));
     await B.runStephBrief({ now: new Date(NOW.getTime() + 2 * DAY), env: {}, deps: d });
     expect(cardText(d)).toContain('Arie Client');
-    expect(cardText(d)).toContain('2nd nudge');
+    expect(cardText(d)).toContain('2nd follow-up');
     expect([...db.items.values()].find(i => i.item_key === 'arie@client.ca').state).toBe('open');
   });
 
@@ -378,8 +379,9 @@ describe('cost trim', () => {
     expect(d.runAgent).not.toHaveBeenCalled();
     expect(d.createDraftReply).not.toHaveBeenCalled();
     const text = cardText(d);
-    expect(text).toContain('Fay');
-    expect(text).toContain('no reply needed');
+    // FYIs are counted in the footer, not listed.
+    expect(text).not.toContain('Fay');
+    expect(text).toContain('1 FYI (no reply needed)');
     expect([...db.items.values()][0]).toMatchObject({ no_reply: true, cost_usd: null });
   });
 
@@ -624,12 +626,12 @@ describe('triage behaviours', () => {
     const d = deps(mailbox([t]), db, { promises: [{ i: 0, what: 'send the budget', due_date: '2026-10-19', confirmable: false }] });
     const r = await B.runStephBrief({ now: NOW, env: {}, deps: d });
     const p = items(db).find(i => i.item_type === 'promise');
-    expect(p).toMatchObject({ category: 'promise', item_key: 'promise:tp1', badge: 'You promised send the budget · due Mon, Oct 19 (1 day ago)' });
+    expect(p).toMatchObject({ category: 'promise', item_key: 'promise:tp1', badge: 'You promised to send the budget · due Mon, Oct 19 (1 day ago)' });
     expect(p.draft_ids).toEqual([]);
     expect(drafts(d)).toHaveLength(0);                 // not confirmable → no draft
     expect(r.cost.promises).toBeGreaterThan(0);
     expect(d.logCost.mock.calls.some(([a]) => a.metadata.step === 'promises' && a.metadata.brief_run_id === 1)).toBe(true);
-    expect(cardText(d)).toContain('Your promises (1)');
+    expect(cardText(d)).toContain('Your promises · 1');
   });
 
   test('promise not due yet, or already followed up → no item; confirmable → a promise follow-up draft', async () => {
@@ -803,6 +805,33 @@ describe('triage behaviours', () => {
     expect(d.runAgent.mock.calls[0][0].message).toContain('<email from=');
     // The injection attempt became a safety item (wire request), not a draft.
     expect(items(db).find(i => i.item_key === 'eve@x.ca').item_type).toBe('safety');
+  });
+});
+
+// ── What the redesigned card reads (migration 053) ─────────────────────────
+describe('card data stored per item', () => {
+  test('draft message id, sources, company, due date, ex-staff recipient, held, urgency', async () => {
+    const db = fakeDb();
+    const exStaff = { id: 'xs', subject: 'Claim receipts', messages: [msg({ from: 'Officer <officer@gc.ca>', to: 'Patty Lim <patty@granted.ca>, ssang@granted.ca', subject: 'Claim receipts' })] };
+    const sentAt = NOW.getTime() - 6 * DAY;
+    const promise = { id: 'pr', subject: 'Budget', messages: [mine({ to: 'Ricky <ricky@cedar.ca>', body: "I'll send the budget Wednesday.", internal_date: sentAt })] };
+    const d = deps(mailbox([clientThread(), leadThread(), exStaff, promise], { formerStaff: ['xs'] }), db, {
+      promises: [{ i: 0, what: 'send the budget', due_date: '2026-10-14', confirmable: false }],
+      crmFacts: jest.fn(async (lead) => (lead.email === 'arie@client.ca' ? { found: true, exClient: true, openDeals: [], company: { name: 'Vos Logistics', domain: 'client.ca' } } : { found: false, openDeals: [] })),
+      verdict: (block) => ({ group: /lead@biz/.test(block) ? 'lead' : (/fixed group: (\w+)/.exec(block)?.[1] || 'partner'), urgency: /officer@gc/.test(block) ? 3 : 1, assessment: 'x', needs_reply: true })
+    });
+    const r = await B.runStephBrief({ now: NOW, env: {}, deps: d });
+    const byKey = Object.fromEntries([...db.items.values()].map(i => [i.item_key, i]));
+    expect(byKey['arie@client.ca']).toMatchObject({ draft_message_id: 'm-tc', company: 'Vos Logistics' });
+    expect(byKey['arie@client.ca'].sources).toEqual(['HubSpot', 'the web']);  // the fake Oracle used search_hubspot_contacts + web_search
+    expect(byKey['lead@biz.ca'].sources).toEqual(['HubSpot', 'their website', 'GetGranted']);
+    expect(byKey['officer@gc.ca']).toMatchObject({ sent_to: 'Patty Lim', urgency: 3 });
+    expect(byKey['promise:pr'].due_on).toBe('2026-10-14');
+    expect(byKey['arie@client.ca'].held).toBe(false);
+    expect(r.former_staff_kept_out).toBe(0);                                  // it became an item
+    const text = cardText(d);
+    expect(text).toContain('Sent to Patty Lim');
+    expect(text).toContain('Checked HubSpot, their website, GetGranted');
   });
 });
 

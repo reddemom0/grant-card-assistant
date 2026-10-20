@@ -64,7 +64,33 @@ const DRAFT_TIMEOUT_MS = 90_000;
 
 export function newLedger() {
   return { model: null, model_cost: 0, website: 0, search_fees: 0, input_tokens: 0, output_tokens: 0,
-    cache_read_tokens: 0, cache_write_tokens: 0, tool_calls: 0, tools_used: [], web_searches: 0 };
+    cache_read_tokens: 0, cache_write_tokens: 0, tool_calls: 0, tools_used: [], web_searches: 0, sources: [] };
+}
+
+/** Where a draft's context came from, as the card names it. */
+const SOURCE_OF_TOOL = [
+  [/hubspot|grant_application/, 'HubSpot'],
+  [/google_drive|files_in_folder|granted_files|google_doc|sheet/, 'Drive'],
+  [/^granola_/, 'Granola'],
+  [/chat_space_history/, 'Chat'],
+  [/^grant_data$|oracle_kb/, 'GetGranted'],
+  [/^web_(search|fetch)$/, 'the web']
+];
+
+/** Record a source the code read (not a model tool). */
+export function noteSource(ledger, source) {
+  if (ledger && source && !ledger.sources.includes(source)) ledger.sources.push(source);
+}
+
+/** The sources a draft actually used: code lookups plus the Oracle tools it called. */
+export function sourcesOf(ledger) {
+  if (!ledger) return [];
+  const out = [...(ledger.sources || [])];
+  for (const tool of ledger.tools_used || []) {
+    const hit = SOURCE_OF_TOOL.find(([re]) => re.test(tool));
+    if (hit && !out.includes(hit[1])) out.push(hit[1]);
+  }
+  return out;
 }
 
 /** One model call. `cost` given (agent loop) or computed from usage. */
@@ -111,6 +137,7 @@ export async function leadFacts(item, deps, ledger = newLedger()) {
   const email = item.sender_address;
   const domain = String(email || '').split('@')[1] || '';
   const looked = await deps.lookupLead({ email, name: item.sender }, { text: item.subject || '' }).catch(() => null);
+  if (looked) noteSource(ledger, 'HubSpot');
   const crm = looked?.crm || item.crm || {};
   const calc = withoutTier(await deps.decodeCalculator(crm.contact?.calculator || {}));
   const session = await deps.leadSession(email).catch(() => null);
@@ -124,6 +151,7 @@ export async function leadFacts(item, deps, ledger = newLedger()) {
       onUsage: (usage, model) => { ledger.website += calculateRequestCost(usage, model); }
     }).catch(() => null)
     : null;
+  if (website) noteSource(ledger, 'their website');
   const pages = websiteUrl ? deps.sitePages(websiteUrl) : async () => [];
   const location = await deps.locateCompany({ company: crm.company, websiteUrl, pages }).catch(() => ({ provinces: [] }));
   const industry = await deps.industryFor({ calculatorLabels: calc.industry || [], companyIndustry: crm.company?.industry, pages })
@@ -139,6 +167,7 @@ export async function leadFacts(item, deps, ledger = newLedger()) {
     annual_revenue: calc.revenue_band || undefined,
     description: website?.description || undefined
   });
+  if (m.ok) noteSource(ledger, 'GetGranted');
   if (m.ok && m.status === 'ok') {
     matches = m.grants.map(g => ({ name: g.name, provider: g.provider, amount: g.amount, match_level: g.match_level, why_fits: g.why_fits, to_confirm: g.to_confirm }));
   } else if (m.ok && m.status === 'insufficient_profile') {
@@ -333,12 +362,14 @@ export async function gatherContext(item, deps, ledger = newLedger()) {
     }
     case 'partner':
     case 'client':      // clients only come here for the dry-run Haiku comparison
+      if (item.crm?.found) noteSource(ledger, 'HubSpot');
       return { facts: { hubspot: condenseCrm(item.crm) }, factsLine: null, note: null };
     case 'government': {
       const q = item.program_question;
       if (!q?.asks_rules) return { facts: null, factsLine: null, note: null };
       try {
         const r = await deps.grantSearch({ query: q.program_name, limit: 3 });
+        noteSource(ledger, 'GetGranted');
         const grants = (r?.results || []).slice(0, 3).map(g => ({
           name: g.name, funder: g.funder, amount: g.amount, deadline: g.deadline, status: g.status,
           summary: String(g.summary || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').slice(0, 600)

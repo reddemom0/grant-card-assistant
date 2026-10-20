@@ -40,7 +40,7 @@ import { GROUP_ORDER, READ_DAYS, carryOver, coveredSummary, docsAssessment, driv
 import { duePromiseItems, extractPromises, promiseCandidates } from './steph-brief-promises.js';
 import { CLEAR_DRAFT_TEXT_SQL, INSERT_CORRECTION_SQL, SWEEP_DRAFT_TEXT_SQL, comparable, loadCorrections, summariseCorrections } from './steph-brief-learn.js';
 import { classifyItems } from './steph-brief-classify.js';
-import { contextForItem, ledgerTotal } from './steph-brief-context.js';
+import { contextForItem, ledgerTotal, sourcesOf } from './steph-brief-context.js';
 import { loadStyleGuide } from './style-guides.js';
 import { meetingLinksFor } from './meeting-links.js';
 
@@ -96,9 +96,11 @@ INSERT INTO steph_brief_items
   (owner_email, is_test, item_key, category, thread_ids, sender, subject, assessment, owner_hint, note, facts_line,
    draft_ids, draft_preview, nudge, first_seen_at, first_inbound_at, last_inbound_at, state, state_at, last_run_id, position,
    no_reply, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-   tool_calls, tools_used, web_searches, conversation_id, compare, item_type, badge, draft_text, draft_text_at)
+   tool_calls, tools_used, web_searches, conversation_id, compare, item_type, badge, draft_text, draft_text_at,
+   urgency, finance, due_on, held, sources, draft_message_id, company, sent_to)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, NOW()), $16, $17, 'open', NOW(), $18, $19,
-   $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35)
+   $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35,
+   $36, $37, $38, $39, $40, $41, $42, $43)
 ON CONFLICT (owner_email, is_test, item_key) DO UPDATE SET
   category = EXCLUDED.category, thread_ids = EXCLUDED.thread_ids, sender = EXCLUDED.sender, subject = EXCLUDED.subject,
   assessment = EXCLUDED.assessment, owner_hint = EXCLUDED.owner_hint, note = EXCLUDED.note, facts_line = EXCLUDED.facts_line,
@@ -115,7 +117,9 @@ ON CONFLICT (owner_email, is_test, item_key) DO UPDATE SET
   item_type = EXCLUDED.item_type, badge = EXCLUDED.badge,
   -- Kept until her reply is compared with it (steph-brief-learn.js), then cleared.
   draft_text = COALESCE(EXCLUDED.draft_text, steph_brief_items.draft_text),
-  draft_text_at = COALESCE(EXCLUDED.draft_text_at, steph_brief_items.draft_text_at)
+  draft_text_at = COALESCE(EXCLUDED.draft_text_at, steph_brief_items.draft_text_at),
+  urgency = EXCLUDED.urgency, finance = EXCLUDED.finance, due_on = EXCLUDED.due_on, held = EXCLUDED.held,
+  sources = EXCLUDED.sources, draft_message_id = EXCLUDED.draft_message_id, company = EXCLUDED.company, sent_to = EXCLUDED.sent_to
 RETURNING id`;
 
 const AUTO_DONE_SQL = `UPDATE steph_brief_items SET state = 'auto_done', state_at = NOW() WHERE id = ANY($1::uuid[]) AND state = 'open'`;
@@ -191,6 +195,31 @@ export async function staffUser(email, query) {
   const r = await query(
     `SELECT id, email, name, chat_user_id, gmail_connected_at FROM users WHERE LOWER(email) = LOWER($1) AND is_active = true LIMIT 1`, [email]);
   return r.rows[0] || null;
+}
+
+/** "Oct 31, 2026" / "2026-10-31" → "2026-10-31", else null. */
+function isoDate(raw) {
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(raw))) return String(raw);
+  const t = Date.parse(String(raw));
+  return Number.isFinite(t) ? new Date(t).toISOString().slice(0, 10) : null;
+}
+
+/** The former-staff colleague an item's mail was addressed to (thread labelled "Former staff"). */
+function formerStaffRecipient(item, formerStaff, mailboxEmail) {
+  for (const t of item.threads || []) {
+    if (!formerStaff.has(t.id)) continue;
+    for (const m of [...(t.messages || [])].reverse()) {
+      if (m.from_user || m.is_draft) continue;
+      const parts = String(`${m.to || ''},${m.cc || ''}`).split(',').map(x => x.trim()).filter(Boolean);
+      const hit = parts.find(p => /@granted\.ca>?$/i.test(p) && !p.toLowerCase().includes(String(mailboxEmail).toLowerCase()));
+      if (hit) {
+        const name = hit.replace(/<[^>]+>/, '').replace(/"/g, '').trim();
+        return name || hit.replace(/[<>]/g, '');
+      }
+    }
+  }
+  return null;
 }
 
 /** The latest unanswered thread of an item — the one its draft replies in. */
@@ -297,6 +326,7 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
     // Threads: the window, her sent mail (promises), everything still open
     // from earlier briefs, and threads whose draft awaits comparison.
     const listed = await deps.listThreadsSince(mailbox.id, since, { max: MAX_THREADS });
+    const formerStaff = new Set(listed.threads.filter(t => (t.labels || []).includes('Former staff')).map(t => t.id));
     const sent = await deps.listThreadsSince(mailbox.id, since, { labels: ['SENT'], max: MAX_THREADS }).catch(() => ({ threads: [] }));
     const ids = [...new Set([
       ...listed.threads.map(t => t.id),
@@ -412,6 +442,8 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       }
       if (ctx.compare) { cost.compare += ctx.compare.cost_usd || 0; item.compareRecord = ctx.compare; }
       item.conversation_id = ctx.conversation_id || null;
+      item.sources = sourcesOf(l);
+      item.held = !!ctx.held;
       if (ctx.held) held += 1;
       item.assessment = ctx.assessment;
       item.owner_hint = ctx.owner_hint || null;
@@ -431,6 +463,7 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       try {
         const d = await deps.createDraftReply(mailbox.id, thread.id, ctx.draft_body, { userEmail: mailbox.email });
         item.draft_ids = [d.draftId];
+        item.draft_message_id = d.messageId || null;
         // Kept until her reply can be compared with it (learning from edits).
         item.draft_text = ctx.draft_body;
         item.draft_text_at = new Date();
@@ -465,7 +498,15 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
         item.conversation_id ?? r?.conversation_id ?? null,
         dryRun && item.compareRecord ? JSON.stringify(item.compareRecord) : null,
         item.item_type || 'mail', item.badge ?? null,
-        dryRun ? null : (item.draft_text ?? null), dryRun ? null : (item.draft_text_at ?? null)
+        dryRun ? null : (item.draft_text ?? null), dryRun ? null : (item.draft_text_at ?? null),
+        Number.isInteger(item.urgency) ? item.urgency : (r?.urgency ?? null),
+        !!(item.finance ?? r?.finance),
+        isoDate(item.promise?.due_date || item.bill?.due) ?? (r?.due_on ?? null),
+        !!(item.held ?? r?.held),
+        item.sources ?? r?.sources ?? [],
+        item.draft_message_id ?? r?.draft_message_id ?? null,
+        item.company ?? r?.company ?? null,
+        formerStaffRecipient(item, formerStaff, mailbox.email) ?? (item.previous?.sent_to ?? null)
       ]);
       const id = row.rows[0].id;
       itemIds.push(id);
@@ -477,6 +518,8 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       threads: fetched.size, items: ordered.length, automated: triageCounts.automated,
       vendor: classified.skipped.vendor, handled: classified.skipped.handled, notifications_dropped: docs.dropped,
       covered: coveredSummary(covered), aged_out: agedOut.length,
+      // Former-staff mail that never became an item (automated, pitches, FYIs, covered…): counted only.
+      former_staff_kept_out: [...formerStaff].filter(id => !ordered.some(i => !i.no_reply && (i.thread_ids || []).includes(id))).length,
       promises: ordered.filter(i => i.item_type === 'promise').length, corrections_learned: learned,
       auto_done: autoDone.length, no_draft_cap: noDraftCap, drafts_created: draftsCreated, held, carry,
       no_reply: ordered.filter(i => i.no_reply).length,
