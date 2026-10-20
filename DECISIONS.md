@@ -12,6 +12,20 @@ Format:
 
 ---
 
+## 2026-10-20 — Steph brief triage behaviours from the inbox-manager review
+**What:** Six triage changes and four hardening rules, taken from Anthropic's inbox-manager skill (SKILL.md, triage_rules.md, gotchas.md):
+- **Window:** a 14-day reading window replaces "since the last run".
+- **Promises she made that are due:** one Haiku extraction over her sent mail.
+- **Covered by a colleague:** no item, no draft, a footer line.
+- **Payment/credential safety:** no draft, "Verify by phone first", lookalike-domain check against HubSpot and `granted.ca`.
+- **Sensitive mail:** an unhappy client gets an acknowledgement-only draft behind a code guard; legal, dispute, negotiation and refund mail gets no draft.
+- **Learning from her edits:** `steph_voice_corrections`, the latest 15 injected into prompts.
+- **Hardening:** email text is untrusted data in every prompt; bills always surface; borderline mail surfaces as "Wasn't sure"; cold pitches are still counted silently.
+
+Each item now carries `item_type` and `badge` for the card (migration 052).
+**Why:** These are the review's named failure modes: the buried promise, replying below a colleague, money and credential fraud, compensation offers, instructions hidden in email, bills filed as receipts, over-trimming, surfacing pitches, and not learning. They are conservative by design: under-filing is cheap, a wrong reply is not. The deterministic backups can only add flags. Chris chose to store draft text only until comparison (cleared after, and within 14 days) and to keep the 14-day window as specified.
+**Impact:** `src/services/steph-brief{,-triage,-classify,-context,-promises,-learn}.js`, `src/cards/brief-card.js` (footer data and group labels only), `migrations/052_steph_brief_triage.sql`, `docs/oracle.md`, tests `steph-brief`, `steph-brief-triage`, `steph-brief-pieces`, `gmail` (no-send scan)
+
 ## 2026-10-20 — Steph brief: admin dry run on another consented inbox
 **What:** `POST /api/admin/steph-brief-run` takes an optional `inbox=<email>`, in dry runs only. It reads that inbox instead of Steph's while keeping Steph's voice guide and meeting links, `is_test` rows (keyed by that inbox), no drafts, no claim, and the card in the caller's DM. It answers 400 on a real run or for an inbox not in `GMAIL_CONSENT_ALLOWLIST`; `preflight` refuses both too.
 **Why:** So Chris can vet the brief end to end on his own mail before Steph connects Gmail. Client Oracle runs act as the inbox owner, not Steph (Chris's choice), so nobody's Drive, Granola or Chat context reaches a card its owner didn't ask for.

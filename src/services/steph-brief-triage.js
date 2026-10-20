@@ -16,17 +16,26 @@ import { addressOf, replyState } from '../tools/gmail.js';
 
 const DAY_MS = 24 * 3600 * 1000;
 
-/** Card order. 'docs' (Drive notifications) is not one of the five mail groups; it goes last. */
-export const GROUP_ORDER = Object.freeze(['client', 'partner', 'lead', 'team', 'government', 'docs']);
+/**
+ * Card order. 'promise' (commitments she made that are due) leads — ranked by
+ * consequence, not arrival. 'other' holds mail triage wasn't sure about
+ * (surfaced, never dropped). 'docs' (Drive notifications) goes last.
+ */
+export const GROUP_ORDER = Object.freeze(['promise', 'client', 'partner', 'lead', 'team', 'government', 'other', 'docs']);
 
 export const GROUP_LABELS = Object.freeze({
+  promise: 'Your promises',
   client: 'Clients',
   partner: 'Partners',
   lead: 'Leads',
   team: 'Team',
   government: 'Government programs',
+  other: 'Not sure if this needs you',
   docs: 'Docs & comments'
 });
+
+/** How many days back the brief reads; older unanswered mail is left to the Stage 3 catch-up. */
+export const READ_DAYS = 14;
 
 // ---------------------------------------------------------------------------
 // Senders
@@ -98,21 +107,158 @@ export function unansweredInbound(thread) {
  * @returns {{ mail: Array, notifications: Array, counts: {automated, replied, notifications_dropped} }}
  *   mail entries: { thread, latest, unanswered } — replyState(thread).replied === false, not automated
  */
-export function sortThreads(threads) {
+export function sortThreads(threads, { since = null } = {}) {
   const mail = [];
   const notifications = [];
+  const covered = [];
+  const agedOut = [];
   const counts = { automated: 0, replied: 0 };
+  const sinceMs = since ? new Date(since).getTime() : null;
   for (const thread of threads) {
     const state = replyState(thread);
     if (state.replied !== false) { counts.replied += state.replied === true ? 1 : 0; continue; }
     const unanswered = unansweredInbound(thread);
     const latest = unanswered[unanswered.length - 1];
     if (!latest) continue;
+    // Older than the reading window: left to the Stage 3 catch-up.
+    if (sinceMs != null && latest.internal_date < sinceMs) { agedOut.push(thread.id); continue; }
+    // A colleague already answered the outside sender: never reply below them.
+    const by = coveredBy(thread);
+    if (by) { covered.push({ thread_id: thread.id, by }); continue; }
     if (isDriveNotification(latest)) { notifications.push(thread); continue; }
-    if (isAutomated(latest)) { counts.automated += 1; continue; }
+    // A bill is never "automated": invoices from billing@ / no-reply senders
+    // carry List-Unsubscribe too, and must still surface.
+    if (isAutomated(latest) && !isBill(latest)) { counts.automated += 1; continue; }
     mail.push({ thread, latest, unanswered });
   }
-  return { mail, notifications, counts };
+  return { mail, notifications, covered, agedOut, counts };
+}
+
+/**
+ * Who covered this thread? A non-draft message from another @granted.ca
+ * address after the latest EXTERNAL inbound → that colleague's name. Internal-
+ * only threads have no external inbound and are never "covered".
+ */
+export function coveredBy(thread) {
+  const real = (thread.messages || []).filter(m => !m.is_draft);
+  const external = real.filter(m => !m.from_user && !isInternal(addressOf(m.from)) && !isDriveNotification(m));
+  if (!external.length) return null;
+  const lastExternal = external.reduce((t, m) => Math.max(t, m.internal_date), 0);
+  const colleague = real.filter(m => !m.from_user && isInternal(addressOf(m.from)) && m.internal_date > lastExternal)
+    .sort((a, b) => b.internal_date - a.internal_date)[0];
+  return colleague ? displayName(colleague.from) : null;
+}
+
+/** "Covered by Ruk: 2 threads · Tom: 1 thread" — names only, for the card footer. */
+export function coveredSummary(covered) {
+  const byName = new Map();
+  for (const c of covered) byName.set(c.by, (byName.get(c.by) || 0) + 1);
+  return [...byName.entries()].map(([by, threads]) => ({ by, threads }));
+}
+
+// ---------------------------------------------------------------------------
+// Bills, payment/credential safety, lookalike domains (pure)
+// ---------------------------------------------------------------------------
+
+const BILL_AMOUNT = /(?:\$|cad\s?|usd\s?)\s?\d[\d,]*(?:\.\d{2})?|\b\d[\d,]*\.\d{2}\s?(?:cad|usd)\b/i;
+const BILL_DUE = /\b(due (date|on|by)?|payable (by|on|upon)|amount due|balance due|past due|overdue|pay by)\b/i;
+const BILL_PAY = /\b(pay(ment)? (link|online|here|now)|remit|e-?transfer|interac|wire|bank transfer|eft|pay (this|the) invoice|invoice #?\w*|cheque|credit card on file)\b/i;
+
+/** An amount owed + a due date + payment instructions. Receipts (already paid) don't match "due". */
+export function isBill(msg) {
+  const text = `${msg.subject || ''}\n${String(msg.body || '').slice(0, 4000)}`;
+  if (/\b(receipt|payment received|thank you for your payment|paid in full)\b/i.test(text) && !BILL_DUE.test(text)) return false;
+  return BILL_AMOUNT.test(text) && BILL_DUE.test(text) && BILL_PAY.test(text);
+}
+
+/** "$1,250.00 due Oct 31" for the badge, best effort. */
+export function billSummary(msg) {
+  const text = `${msg.subject || ''}\n${String(msg.body || '').slice(0, 4000)}`;
+  const amount = (text.match(BILL_AMOUNT) || [])[0]?.trim() || null;
+  const due = (text.match(/\b(?:due|payable by|pay by)\s*(?:date|on|by)?\s*:?\s*([a-z]{3,9}\.? \d{1,2}(?:,? \d{4})?|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})/i) || [])[1] || null;
+  return { amount, due };
+}
+
+/** Requests to verify by phone. Deterministic backup to the classify call: it can only add a flag. */
+export const SAFETY_RE = Object.freeze({
+  bank_change: /\b(new|updated?|change[ds]?|different)\b[^.\n]{0,60}\b(bank(ing)? (details|info(rmation)?|account)|remit(-| )?to|remittance (details|address)|payment (details|instructions|method)|account number|routing number|iban|swift)\b/i,
+  urgent_payment: /\b(urgent(ly)?|asap|immediately|today|right away|now)\b[^.\n]{0,60}\b(wire|payment|transfer|pay)\b|\b(wire|transfer|pay)\b[^.\n]{0,30}\b(urgent(ly)?|asap|immediately|today|right away|now)\b|\b(wire|transfer) (the )?(funds|payment|money)\b|\bwire (of )?\$?\s?\d|\b(send|make|process) (a |the )?(wire|bank transfer)\b|\bgift cards?\b/i,
+  credential: /\b(password|passcode|verification code|security code|one[- ]time (code|password)|2fa|mfa|login (details|credentials|info)|sign[- ]in code|otp)\b|\b(what('?s| is) (the|your)|send (me )?(the |your )?|share (the |your )?)\s*(login|username|log-?in|credentials?|code(?! of))\b/i
+});
+
+export function safetyFlag(msg) {
+  const text = `${msg.subject || ''}\n${String(msg.body || '').slice(0, 4000)}`;
+  for (const [kind, re] of Object.entries(SAFETY_RE)) if (re.test(text)) return kind;
+  return null;
+}
+
+function editDistance(a, b) {
+  const m = a.length, n = b.length;
+  if (Math.abs(m - n) > 3) return 99;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i, ...new Array(n).fill(0)]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) {
+    d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+  }
+  return d[m][n];
+}
+
+const unconfuse = (s) => s.replace(/rn/g, 'm').replace(/vv/g, 'w').replace(/[0]/g, 'o').replace(/[1l]/g, 'i').replace(/-/g, '');
+const nameOf = (domain) => String(domain || '').toLowerCase().split('.').slice(0, -1).join('.') || String(domain || '').toLowerCase();
+
+/**
+ * Does `sender` look like `known` without being it? Same name on another TLD,
+ * a near-miss spelling (edit distance ≤ 2), or a homoglyph/hyphen variant
+ * (rn↔m, 0↔o, 1/l↔i, granted-ca.com). Exact matches and subdomains of the
+ * known domain are not lookalikes. Against granted.ca callers pass
+ * maxDistance 1, so a real company like grants.ca isn't flagged.
+ */
+export function lookalikeOf(sender, known, { maxDistance = 2 } = {}) {
+  const s = String(sender || '').toLowerCase();
+  const k = String(known || '').toLowerCase();
+  if (!s || !k || s === k || s.endsWith(`.${k}`)) return false;
+  const sn = nameOf(s);
+  const kn = nameOf(k);
+  if (sn === kn) return true;                                   // acme.co vs acme.com
+  if (unconfuse(s.replace(/\./g, '')) === unconfuse(k.replace(/\./g, ''))) return true;  // granted-ca.com vs granted.ca
+  if (unconfuse(sn) === unconfuse(kn)) return true;             // rnicrosoft vs microsoft
+  if (unconfuse(sn) === unconfuse(k.replace(/\./g, ''))) return true;  // granted-ca.com vs granted.ca
+  // Near-miss spellings: distance 1 for short names, up to maxDistance for 6+ letters.
+  const d = editDistance(sn, kn);
+  return kn.length >= 4 && (d <= 1 || (kn.length >= 6 && d <= maxDistance));  // grantedd vs granted
+}
+
+// ---------------------------------------------------------------------------
+// Item type, badge, draft rule (pure)
+// ---------------------------------------------------------------------------
+
+export const ITEM_TYPES = Object.freeze(['mail', 'promise', 'safety', 'sensitive', 'unhappy', 'bill', 'unsure']);
+
+/**
+ * What kind of item this is, its badge, and whether it may be drafted.
+ * Precedence: safety > sensitive > bill > unhappy > unsure > mail.
+ *   draft: 'none' | 'ack' (acknowledgement only) | 'normal'
+ * @param {{ category, safety?, lookalike?, sensitivity?, is_bill?, bill? }} item
+ */
+export function decideItemType(item) {
+  if (item.safety || item.lookalike) {
+    return { item_type: 'safety', badge: 'Verify by phone first', draft: 'none' };
+  }
+  if (['legal', 'dispute', 'negotiation', 'refund'].includes(item.sensitivity)) {
+    return { item_type: 'sensitive', badge: 'Sensitive · write this yourself', draft: 'none' };
+  }
+  if (item.is_bill) {
+    const b = item.bill || {};
+    const badge = ['Bill', b.amount, b.due && `due ${b.due}`].filter(Boolean).join(' · ').replace(/ · due/, ' due');
+    return { item_type: 'bill', badge, draft: 'none' };
+  }
+  if (item.sensitivity === 'unhappy') {
+    return { item_type: 'unhappy', badge: 'Unhappy client · call recommended', draft: 'ack' };
+  }
+  if (item.category === 'other') {
+    return { item_type: 'unsure', badge: "Wasn't sure if this needs you", draft: 'none' };
+  }
+  return { item_type: 'mail', badge: null, draft: 'normal' };
 }
 
 // ---------------------------------------------------------------------------
@@ -322,4 +468,27 @@ export function carryOver(previous, fresh, now = Date.now()) {
     }
   }
   return { show, autoDone, reopened, keptDone };
+}
+
+// ---------------------------------------------------------------------------
+// Her own words (pure)
+// ---------------------------------------------------------------------------
+
+/**
+ * The text a message's author actually wrote: quoted history ("On … wrote:",
+ * "-----Original Message-----", Outlook "From: … Sent: …" headers, ">" lines)
+ * and everything after it removed.
+ */
+export function ownText(body) {
+  const lines = String(body || '').split(/\r?\n/);
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (/^\s*On .{3,200}wrote:\s*$/i.test(l) || /^\s*On .{3,120}$/i.test(l) && /wrote:\s*$/i.test(lines[i + 1] || '')) break;
+    if (/^\s*-{2,}\s*(Original Message|Forwarded message)\s*-{2,}/i.test(l)) break;
+    if (/^\s*From:\s.+/i.test(l) && /^\s*(Sent|Date):\s/i.test(lines[i + 1] || '')) break;
+    if (/^\s*>/.test(l)) continue;
+    out.push(l);
+  }
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }

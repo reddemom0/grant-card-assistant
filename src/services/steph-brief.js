@@ -36,7 +36,9 @@
  * Logs counts and codes only — never a sender, subject or body.
  */
 
-import { GROUP_ORDER, carryOver, docsAssessment, driveNotificationItems, groupBySender, hasDraft, orderItems, sortThreads } from './steph-brief-triage.js';
+import { GROUP_ORDER, READ_DAYS, carryOver, coveredSummary, docsAssessment, driveNotificationItems, groupBySender, hasDraft, orderItems, sortThreads } from './steph-brief-triage.js';
+import { duePromiseItems, extractPromises, promiseCandidates } from './steph-brief-promises.js';
+import { CLEAR_DRAFT_TEXT_SQL, INSERT_CORRECTION_SQL, SWEEP_DRAFT_TEXT_SQL, comparable, loadCorrections, summariseCorrections } from './steph-brief-learn.js';
 import { classifyItems } from './steph-brief-classify.js';
 import { contextForItem, ledgerTotal } from './steph-brief-context.js';
 import { loadStyleGuide } from './style-guides.js';
@@ -46,8 +48,7 @@ export const SCHEDULE = '0 8 * * 1-5';
 const TZ = 'America/Vancouver';
 export const DEFAULT_OWNER_EMAIL = 'ssang@granted.ca';
 export const DEFAULT_MAX_DRAFTS = 15;
-const MAX_LOOKBACK_DAYS = 4;
-const MAX_THREADS = 150;
+const MAX_THREADS = 400;
 const FETCH_CONCURRENCY = 5;
 const ORACLE_CONCURRENCY = 3;
 const ORACLE_TIMEOUT_MS = 180_000;
@@ -58,21 +59,14 @@ export function localDate(now = new Date()) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
 }
 
-function vancouverWeekday(now) {
-  return new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short' }).format(now);
-}
-
 export function maxDrafts(env = process.env) {
   const n = Number(env.STEPH_BRIEF_MAX_DRAFTS);
   return Number.isInteger(n) && n >= 0 ? n : DEFAULT_MAX_DRAFTS;
 }
 
-/** Since the last completed real run (capped at 4 days), else 24 h, or 72 h on a Monday. */
-export function windowStart(lastRunAt, now = new Date()) {
-  const floor = now.getTime() - MAX_LOOKBACK_DAYS * DAY_MS;
-  if (lastRunAt) return new Date(Math.max(new Date(lastRunAt).getTime(), floor));
-  const back = vancouverWeekday(now) === 'Mon' ? 3 : 1;
-  return new Date(now.getTime() - back * DAY_MS);
+/** The reading window: everything from the last READ_DAYS (14) days. */
+export function windowStart(now = new Date()) {
+  return new Date(now.getTime() - READ_DAYS * DAY_MS);
 }
 
 // ---------------------------------------------------------------------------
@@ -92,24 +86,19 @@ const TEST_RUN_SQL = `
 INSERT INTO steph_brief_runs (owner_email, local_date, is_test, recipient_email, recipient_chat_id)
 VALUES ($1, $2, true, $3, $4) RETURNING id`;
 
-const LAST_RUN_SQL = `
-SELECT claimed_at FROM steph_brief_runs
- WHERE owner_email = $1 AND NOT is_test AND status = 'done'
- ORDER BY claimed_at DESC LIMIT 1`;
-
 const PREVIOUS_ITEMS_SQL = `
 SELECT * FROM steph_brief_items
  WHERE owner_email = $1 AND is_test = false
-   AND (state = 'open' OR state_at > NOW() - INTERVAL '30 days')`;
+   AND (state = 'open' OR state_at > NOW() - INTERVAL '30 days' OR draft_text IS NOT NULL)`;
 
 const UPSERT_ITEM_SQL = `
 INSERT INTO steph_brief_items
   (owner_email, is_test, item_key, category, thread_ids, sender, subject, assessment, owner_hint, note, facts_line,
    draft_ids, draft_preview, nudge, first_seen_at, first_inbound_at, last_inbound_at, state, state_at, last_run_id, position,
    no_reply, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-   tool_calls, tools_used, web_searches, conversation_id, compare)
+   tool_calls, tools_used, web_searches, conversation_id, compare, item_type, badge, draft_text, draft_text_at)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, NOW()), $16, $17, 'open', NOW(), $18, $19,
-   $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb)
+   $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35)
 ON CONFLICT (owner_email, is_test, item_key) DO UPDATE SET
   category = EXCLUDED.category, thread_ids = EXCLUDED.thread_ids, sender = EXCLUDED.sender, subject = EXCLUDED.subject,
   assessment = EXCLUDED.assessment, owner_hint = EXCLUDED.owner_hint, note = EXCLUDED.note, facts_line = EXCLUDED.facts_line,
@@ -122,7 +111,11 @@ ON CONFLICT (owner_email, is_test, item_key) DO UPDATE SET
   input_tokens = EXCLUDED.input_tokens, output_tokens = EXCLUDED.output_tokens,
   cache_read_tokens = EXCLUDED.cache_read_tokens, cache_write_tokens = EXCLUDED.cache_write_tokens,
   tool_calls = EXCLUDED.tool_calls, tools_used = EXCLUDED.tools_used, web_searches = EXCLUDED.web_searches,
-  conversation_id = EXCLUDED.conversation_id, compare = EXCLUDED.compare
+  conversation_id = EXCLUDED.conversation_id, compare = EXCLUDED.compare,
+  item_type = EXCLUDED.item_type, badge = EXCLUDED.badge,
+  -- Kept until her reply is compared with it (steph-brief-learn.js), then cleared.
+  draft_text = COALESCE(EXCLUDED.draft_text, steph_brief_items.draft_text),
+  draft_text_at = COALESCE(EXCLUDED.draft_text_at, steph_brief_items.draft_text_at)
 RETURNING id`;
 
 const AUTO_DONE_SQL = `UPDATE steph_brief_items SET state = 'auto_done', state_at = NOW() WHERE id = ANY($1::uuid[]) AND state = 'open'`;
@@ -291,34 +284,81 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
   // Every cost row of this run carries these (api_cost_events.metadata).
   const costTags = { brief_run_id: runId, is_dry_run: dryRun };
   const runDeps = { ...deps, costTags };
-  const cost = { classify: 0, drafting: 0, oracle: 0, website: 0, search_fees: 0, compare: 0 };
+  const cost = { classify: 0, promises: 0, learn: 0, drafting: 0, oracle: 0, website: 0, search_fees: 0, compare: 0 };
   const totalCost = () => Object.values(cost).reduce((a, b) => a + b, 0);
   try {
-    const last = (await q(LAST_RUN_SQL, [ownerEmail])).rows[0]?.claimed_at || null;
-    const since = windowStart(last, now);
+    // Window: the last READ_DAYS. New mail from the last 48 h is inside it by
+    // definition; older unanswered mail is left to the Stage 3 catch-up.
+    const since = windowStart(now);
     const previous = (await q(PREVIOUS_ITEMS_SQL, [ownerEmail])).rows;
+    // Learned corrections are the persona's (Steph's), whoever's inbox is read.
+    runDeps.corrections = await loadCorrections(steph.email, q);
 
-    // Threads: the window, plus everything still open from earlier briefs.
+    // Threads: the window, her sent mail (promises), everything still open
+    // from earlier briefs, and threads whose draft awaits comparison.
     const listed = await deps.listThreadsSince(mailbox.id, since, { max: MAX_THREADS });
-    const ids = [...new Set([...listed.threads.map(t => t.id), ...previous.filter(p => p.state === 'open').flatMap(p => p.thread_ids || [])])];
+    const sent = await deps.listThreadsSince(mailbox.id, since, { labels: ['SENT'], max: MAX_THREADS }).catch(() => ({ threads: [] }));
+    const ids = [...new Set([
+      ...listed.threads.map(t => t.id),
+      ...(sent.threads || []).map(t => t.id),
+      ...previous.filter(p => p.state === 'open' || p.draft_text).flatMap(p => p.thread_ids || [])
+    ])];
     const fetched = new Map();
     await pool(ids, FETCH_CONCURRENCY, async (id) => {
       try { fetched.set(id, await deps.getThread(mailbox.id, id, { userEmail: mailbox.email })); } catch { /* unknown this run */ }
     });
 
     // Triage.
-    const { mail, notifications, counts: triageCounts } = sortThreads([...fetched.values()]);
+    const { mail, notifications, covered, agedOut, counts: triageCounts } = sortThreads([...fetched.values()], { since });
     const mailItems = groupBySender(mail, now.getTime());
     const docs = driveNotificationItems(notifications);
     const classified = await classifyItems(mailItems, runDeps);
     cost.classify += classified.costUsd;
-    const fresh = [...classified.items, ...docs.items.map(d => ({ ...d, assessment: docsAssessment(d) }))];
+    for (const item of classified.items) if (item.safety_note) item.note = item.safety_note;
+
+    // Promises she made that are due: one Haiku extraction over her sent mail.
+    // A promise on a thread that's already an item becomes a note on it.
+    const extracted = await extractPromises(promiseCandidates([...fetched.values()], { since }), runDeps);
+    cost.promises += extracted.costUsd;
+    const promiseItems = [];
+    for (const p of duePromiseItems(extracted.promises, fetched, { today: date })) {
+      const host = classified.items.find(i => (i.thread_ids || []).includes(p.thread_ids[0]));
+      if (host) host.note = [host.note, `You promised ${p.promise.what}, due ${p.promise.due_date}.`].filter(Boolean).join(' ');
+      else promiseItems.push(p);
+    }
+    const fresh = [...classified.items, ...promiseItems, ...docs.items.map(d => ({ ...d, assessment: docsAssessment(d) }))];
 
     // Carry over. An item whose threads couldn't all be fetched is left alone:
-    // no auto-tick on missing evidence.
-    const known = (p) => (p.thread_ids || []).every(id => fetched.has(id));
+    // no auto-tick on missing evidence. One whose mail aged out of the window
+    // is neither shown nor auto-ticked (Stage 3 catch-up).
+    const aged = new Set(agedOut);
+    const agedItem = (p) => (p.thread_ids || []).length > 0 && p.thread_ids.every(id => aged.has(id));
+    const known = (p) => (p.thread_ids || []).every(id => fetched.has(id)) && !agedItem(p);
     const { show, autoDone } = carryOver(previous.filter(known), fresh, now.getTime());
-    const untouched = previous.filter(p => p.state === 'open' && !known(p)).map(p => ({ ...p, previous: p, carried_only: true }));
+
+    // Learning from edits (real runs only): where she replied after we saved a
+    // draft, compare her reply with our draft; one Haiku call for the pairs
+    // that changed meaningfully. Done before drafting, so today's drafts
+    // already follow what was learned.
+    let learned = 0;
+    if (!dryRun) {
+      const { toCompare, settled } = comparable(previous.filter(p => p.draft_text), fetched);
+      const { corrections, costUsd } = await summariseCorrections(toCompare, runDeps);
+      cost.learn += costUsd;
+      for (const c of corrections) {
+        try {
+          await q(INSERT_CORRECTION_SQL, [steph.email, false, c.rule, c.example, c.thread_id, c.item.id]);
+          learned += 1;
+        } catch (err) {
+          if (err?.code !== '42P01') console.warn(`⚠️  Steph brief correction not stored — code: ${err?.code || err?.name || 'unknown'}`);
+        }
+      }
+      runDeps.corrections = [...corrections.map(c => c.rule), ...(runDeps.corrections || [])].slice(0, 15);
+      const compared = [...toCompare.map(x => x.item.id), ...settled.map(x => x.item.id)];
+      if (compared.length) await q(CLEAR_DRAFT_TEXT_SQL, [compared]).catch(() => {});
+      await q(SWEEP_DRAFT_TEXT_SQL).catch(() => {});
+    }
+    const untouched = previous.filter(p => p.state === 'open' && !known(p) && !agedItem(p)).map(p => ({ ...p, previous: p, carried_only: true }));
     const ordered = orderItems([...show, ...untouched].filter(i => GROUP_ORDER.includes(i.category)));
 
     // Context + drafts for the first N mail items that need it.
@@ -328,9 +368,12 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
     const work = [];
     for (const item of ordered) {
       if (item.category === 'docs' || item.carried_only) continue;
+      // Safety, sensitive, bills, unsure, unconfirmable promises: on the card
+      // with their badge, never drafted.
+      if (item.draft === 'none') continue;
       // Triage said no reply is needed: on the card with its assessment, no
       // context lookup, no draft, no cost.
-      if (item.needs_reply === false) { item.no_reply = true; continue; }
+      if (item.item_type === 'mail' && item.needs_reply === false) { item.no_reply = true; continue; }
       const prev = item.previous;
       const changed = !prev || item.last_inbound_at > new Date(prev.last_inbound_at || 0).getTime();
       if (!changed && (prev.draft_ids?.length || dryRun)) {
@@ -362,7 +405,7 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       }
       const l = ctx.ledger;
       if (l) {
-        cost[item.category === 'client' ? 'oracle' : 'drafting'] += l.model_cost;
+        cost[item.category === 'client' && item.draft === 'normal' ? 'oracle' : 'drafting'] += l.model_cost;
         cost.website += l.website;
         cost.search_fees += l.search_fees;
         item.costRecord = l;
@@ -388,6 +431,9 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       try {
         const d = await deps.createDraftReply(mailbox.id, thread.id, ctx.draft_body, { userEmail: mailbox.email });
         item.draft_ids = [d.draftId];
+        // Kept until her reply can be compared with it (learning from edits).
+        item.draft_text = ctx.draft_body;
+        item.draft_text_at = new Date();
         draftsCreated += 1;
       } catch (err) {
         item.note = [item.note, 'Draft could not be saved.'].filter(Boolean).join(' ');
@@ -417,7 +463,9 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
         l?.cache_read_tokens ?? r?.cache_read_tokens ?? null, l?.cache_write_tokens ?? r?.cache_write_tokens ?? null,
         l?.tool_calls ?? r?.tool_calls ?? null, l?.tools_used ?? r?.tools_used ?? [], l?.web_searches ?? r?.web_searches ?? null,
         item.conversation_id ?? r?.conversation_id ?? null,
-        dryRun && item.compareRecord ? JSON.stringify(item.compareRecord) : null
+        dryRun && item.compareRecord ? JSON.stringify(item.compareRecord) : null,
+        item.item_type || 'mail', item.badge ?? null,
+        dryRun ? null : (item.draft_text ?? null), dryRun ? null : (item.draft_text_at ?? null)
       ]);
       const id = row.rows[0].id;
       itemIds.push(id);
@@ -427,7 +475,9 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
 
     const counts = {
       threads: fetched.size, items: ordered.length, automated: triageCounts.automated,
-      vendor: classified.skipped.vendor, other: classified.skipped.other, notifications_dropped: docs.dropped,
+      vendor: classified.skipped.vendor, handled: classified.skipped.handled, notifications_dropped: docs.dropped,
+      covered: coveredSummary(covered), aged_out: agedOut.length,
+      promises: ordered.filter(i => i.item_type === 'promise').length, corrections_learned: learned,
       auto_done: autoDone.length, no_draft_cap: noDraftCap, drafts_created: draftsCreated, held, carry,
       no_reply: ordered.filter(i => i.no_reply).length,
       cost: Object.fromEntries([...Object.entries(cost), ['total', totalCost()]].map(([k, v]) => [k, Number(v.toFixed(4))]))

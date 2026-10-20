@@ -211,3 +211,89 @@ describe('carry-over and auto-tick', () => {
     expect(r.show.map(i => i.item_key)).toEqual(['doc:1']);
   });
 });
+
+// ── Inbox-manager behaviours (pure) ─────────────────────────────────────────
+describe('window and covered', () => {
+  test('sortThreads: within 14 days in, older aged out, colleague-covered set aside', () => {
+    const since = NOW - 14 * DAY;
+    const inWin = thread('in', [msg({ internal_date: NOW - 10 * DAY })]);
+    const old = thread('old', [msg({ internal_date: NOW - 16 * DAY })]);
+    const cov = thread('cov', [msg({ from: 'Pat <pat@partner.org>', internal_date: NOW - 2 * DAY }), msg({ from: 'Ruk <rukshaar@granted.ca>', internal_date: NOW - DAY })]);
+    const r = T.sortThreads([inWin, old, cov], { since });
+    expect(r.mail.map(e => e.thread.id)).toEqual(['in']);
+    expect(r.agedOut).toEqual(['old']);
+    expect(r.covered).toEqual([{ thread_id: 'cov', by: 'Ruk' }]);
+  });
+  test('coveredBy: only a colleague reply after the latest external inbound counts', () => {
+    expect(T.coveredBy(thread('a', [msg({ from: 'Pat <pat@p.org>', internal_date: 1 }), msg({ from: 'Ruk <rukshaar@granted.ca>', internal_date: 2 })]))).toBe('Ruk');
+    expect(T.coveredBy(thread('b', [msg({ from: 'Ruk <rukshaar@granted.ca>', internal_date: 1 }), msg({ from: 'Pat <pat@p.org>', internal_date: 2 })]))).toBeNull();
+    expect(T.coveredBy(thread('c', [msg({ from: 'Tom <tom@granted.ca>', internal_date: 1 }), msg({ from: 'Ruk <rukshaar@granted.ca>', internal_date: 2 })]))).toBeNull();
+    expect(T.coveredBy(thread('d', [msg({ from: 'Pat <pat@p.org>', internal_date: 1 }), mine({ internal_date: 2, labels: ['DRAFT'], is_draft: true })]))).toBeNull();
+  });
+  test('coveredSummary counts threads per colleague', () => {
+    expect(T.coveredSummary([{ by: 'Ruk' }, { by: 'Tom' }, { by: 'Ruk' }])).toEqual([{ by: 'Ruk', threads: 2 }, { by: 'Tom', threads: 1 }]);
+  });
+});
+
+describe('bills, safety, lookalikes', () => {
+  const bill = msg({ from: 'Billing <billing@saasco.com>', list_unsubscribe: '<x>', subject: 'Invoice #1042',
+    body: 'Amount due: $1,250.00. Due date: Oct 31, 2026. Pay online via the payment link.' });
+  test('a bill: amount + due + how to pay; a receipt is not one', () => {
+    expect(T.isBill(bill)).toBe(true);
+    expect(T.isBill(msg({ subject: 'Receipt', body: 'Thank you for your payment of $40.00.' }))).toBe(false);
+    expect(T.isBill(msg({ body: 'Our fee is $500.' }))).toBe(false);
+    expect(T.billSummary(bill)).toEqual({ amount: '$1,250.00', due: 'Oct 31, 2026' });
+  });
+  test('a bill with List-Unsubscribe is not filed as automated', () => {
+    const r = T.sortThreads([thread('b', [bill])], {});
+    expect(r.mail).toHaveLength(1);
+    expect(r.counts.automated).toBe(0);
+  });
+  test.each([
+    ['Please note our new bank account details for future payments.', 'bank_change'],
+    ['Updated remit-to address attached', 'bank_change'],
+    ['Please transfer the funds today', 'urgent_payment'],
+    ['wire $5,000 now', 'urgent_payment'],
+    ['Can you send me the verification code?', 'credential'],
+    ['What is the login for the portal?', 'credential'],
+    ['We will send the report now.', null],
+    ['What is the code of conduct link?', null],
+    ['Thanks for the update', null]
+  ])('safetyFlag(%j) → %s', (body, want) => {
+    expect(T.safetyFlag(msg({ body }))).toBe(want);
+  });
+  test.each([
+    ['acme.co', 'acme.com', {}, true],
+    ['grantedd.ca', 'granted.ca', { maxDistance: 1 }, true],
+    ['granted-ca.com', 'granted.ca', { maxDistance: 1 }, true],
+    ['rnicrosoft.com', 'microsoft.com', {}, true],
+    ['grants.ca', 'granted.ca', { maxDistance: 1 }, false],
+    ['acme.com', 'acme.com', {}, false],
+    ['mail.acme.com', 'acme.com', {}, false],
+    ['client.ca', 'granted.ca', { maxDistance: 1 }, false]
+  ])('lookalikeOf(%s, %s) → %s', (sender, known, opts, want) => {
+    expect(T.lookalikeOf(sender, known, opts)).toBe(want);
+  });
+});
+
+describe('decideItemType', () => {
+  test('precedence: safety > sensitive > bill > unhappy > unsure > mail', () => {
+    expect(T.decideItemType({ category: 'client', safety: 'bank_change', sensitivity: 'legal', is_bill: true })).toMatchObject({ item_type: 'safety', badge: 'Verify by phone first', draft: 'none' });
+    expect(T.decideItemType({ category: 'client', lookalike: { known: 'acme.com' } }).item_type).toBe('safety');
+    expect(T.decideItemType({ category: 'client', sensitivity: 'refund', is_bill: true })).toMatchObject({ item_type: 'sensitive', badge: 'Sensitive · write this yourself', draft: 'none' });
+    expect(T.decideItemType({ category: 'team', is_bill: true, bill: { amount: '$90', due: 'Nov 3' } })).toMatchObject({ item_type: 'bill', badge: 'Bill · $90 due Nov 3', draft: 'none' });
+    expect(T.decideItemType({ category: 'client', sensitivity: 'unhappy' })).toMatchObject({ item_type: 'unhappy', draft: 'ack' });
+    expect(T.decideItemType({ category: 'other' })).toMatchObject({ item_type: 'unsure', badge: "Wasn't sure if this needs you", draft: 'none' });
+    expect(T.decideItemType({ category: 'partner' })).toMatchObject({ item_type: 'mail', badge: null, draft: 'normal' });
+  });
+  test('promise and unsure groups have card labels and an order', () => {
+    expect(T.GROUP_ORDER[0]).toBe('promise');
+    expect(T.GROUP_ORDER.indexOf('other')).toBeLessThan(T.GROUP_ORDER.indexOf('docs'));
+    expect(T.GROUP_LABELS.promise).toBe('Your promises');
+    expect(T.GROUP_LABELS.other).toBe('Not sure if this needs you');
+  });
+  test('ownText drops quoted history', () => {
+    expect(T.ownText('Arie,\n\nI will send it Wednesday.\n\nOn Mon, Oct 19, 2026 at 9:00 AM Arie <a@x.ca> wrote:\n> old')).toBe('Arie,\n\nI will send it Wednesday.');
+    expect(T.ownText('Hi\n> quoted\nmore\n-----Original Message-----\nFrom: x')).toBe('Hi\nmore');
+  });
+});

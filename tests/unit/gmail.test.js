@@ -96,7 +96,8 @@ describe('no-send guard: morning brief code', () => {
   const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
   const FILES = [
     'src/services/steph-brief.js', 'src/services/steph-brief-triage.js', 'src/services/steph-brief-classify.js',
-    'src/services/steph-brief-context.js', 'src/cards/brief-card.js', 'src/api/steph-brief-run.js'
+    'src/services/steph-brief-context.js', 'src/services/steph-brief-promises.js', 'src/services/steph-brief-learn.js',
+    'src/cards/brief-card.js', 'src/api/steph-brief-run.js'
   ];
   const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
   // What the brief may take from gmail.js: reads, the reply check, drafts. Nothing else exists there, but the

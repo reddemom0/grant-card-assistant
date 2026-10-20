@@ -108,8 +108,11 @@ export function renderBrief(run, items, { dryRun = !!run.is_test } = {}) {
     items.length > max && `${items.length - max} more not shown.`,
     counts.auto_done && `${counts.auto_done} ticked off — you replied.`,
     [counts.automated && `${counts.automated} automated`, counts.vendor && `${counts.vendor} vendor pitches`,
-      counts.other && `${counts.other} other`, counts.notifications_dropped && `${counts.notifications_dropped} doc notifications`]
-      .filter(Boolean).join(' · ') + (counts.automated || counts.vendor || counts.other || counts.notifications_dropped ? ' skipped.' : ''),
+      counts.handled && `${counts.handled} receipts & newsletters`, counts.notifications_dropped && `${counts.notifications_dropped} doc notifications`]
+      .filter(Boolean).join(' · ') + (counts.automated || counts.vendor || counts.handled || counts.notifications_dropped ? ' skipped.' : ''),
+    // A colleague already answered these: never drafted, never items.
+    Array.isArray(counts.covered) && counts.covered.length
+      ? `Covered by colleagues: ${counts.covered.map(c => `${c.by} (${c.threads})`).join(', ')}.` : null,
     counts.no_draft_cap && `${counts.no_draft_cap} past today's draft limit — assessed only.`,
     dryRun && counts.cost && runCostLine(counts.cost)
   ].filter(Boolean);

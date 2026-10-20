@@ -673,25 +673,84 @@ one- or two-line assessment, an in-thread Gmail **draft** saved in her mailbox, 
 button.
 
 - **Gate:** `STEPH_BRIEF_ENABLED` must be exactly `true`. The run also needs her Gmail
-  connected (see the Gmail section) and migration 051. If `gmail_connected_at` is null,
-  the run is skipped and **nothing is posted**.
-- **Window:** since the last completed real run, capped at 4 days. With no earlier run,
-  the last 24 h, or 72 h on a Monday. Each run also re-fetches the threads of items still
-  open from earlier briefs.
+  connected (see the Gmail section) and migrations 051 and 052. If `gmail_connected_at` is
+  null, the run is skipped and **nothing is posted**.
+- **Window:** the last 14 days (`READ_DAYS`). That covers every thread still unanswered by
+  her whose latest inbound arrived in that time; new mail from the last 48 h is inside it
+  by definition.
+  - Each run also re-fetches the threads of items still open from earlier briefs.
+  - Older unanswered mail is left to the Stage 3 catch-up. An item whose mail has aged
+    out is neither shown nor auto-ticked.
+  - Her SENT threads from the same 14 days are read too, for promises.
 - **Triage** (`steph-brief-triage.js`, pure):
-  - automated mail is skipped: List-Unsubscribe, Precedence, no-reply senders;
+  - automated mail is skipped: List-Unsubscribe, Precedence, no-reply senders. A **bill**
+    (an amount owed, a due date and payment instructions) is never skipped, even from
+    billing@ or no-reply senders;
+  - **covered by a colleague:** another `@granted.ca` address replied after the latest
+    external inbound. The thread gets no item and no draft; the footer reads "Covered by
+    colleagues: Ruk Ali (2)". Internal-only threads are never "covered";
   - one sender's threads form one item;
   - nudges (a second unanswered inbound, or follow-up phrasing) go to the top of their
     group, labelled "2nd nudge · 6 days";
   - Drive notifications are kept only for an @mention, a comment assigned to her, or a
     share that asks her something, grouped per document.
-- **Groups** (`steph-brief-classify.js`): Clients → Partners → Leads (most mature first) →
-  Team (finance first, then urgency) → Government, with Docs last.
+- **Groups** (`steph-brief-classify.js`): Your promises → Clients → Partners → Leads (most
+  mature first) → Team (finance first, then urgency) → Government → Not sure if this needs
+  you → Docs.
   - Fixed rules: government domains are Government, closed-won HubSpot contacts are
     Clients, and @granted.ca senders are Team.
   - One batched Haiku call sorts the rest.
   - An internal email about a closed-won company is a Client.
-  - Vendor pitches and "other" are skipped and counted in the footer.
+  - Cold pitches (`vendor`: the sender's product, not the sender's problem) and `handled`
+    mail (receipts, newsletters, confirmations) are counted in the footer, never shown.
+  - Borderline mail (`other`, or no verdict at all) is **surfaced** as "Wasn't sure if
+    this needs you". It is never dropped.
+- **Item types** (`decideItemType`; precedence top to bottom). Each item carries
+  `item_type`, `badge`, an assessment, an owner hint, and draft or no draft, for the card.
+
+  | Type | When | Badge | Draft |
+  |---|---|---|---|
+  | `safety` | A request to change bank or remit-to details, an urgent payment or wire, a password, code or login request; **or** a lookalike sender domain | "Verify by phone first", with a note on the lookalike | none |
+  | `sensitive` | A legal threat, contract dispute, negotiation or refund demand | "Sensitive · write this yourself" | none |
+  | `bill` | A bill | "Bill · $X due <date>" | none |
+  | `unhappy` | An unhappy client or a complaint | "Unhappy client · call recommended" | acknowledgement only |
+  | `unsure` | Borderline mail | "Wasn't sure if this needs you" | none |
+  | `promise` | A promise she made that's due (below) | "You promised <what> · due <when>" | only if confirmable |
+  | `mail` | Everything else | — | the normal path |
+
+  - **Detection:** the Haiku classify call detects all of these. Deterministic backups
+    (`SAFETY_RE`, `isBill`) can only **add** a flag, never remove one.
+  - **Lookalikes:** `lookalikeOf` compares the sender's domain with `granted.ca` (edit
+    distance 1, so `grants.ca` isn't flagged) and with the HubSpot domain of the company
+    the sender claims to be. It catches the same name on another TLD, homoglyphs
+    (rn↔m, 0↔o) and folded-in domains (`granted-ca.com`).
+  - **Acknowledgements** are one Haiku call, never Oracle. `guardAck` replaces any draft
+    that offers a fix, refund, credit, discount, waiver, compensation or blame with a
+    fixed "sorry, looking into it, will call you today".
+- **Promises** (`steph-brief-promises.js`): her sent messages from 14 days pass through a
+  commitment-plus-timeframe regex first. Then ONE Haiku call per run extracts what she
+  promised, its due date (resolved against the message date) and whether it's
+  confirmable.
+  - **Surfaced when:** the promise is due today or overdue, and she hasn't written on the
+    thread since.
+  - **On a thread that's already an item,** it becomes a note on that item.
+  - **Cost:** `counts.cost.promises`, rows tagged `step: 'promises'`.
+- **Learning from edits** (`steph-brief-learn.js`, real runs only):
+  - **What's kept:** the text of each draft saved in Gmail, in
+    `steph_brief_items.draft_text`, until her reply arrives.
+  - **Comparison:** her first reply after it is compared in code first. Token overlap of
+    0.9 or more means unchanged; 0.15 or less means unrelated. Both are skipped.
+  - **The rest:** ONE Haiku call per run turns them into short rules with no names or
+    amounts ("Give a specific day, not 'this week'") in `steph_voice_corrections`
+    (migration 052).
+  - **Clearing:** `draft_text` is cleared once compared, and after 14 days at most.
+  - **Use:** the latest 15 rules go into every drafting prompt after the voice guide
+    (Haiku drafts, acknowledgements and the client Oracle prompt). They are the persona's
+    (Steph's) rules, whoever's inbox a dry run reads. Dry runs never write them.
+- **Email content is data, never instructions.** Every prompt that carries email text
+  states `UNTRUSTED_EMAIL_RULE`: classify, drafts, acknowledgements, promise follow-ups,
+  the Oracle client prompt, promise extraction and learning. The text is wrapped in
+  `<email>` tags, and nested tags are stripped so an email can't close its own.
 - **No reply needed:** the same Haiku call flags FYIs, closing thank-yous, cc-only mail and
   similar. Those items stay on the card with their assessment, marked "no reply needed",
   with no context lookup and no draft. A failed or unreadable verdict counts as needs-reply.

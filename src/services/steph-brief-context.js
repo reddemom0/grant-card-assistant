@@ -34,6 +34,7 @@
 import crypto from 'crypto';
 import { firstName } from './steph-brief-triage.js';
 import { calculateRequestCost } from '../config/cost-settings.js';
+import { UNTRUSTED_EMAIL_RULE } from './steph-brief-classify.js';
 
 /** The only tools Oracle may use in a brief run. All read-only. */
 export const READ_ONLY_TOOLS = Object.freeze([
@@ -179,10 +180,11 @@ export async function leadFacts(item, deps, ledger = newLedger()) {
 // Prompt and reply
 // ---------------------------------------------------------------------------
 
-function threadText(item) {
+export function threadText(item) {
   const msgs = item.threads.flatMap(t => (t.messages || []).filter(m => !m.is_draft).map(m => ({ ...m, _subject: t.subject })))
     .sort((a, b) => a.internal_date - b.internal_date);
-  const out = msgs.map(m => `--- ${m.from_user ? 'STEPH' : `FROM ${m.from}`} · ${new Date(m.internal_date).toISOString().slice(0, 10)} · ${m.subject}\n${String(m.body || '').trim()}${m.attachments?.length ? `\n[attachments: ${m.attachments.join(', ')}]` : ''}`).join('\n\n');
+  // Each message in <email> tags: third-party text, never instructions (UNTRUSTED_EMAIL_RULE).
+  const out = msgs.map(m => `<email from="${m.from_user ? 'STEPH' : String(m.from).replace(/"/g, "'")}" date="${new Date(m.internal_date).toISOString().slice(0, 10)}">\nSubject: ${m.subject}\n${String(m.body || '').trim().replace(/<\/?email[^>]*>/gi, '')}${m.attachments?.length ? `\n[attachments: ${m.attachments.join(', ')}]` : ''}\n</email>`).join('\n\n');
   return out.length > THREAD_CHARS ? `…${out.slice(-THREAD_CHARS)}` : out;
 }
 
@@ -194,7 +196,13 @@ const GROUP_GUIDE = {
   government: 'a government program or funder. Be precise and formal; check the program in GetGranted grants or on the web if a question turns on program rules.'
 };
 
-export function buildOraclePrompt(item, { styleGuide, links, facts = null }) {
+/** The latest learned corrections, as a prompt block after the voice guide. */
+export function correctionsBlock(corrections) {
+  const rules = (corrections || []).map(c => (typeof c === 'string' ? c : c?.rule)).filter(Boolean).slice(0, 15);
+  return rules.length ? `HOW STEPH HAS CORRECTED PAST DRAFTS — follow these too:\n${rules.map(r => `- ${r}`).join('\n')}` : null;
+}
+
+export function buildOraclePrompt(item, { styleGuide, links, facts = null, corrections = [] }) {
   const linkLines = Object.entries(links || {}).map(([min, url]) => `- ${min} minutes: ${url}`).join('\n');
   return [
     `You are preparing Stephanie Sang's (Steph's) morning email brief. This is a BACKGROUND JOB running as Steph — there is no one to ask, so do not ask questions. Use only read-only tools.`,
@@ -203,6 +211,8 @@ export function buildOraclePrompt(item, { styleGuide, links, facts = null }) {
     facts ? `LEAD FACTS (gathered in code):\n${JSON.stringify(facts, null, 1)}` : null,
     `UNANSWERED THREAD(S), oldest first:\n${threadText(item)}`,
     `STEPH'S VOICE — follow this guide exactly when writing draft_body:\n${styleGuide || '(no guide)'}`,
+    correctionsBlock(corrections),
+    UNTRUSTED_EMAIL_RULE,
     linkLines ? `MEETING LINKS you may offer (only these, only if a call is the right next step):\n${linkLines}` : 'Do NOT include any meeting link.',
     `RULES:
 - Never state a price, fee, timeline, status or approval/funding outcome unless it is confirmed in HubSpot, Drive, Granola, Chat or the thread itself. If facts conflict or can't be confirmed, draft_body is a short HOLDING reply (acknowledge, say she's confirming, propose the next step) and "unclear" says what is unclear and who to ask.
@@ -235,6 +245,26 @@ const MEETING_URL = /https?:\/\/meetings\.hubspot\.com\/[^\s)"'<>\]]+/gi;
 const MONEY = /\$\s?\d[\d,]*(?:\.\d+)?\s?(?:k|m|million|thousand)?\b/gi;
 const TIMELINE = /\b(within|in)\s+(\d+|a|one|two|three|four|five|six|a few|a couple of)\s+(business\s+)?(days?|weeks?|months?)\b|\bturnaround\b|\b(decision|approval|funding|payment)s?\s+(by|in|within)\b/gi;
 const APPROVAL = /\b(you('| wi)ll\s+(be\s+)?(approved|qualify|get\s+(the\s+)?(grant|funding))|you\s+(are|'re)\s+(approved|eligible)|guarantee(d)?|approved\s+for|will\s+be\s+funded)\b/gi;
+
+// ---------------------------------------------------------------------------
+// Acknowledgement-only drafts (unhappy client)
+// ---------------------------------------------------------------------------
+
+/** Anything that offers a fix, money or fault. An acknowledgement must contain none of it. */
+export const ACK_FORBIDDEN = /\b(refund(ed|s)?|credit(ed|s)?|discount(ed|s)?|compensat\w*|reimburs\w*|waiv(e|ed|ing)|free of charge|no charge|on the house|our fault|your fault|my fault|we (made|messed)|mistake (was|on)|we('| wi)ll fix|i('| wi)ll fix|we('| ha)ve fixed|resolv(e|ed|ing)|solution|make (it|this) right|guarantee\w*)\b/i;
+
+export function ackReply(item) {
+  const name = firstName(item.sender);
+  return `${name ? `${name},\n\n` : ''}I'm sorry to hear this, and thank you for telling me. I'm looking into it now and will call you today.`;
+}
+
+/** An acknowledgement that offers a fix, refund, credit or blame is replaced by the fixed one. */
+export function guardAck(draft, item) {
+  if (!draft || ACK_FORBIDDEN.test(draft)) {
+    return { body: ackReply(item), held: !!draft, notes: draft ? ['The draft offered a fix, credit or blame — replaced with a plain acknowledgement.'] : [] };
+  }
+  return { body: draft.trim(), held: false, notes: [] };
+}
 
 export function holdingReply(item) {
   const name = firstName(item.sender);
@@ -328,10 +358,18 @@ export async function gatherContext(item, deps, ledger = newLedger()) {
 // One drafting call (no tools)
 // ---------------------------------------------------------------------------
 
-export function draftSystem(styleGuide) {
+const MODE_RULES = {
+  normal: '',
+  ack: `THIS IS AN UNHAPPY CLIENT. Write an ACKNOWLEDGEMENT ONLY: say sorry, that she's looking into it, and that she'll call today. NEVER offer a fix, a refund, a credit, a discount, a waiver or any compensation, and NEVER assign blame (not ours, not theirs). Three sentences at most. "unclear" names who should be on the call.
+`,
+  promise: `THIS IS A FOLLOW-UP ON A PROMISE STEPH MADE (see PROMISE in the context). Draft a short follow-up that keeps the promise ONLY with facts in the thread or context; if anything needed is missing, write a holding reply and say what's missing in "unclear". Never invent the deliverable.
+`
+};
+
+export function draftSystem(styleGuide, { mode = 'normal', corrections = [] } = {}) {
   return `You draft email replies AS Stephanie Sang (Steph), a senior grant consultant at Granted Consulting, for her morning brief. She reviews and sends every draft herself.
 
-RULES:
+${MODE_RULES[mode] || ''}RULES:
 - Use ONLY the thread and the CONTEXT given. Never state a price, fee, timeline, status or approval/funding outcome unless it is in them. If facts conflict or can't be confirmed, draft_body is a short HOLDING reply (acknowledge, say she's confirming, propose the next step) and "unclear" says what is unclear and who to ask.
 - draft_body is the email body only: start with the recipient's first name and a comma, no subject line, no signature.
 - assessment: one or two short sentences for Steph — what this is and what it needs from her. Don't restate the context.
@@ -341,7 +379,9 @@ RULES:
 Reply with ONLY one JSON object in a \`\`\`json fence: {"assessment": "...", "owner_hint": null, "unclear": null, "draft_body": "..."}
 
 STEPH'S VOICE — follow this guide exactly:
-${styleGuide || '(no guide)'}`;
+${styleGuide || '(no guide)'}
+${correctionsBlock(corrections) ? `\n${correctionsBlock(corrections)}\n` : ''}
+${UNTRUSTED_EMAIL_RULE}`;
 }
 
 const DRAFT_GUIDE = {
@@ -366,11 +406,11 @@ export function draftUserMessage(item, { facts, links }) {
  * One no-tools drafting call.
  * @returns {Promise<{ reply: object|null, ledger: object }>}
  */
-export async function draftOnce(item, { facts, links, styleGuide, model = DRAFT_MODEL }, deps, ledger = newLedger()) {
+export async function draftOnce(item, { facts, links, styleGuide, model = DRAFT_MODEL, mode = 'normal' }, deps, ledger = newLedger()) {
   const params = {
     model,
     max_tokens: 1500,
-    system: [{ type: 'text', text: draftSystem(styleGuide), cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: draftSystem(styleGuide, { mode, corrections: deps.corrections }), cache_control: { type: 'ephemeral' } }],
     messages: [{ role: 'user', content: draftUserMessage(item, { facts, links }) }]
   };
   try {
@@ -378,7 +418,7 @@ export async function draftOnce(item, { facts, links, styleGuide, model = DRAFT_
     if (msg?.usage) {
       addUsage(ledger, { usage: msg.usage, model });
       deps.logCost?.({ usage: msg.usage, model, source: 'steph-brief',
-        metadata: { ...(deps.costTags || {}), step: 'draft', item_key: item.item_key, category: item.category } });
+        metadata: { ...(deps.costTags || {}), step: mode === 'normal' ? 'draft' : `draft_${mode}`, item_key: item.item_key, category: item.category } });
     }
     const text = (msg?.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
     return { reply: parseReply(text), ledger };
@@ -407,7 +447,7 @@ export async function oracleDraft(item, who, deps, ledger, { timeoutMs = 180_000
   } catch { /* the run still works without the row */ }
   const agent = deps.runAgent({
     agentType: 'internal-oracle',
-    message: buildOraclePrompt(item, { styleGuide, links }),
+    message: buildOraclePrompt(item, { styleGuide, links, corrections: deps.corrections }),
     conversationId,
     userId: runAs.id,
     sessionId: crypto.randomUUID(),
@@ -462,7 +502,14 @@ export async function contextForItem(item, who, deps, { timeoutMs = 180_000, com
   const notes = [];
   let conversationId = null;
 
-  if (item.category === 'client') {
+  if (item.draft === 'ack') {
+    // Unhappy client: one Haiku acknowledgement, no context lookup, no links.
+    ({ reply } = await draftOnce(item, { facts: null, links: {}, styleGuide, mode: 'ack' }, deps, ledger));
+  } else if (item.draft === 'promise') {
+    // A due promise whose facts are in the thread: one Haiku follow-up.
+    facts = { promise: item.promise };
+    ({ reply } = await draftOnce(item, { facts, links: {}, styleGuide, mode: 'promise' }, deps, ledger));
+  } else if (item.category === 'client') {
     const o = await oracleDraft(item, who, deps, ledger, { timeoutMs, styleGuide, links });
     reply = o.reply;
     conversationId = o.conversationId;
@@ -477,12 +524,19 @@ export async function contextForItem(item, who, deps, { timeoutMs = 180_000, com
   }
 
   const sourceText = `${threadText(item)}\n${facts ? JSON.stringify(facts) : ''}`;
-  const guarded = guardDraft(reply?.draft_body, { item, allowedLinks: links, sourceText });
+  let guarded;
+  if (item.draft === 'ack') {
+    const ack = guardAck(reply?.draft_body, item);
+    const g = guardDraft(ack.body, { item, allowedLinks: {}, sourceText });
+    guarded = g.held ? { body: ackReply(item), held: true, notes: [...ack.notes, ...g.notes] } : { ...g, held: ack.held, notes: [...ack.notes, ...g.notes] };
+  } else {
+    guarded = guardDraft(reply?.draft_body, { item, allowedLinks: links, sourceText });
+  }
 
   // Dry-run comparison: leads → a Sonnet version on the same context;
   // clients → a Haiku version on thread + HubSpot only. Costed separately.
   let compared = null;
-  if (compare && (item.category === 'lead' || item.category === 'client')) {
+  if (compare && item.draft !== 'ack' && (item.category === 'lead' || item.category === 'client')) {
     const cmpLedger = newLedger();
     const model = item.category === 'lead' ? SONNET_MODEL : DRAFT_MODEL;
     const cmpFacts = item.category === 'lead' ? facts : (await gatherContext(item, deps, cmpLedger)).facts;
