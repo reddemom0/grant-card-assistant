@@ -111,13 +111,15 @@ describe('groups and layout', () => {
   test('Clients, Leads, promises in full detail: who, what\'s going on, draft says, checked; others one line', () => {
     const cards = render([
       it({ category: 'client', sender: 'Arie Vos', company: 'Vos Logistics', subject: 'Renewal', assessment: 'Renewal unsigned; e-contract expired Friday.',
-        draft_ids: ['d'], draft_message_id: 'm1', draft_text: "Arie,\n\nThe renewal came back unsigned. If you're good to go, I'll retrigger it.", sources: ['HubSpot', 'Drive'] }),
+        draft_ids: ['d'], draft_message_id: 'm1', draft_text: "Arie,\n\nThe renewal came back unsigned. If you're good to go, I'll retrigger it.",
+        draft_summary: 'Confirms the renewal and offers to retrigger the e-contract.', sources: ['HubSpot', 'Drive'] }),
       it({ category: 'partner', sender: 'Pat', subject: 'Webinar', assessment: 'Wants a co-host for Nov 12.' })
     ]);
     const [full, one] = decos(cards);
     expect(full.text).toContain('<b>Arie Vos, Vos Logistics</b> — Renewal');
     expect(full.text).toContain("<b>What's going on:</b> Renewal unsigned; e-contract expired Friday.");
-    expect(full.text).toContain('<b>Draft says:</b> The renewal came back unsigned.');
+    expect(full.text).toContain('<b>Draft says:</b> Confirms the renewal and offers to retrigger the e-contract.');
+    expect(full.text).not.toContain('The renewal came back unsigned');   // never the draft's first sentence
     expect(full.text).toContain('Checked HubSpot, Drive');
     expect(one.text).toBe('<b>Pat</b> — Wants a co-host for Nov 12. <font color="#5f6368">· No draft</font>');
     expect(one.text).not.toContain("What's going on");
@@ -225,6 +227,47 @@ describe('footer', () => {
   });
   test('user text is escaped', () => {
     expect(JSON.stringify(render([it({ subject: '<script>x</script>' })]))).not.toContain('<script>');
+  });
+});
+
+describe('dry-run 2 fixes (card)', () => {
+  test('Start-here reasons match each item type; a security alert never gets the fraud reason', () => {
+    const R = await_import_rank();
+    const reason = (o) => R.urgencyOf(it(o), { today: '2026-10-20', now: NOW }).reason;
+    expect(reason({ item_type: 'security', badge: 'Security alert' })).toBe('a security alert — have IT check it today');
+    expect(reason({ item_type: 'safety', badge: 'Verify by phone first' })).toMatch(/^a payment or login request\. Verify it by phone/);
+    expect(reason({ item_type: 'sensitive' })).toBe('a legal or contract matter; write the reply yourself before it escalates');
+    expect(reason({ item_type: 'cc', finance: true, urgency: 3 })).toBeNull();       // someone else's to act on
+    expect(R.urgencyOf(it({ item_type: 'security' }), { today: '2026-10-20', now: NOW }).tier).toBe(1);
+  });
+  test('security and cc items are one line even in full-detail groups, with their owner suggestion', () => {
+    const [sec, cc] = decos(render([
+      it({ category: 'client', item_type: 'security', badge: 'Security alert', owner_hint: 'IT/admin', sender: 'Google Workspace Alerts', summary: 'A suspicious login on your account.' }),
+      it({ category: 'client', item_type: 'cc', badge: "You're cc'd", owner_hint: 'Ruk', sender: 'Arie', summary: 'Asks Ruk for the signed copy.' })
+    ]));
+    expect(sec.topLabel).toBe('Security alert');
+    expect(sec.text).toBe('<b>Google Workspace Alerts</b> — A suspicious login on your account. <font color="#5f6368">· No draft; suggest IT/admin</font>');
+    expect(cc.topLabel).toBe("You're cc'd");
+    expect(cc.text).toContain('· No draft; suggest Ruk');
+  });
+  test('"Draft says" is the stored draft summary; without one it never quotes the draft', () => {
+    const one = (o) => decos(render([it({ category: 'client', draft_ids: ['d'], draft_message_id: 'm', draft_text: "Arie,\n\nThe renewal came back unsigned.", ...o })]))[0].text;
+    expect(one({ draft_summary: 'Confirms the renewal and offers to retrigger it.' })).toContain('<b>Draft says:</b> Confirms the renewal and offers to retrigger it.');
+    const fallback = one({ draft_summary: null });
+    expect(fallback).toContain('<b>Draft saved</b> in your Gmail drafts.');
+    expect(fallback).not.toContain('The renewal came back unsigned');
+  });
+  test('model-written text is shown whole; the hard cut is only a safety net', () => {
+    const assessment = Array.from({ length: 25 }, (_, i) => `word${i}`).join(' ') + '.';            // 25 words, ~180 chars
+    const summary = Array.from({ length: 15 }, (_, i) => `w${i}`).join(' ') + '.';
+    const [full] = decos(render([it({ category: 'client', assessment })]));
+    expect(full.text).toContain(assessment);
+    const [line] = decos(render([it({ category: 'partner', summary, assessment: 'longer fallback text' })]));
+    expect(line.text).toContain(summary);
+    expect(line.text).not.toContain('longer fallback');
+    const [runaway] = decos(render([it({ category: 'client', assessment: 'x'.repeat(900) })]));
+    expect(runaway.text).toContain('…');
+    expect(runaway.text.length).toBeLessThan(900);
   });
 });
 

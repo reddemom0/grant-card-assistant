@@ -38,6 +38,11 @@ const GREY = '#5f6368';
 const ACCENT = '#1a73e8';
 const BADGE = '#b06000';
 const FULL_DETAIL = new Set(['promise', 'client', 'lead']);
+/** Always one line, whatever their group: nothing for Steph to read in depth. */
+const ONE_LINE_TYPES = new Set(['security', 'cc']);
+/** Last-resort caps. The model writes to length (≤25 / ≤15 words); these only stop a runaway. */
+const NET_ASSESSMENT = 400;
+const NET_SUMMARY = 240;
 
 export const EXPLAINER = 'Each item is an email waiting on you. I read the thread, checked HubSpot, Drive, Granola and Chat, and saved a reply in your Gmail drafts. Open it, edit, send. Replying ticks it off here automatically. Press Done if you handled it another way.';
 
@@ -106,29 +111,25 @@ export function badgesOf(item, now = Date.now()) {
   return out;
 }
 
-/** The first real sentence of a draft, after the greeting line. */
-export function draftSays(text) {
-  const body = String(text || '').split(/\n+/).map(l => l.trim()).filter(Boolean).filter((l, i) => !(i === 0 && /^[\p{L}' -]{1,40},$/u.test(l)));
-  const first = (body.join(' ').match(/^.+?[.!?](\s|$)/) || [body.join(' ')])[0].trim();
-  return clip(first, 160);
-}
-
 const NO_DRAFT_WHY = {
   safety: 'verify the request by phone first',
   sensitive: 'write this one yourself',
   bill: 'pay it or pass it to finance',
   unsure: "not sure it needs a reply",
+  security: 'a security alert for IT',
+  cc: "you're only cc'd",
   promise: "the facts to keep this promise aren't in the thread"
 };
 
 function draftLine(item) {
-  const text = item.draft_text || item.draft_preview;
-  if (item.held && (item.draft_ids?.length || item.draft_preview)) {
+  const hasDraft = item.draft_ids?.length || item.draft_preview;
+  if (item.held && hasDraft) {
     const unclear = /Unclear: ([^]*?)(?=(Held back|Removed a meeting|$))/.exec(item.note || '')?.[1]?.trim();
     return `<b>Before you send:</b> ${esc(clip(unclear || 'the draft is a holding reply — confirm the facts first', 220))}`;
   }
-  if (text) return `<b>Draft says:</b> ${esc(draftSays(text))}`;
-  if (item.draft_ids?.length) return '<b>Draft saved</b> in your Gmail drafts.';
+  // What the draft DOES, in the drafting call's own words — never its first sentence.
+  if (hasDraft && item.draft_summary) return `<b>Draft says:</b> ${esc(clip(item.draft_summary, NET_SUMMARY))}`;
+  if (hasDraft) return '<b>Draft saved</b> in your Gmail drafts.';
   const why = NO_DRAFT_WHY[item.item_type] || (item.item_type === 'mail' ? "past today's draft limit" : null);
   return `<b>No draft</b>${why ? ` — ${esc(why)}` : ''}`;
 }
@@ -152,7 +153,7 @@ function fullItem(item, run, { dryRun, mailbox, now }) {
   const done = item.state !== 'open';
   const lines = [
     `<b>${esc(who(item))}</b> — ${esc(clip(item.subject || '(no subject)', 120))}`,
-    item.assessment ? `<b>What's going on:</b> ${esc(clip(item.assessment, 280))}` : null,
+    item.assessment ? `<b>What's going on:</b> ${esc(clip(item.assessment, NET_ASSESSMENT))}` : null,
     item.facts_line ? `<font color="${GREY}">${esc(clip(item.facts_line, 200))}</font>` : null,
     draftLine(item),
     item.sources?.length ? `<font color="${GREY}">Checked ${esc(item.sources.join(', '))}</font>` : null,
@@ -171,7 +172,7 @@ function fullItem(item, run, { dryRun, mailbox, now }) {
 
 function oneLineItem(item, run, { dryRun, mailbox, now }) {
   const done = item.state !== 'open';
-  const summary = item.assessment ? clip(item.assessment, 160) : clip(item.subject || '', 120);
+  const summary = clip(item.summary || item.assessment || item.subject || '', NET_SUMMARY);
   const noDraft = !item.draft_ids?.length && !item.draft_preview && item.category !== 'docs'
     ? ` <font color="${GREY}">· No draft${item.owner_hint ? `; suggest ${esc(clip(item.owner_hint, 60))}` : ''}</font>` : '';
   const warn = item.note && item.item_type === 'safety' ? `<br><font color="${BADGE}">⚠️ ${esc(clip(item.note, 160))}</font>` : '';
@@ -265,10 +266,10 @@ export function renderBrief(run, items, { dryRun = !!run.is_test, now = Date.now
   for (const group of GROUP_ORDER) {
     const inGroup = listed.filter(i => i.category === group && shown.has(i.id));
     if (!inGroup.length) continue;
-    const render = FULL_DETAIL.has(group) ? fullItem : oneLineItem;
+    const render = (i) => (FULL_DETAIL.has(group) && !ONE_LINE_TYPES.has(i.item_type) ? fullItem : oneLineItem)(i, run, { dryRun, mailbox, now });
     sections.push({
       header: `${GROUP_LABELS[group]} · ${inGroup.length}`,
-      widgets: inGroup.flatMap(i => render(i, run, { dryRun, mailbox, now }))
+      widgets: inGroup.flatMap(render)
     });
   }
   if (!listed.length) sections.push({ widgets: [paragraph('Nothing waiting on you in the last 14 days.')] });

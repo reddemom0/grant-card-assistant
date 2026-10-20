@@ -22,6 +22,18 @@ const DAY_MS = 24 * 3600 * 1000;
  * of her) come next to last; 'other' — mail triage wasn't sure about,
  * surfaced and never dropped — is last.
  */
+/**
+ * Is the mailbox owner only in Cc on this message (not in To)?
+ * @param {object} msg - a parsed message
+ * @param {string} mailboxEmail
+ */
+export function ccOnly(msg, mailboxEmail) {
+  const me = String(mailboxEmail || '').toLowerCase();
+  if (!me) return false;
+  const has = (field) => String(field || '').toLowerCase().split(',').map(addressOf).includes(me);
+  return !has(msg.to) && has(msg.cc);
+}
+
 export const GROUP_ORDER = Object.freeze(['promise', 'client', 'partner', 'lead', 'team', 'government', 'docs', 'other']);
 
 export const GROUP_LABELS = Object.freeze({
@@ -129,7 +141,8 @@ export function sortThreads(threads, { since = null } = {}) {
     if (isDriveNotification(latest)) { notifications.push(thread); continue; }
     // A bill is never "automated": invoices from billing@ / no-reply senders
     // carry List-Unsubscribe too, and must still surface.
-    if (isAutomated(latest) && !isBill(latest)) { counts.automated += 1; continue; }
+    // Security alerts too (suspicious sign-in notices come from no-reply senders).
+    if (isAutomated(latest) && !isBill(latest) && !isSecurityAlert(latest)) { counts.automated += 1; continue; }
     mail.push({ thread, latest, unanswered });
   }
   return { mail, notifications, covered, agedOut, counts };
@@ -187,6 +200,23 @@ export const SAFETY_RE = Object.freeze({
   credential: /\b(password|passcode|verification code|security code|one[- ]time (code|password)|2fa|mfa|login (details|credentials|info)|sign[- ]in code|otp)\b|\b(what('?s| is) (the|your)|send (me )?(the |your )?|share (the |your )?)\s*(login|username|log-?in|credentials?|code(?! of))\b/i
 });
 
+/**
+ * An automated security NOTICE (Google Workspace "suspicious login", new
+ * sign-in, password changed, 2-step verification changed, account locked) —
+ * not a person asking for a password. It gets its own type ("Security alert",
+ * suggest IT/admin), never "Verify by phone first". Needs an alert phrase AND a
+ * system sender: a person writing "suspicious login" is still read as mail.
+ */
+const SECURITY_CUE = /\b(suspicious (sign[- ]?in|log[- ]?in|activity)|unusual (sign[- ]?in|activity)|new sign[- ]?in|sign[- ]?in attempt|(critical )?security alert|login from a new device|password (was |has been )?(changed|reset)|2-step verification (was |has been )?(turned (on|off)|enabled|disabled|changed)|account (has been |was )?(locked|suspended|compromised|disabled))\b/i;
+const SECURITY_SENDER = /(^|[.@])(accounts\.google\.com|google\.com|googlemail\.com|microsoft(online)?\.com|okta\.com|slack\.com|hubspot\.com|apple\.com|dropbox\.com|zoom\.us)$|^(security|alerts?|no-?reply|noreply|workspace|admin)[^@]*@/i;
+
+export function isSecurityAlert(msg) {
+  const text = `${msg.subject || ''}\n${String(msg.body || '').slice(0, 2000)}`;
+  if (!SECURITY_CUE.test(text)) return false;
+  const from = addressOf(msg.from);
+  return isAutomated(msg) || SECURITY_SENDER.test(from) || SECURITY_SENDER.test(domainOf(from));
+}
+
 export function safetyFlag(msg) {
   const text = `${msg.subject || ''}\n${String(msg.body || '').slice(0, 4000)}`;
   for (const [kind, re] of Object.entries(SAFETY_RE)) if (re.test(text)) return kind;
@@ -233,20 +263,35 @@ export function lookalikeOf(sender, known, { maxDistance = 2 } = {}) {
 // Item type, badge, draft rule (pure)
 // ---------------------------------------------------------------------------
 
-export const ITEM_TYPES = Object.freeze(['mail', 'promise', 'safety', 'sensitive', 'unhappy', 'bill', 'unsure']);
+export const ITEM_TYPES = Object.freeze(['mail', 'promise', 'safety', 'security', 'sensitive', 'unhappy', 'bill', 'cc', 'unsure']);
+
+/** Owner suggested for security alerts. */
+export const SECURITY_OWNER = 'IT/admin';
 
 /**
  * What kind of item this is, its badge, and whether it may be drafted.
- * Precedence: safety > sensitive > bill > unhappy > unsure > mail.
+ * Precedence: lookalike sender > security alert > payment/credential request >
+ * sensitive > cc'd for someone else > bill > unhappy > unsure > mail.
  *   draft: 'none' | 'ack' (acknowledgement only) | 'normal'
- * @param {{ category, safety?, lookalike?, sensitivity?, is_bill?, bill? }} item
+ * @param {{ category, safety?, lookalike?, security_alert?, sensitivity?, cc_for?, is_bill?, bill? }} item
  */
 export function decideItemType(item) {
-  if (item.safety || item.lookalike) {
+  if (item.lookalike) {
+    return { item_type: 'safety', badge: 'Verify by phone first', draft: 'none' };
+  }
+  // A system security notice, not a request: IT checks it, Steph doesn't phone anyone.
+  if (item.security_alert) {
+    return { item_type: 'security', badge: 'Security alert', draft: 'none', owner_hint: SECURITY_OWNER };
+  }
+  if (item.safety) {
     return { item_type: 'safety', badge: 'Verify by phone first', draft: 'none' };
   }
   if (['legal', 'dispute', 'negotiation', 'refund'].includes(item.sensitivity)) {
     return { item_type: 'sensitive', badge: 'Sensitive · write this yourself', draft: 'none' };
+  }
+  // Steph is only cc'd and the email asks someone else to act: theirs to answer.
+  if (item.cc_for) {
+    return { item_type: 'cc', badge: "You're cc'd", draft: 'none', owner_hint: item.cc_for };
   }
   if (item.is_bill) {
     const b = item.bill || {};

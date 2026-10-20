@@ -3,6 +3,7 @@
  *
  * Ranks card items by consequence, not arrival (inbox-manager triage rule):
  *   tier 0  "Verify by phone first" (payment / credential / lookalike) — always first
+ *   tier 1  a security alert (have IT check it today), alongside the deadlines below
  *   tier 1  a deadline: a promise or bill due date (soonest first, overdue
  *           first), or the email needs an answer today (urgency 3)
  *   tier 2  money or work blocked on Steph: finance, an unhappy client
@@ -53,6 +54,11 @@ export function urgencyOf(item, { today, now = Date.now() }) {
   if (item.item_type === 'safety') {
     return { tier: 0, due, reason: "a payment or login request. Verify it by phone before anything moves; if it's fraud, the money is gone" };
   }
+  if (item.item_type === 'security') {
+    return { tier: 1, due: today, reason: 'a security alert — have IT check it today' };
+  }
+  // cc'd for someone else: theirs to act on, never Steph's first job.
+  if (item.item_type === 'cc') return { tier: 4, due: null, reason: null };
   if (item.item_type === 'promise' && due) {
     const late = daysBetween(due, today);
     return { tier: 1, due, reason: late > 0
@@ -68,6 +74,7 @@ export function urgencyOf(item, { today, now = Date.now() }) {
   }
   if (item.urgency === 3) return { tier: 1, due: today, reason: 'they need an answer today' };
   if (item.item_type === 'unhappy') return { tier: 2, due: null, reason: 'an unhappy client; a call today stops it escalating' };
+  if (item.item_type === 'sensitive') return { tier: 2, due: null, reason: 'a legal or contract matter; write the reply yourself before it escalates' };
   if (item.finance || item.item_type === 'bill') return { tier: 2, due: null, reason: 'money is waiting on your answer' };
   if ((item.nudge || 0) >= 2) {
     const d = waitedDays(item, now);

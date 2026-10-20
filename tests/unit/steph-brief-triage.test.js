@@ -298,3 +298,34 @@ describe('decideItemType', () => {
     expect(T.ownText('Hi\n> quoted\nmore\n-----Original Message-----\nFrom: x')).toBe('Hi\nmore');
   });
 });
+
+// ── Dry-run 2 fixes (pure) ──────────────────────────────────────────────────
+describe('security alerts and cc-only', () => {
+  test.each([
+    ['Google Workspace Alerts <google-workspace-alerts-noreply@google.com>', 'Suspicious login detected', '', true],
+    ['Google <no-reply@accounts.google.com>', 'Security alert', 'New sign-in on Windows', true],
+    ['Microsoft account team <account-security-noreply@accountprotection.microsoft.com>', 'Unusual sign-in activity', '', true],
+    ['Bob <bob@client.ca>', 'Can you send me your login?', '', false],
+    ['Bob <bob@client.ca>', 'Hi', 'We saw a suspicious login on our account yesterday', false],
+    ['Google <no-reply@accounts.google.com>', 'Your storage is almost full', '', false]
+  ])('isSecurityAlert(%s, %j) → %s', (from, subject, body, want) => {
+    expect(T.isSecurityAlert(msg({ from, subject, body }))).toBe(want);
+  });
+  test('precedence: lookalike > security alert > payment/credential request > sensitive > cc > bill', () => {
+    expect(T.decideItemType({ security_alert: true, safety: 'credential' })).toEqual({ item_type: 'security', badge: 'Security alert', draft: 'none', owner_hint: 'IT/admin' });
+    expect(T.decideItemType({ security_alert: true, lookalike: { known: 'google.com' } }).item_type).toBe('safety');
+    expect(T.decideItemType({ safety: 'bank_change' }).badge).toBe('Verify by phone first');
+    expect(T.decideItemType({ sensitivity: 'legal', cc_for: 'Ruk' }).item_type).toBe('sensitive');
+    expect(T.decideItemType({ cc_for: 'Ruk', is_bill: true })).toEqual({ item_type: 'cc', badge: "You're cc'd", draft: 'none', owner_hint: 'Ruk' });
+  });
+  test('ccOnly: in Cc and not in To', () => {
+    expect(T.ccOnly({ to: 'Ruk <rukshaar@granted.ca>', cc: 'Steph <ssang@granted.ca>, x@y.ca' }, ME)).toBe(true);
+    expect(T.ccOnly({ to: 'ssang@granted.ca, ruk@granted.ca', cc: 'x@y.ca' }, ME)).toBe(false);
+    expect(T.ccOnly({ to: 'Ruk <rukshaar@granted.ca>', cc: '' }, ME)).toBe(false);
+    expect(T.ccOnly({ to: 'a@b.ca', cc: 'SSANG@granted.ca' }, ME)).toBe(true);
+  });
+  test('a security alert passes the automated filter', () => {
+    const t = thread('s', [msg({ from: 'Google <no-reply@accounts.google.com>', list_unsubscribe: '<x>', subject: 'Security alert', body: 'New sign-in on Mac' })]);
+    expect(T.sortThreads([t], {}).mail).toHaveLength(1);
+  });
+});

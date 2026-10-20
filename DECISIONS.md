@@ -12,6 +12,17 @@ Format:
 
 ---
 
+## 2026-10-20 — Steph brief card fixes from dry run 2: security alerts, cc-only, model-written summaries
+**What:**
+- **Security alerts:** automated notices (Workspace "Suspicious login", new sign-in) get their own `security` type: "Security alert", one line, suggest IT/admin, Start here "have IT check it today". Only a person asking for payment details, a payment or wire, or credentials keeps "Verify by phone first".
+- **Cc-only mail:** when Steph is only cc'd and someone else is asked to act, the item gets type `cc` (one line, no draft, suggest that person), or is counted as an FYI if no one at Granted needs to act.
+- **"Draft says":** now the drafting call's own `draft_summary` (15 words at most), never the draft's first sentence.
+- **Lengths:** assessments (25 words at most) and one-line summaries (15 words at most) are written to length by the model; the card keeps only a large safety-net cut.
+
+Migration 054 adds `summary`, `draft_summary` and the two types.
+**Why:** In the second dry run, a Google login alert was shown as a payment/credential request with the fraud reason, so the type and the reason were wrong. "Draft says" quoted greetings and opening lines. Summaries ended in "…" mid-thought. Cc'd mail got drafts for emails addressed to colleagues. Security detection needs an alert phrase **and** a system sender, so a person writing "suspicious login" is still read as mail. A lookalike sender still outranks it as `safety`.
+**Impact:** `src/services/steph-brief{,-triage,-classify,-context,-rank}.js`, `src/cards/brief-card.js`, `migrations/054_steph_brief_card_fixes.sql`, `docs/oracle.md`, tests `steph-brief`, `steph-brief-triage`, `brief-card`
+
 ## 2026-10-20 — Steph brief card redesign: Start here, consequence order, counts-only footer
 **What:** The brief card is rebuilt to read in about 90 seconds:
 - **Top:** "Good morning, Steph" with the date and counts (this fixes "Invalid Date": pg returns `DATE` as a JS Date), then a fixed explainer, then **Start here** (the top 1–2 by `rankItems`: verify-by-phone first, then deadlines, money, follow-ups, each with what happens if it waits).

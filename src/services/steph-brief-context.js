@@ -246,9 +246,11 @@ export function buildOraclePrompt(item, { styleGuide, links, facts = null, corre
     `RULES:
 - Never state a price, fee, timeline, status or approval/funding outcome unless it is confirmed in HubSpot, Drive, Granola, Chat or the thread itself. If facts conflict or can't be confirmed, draft_body is a short HOLDING reply (acknowledge, say she's confirming, propose the next step) and "unclear" says what is unclear and who to ask.
 - draft_body is the email body only: start with the recipient's first name and a comma, no subject line, no signature.
-- assessment: one or two short sentences for Steph — what this is and what it needs from her.
+- assessment: AT MOST 25 WORDS, complete sentences — what they want and the one key fact behind your draft. Write it to length; never trail off.
+- summary: AT MOST 15 WORDS — one complete line saying what this email is.
+- draft_summary: AT MOST 15 WORDS — what YOUR DRAFT does, not its first sentence.
 - owner_hint: a colleague who should own this if it isn't Steph's, else null.`,
-    'Reply with ONLY one JSON object in a ```json fence: {"assessment": "...", "owner_hint": null, "unclear": null, "draft_body": "..."}'
+    'Reply with ONLY one JSON object in a ```json fence: {"assessment": "...", "summary": "...", "draft_summary": "...", "owner_hint": null, "unclear": null, "draft_body": "..."}'
   ].filter(Boolean).join('\n\n');
 }
 
@@ -260,7 +262,9 @@ export function parseReply(text) {
     const o = JSON.parse(raw);
     if (!o || typeof o !== 'object') return null;
     const str = (v, n) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, n) : null);
-    return { assessment: str(o.assessment, 400), owner_hint: str(o.owner_hint, 120), unclear: str(o.unclear, 300), draft_body: str(o.draft_body, DRAFT_MAX) };
+    // Lengths are asked of the model; these caps are only a safety net.
+    return { assessment: str(o.assessment, 400), summary: str(o.summary, 200), draft_summary: str(o.draft_summary, 200),
+      owner_hint: str(o.owner_hint, 120), unclear: str(o.unclear, 300), draft_body: str(o.draft_body, DRAFT_MAX) };
   } catch {
     return null;
   }
@@ -403,11 +407,13 @@ export function draftSystem(styleGuide, { mode = 'normal', corrections = [] } = 
 ${MODE_RULES[mode] || ''}RULES:
 - Use ONLY the thread and the CONTEXT given. Never state a price, fee, timeline, status or approval/funding outcome unless it is in them. If facts conflict or can't be confirmed, draft_body is a short HOLDING reply (acknowledge, say she's confirming, propose the next step) and "unclear" says what is unclear and who to ask.
 - draft_body is the email body only: start with the recipient's first name and a comma, no subject line, no signature.
-- assessment: one or two short sentences for Steph — what this is and what it needs from her. Don't restate the context.
+- assessment: AT MOST 25 WORDS, complete sentences — what they want and the one key fact behind your draft. Write it to length; never trail off.
+- summary: AT MOST 15 WORDS — one complete line saying what this email is.
+- draft_summary: AT MOST 15 WORDS — what YOUR DRAFT does (e.g. "Confirms the renewal and offers to retrigger the e-contract this week."), not its first sentence.
 - owner_hint: a colleague who should own this if it isn't Steph's, else null.
 - Offer a meeting link only from the list given, only if a call is the right next step.
 
-Reply with ONLY one JSON object in a \`\`\`json fence: {"assessment": "...", "owner_hint": null, "unclear": null, "draft_body": "..."}
+Reply with ONLY one JSON object in a \`\`\`json fence: {"assessment": "...", "summary": "...", "draft_summary": "...", "owner_hint": null, "unclear": null, "draft_body": "..."}
 
 STEPH'S VOICE — follow this guide exactly:
 ${styleGuide || '(no guide)'}
@@ -579,9 +585,18 @@ export async function contextForItem(item, who, deps, { timeoutMs = 180_000, com
     };
   }
 
+  // "Draft says": the drafting call's own one-line summary — unless the code
+  // replaced its draft (holding reply / plain acknowledgement), when the
+  // summary would describe a draft that no longer exists.
+  const draftSummary = !guarded.body ? null
+    : item.draft === 'ack' && guarded.body === ackReply(item) ? 'Apologises, says you are looking into it and will call today.'
+      : guarded.held ? 'A holding reply: says you are confirming details before answering.'
+        : reply?.draft_summary || null;
   return {
     ok: !!reply,
     assessment: reply?.assessment || item.assessment || null,
+    summary: reply?.summary || item.summary || null,
+    draft_summary: draftSummary,
     owner_hint: reply?.owner_hint || null,
     note: [reply?.unclear && `Unclear: ${reply.unclear}`, ...notes, ...guarded.notes].filter(Boolean).join(' ') || null,
     facts_line: factsLine,

@@ -25,7 +25,7 @@
  * Reads only. Logs counts — never a sender, a subject or a body.
  */
 
-import { billSummary, decideItemType, domainOf, isBill, isGovDomain, isInternal, lookalikeOf, safetyFlag } from './steph-brief-triage.js';
+import { billSummary, ccOnly, decideItemType, domainOf, isBill, isGovDomain, isInternal, isSecurityAlert, lookalikeOf, safetyFlag } from './steph-brief-triage.js';
 import { calculateRequestCost } from '../config/cost-settings.js';
 
 export const CLASSIFY_MODEL = 'claude-haiku-4-5-20251001';
@@ -60,10 +60,16 @@ const SYSTEM = `You sort unanswered emails for Stephanie Sang, a senior grant co
 - vendor: a COLD PITCH — someone selling their own product or service to Granted (a pitch is about the sender's product; an inquiry is about the sender's problem — an inquiry is a lead, never a vendor)
 - handled: needs nothing from anyone — a receipt, newsletter, confirmation or automatic notice. A bill (money owed, a due date, how to pay) is NEVER handled.
 - other: you're not sure whether this needs Steph. Use it whenever you're unsure — it will be shown to her, not dropped.
-Also return: about_company (the client company an internal email is about, else null), finance (true for invoices, payments, payroll, contracts), urgency (0 none – 3 today), and assessment: one or two short plain sentences for Steph — what this is and what it needs from her. Never invent facts; say what is unclear.
+Also return: about_company (the client company an internal email is about, else null), finance (true for invoices, payments, payroll, contracts), urgency (0 none – 3 today), and:
+- assessment: AT MOST 25 WORDS, complete sentences — what they want and the one key fact. Write it to length; never trail off.
+- summary: AT MOST 15 WORDS, one complete line for a one-line list — what it is and what it needs.
+Never invent facts; say what is unclear.
 needs_reply: false ONLY when the email clearly needs no reply from Steph — an FYI, a thank-you that closes the thread, she is only cc'd, an automatic confirmation, or someone else is answering. When in doubt, true.
 program_question: for government emails, {"asks_rules": true, "program_name": "<the program>"} when the email asks about a named program's rules (eligibility, deadlines, eligible costs, reporting); else null.
-safety: "bank_change" (any request to change bank, remit-to or payment details), "urgent_payment" (an urgent payment, wire or gift-card ask), "credential" (asks for a password, code or login), else null.
+safety: "bank_change" (a PERSON asking to change bank, remit-to or payment details), "urgent_payment" (a person asking for an urgent payment, wire or gift cards), "credential" (a person asking for a password, code or login), else null.
+security_alert: true when this is an automated security NOTICE from a system (e.g. Google Workspace "suspicious login", new sign-in, password changed, account locked) — a notice, not a person asking for something. Then safety is null.
+cc_action: only when the line says Steph is only cc'd — "steph" (it still asks Steph to act), "other" (it asks someone else to act, or is addressed to someone else by name), "none" (no action needed from anyone at Granted); else null.
+addressed_to: the first name of the person it asks to act, when cc_action is "other", else null.
 claimed_company: the company the sender says they represent, else null.
 sensitivity: "unhappy" (an unhappy client or a complaint), "legal" (a legal threat), "dispute" (a contract dispute), "negotiation" (negotiating terms or fees), "refund" (a refund demand), else null.
 is_bill: true when the email asks to be paid — an amount owed, a due date and payment instructions.
@@ -124,7 +130,8 @@ export async function classifyItems(items, deps) {
     }
     // Cold pitches and handled mail are counted silently — unless it's a bill,
     // or asks for money or a login, which always surfaces.
-    const mustSurface = (latestInbound(item) && (isBill(latestInbound(item)) || safetyFlag(latestInbound(item)))) || v.is_bill === true || v.safety;
+    const mustSurface = (latestInbound(item) && (isBill(latestInbound(item)) || safetyFlag(latestInbound(item)) || isSecurityAlert(latestInbound(item))))
+      || v.is_bill === true || v.safety || v.security_alert === true;
     if ((category === 'vendor' || category === 'handled') && !mustSurface) { skipped[category] += 1; continue; }
     let lead_maturity = 0;
     if (category === 'lead') {
@@ -137,7 +144,10 @@ export async function classifyItems(items, deps) {
     // (or of granted.ca itself) is a safety item too.
     const latest = latestInbound(item);
     const senderDomain = domainOf(item.sender_address);
-    const safety = ['bank_change', 'urgent_payment', 'credential'].includes(v.safety) ? v.safety : (latest ? safetyFlag(latest) : null);
+    // A system security notice is its own type (suggest IT), never a payment/credential request.
+    const security_alert = v.security_alert === true || (latest ? isSecurityAlert(latest) : false);
+    const safety = security_alert ? null
+      : ['bank_change', 'urgent_payment', 'credential'].includes(v.safety) ? v.safety : (latest ? safetyFlag(latest) : null);
     let lookalike = null;
     if (lookalikeOf(senderDomain, 'granted.ca', { maxDistance: 1 })) lookalike = { known: 'granted.ca', sender: senderDomain };
     else if (typeof v.claimed_company === 'string' && v.claimed_company.trim()) {
@@ -154,9 +164,14 @@ export async function classifyItems(items, deps) {
     const billByCode = latest ? isBill(latest) : false;
     const is_bill = v.is_bill === true || billByCode;
     const sensitivity = ['unhappy', 'legal', 'dispute', 'negotiation', 'refund'].includes(v.sensitivity) ? v.sensitivity : null;
-    if (is_bill && (category === 'vendor' || category === 'handled' || category === 'other')) category = 'team';
+    if ((is_bill || security_alert) && (category === 'vendor' || category === 'handled' || category === 'other')) category = 'team';
+    // Steph only cc'd: someone else's to act on (suggest them), or an FYI.
+    const onlyCc = latest ? ccOnly(latest, deps.mailboxEmail) : false;
+    const cc_for = onlyCc && v.cc_action === 'other'
+      ? (typeof v.addressed_to === 'string' && v.addressed_to.trim() ? v.addressed_to.trim().slice(0, 40) : 'whoever it\'s addressed to') : null;
+    const ccFyi = onlyCc && v.cc_action === 'none';
     const bill = is_bill && latest ? billSummary(latest) : null;
-    const typed = decideItemType({ category, safety, lookalike, sensitivity, is_bill, bill });
+    const typed = decideItemType({ category, safety, lookalike, security_alert, sensitivity, cc_for, is_bill, bill });
     const lookalikeNote = lookalike
       ? (lookalike.similar === false
         ? `Sender domain ${lookalike.sender} doesn't match HubSpot (known: ${lookalike.known}).`
@@ -175,13 +190,15 @@ export async function classifyItems(items, deps) {
       // For the card's "<Sender>, <Company>" line.
       company: item.crm?.company?.name || item.crm?.contact?.company
         || (typeof v.claimed_company === 'string' && v.claimed_company.trim() ? v.claimed_company.trim().slice(0, 80) : null),
-      assessment: typeof v.assessment === 'string' ? v.assessment.trim().slice(0, 300) : null,
+      // Written to length by the model (≤25 / ≤15 words); the caps are only a safety net.
+      assessment: typeof v.assessment === 'string' ? v.assessment.trim().slice(0, 400) : null,
+      summary: typeof v.summary === 'string' ? v.summary.trim().slice(0, 200) : null,
       about_company: v.about_company || null,
       finance: item.finance || v.finance === true,
       urgency: Number.isInteger(v.urgency) ? Math.max(0, Math.min(3, v.urgency)) : 0,
       // Only an explicit false skips the draft: a missing verdict (failed call,
       // bad JSON) keeps needs_reply true, so nothing is dropped by accident.
-      needs_reply: v.needs_reply !== false,
+      needs_reply: v.needs_reply !== false && !ccFyi,
       program_question: v.program_question && typeof v.program_question === 'object' && v.program_question.asks_rules === true
         && typeof v.program_question.program_name === 'string' && v.program_question.program_name.trim()
         ? { asks_rules: true, program_name: v.program_question.program_name.trim().slice(0, 120) } : null,
@@ -206,13 +223,14 @@ async function haikuBatch(batch, deps) {
     const crm = item.crm?.found
       ? `HubSpot: known contact${item.crm.openDeals?.length ? ', open deal' : ''}${item.crm.exClient ? ', past client' : ''}`
       : 'HubSpot: not found';
-    return `${i}. ${crm}${item.category ? ` | fixed group: ${item.category}` : ''}\n<email>\nFrom: ${item.sender} <${item.sender_address}>\nSubject: ${item.subject}\n${excerpt(item)}\n</email>`;
+    const cc = latestInbound(item) && ccOnly(latestInbound(item), deps.mailboxEmail) ? ' | Steph is only cc\'d (not in To)' : '';
+    return `${i}. ${crm}${item.category ? ` | fixed group: ${item.category}` : ''}${cc}\n<email>\nTo: ${latestInbound(item)?.to || ''}\nCc: ${latestInbound(item)?.cc || ''}\nFrom: ${item.sender} <${item.sender_address}>\nSubject: ${item.subject}\n${excerpt(item)}\n</email>`;
   }).join('\n\n');
   const msg = await deps.createMessage({
     model: CLASSIFY_MODEL,
     max_tokens: 4000,
     system: SYSTEM,
-    messages: [{ role: 'user', content: `${lines}\n\nReturn ONLY a JSON array of ${batch.length} objects in order: {"group","about_company","finance","urgency","assessment","needs_reply","program_question","safety","claimed_company","sensitivity","is_bill"}. Where a fixed group is given, return it.` }]
+    messages: [{ role: 'user', content: `${lines}\n\nReturn ONLY a JSON array of ${batch.length} objects in order: {"group","about_company","finance","urgency","assessment","summary","needs_reply","program_question","safety","security_alert","claimed_company","sensitivity","is_bill","cc_action","addressed_to"}. Where a fixed group is given, return it.` }]
   });
   const text = (msg.content || []).map(c => c.text || '').join('');
   let arr = [];

@@ -61,7 +61,8 @@ function fakeDb({ connected = true, chrisConnected = false } = {}) {
         cache_read_tokens: p[24], cache_write_tokens: p[25], tool_calls: p[26], tools_used: p[27], web_searches: p[28],
         conversation_id: p[29], compare: p[30], item_type: p[31], badge: p[32],
         draft_text: p[33] ?? prev?.draft_text ?? null, draft_text_at: p[34] ?? prev?.draft_text_at ?? null,
-        urgency: p[35], finance: p[36], due_on: p[37], held: p[38], sources: p[39], draft_message_id: p[40], company: p[41], sent_to: p[42]
+        urgency: p[35], finance: p[36], due_on: p[37], held: p[38], sources: p[39], draft_message_id: p[40], company: p[41], sent_to: p[42],
+        summary: p[43], draft_summary: p[44]
       };
       items.set(key, row);
       return { rows: [{ id: row.id }] };
@@ -106,7 +107,8 @@ function mailbox(threads, { formerStaff = [] } = {}) {
   };
 }
 
-const oracleReply = (o = {}) => '```json\n' + JSON.stringify({ assessment: 'Wants to know if renewal is on track.', owner_hint: null, unclear: null,
+const oracleReply = (o = {}) => '```json\n' + JSON.stringify({ assessment: 'Wants to know if renewal is on track.', summary: 'Asks whether the renewal is on track.',
+  draft_summary: 'Confirms the renewal is with them to sign and offers to retrigger it.', owner_hint: null, unclear: null,
   draft_body: 'Arie,\n\nThe renewal is with you to sign. If you are good to go, I\'ll retrigger it.', ...o }) + '\n```';
 
 function deps(mb, db, over = {}) {
@@ -194,7 +196,7 @@ describe('runStephBrief', () => {
     const text = cardText(d);
     expect(text.indexOf('Clients · 1')).toBeGreaterThan(-1);
     expect(text.indexOf('Clients · 1')).toBeLessThan(text.indexOf('Leads · 1'));
-    expect(text).toContain('Draft says:');
+    expect(text).toContain('Draft says:</b> Confirms the renewal is with them to sign and offers to retrigger it.');
     expect(text).toContain('#drafts?compose=m-tc');
     expect(text).toContain('Kept out of your way: 1 notification, 1 sales pitch.');
     expect(d.createDraftReply).toHaveBeenCalledTimes(2);
@@ -832,6 +834,108 @@ describe('card data stored per item', () => {
     const text = cardText(d);
     expect(text).toContain('Sent to Patty Lim');
     expect(text).toContain('Checked HubSpot, their website, GetGranted');
+  });
+});
+
+// ── Card fixes from dry run 2 ──────────────────────────────────────────────
+describe('dry-run 2 fixes', () => {
+  const drafts = (d) => d.createMessage.mock.calls.map(c => c[0]).filter(p => Array.isArray(p.system));
+  const items = (db) => [...db.items.values()];
+  const startHere = (d) => (JSON.parse(cardText(d))[0].card.sections.find(sec => /Start here/.test(sec.header || ''))?.widgets[0].textParagraph.text) || '';
+
+  test('1: a Workspace "suspicious login" alert is a Security alert (suggest IT/admin), not "Verify by phone first"', async () => {
+    const db = fakeDb();
+    const alert = { id: 'sa', subject: 'Suspicious login detected', messages: [msg({ from: 'Google Workspace Alerts <google-workspace-alerts-noreply@google.com>',
+      subject: 'Suspicious login detected', body: 'Google detected a suspicious login to ssang@granted.ca. If this was not you, reset your password.' })] };
+    const bank = { id: 'bk', subject: 'New bank details', messages: [msg({ from: 'Accounts <ap@vendorco.com>', subject: 'New bank details', body: 'Please note our new bank account details for future payments.' })] };
+    const d = deps(mailbox([alert, bank]), db, { verdict: (block) => ({ group: /google\.com/.test(block) ? 'handled' : 'partner', urgency: 1, assessment: 'x', summary: 'y', needs_reply: true,
+      ...(/google\.com/.test(block) ? { safety: 'credential' } : {}) }) });   // even if the model wrongly says credential
+    await B.runStephBrief({ now: NOW, env: {}, deps: d });
+    const byKey = Object.fromEntries(items(db).map(i => [i.item_key, i]));
+    expect(byKey['google-workspace-alerts-noreply@google.com']).toMatchObject({ item_type: 'security', badge: 'Security alert', owner_hint: 'IT/admin', category: 'team', draft_ids: [] });
+    expect(byKey['ap@vendorco.com']).toMatchObject({ item_type: 'safety', badge: 'Verify by phone first' });
+    expect(drafts(d)).toHaveLength(0);
+    const text = cardText(d);
+    expect(text).toContain('No draft; suggest IT/admin');
+    const start = startHere(d);
+    expect(start).toContain('<b>Accounts</b> — a payment or login request. Verify it by phone');
+    expect(start).toContain('Then <b>Google Workspace Alerts</b> — a security alert — have IT check it today.');
+  });
+
+  test('1: an alert from a no-reply sender with List-Unsubscribe still surfaces', async () => {
+    const db = fakeDb();
+    const t = { id: 'sb', subject: 'Security alert', messages: [msg({ from: 'Google <no-reply@accounts.google.com>', list_unsubscribe: '<x>',
+      subject: 'Security alert', body: 'New sign-in on Windows. If this was you, you don\'t need to do anything.' })] };
+    const d = deps(mailbox([t]), db);
+    const r = await B.runStephBrief({ now: NOW, env: {}, deps: d });
+    expect(r.automated).toBe(0);
+    expect(items(db)[0].item_type).toBe('security');
+  });
+
+  test('2: "Draft says" is the drafting call\'s own summary; a replaced draft gets a summary of what was saved', async () => {
+    const db = fakeDb();
+    const d = deps(mailbox([leadThread()]), db);
+    await B.runStephBrief({ now: NOW, env: {}, deps: d });
+    expect(drafts(d)[0].system[0].text).toMatch(/draft_summary: AT MOST 15 WORDS — what YOUR DRAFT does/);
+    expect(items(db)[0].draft_summary).toBe('Confirms the renewal is with them to sign and offers to retrigger it.');
+    // A held draft (unconfirmed price) never carries the model's summary of the draft it replaced.
+    const db2 = fakeDb();
+    const d2 = deps(mailbox([leadThread()]), db2);
+    const real = d2.createMessage;
+    d2.createMessage = jest.fn(async (p, o) => (Array.isArray(p.system)
+      ? { content: [{ type: 'text', text: oracleReply({ draft_body: 'Lee,\n\nOur fee is $2,500.', draft_summary: 'Quotes the fee.' }) }], usage: { input_tokens: 900, output_tokens: 80 } }
+      : real(p, o)));
+    await B.runStephBrief({ now: NOW, env: {}, deps: d2 });
+    expect(items(db2)[0].draft_summary).toBe('A holding reply: says you are confirming details before answering.');
+  });
+
+  test('3: classify and drafting prompts ask for ≤25-word assessments and ≤15-word summaries; the model\'s text is stored whole', async () => {
+    const db = fakeDb();
+    const long = 'Wants confirmation that the CanExport claim receipts were received and asks whether the October deadline still applies to their second project.';
+    const d = deps(mailbox([{ id: 'p1', subject: 'Webinar', messages: [msg({ from: 'Pat <pat@partner.org>', subject: 'Webinar' })] }]), db, {
+      verdict: () => ({ group: 'partner', urgency: 1, assessment: long, summary: 'Asks whether the claim receipts arrived and the deadline holds.', needs_reply: true })
+    });
+    // No draft for it (cap 0): the classify assessment and summary are what the card shows.
+    await B.runStephBrief({ now: NOW, env: { STEPH_BRIEF_MAX_DRAFTS: '0' }, deps: d });
+    const classify = d.createMessage.mock.calls.map(c => c[0]).find(p => /You sort unanswered emails/.test(p.system || ''));
+    expect(classify.system).toMatch(/assessment: AT MOST 25 WORDS/);
+    expect(classify.system).toMatch(/summary: AT MOST 15 WORDS/);
+    expect(items(db)[0]).toMatchObject({ assessment: long, summary: 'Asks whether the claim receipts arrived and the deadline holds.' });
+    expect(cardText(d)).toContain('Asks whether the claim receipts arrived and the deadline holds.');
+    expect(cardText(d)).not.toContain('…');
+  });
+
+  test('4: Steph only cc\'d and the email asks someone else → one line, no draft, suggest them; "none" → counted as an FYI', async () => {
+    const db = fakeDb();
+    const forRuk = { id: 'c1', subject: 'Contract renewal', messages: [msg({ to: 'Ruk Ali <rukshaar@granted.ca>', cc: `Steph <${ME}>`, body: 'Ruk, can you send the signed copy?' })] };
+    const fyi = { id: 'c2', subject: 'Notes', messages: [msg({ from: 'Pat <pat@partner.org>', to: 'Ruk Ali <rukshaar@granted.ca>', cc: `Steph <${ME}>`, subject: 'Notes', body: 'Sharing notes from today, nothing needed.' })] };
+    const d = deps(mailbox([forRuk, fyi]), db, {
+      verdict: (block) => /arie@client\.ca/.test(block)
+        ? { group: 'client', urgency: 1, assessment: 'x', summary: 'Asks Ruk for the signed copy.', needs_reply: true, cc_action: 'other', addressed_to: 'Ruk' }
+        : { group: 'partner', urgency: 0, assessment: 'x', summary: 'Shares notes.', needs_reply: true, cc_action: 'none' }
+    });
+    const r = await B.runStephBrief({ now: NOW, env: {}, deps: d });
+    const classify = d.createMessage.mock.calls.map(c => c[0]).find(p => /You sort unanswered emails/.test(p.system || ''));
+    expect(classify.messages[0].content).toContain("Steph is only cc'd (not in To)");
+    const byKey = Object.fromEntries(items(db).map(i => [i.item_key, i]));
+    expect(byKey['arie@client.ca']).toMatchObject({ item_type: 'cc', badge: "You're cc'd", owner_hint: 'Ruk', draft_ids: [] });
+    expect(byKey['pat@partner.org']).toMatchObject({ no_reply: true });
+    expect(drafts(d)).toHaveLength(0);
+    expect(d.runAgent).not.toHaveBeenCalled();                              // a client, but cc'd: no Oracle run
+    const text = cardText(d);
+    expect(text).toContain('<b>Arie Client</b> — Asks Ruk for the signed copy. <font color=\\"#5f6368\\">· No draft; suggest Ruk</font>');
+    expect(text).not.toContain("What's going on");                         // one line even in Clients
+    expect(text).toContain('1 FYI (no reply needed)');
+    expect(r.no_reply).toBe(1);
+  });
+
+  test('4: Steph in To (not just cc) drafts as usual', async () => {
+    const db = fakeDb();
+    const t = { id: 'c3', subject: 'Contract renewal', messages: [msg({ to: `Steph <${ME}>`, cc: 'Ruk <rukshaar@granted.ca>' })] };
+    const d = deps(mailbox([t]), db, { verdict: () => ({ group: 'client', urgency: 1, assessment: 'x', summary: 'y', needs_reply: true, cc_action: 'other', addressed_to: 'Ruk' }) });
+    await B.runStephBrief({ now: NOW, env: {}, deps: d });
+    expect(items(db)[0].item_type).toBe('mail');
+    expect(d.runAgent).toHaveBeenCalledTimes(1);
   });
 });
 

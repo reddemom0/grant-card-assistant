@@ -710,7 +710,9 @@ button.
 
   | Type | When | Badge | Draft |
   |---|---|---|---|
-  | `safety` | A request to change bank or remit-to details, an urgent payment or wire, a password, code or login request; **or** a lookalike sender domain | "Verify by phone first", with a note on the lookalike | none |
+  | `safety` | A **person** asking to change bank or remit-to details, for an urgent payment or wire, or for a password, code or login; **or** a lookalike sender domain | "Verify by phone first", with a note on the lookalike | none |
+  | `security` | An automated security **notice** ("Suspicious login", new sign-in, password changed). It needs an alert phrase **and** a system sender, and passes the automated filter | "Security alert", one line, suggest IT/admin. Start here: "have IT check it today" | none |
+  | `cc` | Steph is only in Cc, and the email asks someone else to act or is addressed to someone else. If no one at Granted needs to act, it's counted as an FYI instead | "You're cc'd", one line, suggest that person | none |
   | `sensitive` | A legal threat, contract dispute, negotiation or refund demand | "Sensitive · write this yourself" | none |
   | `bill` | A bill | "Bill · $X due <date>" | none |
   | `unhappy` | An unhappy client or a complaint | "Unhappy client · call recommended" | acknowledgement only |
@@ -718,7 +720,12 @@ button.
   | `promise` | A promise she made that's due (below) | "You promised <what> · due <when>" | only if confirmable |
   | `mail` | Everything else | — | the normal path |
 
-  - **Detection:** the Haiku classify call detects all of these. Deterministic backups
+  - **Detection:** the Haiku classify call detects all of these. It also writes the
+    "What's going on" assessment (25 words at most) and the one-line summary (15 words at
+    most) to length. The drafting call adds `draft_summary`, what the draft does in 15
+    words at most, which is shown as "Draft says"; the card never quotes the draft. If
+    code replaced the draft (a holding reply or the plain acknowledgement), the summary
+    describes the replacement. Hard cuts are only a safety net. Deterministic backups
     (`SAFETY_RE`, `isBill`) can only **add** a flag, never remove one.
   - **Lookalikes:** `lookalikeOf` compares the sender's domain with `granted.ca` (edit
     distance 1, so `grants.ca` isn't flagged) and with the HubSpot domain of the company

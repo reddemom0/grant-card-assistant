@@ -97,10 +97,10 @@ INSERT INTO steph_brief_items
    draft_ids, draft_preview, nudge, first_seen_at, first_inbound_at, last_inbound_at, state, state_at, last_run_id, position,
    no_reply, model, cost_usd, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
    tool_calls, tools_used, web_searches, conversation_id, compare, item_type, badge, draft_text, draft_text_at,
-   urgency, finance, due_on, held, sources, draft_message_id, company, sent_to)
+   urgency, finance, due_on, held, sources, draft_message_id, company, sent_to, summary, draft_summary)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, COALESCE($15, NOW()), $16, $17, 'open', NOW(), $18, $19,
    $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31::jsonb, $32, $33, $34, $35,
-   $36, $37, $38, $39, $40, $41, $42, $43)
+   $36, $37, $38, $39, $40, $41, $42, $43, $44, $45)
 ON CONFLICT (owner_email, is_test, item_key) DO UPDATE SET
   category = EXCLUDED.category, thread_ids = EXCLUDED.thread_ids, sender = EXCLUDED.sender, subject = EXCLUDED.subject,
   assessment = EXCLUDED.assessment, owner_hint = EXCLUDED.owner_hint, note = EXCLUDED.note, facts_line = EXCLUDED.facts_line,
@@ -119,7 +119,8 @@ ON CONFLICT (owner_email, is_test, item_key) DO UPDATE SET
   draft_text = COALESCE(EXCLUDED.draft_text, steph_brief_items.draft_text),
   draft_text_at = COALESCE(EXCLUDED.draft_text_at, steph_brief_items.draft_text_at),
   urgency = EXCLUDED.urgency, finance = EXCLUDED.finance, due_on = EXCLUDED.due_on, held = EXCLUDED.held,
-  sources = EXCLUDED.sources, draft_message_id = EXCLUDED.draft_message_id, company = EXCLUDED.company, sent_to = EXCLUDED.sent_to
+  sources = EXCLUDED.sources, draft_message_id = EXCLUDED.draft_message_id, company = EXCLUDED.company, sent_to = EXCLUDED.sent_to,
+  summary = EXCLUDED.summary, draft_summary = EXCLUDED.draft_summary
 RETURNING id`;
 
 const AUTO_DONE_SQL = `UPDATE steph_brief_items SET state = 'auto_done', state_at = NOW() WHERE id = ANY($1::uuid[]) AND state = 'open'`;
@@ -312,7 +313,8 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
 
   // Every cost row of this run carries these (api_cost_events.metadata).
   const costTags = { brief_run_id: runId, is_dry_run: dryRun };
-  const runDeps = { ...deps, costTags };
+  // mailboxEmail: classify checks whether its owner is only cc'd.
+  const runDeps = { ...deps, costTags, mailboxEmail: mailbox.email };
   const cost = { classify: 0, promises: 0, learn: 0, drafting: 0, oracle: 0, website: 0, search_fees: 0, compare: 0 };
   const totalCost = () => Object.values(cost).reduce((a, b) => a + b, 0);
   try {
@@ -408,8 +410,8 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       const changed = !prev || item.last_inbound_at > new Date(prev.last_inbound_at || 0).getTime();
       if (!changed && (prev.draft_ids?.length || dryRun)) {
         // Nothing new since the last brief: keep its assessment, draft and cost record.
-        Object.assign(item, { assessment: prev.assessment, owner_hint: prev.owner_hint, note: prev.note,
-          facts_line: prev.facts_line, draft_ids: prev.draft_ids || [], reused: prev });
+        Object.assign(item, { assessment: prev.assessment, summary: prev.summary ?? item.summary, draft_summary: prev.draft_summary,
+          owner_hint: prev.owner_hint, note: prev.note, facts_line: prev.facts_line, draft_ids: prev.draft_ids || [], reused: prev });
         continue;
       }
       if (budget > 0) { budget -= 1; work.push(item); } else { noDraftCap += 1; }
@@ -446,6 +448,8 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       item.held = !!ctx.held;
       if (ctx.held) held += 1;
       item.assessment = ctx.assessment;
+      item.summary = ctx.summary || item.summary || null;
+      item.draft_summary = ctx.draft_summary || null;
       item.owner_hint = ctx.owner_hint || null;
       item.note = ctx.note || null;
       item.facts_line = ctx.facts_line || null;
@@ -506,7 +510,9 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
         item.sources ?? r?.sources ?? [],
         item.draft_message_id ?? r?.draft_message_id ?? null,
         item.company ?? r?.company ?? null,
-        formerStaffRecipient(item, formerStaff, mailbox.email) ?? (item.previous?.sent_to ?? null)
+        formerStaffRecipient(item, formerStaff, mailbox.email) ?? (item.previous?.sent_to ?? null),
+        item.summary ?? r?.summary ?? null,
+        item.draft_summary ?? r?.draft_summary ?? null
       ]);
       const id = row.rows[0].id;
       itemIds.push(id);
