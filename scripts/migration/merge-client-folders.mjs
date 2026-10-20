@@ -73,11 +73,12 @@ const shortcutsIn = n => { const o = []; walkAll(n, x => { if (x.mimeType === SH
 // ---------- dry run ----------
 const srcs = g => (g.sources || [g.source]).map(x => x.path).join(' + ');
 const repath = (n, path) => { n.path = path; n.children.forEach(c => repath(c, `${path}/${c.name}`)); };
-function planGroup(g, S, K) {
-  const actions = [], notes = [], src = S.path;
+// only: optional list of paths relative to the source root; just those subtrees are planned, the source root and
+// everything else in it stay (partial source). Each item's parent must already exist in the keeper (matched by name).
+function planGroup(g, S, K, only = null) {
+  const actions = [], notes = [], blockers = [], src = S.path;
   const land = (c, k) => { k.children.push(c); repath(c, `${k.path}/${c.name}`); };   // later sources see it in the keeper
-  const merge = (s, k, rel, depth) => {
-    for (const c of s.children) {
+  const child = (c, s, k, rel, depth) => {
       if (c.mimeType === FOLDER) {
         const twins = k.children.filter(x => x.mimeType === FOLDER && normF(x.name) === normF(c.name));
         const twin = twins.find(x => x.name === c.name) || twins[0];
@@ -90,12 +91,29 @@ function planGroup(g, S, K) {
         if (ident) actions.push({ type: 'archive', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, archRel: `${ARCH_ROOT}/${K.name}${rel}`, toPath: `${ARCH_ROOT}/${K.name}${rel}/${c.name}`, twin: ident.id, src, can: c.caps.canMoveItemOutOfDrive !== false });
         else { actions.push({ type: 'move', kind: c.mimeType === SHORTCUT ? 'shortcut' : 'file', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, to: k.id, toPath: `${k.path}/${c.name}`, cls: same.length ? 'same-name-diff' : 'new', twin: same[0]?.id || null, files: 1, src, can: c.caps.canMoveItemWithinDrive !== false }); land(c, k); }
       }
-    }
+  };
+  const merge = (s, k, rel, depth) => {
+    for (const c of [...s.children]) child(c, s, k, rel, depth);
     actions.push({ type: 'trash', id: s.id, path: s.path, depth, can: s.caps?.canTrash !== false });
   };
   S.caps = S.caps || {};
-  merge(S, K, '', 0);
-  return { actions, notes };
+  if (!only) { merge(S, K, '', 0); return { actions, notes, blockers, planned: filesIn(S) }; }
+  let planned = 0;
+  for (const relPath of only) {
+    const segs = relPath.split('/'); let s = S, k = K, ok = true;
+    for (const seg of segs.slice(0, -1)) {
+      s = s.children.find(x => x.mimeType === FOLDER && x.name === seg);
+      k = k?.children.find(x => x.mimeType === FOLDER && normF(x.name) === normF(seg));
+      if (!s) { blockers.push(`${S.path}/${relPath}: not found in the source`); ok = false; break; }
+      if (!k) { blockers.push(`${S.path}/${relPath}: the keeper has no "${seg}" folder to put it in`); ok = false; break; }
+    }
+    const c = ok && s.children.find(x => x.name === segs.at(-1));
+    if (ok && !c) { blockers.push(`${S.path}/${relPath}: not found in the source`); continue; }
+    if (!ok) continue;
+    planned += c.mimeType === FOLDER ? filesIn(c) : 1;
+    child(c, s, k, `/${segs.slice(0, -1).join('/')}`.replace(/\/$/, ''), segs.length);
+  }
+  return { actions, notes, blockers, planned };
 }
 async function dry() {
   const G = JSON.parse(fs.readFileSync(GROUPS, 'utf8')).groups, out = [];
@@ -114,8 +132,11 @@ async function dry() {
       const sc = shortcutsIn(S); if (sc.length) blockers.push(`${sc.length} shortcut(s): ${sc.join('; ')}${WITH_SC ? ' (moving them: --include-shortcuts)' : ''}`);
       const sProg = S.children.filter(c => c.mimeType === FOLDER).map(c => normF(c.name));
       if (sProg.length && !sProg.some(p => kProg.has(p))) checks.push(`${src.path}: no program subfolder in common with the keeper`);
-      sources.push({ id: src.id, path: src.path, files: filesIn(S) });
-      const r = planGroup(g, S, K); actions.push(...r.actions); notes.push(...r.notes);
+      const evidence = [];
+      if (src.only) for (const rel of src.only) { const segs = rel.split('/'); let n = S; for (const seg of segs) n = n?.children.find(x => x.name === seg); if (n) walkAll(n, x => { if (x.mimeType !== FOLDER) { const cue = (src.cues || []).filter(([re]) => x.name.toLowerCase().includes(re.toLowerCase())).map(([, why]) => why); evidence.push({ path: x.path, year: (x.path.match(/\/(20\d\d)(\/|$)/) || [])[1] || '', why: [src.onlyReason, ...new Set(cue)].filter(Boolean).join('; ') }); } }); }
+      const totalFiles = filesIn(S);
+      const r = planGroup(g, S, K, src.only || null); actions.push(...r.actions); notes.push(...r.notes); blockers.push(...r.blockers);
+      sources.push({ id: src.id, path: src.path, files: r.planned, ...(src.only ? { partial: true, only: src.only, totalFiles, staying: totalFiles - r.planned, evidence } : {}) });
     }
     for (const a of actions) if (a.can === false) blockers.push(`writers@ cannot ${a.type === 'trash' ? 'trash' : 'move'} ${a.fromPath || a.path}`);
     if (g.match === 'plural') checks.push('plural-type name match — confirm same client');
@@ -158,7 +179,13 @@ Totals: ${g.totals.sourceFiles} source files = ${g.totals.moved} moved + ${g.tot
 
 ${g.actions.filter(a => a.type !== 'trash').map(a => a.type === 'merge-folder' ? `- merge subfolder: ${esc(a.path)} → into ${esc(a.intoPath)}` : a.type === 'archive' ? `- identical → Archive: ${esc(a.fromPath)} → Granted Archive/${esc(a.toPath)}` : `- move ${a.kind}${a.kind === 'folder' ? ` (${a.files} files)` : ''}${a.cls === 'same-name-diff' ? ' — **same name, different content**' : ''}: ${esc(a.fromPath)} → ${esc(a.toPath)}`).join('\n')}
 ${g.actions.filter(a => a.type === 'trash').sort((a, b) => b.depth - a.depth).map(a => `- trash when empty: ${esc(a.path)}`).join('\n')}
-`).join('\n')}`;
+${(g.sources || []).filter(x => x.partial).map(x => `
+**Partial source ${esc(x.path)}:** ${x.files} of its ${x.totalFiles} files move; ${x.staying} stay. Moving: ${x.only.map(esc).join('; ')}.
+
+| File | Year | Why it's identified as ${esc(g.keeper.path.split('/').pop())} |
+|---|---|---|
+${x.evidence.map(e => `| ${esc(e.path)} | ${e.year} | ${esc(e.why)} |`).join('\n')}
+`).join('')}`).join('\n')}`;
   fs.writeFileSync(REPORT, md);
   console.log(JSON.stringify({ mode: 'dry', groups: out.length, held: out.filter(g => g.held).map(g => `${g.i}. ${g.keeper.path}`), checks: out.filter(g => g.checks.length).map(g => `${g.i}. ${g.keeper.path}: ${g.checks.join('; ')}`), totals: tot, sameNameDiff: out.reduce((s, g) => s + n(g, a => a.cls === 'same-name-diff'), 0), trash: out.reduce((s, g) => s + n(g, a => a.type === 'trash'), 0), renames: out.filter(g => g.rename).length, calls, plan: PLAN, report: REPORT }, null, 1));
 }
@@ -259,9 +286,13 @@ async function verify() {
     const notUnder = done.filter(x => x.type === 'move' && !inK.has(x.id)).map(x => x.from_path);
     const archived = done.filter(x => x.type === 'archive-duplicate');
     const archOk = []; for (const x of archived) { const f = await api('GET', `/files/${x.id}?supportsAllDrives=true&fields=parents,driveId,trashed`, null, 'files.get'); archOk.push(f.driveId === GA.id && (f.parents || []).includes(x.new_parent) && !f.trashed); }
-    let srcTrashed = true; for (const x of g.sources || [g.source]) srcTrashed = (await api('GET', `/files/${x.id}?supportsAllDrives=true&fields=trashed`, null, 'files.get')).trashed && srcTrashed;
+    let srcTrashed = true, partial = [];
+    for (const x of g.sources || [g.source]) {
+      if (x.partial) { const T = await tree(x.id, x.path), left = filesIn(T); partial.push({ path: x.path, left, expected: x.staying, ok: left === x.staying }); continue; }
+      srcTrashed = (await api('GET', `/files/${x.id}?supportsAllDrives=true&fields=trashed`, null, 'files.get')).trashed && srcTrashed;
+    }
     const now = filesIn(K);
-    out.push({ g, before: g.keeper.files, movedIn, now, countOk: now === g.keeper.files + movedIn, notUnder, archived: archived.length, archOk: archOk.every(Boolean), sourceTrashed: !!srcTrashed, held: g.held && !done.length });
+    out.push({ g, before: g.keeper.files, movedIn, now, countOk: now === g.keeper.files + movedIn, notUnder, archived: archived.length, archOk: archOk.every(Boolean), sourceTrashed: !!srcTrashed && partial.every(p => p.ok), partial, held: g.held && !done.length });
     process.stderr.write(`\r${g.i}/${P.groups.length}`);
   }
   console.error('');
@@ -275,7 +306,8 @@ Built ${vanTime(new Date().toISOString())} (Vancouver). Fresh read-only walk (dr
 | # | Keeper | Files before | Moved in | Files now | Count ✓ | Moved IDs under keeper | Archived (in place ✓) | Source trashed |
 |---|---|---|---|---|---|---|---|---|
 ${out.map(r => `| ${r.g.i} | ${esc(r.g.keeper.path)} | ${r.before} | ${r.movedIn} | ${r.now} | ${r.held ? 'held' : r.countOk ? '✓' : '✗'} | ${r.notUnder.length ? `✗ ${r.notUnder.length} not` : '✓'} | ${r.archived} ${r.archOk ? '✓' : '✗'} | ${r.held ? 'held' : r.sourceTrashed ? '✓' : '✗'} |`).join('\n')}
-${out.filter(r => !ok(r)).map(r => `\n- ${r.g.i}. ${esc(r.g.keeper.path)}: ${!r.countOk ? `count ${r.now} ≠ ${r.before} + ${r.movedIn}; ` : ''}${r.notUnder.length ? `not under keeper: ${r.notUnder.map(esc).join('; ')}; ` : ''}${!r.archOk ? 'an archived file is not where the ledger says; ' : ''}${!r.sourceTrashed ? 'source folder not trashed' : ''}`).join('')}
+${out.filter(r => !ok(r)).map(r => `\n- ${r.g.i}. ${esc(r.g.keeper.path)}: ${!r.countOk ? `count ${r.now} ≠ ${r.before} + ${r.movedIn}; ` : ''}${r.notUnder.length ? `not under keeper: ${r.notUnder.map(esc).join('; ')}; ` : ''}${!r.archOk ? 'an archived file is not where the ledger says; ' : ''}${!r.sourceTrashed ? 'source folder not trashed, or a partial source does not match the plan' : ''}`).join('')}
+${out.flatMap(r => (r.partial || []).map(p => `\n- Partial source ${esc(p.path)} (group ${r.g.i}): ${p.left} files left, plan said ${p.expected} ${p.ok ? '✓' : '✗'}`)).join('')}
 `;
   fs.writeFileSync(AFTER, md);
   console.log(JSON.stringify({ mode: 'verify', ok: out.filter(ok).length, of: out.length, problems: out.filter(r => !ok(r)).map(r => r.g.keeper.path), calls: callTally(), report: AFTER }, null, 1));
