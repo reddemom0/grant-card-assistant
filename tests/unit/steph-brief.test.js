@@ -20,10 +20,10 @@ const NOW = new Date('2026-10-20T15:00:00Z'); // Tue 08:00 Vancouver
 const ME = 'ssang@granted.ca';
 
 // ── Fake database ───────────────────────────────────────────────────────────
-function fakeDb({ connected = true } = {}) {
+function fakeDb({ connected = true, chrisConnected = false } = {}) {
   const users = [
     { id: 7, email: ME, name: 'Stephanie Sang', chat_user_id: 'users/steph', gmail_connected_at: connected ? new Date() : null },
-    { id: 1, email: 'writers@granted.ca', name: 'Chris', chat_user_id: 'users/chris', gmail_connected_at: null }
+    { id: 1, email: 'writers@granted.ca', name: 'Chris', chat_user_id: 'users/chris', gmail_connected_at: chrisConnected ? new Date() : null }
   ];
   const runs = [];
   const items = new Map(); // key owner|test|item_key → row
@@ -512,6 +512,68 @@ describe('cost trim', () => {
     expect(r.cost.compare).toBe(0);
     expect([...db.items.values()].every(i => i.compare == null)).toBe(true);
     expect(drafts(d).filter(p => p.model === 'claude-sonnet-5-5')).toHaveLength(0);
+  });
+});
+
+// ── Dry run on another consented inbox ─────────────────────────────────────
+describe('dry run on another inbox', () => {
+  const ALLOW = { GMAIL_CONSENT_ALLOWLIST: 'ssang@granted.ca,writers@granted.ca' };
+  const CHRIS = 'writers@granted.ca';
+
+  test('reads that inbox as its owner; Steph\'s voice + links; is_test rows keyed by it; no drafts, no claim; card to the caller', async () => {
+    const db = fakeDb({ connected: false, chrisConnected: true });   // Steph not connected: doesn't matter here
+    const style = jest.fn(() => 'VOICE GUIDE');
+    const links = jest.fn((email, category) => meetingLinksFor(email, category));
+    const d = deps(mailbox([clientThread(), leadThread()]), db, { loadStyleGuide: style, meetingLinksFor: links });
+    const r = await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun: true, dmToEmail: CHRIS, inboxEmail: CHRIS });
+    expect(r.status).toBe('done');
+    expect(d.listThreadsSince.mock.calls[0][0]).toBe(1);
+    expect(d.getThread.mock.calls.every(c => c[0] === 1 && c[2].userEmail === CHRIS)).toBe(true);
+    expect(d.hasGmailScopes).toHaveBeenCalledWith(1);
+    expect(style.mock.calls.every(c => c[0] === ME)).toBe(true);
+    expect(links.mock.calls.every(c => c[0] === ME)).toBe(true);
+    const oracle = d.runAgent.mock.calls[0][0];
+    expect(oracle.userId).toBe(1);
+    expect(oracle.chatContext.senderChatId).toBe('users/chris');
+    expect(d.createConversation.mock.calls[0][1]).toBe(1);
+    expect(d.createDraftReply).not.toHaveBeenCalled();
+    expect(db.runs).toHaveLength(1);
+    expect(db.runs[0]).toMatchObject({ owner_email: CHRIS, is_test: true });
+    expect([...db.items.values()].every(i => i.owner_email === CHRIS && i.is_test)).toBe(true);
+    expect(d.postCard.mock.calls[0][0]).toBe('spaces/dm-chris');
+  });
+
+  test('a real run can never take another inbox', async () => {
+    const db = fakeDb({ chrisConnected: true });
+    const d = deps(mailbox([clientThread()]), db);
+    const r = await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, inboxEmail: CHRIS });
+    expect(r).toMatchObject({ status: 'skipped', reason: 'inbox_only_in_dry_run' });
+    expect(d.listThreadsSince).not.toHaveBeenCalled();
+    expect(db.runs).toHaveLength(0);
+  });
+
+  test('not allowlisted → refused, even in a dry run', async () => {
+    const db = fakeDb({ chrisConnected: true });
+    const d = deps(mailbox([clientThread()]), db);
+    const r = await B.runStephBrief({ now: NOW, env: { GMAIL_CONSENT_ALLOWLIST: 'ssang@granted.ca' }, deps: d, dryRun: true, dmToEmail: CHRIS, inboxEmail: CHRIS });
+    expect(r).toMatchObject({ status: 'skipped', reason: 'inbox_not_allowlisted' });
+    expect(d.listThreadsSince).not.toHaveBeenCalled();
+  });
+
+  test('the inbox owner must have Gmail connected', async () => {
+    const db = fakeDb({ chrisConnected: false });
+    const d = deps(mailbox([clientThread()]), db);
+    const r = await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun: true, dmToEmail: CHRIS, inboxEmail: CHRIS });
+    expect(r).toMatchObject({ status: 'skipped', reason: 'gmail_not_connected' });
+  });
+
+  test('inbox = Steph\'s own address is just the default', async () => {
+    const db = fakeDb();
+    const d = deps(mailbox([clientThread()]), db);
+    const r = await B.runStephBrief({ now: NOW, env: {}, deps: d, inboxEmail: ME });
+    expect(r.status).toBe('done');
+    expect(d.listThreadsSince.mock.calls[0][0]).toBe(7);
+    expect(db.runs[0]).toMatchObject({ owner_email: ME, is_test: false });
   });
 });
 

@@ -215,32 +215,61 @@ function latestThread(item) {
  * answering, so a dry run that can't happen says why at once.
  * @returns {Promise<{ ok: boolean, reason?: string, steph?, recipient? }>}
  */
-export async function preflight({ env = process.env, deps, dryRun = false, dmToEmail = null }) {
-  const ownerEmail = env.STEPH_BRIEF_OWNER_EMAIL || DEFAULT_OWNER_EMAIL;
-  const steph = await staffUser(ownerEmail, deps.query);
-  if (!steph) return { ok: false, reason: 'owner_not_found' };
-  if (!steph.gmail_connected_at) return { ok: false, reason: 'gmail_not_connected' };
-  const scopes = await deps.hasGmailScopes(steph.id);
+/**
+ * May a dry run read this inbox? Same rule as isGmailConsentEligible in
+ * src/api/gmail-auth.js (GMAIL_CONSENT_ALLOWLIST, comma-separated,
+ * case-insensitive, unset = nobody) — mirrored, not imported, because that
+ * module opens a Redis client when loaded.
+ */
+export function inboxAllowed(email, env = process.env) {
+  const want = String(email || '').trim().toLowerCase();
+  if (!want) return false;
+  return String(env.GMAIL_CONSENT_ALLOWLIST || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean).includes(want);
+}
+
+/**
+ * Who, and can we? Two roles:
+ *   persona — whose brief this is (Steph): her voice guide and meeting links.
+ *   mailbox — whose Gmail is read. Steph's own, except in a dry run given
+ *             `inboxEmail` (another consented, allowlisted inbox, e.g. Chris
+ *             vetting the brief before Steph connects). Real runs never take one.
+ * ownerEmail (the row key) is the mailbox's, so another inbox's is_test rows
+ * never mix with Steph's.
+ * @returns {Promise<{ ok: boolean, reason?: string, steph?, mailbox?, recipient?, ownerEmail? }>}
+ */
+export async function preflight({ env = process.env, deps, dryRun = false, dmToEmail = null, inboxEmail = null }) {
+  const personaEmail = env.STEPH_BRIEF_OWNER_EMAIL || DEFAULT_OWNER_EMAIL;
+  const otherInbox = inboxEmail && inboxEmail.trim().toLowerCase() !== personaEmail.toLowerCase() ? inboxEmail.trim().toLowerCase() : null;
+  if (otherInbox && !dryRun) return { ok: false, reason: 'inbox_only_in_dry_run' };
+  if (otherInbox && !inboxAllowed(otherInbox, env)) return { ok: false, reason: 'inbox_not_allowlisted' };
+
+  const mailbox = await staffUser(otherInbox || personaEmail, deps.query);
+  if (!mailbox) return { ok: false, reason: otherInbox ? 'inbox_not_found' : 'owner_not_found' };
+  if (!mailbox.gmail_connected_at) return { ok: false, reason: 'gmail_not_connected' };
+  const scopes = await deps.hasGmailScopes(mailbox.id);
   if (!scopes?.ok) return { ok: false, reason: 'gmail_not_connected' };
   if (dryRun && !dmToEmail) return { ok: false, reason: 'dry_run_needs_recipient' };
-  const recipient = dryRun ? await staffUser(dmToEmail, deps.query) : steph;
+  const recipient = dryRun ? await staffUser(dmToEmail, deps.query) : mailbox;
   if (!recipient?.chat_user_id) return { ok: false, reason: 'recipient_has_no_chat_id' };
-  return { ok: true, steph, recipient, ownerEmail };
+  // In another inbox's dry run the persona needs no users row of its own:
+  // only its email is used (voice guide, meeting links).
+  const steph = otherInbox ? { email: personaEmail } : mailbox;
+  return { ok: true, steph, mailbox, recipient, ownerEmail: mailbox.email, otherInbox: !!otherInbox };
 }
 
 /**
  * @param {{ now?: Date, env?: object, deps?: object, dryRun?: boolean, dmToEmail?: string|null }} opts
  * @returns {Promise<object>} summary — counts and codes only
  */
-export async function runStephBrief({ now = new Date(), env = process.env, deps: given = defaultDeps(), dryRun = false, dmToEmail = null } = {}) {
+export async function runStephBrief({ now = new Date(), env = process.env, deps: given = defaultDeps(), dryRun = false, dmToEmail = null, inboxEmail = null } = {}) {
   const deps = given;
   const date = localDate(now);
-  const pre = await preflight({ env, deps, dryRun, dmToEmail });
+  const pre = await preflight({ env, deps, dryRun, dmToEmail, inboxEmail });
   if (!pre.ok) {
     console.log(`⏭️  Steph brief ${date}: skipped — ${pre.reason}`);
     return { date, status: 'skipped', reason: pre.reason, dryRun };
   }
-  const { steph, recipient, ownerEmail } = pre;
+  const { steph, mailbox, recipient, ownerEmail } = pre;
   const q = deps.query;
 
   // Claim (real) or a fresh test row (dry run).
@@ -270,11 +299,11 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
     const previous = (await q(PREVIOUS_ITEMS_SQL, [ownerEmail])).rows;
 
     // Threads: the window, plus everything still open from earlier briefs.
-    const listed = await deps.listThreadsSince(steph.id, since, { max: MAX_THREADS });
+    const listed = await deps.listThreadsSince(mailbox.id, since, { max: MAX_THREADS });
     const ids = [...new Set([...listed.threads.map(t => t.id), ...previous.filter(p => p.state === 'open').flatMap(p => p.thread_ids || [])])];
     const fetched = new Map();
     await pool(ids, FETCH_CONCURRENCY, async (id) => {
-      try { fetched.set(id, await deps.getThread(steph.id, id, { userEmail: steph.email })); } catch { /* unknown this run */ }
+      try { fetched.set(id, await deps.getThread(mailbox.id, id, { userEmail: mailbox.email })); } catch { /* unknown this run */ }
     });
 
     // Triage.
@@ -318,7 +347,7 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       if (compareLeft > 0 && (item.category === 'lead' || item.category === 'client')) { item.compare = true; compareLeft -= 1; }
     }
     let dmSpace = null;
-    try { dmSpace = await deps.findDm(steph.chat_user_id); } catch { dmSpace = null; }
+    try { dmSpace = await deps.findDm(mailbox.chat_user_id); } catch { dmSpace = null; }
     let draftsCreated = 0;
     let held = 0;
     await pool(work, ORACLE_CONCURRENCY, async (item) => {
@@ -326,7 +355,7 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
       try {
         // Timeouts are handled inside: the Oracle run is aborted and awaited,
         // so its spend still lands in ctx.ledger.
-        ctx = await contextForItem(item, { steph, dmSpace }, runDeps, { timeoutMs: ORACLE_TIMEOUT_MS, compare: !!item.compare });
+        ctx = await contextForItem(item, { steph, runAs: mailbox, dmSpace }, runDeps, { timeoutMs: ORACLE_TIMEOUT_MS, compare: !!item.compare });
       } catch (err) {
         ctx = { ok: false, assessment: item.assessment, note: 'Context lookup failed — no draft today.', draft_body: null, held: false, ledger: null };
         console.warn(`⚠️  Steph brief item failed — code: ${err?.code || err?.name || 'unknown'}`);
@@ -357,7 +386,7 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
         return;
       }
       try {
-        const d = await deps.createDraftReply(steph.id, thread.id, ctx.draft_body, { userEmail: steph.email });
+        const d = await deps.createDraftReply(mailbox.id, thread.id, ctx.draft_body, { userEmail: mailbox.email });
         item.draft_ids = [d.draftId];
         draftsCreated += 1;
       } catch (err) {

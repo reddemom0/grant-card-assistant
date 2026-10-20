@@ -398,15 +398,18 @@ export async function draftOnce(item, { facts, links, styleGuide, model = DRAFT_
 export async function oracleDraft(item, who, deps, ledger, { timeoutMs = 180_000, styleGuide, links }) {
   const conversationId = crypto.randomUUID();
   const controller = new AbortController();
+  // Whose access the run uses: the mailbox owner (Steph, or the inbox an admin
+  // dry run reads). The voice guide and links stay the persona's (who.steph).
+  const runAs = who.runAs || who.steph;
   let timedOut = false;
   try {
-    await deps.createConversation(conversationId, who.steph.id, 'internal-oracle', `Morning brief: ${item.category}`);
+    await deps.createConversation(conversationId, runAs.id, 'internal-oracle', `Morning brief: ${item.category}`);
   } catch { /* the run still works without the row */ }
   const agent = deps.runAgent({
     agentType: 'internal-oracle',
     message: buildOraclePrompt(item, { styleGuide, links }),
     conversationId,
-    userId: who.steph.id,
+    userId: runAs.id,
     sessionId: crypto.randomUUID(),
     res: null,
     forceModel: SONNET_MODEL,
@@ -414,7 +417,7 @@ export async function oracleDraft(item, who, deps, ledger, { timeoutMs = 180_000
     allowedTools: [...READ_ONLY_TOOLS],
     abortSignal: controller.signal,
     costMetadata: { ...(deps.costTags || {}), step: 'oracle', item_key: item.item_key, category: item.category },
-    chatContext: { surface: 'chat_dm', spaceName: who.dmSpace || null, senderChatId: who.steph.chat_user_id || null, senderDisplayName: 'Steph' },
+    chatContext: { surface: 'chat_dm', spaceName: who.dmSpace || null, senderChatId: runAs.chat_user_id || null, senderDisplayName: 'Steph' },
     onCostCalculated: (cost, detail = {}) => {
       addUsage(ledger, { usage: detail.usage, model: detail.model || SONNET_MODEL, cost, toolNames: detail.toolNames || [] });
     }
@@ -441,7 +444,9 @@ export async function oracleDraft(item, who, deps, ledger, { timeoutMs = 180_000
 
 /**
  * @param {object} item - a classified item (category, threads, sender, crm…)
- * @param {{ steph: {id, email, chat_user_id}, dmSpace: string|null }} who
+ * @param {{ steph: {email, id?, chat_user_id?}, runAs?: {id, email, chat_user_id}, dmSpace: string|null }} who
+ *   steph — the persona (voice guide, meeting links); runAs — whose access the
+ *   client Oracle run uses (defaults to steph)
  * @param {object} deps - runAgent, createConversation, createMessage, grantSearch, lead deps,
  *   loadStyleGuide, meetingLinksFor, logCost, costTags
  * @param {{ timeoutMs?: number, compare?: boolean }} opts - compare: dry-run model comparison

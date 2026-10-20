@@ -13,12 +13,20 @@
  *   dry_run=0 — a real run, through the same daily claim as the 08:00 job
  *     (so it can't double-post a day the job already ran).
  *
+ *   inbox=<email> (dry runs only) — read that consented inbox instead of
+ *     Steph's, e.g. Chris vetting the brief before Steph connects. Must be in
+ *     GMAIL_CONSENT_ALLOWLIST; given with dry_run=0 or not allowlisted → 400.
+ *     Still Steph's voice guide and meeting links; client Oracle runs act as
+ *     that inbox's owner; is_test rows keyed by that inbox; no drafts.
+ *
  * Answers at once (202) after the cheap checks; the brief itself takes
  * minutes and lands in Chat. A check that fails answers 409 with its reason.
  */
 
 import crypto from 'crypto';
-import { preflight, runStephBrief, defaultDeps } from '../services/steph-brief.js';
+import { inboxAllowed, preflight, runStephBrief, defaultDeps } from '../services/steph-brief.js';
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function secretMatches(provided) {
   const expected = process.env.MIGRATION_SECRET || process.env.JWT_SECRET;
@@ -32,14 +40,22 @@ export async function stephBriefRunEndpoint(req, res, { deps = defaultDeps(), ru
   if (!secretMatches(req.query.secret)) return res.status(401).json({ error: 'Unauthorized' });
   const dryRun = req.query.dry_run !== '0';
   const dmToEmail = dryRun ? req.user?.email : null;
+  let inboxEmail = null;
+  if (req.query.inbox !== undefined) {
+    const inbox = typeof req.query.inbox === 'string' ? req.query.inbox.trim().toLowerCase() : '';
+    if (!dryRun) return res.status(400).json({ error: 'inbox_only_in_dry_run' });
+    if (!EMAIL.test(inbox) || !inboxAllowed(inbox)) return res.status(400).json({ error: 'inbox_not_allowlisted' });
+    inboxEmail = inbox;
+  }
+  let pre;
   try {
-    const pre = await preflight({ deps, dryRun, dmToEmail });
+    pre = await preflight({ deps, dryRun, dmToEmail, inboxEmail });
     if (!pre.ok) return res.status(409).json({ started: false, dryRun, reason: pre.reason });
   } catch (err) {
     return res.status(500).json({ error: 'preflight_failed', code: err?.code || err?.name || 'unknown' });
   }
-  res.status(202).json({ started: true, dryRun, postsTo: dryRun ? 'your DM' : "Steph's DM" });
-  run({ deps, dryRun, dmToEmail }).catch((err) => {
+  res.status(202).json({ started: true, dryRun, inbox: pre.ownerEmail, postsTo: dryRun ? 'your DM' : "Steph's DM" });
+  run({ deps, dryRun, dmToEmail, inboxEmail }).catch((err) => {
     console.error(`❌ Steph brief (manual) failed — code: ${err?.code || err?.name || 'unknown'}`);
   });
 }

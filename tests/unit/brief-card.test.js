@@ -154,6 +154,48 @@ describe('manual trigger endpoint', () => {
     expect(r.statusCode).toBe(202);
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true, dmToEmail: 'writers@granted.ca' }));
   });
+  test('no inbox: the default is unchanged (Steph\'s inbox)', async () => {
+    const run = jest.fn(async () => ({}));
+    const r = res();
+    await stephBriefRunEndpoint({ query: { secret: 's3cret' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
+    expect(r.statusCode).toBe(202);
+    expect(r.body.inbox).toBe('ssang@granted.ca');
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ inboxEmail: null }));
+  });
+  test('inbox on a real run → 400, nothing runs', async () => {
+    process.env.GMAIL_CONSENT_ALLOWLIST = 'ssang@granted.ca,writers@granted.ca';
+    const run = jest.fn();
+    const r = res();
+    await stephBriefRunEndpoint({ query: { secret: 's3cret', dry_run: '0', inbox: 'writers@granted.ca' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
+    expect(r.statusCode).toBe(400);
+    expect(r.body.error).toBe('inbox_only_in_dry_run');
+    expect(run).not.toHaveBeenCalled();
+  });
+  test('inbox not on GMAIL_CONSENT_ALLOWLIST (or not an address) → 400, nothing runs', async () => {
+    process.env.GMAIL_CONSENT_ALLOWLIST = 'ssang@granted.ca,writers@granted.ca';
+    const run = jest.fn();
+    for (const inbox of ['someone@granted.ca', 'not-an-email', '', ['writers@granted.ca', 'x@y.ca']]) {
+      const r = res();
+      await stephBriefRunEndpoint({ query: { secret: 's3cret', inbox }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
+      expect(r.statusCode).toBe(400);
+      expect(r.body.error).toBe('inbox_not_allowlisted');
+    }
+    delete process.env.GMAIL_CONSENT_ALLOWLIST;
+    const r = res();
+    await stephBriefRunEndpoint({ query: { secret: 's3cret', inbox: 'writers@granted.ca' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
+    expect(r.statusCode).toBe(400);
+    expect(run).not.toHaveBeenCalled();
+  });
+  test('an allowlisted inbox in a dry run → 202, run reads that inbox, card to the caller', async () => {
+    process.env.GMAIL_CONSENT_ALLOWLIST = 'ssang@granted.ca,writers@granted.ca';
+    const run = jest.fn(async () => ({}));
+    const r = res();
+    await stephBriefRunEndpoint({ query: { secret: 's3cret', inbox: ' Writers@Granted.ca ' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
+    expect(r.statusCode).toBe(202);
+    expect(r.body).toMatchObject({ started: true, dryRun: true, inbox: 'writers@granted.ca', postsTo: 'your DM' });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true, inboxEmail: 'writers@granted.ca', dmToEmail: 'writers@granted.ca' }));
+    delete process.env.GMAIL_CONSENT_ALLOWLIST;
+  });
   test('dry_run=0 is a real run; a failed preflight answers 409 with its reason', async () => {
     const run = jest.fn(async () => ({}));
     const r = res();

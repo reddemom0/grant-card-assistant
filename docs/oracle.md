@@ -750,7 +750,18 @@ button.
   - **Dry run (the default):** reads her mail and makes the drafting calls and client
     Oracle runs, which cost money. It adds the comparison drafts. It creates **no drafts** and writes only `is_test` rows. Her real item state is
     untouched. The card goes to the **caller's** DM, with each draft shown for review.
-  - **`dry_run=0`:** a real run, through the daily claim.
+  - **`inbox=<email>` (dry runs only):** reads another consented inbox instead of Steph's,
+    for example Chris vetting the brief before Steph connects Gmail.
+    - **Who's allowed:** the inbox must be in `GMAIL_CONSENT_ALLOWLIST` and have Gmail
+      connected. Given with `dry_run=0`, or not on the allowlist, it answers 400.
+      `preflight` refuses both again.
+    - **Whose brief it stays:** Steph's voice guide and meeting links.
+    - **Whose access:** client Oracle runs act as the inbox owner, so they read that
+      person's Drive, Granola and Chat, never Steph's.
+    - **What's written:** `is_test` rows keyed by that inbox's email, so they never mix
+      with Steph's. No drafts, no claim, and the card goes to the caller.
+  - **`dry_run=0`:** a real run, through the daily claim. Real runs only ever read
+    `STEPH_BRIEF_OWNER_EMAIL` (default `ssang@granted.ca`).
   - It answers 202, or 409 with the reason when a check fails.
 - **Cost** (every cent attributable):
   - **Per item:** `steph_brief_items` stores the model, `cost_usd`, the four token
