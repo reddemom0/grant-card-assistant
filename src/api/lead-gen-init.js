@@ -293,10 +293,12 @@ async function runIntakeCategorization(sessionId, prospectDataFromForm) {
  */
 // `onUsage` (optional) receives the Haiku call's usage — for a caller that
 // accounts its own spend (the morning brief). Lead-gen callers don't pass it.
-export async function extractCompanyBackgroundFromWebsite(websiteUrl, sessionId, { onUsage } = {}) {
+// `quiet` (optional) keeps the URL and the extracted company text out of the
+// log — the brief's dry runs, whose logs must carry no mail-derived content.
+export async function extractCompanyBackgroundFromWebsite(websiteUrl, sessionId, { onUsage, quiet = false } = {}) {
   if (!websiteUrl) return null;
 
-  console.log(`🌐 Background: Fetching ${websiteUrl} for session ${sessionId}...`);
+  console.log(`🌐 Background: Fetching ${quiet ? 'a website' : websiteUrl} for session ${sessionId}...`);
 
   try {
     // Fetch website with 5-second timeout
@@ -328,7 +330,7 @@ export async function extractCompanyBackgroundFromWebsite(websiteUrl, sessionId,
       .trim()
       .slice(0, 8000); // Limit to 8K characters for Haiku
 
-    console.log(`✓ Fetched ${textContent.length} characters from ${websiteUrl}`);
+    console.log(`✓ Fetched ${textContent.length} characters from ${quiet ? 'the website' : websiteUrl}`);
 
     // Extract structured info via Haiku
     console.log(`🤖 Extracting company info via Haiku for session ${sessionId}...`);
@@ -373,7 +375,8 @@ Return ONLY the JSON object, no additional text.`;
     }
 
     const extractedText = extractionResponse.content[0].text.trim();
-    console.log(`✓ Haiku extraction complete for session ${sessionId}:`, extractedText);
+    if (quiet) console.log(`✓ Haiku extraction complete for session ${sessionId} (${extractedText.length} chars)`);
+    else console.log(`✓ Haiku extraction complete for session ${sessionId}:`, extractedText);
 
     // Parse JSON response
     const jsonMatch = extractedText.match(/\{[\s\S]*\}/);

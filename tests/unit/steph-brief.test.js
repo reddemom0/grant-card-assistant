@@ -212,13 +212,14 @@ describe('runStephBrief', () => {
     expect(d.postCard).toHaveBeenCalledTimes(1);
   });
 
-  test('dry run: no drafts, no claim, posts to the caller, real items untouched, drafts shown on the card', async () => {
+  test('dry run: no drafts, no claim, posts to the inbox OWNER (not the caller), real items untouched, drafts shown on the card', async () => {
     const db = fakeDb();
     const d = deps(mailbox([clientThread()]), db);
     const r = await B.runStephBrief({ now: NOW, env: {}, deps: d, dryRun: true, dmToEmail: 'writers@granted.ca' });
     expect(r).toMatchObject({ status: 'done', dryRun: true, drafts_created: 0 });
     expect(d.createDraftReply).not.toHaveBeenCalled();
-    expect(d.postCard.mock.calls[0][0]).toBe('spaces/dm-chris');
+    expect(d.postCard.mock.calls[0][0]).toBe('spaces/dm-steph');          // Steph's inbox → Steph's DM, never the caller's
+    expect(d.postCard.mock.calls.some(c => c[0] === 'spaces/dm-chris')).toBe(false);
     expect(db.runs[0].is_test).toBe(true);
     expect([...db.items.values()].every(i => i.is_test)).toBe(true);
     const text = cardText(d);
@@ -228,11 +229,11 @@ describe('runStephBrief', () => {
     expect((await B.runStephBrief({ now: NOW, env: {}, deps: d })).status).toBe('done');
   });
 
-  test('a dry run needs a recipient with a Chat id', async () => {
+  test('a dry run needs the inbox owner to have a Chat DM', async () => {
     const db = fakeDb();
-    db.users[1].chat_user_id = null;
+    db.users[0].chat_user_id = null;                                           // Steph
     const r = await B.runStephBrief({ now: NOW, env: {}, deps: deps(mailbox([]), db), dryRun: true, dmToEmail: 'writers@granted.ca' });
-    expect(r).toMatchObject({ status: 'skipped', reason: 'recipient_has_no_chat_id' });
+    expect(r).toMatchObject({ status: 'skipped', reason: 'inbox_owner_has_no_dm' });
   });
 
   test('no duplicate draft when the thread already holds one', async () => {
@@ -936,6 +937,80 @@ describe('dry-run 2 fixes', () => {
     await B.runStephBrief({ now: NOW, env: {}, deps: d });
     expect(items(db)[0].item_type).toBe('mail');
     expect(d.runAgent).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ── Dry-run privacy: owner-only delivery, no content in logs ───────────────
+describe('dry-run privacy', () => {
+  const ALLOW = { GMAIL_CONSENT_ALLOWLIST: 'ssang@granted.ca,writers@granted.ca' };
+  const CHRIS = 'writers@granted.ca';
+
+  test('(a) another admin dry-runs Steph\'s inbox → the card goes to Steph\'s DM only', async () => {
+    const db = fakeDb();
+    const d = deps(mailbox([clientThread()]), db);
+    const r = await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun: true, dmToEmail: CHRIS, inboxEmail: ME });
+    expect(r.status).toBe('done');
+    expect(d.postCard.mock.calls.map(c => c[0])).toEqual(['spaces/dm-steph']);
+    expect(db.runs[0]).toMatchObject({ is_test: true, recipient_email: ME, recipient_chat_id: 'users/steph' });
+  });
+
+  test('(b) the caller dry-runs their own inbox → the card goes to the caller', async () => {
+    const db = fakeDb({ chrisConnected: true });
+    const d = deps(mailbox([clientThread()]), db);
+    await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun: true, dmToEmail: CHRIS, inboxEmail: CHRIS });
+    expect(d.postCard.mock.calls.map(c => c[0])).toEqual(['spaces/dm-chris']);
+  });
+
+  test('(c) the inbox owner has no reachable DM → refused before anything is read or posted', async () => {
+    const db = fakeDb();
+    const d = deps(mailbox([clientThread()]), db, { findDm: jest.fn(async (id) => (id === 'users/steph' ? null : 'spaces/dm-chris')) });
+    const r = await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun: true, dmToEmail: CHRIS, inboxEmail: ME });
+    expect(r).toMatchObject({ status: 'skipped', reason: 'inbox_owner_has_no_dm' });
+    expect(d.listThreadsSince).not.toHaveBeenCalled();
+    expect(d.postCard).not.toHaveBeenCalled();
+    expect(db.runs).toHaveLength(0);
+  });
+
+  test('test-only: is_test rows, no claim, no Gmail drafts, no learning writes', async () => {
+    const db = fakeDb();
+    const d = deps(mailbox([clientThread(), leadThread()]), db);
+    await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun: true, dmToEmail: CHRIS, inboxEmail: ME });
+    expect(db.query.mock.calls.some(([sql]) => /ON CONFLICT \(owner_email, local_date\)/.test(sql))).toBe(false);
+    expect(db.runs.every(r => r.is_test)).toBe(true);
+    expect([...db.items.values()].every(i => i.is_test)).toBe(true);
+    expect(d.createDraftReply).not.toHaveBeenCalled();
+    expect(db.corrections).toHaveLength(0);
+  });
+
+  test('dry runs pass quietLogs to Oracle and quiet to the website lookup; real runs do not', async () => {
+    const run = async (dryRun) => {
+      const db = fakeDb();
+      const website = jest.fn(async () => ({ description: 'x' }));
+      const d = deps(mailbox([clientThread(), leadThread()]), db, { website });
+      await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun, dmToEmail: dryRun ? CHRIS : null });
+      return { oracle: d.runAgent.mock.calls[0][0], web: website.mock.calls[0]?.[1] };
+    };
+    const dry = await run(true);
+    expect(dry.oracle.quietLogs).toBe(true);
+    expect(dry.web.quiet).toBe(true);
+    const real = await run(false);
+    expect(real.oracle.quietLogs).toBe(false);
+    expect(real.web.quiet).toBe(false);
+  });
+
+  test('a dry run logs no sender, subject, body or draft text', async () => {
+    const SECRET = ['Zelda Quartermain', 'zelda@quartermain.ca', 'Confidential merger terms', 'TOPSECRETBODY', 'Zelda,'];
+    const t = { id: 'zq', subject: 'Confidential merger terms', messages: [msg({ from: 'Zelda Quartermain <zelda@quartermain.ca>', subject: 'Confidential merger terms', body: 'TOPSECRETBODY please advise' })] };
+    const db = fakeDb();
+    const d = deps(mailbox([t]), db, { runAgent: jest.fn(async (opts) => ({ success: true, response: { content: [{ type: 'text', text: oracleReply({ draft_body: 'Zelda,\n\nThanks — looking into it.' }) }] } })) });
+    const lines = [];
+    const spies = ['log', 'warn', 'error', 'info'].map(k => jest.spyOn(console, k).mockImplementation((...a) => { lines.push(a.map(x => (typeof x === 'string' ? x : JSON.stringify(x))).join(' ')); }));
+    try {
+      await B.runStephBrief({ now: NOW, env: ALLOW, deps: d, dryRun: true, dmToEmail: CHRIS });
+    } finally { spies.forEach(s => s.mockRestore()); }
+    const all = lines.join('\n');
+    expect(lines.length).toBeGreaterThan(0);
+    for (const s of SECRET) expect(all).not.toContain(s);
   });
 });
 

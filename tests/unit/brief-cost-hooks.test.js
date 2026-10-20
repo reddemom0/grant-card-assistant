@@ -44,6 +44,18 @@ describe('runAgent hooks (source wiring)', () => {
     const toolCase = src.indexOf("if (fullResponse.stop_reason === 'tool_use') {");
     expect(src.indexOf('if (abortSignal?.aborted)', toolCase)).toBeLessThan(src.indexOf('executeToolCall(', toolCase));
   });
+  test('quietLogs keeps tool inputs and results out of the runAgent and executor logs', () => {
+    expect(src).toMatch(/quietLogs = false/);
+    expect(src).toMatch(/if \(quietLogs\) console\.log\(`  📥 Input: \(/);
+    expect(src).toMatch(/if \(quietLogs\) console\.log\(`  📤 Result: \(/);
+    expect(src).toMatch(/\.\.\.\(quietLogs \? \{ quiet: true \} : \{\}\)/);
+    const exec = readFileSync(new URL('../../src/tools/executor.js', import.meta.url), 'utf8');
+    expect(exec).toMatch(/if \(options\.quiet\) console\.log\(`   Input: \(/);
+    expect(exec).toMatch(/if \(options\.quiet\) console\.log\(`   Result: \(/);
+    const web = readFileSync(new URL('../../src/api/lead-gen-init.js', import.meta.url), 'utf8');
+    expect(web).toMatch(/quiet = false \} = \{\}\) \{/);
+    expect(web).toMatch(/quiet \? 'a website' : websiteUrl/);
+  });
   test('costMetadata reaches logAPICost; onCostCalculated gets usage + tool names', () => {
     expect(src).toMatch(/\.\.\.\(costMetadata \? \{ metadata: costMetadata \} : \{\}\),\s*usage,\s*model: MODEL,\s*source: 'agent-loop'/);
     expect(src).toMatch(/await onCostCalculated\(cost, \{ usage, model: MODEL, toolNames \}\)/);

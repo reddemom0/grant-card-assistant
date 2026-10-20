@@ -307,7 +307,9 @@ describe('handleBriefClick', () => {
 
 describe('manual trigger endpoint', () => {
   const res = () => { const r = { statusCode: 0, body: null }; r.status = (c) => { r.statusCode = c; return r; }; r.json = (b) => { r.body = b; return r; }; return r; };
-  const okDeps = { query: jest.fn(async (sql, p) => ({ rows: [{ id: 7, email: p[0], chat_user_id: 'users/x', gmail_connected_at: new Date() }] })), hasGmailScopes: async () => ({ ok: true }) };
+  const okDeps = { query: jest.fn(async (sql, p) => ({ rows: [{ id: 7, email: p[0], chat_user_id: 'users/x', gmail_connected_at: new Date() }] })),
+    hasGmailScopes: async () => ({ ok: true }), findDm: async () => 'spaces/dm-x' };
+  const CONTENT_FREE = (body) => !/@|Steph|Sang|subject|draft/i.test(JSON.stringify({ ...body, postsTo: undefined }));
 
   test('wrong or missing secret → 401, nothing runs', async () => {
     process.env.MIGRATION_SECRET = 's3cret';
@@ -320,19 +322,21 @@ describe('manual trigger endpoint', () => {
     expect(r2.statusCode).toBe(401);
     expect(run).not.toHaveBeenCalled();
   });
-  test('dry run by default, to the caller', async () => {
+  test('dry run by default; a different caller is told it goes to the inbox owner', async () => {
     const run = jest.fn(async () => ({}));
     const r = res();
     await stephBriefRunEndpoint({ query: { secret: 's3cret' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
     expect(r.statusCode).toBe(202);
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true, dmToEmail: 'writers@granted.ca' }));
+    expect(r.body).toEqual({ started: true, dryRun: true, postsTo: "the inbox owner's DM" });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true }));
   });
-  test('no inbox: the default is unchanged (Steph\'s inbox)', async () => {
+  test('no inbox: the default inbox is Steph\'s (inboxEmail null), answer has no address', async () => {
     const run = jest.fn(async () => ({}));
     const r = res();
     await stephBriefRunEndpoint({ query: { secret: 's3cret' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
     expect(r.statusCode).toBe(202);
-    expect(r.body.inbox).toBe('ssang@granted.ca');
+    expect(r.body.inbox).toBeUndefined();
+    expect(CONTENT_FREE(r.body)).toBe(true);
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ inboxEmail: null }));
   });
   test('inbox on a real run → 400, nothing runs', async () => {
@@ -365,9 +369,27 @@ describe('manual trigger endpoint', () => {
     const r = res();
     await stephBriefRunEndpoint({ query: { secret: 's3cret', inbox: ' Writers@Granted.ca ' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
     expect(r.statusCode).toBe(202);
-    expect(r.body).toMatchObject({ started: true, dryRun: true, inbox: 'writers@granted.ca', postsTo: 'your DM' });
+    expect(r.body).toEqual({ started: true, dryRun: true, postsTo: 'your DM' });             // (b) caller's own inbox
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ dryRun: true, inboxEmail: 'writers@granted.ca', dmToEmail: 'writers@granted.ca' }));
     delete process.env.GMAIL_CONSENT_ALLOWLIST;
+  });
+  test('(a) inbox=Steph called by a different admin → 202, goes to the owner, no content in the answer', async () => {
+    process.env.GMAIL_CONSENT_ALLOWLIST = 'ssang@granted.ca,writers@granted.ca';
+    const run = jest.fn(async () => ({}));
+    const r = res();
+    await stephBriefRunEndpoint({ query: { secret: 's3cret', inbox: 'ssang@granted.ca' }, user: { email: 'writers@granted.ca' } }, r, { deps: okDeps, run });
+    expect(r.statusCode).toBe(202);
+    expect(r.body).toEqual({ started: true, dryRun: true, postsTo: "the inbox owner's DM" });
+    expect(CONTENT_FREE(r.body)).toBe(true);
+    delete process.env.GMAIL_CONSENT_ALLOWLIST;
+  });
+  test('(c) the inbox owner has no reachable DM → 409 inbox_owner_has_no_dm, nothing runs', async () => {
+    const run = jest.fn();
+    const r = res();
+    await stephBriefRunEndpoint({ query: { secret: 's3cret' }, user: { email: 'writers@granted.ca' } }, r, { deps: { ...okDeps, findDm: async () => null }, run });
+    expect(r.statusCode).toBe(409);
+    expect(r.body).toEqual({ started: false, dryRun: true, reason: 'inbox_owner_has_no_dm' });
+    expect(run).not.toHaveBeenCalled();
   });
   test('dry_run=0 is a real run; a failed preflight answers 409 with its reason', async () => {
     const run = jest.fn(async () => ({}));

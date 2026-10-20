@@ -9,7 +9,9 @@
  *   dry_run=1 (the default) — reads Steph's mail as her and runs the Oracle
  *     steps (that costs money), creates NO Gmail drafts, writes only is_test
  *     rows, leaves her real item state untouched, and posts the card to the
- *     CALLER's own DM, with each draft shown for review.
+ *     DM of the INBOX OWNER — never the caller's, unless the caller is that
+ *     owner. No reachable DM for the owner → 409 inbox_owner_has_no_dm.
+ *     The answer and the logs carry no mail content (quietLogs).
  *   dry_run=0 — a real run, through the same daily claim as the 08:00 job
  *     (so it can't double-post a day the job already ran).
  *
@@ -17,7 +19,8 @@
  *     Steph's, e.g. Chris vetting the brief before Steph connects. Must be in
  *     GMAIL_CONSENT_ALLOWLIST; given with dry_run=0 or not allowlisted → 400.
  *     Still Steph's voice guide and meeting links; client Oracle runs act as
- *     that inbox's owner; is_test rows keyed by that inbox; no drafts.
+ *     that inbox's owner; is_test rows keyed by that inbox; no drafts; the
+ *     card goes to that inbox's owner.
  *
  * Answers at once (202) after the cheap checks; the brief itself takes
  * minutes and lands in Chat. A check that fails answers 409 with its reason.
@@ -54,7 +57,8 @@ export async function stephBriefRunEndpoint(req, res, { deps = defaultDeps(), ru
   } catch (err) {
     return res.status(500).json({ error: 'preflight_failed', code: err?.code || err?.name || 'unknown' });
   }
-  res.status(202).json({ started: true, dryRun, inbox: pre.ownerEmail, postsTo: dryRun ? 'your DM' : "Steph's DM" });
+  // No addresses, names or mail content in the answer: where it goes, nothing more.
+  res.status(202).json({ started: true, dryRun, postsTo: !dryRun ? "Steph's DM" : pre.toCaller ? 'your DM' : "the inbox owner's DM" });
   run({ deps, dryRun, dmToEmail, inboxEmail }).catch((err) => {
     console.error(`❌ Steph brief (manual) failed — code: ${err?.code || err?.name || 'unknown'}`);
   });

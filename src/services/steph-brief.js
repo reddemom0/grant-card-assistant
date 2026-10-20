@@ -162,8 +162,8 @@ export function defaultDeps() {
     lookupLead: async (...a) => (await import('../cards/lead-lookup.js')).lookupLead(...a),
     leadSession: async (email) => (await import('../database/lead-gen-reads.js')).latestLeadGenSession(email),
     decodeCalculator: async (c) => (await gather()).decodeCalculator(c),
-    website: async (url, { sessionId = 'steph-brief', onUsage } = {}) =>
-      (await import('../api/lead-gen-init.js')).extractCompanyBackgroundFromWebsite(url, sessionId, { onUsage }),
+    website: async (url, { sessionId = 'steph-brief', onUsage, quiet = false } = {}) =>
+      (await import('../api/lead-gen-init.js')).extractCompanyBackgroundFromWebsite(url, sessionId, { onUsage, quiet }),
     grantSearch: async (args) => (await import('../tools/grant-data.js')).searchGrantData(args),
     // Fetched once per lead, shared by the location and industry lookups.
     sitePages: (url) => { let read; return () => (read ||= gather().then(g => g.sitePages(url, g.defaultGatherDeps)())); },
@@ -272,12 +272,21 @@ export async function preflight({ env = process.env, deps, dryRun = false, dmToE
   const scopes = await deps.hasGmailScopes(mailbox.id);
   if (!scopes?.ok) return { ok: false, reason: 'gmail_not_connected' };
   if (dryRun && !dmToEmail) return { ok: false, reason: 'dry_run_needs_recipient' };
-  const recipient = dryRun ? await staffUser(dmToEmail, deps.query) : mailbox;
-  if (!recipient?.chat_user_id) return { ok: false, reason: 'recipient_has_no_chat_id' };
+  // A dry run goes ONLY to the owner of the inbox it read — never to whoever
+  // asked for it, unless they are that owner. One person's mail never lands in
+  // another person's DM. The owner needs a Chat DM Oracle can reach.
+  const recipient = mailbox;
+  if (!recipient?.chat_user_id) return { ok: false, reason: dryRun ? 'inbox_owner_has_no_dm' : 'recipient_has_no_chat_id' };
+  if (dryRun) {
+    let dm = null;
+    try { dm = await deps.findDm(recipient.chat_user_id); } catch { dm = null; }
+    if (!dm) return { ok: false, reason: 'inbox_owner_has_no_dm' };
+  }
+  const toCaller = !!dmToEmail && String(dmToEmail).toLowerCase() === String(mailbox.email).toLowerCase();
   // In another inbox's dry run the persona needs no users row of its own:
   // only its email is used (voice guide, meeting links).
   const steph = otherInbox ? { email: personaEmail } : mailbox;
-  return { ok: true, steph, mailbox, recipient, ownerEmail: mailbox.email, otherInbox: !!otherInbox };
+  return { ok: true, steph, mailbox, recipient, ownerEmail: mailbox.email, otherInbox: !!otherInbox, toCaller };
 }
 
 /**
@@ -314,7 +323,9 @@ export async function runStephBrief({ now = new Date(), env = process.env, deps:
   // Every cost row of this run carries these (api_cost_events.metadata).
   const costTags = { brief_run_id: runId, is_dry_run: dryRun };
   // mailboxEmail: classify checks whether its owner is only cc'd.
-  const runDeps = { ...deps, costTags, mailboxEmail: mailbox.email };
+  // quietLogs: a dry run writes no mail-derived text (tool inputs/results,
+  // website text) to the server log — counts and codes only.
+  const runDeps = { ...deps, costTags, mailboxEmail: mailbox.email, quietLogs: dryRun };
   const cost = { classify: 0, promises: 0, learn: 0, drafting: 0, oracle: 0, website: 0, search_fees: 0, compare: 0 };
   const totalCost = () => Object.values(cost).reduce((a, b) => a + b, 0);
   try {

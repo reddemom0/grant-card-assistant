@@ -148,6 +148,7 @@ export async function leadFacts(item, deps, ledger = newLedger()) {
   const website = websiteUrl
     ? await deps.website(websiteUrl, {
       sessionId: `steph-brief:${deps.costTags?.brief_run_id ?? 'run'}`,
+      quiet: !!deps.quietLogs,
       onUsage: (usage, model) => { ledger.website += calculateRequestCost(usage, model); }
     }).catch(() => null)
     : null;
@@ -493,6 +494,7 @@ export async function oracleDraft(item, who, deps, ledger, { timeoutMs = 180_000
     modelConfig: { maxIterations: ORACLE_MAX_ITERATIONS },
     allowedTools: [...READ_ONLY_TOOLS],
     abortSignal: controller.signal,
+    quietLogs: !!deps.quietLogs,
     costMetadata: { ...(deps.costTags || {}), step: 'oracle', item_key: item.item_key, category: item.category },
     chatContext: { surface: 'chat_dm', spaceName: who.dmSpace || null, senderChatId: runAs.chat_user_id || null, senderDisplayName: 'Steph' },
     onCostCalculated: (cost, detail = {}) => {

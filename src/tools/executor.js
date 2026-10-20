@@ -127,7 +127,9 @@ async function buildProspectDataFromSession(conversationId) {
  */
 export async function executeToolCall(toolName, input, conversationId, userId = null, agentType = null, options = {}) {
   console.log(`🔧 Executing tool: ${toolName}`);
-  console.log(`   Input:`, JSON.stringify(input, null, 2));
+  // options.quiet (runAgent quietLogs): a run over someone's mail logs no content.
+  if (options.quiet) console.log(`   Input: (${JSON.stringify(input ?? {}).length} chars, not logged)`);
+  else console.log(`   Input:`, JSON.stringify(input, null, 2));
 
   // Get user email for domain-wide delegation (Google Drive search AND read).
   // Both tools take a userEmail argument; resolving it only for search meant
@@ -1297,7 +1299,8 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
     }
 
     console.log(`✅ Tool ${toolName} completed`);
-    console.log(`   Result:`, JSON.stringify(result, null, 2).substring(0, 500) + '...');
+    if (options.quiet) console.log(`   Result: (${JSON.stringify(result ?? {}).length} chars, not logged)`);
+    else console.log(`   Result:`, JSON.stringify(result, null, 2).substring(0, 500) + '...');
 
     if (autoApproval) await recordResult(autoApproval.id, result).catch(() => {});
 

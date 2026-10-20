@@ -347,7 +347,11 @@ export async function runAgent({
   abortSignal = null,
   // Extra api_cost_events metadata for every agent-loop cost row of this run
   // (e.g. { brief_run_id, is_dry_run }), so a caller can sum its own spend.
-  costMetadata = null
+  costMetadata = null,
+  // Keep tool inputs and results out of the log (tool name and size only) —
+  // for a run over someone's mail whose logs must carry no content (the
+  // morning brief's dry runs). Passed on to executeToolCall as options.quiet.
+  quietLogs = false
 }) {
   console.log('\n' + '='.repeat(80));
   console.log(`🤖 Running agent: ${agentType}`);
@@ -1146,7 +1150,8 @@ export async function runAgent({
         for (const block of fullResponse.content) {
           if (block.type === 'tool_use') {
             console.log(`\n  🛠️  Tool: ${block.name}`);
-            console.log(`  📥 Input:`, JSON.stringify(block.input, null, 2));
+            if (quietLogs) console.log(`  📥 Input: (${JSON.stringify(block.input ?? {}).length} chars, not logged)`);
+            else console.log(`  📥 Input:`, JSON.stringify(block.input, null, 2));
 
             // Notify frontend of tool use
             sendSSE(res, {
@@ -1164,10 +1169,12 @@ export async function runAgent({
               conversationId,
               userId,  // Pass userId for domain-wide delegation
               agentType,  // Pass agentType for agent-specific tool behavior
-              chatContext ? { chatContext } : {}  // INTERNAL ONLY — see executeToolCall
+              // INTERNAL ONLY — see executeToolCall. quiet: no tool inputs/results in the log.
+              { ...(chatContext ? { chatContext } : {}), ...(quietLogs ? { quiet: true } : {}) }
             );
 
-            console.log(`  📤 Result:`, JSON.stringify(result, null, 2).substring(0, 200) + '...');
+            if (quietLogs) console.log(`  📤 Result: (${JSON.stringify(result ?? {}).length} chars, not logged)`);
+            else console.log(`  📤 Result:`, JSON.stringify(result, null, 2).substring(0, 200) + '...');
 
             // Notify frontend of tool result
             sendSSE(res, {
