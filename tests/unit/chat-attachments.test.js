@@ -3,7 +3,8 @@
  *
  * What gets read, what is refused and why, the 10 MB cap on the download stream,
  * and the rule that file text is never stored. No network: the Chat client is a
- * stand-in, and Drive attachments are not exercised here.
+ * stand-in, and Drive attachments are not read here (only how their ID and link are
+ * passed on).
  *
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest tests/unit/chat-attachments.test.js
  */
@@ -16,7 +17,8 @@ import {
   readAttachments,
   unreadableLine,
   attachmentPlaceholder,
-  attachmentBlockText
+  attachmentBlockText,
+  attachmentLabel
 } from '../../src/tools/chat-attachments.js';
 import { extractFileText, fileKind, MAX_DOWNLOAD_BYTES } from '../../src/tools/google-drive.js';
 import { normalizeChatEvent, withAttachmentNotes, FILE_ONLY_MESSAGE } from '../../src/api/chat-google.js';
@@ -220,5 +222,34 @@ describe('file text is never stored', () => {
     const stored = toolResultsToStore(results, names);
     expect(stored[0].content).toBe(attachmentPlaceholder('files read from this thread'));
     expect(stored[1]).toEqual(results[1]);
+  });
+});
+
+describe('a Drive attachment carries its file ID and link', () => {
+  const drive = { name: 'GetGranted Control Centre — User Guide', ok: true, content: 'guide text', fileId: '1WmWs3XbMuP3AouNjPNmblb4_Ddc4p49rpJrDANtMmCo', url: 'https://docs.google.com/document/d/1WmWs3XbMuP3AouNjPNmblb4_Ddc4p49rpJrDANtMmCo/edit' };
+  const upload = { name: 'impact.pdf', ok: true, content: 'confidential figures' };
+
+  test('the text the agent gets names the ID and the link', () => {
+    const text = attachmentBlockText(drive);
+    expect(text.startsWith('[Chat attachment: GetGranted Control Centre — User Guide (Drive file ID: 1WmWs3XbMuP3AouNjPNmblb4_Ddc4p49rpJrDANtMmCo · link: https://docs.google.com/document/d/')).toBe(true);
+    expect(text.endsWith('\n\nguide text')).toBe(true);
+  });
+
+  test('the saved placeholder keeps the ID and the link, not the text', () => {
+    const stored = attachmentPlaceholder(attachmentLabel(drive));
+    expect(stored).toContain(drive.fileId);
+    expect(stored).toContain(drive.url);
+    expect(stored).toContain('read, not stored');
+    expect(stored).not.toContain('guide text');
+  });
+
+  test('without a link, the ID still makes one', () => {
+    expect(attachmentLabel({ ...drive, url: undefined })).toContain(`https://drive.google.com/open?id=${drive.fileId}`);
+  });
+
+  test('an uploaded file is unchanged', () => {
+    expect(attachmentLabel(upload)).toBe('impact.pdf');
+    expect(attachmentBlockText(upload)).toBe('[Chat attachment: impact.pdf]\n\nconfidential figures');
+    expect(attachmentPlaceholder(attachmentLabel(upload))).toBe('[Chat attachment: impact.pdf — read, not stored]');
   });
 });

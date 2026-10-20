@@ -23,7 +23,7 @@ import { createConversation, saveMessage } from '../database/messages.js';
 import { query } from '../database/connection.js';
 import { tryHandleConfirmation, tryHandleUndoRequest, currentPendingId, proposalNotice } from './confirmation.js';
 import { hubSignInUrl } from '../tools/chat-history.js';
-import { attachmentsOf, readAttachments, attachmentBlockText, unreadableLine } from '../tools/chat-attachments.js';
+import { attachmentsOf, readAttachments, attachmentBlockText, attachmentLabel, unreadableLine } from '../tools/chat-attachments.js';
 import { isListenSpace } from '../chat-listen/config.js';
 import { takeCardReply, findAppCommand } from '../cards/registry.js';
 import { findPulsePost } from '../services/pulse-posts.js';
@@ -931,7 +931,7 @@ export async function runOracleAndReply(evt, user, conversationId, messageText) 
       const results = await readAttachments(evt.files, { chat: createChatClient(), userEmail: user.email });
       attachments = results.filter(r => r.ok).map(r => ({
         type: 'text_file',
-        filename: r.name,
+        filename: attachmentLabel(r),
         content: attachmentBlockText(r),
         ephemeral: true
       }));
@@ -1165,7 +1165,7 @@ async function runLearnThis(evt, user, conversationId, messageText) {
     },
     ...results.filter(r => r.ok).map(r => ({
       type: 'text_file',
-      filename: r.name,
+      filename: attachmentLabel(r),
       content: attachmentBlockText(r),
       ephemeral: true
     }))

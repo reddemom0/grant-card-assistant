@@ -423,6 +423,7 @@ and/or rename it, gated and asker-only (above). The limits are code, checked whe
   words, against the file name, the new name and every folder in its current path, plus the
   finance owners. Client files match too ("Financial Statement-…") and are moved by hand.
 - **Never:** share, copy, delete or trash — the module has no such call.
+- **Google Chat attachments:** a Drive file attached in Chat reaches the model with its file ID and link (`attachmentLabel` in `chat-attachments.js`, kept in the saved placeholder), so it can be filed directly. For a move into Granted Files from another drive, the card warns when the asker isn't a Granted Files Manager ("Undo may need a Granted Files Manager.") and when the file has "anyone with the link" access ("Link sharing may be lost after the move."); both are reads (`moveWarnings` in `drive-actions.js`).
 
 Each executed attempt writes a `drive_actions` row (migration 042: asker, file, parents and
 names before/after, paths, folders created, result, `undo_token`) and appends to the "Drive

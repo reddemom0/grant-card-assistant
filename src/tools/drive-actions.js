@@ -181,6 +181,8 @@ async function checkFileMove(input, { askerEmail, askerUserId = null } = {}) {
   const renaming = nameAfter !== file.name;
   if (!moving && !renaming) return refuse('It is already there with that name. Nothing to do.');
 
+  const warnings = moving && sourceDrive !== 'Granted Files' ? await moveWarnings(drive, file.id) : [];
+
   return {
     ok: true,
     plan: {
@@ -199,9 +201,32 @@ async function checkFileMove(input, { askerEmail, askerUserId = null } = {}) {
       folders_to_create: moving ? foldersToCreate : [],
       request: { file: file.id, destination_path: destinationPath || null, new_name: requestedName || null },
       asker_email: askerEmail,
-      asker_user_id: askerUserId
+      asker_user_id: askerUserId,
+      warnings
     }
   };
+}
+
+/**
+ * Confirm-card warnings for a move into Granted Files from another drive.
+ * Reads only, as the asker; a read that fails just means no warning.
+ * - Undo moves the file back out of the shared drive, which may need a Manager
+ *   (canManageMembers is a Manager-only capability).
+ * - "Anyone with the link" access may not survive the move (it can come from a
+ *   My Drive folder); whether it is inherited isn't worked out.
+ */
+async function moveWarnings(drive, fileId) {
+  const warnings = [];
+  try {
+    const { data } = await drive.drives.get({ driveId: GRANTED_FILES_DRIVE_ID, fields: 'capabilities(canManageMembers)' });
+    if (data?.capabilities?.canManageMembers === false) warnings.push('Undo may need a Granted Files Manager.');
+  } catch { /* no warning */ }
+  try {
+    // files.get, not the permissions API: this module never touches sharing.
+    const { data } = await drive.files.get({ fileId, supportsAllDrives: true, fields: 'permissions(type)' });
+    if ((data?.permissions || []).some(p => p.type === 'anyone')) warnings.push('Link sharing may be lost after the move.');
+  } catch { /* no warning */ }
+  return warnings;
 }
 
 /**

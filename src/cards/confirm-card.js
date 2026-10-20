@@ -81,6 +81,8 @@ export function renderConfirmCard(action, { state = 'open', detail = null, asker
     widgets.push(decorated({ top: 'Folders to create (new)', text: plan.folders_to_create.map(esc).join(' / ') }));
   }
 
+  for (const warning of plan.warnings || []) widgets.push(paragraph(`⚠️ ${esc(warning)}`));
+
   if (state === 'open') {
     widgets.push(paragraph(`<i>Press Confirm to run it. Only ${esc(askerName || 'the person who asked')} can confirm.</i>`));
     widgets.push(buttonRow([

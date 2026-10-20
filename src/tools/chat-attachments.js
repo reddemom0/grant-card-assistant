@@ -98,7 +98,7 @@ export async function readAttachments(files, { chat, userEmail }) {
         const r = await readGoogleDriveFile(file.fileId, userEmail);
         const name = r.file?.name || file.name;
         if (r.tooLarge) results.push({ name, ok: false, reason: 'too_large' });
-        else if (r.success) results.push({ name, ok: true, content: r.content, url: r.file?.url });
+        else if (r.success) results.push({ name, ok: true, content: r.content, fileId: file.fileId, url: r.file?.url });
         else results.push({ name, ok: false, reason: /^Unsupported file type/.test(r.error || '') ? 'unsupported' : 'error' });
         continue;
       }
@@ -132,9 +132,20 @@ export async function readAttachments(files, { chat, userEmail }) {
   return results;
 }
 
+/**
+ * How an attachment is named to the agent and in the saved turn. A Drive file
+ * carries its ID and link, so the agent can file it (file_move_rename); an
+ * upload is just its name.
+ */
+export function attachmentLabel(result) {
+  if (!result.fileId) return result.name;
+  const link = result.url || `https://drive.google.com/open?id=${result.fileId}`;
+  return `${result.name} (Drive file ID: ${result.fileId} · link: ${link})`;
+}
+
 /** The text block the agent receives for one readable attachment. */
 export function attachmentBlockText(result) {
-  return `[Chat attachment: ${result.name}]\n\n${result.content}`;
+  return `[Chat attachment: ${attachmentLabel(result)}]\n\n${result.content}`;
 }
 
 /** What the conversation history keeps instead of the file's text. */
