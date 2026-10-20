@@ -8,14 +8,17 @@
 //          --go      renames the folders in the frozen plan; re-checks each live first; ledger line before every
 //                    change; appends the run to the Drive migration log.
 //          --undo    renames every folder the ledger records as renamed back to its old name.
+//        or: --list <json> --run "<label>" --tag <prefix> [--dry|--go|--verify|--undo]
+//          explicit-ID mode: renames exactly the listed folders ([{group, id, parent, path, from, to}]), nothing else.
+//          Writes <tag>-renames-plan.csv / -renames-dryrun.md / -renames-after-go.md; same ledger as above.
 import fs from 'fs';
 import { INV, CFG, ADMIN, token, tally, callTally, parseCsv, vanTime, appendAfterRun, countsText } from './migration-log.mjs';
 
 const args = process.argv.slice(2), opt = k => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
-const GO = args.includes('--go'), UNDO = args.includes('--undo');
+const GO = args.includes('--go'), UNDO = args.includes('--undo'), VERIFY = args.includes('--verify'), LIST = opt('--list');
 const FROM = opt('--from'), TO = opt('--to'), RUN = opt('--run'), TAG = opt('--tag');
-if (!FROM || !TO || !RUN || !TAG) { console.error('usage: rename-folders.mjs --from "<old>" --to "<new>" --run "<label>" --tag <prefix> [--dry|--go|--undo]'); process.exit(2); }
-const PLAN = `${INV}/${TAG}-plan.csv`, REPORT = `${INV}/${TAG}-dryrun.md`, LEDGER = `${TAG}-ledger.jsonl`, L = `${INV}/${LEDGER}`;
+if (!RUN || !TAG || (!LIST && (!FROM || !TO))) { console.error('usage: rename-folders.mjs --from "<old>" --to "<new>" --run "<label>" --tag <prefix> [--dry|--go|--undo]'); process.exit(2); }
+const PLAN = `${INV}/${TAG}${LIST ? '-renames' : ''}-plan.csv`, REPORT = `${INV}/${TAG}${LIST ? '-renames' : ''}-dryrun.md`, AFTER = `${INV}/${TAG}-renames-after-go.md`, LEDGER = `${TAG}-ledger.jsonl`, L = `${INV}/${LEDGER}`;
 const DRIVE = CFG.drives.sorted, FOLDER = 'application/vnd.google-apps.folder', RO = 'https://www.googleapis.com/auth/drive.readonly';
 const SCOPE = GO || UNDO ? 'https://www.googleapis.com/auth/drive' : RO;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -161,4 +164,66 @@ async function undo() {
   console.log(JSON.stringify({ mode: 'undo', renamedBack: done.length, skipped, failed, log: lg.ok ? `appended ${rows.length} rows` : lg.warning, calls: callTally() }, null, 1));
 }
 
-await (GO ? go() : UNDO ? undo() : dry());
+// ---------- explicit-ID list mode ----------
+const items = () => JSON.parse(fs.readFileSync(LIST, 'utf8'));
+async function check(x) {
+  const f = await api('GET', `/files/${x.id}?supportsAllDrives=true&fields=id,name,mimeType,parents,trashed,capabilities(canRename)`, null, 'files.get');
+  if (f.mimeType !== FOLDER) return 'not a folder';
+  if (f.trashed) return 'trashed';
+  if (f.name !== x.from) return `name is now "${f.name}"`;
+  if (x.parent && (f.parents || [])[0] !== x.parent) return 'moved since the plan';
+  if (f.capabilities?.canRename === false) return 'writers@ cannot rename it';
+  const twin = (await siblings((f.parents || [])[0])).find(s => s.id !== x.id && norm(s.name) === norm(x.to));
+  if (twin) return `parent already has "${twin.name}" (${twin.id}) — merge case`;
+  x.parent ||= (f.parents || [])[0];
+  return null;
+}
+async function dryList() {
+  const rows = [];
+  for (const x of items()) { const why = await check(x); rows.push({ ...x, action: why ? 'blocked' : 'rename', note: why || '' }); }
+  const cols = ['action', 'group', 'id', 'parent', 'path', 'from', 'to', 'note', 'link'];
+  fs.writeFileSync(PLAN, [cols.join(','), ...rows.map(r => cols.map(c => csvCell(c === 'link' ? folderLink(r.id) : r[c] ?? '')).join(','))].join('\n') + '\n');
+  const md = `# ${RUN} — renames dry run\n\nBuilt ${vanTime(new Date().toISOString())} (Vancouver). Read-only (drive.readonly, GETs only): ${Object.entries(callTally()).map(([k, v]) => `${k} ×${v}`).join('; ')}. Nothing was renamed.\n\nRenames: **${rows.filter(r => r.action === 'rename').length}**, blocked: **${rows.filter(r => r.action !== 'rename').length}**.\n\n| Group | Path | Current name | New name | Action |\n|---|---|---|---|---|\n${rows.map(r => `| ${r.group} | ${esc(r.path)} | ${esc(JSON.stringify(r.from))} | ${esc(r.to)} | ${r.action}${r.note ? ` — ${esc(r.note)}` : ''} |`).join('\n')}\n`;
+  fs.writeFileSync(REPORT, md);
+  console.log(JSON.stringify({ mode: 'dry-list', rename: rows.filter(r => r.action === 'rename').length, blocked: rows.filter(r => r.action !== 'rename').map(r => `${r.path}: ${r.note}`), calls: callTally(), plan: PLAN, report: REPORT }, null, 1));
+}
+async function goList() {
+  const plan = loadPlan().filter(r => r.action === 'rename'), RUN_START = new Date().toISOString(), done = [], skipped = [], failed = [];
+  for (const r of plan) {
+    try {
+      const why = await check(r); if (why) { skipped.push(`${r.path}: ${why}`); continue; }
+      const line = { type: 'rename-folder', group: r.group, id: r.id, parent: r.parent, old_name: r.from, new_name: r.to, old_path: r.path, new_path: `${r.path.slice(0, r.path.length - r.from.length)}${r.to}` };
+      ledger({ ...line, status: 'intent' });
+      await api('PATCH', `/files/${r.id}?supportsAllDrives=true&fields=id,name`, { name: r.to }, 'files.update (name)');
+      const v = await api('GET', `/files/${r.id}?supportsAllDrives=true&fields=name,parents`, null, 'files.get (verify)');
+      if (v.name !== r.to || (v.parents || [])[0] !== r.parent) throw new Error(`verify failed: name "${v.name}"`);
+      ledger({ ...line, status: 'done' }); done.push({ ...line, ts: new Date().toISOString() });
+    } catch (e) { failed.push(`${r.path}: ${e.message}`); ledger({ type: 'rename-folder', id: r.id, old_name: r.from, new_name: r.to, old_path: r.path, status: 'failed', detail: e.message }); }
+    await sleep(50);
+  }
+  const rows = done.map(x => ({ ts: x.ts, run: RUN, ledger: LEDGER, action: 'rename', name: x.new_name, id: x.id, owner: 'shared drive', from: `${DRIVE.name}/${x.old_path}`, to: `${DRIVE.name}/${x.new_path}`, sharing: `renamed from "${x.old_name}"`, by: ADMIN }));
+  const lg = await appendAfterRun(rows, [vanTime(RUN_START).slice(0, 10), `${RUN} (renames)`, countsText(rows) || 'no changes', CFG.approver, LEDGER, '']);
+  console.log(JSON.stringify({ mode: 'go-list', planned: plan.length, renamed: done.length, skipped, failed, log: lg.ok ? `appended ${rows.length} rows` : lg.warning, calls: callTally() }, null, 1));
+}
+async function verifyList() {
+  const lines = fs.readFileSync(L, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).filter(x => x.type === 'rename-folder' && x.status === 'done');
+  const res = [];
+  for (const x of lines) { const f = await api('GET', `/files/${x.id}?supportsAllDrives=true&fields=name,trashed`, null, 'files.get'); res.push({ ...x, now: f.name, ok: f.name === x.new_name && !f.trashed }); }
+  // old names left at program level (parent is a client folder under Clients/, or Programs/)
+  const top = await (async () => { const o = {}; for (const n of ['Clients', 'Programs']) { const p = new URLSearchParams({ q: `'${DRIVE.id}' in parents and name = '${n}' and mimeType = '${FOLDER}' and trashed = false`, corpora: 'drive', driveId: DRIVE.id, includeItemsFromAllDrives: 'true', supportsAllDrives: 'true', fields: 'files(id)' }); o[n] = (await api('GET', `/files?${p}`, null, 'files.list')).files[0]?.id; } return o; })();
+  const parentOk = new Map(), left = [];
+  for (const old of [...new Set(items().map(x => x.from))]) {
+    const p = new URLSearchParams({ q: `name = '${qs(old)}' and mimeType = '${FOLDER}' and trashed = false`, corpora: 'drive', driveId: DRIVE.id, includeItemsFromAllDrives: 'true', supportsAllDrives: 'true', fields: 'files(id,name,parents)', pageSize: '1000' });
+    for (const f of (await api('GET', `/files?${p}`, null, 'files.list')).files) {
+      if (f.name !== old) continue;   // Drive name queries ignore case; MiTacs → Mitacs must not count
+      const par = (f.parents || [])[0];
+      if (!parentOk.has(par)) parentOk.set(par, par === top.Programs || ((await api('GET', `/files/${par}?supportsAllDrives=true&fields=parents`, null, 'files.get')).parents || [])[0] === top.Clients);
+      if (parentOk.get(par)) left.push({ id: f.id, name: f.name });
+    }
+  }
+  const md = `# ${RUN} — renames after go\n\nBuilt ${vanTime(new Date().toISOString())} (Vancouver). Read-only (drive.readonly, GETs only): ${Object.entries(callTally()).map(([k, v]) => `${k} ×${v}`).join('; ')}.\n\n**${res.filter(r => r.ok).length} of ${res.length} renamed folders carry their new name.** Old names still at program level: **${left.length}**${left.length ? ` (${left.map(l => `"${esc(l.name)}" ${folderLink(l.id)}`).join('; ')})` : ''}.\n\n| Group | Old path | New name | Now | ✓ |\n|---|---|---|---|---|\n${res.map(r => `| ${r.group ?? ''} | ${esc(r.old_path)} | ${esc(r.new_name)} | ${esc(r.now)} | ${r.ok ? '✓' : '✗'} |`).join('\n')}\n`;
+  fs.writeFileSync(AFTER, md);
+  console.log(JSON.stringify({ mode: 'verify-list', ok: res.filter(r => r.ok).length, of: res.length, oldNamesLeft: left, calls: callTally(), report: AFTER }, null, 1));
+}
+
+await (LIST ? (GO ? goList() : UNDO ? undo() : VERIFY ? verifyList() : dryList()) : (GO ? go() : UNDO ? undo() : dry()));

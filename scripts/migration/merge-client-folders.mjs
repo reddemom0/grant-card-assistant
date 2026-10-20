@@ -88,7 +88,7 @@ function planGroup(g, S, K, only = null) {
       } else {
         const same = k.children.filter(x => x.mimeType !== FOLDER && normName(x.name) === normName(c.name));
         const ident = c.md5 && same.find(x => x.md5 === c.md5);
-        if (ident) actions.push({ type: 'archive', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, archRel: `${ARCH_ROOT}/${K.name}${rel}`, toPath: `${ARCH_ROOT}/${K.name}${rel}/${c.name}`, twin: ident.id, src, can: c.caps.canMoveItemOutOfDrive !== false });
+        if (ident) actions.push({ type: 'archive', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, archRel: `${ARCH_ROOT}/${g.archName || K.name}${rel}`, toPath: `${ARCH_ROOT}/${g.archName || K.name}${rel}/${c.name}`, twin: ident.id, src, can: c.caps.canMoveItemOutOfDrive !== false });
         else { actions.push({ type: 'move', kind: c.mimeType === SHORTCUT ? 'shortcut' : 'file', id: c.id, name: c.name, md5: c.md5, from: s.id, fromPath: c.path, to: k.id, toPath: `${k.path}/${c.name}`, cls: same.length ? 'same-name-diff' : 'new', twin: same[0]?.id || null, files: 1, src, can: c.caps.canMoveItemWithinDrive !== false }); land(c, k); }
       }
   };
@@ -143,7 +143,7 @@ async function dry() {
     const pn = g.proposedName || (g.proposedKeeper && g.proposedKeeper !== g.keeper.path ? g.proposedKeeper.split('/').pop() : '');
     const rename = pn ? `rename proposed (separate step, not in this run): ${g.keeper.path} → Clients/${pn}` : null;
     const t = { sourceFiles: sources.reduce((s, x) => s + x.files, 0), moved: actions.filter(a => a.type === 'move').reduce((s, a) => s + a.files, 0), archived: actions.filter(a => a.type === 'archive').length };
-    out.push({ i: i + 1, gid: g.gid ?? i + 1, keeper: { id: g.keeper.id, path: g.keeper.path, files: keeperFiles }, sources, source: sources[0], match: g.match, actions, notes, blockers, checks, rename, totals: t, held: blockers.some(b => !b.includes('shortcut') || !WITH_SC) });
+    out.push({ i: i + 1, gid: g.gid ?? i + 1, archName: g.archName, keeper: { id: g.keeper.id, path: g.keeper.path, files: keeperFiles }, sources, source: sources[0], match: g.match, actions, notes, blockers, checks, rename, totals: t, held: blockers.some(b => !b.includes('shortcut') || !WITH_SC) });
     process.stderr.write(`\r${i + 1}/${G.length}`);
   }
   console.error('');
@@ -246,7 +246,7 @@ async function go() {
         let why = await move(a, dest, destPath, g.i, rows);
         if (why?.redirect === 'archive') {
           const rel = a.fromPath.split('/').slice(0, -1).join('/').slice((a.src || g.source.path).length);
-          a = { ...a, type: 'archive', archRel: `${ARCH_ROOT}/${g.keeper.path.split('/').pop()}${rel}`, toPath: `${ARCH_ROOT}/${g.keeper.path.split('/').pop()}${rel}/${a.name}`, twin: why.twin, shortcutDup: true };
+          a = { ...a, type: 'archive', archRel: `${ARCH_ROOT}/${g.archName || g.keeper.path.split('/').pop()}${rel}`, toPath: `${ARCH_ROOT}/${g.archName || g.keeper.path.split('/').pop()}${rel}/${a.name}`, twin: why.twin, shortcutDup: true };
           dest = await archFolder(a.archRel, created); destPath = `${GA.name}/${a.toPath}`;
           why = await move(a, dest, destPath, g.i, rows);
         }
