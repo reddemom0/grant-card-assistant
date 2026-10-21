@@ -11,7 +11,10 @@
  *                 Clients, Leads and promises in full detail; the rest one line
  *   +N more       past the 10 most urgent: sender — subject, Open email, Done
  *   footer        counts only — covered by colleagues, and what was kept out of
- *                 her way. Never itemised. Money only on dry runs.
+ *                 her way. Never itemised. Never money.
+ * A dry run renders exactly like a real run: it goes to the inbox owner's DM,
+ * so it must read as the real brief. Cost, tokens and the model comparison are
+ * recorded in the database only.
  * FYIs (no reply needed) are counted in the footer, not listed.
  *
  * Not a tracked card: like the confirm card (confirm-card.js), the brief has
@@ -56,17 +59,7 @@ export function briefDate(localDate) {
   return new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).replace(',', '');
 }
 
-const money = (v) => `$${(Number(v) || 0).toFixed(Number(v) < 0.01 ? 4 : 3)}`;
-const modelLabel = (m) => (/haiku/i.test(m) ? 'Haiku' : /sonnet/i.test(m) ? 'Sonnet' : String(m || ''));
 const daysSince = (at, now = Date.now()) => (at ? Math.max(0, Math.floor((now - new Date(at).getTime()) / 86400000)) : 0);
-
-/** "Run cost $0.84 — classify $0.010 · drafts $0.050 · …" (dry-run card only). */
-export function runCostLine(c) {
-  if (!c) return null;
-  const parts = [['classify', c.classify], ['promises', c.promises], ['learning', c.learn], ['drafts', c.drafting], ['Oracle', c.oracle],
-    ['web lookups', c.website], ['search fees', c.search_fees], ['comparison', c.compare]].filter(([, v]) => v > 0).map(([k, v]) => `${k} ${money(v)}`);
-  return `Run cost ${money(c.total)}${parts.length ? ` — ${parts.join(' · ')}` : ''}`;
-}
 
 // ---------------------------------------------------------------------------
 // Links
@@ -76,15 +69,27 @@ function linkButton(text, url) {
   return { text, onClick: { openLink: { url } } };
 }
 
-const gmailBase = (mailbox) => `https://mail.google.com/mail/u/${encodeURIComponent(mailbox || '0')}`;
+/**
+ * A Gmail thread, opened in the mailbox owner's account. `authuser=<email>`
+ * picks the right one of several signed-in Google accounts; a /u/<email>/
+ * path segment (percent-encoded @) did not, and showed Gmail's error page.
+ * The id is the Gmail API thread id, which #all/ accepts.
+ */
+function gmailThreadUrl(mailbox, threadId) {
+  return `https://mail.google.com/mail/?authuser=${encodeURIComponent(mailbox || '')}#all/${encodeURIComponent(threadId)}`;
+}
 
-/** Open draft (when one was saved), Open doc (Drive items), else Open email. */
+/**
+ * Open draft (when one was saved — it shows inside the thread, so the link is
+ * the thread), Open doc (Drive items), else Open email. thread_ids are stored
+ * newest-first: the link opens the newest thread.
+ */
 export function openLink(item, mailbox) {
-  if (item.draft_message_id) return { text: 'Open draft', url: `${gmailBase(mailbox)}/#drafts?compose=${encodeURIComponent(item.draft_message_id)}` };
+  const thread = (item.thread_ids || [])[0];
+  if (item.draft_message_id && thread) return { text: 'Open draft', url: gmailThreadUrl(mailbox, thread) };
   const docId = /^doc:([A-Za-z0-9_-]{20,})$/.exec(item.item_key || '')?.[1];
-  if (item.category === 'docs' && docId) return { text: 'Open doc', url: `https://drive.google.com/open?id=${docId}` };
-  const thread = (item.thread_ids || []).at(-1);
-  return thread ? { text: 'Open email', url: `${gmailBase(mailbox)}/#all/${encodeURIComponent(thread)}` } : null;
+  if (item.category === 'docs' && docId) return { text: 'Open doc', url: `https://drive.google.com/open?id=${docId}&authuser=${encodeURIComponent(mailbox || '')}` };
+  return thread ? { text: 'Open email', url: gmailThreadUrl(mailbox, thread) } : null;
 }
 
 function actions(item, run, mailbox) {
@@ -149,7 +154,7 @@ function strike(html, done) {
   return done ? `<font color="${GREY}">✅ <s>${html}</s></font>` : html;
 }
 
-function fullItem(item, run, { dryRun, mailbox, now }) {
+function fullItem(item, run, { mailbox, now }) {
   const done = item.state !== 'open';
   const lines = [
     `<b>${esc(who(item))}</b> — ${esc(clip(item.subject || '(no subject)', 120))}`,
@@ -166,11 +171,10 @@ function fullItem(item, run, { dryRun, mailbox, now }) {
   const widgets = [decorated({ top: badges.length ? clip(badges.join(' · '), 120) : null, text: strike(lines.join('<br>'), done) })];
   const row = actions(item, run, mailbox);
   if (row) widgets.push(row);
-  if (dryRun && !done) widgets.push(...dryRunExtras(item));
   return widgets;
 }
 
-function oneLineItem(item, run, { dryRun, mailbox, now }) {
+function oneLineItem(item, run, { mailbox, now }) {
   const done = item.state !== 'open';
   const summary = clip(item.summary || item.assessment || item.subject || '', NET_SUMMARY);
   const noDraft = !item.draft_ids?.length && !item.draft_preview && item.category !== 'docs'
@@ -181,22 +185,7 @@ function oneLineItem(item, run, { dryRun, mailbox, now }) {
   const widgets = [decorated({ top: badges.length ? clip(badges.join(' · '), 120) : null, text: strike(text, done) })];
   const row = actions(item, run, mailbox);
   if (row) widgets.push(row);
-  if (dryRun && !done) widgets.push(...dryRunExtras(item));
   return widgets;
-}
-
-function dryRunExtras(item) {
-  const out = [];
-  if (item.draft_preview) {
-    const label = `Draft${item.model ? ` · ${modelLabel(item.model)}` : ''}${item.cost_usd != null ? ` · ${money(item.cost_usd)}` : ''}`;
-    out.push(paragraph(`<font color="${GREY}"><i>${esc(label)}:</i> ${esc(clip(item.draft_preview, 600)).replace(/\n/g, '<br>')}</font>`));
-  }
-  let cmp = item.compare;
-  if (typeof cmp === 'string') { try { cmp = JSON.parse(cmp); } catch { cmp = null; } }
-  if (cmp?.draft) {
-    out.push(paragraph(`<font color="${GREY}"><i>${esc(`${cmp.label} · ${modelLabel(cmp.model)} · ${money(cmp.cost_usd)}`)}:</i> ${esc(clip(cmp.draft, 600)).replace(/\n/g, '<br>')}</font>`));
-  }
-  return out;
 }
 
 function moreRow(item, run, mailbox) {
@@ -238,10 +227,12 @@ export function coveredLine(counts) {
 /**
  * @param {object} run - steph_brief_runs row (id, local_date, is_test, owner_email, counts)
  * @param {Array} items - steph_brief_items rows in card order, each optionally with `carry`
- * @param {{ dryRun?: boolean, now?: number }} [opts]
- * @returns {Array} cardsV2
+ * @param {{ now?: number }} [opts]
+ * @returns {Array} cardsV2 — identical for a dry run and a real run with the
+ *   same rows: no dry-run banner, no money, no model comparison. Those stay in
+ *   the database (cost_usd, counts.cost, compare) and never reach the card.
  */
-export function renderBrief(run, items, { dryRun = !!run.is_test, now = Date.now() } = {}) {
+export function renderBrief(run, items, { now = Date.now() } = {}) {
   const counts = run.counts || {};
   const mailbox = run.owner_email;
   const today = ymd(run.local_date) || new Date(now).toISOString().slice(0, 10);
@@ -266,7 +257,7 @@ export function renderBrief(run, items, { dryRun = !!run.is_test, now = Date.now
   for (const group of GROUP_ORDER) {
     const inGroup = listed.filter(i => i.category === group && shown.has(i.id));
     if (!inGroup.length) continue;
-    const render = (i) => (FULL_DETAIL.has(group) && !ONE_LINE_TYPES.has(i.item_type) ? fullItem : oneLineItem)(i, run, { dryRun, mailbox, now });
+    const render = (i) => (FULL_DETAIL.has(group) && !ONE_LINE_TYPES.has(i.item_type) ? fullItem : oneLineItem)(i, run, { mailbox, now });
     sections.push({
       header: `${GROUP_LABELS[group]} · ${inGroup.length}`,
       widgets: inGroup.flatMap(render)
@@ -283,8 +274,7 @@ export function renderBrief(run, items, { dryRun = !!run.is_test, now = Date.now
   const footer = [
     coveredLine(counts),
     keptOutLine(counts, fyis),
-    counts.auto_done ? `${counts.auto_done} ticked off since the last brief — you replied.` : null,
-    dryRun && counts.cost ? runCostLine(counts.cost) : null
+    counts.auto_done ? `${counts.auto_done} ticked off since the last brief — you replied.` : null
   ].filter(Boolean);
   if (footer.length) sections.push({ widgets: footer.map(line => paragraph(`<font color="${GREY}">${esc(line)}</font>`)) });
 
@@ -292,8 +282,8 @@ export function renderBrief(run, items, { dryRun = !!run.is_test, now = Date.now
     cardId: `steph-brief-${run.id}`,
     card: {
       header: {
-        title: dryRun ? 'DRY RUN — Good morning, Steph' : 'Good morning, Steph',
-        subtitle: `${briefDate(run.local_date)} · ${needYou} ${needYou === 1 ? 'email needs' : 'emails need'} you · ${drafted} ${drafted === 1 ? 'reply' : 'replies'} drafted${dryRun ? ' (not saved)' : ''}`
+        title: 'Good morning, Steph',
+        subtitle: `${briefDate(run.local_date)} · ${needYou} ${needYou === 1 ? 'email needs' : 'emails need'} you · ${drafted} ${drafted === 1 ? 'reply' : 'replies'} drafted`
       },
       sections
     }

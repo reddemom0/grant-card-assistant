@@ -55,10 +55,10 @@ describe('header and explainer', () => {
     expect(K.briefDate('2026-10-20T00:00:00.000Z')).toBe('Tue Oct 20');
     expect(JSON.stringify(render([it({})]))).not.toContain('Invalid Date');
   });
-  test('"Good morning, Steph" · date · N need you · M drafted; dry run marked', () => {
+  test('"Good morning, Steph" · date · N need you · M drafted — the same on a dry run', () => {
     const items = [it({ draft_ids: ['d'], draft_message_id: 'm1' }), it({}), it({ state: 'done' }), it({ no_reply: true })];
     expect(card(render(items)).header).toEqual({ title: 'Good morning, Steph', subtitle: 'Tue Oct 20 · 2 emails need you · 1 reply drafted' });
-    expect(card(render([it({ draft_preview: 'x' })], RUN({ is_test: true }))).header.title).toBe('DRY RUN — Good morning, Steph');
+    expect(card(render([it({ draft_preview: 'x' })], RUN({ is_test: true }))).header).toEqual({ title: 'Good morning, Steph', subtitle: 'Tue Oct 20 · 1 email needs you · 1 reply drafted' });
   });
   test('the explainer, word for word, first', () => {
     const first = card(render([it({})])).sections[0].widgets[0].textParagraph.text;
@@ -154,11 +154,11 @@ describe('groups and layout', () => {
       it({ category: 'docs', item_key: 'doc:1AbCdEfGhIjKlMnOpQrStUvWxYz012345', thread_ids: ['th3'] })
     ]));
     expect(b[0].map(x => x.text)).toEqual(['Open draft', 'Done']);
-    expect(b[0][0].onClick.openLink.url).toBe('https://mail.google.com/mail/u/ssang%40granted.ca/#drafts?compose=18f2a9c0');
+    expect(b[0][0].onClick.openLink.url).toBe('https://mail.google.com/mail/?authuser=ssang%40granted.ca#all/th1');
     expect(b[1].map(x => x.text)).toEqual(['Open email', 'Done']);
-    expect(b[1][0].onClick.openLink.url).toBe('https://mail.google.com/mail/u/ssang%40granted.ca/#all/th2');
+    expect(b[1][0].onClick.openLink.url).toBe('https://mail.google.com/mail/?authuser=ssang%40granted.ca#all/th2');
     expect(b[2].map(x => x.text)).toEqual(['Open doc', 'Done']);
-    expect(b[2][0].onClick.openLink.url).toBe('https://drive.google.com/open?id=1AbCdEfGhIjKlMnOpQrStUvWxYz012345');
+    expect(b[2][0].onClick.openLink.url).toBe('https://drive.google.com/open?id=1AbCdEfGhIjKlMnOpQrStUvWxYz012345&authuser=ssang%40granted.ca');
     const doneParams = b[0][1].onClick.action.parameters;
     expect(doneParams).toEqual(expect.arrayContaining([{ key: 'action', value: 'brief.done' }, { key: 'runId', value: '5' }]));
   });
@@ -187,7 +187,7 @@ describe('length cap', () => {
     const more = sections.find(sec => /^\+\d+ more$/.test(sec.header || ''));
     expect(more.header).toBe('+5 more');
     expect(more.widgets).toHaveLength(5);
-    expect(more.widgets[0].decoratedText.text).toMatch(/<b>S\d+<\/b> — Subj \d+ · <a href="https:\/\/mail\.google\.com\/mail\/u\/ssang%40granted\.ca\/#all\/t\d+">Open email<\/a>/);
+    expect(more.widgets[0].decoratedText.text).toMatch(/<b>S\d+<\/b> — Subj \d+ · <a href="https:\/\/mail\.google\.com\/mail\/\?authuser=ssang%40granted\.ca#all\/t\d+">Open email<\/a>/);
     expect(more.widgets[0].decoratedText.button.text).toBe('Done');
     const shown = sections.filter(sec => sec !== more).flatMap(sec => sec.widgets).filter(w => w.decoratedText).map(w => w.decoratedText.text);
     expect(shown.some(t => t.includes('Fraud'))).toBe(true);                 // the urgent ones stay in layout
@@ -215,15 +215,15 @@ describe('footer', () => {
     expect(K.keptOutLine({}, 0)).toBeNull();
     expect(K.coveredLine({ covered: [] })).toBeNull();
   });
-  test('no money on real runs; the cost line stays on dry runs', () => {
+  test('no money, models or comparison on any card — real or dry run', () => {
     const counts = { cost: { classify: 0.0012, drafting: 0.009, oracle: 0.41, website: 0.002, search_fees: 0.02, compare: 0.05, total: 0.4922 } };
-    expect(JSON.stringify(render([it({ draft_ids: ['d'], cost_usd: 0.4, model: 'claude-sonnet-5-5' })], RUN({ counts })))).not.toMatch(/\$0\.4|Run cost/);
-    const dry = render([it({ draft_preview: 'Arie,\n\nHello', model: 'claude-sonnet-5-5', cost_usd: 0.41,
-      compare: { label: 'Haiku version', model: 'claude-haiku-4-5-20251001', draft: 'Arie,\n\nHi there', cost_usd: 0.004 } })], RUN({ is_test: true, counts }));
-    const t = JSON.stringify(dry);
-    expect(t).toContain('Run cost $0.492 — classify $0.0012 · drafts $0.0090 · Oracle $0.410 · web lookups $0.0020 · search fees $0.020 · comparison $0.050');
-    expect(t).toContain('Draft · Sonnet · $0.410');
-    expect(t).toContain('Haiku version · Haiku · $0.0040');
+    for (const is_test of [false, true]) {
+      const t = JSON.stringify(render([it({ draft_preview: 'Arie,\n\nHello there friend', draft_summary: 'Says hello.', model: 'claude-sonnet-5-5', cost_usd: 0.41,
+        compare: { label: 'Haiku version', model: 'claude-haiku-4-5-20251001', draft: 'Arie,\n\nHi there', cost_usd: 0.004 } })], RUN({ is_test, counts })));
+      for (const banned of ['DRY RUN', 'not saved', 'Run cost', '$0.', 'Haiku', 'Sonnet', 'version ·', 'Draft ·', 'Hello there friend', 'Hi there']) {
+        expect(t).not.toContain(banned);
+      }
+    }
   });
   test('user text is escaped', () => {
     expect(JSON.stringify(render([it({ subject: '<script>x</script>' })]))).not.toContain('<script>');
@@ -268,6 +268,105 @@ describe('dry-run 2 fixes (card)', () => {
     const [runaway] = decos(render([it({ category: 'client', assessment: 'x'.repeat(900) })]));
     expect(runaway.text).toContain('…');
     expect(runaway.text.length).toBeLessThan(900);
+  });
+});
+
+describe('production-identical dry-run card', () => {
+  // A rich fixture: every item type, drafts, holds, carry-over, cost and comparison data.
+  const fixture = () => [
+    it({ category: 'promise', item_type: 'promise', badge: 'You promised to send the budget · due Mon, Oct 19 (1 day ago)', due_on: '2026-10-19', sender: 'Ricky' }),
+    it({ category: 'client', sender: 'Arie', company: 'Vos', subject: 'Renewal', assessment: 'Renewal unsigned.', nudge: 2, carry: 'from yesterday',
+      draft_preview: 'Arie,\n\nThe renewal is with you.', draft_summary: 'Confirms the renewal.', sources: ['HubSpot'], model: 'claude-sonnet-5-5', cost_usd: 0.31,
+      compare: { label: 'Haiku version', model: 'claude-haiku-4-5-20251001', draft: 'Arie,\n\nHi.', cost_usd: 0.004 } }),
+    it({ category: 'client', item_type: 'unhappy', badge: 'Unhappy client · call recommended', draft_preview: 'x', draft_summary: 'Apologises.', model: 'claude-haiku-4-5-20251001', cost_usd: 0.005 }),
+    it({ category: 'client', held: true, note: 'Unclear: the decision date — ask Ruk.', draft_preview: 'x', draft_summary: 'A holding reply.' }),
+    it({ category: 'lead', facts_line: 'Calculator: est. $45,000', draft_preview: 'x', draft_summary: 'Suggests a call.', model: 'claude-haiku-4-5-20251001', cost_usd: 0.009,
+      compare: { label: 'Sonnet version', model: 'claude-sonnet-5-5', draft: 'Lee,\n\nSonnet text.', cost_usd: 0.04 } }),
+    it({ category: 'partner', item_type: 'safety', badge: 'Verify by phone first', note: 'Sender domain a.co looks like a.com but isn\'t.' }),
+    it({ category: 'team', item_type: 'security', badge: 'Security alert', owner_hint: 'IT/admin' }),
+    it({ category: 'team', item_type: 'bill', badge: 'Bill · $90 due Oct 31', due_on: '2026-10-31' }),
+    it({ category: 'government', item_type: 'cc', badge: "You're cc'd", owner_hint: 'Ruk', summary: 'Asks Ruk.' }),
+    it({ category: 'docs', item_key: 'doc:1AbCdEfGhIjKlMnOpQrStUvWxYz012345' }),
+    it({ category: 'other', item_type: 'unsure', badge: "Wasn't sure if this needs you" }),
+    it({ state: 'done' }),
+    it({ no_reply: true })
+  ];
+  const counts = { covered: [{ by: 'Ruk Ali', threads: 2 }], automated: 9, vendor: 3, auto_done: 1,
+    cost: { classify: 0.002, drafting: 0.05, oracle: 0.31, compare: 0.044, total: 0.406 } };
+
+  test('the dry-run card deep-equals the real-run card for the same rows', () => {
+    const items = fixture();
+    const real = render(items, RUN({ is_test: false, counts }));
+    const dry = render(items, RUN({ is_test: true, counts }));
+    expect(dry).toEqual(real);
+    expect(JSON.stringify(dry)).toBe(JSON.stringify(real));                // byte-identical too
+  });
+
+  test('no cost, model, token or comparison text anywhere on a dry-run card', () => {
+    const t = JSON.stringify(render(fixture(), RUN({ is_test: true, counts })));
+    for (const banned of ['DRY RUN', 'not saved', 'Run cost', 'Haiku', 'Sonnet', 'version ·', 'Draft ·', 'tokens', '$0.', 'Sonnet text', 'Arie,\\n\\nHi.']) {
+      expect(t).not.toContain(banned);
+    }
+  });
+
+  test('Done on a dry-run card updates only that test row: no claim, no auto-tick, same card back', async () => {
+    const id = IDS[0];
+    const { query, byId } = db([ITEM({ id, state: 'open' }), ITEM({ id: IDS[1], sender: 'Other', state: 'open' })], { is_test: true, owner_email: 'ssang@granted.ca' });
+    const patchCard = jest.fn(async () => {});
+    const r = await K.handleBriefClick(press(), { query, patchCard });
+    expect(byId.get(id).state).toBe('done');
+    expect(byId.get(IDS[1]).state).toBe('open');
+    const sqls = query.mock.calls.map(([sql]) => sql).join('\\n');
+    expect(sqls).not.toMatch(/INSERT INTO steph_brief_runs|ON CONFLICT|auto_done/);
+    const updates = query.mock.calls.filter(([sql]) => /^UPDATE/i.test(sql.trim()));
+    expect(updates).toHaveLength(1);
+    expect(updates[0][1]).toEqual([id]);
+    const cards = r.hostAppDataAction.chatDataAction.updateMessageAction.message.cardsV2;
+    expect(cards[0].card.header.title).toBe('Good morning, Steph');
+  });
+});
+
+describe('card links open the right account and the newest thread', () => {
+  const urls = (cards) => {
+    const out = [];
+    JSON.stringify(cards, (k, v) => { if (k === 'openLink' && v?.url) out.push(v.url); return v; });
+    for (const m of JSON.stringify(cards).matchAll(/href=\\"([^"\\\\]+)\\"/g)) out.push(m[1]);
+    return out;
+  };
+
+  test('authuser carries the mailbox, encoded; no /u/ segment in any link', () => {
+    const cards = render([it({ category: 'client', draft_ids: ['d'], draft_message_id: 'm1' }), it({ category: 'partner' }),
+      it({ category: 'docs', item_key: 'doc:1AbCdEfGhIjKlMnOpQrStUvWxYz012345' })], RUN({ owner_email: 'writers@granted.ca' }));
+    const all = urls(cards);
+    expect(all).toHaveLength(3);
+    for (const u of all) {
+      expect(u).toContain('authuser=writers%40granted.ca');
+      expect(u).not.toMatch(/\/u\//);
+      expect(u).not.toContain('@');
+    }
+  });
+
+  test('the newest thread (first in thread_ids) is linked — full, one-line and "+N more" rows', () => {
+    const many = (o) => it({ thread_ids: ['newest', 'mid', 'oldest'], ...o });
+    expect(K.openLink(many({}), 'ssang@granted.ca').url).toBe('https://mail.google.com/mail/?authuser=ssang%40granted.ca#all/newest');
+    const items = [many({ category: 'client' }), many({ category: 'partner' }),
+      ...Array.from({ length: 11 }, (_, i) => it({ category: 'team', sender: `T${i}`, thread_ids: [`new${i}`, `old${i}`] }))];
+    const all = urls(render(items));
+    expect(all.some(u => /#all\/(mid|oldest|old\d+)$/.test(u))).toBe(false);
+    expect(all.filter(u => u.endsWith('#all/newest'))).toHaveLength(2);
+    expect(all.some(u => /#all\/new\d+$/.test(u))).toBe(true);           // includes the "+N more" rows
+  });
+
+  test('Open draft is the thread URL (the saved draft shows in the thread), never #drafts', () => {
+    const draft = K.openLink(it({ draft_ids: ['d'], draft_message_id: '18f2a9c0', thread_ids: ['th9', 'th1'] }), 'ssang@granted.ca');
+    const email = K.openLink(it({ thread_ids: ['th9', 'th1'] }), 'ssang@granted.ca');
+    expect(draft).toEqual({ text: 'Open draft', url: email.url });
+    expect(draft.url).not.toContain('#drafts');
+  });
+
+  test('Open doc keeps id= and adds authuser=', () => {
+    expect(K.openLink(it({ category: 'docs', item_key: 'doc:1AbCdEfGhIjKlMnOpQrStUvWxYz012345' }), 'ssang@granted.ca'))
+      .toEqual({ text: 'Open doc', url: 'https://drive.google.com/open?id=1AbCdEfGhIjKlMnOpQrStUvWxYz012345&authuser=ssang%40granted.ca' });
   });
 });
 

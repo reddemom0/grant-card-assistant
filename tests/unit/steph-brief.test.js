@@ -197,7 +197,7 @@ describe('runStephBrief', () => {
     expect(text.indexOf('Clients · 1')).toBeGreaterThan(-1);
     expect(text.indexOf('Clients · 1')).toBeLessThan(text.indexOf('Leads · 1'));
     expect(text).toContain('Draft says:</b> Confirms the renewal is with them to sign and offers to retrigger it.');
-    expect(text).toContain('#drafts?compose=m-tc');
+    expect(text).toContain('https://mail.google.com/mail/?authuser=ssang%40granted.ca#all/tc');
     expect(text).toContain('Kept out of your way: 1 notification, 1 sales pitch.');
     expect(d.createDraftReply).toHaveBeenCalledTimes(2);
     expect(db.runs[0].status).toBe('done');
@@ -223,8 +223,13 @@ describe('runStephBrief', () => {
     expect(db.runs[0].is_test).toBe(true);
     expect([...db.items.values()].every(i => i.is_test)).toBe(true);
     const text = cardText(d);
-    expect(text).toContain('DRY RUN');
-    expect(text).toContain('retrigger it');
+    // Production-identical card: no dry-run banner, no draft text on it…
+    expect(text).not.toContain('DRY RUN');
+    expect(text).not.toContain('If you are good to go');                   // the draft body itself
+    // …but the draft and its cost are still recorded for review.
+    const row = [...db.items.values()][0];
+    expect(row.draft_preview).toContain('If you are good to go');
+    expect(Number(row.cost_usd)).toBeGreaterThan(0);
     // The real run still happens later the same day.
     expect((await B.runStephBrief({ now: NOW, env: {}, deps: d })).status).toBe('done');
   });
@@ -501,8 +506,9 @@ describe('cost trim', () => {
     if (leadCmp) expect(leadCmp).toMatchObject({ label: 'Sonnet version', model: 'claude-sonnet-5-5' });
     expect(r.cost.compare).toBeGreaterThan(0);
     const text = cardText(d);
-    expect(text).toContain('Haiku version');
-    expect(text).toContain('Run cost $');
+    expect(text).not.toContain('Haiku version');
+    expect(text).not.toContain('Run cost');
+    expect(db.runs[0].counts.cost.compare).toBeGreaterThan(0);              // still logged to the database
   });
 
   test('dry run: a lead gets a "Sonnet version" on the same context as its Haiku draft', async () => {
@@ -518,7 +524,7 @@ describe('cost trim', () => {
     const cmp = JSON.parse([...db.items.values()][0].compare);
     expect(cmp).toMatchObject({ label: 'Sonnet version', model: 'claude-sonnet-5-5' });
     expect(cmp.draft).toContain('Sonnet wording here.');
-    expect(cardText(d)).toContain('Sonnet version · Sonnet · $');
+    expect(cardText(d)).not.toContain('Sonnet version');                    // in the database only
   });
 
   test('the comparison never runs on a real run', async () => {
