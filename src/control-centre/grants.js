@@ -32,7 +32,7 @@
 import { query as hubQueryDefault } from '../database/connection.js';
 import { appQuery as appQueryDefault, opsQuery as opsQueryDefault } from './db.js';
 import { readDay, TIME_ZONE } from './rollup.js';
-import { loadWindowRows, RANGE_DAYS, OverviewError } from './overview.js';
+import { loadWindowRows, OverviewError, rangeError, trimCache } from './overview.js';
 import { liveGrants as liveGrantsDefault } from './live-sources.js';
 import { companyNamesForIds } from './identity.js';
 import { isInternalCompany } from './internal-accounts.js';
@@ -394,8 +394,9 @@ export function defaultDeps() {
 
 const windowCache = new Map();
 
-const parseRange = (range) => {
-  if (!RANGE_DAYS[range]) throw new GrantsError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+const parseRange = (range, now = new Date()) => {
+  const err = rangeError(range, now);
+  if (err) throw new GrantsError(400, err);
   return range;
 };
 
@@ -404,7 +405,7 @@ const parseRange = (range) => {
  * rows plus the grant-only reads. Cached LIST_CACHE_MS per range.
  */
 export async function loadGrantWindow(range, overrides = {}) {
-  parseRange(range);
+  parseRange(range, overrides.now?.());
   const deps = { ...defaultDeps(), ...overrides };
   const now = deps.now().getTime();
   const hit = windowCache.get(range);
@@ -436,13 +437,13 @@ export async function loadGrantWindow(range, overrides = {}) {
     data: { last_rolled_day: rows.lastRolled ?? null, live_days: rows.tail?.days?.length ?? 0 },
     generated_at: new Date(now).toISOString()
   };
-  if (!overrides.noCache) windowCache.set(range, { at: now, value });
+  if (!overrides.noCache) { windowCache.set(range, { at: now, value }); trimCache(windowCache); }
   return value;
 }
 
 /** The list for a range and view: both variants, the page picks by its toggle. */
 export async function grantList(range = 'week', view = 'all', overrides = {}) {
-  parseRange(range);
+  parseRange(range, overrides.now?.());
   if (!VIEWS.includes(view)) throw new GrantsError(400, `view must be one of ${VIEWS.join(', ')}`);
   const win = await loadGrantWindow(range, overrides);
   return {
@@ -466,7 +467,7 @@ const parseGrantId = (v) => {
 /** One grant's page for a range. */
 export async function grantPage(idInput, range = 'week', overrides = {}) {
   const id = parseGrantId(idInput);
-  parseRange(range);
+  parseRange(range, overrides.now?.());
   const deps = { ...defaultDeps(), ...overrides };
   const win = await loadGrantWindow(range, overrides);
   const grant = win.grants.find((g) => g.root_id === id);

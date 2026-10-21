@@ -32,7 +32,7 @@
 import { query as hubQueryDefault } from '../database/connection.js';
 import { appQuery as appQueryDefault, opsQuery as opsQueryDefault } from './db.js';
 import { TIME_ZONE, vancouverDay, addDays } from './rollup.js';
-import { windowsFor, RANGE_DAYS, OverviewError } from './overview.js';
+import { windowsFor, OverviewError, rangeError, trimCache } from './overview.js';
 import { identitiesForClerkIds, companyNamesForIds, internalClerkIds as internalClerkIdsDefault } from './identity.js';
 import { isInternalCompany } from './internal-accounts.js';
 import { cardLink, grantLink } from './links.js';
@@ -311,8 +311,9 @@ export function defaultDeps() {
 
 const cache = new Map();
 
-const parseRange = (range) => {
-  if (!RANGE_DAYS[range]) throw new ChatError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+const parseRange = (range, now = new Date()) => {
+  const err = rangeError(range, now);
+  if (err) throw new ChatError(400, err);
   return range;
 };
 
@@ -348,9 +349,9 @@ async function windowChats(from, to, deps) {
 
 /** Sections 1–6 for a range, both variants (the page picks by its toggle; Themes is always client-only). */
 export async function chatOverview(range = 'month', overrides = {}) {
-  parseRange(range);
   const deps = { ...defaultDeps(), ...overrides };
   const now = deps.now();
+  parseRange(range, now);
   const hit = cache.get(range);
   if (hit && now.getTime() - hit.at < CACHE_MS && !overrides.noCache) return hit.value;
 
@@ -367,6 +368,7 @@ export async function chatOverview(range = 'month', overrides = {}) {
     const earliest = [w.previous.from, trendStart].sort()[0];
     rows = (await deps.storeQuery(QUESTIONS_SQL, [earliest, to])).rows;
     store.last_run_day = (await deps.storeQuery(LAST_RUN_SQL)).rows[0]?.day ?? null;
+    store.first_day = (await deps.storeQuery(FIRST_DAY_SQL)).rows[0]?.day ?? null;
   } catch (err) {
     if (err?.code !== '42P01') throw err;
     store = { ok: false, missing: 'migration_049' };
@@ -420,6 +422,9 @@ export async function chatOverview(range = 'month', overrides = {}) {
     range, current: w.current ? { from, to } : null, previous: { from: w.previous.from, to: w.previous.to },
     definitions: { outcome_hours: OUTCOME_HOURS, trend_weeks: TREND_WEEKS, unanswered: UNANSWERED_WORDS },
     store,
+    // A theme's change needs the whole previous window stored; before the
+    // daily review's first day there's nothing to compare with ("—" on the page).
+    tracking: { from: store.first_day ?? null, comparable: store.first_day != null && store.first_day <= w.previous.from },
     // Themes: clients only, whatever the toggle.
     themes: store.ok ? buildThemes(rows.filter(keep.clients), { current: { from, to }, previous: w.previous, trendWeeks }) : [],
     trend_weeks: trendWeeks,
@@ -429,8 +434,55 @@ export async function chatOverview(range = 'month', overrides = {}) {
     grants: gNames,
     generated_at: new Date(now).toISOString()
   };
-  if (!overrides.noCache) cache.set(range, { at: now.getTime(), value });
+  if (!overrides.noCache) { cache.set(range, { at: now.getTime(), value }); trimCache(cache); }
   return value;
+}
+
+// The first day the daily review stored, so a range reaching further back can say where its themes start.
+export const FIRST_DAY_SQL = 'SELECT min(day)::text AS day FROM cc_chat_questions';
+export const ASKED_RECENT = 24;
+
+/**
+ * The Overview's "What clients asked about" for any window (windowsFor):
+ * the daily review's themes (client-only, as on this tab) with how many of
+ * each theme's questions came from internal accounts, and the newest
+ * rewritten questions tagged by company. Reads the stored rows only — no
+ * model call. A missing table (049) throws 42P01 for the caller to report.
+ */
+export async function askedForWindow(w, overrides = {}) {
+  const storeQuery = overrides.storeQuery ?? overrides.hubQuery ?? hubQueryDefault;
+  const appQuery = overrides.appQuery ?? appQueryDefault;
+  const internalClerks = overrides.internalClerkIds ?? (() => internalClerkIdsDefault());
+  const { from, to } = w.current;
+  const [rowsRes, firstRes, internalIds] = await Promise.all([
+    storeQuery(QUESTIONS_SQL, [from, to]),
+    storeQuery(FIRST_DAY_SQL),
+    Promise.resolve().then(internalClerks).catch(() => new Set())
+  ]);
+  const rows = rowsRes.rows;
+  const keep = variants(internalIds);
+  const internalBy = new Map();
+  for (const r of rows) if (!keep.clients(r)) internalBy.set(r.theme, (internalBy.get(r.theme) ?? 0) + 1);
+  const themes = buildThemes(rows.filter(keep.clients), { current: { from, to }, previous: w.previous, trendWeeks: [] })
+    .filter((t) => t.current > 0)
+    .map((t) => ({ name: t.theme, count: t.current, internal_count: internalBy.get(t.theme) ?? 0, example: t.examples[0]?.question ?? null }));
+  const newest = [...rows].sort((a, b) => String(b.occurred_at ?? b.day).localeCompare(String(a.occurred_at ?? a.day))
+    || b.conversation_id - a.conversation_id || b.turn_index - a.turn_index).slice(0, ASKED_RECENT);
+  let questions = newest.map((r) => ({ text: r.question, theme: r.theme, day: r.day, company_id: r.company_id ?? null,
+    linked: r.clerk_id != null, clerk_internal: r.company_id == null && internalIds.has(r.clerk_id) }));
+  try {
+    const named = await companyNamesForIds(questions.map((q) => q.company_id), { query: appQuery });
+    questions = questions.map((q) => ({ ...q, company_name: q.company_id != null ? named.get(q.company_id) ?? null : null }));
+  } catch {
+    questions = questions.map((q) => ({ ...q, company_name: null }));
+  }
+  return {
+    from, to,
+    data_from: firstRes.rows[0]?.day ?? null,
+    source: 'daily_review',
+    themes,
+    recent_questions: questions.map(({ clerk_internal, ...q }) => ({ ...q, company_internal: isInternalCompany(q.company_id) || clerk_internal }))
+  };
 }
 
 /** Company filter → its Clerk ids: an id, or part of a name. */

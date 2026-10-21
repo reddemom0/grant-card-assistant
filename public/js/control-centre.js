@@ -1,13 +1,16 @@
 /**
- * Control Centre page. Overview (step 6) and the Review queue (step 5c+9,
- * public/js/control-centre-review.js) are live; the other tabs are
- * placeholders until their steps land.
+ * Control Centre page. Department views (public/js/control-centre-views.js) is
+ * the landing tab (#views); the old Overview is the "Everything" tab
+ * (?tab=overview). Inbox is still a placeholder.
  *
- * State lives in the URL — ?tab=&range=&company=&grant= — so every view is
- * deep-linkable and the back button works (pushState + popstate). The Review
+ * State lives in the URL — ?tab=&range=&company=&grant=, or ?from=&to= for a
+ * custom range — so every view is deep-linkable and the back button works
+ * (pushState + popstate). A custom range travels to the APIs as one range
+ * token, 'YYYY-MM-DD..YYYY-MM-DD' (Vancouver days). The Review
  * queue lives in the hash: #review, #review/<id>, #review?owner=&type= (the
- * links in Oracle's DMs and answers point there). The last range is also
- * remembered in localStorage when it's available.
+ * links in Oracle's DMs and answers point there). A range the person picks is
+ * remembered in localStorage['cc.rangePick'] when it's available; with none,
+ * Department views opens on Month and the other tabs on Week.
  *
  * Data: GET /api/control-centre/overview?range=…, GET /api/control-centre/search?q=…,
  * /api/control-centre/review (see the review module). Docs: docs/control-centre.md
@@ -16,9 +19,13 @@
   'use strict';
 
   const RANGES = ['day', 'week', 'month', 'year'];
-  const RANGE_DAYS = { day: 1, week: 7, month: 30, year: 365 };
-  const TABS = ['overview', 'inbox', 'companies', 'grants', 'review', 'coverage', 'themes'];
-  const STORE_KEY = 'cc.range';
+  const TABS = ['views', 'overview', 'inbox', 'companies', 'grants', 'review', 'coverage', 'themes'];
+  // Only a range the person picked (a button or Apply) is stored. The old
+  // 'cc.range' key was written on every load, so it couldn't tell a pick from
+  // a default; it's no longer read or written.
+  const STORE_KEY = 'cc.rangePick';
+  const CUSTOM_RANGE = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
+  const MAX_CUSTOM_DAYS = 365;
   const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const SOON = {
@@ -37,16 +44,65 @@
   const span = (a, b) => (a === b ? dayLabel(a) : `${dayLabel(a)} – ${dayLabel(b)}`);
   // Plain words for the selected range: "this week" vs "last week".
   const NOW_WORDS = { 1: 'today', 7: 'this week', 30: 'in the last 30 days', 365: 'in the last year' };
-  const BEFORE_WORDS = { 1: 'yesterday', 7: 'last week', 30: 'the 30 days before', 365: 'the year before' };
-  const nowWords = (n) => NOW_WORDS[n] ?? `in the last ${n} days`;
-  const beforeWords = (n) => BEFORE_WORDS[n] ?? `the ${n} days before`;
+  // The Overview's window words, set from each payload's own dates (paintOverview):
+  // "this week" / "from Sep 1 to Oct 15", and the previous window's dates.
+  let periodWords = { now: 'this week', before: 'last week' };
+  const nowWords = () => periodWords.now;
+  const beforeWords = () => periodWords.before;
+
+  // ---------------------------------------------------------------- tracking starts
+  // The Overview payload's `tracking` (overview.js trackingFor): per metric,
+  // whether the previous window lies wholly after that number's data starts.
+  // When it doesn't, a change would compare with history that wasn't kept, so
+  // it shows "—" with when tracking started. Set per payload in paintOverview.
+  let tracking = null;
+  const comparable = (metric) => !tracking || tracking.metrics?.[metric] !== false;
+  function untrackedWhy(metric, what) {
+    const start = tracking?.metric_from?.[metric];
+    return start
+      ? `Tracking of ${what} started ${dayLabel(start)}, after ${beforeWords()} began, so there's no full period to compare with.`
+      : `There's no ${what} data before this window, so there's nothing to compare with.`;
+  }
+  /** The "—" in place of a change, with its reason as a hover/focus tip and for screen readers. */
+  const untrackedCell = (metric, what) => `<span class="cc-untracked" tabindex="0" title="${esc(untrackedWhy(metric, what))}" aria-label="No comparison: ${esc(untrackedWhy(metric, what))}">—</span>`;
+  const METRIC_WORDS = { signups: 'sign-ups', active_companies: 'client activity', matches_shown: 'grant matches', grants_opened: 'grant card opens',
+    ratings_up: 'ratings', watchlist_adds: 'watchlist adds', chats: 'chats' };
+  const RANGE_WORDS = { day: 'today', week: 'in the last 7 days', month: 'in the last 30 days', year: 'in the last year' };
+
+  // ---------------------------------------------------------------- ranges
+  const DAY = /^\d{4}-\d{2}-\d{2}$/;
+  const shiftDay = (d, n) => { const t = new Date(`${d}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  const realDay = (d) => DAY.test(d || '') && shiftDay(d, 0) === d;
+  const daysBetween = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000) + 1;
+  /** Today in Vancouver, the day every window is built from. */
+  const vancouverToday = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Vancouver', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const isCustom = (r) => CUSTOM_RANGE.test(r || '');
+  const customParts = (r) => { const m = CUSTOM_RANGE.exec(r || ''); return m ? { from: m[1], to: m[2] } : null; };
+  /** Null when from..to is a usable custom range, else why not (the server checks the same). */
+  function customError(from, to) {
+    if (!realDay(from) || !realDay(to)) return 'Pick a start and an end date.';
+    if (from > to) return 'The start has to be on or before the end.';
+    if (to > vancouverToday()) return "The end can't be after today.";
+    if (daysBetween(from, to) > MAX_CUSTOM_DAYS) return `A custom range can be at most ${MAX_CUSTOM_DAYS} days.`;
+    return null;
+  }
+  const usableRange = (r) => RANGES.includes(r) || (isCustom(r) && !customError(customParts(r).from, customParts(r).to));
+  /** A payload's previous window as dates ("Aug 23 – Sep 21"), for "vs …" wording on any tab. */
+  const previousLabel = (d) => (d?.previous ? d.previous.label || span(d.previous.from, d.previous.to) : 'the window before');
+  /** "in the last 7 days", or "from Sep 1 to Oct 15" for a custom range. */
+  function rangeWords(r) {
+    const c = customParts(r);
+    if (!c) return RANGE_WORDS[r] || 'in the range';
+    return c.from === c.to ? `on ${dayLabel(c.from)}` : `from ${dayLabel(c.from)} to ${dayLabel(c.to)}`;
+  }
   const plural = (n, one, many = `${one}s`) => `${fmt(n)} ${Math.abs(n) === 1 ? one : many}`;
 
   function storeGet() { try { return window.localStorage.getItem(STORE_KEY); } catch { return null; } }
+  /** Only for a range the person picked. */
   function storeSet(v) { try { window.localStorage.setItem(STORE_KEY, v); } catch { /* private mode etc. */ } }
 
   // ---------------------------------------------------------------- state + URL
-  let state = { tab: 'overview', range: 'week', company: null, grant: null, card: null, rq: '', cq: '', gq: '', industry: null, vq: '', chat: null, hq: '' };
+  let state = { tab: 'views', range: 'week', company: null, grant: null, card: null, rq: '', cq: '', gq: '', industry: null, vq: '', chat: null, hq: '', dq: '' };
   const knownNames = { company: new Map(), grant: new Map() };
   /** companies.id of internal accounts seen in any response (search, overview). */
   const internalIds = new Set();
@@ -67,10 +123,19 @@
     const decoded = (v) => { try { return decodeURIComponent(v); } catch { return null; } };
     // #chat, #chat/<conversation id>, #chat?q=…&company=…&from=…&to=…&cards=…&sort=…
     const ch = /^#chat(?:\/(\d{1,9}))?(?:\?(.*))?$/.exec(window.location.hash);
-    const tab = hash ? 'review' : co ? 'companies' : gr ? 'grants' : cv ? 'coverage' : ch ? 'themes' : TABS.includes(p.get('tab')) ? p.get('tab') : 'overview';
+    // #views, #views?dept=research|consulting|marketing — and the page with no tab at all.
+    const dv = /^#views(?:\?(.*))?$/.exec(window.location.hash);
+    const tab = hash ? 'review' : co ? 'companies' : gr ? 'grants' : cv ? 'coverage' : ch ? 'themes' : dv ? 'views' : TABS.includes(p.get('tab')) ? p.get('tab') : 'views';
+    // The link's range (?from=&to= or ?range=), else the person's last pick,
+    // else Month on Department views and Week everywhere else.
+    const linkCustom = p.get('from') && p.get('to') ? `${p.get('from')}..${p.get('to')}` : null;
+    const range = usableRange(linkCustom) ? linkCustom
+      : RANGES.includes(p.get('range')) ? p.get('range')
+        : usableRange(stored) ? stored
+          : tab === 'views' ? 'month' : 'week';
     return {
       tab,
-      range: RANGES.includes(p.get('range')) ? p.get('range') : (RANGES.includes(stored) ? stored : 'week'),
+      range,
       company: co ? (co[1] ? Number(co[1]) : null) : id(p.get('company')),
       grant: gr ? (gr[1] ? Number(gr[1]) : null) : id(p.get('grant')),
       card: hash?.[1] ? Number(hash[1]) : null,
@@ -80,19 +145,22 @@
       industry: cv?.[1] ? decoded(cv[1]) : null,
       vq: cv?.[2] ?? '',
       chat: ch?.[1] ? Number(ch[1]) : null,
-      hq: ch?.[2] ?? ''
+      hq: ch?.[2] ?? '',
+      dq: dv?.[1] ?? ''
     };
   }
 
   function urlFor(s) {
     const p = new URLSearchParams();
-    if (!['overview', 'review', 'companies', 'grants', 'coverage', 'themes'].includes(s.tab)) p.set('tab', s.tab);
-    p.set('range', s.range);
+    if (!['views', 'review', 'companies', 'grants', 'coverage', 'themes'].includes(s.tab)) p.set('tab', s.tab);
+    const c = customParts(s.range);
+    if (c) { p.set('from', c.from); p.set('to', c.to); } else p.set('range', s.range);
     const hash = s.tab === 'review' ? `#review${s.card ? `/${s.card}` : ''}${s.rq ? `?${s.rq}` : ''}`
       : s.tab === 'companies' ? `#companies${s.company ? `/${s.company}` : ''}${s.cq ? `?${s.cq}` : ''}`
         : s.tab === 'grants' ? `#grants${s.grant ? `/${s.grant}` : ''}${s.gq && !s.grant ? `?${s.gq}` : ''}`
           : s.tab === 'coverage' ? `#coverage${s.industry ? `/industry/${encodeURIComponent(s.industry)}` : ''}${s.vq ? `?${s.vq}` : ''}`
-            : s.tab === 'themes' ? `#chat${s.chat ? `/${s.chat}` : ''}${s.hq && !s.chat ? `?${s.hq}` : ''}` : '';
+            : s.tab === 'themes' ? `#chat${s.chat ? `/${s.chat}` : ''}${s.hq && !s.chat ? `?${s.hq}` : ''}`
+              : s.tab === 'views' ? `#views${s.dq ? `?${s.dq}` : ''}` : '';
     return `${window.location.pathname}?${p}${hash}`;
   }
 
@@ -103,11 +171,46 @@
     if (state.tab !== 'coverage') { state.industry = null; state.vq = ''; }
     if (state.tab !== 'themes') { state.chat = null; state.hq = ''; }
     if (state.tab !== 'review') { state.card = null; state.rq = ''; }
-    storeSet(state.range);
+    if (state.tab !== 'views') state.dq = '';
     const url = urlFor(state);
     if (push) window.history.pushState(state, '', url);
     else window.history.replaceState(state, '', url);
     render();
+  }
+
+  // ---------------------------------------------------------------- custom range
+  /** The two date fields: filled from a custom range in the URL, capped at today. */
+  function syncCustom() {
+    const box = $('#cc-custom');
+    if (!box) return;
+    const c = customParts(state.range);
+    const today = vancouverToday();
+    for (const el of $$('input[type="date"]', box)) el.max = today;
+    if (c && !box.contains(document.activeElement)) { $('#cc-from').value = c.from; $('#cc-to').value = c.to; }
+    $('#cc-custom-btn')?.setAttribute('aria-expanded', String(!box.hidden));
+  }
+
+  function toggleCustom(open) {
+    const box = $('#cc-custom');
+    box.hidden = open === undefined ? !box.hidden : !open;
+    $('#cc-custom-msg').textContent = '';
+    syncCustom();
+    if (!box.hidden) $('#cc-from').focus();
+  }
+
+  function bindCustom() {
+    $('#cc-custom').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const from = $('#cc-from').value; const to = $('#cc-to').value;
+      const why = customError(from, to);
+      if (why) { $('#cc-custom-msg').textContent = why; return; }
+      const range = `${from}..${to}`;
+      storeSet(range);
+      toggleCustom(false);
+      if (range !== state.range) go({ range });
+    });
+    $('#cc-custom-cancel').addEventListener('click', () => toggleCustom(false));
+    $('#cc-custom').addEventListener('keydown', (e) => { if (e.key === 'Escape') { toggleCustom(false); $('#cc-custom-btn').focus(); } });
   }
 
   // ---------------------------------------------------------------- tooltip
@@ -169,7 +272,7 @@
 
   async function loadOverview(range) {
     if (!overviewCache.has(range)) {
-      overviewCache.set(range, api(`/api/control-centre/overview?range=${range}`).catch((e) => { overviewCache.delete(range); throw e; }));
+      overviewCache.set(range, api(`/api/control-centre/overview?range=${encodeURIComponent(range)}`).catch((e) => { overviewCache.delete(range); throw e; }));
     }
     return overviewCache.get(range);
   }
@@ -179,7 +282,9 @@
     // The date range doesn't apply to the review queue.
     $('#cc-range').hidden = state.tab === 'review';
     $('#cc-period').hidden = state.tab === 'review';
-    $$('#cc-range button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.range === state.range)));
+    if (state.tab === 'review' && $('#cc-custom')) $('#cc-custom').hidden = true;
+    $$('#cc-range button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.range === state.range || (b.dataset.range === 'custom' && isCustom(state.range)))));
+    syncCustom();
     $$('#cc-tabs .cc-tab').forEach((t) => {
       const on = t.dataset.tab === state.tab;
       t.setAttribute('aria-selected', String(on));
@@ -193,10 +298,11 @@
     updateTabsMore();
     const period = $('#cc-period');
     if (data) {
-      const n = RANGE_DAYS[data.range];
-      period.innerHTML = n === 1
-        ? '<strong>Today so far</strong> vs yesterday'
-        : `<strong>${span(data.current.from, data.current.to)}</strong> vs ${span(data.previous.from, data.previous.to)} · today so far`;
+      // Every comparison is with the same number of days just before the window, named by its dates.
+      const today = !data.custom && data.days === 1;
+      period.innerHTML = today
+        ? `<strong>Today so far</strong> vs yesterday (${esc(dayLabel(data.previous.from))})`
+        : `<strong>${esc(data.current.label || span(data.current.from, data.current.to))}</strong> vs ${esc(data.previous.label || span(data.previous.from, data.previous.to))}${data.today_partial ? ' · today so far' : ''}`;
       const need = data.need_action || 0;
       const action = $('#cc-action');
       action.hidden = need === 0;
@@ -308,13 +414,22 @@
       internal_prev: (up.internal?.previous ?? 0) + (down.internal?.previous ?? 0) };
   }
 
-  function deltaChip(m, n) {
+  function deltaChip(m, metric) {
     const el = document.createElement('span');
+    if (metric && !comparable(metric)) {
+      el.className = 'cc-delta cc-untracked';
+      el.textContent = '—';
+      el.tabIndex = 0;
+      const why = untrackedWhy(metric, METRIC_WORDS[metric] || 'this number');
+      el.setAttribute('aria-label', `No comparison: ${why}`);
+      bindTip(el, () => esc(why));
+      return el;
+    }
     const cls = m.delta > 0 ? 'up' : m.delta < 0 ? 'down' : '';
     el.className = `cc-delta ${cls}`;
     const pct = m.delta_pct == null ? null : Math.abs(m.delta_pct) >= 10 ? Math.round(m.delta_pct) : m.delta_pct;
     el.textContent = m.delta === 0 ? 'no change' : `${signed(m.delta)}${pct != null ? ` (${pct > 0 ? '+' : ''}${pct}%)` : ''}`;
-    bindTip(el, () => `Previous ${n === 1 ? 'day' : `${n} days`}: <b>${fmt(m.previous)}</b>`);
+    bindTip(el, () => `vs ${esc(beforeWords())}: <b>${fmt(m.previous)}</b>`);
     return el;
   }
 
@@ -327,7 +442,9 @@
   }
 
   function renderTiles(root, data) {
-    const n = RANGE_DAYS[data.range];
+    const n = data.days;
+    // One plain line naming what every change on the tiles is measured against.
+    root.insertAdjacentHTML('beforeend', `<p class="cc-vs-note">Changes compare with ${esc(beforeWords())}, the ${n === 1 ? 'day' : `${fmt(n)} days`} just before.</p>`);
     const grid = document.createElement('div');
     grid.className = 'cc-tiles';
     root.appendChild(grid);
@@ -344,7 +461,7 @@
       } else {
         rollTo(num, t.key, m.current);
       }
-      top.append(num, deltaChip(m, n));
+      top.append(num, deltaChip(m, t.key === 'ratings' ? 'ratings_up' : t.metric ?? t.key));
       const label = document.createElement('div'); label.className = 'cc-label'; label.textContent = t.label;
       if (t.hint) label.title = t.hint;
       // How much of this number came from internal accounts (they're counted, not hidden).
@@ -354,7 +471,7 @@
       const sub = document.createElement('div');
       sub.className = 'cc-internal';
       sub.textContent = inner.now > 0 ? inner.text : 'none internal';
-      if (inner.now > 0) bindTip(sub, () => `From Granted staff and test companies. Previous ${n === 1 ? 'day' : `${n} days`}: <b>${fmt(t.key === 'ratings' ? m.internal_prev : m.internal?.previous ?? 0)}</b>`);
+      if (inner.now > 0) bindTip(sub, () => `From Granted staff and test companies. vs ${esc(beforeWords())}: <b>${fmt(t.key === 'ratings' ? m.internal_prev : m.internal?.previous ?? 0)}</b>`);
       tile.append(top, label, sub, sparkline(m.series, m.previous_series, t.label));
       grid.appendChild(tile);
     }
@@ -419,9 +536,13 @@
     const c = card(`Grants matched to more / fewer clients ${nowWords(nDays)}`,
       `Each bar is how many more or fewer clients a grant was matched to than ${beforeWords(nDays)}; before → now is beside it. Click a grant to open it.`);
     c.classList.add('cc-hero');
+    if (!comparable('matches_shown')) {
+      c.insertAdjacentHTML('beforeend', `<p class="cc-empty">${untrackedCell('matches_shown', 'grant matches')} ${esc(untrackedWhy('matches_shown', 'grant matches'))}</p>`);
+      return c;
+    }
     const { risers, drops } = data.movers;
     if (!risers.length && !drops.length) {
-      c.insertAdjacentHTML('beforeend', `<p class="cc-empty">Every grant was matched to the same number of clients as ${beforeWords(nDays)}.</p>`);
+      c.insertAdjacentHTML('beforeend', `<p class="cc-empty">Every grant was matched to the same number of clients as in ${beforeWords(nDays)}.</p>`);
       return c;
     }
     // Two columns on one shared scale, so a +6 and a −6 bar are the same length.
@@ -480,13 +601,15 @@
 
   function renderMostMatched(data, nDays) {
     const c = card('Most matched grants',
-      `Each bar is how many clients the grant was matched to ${nowWords(nDays)}; Before is ${beforeWords(nDays)}. Click a grant to open it.`);
+      `Each bar is how many clients the grant was matched to ${nowWords(nDays)}; Before is ${beforeWords(nDays)}, the same number of days just before. Click a grant to open it.`);
     const list = data.most_matched;
     if (!list.length) { c.insertAdjacentHTML('beforeend', `<p class="cc-empty">No grant was matched to a client ${nowWords(nDays)}.</p>`); return c; }
     const max = Math.max(...list.map((g) => g.companies));
     const prevLabel = nDays === 1 ? 'Yesterday' : 'Before';
     c.insertAdjacentHTML('beforeend', `<table class="cc-table"><thead><tr><th>Grant</th><th>Clients</th><th class="hide-sm">${prevLabel}</th><th>Change</th><th class="hide-sm">Card opens</th></tr></thead><tbody>${
-      list.map((g) => `<tr data-href="${esc(grantLink(g.grant_id))}"><td><span class="cc-gname">${esc(g.title)}</span></td><td>${barCell(g.companies, max)}</td><td class="hide-sm cc-muted">${fmt(g.previous)}</td><td><span class="cc-chg ${g.change > 0 ? 'up' : g.change < 0 ? 'down' : ''}">${g.change === 0 ? '—' : signed(g.change)}</span></td><td class="hide-sm cc-muted">${g.opens ? `${fmt(g.opens)}×` : '—'}</td></tr>`).join('')
+      list.map((g) => `<tr data-href="${esc(grantLink(g.grant_id))}"><td><span class="cc-gname">${esc(g.title)}</span></td><td>${barCell(g.companies, max)}</td>${comparable('matches_shown')
+        ? `<td class="hide-sm cc-muted">${fmt(g.previous)}</td><td><span class="cc-chg ${g.change > 0 ? 'up' : g.change < 0 ? 'down' : ''}">${g.change === 0 ? '—' : signed(g.change)}</span></td>`
+        : `<td class="hide-sm">${untrackedCell('matches_shown', 'grant matches')}</td><td>${untrackedCell('matches_shown', 'grant matches')}</td>`}<td class="hide-sm cc-muted">${g.opens ? `${fmt(g.opens)}×` : '—'}</td></tr>`).join('')
     }</tbody></table>`);
     bindRows($('table', c), list);
     return c;
@@ -508,8 +631,10 @@
     c.insertAdjacentHTML('beforeend', `<table class="cc-table cc-sources"><thead><tr><th>Opened from</th><th>Card opens</th><th class="hide-sm">Share</th><th>${prevLabel}</th><th>Change</th></tr></thead><tbody>${
       list.map((s) => `<tr><td>${esc(s.label)}</td><td>${barCell(s.current, max)}</td>`
         + `<td class="hide-sm cc-muted">${total ? `${Math.round((s.current / total) * 100)}%` : '—'}</td>`
-        + `<td class="cc-muted">${fmt(s.previous)}</td>`
-        + `<td><span class="cc-chg ${s.delta > 0 ? 'up' : s.delta < 0 ? 'down' : ''}">${s.delta === 0 ? '—' : signed(s.delta)}</span></td></tr>`).join('')
+        + (comparable('grants_opened')
+          ? `<td class="cc-muted">${fmt(s.previous)}</td>`
+            + `<td><span class="cc-chg ${s.delta > 0 ? 'up' : s.delta < 0 ? 'down' : ''}">${s.delta === 0 ? '—' : signed(s.delta)}</span></td></tr>`
+          : `<td>${untrackedCell('grants_opened', 'grant card opens')}</td><td>${untrackedCell('grants_opened', 'grant card opens')}</td></tr>`)).join('')
     }</tbody></table>`);
     return c;
   }
@@ -521,24 +646,29 @@
     const s = view.chat;
     if (s) {
       const stats = [
-        ['chats started', s.chats_started],
-        ['clients who chatted', s.clients_chatted],
-        ['questions asked', s.questions_asked, 'Each message a client typed in a chat started this period'],
-        ['questions per chat', s.avg_questions_per_chat, 'Questions asked ÷ chats started', true],
-        ['grant cards opened from chat', s.cards_opened_from_chat]
+        ['chats started', s.chats_started, null, false, 'chats'],
+        ['clients who chatted', s.clients_chatted, null, false, 'chats'],
+        ['questions asked', s.questions_asked, 'Each message a client typed in a chat started this period', false, 'chats'],
+        ['questions per chat', s.avg_questions_per_chat, 'Questions asked ÷ chats started', true, 'chats'],
+        ['grant cards opened from chat', s.cards_opened_from_chat, null, false, 'grants_opened']
       ];
       const grid = document.createElement('div');
       grid.className = 'cc-chat-stats';
-      for (const [label, m, hint, decimal] of stats) {
+      for (const [label, m, hint, decimal, metric] of stats) {
         const cell = document.createElement('div');
         cell.className = 'cc-chat-stat';
         const num = document.createElement('div');
         num.className = 'cc-chat-num';
         num.textContent = decimal ? m.current.toFixed(1) : fmt(m.current);
-        const chip = document.createElement('span');
-        chip.className = `cc-delta ${m.delta > 0 ? 'up' : m.delta < 0 ? 'down' : ''}`;
-        chip.textContent = m.delta === 0 ? 'no change' : `${m.delta > 0 ? '+' : '−'}${decimal ? Math.abs(m.delta).toFixed(1) : fmt(Math.abs(m.delta))}`;
-        bindTip(chip, () => `${beforeWords(nDays)[0].toUpperCase()}${beforeWords(nDays).slice(1)}: <b>${decimal ? m.previous.toFixed(1) : fmt(m.previous)}</b>`);
+        let chip;
+        if (!comparable(metric)) {
+          chip = deltaChip(m, metric);
+        } else {
+          chip = document.createElement('span');
+          chip.className = `cc-delta ${m.delta > 0 ? 'up' : m.delta < 0 ? 'down' : ''}`;
+          chip.textContent = m.delta === 0 ? 'no change' : `${m.delta > 0 ? '+' : '−'}${decimal ? Math.abs(m.delta).toFixed(1) : fmt(Math.abs(m.delta))}`;
+          bindTip(chip, () => `vs ${esc(beforeWords(nDays))}: <b>${decimal ? m.previous.toFixed(1) : fmt(m.previous)}</b>`);
+        }
         const lab = document.createElement('div');
         lab.className = 'cc-label';
         lab.textContent = label;
@@ -555,39 +685,47 @@
     return c;
   }
 
+  /** What clients asked about, for the picked window: the daily chat review's
+   *  stored themes (client-only, as on the Chat themes tab) and its rewritten
+   *  questions. No model call; it starts when the daily review's data starts. */
   function renderAsked(asked, error) {
     const box = document.createElement('div');
     box.className = 'cc-asked';
     if (!asked) {
       box.innerHTML = `<h3 class="cc-asked-head">What clients asked about</h3><p class="cc-empty">${
-        error ? 'Themes couldn\'t be read right now.' : 'No weekly digest has stored its themes yet. They appear here after the next Monday digest.'}</p>`;
+        error ? 'Themes couldn\'t be read right now.' : 'The daily chat review hasn\'t stored any themes yet.'}</p>`;
       return box;
     }
-    const week = span(asked.week_start, asked.week_end);
-    const backfill = asked.source === 'backfill_summary';
-    box.innerHTML = `<h3 class="cc-asked-head">What clients asked about <span class="cc-week">Week of ${esc(week)}</span></h3>
-      <p class="cc-sub">Each bar is how many client questions the weekly digest placed in that theme. It always shows the latest digest week, whatever range is picked above.</p>`;
-    const max = Math.max(1, ...asked.themes.map((t) => t.count));
-    const list = document.createElement('div');
-    list.className = 'cc-themes';
-    for (const t of asked.themes) {
-      const row = document.createElement('div');
-      row.className = 'cc-theme';
-      row.innerHTML = `<div class="cc-theme-name">${esc(t.name)}</div>
-        <div class="cc-bar"><span class="b" data-w="${Math.max(4, Math.round((t.count / max) * 56))}"></span>${plural(t.count, 'question')}</div>
-        <div class="cc-theme-take">${esc(t.takeaway || '')}${t.internal_count ? ` <span class="cc-muted">(${plural(t.internal_count, 'question')} from internal accounts)</span>` : ''}</div>`;
-      list.appendChild(row);
+    const covered = asked.data_from && asked.data_from > asked.from
+      ? (asked.data_from > asked.to ? null : span(asked.data_from, asked.to)) : span(asked.from, asked.to);
+    const startNote = asked.data_from && asked.data_from > asked.from
+      ? ` The daily chat review's data starts ${esc(dayLabel(asked.data_from))}, so ${covered ? `this covers ${esc(covered)} only` : 'nothing in this range is covered'}.` : '';
+    box.innerHTML = `<h3 class="cc-asked-head">What clients asked about <span class="cc-week">${esc(span(asked.from, asked.to))}</span></h3>
+      <p class="cc-sub">Each bar is how many client questions the daily chat review placed in that theme ${esc(nowWords())}. Themes count clients only, the same as the Chat themes tab.${startNote}</p>`;
+    if (!asked.themes.length) {
+      box.insertAdjacentHTML('beforeend', `<p class="cc-empty">No client questions were stored for ${esc(span(asked.from, asked.to))}.</p>`);
+    } else {
+      const max = Math.max(1, ...asked.themes.map((t) => t.count));
+      const list = document.createElement('div');
+      list.className = 'cc-themes';
+      for (const t of asked.themes.slice(0, 10)) {
+        const row = document.createElement('div');
+        row.className = 'cc-theme';
+        row.innerHTML = `<div class="cc-theme-name">${esc(t.name)}</div>
+          <div class="cc-bar"><span class="b" data-w="${Math.max(4, Math.round((t.count / max) * 56))}"></span>${plural(t.count, 'question')}</div>
+          <div class="cc-theme-take">${t.example ? `“${esc(t.example)}”` : ''}${t.internal_count ? ` <span class="cc-muted">(and ${plural(t.internal_count, 'question')} from internal accounts)</span>` : ''}</div>`;
+        list.appendChild(row);
+      }
+      box.appendChild(list);
     }
-    box.appendChild(list);
 
     const qs = (asked.recent_questions || []).filter((q) => includeInternal || !q.company_internal).slice(0, 8);
     const qh = document.createElement('div');
     qh.innerHTML = `<h3 class="cc-asked-head cc-recent-head">Recent client questions</h3>
-      <p class="cc-sub">Each line is a client's question as the weekly digest rewrote it, with names and details taken out${
-        backfill ? '. This week was recovered from the digest\'s summary, so it shows one example per theme and who asked isn\'t recorded.' : '; newest first.'}</p>`;
+      <p class="cc-sub">Each line is a client's question in the range as the daily chat review rewrote it, with names and details taken out; newest first.</p>`;
     box.appendChild(qh);
     if (!qs.length) {
-      box.insertAdjacentHTML('beforeend', `<p class="cc-empty">${includeInternal ? 'No rewritten questions stored for this week.' : 'Every stored question this week came from an internal account. Turn on "Include internal accounts" to see them.'}</p>`);
+      box.insertAdjacentHTML('beforeend', `<p class="cc-empty">${includeInternal || !(asked.recent_questions || []).length ? 'No rewritten questions stored for this range.' : 'Every stored question in this range came from an internal account. Turn on "Include internal accounts" to see them.'}</p>`);
       return box;
     }
     const ul = document.createElement('ul');
@@ -595,9 +733,9 @@
     for (const q of qs) {
       const who = q.company_id != null
         ? `${esc(q.company_name || `Company #${q.company_id}`)}${q.company_internal ? ' <span class="cc-tag-internal">Internal</span>' : ''} <span class="cc-muted">#${q.company_id}</span>`
-        : `<span class="cc-muted">${q.linked ? 'client not linked to a company' : 'who asked isn\'t recorded'}</span>`;
+        : `<span class="cc-muted">${q.linked ? 'client not linked to a company' : 'who asked isn\'t recorded'}</span>${q.company_internal ? ' <span class="cc-tag-internal">Internal</span>' : ''}`;
       const li = document.createElement('li');
-      li.innerHTML = `<p class="cc-q">“${esc(q.text)}”</p><p class="cc-q-meta">${q.theme ? `<span class="chip">${esc(q.theme)}</span>` : ''}${who}</p>`;
+      li.innerHTML = `<p class="cc-q">“${esc(q.text)}”</p><p class="cc-q-meta">${q.theme ? `<span class="chip">${esc(q.theme)}</span>` : ''}${who}${q.day ? ` <span class="cc-muted">· ${esc(dayLabel(q.day))}</span>` : ''}</p>`;
       ul.appendChild(li);
     }
     box.appendChild(ul);
@@ -641,6 +779,12 @@
         : `Each bar is how many more or fewer clients in that ${where} signed up ${nowWords(nDays)} than ${beforeWords(nDays)}.`);
     c.classList.add('cc-wide');
     c.appendChild(toggles);
+    const trendMetric = field === 'matches' ? 'matches_shown' : 'signups';
+    if (!comparable(trendMetric)) {
+      const what = field === 'matches' ? 'grant matches' : 'sign-ups';
+      c.insertAdjacentHTML('beforeend', `<p class="cc-empty">${untrackedCell(trendMetric, what)} ${esc(untrackedWhy(trendMetric, what))}</p>`);
+      return c;
+    }
     const rows = (data.trends[trendView.dim] || [])
       .filter((r) => r[`${field}_change`] !== 0)
       .sort((a, b) => b[`${field}_change`] - a[`${field}_change`])
@@ -663,8 +807,10 @@
     p.className = 'cc-lede';
     const up = data.movers.up_count;
     const opens = m.grants_opened.current;
-    p.innerHTML = `<b>${fmt(up)}</b> grant ${up === 1 ? 'card was' : 'cards were'} matched to more clients than ${beforeWords(nDays)}, `
-      + `<b class="down">${fmt(data.movers.down_count)}</b> to fewer. `
+    p.innerHTML = (comparable('matches_shown')
+      ? `<b>${fmt(up)}</b> grant ${up === 1 ? 'card was' : 'cards were'} matched to more clients than ${beforeWords(nDays)}, `
+        + `<b class="down">${fmt(data.movers.down_count)}</b> to fewer. `
+      : `<b>${fmt(m.matches_shown.current)}</b> grant ${m.matches_shown.current === 1 ? 'match' : 'matches'} ${nowWords(nDays)}. `)
       + `<b>${fmt(m.active_companies.current)}</b> ${m.active_companies.current === 1 ? 'client was' : 'clients were'} active and opened grant cards `
       + `<b>${fmt(opens)}</b> ${opens === 1 ? 'time' : 'times'}.`;
     return p;
@@ -721,7 +867,12 @@
   /** Draw the Overview from a loaded payload. The internal-accounts toggle
    *  repaints from the same payload: both rankings are already in it. */
   function paintOverview(panel, data) {
-    const n = RANGE_DAYS[data.range];
+    const n = data.days;
+    tracking = data.tracking || null;
+    periodWords = {
+      now: data.custom ? rangeWords(data.range) : NOW_WORDS[n] ?? `in the last ${n} days`,
+      before: data.previous.label || span(data.previous.from, data.previous.to)
+    };
     const view = { ...data, ...data.rankings[includeInternal ? 'all' : 'clients'] };
     panel.innerHTML = '';
     panel.classList.remove('cc-loading');
@@ -787,7 +938,7 @@
 
   /** What the Review queue module gets from this page. */
   const reviewCtx = {
-    esc, fmt, plural, api, send, reduceMotion,
+    esc, fmt, plural, api, rangeWords, previousLabel, send, reduceMotion,
     state: () => state,
     go: (next, opts) => go({ tab: 'review', ...next }, opts),
     includeInternal: () => includeInternal,
@@ -799,7 +950,7 @@
 
   /** What the Companies module gets from this page. */
   const companiesCtx = {
-    esc, fmt, plural, api, send, reduceMotion,
+    esc, fmt, plural, api, rangeWords, previousLabel, send, reduceMotion,
     state: () => state,
     go: (next, opts) => go({ tab: 'companies', ...next }, opts),
     goReview: (id) => go({ tab: 'review', card: id, rq: '' }),
@@ -812,7 +963,7 @@
 
   /** What the Grants module gets from this page. */
   const grantsCtx = {
-    esc, fmt, plural, api, send, reduceMotion,
+    esc, fmt, plural, api, rangeWords, previousLabel, send, reduceMotion,
     state: () => state,
     go: (next, opts) => go({ tab: 'grants', ...next }, opts),
     goReview: (id) => go({ tab: 'review', card: id, rq: '' }),
@@ -825,7 +976,7 @@
 
   /** What the Coverage & changes module gets from this page. */
   const coverageCtx = {
-    esc, fmt, plural, api, send, reduceMotion,
+    esc, fmt, plural, api, rangeWords, previousLabel, send, reduceMotion,
     state: () => state,
     go: (next, opts) => go({ tab: 'coverage', ...next }, opts),
     goGrant: (id, name) => { if (name) knownNames.grant.set(id, name); go({ tab: 'grants', grant: id }); },
@@ -837,7 +988,7 @@
 
   /** What the Chat themes module gets from this page. */
   const chatCtx = {
-    esc, fmt, plural, api, send, reduceMotion,
+    esc, fmt, plural, api, rangeWords, previousLabel, send, reduceMotion,
     state: () => state,
     go: (next, opts) => go({ tab: 'themes', ...next }, opts),
     goGrant: (id, name) => { if (name) knownNames.grant.set(id, name); go({ tab: 'grants', grant: id }); },
@@ -847,10 +998,28 @@
     setIncludeInternal: (on) => reviewCtx.setIncludeInternal(on)
   };
 
+  /** What the Department views module gets from this page. */
+  const viewsCtx = {
+    esc, fmt, plural, api, rangeWords, previousLabel, reduceMotion,
+    state: () => state,
+    go: (next, opts) => go({ tab: 'views', ...next }, opts),
+    // A row or See all link: a full ?range=…#… URL, read the way a pasted link is.
+    goUrl: (url) => { window.history.pushState(null, '', url); state = readUrl(); window.history.replaceState(state, '', urlFor(state)); render(); window.scrollTo(0, 0); },
+    includeInternal: () => includeInternal,
+    setIncludeInternal: (on) => reviewCtx.setIncludeInternal(on)
+  };
+
   function render() {
     hideTip();
     const panel = $('#cc-panel');
     if (state.tab !== 'review') window.CCReview?.closeDrawer();
+    if (state.tab === 'views' && window.CCViews) {
+      loadSeq++;
+      renderChrome(null);
+      window.CCViews.render(panel, viewsCtx);
+      loadOverview(state.range).then(renderChrome).catch(() => renderChrome(null));
+      return;
+    }
     if (state.tab === 'companies' && window.CCCompanies) {
       loadSeq++;
       renderChrome(null);
@@ -940,9 +1109,15 @@
     document.body.appendChild(tip);
     state = readUrl();
     window.history.replaceState(state, '', urlFor(state));
-    storeSet(state.range);
 
-    $$('#cc-range button').forEach((b) => b.addEventListener('click', () => { if (b.dataset.range !== state.range) go({ range: b.dataset.range }); }));
+    // A named range is one click; Custom opens the two dates. Either is a pick, so it's remembered.
+    $$('#cc-range button').forEach((b) => b.addEventListener('click', () => {
+      if (b.dataset.range === 'custom') { toggleCustom(); return; }
+      toggleCustom(false);
+      storeSet(b.dataset.range);
+      if (b.dataset.range !== state.range) go({ range: b.dataset.range });
+    }));
+    bindCustom();
     $$('#cc-tabs .cc-tab').forEach((t) => t.addEventListener('click', () => { if (t.dataset.tab !== state.tab) go({ tab: t.dataset.tab }); }));
     $('#cc-tabs').addEventListener('keydown', (e) => {
       if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;

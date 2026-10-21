@@ -13,8 +13,11 @@ import {
   _clearCacheForTests, OverviewError, CACHE_TTL_MS, MAX_LIVE_DAYS,
   ROLLED_MATCHES_SQL, ROLLED_VIEWS_SQL, ROLLED_RATINGS_SQL, LAST_ROLLED_SQL, NEED_ACTION_SQL,
   SIGNUPS_SQL, WATCHLIST_ADDS_SQL, CHATS_SQL, COMPANY_METADATA_SQL, COMPANY_SEARCH_SQL,
-  OPEN_SOURCES, openSourceKey, openSources, chatStats
+  OPEN_SOURCES, openSourceKey, openSources, chatStats,
+  rangeError, parseCustomRange, customRange, spanLabel, MAX_CUSTOM_DAYS, trimCache,
+  trackingFor, trackingStarts, HUB_TRACKING_SQL, APP_TRACKING_SQL, OPS_TRACKING_SQL, TRACKED_BY
 } from '../../src/control-centre/overview.js';
+import { askedForWindow, QUESTIONS_SQL, FIRST_DAY_SQL } from '../../src/control-centre/chat-themes.js';
 import { MATCH_SQL } from '../../src/control-centre/rollup.js';
 import { INTERNAL_COMPANY_IDS, internalCompanySet, isInternalCompany } from '../../src/control-centre/internal-accounts.js';
 import { namedItems } from '../../src/control-centre/review-routes.js';
@@ -53,6 +56,70 @@ describe('windowsFor', () => {
 
   test('a bad range is a 400', () => {
     expect(() => windowsFor('decade', NOW)).toThrow(OverviewError);
+  });
+});
+
+describe('custom ranges', () => {
+  test('from..to is its own window; the previous window has the same number of days just before it', () => {
+    const w = windowsFor('2026-09-01..2026-10-15', NOW);
+    expect(w).toMatchObject({ days: 45, custom: true, ends_today: true });
+    expect(w.current).toMatchObject({ from: '2026-09-01', to: '2026-10-15', label: 'Sep 1 – Oct 15' });
+    expect(w.previous).toMatchObject({ from: '2026-07-18', to: '2026-08-31', label: 'Jul 18 – Aug 31' });
+    expect(w.previous.days).toHaveLength(45);
+  });
+
+  test('a range that ended before today is complete; one day compares with the day before', () => {
+    const w = windowsFor('2026-10-01..2026-10-01', NOW);
+    expect(w).toMatchObject({ days: 1, ends_today: false });
+    expect(w.previous).toMatchObject({ from: '2026-09-30', to: '2026-09-30', label: 'Sep 30' });
+  });
+
+  test('labels carry the year only when the windows cross into another year', () => {
+    expect(windowsFor('year', NOW).previous.label).toBe('Oct 16, 2024 – Oct 15, 2025');
+    expect(spanLabel('2025-12-20', '2026-01-05', '2026')).toBe('Dec 20, 2025 – Jan 5, 2026');
+    expect(windowsFor('week', NOW).previous.label).toBe('Oct 2 – Oct 8');
+  });
+
+  test('named windows are unchanged and labelled', () => {
+    expect(windowsFor('month', NOW)).toMatchObject({ days: 30, custom: false, ends_today: true,
+      current: { from: '2026-09-16', to: '2026-10-15', label: 'Sep 16 – Oct 15' }, previous: { from: '2026-08-17', to: '2026-09-15' } });
+  });
+
+  test.each([
+    ['2026-10-10..2026-10-01', /on or before/],
+    ['2026-10-01..2026-10-16', /after today/],
+    ['2026-02-30..2026-03-02', /real dates/],
+    ['2025-01-01..2026-10-01', /at most 365 days/],
+    ['2026-9-1..2026-10-1', /range must be one of/],
+    ['', /range must be one of/]
+  ])('%s is refused', (range, why) => {
+    expect(rangeError(range, NOW)).toMatch(why);
+    expect(() => windowsFor(range, NOW)).toThrow(OverviewError);
+  });
+
+  test('exactly MAX_CUSTOM_DAYS is allowed; named ranges are fine; the token round-trips', () => {
+    expect(MAX_CUSTOM_DAYS).toBe(365);
+    expect(rangeError('2025-10-16..2026-10-15', NOW)).toBeNull();
+    expect(rangeError('week', NOW)).toBeNull();
+    expect(parseCustomRange(customRange('2026-09-01', '2026-10-15'))).toEqual({ from: '2026-09-01', to: '2026-10-15' });
+    expect(parseCustomRange('week')).toBeNull();
+  });
+
+  test('the payload names both windows for "vs …" wording', () => {
+    const o = buildOverview(windowsFor('2026-09-01..2026-10-14', NOW), base());
+    expect(o).toMatchObject({ days: 44, custom: true, today_partial: false,
+      current: { from: '2026-09-01', to: '2026-10-14', label: 'Sep 1 – Oct 14' }, previous: { label: 'Jul 19 – Aug 31' } });
+  });
+
+  test('getOverview refuses a bad custom range with a 400', async () => {
+    await expect(getOverview('2026-10-10..2026-10-01', deps())).rejects.toMatchObject({ status: 400 });
+  });
+
+  test('per-range caches drop their oldest keys past the limit', () => {
+    const m = new Map(Array.from({ length: 23 }, (_, i) => [`k${i}`, i]));
+    trimCache(m, 20);
+    expect([...m.keys()][0]).toBe('k3');
+    expect(m.size).toBe(20);
   });
 });
 
@@ -187,10 +254,18 @@ describe('chat numbers', () => {
 
   test('a missing themes table never fails the overview', async () => {
     _clearCacheForTests();
-    const d = { ...deps(), latestDigest: async () => { throw Object.assign(new Error('x'), { code: '42P01' }); } };
+    const d = { ...deps(), askedForWindow: async () => { throw Object.assign(new Error('x'), { code: '42P01' }); } };
     const o = await computeOverview('week', d);
     expect(o.asked).toBeNull();
     expect(o.asked_error).toBe('42P01');
+  });
+
+  test('"What clients asked about" is read for the overview\'s own window', async () => {
+    _clearCacheForTests();
+    const askedForWindow = jest.fn(async (w) => ({ from: w.current.from, to: w.current.to, themes: [], recent_questions: [] }));
+    const o = await computeOverview('2026-09-01..2026-10-15', { ...deps(), askedForWindow });
+    expect(askedForWindow.mock.calls[0][0].current).toMatchObject({ from: '2026-09-01', to: '2026-10-15' });
+    expect(o.asked).toMatchObject({ from: '2026-09-01', to: '2026-10-15' });
   });
 });
 
@@ -487,5 +562,104 @@ describe('search', () => {
     const x = d();
     expect(await search('  ', x)).toEqual({ companies: [], grants: [] });
     expect(x.appQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe('askedForWindow (the daily review\'s stored themes, no model call)', () => {
+  const rows = [
+    { day: '2026-10-14', occurred_at: '2026-10-14T18:00:00Z', conversation_id: 5, turn_index: 1, clerk_id: 'user_a', company_id: 83, question: 'Hiring subsidies?', theme: 'Hiring' },
+    { day: '2026-10-13', occurred_at: '2026-10-13T18:00:00Z', conversation_id: 4, turn_index: 0, clerk_id: 'user_a', company_id: 83, question: 'Wage grants?', theme: 'Hiring' },
+    { day: '2026-10-13', occurred_at: '2026-10-13T17:00:00Z', conversation_id: 3, turn_index: 0, clerk_id: 'user_s', company_id: 81, question: 'Staff test', theme: 'Hiring' },
+    { day: '2026-10-12', occurred_at: '2026-10-12T17:00:00Z', conversation_id: 2, turn_index: 0, clerk_id: 'user_i', company_id: null, question: 'Internal, no company', theme: 'Export' },
+    { day: '2026-10-11', occurred_at: '2026-10-11T17:00:00Z', conversation_id: 1, turn_index: 0, clerk_id: 'user_z', company_id: null, question: 'Export help?', theme: 'Export' }
+  ];
+  const run = async (w) => {
+    const storeQuery = jest.fn(async (sql, p) => {
+      if (sql === QUESTIONS_SQL) return { rows: rows.filter((r) => r.day >= p[0] && r.day <= p[1]) };
+      if (sql === FIRST_DAY_SQL) return { rows: [{ day: '2026-09-21' }] };
+      throw new Error('unexpected');
+    });
+    const appQuery = jest.fn(async () => ({ rows: [{ id: 83, name: 'NYA Ventures' }, { id: 81, name: 'Maximizer' }] }));
+    const out = await askedForWindow(w, { storeQuery, appQuery, internalClerkIds: async () => new Set(['user_i']) });
+    return { out, storeQuery, appQuery };
+  };
+
+  test('themes are client-only with an internal count; questions newest first, tagged', async () => {
+    const { out, storeQuery, appQuery } = await run(windowsFor('week', NOW));
+    expect(storeQuery).toHaveBeenCalledWith(QUESTIONS_SQL, ['2026-10-09', '2026-10-15']);
+    expect(out).toMatchObject({ from: '2026-10-09', to: '2026-10-15', data_from: '2026-09-21', source: 'daily_review' });
+    expect(out.themes).toEqual([
+      { name: 'Hiring', count: 2, internal_count: 1, example: 'Hiring subsidies?' },
+      { name: 'Export', count: 1, internal_count: 1, example: 'Export help?' }
+    ]);
+    expect(out.recent_questions.map((q) => [q.text, q.company_name, q.company_internal])).toEqual([
+      ['Hiring subsidies?', 'NYA Ventures', false], ['Wage grants?', 'NYA Ventures', false], ['Staff test', 'Maximizer', true],
+      ['Internal, no company', null, true], ['Export help?', null, false]
+    ]);
+    for (const q of [storeQuery, appQuery]) expect(q.mock.calls.every(([sql]) => /^\s*SELECT/i.test(sql))).toBe(true);
+  });
+
+  test('a different window gives different themes', async () => {
+    const { out } = await run(windowsFor('2026-10-11..2026-10-12', NOW));
+    expect(out.themes).toEqual([{ name: 'Export', count: 1, internal_count: 1, example: 'Export help?' }]);
+  });
+});
+
+describe('no change shown before tracking began', () => {
+  // The first day of each source's data, as production had them on 2026-10-21.
+  const FROM = { matches: '2026-08-26', views: '2026-09-09', ratings: '2026-09-10', chats: '2026-05-27', signups: '2025-11-28', watchlist: '2026-09-09' };
+
+  test('Sep 1 – Oct 15 vs Jul 18 – Aug 31: matches, opens, ratings, watchlist and active clients have no comparison; chats and sign-ups do', () => {
+    const t = trackingFor(FROM, windowsFor('2026-09-01..2026-10-15', NOW).previous.from);
+    expect(t.previous_from).toBe('2026-07-18');
+    expect(t.metrics).toEqual({ signups: true, active_companies: false, matches_shown: false, grants_opened: false,
+      ratings_up: false, ratings_down: false, watchlist_adds: false, chats: true });
+    // The tooltip names the start of the source that began latest.
+    expect(t.metric_from).toMatchObject({ matches_shown: '2026-08-26', grants_opened: '2026-09-09', active_companies: '2026-09-10', chats: '2026-05-27' });
+  });
+
+  test('a window that begins on the first tracked day compares; one day earlier doesn\'t', () => {
+    expect(trackingFor(FROM, '2026-08-26').metrics.matches_shown).toBe(true);
+    expect(trackingFor(FROM, '2026-08-25').metrics.matches_shown).toBe(false);
+    expect(trackingFor(FROM, windowsFor('week', NOW).previous.from).metrics).toEqual(Object.fromEntries(Object.keys(TRACKED_BY).map((k) => [k, true])));
+  });
+
+  test('a source that couldn\'t be read keeps its change; a source with no data at all has none', () => {
+    const t = trackingFor({ matches: null }, '2026-10-01');
+    expect(t.sources).toMatchObject({ matches: false, views: true, chats: true });
+    expect(t.metrics.matches_shown).toBe(false);
+    expect(t.metrics.grants_opened).toBe(true);
+  });
+
+  test('the first days are read once an hour, read-only, from each source', async () => {
+    _clearCacheForTests();
+    const hubQuery = jest.fn(async () => ({ rows: [{ matches: FROM.matches, views: FROM.views, ratings: FROM.ratings }] }));
+    const appQuery = jest.fn(async () => ({ rows: [{ signups: FROM.signups, watchlist: FROM.watchlist }] }));
+    const opsQuery = jest.fn(async () => ({ rows: [{ chats: FROM.chats }] }));
+    const deps = { hubQuery, appQuery, opsQuery, now: () => NOW };
+    expect(await trackingStarts(deps)).toEqual(FROM);
+    await trackingStarts(deps);
+    expect(hubQuery).toHaveBeenCalledTimes(1);
+    expect(hubQuery).toHaveBeenCalledWith(HUB_TRACKING_SQL);
+    expect(appQuery).toHaveBeenCalledWith(APP_TRACKING_SQL);
+    expect(opsQuery).toHaveBeenCalledWith(OPS_TRACKING_SQL);
+    for (const sql of [HUB_TRACKING_SQL, APP_TRACKING_SQL, OPS_TRACKING_SQL]) {
+      expect(sql).toMatch(/^\s*SELECT/);
+      expect(sql).not.toMatch(/\b(INSERT|UPDATE|DELETE)\b/);
+    }
+    _clearCacheForTests();
+  });
+
+  test('the overview payload carries it for its own previous window', async () => {
+    _clearCacheForTests();
+    const d = deps();
+    const hub = d.hubQuery;
+    d.hubQuery = jest.fn(async (sql, p) => (sql === HUB_TRACKING_SQL ? { rows: [{ matches: '2026-10-05', views: '2026-09-09', ratings: '2026-09-10' }] } : hub(sql, p)));
+    const o = await computeOverview('week', { ...d, askedForWindow: async () => null });
+    expect(o.tracking.previous_from).toBe('2026-10-02');
+    expect(o.tracking.metrics.matches_shown).toBe(false);
+    expect(o.tracking.metric_from.matches_shown).toBe('2026-10-05');
+    expect(o.tracking.metrics.grants_opened).toBe(true);
+    _clearCacheForTests();
   });
 });

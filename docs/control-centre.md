@@ -8,8 +8,9 @@ of the data.
 Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`,
 `rollup.js`, `review-queue.js`, `review-routes.js`, `diagnosis.js`, `overview.js`,
 `overview-routes.js`, `companies.js`, `companies-routes.js`, `grants.js`, `grants-routes.js`,
-`coverage.js`, `coverage-routes.js`, `industry-vocabulary.js`, `chat-daily.js`, `chat-themes.js`, `chat-routes.js`.
-Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`, `-coverage`, `-chat`),
+`coverage.js`, `coverage-routes.js`, `industry-vocabulary.js`, `chat-daily.js`, `chat-themes.js`, `chat-routes.js`,
+`views.js`, `views-routes.js`.
+Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`, `-coverage`, `-chat`, `-views`),
 `public/css/control-centre.css`.
 Tests: `tests/unit/control-centre-*.test.js`.
 
@@ -556,15 +557,17 @@ The page uses platform language, not database names:
 
 ### Frame and URL
 
-There are 7 tabs: Overview (the default), Inbox, Companies, Grants, Review queue, Coverage &
-changes and Chat themes. Every tab but Inbox has content; Inbox shows a "Coming soon" card.
+There are 8 tabs: Department views (the default), Everything (the Overview), Inbox, Companies,
+Grants, Review queue, Coverage & changes and Chat themes. Every tab but Inbox has content; Inbox
+shows a "Coming soon" card. A bare `/control-centre` opens Department views (`#views`); the
+Overview is the "Everything" tab at `?tab=overview`.
 Inbox and Review queue carry a badge with the count of review items that aren't closed.
 
 All state is in the URL, so any view can be linked and the back button works:
 
 | Param | Values |
 |---|---|
-| `tab` | `overview` (omitted), `inbox`, `companies`, `grants`, `review`, `coverage`, `themes` |
+| `tab` | `overview`, `inbox` (the others live in the hash; none at all means Department views) |
 | `range` | `day`, `week` (default), `month`, `year` |
 | `company` | companies.id, only with `tab=companies` |
 | `grant` | grant **root** id, only with `tab=grants` (rewritten to `#grants/<id>`) |
@@ -572,18 +575,20 @@ All state is in the URL, so any view can be linked and the back button works:
 Companies, Grants, Review queue and Coverage keep their own state in the hash instead: `#companies/<id>`,
 `#grants/<id>`, `#grants?view=…&sort=…&dir=…&q=…`, `#review/<id>`, `#coverage`,
 `#coverage?view=not_matching`, `#coverage/industry/<name>` (URL-encoded, a main or specific industry),
-`#chat`, `#chat?q=…&company=…&from=…&to=…&cards=…&sort=left_after`, `#chat/<conversation id>`.
+`#chat`, `#chat?q=…&company=…&from=…&to=…&cards=…&sort=left_after`, `#chat/<conversation id>`,
+`#views`, `#views?dept=research|consulting|marketing`.
 
-The last range is also kept in `localStorage['cc.range']`, in try/catch, so the page works
-without it. Search finds companies by name or id and live grants by title or root id.
+A range the person **picks** (a range button or Custom → Apply) is kept in
+`localStorage['cc.rangePick']`, in try/catch, so the page works without it. The old
+`cc.range` key was written on every load, so it couldn't tell a pick from a default; it is no
+longer read or written. Search finds companies by name or id and live grants by title or root id.
 Choosing a result deep-links to the Companies or Grants tab with it selected. Every grant name
 on Overview, the Companies page and a review card's panel links to `#grants/<id>`.
 
 ### Ranges
 
-Windows are whole **America/Vancouver** days, the same as the roll-ups. The current window
-is the N days ending today, with today counted so far. The previous window is the N days
-before it. Every number and chart compares the two.
+Windows are whole **America/Vancouver** days, the same as the roll-ups. A named range is the N
+days ending today, with today counted so far. **Custom** is any from..to.
 
 | Range | N |
 |---|---|
@@ -591,10 +596,48 @@ before it. Every number and chart compares the two.
 | Week | 7 |
 | Month | 30 |
 | Year | 365 |
+| Custom | the days from..to, inclusive |
+
+**Comparison rule:** every change ("+12", movers, Before, deltas) compares the window with the
+**previous window of the same length, ending the day before it starts**: Sep 1–Oct 15 (45 days)
+compares with Jul 18–Aug 31. The page names that window by its dates wherever a change is shown:
+the period line ("Sep 1 – Oct 15 vs Jul 18 – Aug 31"), a line above the Overview tiles ("Changes
+compare with …"), tile tooltips ("vs …"), the Overview card subtitles and the Chat themes tab
+("questions … vs …"). "Today so far" shows only when the window ends today.
+
+**No change before tracking began:** a change needs the whole previous window in the data. Each
+number's history starts on the earliest day in its own data (`trackingStarts`, read hourly):
+grant matches 2026-08-26, card opens 2026-09-09, ratings 2026-09-10, chats 2026-05-27, sign-ups
+and watchlist adds from their first rows; active clients need all four of matches, opens, ratings
+and chats. When the previous window starts earlier (`trackingFor`, payload `tracking`), the
+page shows **"—"** in place of the change (tiles, Chat chips, Before/Change columns) or a note in
+place of the movers and trends, with a tooltip naming the day tracking started. The Chat themes
+tab does the same from the daily review's first stored day (2026-09-21, `tracking` in its
+payload). A source that can't be read keeps its changes; one with no rows has none. The existing
+"—" for a zero change in the Change columns is unchanged; the new one is dotted-underlined
+with a tooltip.
+
+**Custom ranges:**
+- **In the link:** `?from=2026-09-01&to=2026-10-15`, with no `range=`. Named ranges keep `?range=`, and both
+  forms load. To the APIs a custom range is one token, `range=2026-09-01..2026-10-15`; every
+  Control Centre API (`overview`, `companies`, `grants`, `coverage`, `coverage/changes`, `chat`,
+  `views`) accepts it.
+- **Limits** (`rangeError` in `overview.js`, checked again on the page): real dates, start ≤ end,
+  end ≤ today in Vancouver, at most `MAX_CUSTOM_DAYS` (365, the same as Year). Anything else is a
+  400 with the reason.
+- **Code:** `windowsFor` builds both windows and their labels (`spanLabel`). Each module's 5-minute cache
+  is keyed by the range string and drops its oldest entry past 20 keys (`trimCache`).
+- **Fixed windows that ignore the range:** the Coverage tab's deadline flags (today's catalogue),
+  Department views' Deadline hygiene, Quiet clients (30 days) and New grants / What changed
+  (7 days).
+- Oracle's tools still pass named ranges only.
+
+**Default when the link has no range:** the remembered pick, else **Month on Department
+views** and Week on every other tab. A link with its own range always wins.
 
 ### Overview API
 
-`GET /api/control-centre/overview?range=day|week|month|year`, behind `authenticateUser` +
+`GET /api/control-centre/overview?range=day|week|month|year|YYYY-MM-DD..YYYY-MM-DD`, behind `authenticateUser` +
 `requireAuth`. It returns 400 for a bad range and 503 (`not_configured`) when a database env
 var is unset. Each range is cached in memory for **5 minutes**, and the response carries
 `generated_at` and `cached`. Code: `overview.js`.
@@ -744,15 +787,23 @@ The Chat section comes after "How clients found grant cards".
 | questions per chat | questions asked ÷ chats started, to one decimal |
 | grant cards opened from chat | grant card opens with source `advisor`, the same as Chat in "How clients found grant cards" |
 
-**What clients asked about** and **recent client questions** come from the weekly digest's
-stored themes (below). They show the **latest stored week**, labelled "Week of …", whatever
-range is picked.
-- **Themes:** each shows its count, its takeaway and how many of its questions came from
-  internal accounts.
-- **Recent questions:** follow the toggle and tag internal accounts. Rows with no client show
-  "who asked isn't recorded".
-- **Missing table:** if the table is missing (046 not applied), the section says themes can't be
+**What clients asked about** and **recent client questions** **follow the picked range**. They
+come from the daily chat review's stored rows (`cc_chat_questions`, migration 049) through
+`askedForWindow` in `chat-themes.js`: the same theme grouping (`buildThemes`) as the Chat themes
+tab, with **no model call**. Labelled with the window's dates.
+- **Themes:** client-only, as on the Chat tab. Each shows its count, an example question and how
+  many more of its questions came from internal accounts. There is no takeaway sentence: only
+  the weekly digest writes those.
+- **Recent questions:** the newest 24 rewritten questions in the window (the page shows 8),
+  following the toggle and tagging internal accounts (by company, or by Clerk id when there's no
+  company). Rows with a Clerk id but no company say "client not linked to a company".
+- **Where data starts:** the daily review's rows begin **2026-09-21** (`data_from`, the earliest
+  stored day). A range that starts earlier says which part it covers.
+- **Missing table:** if the table is missing (049 not applied), the section says themes can't be
   read; the rest of the Overview is unaffected.
+- **The weekly digest is unchanged:** its tables (046, below) are still written by the Monday
+  digest and still read by Oracle's `control_centre` tool (`latestDigest`) and the daily chat
+  review's theme list; only the Overview stopped reading them.
 
 ### Digest themes (migration 046)
 
@@ -869,8 +920,12 @@ read-only pool, and running them together delayed the part that matters.
   the date). Province and industry are the engine source. Grant matches (distinct grants
   shown), cards opened and chats count in the page's range, from the Overview's own rows
   (`loadWindowRows`, factored out of `computeOverview` — the Overview is unchanged). Last
-  active is any time: all-time roll-up days, the window's live days, and the latest
-  conversation. Open review cards from the Hub. Cached 5 minutes per range. Sortable by every
+  active is any time and counts **client actions only**: card opens and ratings (all-time
+  roll-up days and the window's live days) and the latest conversation. Our own match runs
+  (`cc_daily_matches.times_computed`) don't count — a refresh or backfill isn't the client.
+  Saves and profile edits aren't counted: nothing the list reads carries a profile-edit time,
+  and saves are an app-DB read the list doesn't make. The company page's "last active" skips
+  match-run and review-card entries the same way. Open review cards from the Hub. Cached 5 minutes per range. Sortable by every
   column, filterable, and the "Include internal accounts" switch hides internal accounts.
 - **Company page** (`#companies/<id>`): header and tiles (grant card views, grants
   opened, time on grant cards, 👍 / 👎, chats — all-time); the profile as matching sees it with
@@ -1115,7 +1170,8 @@ don't fit.
 **$0.12 for 30 days** (68 chats), about **$0.004 a day**; the busiest day (Oct 13: 25 chats, 57
 messages) cost $0.05. Logged to `api_cost_events` as `cc-chat-daily` by the nightly run.
 
-**Stored** (Hub, migration 049 — **not yet applied to production**):
+**Stored** (Hub, migration 049 — applied in production; `cc_chat_questions` holds rows from
+2026-09-21, checked 2026-10-21):
 
 | Table | One row per |
 |---|---|
@@ -1180,7 +1236,46 @@ Range picker and "Include internal accounts" as on the other tabs (both variants
    with its grant card names and the daily review's reading of the message. **Every opening is
    logged** in `cc_transcript_views` (048), as on the Companies tab.
 
-Before 049 is applied, sections 1–3 say the nightly review isn't set up and 4–7 still load.
+On a database without 049, sections 1–3 say the nightly review isn't set up and 4–7 still load.
+
+## Department views (the landing tab)
+
+`/control-centre` opens here. A toggle at the top picks **Research**, **Consulting/Sales** or
+**Marketing**; the choice is in the hash (`#views?dept=…`) and remembered per browser in
+`localStorage['cc.department']` (try/catch; Research when there's none). The range picker and
+the **Include internal accounts** switch (off by default, same `cc.includeInternal` key) apply.
+With no range in the link and none picked, the tab opens on **Month**; custom ranges work here as
+everywhere, and row and See all links carry them as `?from=&to=`.
+
+`src/control-centre/views.js` (`departmentViews`), `views-routes.js`
+(`GET /api/control-centre/views?range=`, `authenticateUser` + `requireAuth`, cached 5 minutes
+per range) and `public/js/control-centre-views.js`. **No new source:** it composes the tabs' own
+functions (`coverage`, `changes`, `loadGrantWindow` / `buildGrantList`, `listItems`,
+`chatOverview`, `companyList`, `liveGrants`), each with its own cache, plus one Hub read
+(`CHAT_SIGNALS_SQL` on `cc_chat_questions`). Both variants come back, so the switch needs no
+refetch. An item whose source fails (not configured, a missing table) shows that on its own card;
+the rest load, and a response with a failed item isn't cached. The four window readers
+(`coverage`, `loadGrantWindow`, `companyList`, `chatOverview`) run one after another: together
+on a cold cache they queued past the app pool's 5-second connection wait (3 connections). A cold
+load took about 12 s locally on 2026-10-21; warm loads come from the caches.
+
+Every item has a one-line question, a headline count, at most **5 rows** (`MAX_ROWS`, shared in
+turn across its lists), and a **See all** link to the tab and filter with the detail. Rows link to
+the grant, company, industry or review card.
+
+| Department | Item | Definition | See all |
+|---|---|---|---|
+| Research | Deadline hygiene | Live grants (today's catalogue) whose deadline is past; due in the next 90 days (`HYGIENE_DAYS`); blank or unreadable. Rolling text ("Open Until Filled", `ROLLING_DEADLINE`) is counted apart, not as a problem. `deadlineHygiene` in `coverage.js` reuses `parseDeadline`; `deadlineFlags` / `DUE_SOON_DAYS` (30, the Changes list) are unchanged. | `#coverage`, `#grants` |
+| | Cards that look wrong | Open review cards owned by Research; grants shown to 3+ clients that most never opened (Grants `most_ignored`). | `#review?owner=research`, `#grants?view=most_ignored` |
+| | Coverage gaps | Thin industries (Coverage's `thin`, mains and specifics); live grants matched to no one in the range (Grants `not_matching`). | `#coverage`, `#grants?view=not_matching` |
+| | Stuck flags | Open Research cards with no activity for 3+ days (the board's `stuck`). | `#review?owner=research` |
+| Consulting/Sales | Quiet clients | Clients shown ≥1 grant match in the last 30 days whose last active (client actions only, see Companies) is 14+ days ago (`QUIET_DAYS`); and those shown matches who opened none. Fixed 30-day window, whatever the range. Saves aren't counted yet. | `#companies?sort=last_active&dir=asc` (month) |
+| | Chat questions that signal paid work | Unanswered questions and unmet needs from the daily chat review in the range, grouped by company, with an example. Rows with no company show as "Company not recorded". | `#chat` |
+| | New grants for client industries | Grants that went live in the last 7 days (`changes('week').added`, publish history from 2026-07-02; a reopened grant counts), each with the clients its industry tag reaches: profile main industry ∩ the grant's tokens' mains; open to every industry = every client; not in the Hub copy = "not tagged yet". | `#coverage` |
+| Marketing | What clients ask and don't get answered | Unanswered and unmet totals in the range; top themes (clients only) with an example question. | `#chat` |
+| | Engagement | Most opened, most discussed in chat (`grants_discussed`) and shown but never opened, each with how clients found the grant (opens by source, the Overview's `OPEN_SOURCES`). Saves aren't counted yet. | `#grants?sort=opens&dir=desc`, `#chat`, `#grants?view=most_ignored` |
+| | Where grants and clients don't line up | Industries (mains and specifics, not "general" rows) with 3+ industry-restricted grants and at most 1 client, and with 2+ clients and at most 1 restricted grant. Open-to-every-industry grants are left out: they're the same on every row. | `#coverage` |
+| | What changed this week | One line from `changes('week')`: went live, closed, removed, edited. | `#coverage` |
 
 ## Oracle: `control_centre` (read-only)
 

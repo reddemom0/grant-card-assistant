@@ -35,7 +35,7 @@
 import { query as hubQueryDefault } from '../database/connection.js';
 import { appQuery as appQueryDefault, opsQuery as opsQueryDefault } from './db.js';
 import { readDay } from './rollup.js';
-import { loadWindowRows, COMPANY_METADATA_SQL, shapeMetadata, RANGE_DAYS, OverviewError, openSourceKey } from './overview.js';
+import { loadWindowRows, COMPANY_METADATA_SQL, shapeMetadata, OverviewError, openSourceKey, rangeError, trimCache } from './overview.js';
 import { companyProfile as companyProfileDefault } from './live-sources.js';
 import { companyNamesForIds } from './identity.js';
 import { isInternalCompany } from './internal-accounts.js';
@@ -208,11 +208,11 @@ export const LAST_CHATS_SQL = `
 
 export const CONVERSATION_SQL = 'SELECT id, user_id, messages FROM conversations WHERE id = $1';
 
-// Hub DB
+// Hub DB. Last active is client actions only: card opens and ratings here,
+// chats from ops. Match runs are ours (a refresh, a backfill), so they don't count.
 export const LAST_ROLLED_ACTIVITY_SQL = `
   SELECT company_id, max(day)::text AS day FROM (
-    SELECT company_id, day FROM cc_daily_matches WHERE times_computed > 0
-    UNION ALL SELECT company_id, day FROM cc_daily_views
+    SELECT company_id, day FROM cc_daily_views
     UNION ALL SELECT company_id, day FROM cc_daily_ratings) x
    WHERE company_id IS NOT NULL
    GROUP BY company_id`;
@@ -279,7 +279,8 @@ const laterDay = (a, b) => (a == null ? b : b == null ? a : (a > b ? a : b));
 
 /**
  * Pure: the window's rows → per company: distinct grants shown, card opens,
- * chats started, and the latest day with any activity.
+ * chats started, and the latest day with a client action (an open, a rating,
+ * a chat — not a match run).
  */
 export function companyActivity({ matches, views, ratings, chats, chatCompany }, days) {
   const inWindow = new Set(days);
@@ -292,7 +293,6 @@ export function companyActivity({ matches, views, ratings, chats, chatCompany },
     if (r.company_id == null || !inWindow.has(r.day)) continue;
     const a = get(r.company_id);
     if (r.times_shown > 0) a.grants.add(r.grant_id);
-    if (r.times_computed > 0) a.last_day = laterDay(a.last_day, r.day);
   }
   for (const r of views) {
     if (r.company_id == null || !inWindow.has(r.day)) continue;
@@ -433,8 +433,9 @@ const listCache = new Map();
 
 /** The client list for a range (cached LIST_CACHE_MS per range). */
 export async function companyList(range = 'week', overrides = {}) {
-  if (!RANGE_DAYS[range]) throw new CompaniesError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
   const deps = { ...defaultDeps(), ...overrides };
+  const rangeProblem = rangeError(range, deps.now());
+  if (rangeProblem) throw new CompaniesError(400, rangeProblem);
   const now = deps.now().getTime();
   const hit = listCache.get(range);
   if (hit && now - hit.at < LIST_CACHE_MS && !overrides.noCache) return hit.value;
@@ -470,7 +471,7 @@ export async function companyList(range = 'week', overrides = {}) {
     }),
     generated_at: new Date(now).toISOString()
   };
-  if (!overrides.noCache) listCache.set(range, { at: now, value });
+  if (!overrides.noCache) { listCache.set(range, { at: now, value }); trimCache(listCache); }
   return value;
 }
 
@@ -667,7 +668,8 @@ export async function companyFeed(idInput, overrides = {}) {
   return {
     company_id: id,
     users: clerkIds.length,
-    last_active: timeline.find((e) => e.type !== 'card_filed' && e.type !== 'card_closed')?.at ?? null,
+    // Client actions only: not our match runs or review cards.
+    last_active: timeline.find((e) => !['matches', 'card_filed', 'card_closed'].includes(e.type))?.at ?? null,
     tiles: { grant_views: ot.views, grants_opened: ot.grants, minutes_on_grants: Math.round(Number(ot.visible_ms) / 6000) / 10,
       thumbs_up: ratingCount('up'), thumbs_down: ratingCount('down'), chats: chats.length },
     timeline,

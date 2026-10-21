@@ -249,6 +249,24 @@ describe('deadlines', () => {
     expect(f.due_soon.map((x) => x.grant_id)).toEqual([2, 3, 4]);
     expect(f.no_date).toBe(1);
   });
+
+  test('hygiene: passed, due within 90 days (inclusive), blank, rolling and unreadable kept apart; the 30-day flags are unchanged', () => {
+    const grants = [
+      live(1, { deadline: '2026-10-18' }), live(2, { deadline: '2026-10-19' }), live(3, { deadline: '2027-01-17' }),
+      live(4, { deadline: '2027-01-18' }), live(5, { deadline: '' }), live(6, { deadline: null }),
+      live(7, { deadline: 'Open Until Filled' }), live(8, { deadline: 'open until filled' }), live(9, { deadline: 'Ouvert jusqu’à épuisement des fonds' }),
+      live(10, { deadline: 'Spring intake' })
+    ];
+    const h = C.deadlineHygiene(grants, '2026-10-19');
+    expect(h.days).toBe(90);
+    expect(h.passed.map((x) => x.grant_id)).toEqual([1]);
+    expect(h.due_within.map((x) => x.grant_id)).toEqual([2, 3]);
+    expect(h.blank.map((x) => x.grant_id)).toEqual([5, 6]);
+    expect(h.rolling).toBe(3);
+    expect(h.unreadable.map((x) => x.grant_id)).toEqual([10]);
+    expect(C.DUE_SOON_DAYS).toBe(30);
+    expect(C.deadlineFlags(grants, '2026-10-19')).toMatchObject({ due_soon: [{ grant_id: 2 }], no_date: 6 });
+  });
 });
 
 describe('changes', () => {
@@ -295,6 +313,19 @@ describe('changes', () => {
     expect(out.closed[0]).toMatchObject({ grant_id: 50, title: 'Old grant', live: false, status: 'inactive', link: expect.stringContaining('#grants/50') });
     expect(out.deadline_passed[0]).toMatchObject({ grant_id: 1, deadline: '2026-10-01', live: true });
     expect(appQuery.mock.calls.find(([s]) => s === C.TRANSITIONS_SQL)[1]).toEqual(['2026-10-13', '2026-10-19']);
+  });
+
+  test('changes() on a custom range reads that window, not one ending today; deadline flags stay today\'s', async () => {
+    const appQuery = jest.fn(async () => ({ rows: [] }));
+    const out = await C.changes('2026-09-01..2026-10-15', { appQuery, liveGrants: async () => [live(1, { deadline: '2026-10-17' })],
+      now: () => new Date('2026-10-19T20:00:00Z'), noCache: true });
+    expect(out.current).toEqual({ from: '2026-09-01', to: '2026-10-15' });
+    for (const sql of [C.TRANSITIONS_SQL, C.DELETED_LIVE_SQL, C.RANGE_EDITS_SQL]) {
+      expect(appQuery.mock.calls.find(([s]) => s === sql)[1]).toEqual(['2026-09-01', '2026-10-15']);
+    }
+    expect(out.deadline_passed[0]).toMatchObject({ grant_id: 1 });
+    await expect(C.changes('2026-10-15..2026-09-01', { appQuery, noCache: true })).rejects.toMatchObject({ status: 400 });
+    await expect(C.coverage('2025-01-01..2026-10-15', { noCache: true, now: () => new Date('2026-10-19T20:00:00Z') })).rejects.toMatchObject({ status: 400 });
   });
 });
 
@@ -359,7 +390,11 @@ describe('routes', () => {
     const real = await serve({});
     expect((await real.get('/?range=decade')).status).toBe(400);
     expect((await real.get('/changes?range=decade')).status).toBe(400);
+    expect((await real.get('/changes?range=2026-10-15..2026-09-01')).body.error).toMatch(/on or before/);
     await real.close();
+    const custom = await serve({ coverage: jest.fn(async (range) => ({ range })) });
+    expect((await custom.get('/?range=2026-09-01..2026-10-15')).body).toEqual({ range: '2026-09-01..2026-10-15' });
+    await custom.close();
   });
 });
 

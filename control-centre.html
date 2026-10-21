@@ -27,7 +27,15 @@
                 <button type="button" data-range="week">Week</button>
                 <button type="button" data-range="month">Month</button>
                 <button type="button" data-range="year">Year</button>
+                <button type="button" data-range="custom" id="cc-custom-btn" aria-expanded="false" aria-controls="cc-custom">Custom</button>
             </div>
+            <form class="cc-custom" id="cc-custom" hidden aria-label="Custom date range">
+                <label>From <input type="date" id="cc-from" required></label>
+                <label>To <input type="date" id="cc-to" required></label>
+                <button type="submit" class="cc-custom-apply">Apply</button>
+                <button type="button" class="cc-custom-cancel" id="cc-custom-cancel">Cancel</button>
+                <span class="cc-custom-msg" id="cc-custom-msg" role="status" aria-live="polite"></span>
+            </form>
             <div class="cc-period" id="cc-period" aria-live="polite"></div>
             <div class="cc-search">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -39,7 +47,8 @@
 
         <div class="cc-tabs-wrap" id="cc-tabs-wrap">
         <nav class="cc-tabs" role="tablist" aria-label="Control Centre sections" id="cc-tabs">
-            <button class="cc-tab" role="tab" data-tab="overview">Overview</button>
+            <button class="cc-tab" role="tab" data-tab="views">Department views</button>
+            <button class="cc-tab" role="tab" data-tab="overview">Everything</button>
             <button class="cc-tab" role="tab" data-tab="inbox">Inbox <span class="cc-badge" data-badge hidden></span></button>
             <button class="cc-tab" role="tab" data-tab="companies">Companies</button>
             <button class="cc-tab" role="tab" data-tab="grants">Grants</button>
@@ -59,6 +68,7 @@
     <script src="/public/js/control-centre-grants.js"></script>
     <script src="/public/js/control-centre-coverage.js"></script>
     <script src="/public/js/control-centre-chat.js"></script>
+    <script src="/public/js/control-centre-views.js"></script>
     <script src="/public/js/control-centre.js"></script>
 </body>
 </html>

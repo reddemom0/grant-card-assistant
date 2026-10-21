@@ -33,7 +33,6 @@
   const STATUS_WORDS = { new: 'New', diagnosed: 'Diagnosed', in_progress: 'In progress', closed: 'Closed' };
   const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason' };
   const TYPE_WORDS = { match: 'Match', grant_pattern: 'Grant pattern', chat: 'Chat', empty_track: 'Empty track' };
-  const RANGE_WORDS = { day: 'today', week: 'in the last 7 days', month: 'in the last 30 days', year: 'in the last year' };
   const TIMELINE_PAGE = 30;
 
   let ctx = null;
@@ -130,7 +129,7 @@
     panel.innerHTML = `<section class="cc-card co-list${first && !ctx.reduceMotion ? ' co-enter' : ''}">
       <div class="co-list-head">
         <div><h2>Companies</h2>
-          <p class="cc-sub">Every client with a sign-in. Matches, card opens and chats count ${esc(RANGE_WORDS[data.range] || 'in the range')}; last active is any time.</p></div>
+          <p class="cc-sub">Every client with a sign-in. Matches, card opens and chats count ${esc(ctx.rangeWords(data.range))}; last active is any time.</p></div>
         <div class="co-tools">
           <input type="search" class="co-filter" placeholder="Filter by name, ID, province or industry" value="${esc(q)}" aria-label="Filter companies">
           <label class="cc-switch"><input type="checkbox" role="switch" ${internal ? 'checked' : ''}><span class="cc-switch-track" aria-hidden="true"></span><span>Include internal accounts</span></label>

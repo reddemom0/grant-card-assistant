@@ -1025,3 +1025,48 @@
 @media (max-width: 1100px) { .ch-grid { grid-template-columns: minmax(0, 1fr); } }
 .ch-themes .ch-table th:nth-child(4), .ch-themes .ch-table td:nth-child(4) { padding-left: 22px; padding-right: 18px; }
 .ch-themes .ch-table th:nth-child(3) { padding-left: 14px; }
+
+/* ---------- Department views (control-centre-views.js) ----------
+   The landing tab: a department toggle, then one card per item. Reuses the
+   Grants tab's segmented toggle (.gr-views) and the shared switch. */
+.dv-head { display: flex; align-items: center; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; margin-bottom: 16px; }
+.dv-head .dv-depts { margin: 0; flex-wrap: wrap; }
+.dv-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.dv-item { display: flex; flex-direction: column; gap: 10px; }
+.dv-q { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .02em; color: var(--cc-grey); }
+.dv-headline { margin: 0; display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.dv-headline b { font-size: 34px; font-weight: 800; line-height: 1; color: var(--cc-teal-ink); }
+.dv-headline span { font-size: 14.5px; font-weight: 600; }
+.dv-counts { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; }
+.dv-counts b { font-weight: 800; }
+.dv-sub, .dv-note { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--cc-grey); }
+.dv-note { padding: 8px 12px; border-radius: 8px; background: var(--cc-yellow-tint); border: 1px solid var(--cc-yellow); color: var(--cc-ink); }
+.dv-line { margin: 4px 0 0; font-size: 15px; font-weight: 600; line-height: 1.45; }
+.dv-group h3 { margin: 4px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--cc-grey); }
+.dv-rows { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--cc-rule); }
+.dv-rows li { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--cc-rule); min-width: 0; }
+.dv-rows a { color: var(--cc-teal-ink); font-weight: 600; font-size: 14px; text-decoration: none; overflow-wrap: anywhere; }
+.dv-rows a:hover { text-decoration: underline; }
+.dv-meta { font-size: 12.5px; color: var(--cc-grey); }
+.dv-detail { font-size: 12.5px; font-style: italic; color: var(--cc-ink); overflow-wrap: anywhere; }
+.dv-none { margin: 0; font-size: 13px; color: var(--cc-grey); }
+.dv-err { margin: 0; padding: 10px 12px; border-radius: 8px; background: var(--cc-orange-tint); color: var(--cc-orange-ink); font-size: 13.5px; }
+.dv-links { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: auto; padding-top: 4px; }
+.dv-all { font-size: 13px; font-weight: 700; color: var(--cc-teal); text-decoration: none; }
+.dv-all:hover { text-decoration: underline; }
+.dv-changed { grid-column: 1 / -1; }
+@media (max-width: 980px) { .dv-grid { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- Custom date range (control-centre.js) ---------- */
+.cc-custom { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; flex-basis: 100%; order: 3;
+  padding: 10px 14px; background: var(--cc-card); border: 1px solid var(--cc-rule); border-radius: var(--cc-radius); font-size: 13.5px; }
+.cc-custom[hidden] { display: none; }
+.cc-custom label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+.cc-custom input[type="date"] { font: inherit; padding: 5px 8px; border: 1px solid var(--cc-rule); border-radius: 8px; color: var(--cc-ink); background: var(--cc-card); }
+.cc-custom button { border: 1px solid var(--cc-rule); border-radius: 999px; padding: 6px 14px; cursor: pointer; font-weight: 600; background: var(--cc-card); }
+.cc-custom .cc-custom-apply { background: var(--cc-teal); border-color: var(--cc-teal); color: #fff; }
+.cc-custom-msg { color: var(--cc-orange-ink); font-weight: 600; }
+.cc-vs-note { margin: 0 0 8px; font-size: 13px; color: var(--cc-grey); }
+/* A change that can't be shown because the comparison window starts before tracking did (overview.js trackingFor). */
+.cc-untracked { color: var(--cc-grey); cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; }
+.cc-delta.cc-untracked { background: var(--cc-paper); }

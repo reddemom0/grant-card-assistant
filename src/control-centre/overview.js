@@ -1,10 +1,11 @@
 /**
  * Control Centre Overview (step 6): one read-only payload behind
- * GET /api/control-centre/overview?range=day|week|month|year.
+ * GET /api/control-centre/overview?range=day|week|month|year|YYYY-MM-DD..YYYY-MM-DD.
  *
  * Windows are whole America/Vancouver days, the same boundaries as the
- * roll-ups. The current window is the N days ending today (today counts so
- * far); the previous window is the N days before it. N = 1 / 7 / 30 / 365.
+ * roll-ups. A named range is the N days ending today (today counts so far),
+ * N = 1 / 7 / 30 / 365; a custom range is its own from..to. The previous
+ * window is always the same number of days just before (windowsFor).
  *
  * Where each number comes from:
  *   matches, opens, ratings   the cc_daily_* roll-ups for every day the job wrote
@@ -33,7 +34,7 @@ import { TIME_ZONE, vancouverDay, addDays, dayRange, readDay, aggregateMatches, 
 import { liveGrants as liveGrantsDefault, splitProvinces } from './live-sources.js';
 import { identitiesForClerkIds, companyNamesForIds } from './identity.js';
 import { INTERNAL_COMPANY_IDS, internalCompanySet, isInternalCompany } from './internal-accounts.js';
-import { latestDigest } from './digest-themes.js';
+import { askedForWindow } from './chat-themes.js';
 
 export const RANGE_DAYS = Object.freeze({ day: 1, week: 7, month: 30, year: 365 });
 export const DEFAULT_RANGE = 'week';
@@ -56,23 +57,79 @@ export class OverviewError extends Error {
 // Range maths
 // ---------------------------------------------------------------------------
 
+/** The longest custom range, the same as Year. */
+export const MAX_CUSTOM_DAYS = 365;
+const CUSTOM_RANGE = /^(\d{4}-\d{2}-\d{2})\.\.(\d{4}-\d{2}-\d{2})$/;
+const MONTH_WORDS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const realDay = (d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && addDays(d, 0) === d;
+
+/** A custom range token for from..to (Vancouver days): '2026-09-01..2026-10-15'. */
+export const customRange = (from, to) => `${from}..${to}`;
+
+/** 'YYYY-MM-DD..YYYY-MM-DD' → {from, to}, or null when it isn't a custom token. */
+export function parseCustomRange(range) {
+  const m = CUSTOM_RANGE.exec(String(range ?? ''));
+  return m ? { from: m[1], to: m[2] } : null;
+}
+
+/** 'Sep 1 – Oct 15' (the year only when the two days' years differ or it isn't `year`). */
+export function spanLabel(from, to, year = null) {
+  const one = (d, withYear) => {
+    const [y, m, dd] = d.split('-').map(Number);
+    return `${MONTH_WORDS[m - 1]} ${dd}${withYear ? `, ${y}` : ''}`;
+  };
+  const showYear = from.slice(0, 4) !== to.slice(0, 4) || (year != null && from.slice(0, 4) !== String(year));
+  return from === to ? one(from, showYear) : `${one(from, showYear)} – ${one(to, showYear)}`;
+}
+
 /**
- * @returns {{range, days, current: {from, to, days: string[]}, previous: {from, to, days: string[]}, today}}
+ * Null when `range` is usable, else why not: a named range (day / week /
+ * month / year) or a custom 'YYYY-MM-DD..YYYY-MM-DD' of real Vancouver days,
+ * start ≤ end ≤ today, at most MAX_CUSTOM_DAYS days.
+ */
+export function rangeError(range, now = new Date()) {
+  if (RANGE_DAYS[range]) return null;
+  const c = parseCustomRange(range);
+  if (!c) return `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}, or from..to as YYYY-MM-DD..YYYY-MM-DD`;
+  if (!realDay(c.from) || !realDay(c.to)) return 'from and to must be real dates (YYYY-MM-DD)';
+  if (c.from > c.to) return 'from must be on or before to';
+  if (c.to > vancouverDay(now)) return 'to can\'t be after today (Vancouver)';
+  if (dayRange(c.from, c.to).length > MAX_CUSTOM_DAYS) return `a custom range can be at most ${MAX_CUSTOM_DAYS} days`;
+  return null;
+}
+
+/**
+ * The current window and the previous window of the same length just before
+ * it. Named ranges end today (today counts so far); a custom range is its own
+ * from..to. Labels are the windows' dates, for "vs …" wording.
+ * @returns {{range, days, custom, today, ends_today, current: {from, to, days: string[], label}, previous: {from, to, days: string[], label}}}
  */
 export function windowsFor(range, now = new Date()) {
-  const n = RANGE_DAYS[range];
-  if (!n) throw new OverviewError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+  const err = rangeError(range, now);
+  if (err) throw new OverviewError(400, err);
   const today = vancouverDay(now);
-  const curFrom = addDays(today, -(n - 1));
+  const custom = parseCustomRange(range);
+  const curFrom = custom ? custom.from : addDays(today, -(RANGE_DAYS[range] - 1));
+  const curTo = custom ? custom.to : today;
+  const n = dayRange(curFrom, curTo).length;
   const prevTo = addDays(curFrom, -1);
   const prevFrom = addDays(prevTo, -(n - 1));
+  const year = today.slice(0, 4);
   return {
     range,
     days: n,
+    custom: Boolean(custom),
     today,
-    current: { from: curFrom, to: today, days: dayRange(curFrom, today) },
-    previous: { from: prevFrom, to: prevTo, days: dayRange(prevFrom, prevTo) }
+    ends_today: curTo === today,
+    current: { from: curFrom, to: curTo, days: dayRange(curFrom, curTo), label: spanLabel(curFrom, curTo, year) },
+    previous: { from: prevFrom, to: prevTo, days: dayRange(prevFrom, prevTo), label: spanLabel(prevFrom, prevTo, year) }
   };
+}
+
+/** Keep a per-range cache from growing without bound now that custom ranges exist. */
+export const CACHE_MAX_KEYS = 20;
+export function trimCache(cache, max = CACHE_MAX_KEYS) {
+  while (cache.size > max) cache.delete(cache.keys().next().value);
 }
 
 /** Days of [from, to] that the roll-up hasn't written, newest MAX_LIVE_DAYS of them. */
@@ -170,6 +227,27 @@ export const CHATS_SQL = `
    WHERE ${between('created_at')}
      AND user_id LIKE 'user\\_%'
      AND jsonb_array_length(messages) > 0`;
+
+// Where each number's history starts: the earliest day in its own data. A
+// comparison window that begins before this has nothing to compare with, so
+// the page shows "—" instead of a change (trackingFor).
+export const HUB_TRACKING_SQL = `
+  SELECT (SELECT min(day) FROM cc_daily_matches)::text AS matches,
+         (SELECT min(day) FROM cc_daily_views)::text AS views,
+         (SELECT min(day) FROM cc_daily_ratings)::text AS ratings`;
+export const APP_TRACKING_SQL = `
+  SELECT (SELECT ${dayOf('min(c.created_at)')} FROM companies c
+           WHERE c.deleted_at IS NULL
+             AND EXISTS (
+               SELECT 1 FROM company_users cu
+                 JOIN users_clerk uc ON uc.user_id = cu.user_id AND uc.deleted_at IS NULL
+                WHERE cu.company_id = c.id AND cu.deleted_at IS NULL
+                  AND uc.clerk_id LIKE 'user\\_%')) AS signups,
+         (SELECT ${dayOf('min(created_at)')} FROM watchlist_grants) AS watchlist`;
+export const OPS_TRACKING_SQL = `
+  SELECT ${dayOf('min(created_at)')} AS chats
+    FROM conversations
+   WHERE user_id LIKE 'user\\_%' AND jsonb_array_length(messages) > 0`;
 
 export const COMPANY_METADATA_SQL = `
   SELECT DISTINCT ON (company_id) company_id, primary_industries, provinces
@@ -300,9 +378,12 @@ export function buildOverview(w, data) {
   return {
     range: w.range,
     time_zone: TIME_ZONE,
-    current: { from: w.current.from, to: w.current.to },
-    previous: { from: w.previous.from, to: w.previous.to },
-    today_partial: true,
+    days: w.days,
+    custom: Boolean(w.custom),
+    current: { from: w.current.from, to: w.current.to, label: w.current.label ?? null },
+    previous: { from: w.previous.from, to: w.previous.to, label: w.previous.label ?? null },
+    // A custom range that ends before today is complete; otherwise today counts so far.
+    today_partial: w.ends_today !== false,
     metrics,
     need_action: needAction,
     rankings: {
@@ -531,18 +612,21 @@ export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
   // Names first, id second, wherever a company is shown. A names failure
   // never fails the overview.
   const names = await companyNamesForIds([...internalIds], { query: deps.appQuery }).catch(() => new Map());
-  // What clients asked: the latest week the digest stored (migration 046). It
-  // follows the digest's Mon–Sun weeks, not the range picker. A missing table
-  // or a read error never fails the overview.
+  // What clients asked: the daily chat review's themes and rewritten questions
+  // (cc_chat_questions, migration 049) for this window — the Chat tab's own
+  // grouping, no model call. A missing table or a read error never fails the
+  // overview.
   let asked = null;
   let askedError = null;
   try {
-    asked = await (deps.latestDigest ?? latestDigest)({ hubQuery: deps.hubQuery, appQuery: deps.appQuery });
+    asked = await (deps.askedForWindow ?? askedForWindow)(w, { hubQuery: deps.hubQuery, appQuery: deps.appQuery, storeQuery: deps.storeQuery });
   } catch (err) {
     askedError = String(err?.code ?? err?.name ?? 'unknown');
   }
+  const tracking = trackingFor(await trackingStarts(deps), w.previous.from);
   return {
     ...payload,
+    tracking,
     asked,
     ...(askedError ? { asked_error: askedError } : {}),
     internal_accounts: internalIds.map((id) => ({ id, name: names.get(id) ?? null, internal: true })),
@@ -555,6 +639,50 @@ export async function computeOverview(range = DEFAULT_RANGE, overrides = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Tracking starts
+// ---------------------------------------------------------------------------
+
+/** Each payload metric and the data its history comes from ("active" needs all four sources). */
+export const TRACKED_BY = Object.freeze({
+  signups: ['signups'], active_companies: ['matches', 'views', 'ratings', 'chats'], matches_shown: ['matches'],
+  grants_opened: ['views'], ratings_up: ['ratings'], ratings_down: ['ratings'], watchlist_adds: ['watchlist'], chats: ['chats']
+});
+export const TRACKING_TTL_MS = 60 * 60 * 1000;
+const trackingCache = { value: null, at: 0 };
+
+/**
+ * The first day of each source's data (Vancouver), cached for an hour. A
+ * source that can't be read is left out (its changes keep showing); one with
+ * no rows at all is null (nothing to compare with).
+ */
+export async function trackingStarts(deps) {
+  const now = deps.now().getTime();
+  if (trackingCache.value && now - trackingCache.at < TRACKING_TTL_MS) return trackingCache.value;
+  const read = (q, sql) => q(sql).then((r) => r.rows[0] ?? {}).catch(() => ({}));
+  const [hub, app, ops] = await Promise.all([
+    read(deps.hubQuery, HUB_TRACKING_SQL), read(deps.appQuery, APP_TRACKING_SQL), read(deps.opsQuery, OPS_TRACKING_SQL)
+  ]);
+  const value = { ...hub, ...app, ...ops };
+  if (Object.keys(value).length === 6) { trackingCache.value = value; trackingCache.at = now; }
+  return value;
+}
+
+/**
+ * Pure: per source and per metric, whether the previous window lies wholly
+ * after tracking began. `from[source]` undefined = unknown (comparable),
+ * null = no data yet (not comparable).
+ */
+export function trackingFor(from, previousFrom) {
+  const ok = (src) => !(src in from) || (from[src] != null && from[src] <= previousFrom);
+  const sources = Object.fromEntries(['matches', 'views', 'ratings', 'chats', 'signups', 'watchlist'].map((k) => [k, ok(k)]));
+  const metrics = Object.fromEntries(Object.entries(TRACKED_BY).map(([m, srcs]) => [m, srcs.every((k) => sources[k])]));
+  // The metric whose data starts latest names the date in the tooltip.
+  const startOf = Object.fromEntries(Object.entries(TRACKED_BY).map(([m, srcs]) => [m,
+    srcs.map((k) => from[k]).filter((d) => d != null).sort().pop() ?? null]));
+  return { from, previous_from: previousFrom, sources, metrics, metric_from: startOf };
+}
+
+// ---------------------------------------------------------------------------
 // Cache
 // ---------------------------------------------------------------------------
 
@@ -562,13 +690,15 @@ const cache = new Map();
 
 /** The payload for a range, from cache when it is under CACHE_TTL_MS old. */
 export async function getOverview(range = DEFAULT_RANGE, overrides = {}) {
-  if (!RANGE_DAYS[range]) throw new OverviewError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
   const now = (overrides.now ?? (() => new Date()))();
+  const err = rangeError(range, now);
+  if (err) throw new OverviewError(400, err);
   const hit = cache.get(range);
   if (hit && now.getTime() - hit.at < CACHE_TTL_MS) return { ...(await hit.promise), cached: true };
 
   const promise = computeOverview(range, overrides).then((p) => ({ ...p, generated_at: now.toISOString() }));
   cache.set(range, { at: now.getTime(), promise });
+  trimCache(cache);
   try {
     return { ...(await promise), cached: false };
   } catch (err) {
@@ -579,6 +709,7 @@ export async function getOverview(range = DEFAULT_RANGE, overrides = {}) {
 
 export function _clearCacheForTests() {
   cache.clear();
+  trackingCache.value = null;
   grantCache.value = null;
 }
 

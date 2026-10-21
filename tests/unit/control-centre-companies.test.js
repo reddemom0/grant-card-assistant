@@ -54,6 +54,19 @@ describe('companyActivity + buildCompanyList', () => {
     expect(list[2]).toMatchObject({ name: 'Company #99', last_active: '2026-10-01', grant_matches: 0 });
   });
 
+  test('match runs are ours, not client activity: a client with only runs is last active at sign-up', () => {
+    const runsOnly = { matches: [{ day: '2026-10-15', company_id: 77, grant_id: 1, times_computed: 3, times_shown: 2 }], views: [], ratings: [], chats: [], chatCompany: new Map() };
+    const a = C.companyActivity(runsOnly, days);
+    expect(a.get(77)).toEqual({ grant_matches: 1, cards_opened: 0, chats: 0, last_day: null });
+    const [row] = C.buildCompanyList({ clients: [{ id: 77, name: 'Quiet Co', created_at: '2026-09-01T17:00:00Z' }], metadata: new Map(), activity: a,
+      rolledLast: new Map(), chatLast: new Map(), openCards: new Map(), isInternal: () => false });
+    expect(row).toMatchObject({ grant_matches: 1, last_active: '2026-09-01' });
+    // The rolled history reads opens and ratings only.
+    expect(C.LAST_ROLLED_ACTIVITY_SQL).not.toMatch(/cc_daily_matches|times_computed/);
+    expect(C.LAST_ROLLED_ACTIVITY_SQL).toMatch(/cc_daily_views/);
+    expect(C.LAST_ROLLED_ACTIVITY_SQL).toMatch(/cc_daily_ratings/);
+  });
+
   test('companyList reads only, follows the range, caches per range', async () => {
     const hubQuery = jest.fn(async (sql) => ({ rows: sql === C.OPEN_CARDS_SQL ? [{ company_id: 83, n: 1 }] : [] }));
     const appQuery = jest.fn(async (sql) => ({ rows: sql === C.CLIENTS_SQL ? [{ id: 83, name: 'Expanding Domestically', created_at: '2026-09-14T17:00:00Z' }] : [] }));
@@ -230,6 +243,15 @@ describe('companyDetail', () => {
     expect(Object.keys(core).sort()).toEqual(['company', 'goal_tracks', 'goals', 'profile']);
     const feed = await C.companyFeed('135', deps);
     expect(Object.keys(feed).sort()).toEqual(['chats', 'company_id', 'last_active', 'review_cards', 'tiles', 'timeline', 'users']);
+  });
+
+  test('last active is the latest client action, not a later match run or review card', async () => {
+    const opsLateRun = jest.fn(async (sql, p) => (sql === C.RUNS_SQL
+      ? { rows: [{ result_set_id: 'rs2', at: '2026-10-20T10:00:00Z', shown: 5, sections: 1 }] }
+      : ops(sql, p)));
+    const feed = await C.companyFeed('135', { ...deps, opsQuery: opsLateRun });
+    expect(feed.timeline[0].type).toBe('matches');
+    expect(feed.last_active).toBe('2026-10-13T19:22:00.000Z'); // the watchlist removal
   });
 
   test('bad id 400, unknown company 404', async () => {

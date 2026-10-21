@@ -18,7 +18,6 @@
   'use strict';
 
   const API = '/api/control-centre/chat';
-  const RANGE_WORDS = { day: 'today', week: 'in the last 7 days', month: 'in the last 30 days', year: 'in the last year' };
   const ISSUE_WORDS = { no_cards_for_funding_ask: 'Funding ask, no grant cards', card_for_rejected_grant: 'Card for a grant the reply ruled out' };
   const VERDICT_WORDS = { chat_did_not_search: "didn't search", chat_search_found_nothing: 'searched, found nothing',
     chat_results_not_shown: 'found grants, showed no cards', chat_carded_rejected_grant: 'card for a ruled-out grant' };
@@ -39,7 +38,7 @@
   const when = (iso) => (iso ? new Date(iso).toLocaleString('en-CA', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/Vancouver' }) : '');
   const internalTag = (on) => (on ? ' <span class="cc-tag-internal">Internal</span>' : '');
   const variantKey = () => (ctx.includeInternal() ? 'all_variant' : 'clients_variant');
-  const rangeWords = (d) => RANGE_WORDS[d.range] || 'in the range';
+  const rangeWords = (d) => ctx.rangeWords(d.range);
   const query = () => new URLSearchParams(ctx.state().hq || '');
   const section = (title, sub, body, cls = '') => `<section class="cc-card co-sec ch-sec ${cls}"><div class="co-sec-head"><h2>${title}</h2>${sub ? `<span class="cc-muted">${sub}</span>` : ''}</div>${body}</section>`;
 
@@ -105,8 +104,13 @@
       return section('Themes', 'clients only', `<p class="cc-muted ch-empty">${d.store.ok ? `No client questions stored ${esc(rangeWords(d))}.` : 'Nothing stored yet.'}</p>`);
     }
     const max = Math.max(1, ...d.themes.flatMap((t) => t.weeks.map((w) => w.n)));
-    const delta = (t) => (t.delta > 0 ? `<span class="cc-delta up">+${ctx.fmt(t.delta)}</span>` : t.delta < 0 ? `<span class="cc-delta">−${ctx.fmt(-t.delta)}</span>` : '<span class="cc-delta">0</span>');
-    return section('Themes', `clients only · questions ${esc(rangeWords(d))} vs the window before · weekly, last ${d.definitions.trend_weeks} weeks`,
+    // Before the daily review's first stored day there's nothing to compare with: "—", and when it started.
+    const why = d.tracking?.from
+      ? `The daily chat review's data starts ${day(d.tracking.from)}, after ${ctx.previousLabel(d)} began, so there's no full period to compare with.`
+      : "The daily chat review has no data before this window, so there's nothing to compare with.";
+    const delta = (t) => (d.tracking && !d.tracking.comparable ? `<span class="cc-delta cc-untracked" tabindex="0" title="${esc(why)}" aria-label="No comparison: ${esc(why)}">—</span>`
+      : t.delta > 0 ? `<span class="cc-delta up">+${ctx.fmt(t.delta)}</span>` : t.delta < 0 ? `<span class="cc-delta">−${ctx.fmt(-t.delta)}</span>` : '<span class="cc-delta">0</span>');
+    return section('Themes', `clients only · questions ${esc(rangeWords(d))} vs ${esc(ctx.previousLabel(d))}, the same number of days just before · weekly, last ${d.definitions.trend_weeks} weeks`,
       `<table class="cc-table co-table ch-table"><thead><tr><th scope="col">Theme</th><th scope="col" class="num">Questions</th><th scope="col" class="num">Change</th>
         <th scope="col">Week by week</th><th scope="col">For example</th></tr></thead><tbody>
         ${d.themes.map((t) => `<tr class="ch-static"><td><span class="co-name">${esc(t.theme)}</span></td><td class="num">${ctx.fmt(t.current)}</td><td class="num">${delta(t)}</td>

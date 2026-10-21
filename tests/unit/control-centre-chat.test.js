@@ -314,8 +314,58 @@ describe('routes', () => {
     await s.close();
     const real = await serve({});
     expect((await real.get('/?range=decade')).status).toBe(400);
+    expect((await real.get('/?range=2026-10-15..2026-09-01')).status).toBe(400);
     expect((await real.get('/search?q=a')).status).toBe(400);
     await real.close();
+  });
+
+  test('a custom range passes through to the overview', async () => {
+    const chatOverview = jest.fn(async (range) => ({ range }));
+    const s = await serve({ chatOverview });
+    expect((await s.get('/?range=2026-09-01..2026-10-15')).body).toEqual({ range: '2026-09-01..2026-10-15' });
+    await s.close();
+  });
+});
+
+describe('chatOverview: theme changes only when the previous window was stored', () => {
+  test('a previous window wholly after the first stored day compares', async () => {
+    const storeQuery = jest.fn(async (sql) => {
+      if (sql === C.QUESTIONS_SQL) return { rows: [] };
+      if (sql === C.LAST_RUN_SQL) return { rows: [{ day: '2026-10-19' }] };
+      if (sql === C.FIRST_DAY_SQL) return { rows: [{ day: '2026-09-21' }] };
+      throw new Error('unexpected');
+    });
+    const out = await C.chatOverview('week', {
+      storeQuery, opsQuery: async () => ({ rows: [] }), hubQuery: async () => ({ rows: [] }), appQuery: async () => ({ rows: [] }),
+      internalClerkIds: async () => new Set(), now: () => new Date('2026-10-20T18:00:00Z'), noCache: true
+    });
+    expect(out.tracking).toEqual({ from: '2026-09-21', comparable: true });
+    expect(C.FIRST_DAY_SQL).toMatch(/^SELECT min\(day\)/);
+  });
+});
+
+describe('chatOverview on a custom range', () => {
+  test('the window is from..to, the previous window the same length before it; themes compare the two', async () => {
+    const storeQuery = jest.fn(async (sql) => {
+      if (sql === C.QUESTIONS_SQL) return { rows: [
+        row({ day: '2026-10-10', theme: 'Eligibility' }), row({ day: '2026-10-11', conversation_id: 2, theme: 'Eligibility' }),
+        row({ day: '2026-09-25', conversation_id: 3, theme: 'Eligibility' })
+      ] };
+      if (sql === C.LAST_RUN_SQL) return { rows: [{ day: '2026-10-19' }] };
+      if (sql === C.FIRST_DAY_SQL) return { rows: [{ day: '2026-09-21' }] };
+      throw new Error('unexpected');
+    });
+    const out = await C.chatOverview('2026-10-01..2026-10-14', {
+      storeQuery, opsQuery: async () => ({ rows: [] }), hubQuery: async () => ({ rows: [] }), appQuery: async () => ({ rows: [] }),
+      internalClerkIds: async () => new Set(), now: () => new Date('2026-10-20T18:00:00Z'), noCache: true
+    });
+    expect(out.current).toEqual({ from: '2026-10-01', to: '2026-10-14' });
+    expect(out.previous).toEqual({ from: '2026-09-17', to: '2026-09-30' });
+    expect(out.themes[0]).toMatchObject({ theme: 'Eligibility', current: 2, previous: 1, delta: 1 });
+    // Sep 17 – Sep 30 starts before the daily review's first day (Sep 21): no change is shown for themes.
+    expect(out.tracking).toEqual({ from: '2026-09-21', comparable: false });
+    await expect(C.chatOverview('2026-10-14..2026-10-01', { now: () => new Date('2026-10-20T18:00:00Z'), noCache: true }))
+      .rejects.toMatchObject({ status: 400 });
   });
 });
 

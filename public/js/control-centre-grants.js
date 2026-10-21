@@ -41,7 +41,6 @@
   const STATUS_WORDS = { new: 'New', diagnosed: 'Diagnosed', in_progress: 'In progress', closed: 'Closed' };
   const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason' };
   const TYPE_WORDS = { match: 'Match', grant_pattern: 'Grant pattern', chat: 'Chat', empty_track: 'Empty track' };
-  const RANGE_WORDS = { day: 'today', week: 'in the last 7 days', month: 'in the last 30 days', year: 'in the last year' };
   const TREND = [
     { key: 'opens', label: 'Card opens' },
     { key: 'saves', label: 'Saves' },
@@ -157,7 +156,7 @@
     panel.innerHTML = `<section class="cc-card co-list gr-list${first && !ctx.reduceMotion ? ' co-enter' : ''}">
       <div class="co-list-head">
         <div><h2>Grants</h2>
-          <p class="cc-sub">${esc(v.sub)} Counts are ${esc(RANGE_WORDS[data.range] || 'in the range')}.</p></div>
+          <p class="cc-sub">${esc(v.sub)} Counts are ${esc(ctx.rangeWords(data.range))}.</p></div>
         <div class="co-tools">
           <input type="search" class="co-filter gr-filter" placeholder="Filter by grant name, ID or funder" value="${esc(q)}" aria-label="Filter grants">
           <label class="cc-switch"><input type="checkbox" role="switch" ${internal ? 'checked' : ''}><span class="cc-switch-track" aria-hidden="true"></span><span>Include internal accounts</span></label>
@@ -244,7 +243,7 @@
         <p class="co-eyebrow">Grant</p>
         <h1>${esc(g.title)} <span class="cc-muted co-id">#${g.root_id}</span></h1>
         <p class="cc-muted">${[g.grantor, g.type, money(g.value), g.deadline ? `Deadline ${/^\d{4}-\d{2}-\d{2}/.test(g.deadline) ? day(g.deadline) : g.deadline}` : null, g.version_number ? `version ${g.version_number}` : null].filter(Boolean).map(esc).join(' · ')}</p>
-        <div class="gr-head-tools"><span class="cc-muted">Counts ${esc(RANGE_WORDS[d.range] || 'in the range')}, ${internal ? 'internal accounts included' : 'clients only'}.</span>
+        <div class="gr-head-tools"><span class="cc-muted">Counts ${esc(ctx.rangeWords(d.range))}, ${internal ? 'internal accounts included' : 'clients only'}.</span>
           <label class="cc-switch"><input type="checkbox" role="switch" ${internal ? 'checked' : ''}><span class="cc-switch-track" aria-hidden="true"></span><span>Include internal accounts</span></label></div>
         <div class="co-tiles gr-tiles">
           ${tile(ctx.fmt(t.clients_matched), t.clients_matched === 1 ? 'client matched' : 'clients matched')}
@@ -281,8 +280,8 @@
       </div>
       <div class="co-slot" hidden></div>
     </li>`;
-    const sub = `${ctx.plural(total, 'company', 'companies')} ${esc(RANGE_WORDS[ctx.state().range] || '')}${!internal && hiddenCount ? ` · ${ctx.fmt(hiddenCount)} internal hidden` : ''}`;
-    if (!shown.length) return section('Companies matched', sub, `<p class="cc-muted">No ${internal ? '' : 'client '}company was matched to this grant ${esc(RANGE_WORDS[ctx.state().range] || 'in the range')}.</p>`);
+    const sub = `${ctx.plural(total, 'company', 'companies')} ${esc(ctx.rangeWords(ctx.state().range))}${!internal && hiddenCount ? ` · ${ctx.fmt(hiddenCount)} internal hidden` : ''}`;
+    if (!shown.length) return section('Companies matched', sub, `<p class="cc-muted">No ${internal ? '' : 'client '}company was matched to this grant ${esc(ctx.rangeWords(ctx.state().range))}.</p>`);
     return section('Companies matched', sub, `<div class="co-tracks">${shown.map((t) => `<div class="co-track"><h3>${esc(t.label)} <span class="cc-muted co-alias">${ctx.plural(t.companies.length, 'company', 'companies')}</span></h3>
       <ol class="co-grants">${t.companies.map((c) => row(c, t.label)).join('')}</ol></div>`).join('')}</div>`, 'co-tracks-sec');
   }

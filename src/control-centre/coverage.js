@@ -42,7 +42,7 @@
 import { query as hubQueryDefault } from '../database/connection.js';
 import { appQuery as appQueryDefault, opsQuery as opsQueryDefault } from './db.js';
 import { readDay, TIME_ZONE, vancouverDay, addDays } from './rollup.js';
-import { loadWindowRows, RANGE_DAYS, OverviewError, COMPANY_METADATA_SQL, shapeMetadata } from './overview.js';
+import { loadWindowRows, OverviewError, COMPANY_METADATA_SQL, shapeMetadata, rangeError, windowsFor, trimCache } from './overview.js';
 import { liveGrants as liveGrantsDefault } from './live-sources.js';
 import { companyNamesForIds } from './identity.js';
 import { isInternalCompany } from './internal-accounts.js';
@@ -473,8 +473,9 @@ export function defaultDeps() {
 const coverageCache = new Map();
 const changesCache = new Map();
 
-const parseRange = (range) => {
-  if (!RANGE_DAYS[range]) throw new CoverageError(400, `range must be one of ${Object.keys(RANGE_DAYS).join(', ')}`);
+const parseRange = (range, now = new Date()) => {
+  const err = rangeError(range, now);
+  if (err) throw new CoverageError(400, err);
   return range;
 };
 
@@ -483,13 +484,13 @@ async function cached(cache, key, overrides, deps, build) {
   const hit = cache.get(key);
   if (hit && now - hit.at < CACHE_MS && !overrides.noCache) return hit.value;
   const value = await build(now);
-  if (!overrides.noCache) cache.set(key, { at: now, value });
+  if (!overrides.noCache) { cache.set(key, { at: now, value }); trimCache(cache); }
   return value;
 }
 
 /** Coverage for a range: both variants, the page picks by its toggle. */
 export async function coverage(range = 'month', overrides = {}) {
-  parseRange(range);
+  parseRange(range, overrides.now?.());
   const deps = { ...defaultDeps(), ...overrides };
   return cached(coverageCache, range, overrides, deps, async (now) => {
     const rows = await loadWindowRows(range, deps);
@@ -648,18 +649,48 @@ export function deadlineFlags(grants, today) {
     due_soon: dueSoon.sort((a, b) => a.deadline.localeCompare(b.deadline)), no_date: noDate };
 }
 
+/** Deadline text that means "no fixed date, apply any time" — not a problem to fix. */
+export const ROLLING_DEADLINE = /until filled|ongoing|rolling|continuous|year[- ]round|no deadline|jusqu|en continu|en tout temps/i;
+export const HYGIENE_DAYS = 90;
+
+/**
+ * Pure: the Research "deadline hygiene" counts. Same parse as deadlineFlags
+ * (which, with DUE_SOON_DAYS, stays as it is for the Changes list) but a wider
+ * window, and the no-date grants split: blank, rolling ("Open Until Filled" and
+ * the like — fine), and text that isn't a date or a rolling phrase (unreadable).
+ */
+export function deadlineHygiene(grants, today, days = HYGIENE_DAYS) {
+  const until = addDays(today, days);
+  const passed = []; const dueWithin = []; const blank = []; const unreadable = []; let rolling = 0;
+  for (const g of grants) {
+    const text = String(g.deadline ?? '').trim();
+    const d = parseDeadline(text);
+    const row = { grant_id: g.root_id, title: g.title, deadline: d, deadline_text: g.deadline ?? null };
+    if (d) {
+      if (d < today) passed.push(row);
+      else if (d <= until) dueWithin.push(row);
+    } else if (!text) blank.push(row);
+    else if (ROLLING_DEADLINE.test(text)) rolling += 1;
+    else unreadable.push(row);
+  }
+  const byDate = (a, b) => a.deadline.localeCompare(b.deadline);
+  return { days, passed: passed.sort(byDate), due_within: dueWithin.sort(byDate), blank, unreadable, rolling };
+}
+
 /** What changed in the catalogue in the range. */
 export async function changes(range = 'month', overrides = {}) {
-  parseRange(range);
+  parseRange(range, overrides.now?.());
   const deps = { ...defaultDeps(), ...overrides };
   return cached(changesCache, range, overrides, deps, async (now) => {
     const today = vancouverDay(new Date(now));
-    const from = addDays(today, -(RANGE_DAYS[range] - 1));
+    // The range's own window: a named range ends today, a custom one at its end.
+    const w = windowsFor(range, new Date(now));
+    const { from, to } = w.current;
     const [grants, transitions, deletedLive, edits] = await Promise.all([
       deps.liveGrants({ query: deps.appQuery }),
-      deps.appQuery(TRANSITIONS_SQL, [from, today]),
-      deps.appQuery(DELETED_LIVE_SQL, [from, today]),
-      deps.appQuery(RANGE_EDITS_SQL, [from, today])
+      deps.appQuery(TRANSITIONS_SQL, [from, to]),
+      deps.appQuery(DELETED_LIVE_SQL, [from, to]),
+      deps.appQuery(RANGE_EDITS_SQL, [from, to])
     ]);
     const liveIds = new Set(grants.map((g) => g.root_id));
     const moves = catalogueTransitions(transitions.rows, deletedLive.rows, liveIds);
@@ -674,7 +705,8 @@ export async function changes(range = 'month', overrides = {}) {
       grantor: titles.get(x.grant_id)?.grantor ?? null, live: liveIds.has(x.grant_id), link: grantLink(x.grant_id) });
     return {
       range,
-      current: { from, to: today },
+      current: { from, to },
+      // Deadline flags are about today's catalogue, whatever the range.
       added: moves.added.map(named),
       closed: moves.closed.map(named),
       removed: moves.removed.map(named),

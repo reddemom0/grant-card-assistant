@@ -22,7 +22,6 @@
     { key: 'all', label: 'All industries' },
     { key: 'not_matching', label: 'Not matching' }
   ];
-  const RANGE_WORDS = { day: 'today', week: 'in the last 7 days', month: 'in the last 30 days', year: 'in the last year' };
   const STATUS_WORDS = { inactive: 'inactive', archived: 'archived', hide: 'hidden', draft: 'back to draft', waitlisting: 'waitlisting', coming_soon: 'coming soon', editing: 'editing' };
   const LEVEL_WORDS = { umbrella: 'restricted (broad)', specific: 'restricted (specific)', agnostic: 'open to every industry' };
 
@@ -43,7 +42,7 @@
   const internalTag = (on) => (on ? ' <span class="cc-tag-internal">Internal</span>' : '');
   const variantKey = () => (ctx.includeInternal() ? 'all_variant' : 'clients_variant');
   const viewOf = () => (new URLSearchParams(ctx.state().vq || '').get('view') === 'not_matching' ? 'not_matching' : 'all');
-  const rangeWords = (d) => RANGE_WORDS[d.range] || 'in the range';
+  const rangeWords = (d) => ctx.rangeWords(d.range);
 
   // ---------------------------------------------------------------- render
   async function render(panel, helpers) {
