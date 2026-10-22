@@ -193,12 +193,27 @@ export function billSummary(msg) {
   return { amount, due };
 }
 
-/** Requests to verify by phone. Deterministic backup to the classify call: it can only add a flag. */
+/**
+ * Requests to verify by phone. Deterministic backup to the classify call: it can
+ * only add a flag. Matched on the sender's own words (safetyFlag strips quoted
+ * and forwarded text and meeting-join details first), and only on requests:
+ * a bare "password" or "pay" is not one.
+ */
+const URGENT = String.raw`(urgent(ly)?|asap|immediately|today|right away|now)`;
+// "pay" counts only with something to pay: an amount, an invoice, bank details.
+const PAY_REQUEST = String.raw`(\b(pay|wire|transfer)\b[^.\n]{0,30}(\$\s?\d|\b\d[\d,.]*\s?(cad|usd|dollars)\b|\binvoice\b|\bbank (details|account|info)|\baccount (number|details)\b)|\bsend (me |us )?(the |a )?(\$\s?\d|payment\b|funds\b|money\b))`;
+const CREDENTIAL = String.raw`(password|passcode|log-?in (details|credentials|info)|log-?in(?! (page|link|screen|url|portal))|username|credentials?|(verification|security|one[- ]time|sign[- ]in|2fa|mfa|access) code|otp|pin)`;
 export const SAFETY_RE = Object.freeze({
   bank_change: /\b(new|updated?|change[ds]?|different)\b[^.\n]{0,60}\b(bank(ing)? (details|info(rmation)?|account)|remit(-| )?to|remittance (details|address)|payment (details|instructions|method)|account number|routing number|iban|swift)\b/i,
-  urgent_payment: /\b(urgent(ly)?|asap|immediately|today|right away|now)\b[^.\n]{0,60}\b(wire|payment|transfer|pay)\b|\b(wire|transfer|pay)\b[^.\n]{0,30}\b(urgent(ly)?|asap|immediately|today|right away|now)\b|\b(wire|transfer) (the )?(funds|payment|money)\b|\bwire (of )?\$?\s?\d|\b(send|make|process) (a |the )?(wire|bank transfer)\b|\bgift cards?\b/i,
-  credential: /\b(password|passcode|verification code|security code|one[- ]time (code|password)|2fa|mfa|login (details|credentials|info)|sign[- ]in code|otp)\b|\b(what('?s| is) (the|your)|send (me )?(the |your )?|share (the |your )?)\s*(login|username|log-?in|credentials?|code(?! of))\b/i
+  urgent_payment: new RegExp(String.raw`\b${URGENT}\b[^.\n]{0,60}(\b(wire|payment)\b|${PAY_REQUEST})|${PAY_REQUEST}[^.\n]{0,30}\b${URGENT}\b|\b(wire|payment)\b[^.\n]{0,30}\b${URGENT}\b|\b(wire|transfer) (the )?(funds|payment|money)\b|\bwire (of )?\$?\s?\d|\b(send|make|process) (a |the )?(wire|bank transfer)\b|\bgift cards?\b`, 'i'),
+  credential: new RegExp(String.raw`\b(send|share|confirm|provide|give|forward|tell|reply with|verify)\b[^.\n?]{0,30}?\b${CREDENTIAL}\b|\bwhat('?s| is) (the|your)\s+(password|passcode|log-?in|username|credentials?)\b`, 'i')
 });
+
+/** Meeting-joining lines ("Passcode: 123456", "Meeting ID", Zoom/Meet/Teams join blocks) — never a request. */
+const MEETING_LINE = /\b(passcode|password|pin|meeting id|webinar id)\s*[:#]|zoom\.us\/j\/|meet\.google\.com\/|teams\.microsoft\.com\/l\/meetup-join|\bjoin (zoom|the zoom|with google meet|microsoft teams|the) meeting\b|\bmicrosoft teams meeting\b|\bone tap mobile\b|\bdial by your location\b|\bjoin by phone\b/i;
+function stripMeetingDetails(text) {
+  return text.split('\n').filter(l => !MEETING_LINE.test(l)).join('\n');
+}
 
 /**
  * An automated security NOTICE (Google Workspace "suspicious login", new
@@ -218,7 +233,8 @@ export function isSecurityAlert(msg) {
 }
 
 export function safetyFlag(msg) {
-  const text = `${msg.subject || ''}\n${String(msg.body || '').slice(0, 4000)}`;
+  // The sender's own words only: not quoted replies, forwards or meeting-join details.
+  const text = `${msg.subject || ''}\n${stripMeetingDetails(ownText(msg.body)).slice(0, 4000)}`;
   for (const [kind, re] of Object.entries(SAFETY_RE)) if (re.test(text)) return kind;
   return null;
 }

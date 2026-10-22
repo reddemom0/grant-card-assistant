@@ -10,7 +10,8 @@
  *   tier 3  follow-ups: nudge level, then how long they've waited
  *   tier 4  everything else, in group order, oldest first
  * Each ranked item carries a short reason saying what happens if it waits.
- * Used for "Start here" (top 2) and the length cap (top 10). No model call.
+ * Used for "Start here" (top 2, security alerts sharing one slot) and the
+ * length cap (top 10). No model call.
  */
 
 import { GROUP_ORDER, ordinal } from './steph-brief-triage.js';
@@ -102,7 +103,19 @@ export function rankItems(items, { today, now = Date.now() }) {
       || String(a.item.id).localeCompare(String(b.item.id)));
 }
 
-/** The 1–2 items for "Start here": open, and with a reason to act now. */
+/**
+ * The 1–2 items for "Start here": open, and with a reason to act now. All open
+ * security alerts share one slot ("N security alerts — have IT check them
+ * today"), so a batch of alerts never pushes everything else out.
+ */
 export function startHere(items, opts) {
-  return rankItems(items, opts).filter(r => r.item.state === 'open' && r.tier < 4).slice(0, 2);
+  const open = rankItems(items, opts).filter(r => r.item.state === 'open' && r.tier < 4);
+  const alerts = open.filter(r => r.item.item_type === 'security').length;
+  const firstAlert = open.find(r => r.item.item_type === 'security');
+  return open
+    .filter(r => r.item.item_type !== 'security' || r === firstAlert)
+    .map(r => r === firstAlert
+      ? { ...r, who: `${alerts} security ${alerts === 1 ? 'alert' : 'alerts'}`, reason: `have IT check ${alerts === 1 ? 'it' : 'them'} today` }
+      : r)
+    .slice(0, 2);
 }

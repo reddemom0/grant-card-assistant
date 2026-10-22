@@ -863,10 +863,11 @@ describe('dry-run 2 fixes', () => {
     expect(byKey['ap@vendorco.com']).toMatchObject({ item_type: 'safety', badge: 'Verify by phone first' });
     expect(drafts(d)).toHaveLength(0);
     const text = cardText(d);
-    expect(text).toContain('No draft; suggest IT/admin');
+    expect(text).toContain('<b>1 security alert</b> — Google ');
+    expect(text).toContain('· have IT/admin check');
     const start = startHere(d);
     expect(start).toContain('<b>Accounts</b> — a payment or login request. Verify it by phone');
-    expect(start).toContain('Then <b>Google Workspace Alerts</b> — a security alert — have IT check it today.');
+    expect(start).toContain('Then <b>1 security alert</b> — have IT check it today.');
   });
 
   test('1: an alert from a no-reply sender with List-Unsubscribe still surfaces', async () => {

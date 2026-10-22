@@ -8,7 +8,10 @@
  *                 (steph-brief-rank.js — "Verify by phone first" always first)
  *   groups        Your promises → Clients → Partners → Leads → Team →
  *                 Government → Docs that need you → Not sure if this needs you
- *                 Clients, Leads and promises in full detail; the rest one line
+ *                 Clients, Leads and promises in full detail; the rest one line.
+ *                 All security alerts are ONE line where the first would sit
+ *                 ("5 security alerts — Railway, Google (3) · have IT/admin
+ *                 check"); its Done ticks every one. Rows stay one per alert.
  *   +N more       past the 10 most urgent: sender — subject, Open email, Done
  *   footer        counts only — covered by colleagues, and what was kept out of
  *                 her way. Never itemised. Never money.
@@ -188,6 +191,42 @@ function oneLineItem(item, run, { mailbox, now }) {
   return widgets;
 }
 
+/** "google" from accounts.google.com → "Google"; the sender's name when there's no address. */
+function brandOf(item) {
+  const domain = /@([^@\s>]+)$/.exec(String(item.item_key || ''))?.[1]?.toLowerCase();
+  const parts = domain ? domain.split('.') : [];
+  const name = parts.length >= 3 && /^(co|com|org|net|gov|ac)$/.test(parts.at(-2)) ? parts.at(-3) : parts.at(-2);
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : clip(item.sender || 'Unknown sender', 40);
+}
+
+/** "Railway, Google (3), Zapier" — senders in card order, a count when more than one. */
+export function alertSenders(alerts) {
+  const counts = new Map();
+  for (const a of alerts) { const b = brandOf(a); counts.set(b, (counts.get(b) || 0) + 1); }
+  return [...counts].map(([b, k]) => (k > 1 ? `${b} (${k})` : b)).join(', ');
+}
+
+/**
+ * Every security alert as one line: Open email on the newest alert, and one
+ * Done that ticks them all (brief.done_security — the server picks the ids).
+ */
+function securityLine(alerts, run, mailbox) {
+  const open = alerts.filter(i => i.state === 'open');
+  const listed = open.length ? open : alerts;
+  const k = listed.length;
+  const text = `<b>${k} security ${k === 1 ? 'alert' : 'alerts'}</b> — ${esc(alertSenders(listed))} <font color="${GREY}">· have IT/admin check</font>`;
+  const widgets = [decorated({ top: 'Security alert', text: strike(text, !open.length) })];
+  if (!open.length) return widgets;
+  const time = (i) => new Date(i.last_inbound_at || i.first_inbound_at || 0).getTime();
+  const newest = open.reduce((a, b) => (time(b) > time(a) ? b : a));
+  const buttons = [];
+  const link = openLink({ ...newest, draft_message_id: null }, mailbox);
+  if (link) buttons.push(linkButton(link.text, link.url));
+  if (buttonsAvailable()) buttons.push(button('Done', { action: 'brief.done_security', runId: run.id }));
+  if (buttons.length) widgets.push(buttonRow(buttons));
+  return widgets;
+}
+
 function moreRow(item, run, mailbox) {
   const open = openLink(item, mailbox);
   const text = `<b>${esc(clip(item.sender || 'Unknown sender', 50))}</b> — ${esc(clip(item.subject || '(no subject)', 80))}${open ? ` · <a href="${open.url}">${esc(open.text)}</a>` : ''}`;
@@ -240,8 +279,12 @@ export function renderBrief(run, items, { now = Date.now() } = {}) {
   const fyis = items.filter(i => i.no_reply).length;
   const listed = items.filter(i => !i.no_reply);
   const ranked = rankItems(listed, { today, now });
-  const shown = new Set(ranked.slice(0, SHOWN_ITEMS).map(r => r.item.id));
-  const more = ranked.slice(SHOWN_ITEMS).map(r => r.item);
+  // Security alerts collapse to one line at the first alert's place, counting as one shown item.
+  const alerts = ranked.filter(r => r.item.item_type === 'security').map(r => r.item);
+  const anchor = alerts[0] || null;
+  const rows = ranked.filter(r => r.item.item_type !== 'security' || r.item === anchor);
+  const shown = new Set(rows.slice(0, SHOWN_ITEMS).map(r => r.item.id));
+  const more = rows.slice(SHOWN_ITEMS).map(r => r.item);
 
   const needYou = listed.filter(i => i.state === 'open').length;
   const drafted = listed.filter(i => i.draft_ids?.length || i.draft_preview).length;
@@ -250,16 +293,19 @@ export function renderBrief(run, items, { now = Date.now() } = {}) {
 
   const first = startHere(listed, { today, now });
   if (first.length) {
-    const lines = first.map((r, i) => `${i === 0 ? '' : 'Then '}<b>${esc(clip(r.item.sender || 'Unknown sender', 60))}</b> — ${esc(r.reason)}.`);
+    const lines = first.map((r, i) => `${i === 0 ? '' : 'Then '}<b>${esc(clip(r.who || r.item.sender || 'Unknown sender', 60))}</b> — ${esc(r.reason)}.`);
     sections.push({ header: `<font color="${ACCENT}">👉 Start here</font>`, widgets: [paragraph(`<font color="${ACCENT}">${lines.join('<br>')}</font>`)] });
   }
 
   for (const group of GROUP_ORDER) {
     const inGroup = listed.filter(i => i.category === group && shown.has(i.id));
     if (!inGroup.length) continue;
-    const render = (i) => (FULL_DETAIL.has(group) && !ONE_LINE_TYPES.has(i.item_type) ? fullItem : oneLineItem)(i, run, { mailbox, now });
+    const render = (i) => (i === anchor ? securityLine(alerts, run, mailbox)
+      : (FULL_DETAIL.has(group) && !ONE_LINE_TYPES.has(i.item_type) ? fullItem : oneLineItem)(i, run, { mailbox, now }));
+    // The header counts emails: the security line counts every alert it stands for.
+    const emails = inGroup.length + (inGroup.includes(anchor) ? alerts.length - 1 : 0);
     sections.push({
-      header: `${GROUP_LABELS[group]} · ${inGroup.length}`,
+      header: `${GROUP_LABELS[group]} · ${emails}`,
       widgets: inGroup.flatMap(render)
     });
   }
@@ -312,7 +358,8 @@ export async function loadBriefCard(runId, query = defaultQuery) {
 export async function handleBriefClick(evt, { query = defaultQuery, patchCard = defaultPatch } = {}) {
   const params = evt.parameters || {};
   const runId = Number(params.runId);
-  if (params.action !== 'brief.done' || !UUID.test(params.itemId || '') || !Number.isInteger(runId) || !evt.actorChatId) {
+  const all = params.action === 'brief.done_security';
+  if (!(all || (params.action === 'brief.done' && UUID.test(params.itemId || ''))) || !Number.isInteger(runId) || !evt.actorChatId) {
     console.log('↩️  Brief click ignored — reason: missing_parameters');
     return {};
   }
@@ -322,11 +369,19 @@ export async function handleBriefClick(evt, { query = defaultQuery, patchCard = 
     console.log('↩️  Brief click ignored — reason: not_the_recipient');
     return {};
   }
-  if (!(loaded.run.item_ids || []).includes(params.itemId)) return {};
-  await query(
-    `UPDATE steph_brief_items SET state = 'done', state_at = NOW() WHERE id = $1 AND state = 'open'`,
-    [params.itemId]
-  );
+  if (all) {
+    // Every security alert on this card: the ids come from the run, not the button.
+    await query(
+      `UPDATE steph_brief_items SET state = 'done', state_at = NOW() WHERE id = ANY($1::uuid[]) AND item_type = 'security' AND state = 'open'`,
+      [loaded.run.item_ids || []]
+    );
+  } else {
+    if (!(loaded.run.item_ids || []).includes(params.itemId)) return {};
+    await query(
+      `UPDATE steph_brief_items SET state = 'done', state_at = NOW() WHERE id = $1 AND state = 'open'`,
+      [params.itemId]
+    );
+  }
   const fresh = await loadBriefCard(runId, query);
   const cardsV2 = renderBrief(fresh.run, fresh.items);
   if (evt.messageName) patchCard(evt.messageName, cardsV2).catch(() => {});

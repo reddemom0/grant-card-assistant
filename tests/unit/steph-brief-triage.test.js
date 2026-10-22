@@ -258,9 +258,29 @@ describe('bills, safety, lookalikes', () => {
     ['What is the login for the portal?', 'credential'],
     ['We will send the report now.', null],
     ['What is the code of conduct link?', null],
-    ['Thanks for the update', null]
+    ['Thanks for the update', null],
+    // Must still match
+    ['Can you send me your login?', 'credential'],
+    ['Please note our new bank details.', 'bank_change'],
+    ['Please wire $5,000 today.', 'urgent_payment'],
+    ['Please confirm your password.', 'credential'],
+    // Narrowed: bare nouns and non-payment "pay" no longer count
+    ['Please pay attention today.', null],
+    ['Your password is in the shared vault.', null],
+    ["I'll send you the login page link.", null],
+    ['I will send the invoice today.', null],
+    ['Please pay the $1,200 invoice today.', 'urgent_payment']
   ])('safetyFlag(%j) → %s', (body, want) => {
     expect(T.safetyFlag(msg({ body }))).toBe(want);
+  });
+  test('meeting-join details and forwarded text are not her words: the Amii forward is not safety', () => {
+    const amii = msg({ subject: 'Fwd: Training reminder',
+      body: 'Sharing the training details for next week.\n\n---------- Forwarded message ---------\nFrom: Amii Events <events@amii.ca>\nDate: Mon, Oct 19, 2026\nSubject: Training reminder\n\n'
+        + 'Join Zoom Meeting\nhttps://us02web.zoom.us/j/81234567890\nMeeting ID: 812 3456 7890\nPasscode: 123456\nPlease confirm your password before the session.' });
+    expect(T.safetyFlag(amii)).toBeNull();
+    expect(T.safetyFlag(msg({ body: 'See you there.\nMeeting ID: 812 3456 7890\nPasscode: 123456' }))).toBeNull();
+    expect(T.safetyFlag(msg({ body: 'Thanks!\n\nOn Mon, Oct 19, 2026 at 9:00 AM Vendor <a@v.co> wrote:\n> Please wire $5,000 today.' }))).toBeNull();
+    expect(T.safetyFlag(msg({ body: 'Please wire $5,000 today.\n\nOn Mon, Oct 19, 2026 at 9:00 AM Me <s@granted.ca> wrote:\n> ok' }))).toBe('urgent_payment');
   });
   test.each([
     ['acme.co', 'acme.com', {}, true],

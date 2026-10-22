@@ -25,6 +25,10 @@ function db(items, run = {}) {
   const query = jest.fn(async (sql, p) => {
     if (/FROM steph_brief_runs WHERE id/.test(sql)) return { rows: p[0] === r.id ? [r] : [] };
     if (/FROM steph_brief_items WHERE id = ANY/.test(sql)) return { rows: p[0].map(id => byId.get(id)).filter(Boolean) };
+    if (/SET state = 'done'/.test(sql) && /item_type = 'security'/.test(sql)) {
+      for (const id of p[0]) { const it = byId.get(id); if (it?.item_type === 'security' && it.state === 'open') it.state = 'done'; }
+      return { rows: [] };
+    }
     if (/SET state = 'done'/.test(sql)) { const it = byId.get(p[0]); if (it?.state === 'open') it.state = 'done'; return { rows: [] }; }
     throw new Error(`unhandled ${sql}`);
   });
@@ -246,7 +250,7 @@ describe('dry-run 2 fixes (card)', () => {
       it({ category: 'client', item_type: 'cc', badge: "You're cc'd", owner_hint: 'Ruk', sender: 'Arie', summary: 'Asks Ruk for the signed copy.' })
     ]));
     expect(sec.topLabel).toBe('Security alert');
-    expect(sec.text).toBe('<b>Google Workspace Alerts</b> — A suspicious login on your account. <font color="#5f6368">· No draft; suggest IT/admin</font>');
+    expect(sec.text).toBe('<b>1 security alert</b> — Google Workspace Alerts <font color="#5f6368">· have IT/admin check</font>');
     expect(cc.topLabel).toBe("You're cc'd");
     expect(cc.text).toContain('· No draft; suggest Ruk');
   });
@@ -373,6 +377,71 @@ describe('card links open the right account and the newest thread', () => {
 // rank helpers, loaded once (top-level await is fine in ESM tests)
 const RANK = await import('../../src/services/steph-brief-rank.js');
 function await_import_rank() { return RANK; }
+
+describe('security alerts: one line, one Done', () => {
+  const sec = (key, o = {}) => it({ category: 'team', item_type: 'security', badge: 'Security alert', owner_hint: 'IT/admin', item_key: key, sender: 'Alerts', ...o });
+  const five = () => [
+    sec('notify@railway.app', { id: IDS[0], last_inbound_at: new Date(NOW - 5 * 3600e3), thread_ids: ['t-rail'] }),
+    sec('no-reply@accounts.google.com', { id: IDS[1], last_inbound_at: new Date(NOW - 4 * 3600e3), thread_ids: ['t-g1'] }),
+    sec('google-workspace-alerts-noreply@google.com', { id: IDS[2], last_inbound_at: new Date(NOW - 1 * 3600e3), thread_ids: ['t-newest', 't-older'] }),
+    sec('alerts@google.com', { id: '44444444-4444-4444-8444-444444444444', last_inbound_at: new Date(NOW - 3 * 3600e3), thread_ids: ['t-g3'] }),
+    sec('no-reply@mail.zapier.com', { id: '55555555-5555-4555-8555-555555555555', last_inbound_at: new Date(NOW - 2 * 3600e3), thread_ids: ['t-zap'] })
+  ];
+  const startText = (cards) => card(cards).sections.find(s => /Start here/.test(s.header || ''))?.widgets[0].textParagraph.text || '';
+
+  test('five alerts render as ONE line with sender counts; one Open email (newest) and one Done', () => {
+    const cards = render([...five(), it({ category: 'client', sender: 'Arie' })]);
+    const lines = decos(cards).filter(d => d.topLabel === 'Security alert');
+    expect(lines).toHaveLength(1);
+    expect(lines[0].text).toBe('<b>5 security alerts</b> — Railway, Google (3), Zapier <font color="#5f6368">· have IT/admin check</font>');
+    expect(headers(cards)).toContain('Team · 5');
+    const sectionButtons = card(cards).sections.find(s => /^Team/.test(s.header || '')).widgets.filter(w => w.buttonList).map(w => w.buttonList.buttons);
+    expect(sectionButtons).toHaveLength(1);
+    const [open, done] = sectionButtons[0];
+    expect(open).toEqual({ text: 'Open email', onClick: { openLink: { url: 'https://mail.google.com/mail/?authuser=ssang%40granted.ca#all/t-newest' } } });
+    expect(done.text).toBe('Done');
+    expect(done.onClick.action.parameters).toEqual([{ key: 'action', value: 'brief.done_security' }, { key: 'runId', value: '5' }]);
+    expect(texts(cards)).not.toMatch(/\+\d+ more/);
+  });
+
+  test('the security line counts as one of the 10 shown items; no alert reaches "+N more"', () => {
+    const rest = Array.from({ length: 9 }, (_, i) => it({ category: 'partner', sender: `P${i}` }));
+    const cards = render([...five(), ...rest]);
+    expect(headers(cards).some(h => /^\+\d+ more/.test(h))).toBe(false);
+    const more = render([...five(), ...rest, it({ category: 'partner', sender: 'Extra' })]);
+    expect(headers(more)).toContain('+1 more');
+    expect(JSON.stringify(card(more).sections.find(s => s.header === '+1 more'))).not.toContain('Alerts');
+  });
+
+  test('Start here: at most one security slot, "N security alerts — have IT check them today"', () => {
+    const start = startText(render([...five(), it({ category: 'client', sender: 'Arie', urgency: 3 })]));
+    expect(start.match(/security alert/g)).toHaveLength(1);
+    expect(start).toContain('<b>5 security alerts</b> — have IT check them today.');
+    expect(start).toContain('<b>Arie</b> — they need an answer today.');
+    const R = await_import_rank();
+    expect(R.startHere(five(), { today: '2026-10-20', now: NOW })).toHaveLength(1);
+  });
+
+  test('Done on the line ticks all five; the rebuilt card strikes the line through', async () => {
+    const items = five();
+    const other = ITEM({ id: '66666666-6666-4666-8666-666666666666', sender: 'Arie' });
+    const { query, byId } = db([...items, other]);
+    const r = await K.handleBriefClick(press({ parameters: { action: 'brief.done_security', runId: '5' } }), { query, patchCard: jest.fn(async () => {}) });
+    expect(items.map(i => byId.get(i.id).state)).toEqual(['done', 'done', 'done', 'done', 'done']);
+    expect(byId.get(other.id).state).toBe('open');
+    const sql = query.mock.calls.find(([q]) => /item_type = 'security'/.test(q));
+    expect(sql[1][0]).toEqual([...items.map(i => i.id), other.id]);        // the run's ids, not the button's
+    const cards = r.hostAppDataAction.chatDataAction.updateMessageAction.message.cardsV2;
+    expect(texts(cards)).toContain('✅ <s><b>5 security alerts</b>');
+  });
+
+  test('Done on the line by anyone else is ignored', async () => {
+    const items = five();
+    const { query, byId } = db(items);
+    expect(await K.handleBriefClick(press({ parameters: { action: 'brief.done_security', runId: '5' }, actorChatId: 'users/someone' }), { query, patchCard: jest.fn() })).toEqual({});
+    expect(items.every(i => byId.get(i.id).state === 'open')).toBe(true);
+  });
+});
 
 describe('handleBriefClick', () => {
   test('the recipient presses Done: state updated, card rebuilt and returned, message patched', async () => {
