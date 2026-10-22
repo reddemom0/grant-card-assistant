@@ -36,6 +36,9 @@ export const TYPES = Object.freeze([
 /** Top-level areas that are never filing targets, and department folders nothing is filed into. */
 const EXCLUDED_TOP = new Set(['oldfiles', 'activeclients', 'review', 'precallbriefings'].map(folderKey));
 const EXCLUDED_DEPARTMENTS = new Set(['mindfulness', 'hr', 'finance'].map(folderKey));
+// Machine-written subtrees: everything below a path whose last part starts with the given name
+// (Departments/AI/Matching sweep — raw artifacts holds the matching engine's sweep reports).
+export const EXCLUDED_SUBTREES = Object.freeze([['Departments', 'AI', 'Matching sweep']]);
 
 let names = null;
 /** Standard program folder names from the program table in reference.md, as written. */
@@ -124,6 +127,9 @@ export function checkFile({ path = [], name = '', mimeType = '' }, { programSet 
   const keys = path.map(folderKey);
   if (keys[0] && EXCLUDED_TOP.has(keys[0])) return { excluded: `area:${path[0]}`, failures: [] };
   if (keys[0] === 'departments' && keys[1] && EXCLUDED_DEPARTMENTS.has(keys[1])) return { excluded: `area:Departments/${path[1]}`, failures: [] };
+  const subtree = EXCLUDED_SUBTREES.find(parts => parts.length <= keys.length
+    && parts.every((p, i) => (i === parts.length - 1 ? keys[i].startsWith(folderKey(p)) : keys[i] === folderKey(p))));
+  if (subtree) return { excluded: `area:${subtree.join('/')}`, failures: [] };
   if ([name, ...path].some(t => matchSensitive(t))) return { excluded: 'sensitive_name', failures: [] };
 
   const failures = [];

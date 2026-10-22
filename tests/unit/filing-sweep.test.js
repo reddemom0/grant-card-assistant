@@ -63,6 +63,13 @@ describe('rule checks', () => {
     expect(R.checkFile({ path: ['Clients'], name: 'X', mimeType: 'application/vnd.google-apps.shortcut' }).excluded).toBe('shortcut');
   });
 
+  test('the matching engine\'s sweep artifacts are excluded; the rest of Departments/AI is not', () => {
+    expect(check('Departments/AI/Matching sweep — raw artifacts', 'stage-stress-report-scoring-2026-10-18T12-15-47Z.md', 'text/markdown').excluded).toBe('area:Departments/AI/Matching sweep');
+    expect(check('Departments/AI/Matching sweep — raw artifacts/2026-10', 'axis-sweep-report.json', 'application/json').excluded).toBe('area:Departments/AI/Matching sweep');
+    expect(check('Departments/AI/Matching fix queue', 'notes', DOC).excluded).toBeNull();
+    expect(check('Departments/AI', 'AI-001-Control Centre User Guide', DOC).excluded).toBeNull();
+  });
+
   test('the program table parses from the skill', () => {
     const names = R.programNames();
     expect(names.length).toBeGreaterThan(200);

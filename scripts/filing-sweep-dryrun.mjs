@@ -32,10 +32,13 @@ function loadServiceAccountKey() {
   const lines = fs.readFileSync(path.join(REPO, '.env'), 'utf8').split('\n');
   const start = lines.findIndex(l => l.startsWith('GOOGLE_SERVICE_ACCOUNT_KEY='));
   if (start === -1) throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY not found in .env');
+  const unquote = (v) => v.trim().replace(/^['"]|['"]$/g, '');
+  // One line ('{…}' quoted or not), or JSON spread over several lines until the closing brace.
   const buf = [lines[start].slice('GOOGLE_SERVICE_ACCOUNT_KEY='.length)];
-  for (let i = start + 1; !buf[buf.length - 1].trim().endsWith('}') && i < lines.length; i++) buf.push(lines[i]);
-  const raw = buf.join('\n').trim().replace(/^['"]|['"]$/g, '');
-  JSON.parse(raw);
+  for (let i = start + 1; !unquote(buf[buf.length - 1]).endsWith('}') && i < lines.length; i++) buf.push(lines[i]);
+  const raw = unquote(buf.join('\n'));
+  // Never let a parse error echo the value: Node's SyntaxError prints the input, which is a private key.
+  try { JSON.parse(raw); } catch { throw new Error('GOOGLE_SERVICE_ACCOUNT_KEY in .env is not valid JSON (value not shown)'); }
   process.env.GOOGLE_SERVICE_ACCOUNT_KEY = raw;
 }
 
@@ -48,7 +51,21 @@ const readOnlyQuery = (sql, params) => {
   if (!/^\s*SELECT\b/i.test(sql)) throw new Error(`dry run refuses a write: ${sql.trim().slice(0, 40)}`);
   return dbQuery(sql, params);
 };
-const deps = { ...S.defaultDeps(), query: readOnlyQuery, logCost: () => undefined };
+// No database from here (e.g. the Postgres public proxy is off): people are taken from the
+// editor's address alone. Only the users lookup is needed, and nothing is sent anyway.
+let offline = false;
+try { await dbQuery('SELECT 1'); } catch (err) {
+  offline = true;
+  console.log(`(database unreachable — ${err.code || err.message}; recipients are taken from the editor's address, no users-table lookup)\n`);
+}
+const offlineQuery = async (sql, params = []) => {
+  if (/FROM users/i.test(sql) && /@granted\.ca$/i.test(String(params[0] || ''))) {
+    const email = String(params[0]).toLowerCase();
+    return { rows: [{ id: null, email, name: email, chat_user_id: null }] };
+  }
+  return { rows: [] };
+};
+const deps = { ...S.defaultDeps(), query: offline ? offlineQuery : readOnlyQuery, logCost: () => undefined };
 
 const reader = String(env.FILING_SWEEP_READER_EMAIL || S.fallbackEmail(env));
 const drive = await deps.readDrive(reader);
