@@ -388,6 +388,8 @@ Controlled docs: no date in the name; keep a version table at the top of the doc
 
 Department codes → folders: OPS → OPERATIONS · MKT → MARKETING · SLS → SALES · RES → RESEARCH · WRT → WRITERS · PRD → PRODUCT · AI → AI · LDR → LEADERSHIP. (FIN and HR exist as codes but their files don't go in Granted Files. `Departments/HR` and `Departments/FINANCE` still exist today and are pending a move to Granted Archive; don't file into them.)
 
+Inside `Departments/{DEPT}`, group files in a **topic subfolder** (e.g. `Departments/PRODUCT/Control Centre`, `Departments/OPERATIONS/Grant Coordinator Processes`). Don't leave files loose at the top of a department folder; if no topic folder fits, propose one, marked (new).
+
 ## Other areas of Granted Files
 
 | Folder | What it is | File here? |

@@ -12,6 +12,29 @@ Format:
 
 ---
 
+## 2026-10-21 — Filing sweep: weekday suggest-only pilot
+**What:** Chris's 11 decisions:
+1. **Suggest only:** each card proposes a move and/or rename through `file_move_rename` (Confirm, `drive_actions`, undo).
+2. **Scope:** files created in, or moved into, Granted Files since the last successful run.
+3. **Recipient:** the person who added the file, DMed by Oracle in Chat. Drive Activity if the scopes allow, else `lastModifyingUser`; no @granted.ca person → Chris.
+4. **Schedule:** weekdays 08:30 Vancouver.
+5. **Per person:** one message, at most 10 cards; the rest listed.
+6. **Skip:** on every card. Skipped, ignored for 7 days, or confirmed → never suggested again.
+7. **Unsure:** no card, a "Not sure where X goes. Reply and tell me." line instead.
+8. **Tracking:** every suggestion logged with file, recipient, suggestion, status and times. A Monday summary to Chris (counts, most-skipped).
+9. **Pilot:** `FILING_SWEEP_ENABLED` (default off) and `FILING_SWEEP_PILOT_EMAILS` (writers@); everyone else is logged `would_suggest`.
+10. **Cost:** cheap rule checks first; only failing files get a Haiku call; passing files are logged `ok`.
+11. **Departments:** files go in a topic subfolder of `Departments/<DEPT>`, never loose at the top (filing skill).
+
+Found while building it:
+- The delegation **refuses** `drive.activity.readonly`, so the recipient is `lastModifyingUser`, the last editor.
+- "One message" is **one thread** (header, then one card per reply), because a confirm-card press re-renders its whole message.
+- "New" means not in a baseline of known file IDs, which the first run records, so nothing that existed before is checked.
+- Suggestions with a month the file doesn't show are refused (the model invented dates in testing).
+
+**Why:** keep new files tidy after the October cleanup without moving anything automatically, and learn from skips before widening the pilot.
+**Impact:** `src/services/filing-sweep.js`, `src/services/filing-rules.js`, `src/cards/sweep-card.js`, `src/cards/confirm-card.js` (Skip option, log update), `src/cards/actions.js` (`sweep.` route), `server.js`, `migrations/055_filing_sweep.sql`, `scripts/filing-sweep-dryrun.mjs`, `.claude/skills/filing/{SKILL,reference}.md`, `docs/oracle.md`, tests `filing-sweep`
+
 ## 2026-10-20 — Filing rules match Granted Files after the October cleanup
 **What:** Chris's 10 filing decisions, written into the `filing` skill:
 1. **Grant Planners:** in `Clients/{Client}/General/{YYYY}/`; new ones `Grant Planner-{Client}-{YYYY}`; existing ones not renamed.

@@ -77,6 +77,7 @@ import { startPulseSpike } from './src/services/pulse-spike.js';
 import { startPulseRoundup } from './src/services/pulse-roundup.js';
 import { startRukBriefings } from './src/services/ruk-briefings.js';
 import { startStephBrief } from './src/services/steph-brief.js';
+import { startFilingSweep } from './src/services/filing-sweep.js';
 import { stephBriefRunEndpoint } from './src/api/steph-brief-run.js';
 import { startPulseDigest } from './src/services/pulse-digest.js';
 // TEMPORARY: Workspace add-on timeout probe. Delete with its route below once
@@ -1448,6 +1449,13 @@ async function startServer() {
     // each (never sent). Off unless STEPH_BRIEF_ENABLED=true; needs her Gmail
     // connected (/api/auth/gmail) and migration 051.
     startStephBrief(cron);
+
+    // Filing sweep (pilot): weekdays 08:30, Oracle DMs whoever added new
+    // Granted Files files that look misfiled or misnamed, one Confirm card per
+    // file (file_move_rename) with Skip; nothing moves without Confirm. Monday
+    // 08:45 summary to Chris. Off unless FILING_SWEEP_ENABLED=true;
+    // FILING_SWEEP_PILOT_EMAILS limits who gets DMs. Needs migration 055.
+    startFilingSweep(cron);
 
     // Log A/B testing configuration for lead-gen
     const leadGenVariant = process.env.LEAD_GEN_VARIANT || 'A';

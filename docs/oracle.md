@@ -475,6 +475,55 @@ exact match always wins. `planFileMove` (`drive-actions.js`) and the Ruk briefin
 (`briefing-drive.js`) don't pass the option and keep exact matching, so a move or a created
 folder never lands on a prefix guess.
 
+## Filing sweep (pilot)
+
+`src/services/filing-sweep.js` (rules in `src/services/filing-rules.js`, Skip in
+`src/cards/sweep-card.js`, log in migration 055). **Suggest-only:** nothing moves without the
+recipient's Confirm.
+- **When:** weekdays 08:30 America/Vancouver (`SWEEP_SCHEDULE`); a summary to the fallback
+  (Chris) Mondays 08:45. Both off unless `FILING_SWEEP_ENABLED=true` (`startFilingSweep` in
+  `server.js`). A per-day claim in `filing_sweep_runs` stops a second server copy.
+- **What it looks at:** Granted Files only, via the Drive change feed since the last
+  successful run (`changes.list`, `drive.readonly`, as `FILING_SWEEP_READER_EMAIL`, default
+  the fallback). "New" means a file ID not in `filing_sweep_known_files`: the first run
+  records every existing file and checks nothing, so there is no backfill. Files Oracle
+  filed itself in the last two days are skipped.
+- **Rule checks first** (`checkFile`, no model): Client/Program/Year or General/Year, a
+  listed Type at the start of a client file's name, the internal patterns for department
+  files, and loose files (client root, `_Unsorted`, top of a department or of `Programs/`).
+  Excluded: Old Files, Active Clients, Review, Pre-Call Briefings, Departments/Mindfulness,
+  HR and FINANCE, sensitive names, folders and shortcuts. A file that passes is logged `ok`.
+- **Suggestion:** one Haiku call per failing file (`claude-haiku-4-5-20251001`, forced tool),
+  on metadata only: name, folder, the client's program and year folders, the type patterns
+  and the program table. It is refused, so the person gets a "Not sure where X goes. Reply
+  and tell me." line instead of a card, when:
+  - the model isn't confident
+  - the suggestion has a month the file's name and folders don't show
+  - the name still has a pattern placeholder
+  - another new file would get the same home and name
+  - `planFileMove`, run as the recipient, refuses it
+- **Who gets it:** the file's `lastModifyingUser`. The Drive Activity scope, which would name
+  who added it, is refused by the delegation, so a file moved in without edits goes to its last
+  editor. No @granted.ca person → the fallback (`FILING_SWEEP_FALLBACK_EMAIL`, default
+  writers@). No DM with Oracle yet → the fallback's thread, marked for them, re-planned as the
+  fallback (only the asker can confirm a move).
+- **The DM:** one thread per person per run, because a card press re-renders its whole message:
+  a header (with the "not sure" lines), then one confirm card per file (at most 10), each its
+  own `file_move_rename` pending action on its own conversation with a 7-day expiry, Confirm
+  and **Skip**. Anything over 10 is listed in a final reply (`listed`). The thread's
+  conversation is seeded with a system note listing the suggestions, so a reply has context.
+- **Pilot:** while `FILING_SWEEP_PILOT_EMAILS` is set, only those people get DMs; the rest
+  are logged `would_suggest`.
+- **Log:** `filing_sweep_suggestions`, one row per new file (file_id unique, so a file is
+  never suggested twice). Statuses: `ok`, `excluded`, `unsure`, `would_suggest`,
+  `suggested`, `listed`, `confirmed`, `skipped`, `ignored`, `failed`.
+  - A Confirm press updates it in `handlePendingClick`; Skip in `handleSweepClick`.
+  - Each run reconciles against `pending_actions` and marks `suggested` rows older than 7 days `ignored`, expiring their cards.
+- **Dry run:** `node --network-family-autoselection-attempt-timeout=5000 scripts/filing-sweep-dryrun.mjs --days 7`
+  lists files *created* in the last N days (the change feed can't look back, so moved-in
+  files aren't shown) and prints what each person would get. It sends nothing and writes
+  nothing (non-SELECT queries are refused). It does spend a little on Haiku.
+
 ## Prompt
 
 Single file, `.claude/agents/internal-oracle.md` (~426 lines, ~40 KB). No concatenation —

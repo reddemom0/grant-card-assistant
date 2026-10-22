@@ -152,6 +152,11 @@ async function pressAnswer(evt, now, startedAt) {
     const { handlePendingClick } = await import('./confirm-card.js');
     return handlePendingClick(evt);
   }
+  // Skip on a filing-sweep card: its own table, not a tracked card.
+  if (typeof params.action === 'string' && params.action.startsWith('sweep.')) {
+    const { handleSweepClick } = await import('./sweep-card.js');
+    return handleSweepClick(evt);
+  }
   // Done on Steph's morning brief: its own table, not a tracked card.
   if (typeof params.action === 'string' && params.action.startsWith('brief.')) {
     const { handleBriefClick } = await import('./brief-card.js');

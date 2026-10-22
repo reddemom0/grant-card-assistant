@@ -67,9 +67,10 @@ export function systemEventText(run, { presserName = null, at = new Date() } = {
 
 /**
  * @param {Object} action - pending_actions row
- * @param {{state?: 'open'|'done'|'failed'|'cancelled', detail?: string, askerName?: string}} opts
+ * @param {{state?: 'open'|'done'|'failed'|'cancelled', detail?: string, askerName?: string,
+ *   secondary?: {text: string, params: Object}}} opts - secondary replaces Cancel (the filing sweep's Skip)
  */
-export function renderConfirmCard(action, { state = 'open', detail = null, askerName = null } = {}) {
+export function renderConfirmCard(action, { state = 'open', detail = null, askerName = null, secondary = null } = {}) {
   const plan = planOf(action);
   const undo = action.tool_name === 'file_move_rename_undo';
   const widgets = [
@@ -87,7 +88,7 @@ export function renderConfirmCard(action, { state = 'open', detail = null, asker
     widgets.push(paragraph(`<i>Press Confirm to run it. Only ${esc(askerName || 'the person who asked')} can confirm.</i>`));
     widgets.push(buttonRow([
       button('Confirm', { action: 'pending.confirm', actionId: action.id }),
-      button('Cancel', { action: 'pending.cancel', actionId: action.id })
+      secondary ? button(secondary.text, secondary.params) : button('Cancel', { action: 'pending.cancel', actionId: action.id })
     ]));
   } else {
     const label = { done: '✅ Done', failed: '⚠️ Not done', cancelled: 'Cancelled' }[state] || state;
@@ -180,6 +181,9 @@ export async function handlePendingClick(evt) {
       // later "undo that" has evidence it can trust.
       const presserName = person?.display_name || evt.actorName || person?.email || null;
       await saveMessage(action.conversation_id, 'system', systemEventText(run, { presserName })).catch(() => {});
+      // A filing-sweep card: record the outcome in its log (no row, or no table yet → nothing to do).
+      await query(`UPDATE filing_sweep_suggestions SET status = $2, resolved_at = NOW() WHERE pending_action_id = $1 AND status = 'suggested'`,
+        [action.id, failed ? 'failed' : 'confirmed']).catch(() => {});
     }
   } else {
     return {};
