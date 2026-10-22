@@ -35,7 +35,7 @@ export const TYPES = Object.freeze([
 
 /** Top-level areas that are never filing targets, and department folders nothing is filed into. */
 const EXCLUDED_TOP = new Set(['oldfiles', 'activeclients', 'review', 'precallbriefings'].map(folderKey));
-const EXCLUDED_DEPARTMENTS = new Set(['mindfulness', 'hr', 'finance'].map(folderKey));
+export const EXCLUDED_DEPARTMENTS = new Set(['mindfulness', 'hr', 'finance'].map(folderKey));
 // Machine-written subtrees: everything below a path whose last part starts with the given name
 // (Departments/AI/Matching sweep — raw artifacts holds the matching engine's sweep reports).
 export const EXCLUDED_SUBTREES = Object.freeze([['Departments', 'AI', 'Matching sweep']]);
