@@ -71,6 +71,7 @@ import controlCentreGrantsRouter from './src/control-centre/grants-routes.js';
 import controlCentreCoverageRouter from './src/control-centre/coverage-routes.js';
 import controlCentreChatRouter from './src/control-centre/chat-routes.js';
 import controlCentreViewsRouter from './src/control-centre/views-routes.js';
+import controlCentreKnowledgeRouter from './src/control-centre/knowledge-routes.js';
 import { startChatDaily } from './src/control-centre/chat-daily.js';
 // GetGranted Pulse: chat spike alert (pulse_alert_state, migration 040)
 import { startPulseSpike } from './src/services/pulse-spike.js';
@@ -220,6 +221,8 @@ app.use('/api/control-centre/coverage', authenticateUser, requireAuth, controlCe
 app.use('/api/control-centre/chat', authenticateUser, requireAuth, controlCentreChatRouter);
 // Department views (the landing page): Research, Consulting/Sales, Marketing snapshots from the tabs' own data.
 app.use('/api/control-centre/views', authenticateUser, requireAuth, controlCentreViewsRouter);
+// The AI knowledge queue: consultant answers Chris approved, exported as markdown. Needs migration 057.
+app.use('/api/control-centre/knowledge', authenticateUser, requireAuth, controlCentreKnowledgeRouter);
 // Control Centre page data: GET /overview, GET /search. Read-only, cached 5 min.
 app.use('/api/control-centre', authenticateUser, requireAuth, controlCentreOverviewRouter);
 

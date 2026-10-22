@@ -68,6 +68,11 @@ function deps(over = {}) {
     setOwner: jest.fn(async (id, owner, actor) => ({ id: Number(id), owner, actor })),
     close: jest.fn(async (id, body, actor) => ({ id: Number(id), status: 'closed', ...body, closed_by: actor })),
     addFlag: jest.fn(async () => ({ created: true })),
+    // Consulting cards (the main session's review-queue.js): stubbed with the agreed signatures.
+    setAnswer: jest.fn(async (id, answer, actor) => ({ id: Number(id), staff_answer: answer, staff_answer_by: actor })),
+    sendToChris: jest.fn(async (id, answer, actor) => ({ id: Number(id), staff_answer: answer, staff_answer_by: actor, owner: 'chris', status: 'in_progress' })),
+    approveForAi: jest.fn(async (id, actor, { answer } = {}) => ({ item: { id: Number(id), status: 'closed', closed_by: actor, staff_answer: answer ?? 'stored' },
+      knowledge: { id: 1, item_id: Number(id), answer: answer ?? 'stored', approved_by: actor } })),
     ...over
   };
   return { d, calls };
@@ -177,6 +182,37 @@ describe('actions record the signed-in staff member', () => {
     expect((await srv.call('PATCH', '/3/owner', { owner: 'research' })).body.item).toMatchObject({ owner: 'research', actor: STAFF });
     expect((await srv.call('POST', '/3/close', { expected_match: 'shouldnt', close_note: 'Tag fixed' })).body.item)
       .toMatchObject({ expected_match: 'shouldnt', close_note: 'Tag fixed', closed_by: STAFF });
+  });
+
+  test('consulting cards: answer, send to Chris and approve for AI pass the id, the answer and req.user.email', async () => {
+    const { d } = deps();
+    srv = await serve(d);
+    const saved = await srv.call('PATCH', '/9/answer', { answer: 'Book a scoping call with us.' });
+    expect(saved.status).toBe(200);
+    expect(d.setAnswer).toHaveBeenCalledWith('9', 'Book a scoping call with us.', STAFF);
+    expect(saved.body.item).toMatchObject({ id: 9, staff_answer: 'Book a scoping call with us.', staff_answer_by: STAFF });
+
+    const sent = await srv.call('POST', '/9/send-to-chris', { answer: 'Book a scoping call with us.' });
+    expect(d.sendToChris).toHaveBeenCalledWith('9', 'Book a scoping call with us.', STAFF);
+    expect(sent.body.item).toMatchObject({ owner: 'chris', status: 'in_progress' });
+
+    const approved = await srv.call('POST', '/9/approve-for-ai', { answer: 'Final wording.' });
+    expect(d.approveForAi).toHaveBeenCalledWith('9', STAFF, { answer: 'Final wording.' });
+    expect(approved.body).toEqual({ item: expect.objectContaining({ id: 9, status: 'closed', closed_by: STAFF }),
+      knowledge: expect.objectContaining({ item_id: 9, approved_by: STAFF }) });
+    // No answer in the body: approve uses the stored one.
+    await srv.call('POST', '/9/approve-for-ai');
+    expect(d.approveForAi).toHaveBeenLastCalledWith('9', STAFF, { answer: undefined });
+  });
+
+  test('consulting-card errors keep their status: not a consulting card 400, not Chris\'s yet 409', async () => {
+    const { d } = deps({
+      setAnswer: async () => { throw new Q.ReviewQueueError(400, 'only a consulting card takes an answer'); },
+      approveForAi: async () => { throw new Q.ReviewQueueError(409, 'send the card to Chris before approving'); }
+    });
+    srv = await serve(d);
+    expect(await srv.call('PATCH', '/3/answer', { answer: 'x' })).toEqual({ status: 400, body: { error: 'only a consulting card takes an answer' } });
+    expect((await srv.call('POST', '/9/approve-for-ai', { answer: 'x' })).status).toBe(409);
   });
 
   test('queue errors keep their status: a bad comment 400, closing twice 409', async () => {

@@ -14,7 +14,9 @@ const MONTHS = {
   november: 11, nov: 11, novembre: 11, december: 12, dec: 12, decembre: 12
 };
 const MONTH_WORD = Object.keys(MONTHS).sort((a, b) => b.length - a.length).join('|');
-const ROLLING = /open until|until filled|until funds|while funds|jusqu|epuisement|ongoing|continuous|rolling|year round|no deadline|no fixed deadline|en continu/;
+// The phrases the Control Centre's deadline flags counted as rolling (coverage.js,
+// before it adopted this parser) are here too: "year-round", "en tout temps".
+const ROLLING = /open until|until filled|until funds|while funds|jusqu|epuisement|ongoing|continuous|rolling|year[- ]round|no deadline|no fixed deadline|en continu|en tout temps/;
 
 const pad = (n) => String(n).padStart(2, '0');
 function isoDate(y, m, d) {

@@ -4,12 +4,17 @@
  *   #review                 the board: New → Diagnosed → In progress → Closed
  *   #review/<id>            the board with that card open in the side panel
  *   #review?owner=&type=    filters (combinable), kept in the hash
+ *   #review?view=knowledge  the AI knowledge queue (consulting answers Chris
+ *                           approved; Export downloads the pending ones)
  *
  * Board data: GET /api/control-centre/review (summaries, no evidence). The
  * panel loads one card in full: GET /api/control-centre/review/:id, and for a
  * chat card, on request, GET /:id/conversation. Actions: PATCH /:id/status,
  * PATCH /:id/owner, POST /:id/close, POST /:id/comment — each recorded by the
- * server against the signed-in staff member.
+ * server against the signed-in staff member. A consulting card (a chat card
+ * whose ref is conv:<id>:consulting_question) also takes PATCH /:id/answer,
+ * POST /:id/send-to-chris and, for Chris, POST /:id/approve-for-ai. The queue
+ * view reads GET /api/control-centre/knowledge and POST /export.
  *
  * Loaded before control-centre.js, which calls CCReview.render(panel, ctx)
  * with its helpers (escaping, formatting, fetch, navigation, the
@@ -26,11 +31,20 @@
     { status: 'closed', label: 'Closed', empty: 'Nothing closed yet.' }
   ];
   const CLOSED_SHOWN = 30;
-  const OWNERS = [['client', 'Client'], ['research', 'Research'], ['chris', 'Chris'], ['jason', 'Jason'], ['none', 'Unassigned']];
-  const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason' };
-  const OWNER_FIXES = { client: 'company profile', research: 'grant data and card text', chris: 'tagger, engine and chat answers', jason: 'the app' };
-  const TYPES = [['match', 'Match'], ['grant_pattern', 'Grant pattern'], ['chat', 'Chat'], ['empty_track', 'Empty track']];
+  const KAPI = '/api/control-centre/knowledge';
+  const OWNERS = [['client', 'Client'], ['research', 'Research'], ['chris', 'Chris'], ['jason', 'Jason'], ['consulting', 'Consulting'], ['none', 'Unassigned']];
+  const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason', consulting: 'Consulting' };
+  const OWNER_FIXES = { client: 'company profile', research: 'grant data and card text', chris: 'tagger, engine and chat answers', jason: 'the app', consulting: 'client questions a consultant answers' };
+  const TYPES = [['match', 'Match'], ['grant_pattern', 'Grant pattern'], ['chat', 'Chat'], ['empty_track', 'Empty track'], ['grant_deadline', 'Deadline']];
   const TYPE_WORDS = Object.fromEntries(TYPES);
+  // A consulting card is a chat card from the daily review's consulting_question rule (chat-daily.js).
+  const CONSULTING = 'consulting_question';
+  const chatIssue = (ref) => /^conv:\d+:([a-z_]+)$/.exec(ref || '')?.[1] ?? null;
+  const isConsulting = (i) => i?.kind === 'chat' && chatIssue(i.chat_turn_ref) === CONSULTING;
+  const typeChip = (i) => (isConsulting(i) ? '<span class="rq-type rq-type-consulting">Consulting</span>'
+    : `<span class="rq-type rq-type-${i.kind}">${TYPE_WORDS[i.kind] || ctx.esc(i.kind)}</span>`);
+  const ANSWER_WORDS = { answered: 'answered it', partly: 'only partly answered it', not_answered: "didn't answer it" };
+  const UNANSWERED_WORDS = { no_answer: 'no answer', asked_for_person: 'the client asked for a person', left_after_bad_reply: 'the client left after the reply' };
   const STATUS_WORDS = { new: 'New', diagnosed: 'Diagnosed', in_progress: 'In progress', closed: 'Closed' };
   const VERDICT_WORDS = {
     tag_missed_restriction: 'Tag missed a restriction',
@@ -47,6 +61,8 @@
     chat_results_not_shown: 'Chat found grants, showed no cards',
     chat_carded_rejected_grant: 'Card shown for a grant the reply ruled out',
     no_grants_for_goal: 'No grants cover this goal for them',
+    consulting_question: 'Consulting question for a consultant',
+    deadline_passed: 'Deadline passed, still live',
     unclear: 'Cause unclear',
     could_not_diagnose: "Couldn't diagnose"
   };
@@ -91,7 +107,8 @@
   function readFilters() {
     const q = new URLSearchParams(ctx.state().rq || '');
     const pick = (k, allowed) => (q.get(k) || '').split(',').filter((v) => allowed.includes(v));
-    return { owner: pick('owner', OWNERS.map((o) => o[0])), type: pick('type', TYPES.map((t) => t[0])) };
+    // `view` is read but never written back by filtersQuery, so any chip returns to the board.
+    return { owner: pick('owner', OWNERS.map((o) => o[0])), type: pick('type', TYPES.map((t) => t[0])), view: q.get('view') === 'knowledge' ? 'knowledge' : '' };
   }
   function filtersQuery(f) {
     const q = new URLSearchParams();
@@ -153,6 +170,7 @@
   function paint(panel) {
     setBadge();
     const f = readFilters();
+    if (f.view === 'knowledge') { knowledgeView(panel); return; }
     const shown = visible(list, f);
     const first = !panel.querySelector('.rq');
     const internalCount = list.filter((i) => i.kind !== 'grant_pattern' && i.company_internal).length;
@@ -164,6 +182,7 @@
           <h2>Review queue</h2>
           <p class="rq-intro">Every flagged grant match, grant pattern and chat answer. Each card gets a cause and an owner — the hourly sweep writes the first diagnosis. Drag a card to move it; open it for the evidence.</p>
         </div>
+        <a class="rq-kn-link" href="#review?view=knowledge" data-knowledge>AI knowledge queue →</a>
       </div>
       <div class="rq-filters">
         <div class="rq-chips" role="group" aria-label="Owner">
@@ -203,7 +222,7 @@
     return `<article class="rq-card${i.stuck ? ' is-stuck' : ''}${selected ? ' is-open' : ''}" data-id="${i.id}" data-kind="${i.kind}" tabindex="0" draggable="true"
       aria-label="${ctx.esc(i.title)}">
       <div class="rq-card-top">
-        <span class="rq-type rq-type-${i.kind}">${TYPE_WORDS[i.kind] || ctx.esc(i.kind)}</span>
+        ${typeChip(i)}
         ${stuckDays != null ? `<span class="rq-stuck" title="Open with no change or comment for ${stuckDays} days">Stuck ${stuckDays}d</span>` : ''}
         <span class="rq-age" title="Flagged ${ctx.esc(when(i.created_at))}">${age(i.created_at)}</span>
       </div>
@@ -215,6 +234,11 @@
   }
 
   function bindBoard(panel, f) {
+    panel.querySelector('[data-knowledge]')?.addEventListener('click', (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      ctx.go({ rq: 'view=knowledge', card: null });
+    });
     panel.querySelectorAll('.rq-chip').forEach((b) => b.addEventListener('click', () => {
       const g = b.dataset.group; const v = b.dataset.value;
       const next = { ...f, [g]: v === '' ? [] : f[g].includes(v) ? f[g].filter((x) => x !== v) : [...f[g], v] };
@@ -376,11 +400,11 @@
     const verdict = d?.verdict;
     const closed = it.status === 'closed';
     const statusOptions = ['new', 'diagnosed', 'in_progress'].map((s) => `<option value="${s}" ${it.status === s ? 'selected' : ''}>${STATUS_WORDS[s]}</option>`).join('');
-    const ownerOptions = ['client', 'research', 'chris', 'jason'].map((o) => `<option value="${o}" ${it.owner === o ? 'selected' : ''} title="${OWNER_FIXES[o]}">${OWNER_WORDS[o]}</option>`).join('');
+    const ownerOptions = OWNERS.filter(([o]) => o !== 'none').map(([o]) => `<option value="${o}" ${it.owner === o ? 'selected' : ''} title="${OWNER_FIXES[o]}">${OWNER_WORDS[o]}</option>`).join('');
 
     return `<div class="rq-d-head">
         <div class="rq-d-tags">
-          <span class="rq-type rq-type-${it.kind}">${TYPE_WORDS[it.kind] || esc(it.kind)}</span>
+          ${typeChip(it)}
           <span class="rq-status rq-status-${it.status}">${STATUS_WORDS[it.status]}</span>
           ${it.company_internal ? '<span class="cc-tag-internal">Internal</span>' : ''}
           ${it.flagged_again ? '<span class="rq-again">Flagged again</span>' : ''}
@@ -417,6 +441,8 @@
   // ---------------------------------------------------------------- evidence
   function evidenceHtml(it, data) {
     const s = it.snapshot;
+    // A consulting card shows its question and the answer box even before any evidence is frozen.
+    if (isConsulting(it)) return consultingEvidence(s, it, data);
     if (!s) {
       const flags = (data.flags || []).slice(-10);
       return section('Evidence', `<p class="cc-muted">No evidence frozen yet — it's taken at the first diagnosis.</p>${flags.length ? `<ul class="rq-flaglist">${flags.map((f) => `<li>${esc2(SOURCE_WORDS[f.source] || words(f.source))} · ${esc2(actorName(data, f.actor))} · ${esc2(when(f.source_created_at || f.created_at))}${f.comment ? `<br><span>${esc2(clipText(f.comment, 300))}</span>` : ''}</li>`).join('')}</ul>` : ''}`);
@@ -424,9 +450,66 @@
     if (it.kind === 'match') return matchEvidence(s.response || {});
     if (it.kind === 'grant_pattern') return patternEvidence(s);
     if (it.kind === 'empty_track') return emptyTrackEvidence(s);
+    if (it.kind === 'grant_deadline') return deadlineEvidence(s, it);
     return chatEvidence(s, it);
   }
   const esc2 = (v) => ctx.esc(v);
+
+  /** A grant_deadline card (deadline-cards.js): the deadline as written, how it was read, and how far past it is. */
+  function deadlineEvidence(s, it) {
+    const g = s?.grant || {};
+    const over = g.days_over != null ? ctx.plural(Number(g.days_over), 'day') : null;
+    return section('The deadline', `<dl class="rq-fields">
+        <dt>Deadline on the card</dt><dd>${esc2(g.deadline_text || 'Blank')}</dd>
+        <dt>Read as</dt><dd>${esc2(g.deadline || 'No date')}</dd>
+        ${over ? `<dt>Past by</dt><dd>${esc2(over)} when checked</dd>` : ''}
+        <dt>Status</dt><dd>${esc2(g.status || 'active')} — still live</dd>
+        <dt>Checked on</dt><dd>${esc2(s?.checked_on || when(it.snapshot_at) || '—')}</dd>
+      </dl>
+      ${it.grant_root_id != null ? `<p><a href="#grants/${Number(it.grant_root_id)}">Open ${esc2(g.title || it.grant_name || `grant #${it.grant_root_id}`)}</a></p>` : ''}`);
+  }
+
+  /**
+   * A consulting card: the client's question and the AI's reply from the
+   * frozen turns, the company, and the consultant's answer box with Save,
+   * Send to Chris (until Chris owns it) and Approve for AI (Chris only).
+   */
+  function consultingEvidence(s, it, data) {
+    const ev = s?.rule_evidence || {};
+    const turns = s?.turns || [];
+    const turn = turns.find((t) => t.flagged) || turns.find((t) => t.turn_index === s?.flagged_turn_index) || turns.at(-1) || null;
+    const closed = it.status === 'closed';
+    const company = it.company_id != null
+      ? `<a href="#companies/${Number(it.company_id)}">${esc2(it.company_name || `Company #${it.company_id}`)}</a>${it.company_internal ? ' <span class="cc-tag-internal">Internal</span>' : ''}`
+      : 'Company not recorded';
+    const how = [
+      ev.unmet_need ? `Asked for: ${esc2(ev.unmet_need)}` : '',
+      ev.answer ? `The chat ${ANSWER_WORDS[ev.answer] || esc2(words(ev.answer))}` : '',
+      ev.unanswered_reason ? UNANSWERED_WORDS[ev.unanswered_reason] || esc2(words(ev.unanswered_reason)) : ''
+    ].filter(Boolean).join(' · ');
+    const qa = turn
+      ? `<ol class="rq-chat"><li class="is-flagged">
+          <div class="rq-msg rq-msg-client"><span class="rq-who">What the client asked · message ${turn.turn_index + 1}</span><p>${esc2(turn.client)}</p></div>
+          ${turn.assistant ? `<div class="rq-msg rq-msg-ai"><span class="rq-who">What the AI replied</span><p>${esc2(turn.assistant)}</p></div>`
+    : '<div class="rq-msg rq-msg-ai is-empty"><span class="rq-who">What the AI replied</span><p>No reply recorded.</p></div>'}
+        </li></ol>`
+      : `<p class="cc-muted">The client's message isn't on this card — no evidence was frozen when it was filed.${ev.question ? ` The daily review read it as: “${esc2(ev.question)}”` : ''}</p>`;
+    const saved = it.staff_answer_at ? `<p class="cc-muted rq-answer-saved">Saved by ${esc2(actorName(data, it.staff_answer_by))}, ${esc2(when(it.staff_answer_at))}</p>` : '';
+    const canSend = !closed && it.owner !== 'chris';
+    const canApprove = !closed && it.owner === 'chris';
+    const actions = closed ? '' : `<div class="rq-answer-actions">
+        <button type="button" class="rq-btn" data-save-answer>Save answer</button>
+        ${canSend ? '<button type="button" class="rq-btn rq-btn-primary" data-send-chris>Send to Chris</button>' : ''}
+        ${canApprove ? '<button type="button" class="rq-btn rq-btn-primary" data-approve>Approve for AI</button>' : ''}
+      </div>
+      <p class="cc-muted rq-answer-help">${canApprove ? 'Approve for AI saves the question and this answer to the AI knowledge queue and closes the card.' : 'Send to Chris saves the answer and hands the card to Chris to approve for the AI.'}</p>`;
+    return section('The question', `<p class="rq-consult-co">Client: ${company}</p>${how ? `<p class="cc-muted">${how}</p>` : ''}${qa}
+        ${turns.length ? '<button type="button" class="rq-btn rq-btn-link" data-full-conv>Show the full conversation</button><div data-full></div>' : ''}`)
+      + section('Answer', `<div class="rq-answer">
+        <label class="sr-only" for="rq-answer">The consultant's answer</label>
+        <textarea id="rq-answer" data-answer rows="6" maxlength="8000" ${closed ? 'readonly' : ''} placeholder="${closed ? '' : 'The answer a consultant would give this client'}">${esc2(it.staff_answer || '')}</textarea>
+        ${saved}${actions}</div>`);
+  }
 
   function matchEvidence(r) {
     const axes = r.axes || [];
@@ -525,7 +608,9 @@
     owner: (e, d) => `Reassigned ${d?.from ? OWNER_WORDS[d.from] : 'no owner'} → ${d?.to ? OWNER_WORDS[d.to] : 'no owner'}`,
     closed: (e, d) => `Closed${d?.expected_match ? ` — ${d.expected_match === 'should' ? 'should have matched' : "shouldn't have matched"}` : ''}${d?.close_note ? `: “${d.close_note}”` : ''}`,
     comment: () => 'Commented',
-    recheck: (e, d) => `Re-check: pattern #${d?.pattern_id} was fixed`
+    recheck: (e, d) => `Re-check: pattern #${d?.pattern_id} was fixed`,
+    answered: () => 'Answer saved',
+    approved_for_ai: () => 'Approved for AI'
   };
 
   function historyHtml(data) {
@@ -571,6 +656,21 @@
     aside.querySelector('[data-close-card]')?.addEventListener('click', async () => {
       const answer = await closeDialog(it);
       if (answer) await act(() => ctx.send('POST', `${API}/${it.id}/close`, answer), 'closed');
+    });
+    // Consulting cards: the answer box and its three actions.
+    const answerText = () => aside.querySelector('[data-answer]')?.value.trim() ?? '';
+    const needAnswer = () => { const t = answerText(); if (!t) { toast('Write the answer first.', true); aside.querySelector('[data-answer]')?.focus(); } return t; };
+    aside.querySelector('[data-save-answer]')?.addEventListener('click', async () => {
+      const answer = needAnswer();
+      if (answer) await act(() => ctx.send('PATCH', `${API}/${it.id}/answer`, { answer }), 'answer saved');
+    });
+    aside.querySelector('[data-send-chris]')?.addEventListener('click', async () => {
+      const answer = needAnswer();
+      if (answer) await act(() => ctx.send('POST', `${API}/${it.id}/send-to-chris`, { answer }), 'sent to Chris');
+    });
+    aside.querySelector('[data-approve]')?.addEventListener('click', async () => {
+      const answer = needAnswer();
+      if (answer) await act(() => ctx.send('POST', `${API}/${it.id}/approve-for-ai`, { answer }), 'approved for the AI and closed');
     });
     aside.querySelector('[data-copy]')?.addEventListener('click', async (e) => {
       try { await navigator.clipboard.writeText(it.client_notice); e.target.textContent = 'Copied'; } catch { e.target.textContent = 'Select and copy'; }
@@ -641,6 +741,93 @@
       dlg.showModal();
       (dlg.querySelector('input[name="em"]') || dlg.querySelector('textarea')).focus();
     });
+  }
+
+  // ---------------------------------------------------------------- AI knowledge queue (#review?view=knowledge)
+  /** The queue: pending and exported answers, with Export. Keeps the .rq class so the shell treats it as the board. */
+  async function knowledgeView(panel) {
+    panel.innerHTML = `<section class="cc-card rq rq-kn">
+      <div class="rq-head">
+        <div>
+          <h2>AI knowledge queue</h2>
+          <p class="rq-intro">Consulting questions whose answers Chris approved for the AI. Export downloads the pending ones as one markdown file for gg3-ai-service and marks them exported; a past batch can be downloaded again.</p>
+        </div>
+        <a class="rq-kn-link" href="#review" data-back>← Back to the board</a>
+      </div>
+      <div data-kn-body><div class="cc-skel" style="width:60%"></div><div class="cc-skel" style="width:80%"></div></div>
+    </section>`;
+    panel.querySelector('[data-back]').addEventListener('click', (e) => {
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      ctx.go({ rq: '' });
+    });
+    const body = panel.querySelector('[data-kn-body]');
+    let data;
+    try {
+      data = await ctx.api(KAPI);
+    } catch (err) {
+      body.innerHTML = `<p class="cc-error">${esc2(err.status === 503 ? "The AI knowledge queue isn't set up on this server yet (migration 057)."
+        : err.status === 401 ? 'Your session has expired. Sign in again.' : "The queue didn't load. Refresh to try again.")}</p>`;
+      return;
+    }
+    if (ctx.state().tab !== 'review' || readFilters().view !== 'knowledge') return;
+    const items = data.items || [];
+    const pending = items.filter((r) => r.status === 'pending');
+    const exported = items.filter((r) => r.status === 'exported');
+    const question = (r) => clipText(String(r.question_rewritten || r.question || '').replace(/\s+/g, ' '), 140);
+    const company = (r) => (r.company_id != null
+      ? `<a href="#companies/${Number(r.company_id)}">${esc2(r.company_name || `Company #${r.company_id}`)}</a>${r.company_internal ? ' <span class="cc-tag-internal">Internal</span>' : ''}`
+      : '<span class="cc-muted">—</span>');
+    const table = (rows, isExported) => (rows.length
+      ? `<div class="rq-scroll"><table class="rq-table rq-kn-table"><thead><tr><th>Question</th><th>Company</th><th>Approved</th><th>Card</th>${isExported ? '<th>Batch</th>' : ''}</tr></thead>
+          <tbody>${rows.map((r) => `<tr>
+            <td title="${esc2(r.answer || '')}">${esc2(question(r))}</td>
+            <td>${company(r)}</td>
+            <td>${esc2(r.approved_by || '')}<br><span class="cc-muted">${esc2(when(r.approved_at))}</span></td>
+            <td>${r.item_id != null ? `<a href="#review/${Number(r.item_id)}">#${Number(r.item_id)}</a>` : '<span class="cc-muted">—</span>'}</td>
+            ${isExported ? `<td>${r.export_batch ? `<a href="${KAPI}/export/${esc2(r.export_batch)}" download title="Download this batch again">${esc2(r.export_batch)}</a>` : ''}</td>` : ''}
+          </tr>`).join('')}</tbody></table></div>`
+      : `<p class="cc-muted">${isExported ? 'Nothing exported yet.' : 'Nothing pending.'}</p>`);
+    body.innerHTML = `<div class="rq-kn-actions">
+        <button type="button" class="rq-btn rq-btn-primary" data-export ${pending.length ? '' : 'disabled'}>Export ${pending.length ? ctx.plural(pending.length, 'pending answer') : '— nothing pending'}</button>
+      </div>
+      <section class="rq-d-sec"><h3>Pending (${ctx.fmt(data.counts?.pending ?? pending.length)})</h3>${table(pending, false)}</section>
+      <section class="rq-d-sec"><h3>Exported (${ctx.fmt(data.counts?.exported ?? exported.length)})</h3>${table(exported, true)}</section>`;
+    body.querySelector('[data-export]')?.addEventListener('click', () => exportKnowledge(panel));
+    body.querySelectorAll('a[href^="#review/"]').forEach((a) => a.addEventListener('click', (e) => {
+      e.preventDefault();
+      ctx.go({ rq: '', card: Number(a.getAttribute('href').slice('#review/'.length)) });
+    }));
+  }
+
+  /** POST /export, then save the markdown the browser gets back. Raw fetch: ctx.send expects JSON. */
+  async function exportKnowledge(panel) {
+    const btn = panel.querySelector('[data-export]');
+    if (btn) { btn.disabled = true; btn.textContent = 'Exporting…'; }
+    try {
+      const r = await fetch(`${KAPI}/export`, { method: 'POST', credentials: 'same-origin', headers: { accept: 'text/markdown, application/json' } });
+      const type = r.headers.get('content-type') || '';
+      if (!r.ok) {
+        const b = type.includes('json') ? await r.json().catch(() => ({})) : {};
+        throw Object.assign(new Error(b.error || 'export failed'), { status: r.status });
+      }
+      if (type.includes('application/json')) {
+        toast('Nothing pending to export');
+      } else {
+        const blob = await r.blob();
+        const name = /filename="([^"]+)"/.exec(r.headers.get('content-disposition') || '')?.[1] || 'ai-knowledge.md';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        const n = Number(r.headers.get('x-export-count')) || 0;
+        toast(n ? `Exported ${ctx.plural(n, 'answer')} — ${name}` : `Exported ${name}`);
+      }
+    } catch (err) {
+      toast(err.status === 503 ? "The queue isn't set up on this server yet." : actionError(err), true);
+    }
+    await knowledgeView(panel);
   }
 
   // ---------------------------------------------------------------- toast

@@ -17,9 +17,11 @@ import {
   GET_ITEM_SQL, GET_FLAGS_SQL, GET_EVENTS_SQL, NEW_ITEM_IDS_SQL, NEW_ITEMS_SQL, LIST_SQL,
   SWEEP_CURSOR_SQL, KNOWN_REFS_SQL, EXISTING_MATCH_ITEMS_SQL, DOWNS_SQL, SWEEP_OVERLAP_MS,
   LOCK_PATTERN_SQL, LOCK_EMPTY_TRACK_SQL, SET_SNAPSHOT_SQL, LINKED_ITEMS_SQL, reopensClosed, addComment, COMMENT_MAX, STUCK_DAYS,
-  previewDiagnoses
+  previewDiagnoses,
+  LOCK_DEADLINE_SQL, SET_ANSWER_SQL, setAnswer, sendToChris, approveForAi, APPROVED_NOTE, ANSWER_MAX, isConsultingCard, KINDS, SOURCES
 } from '../../src/control-centre/review-queue.js';
 import { LINK_PATTERNS_SQL, PATTERN_ITEMS_SQL } from '../../src/control-centre/grant-patterns.js';
+import { INSERT_KNOWLEDGE_SQL } from '../../src/control-centre/knowledge.js';
 
 /** In-memory Hub: partial unique keys on items, UNIQUE source_ref on flags, unique link pairs. */
 function fakeHub() {
@@ -27,8 +29,9 @@ function fakeHub() {
   const flags = [];
   const events = [];
   const links = [];
+  const knowledge = [];
   const clock = { closeAt: null };
-  let ids = { item: 0, flag: 0, event: 0, link: 0 };
+  let ids = { item: 0, flag: 0, event: 0, link: 0, knowledge: 0 };
   const copy = (r) => (r ? { ...r } : r);
   const one = (r) => ({ rows: r ? [copy(r)] : [] });
   const byId = (id) => items.find((i) => i.id === id);
@@ -44,13 +47,16 @@ function fakeHub() {
             ? i.kind === 'grant_pattern' && i.grant_root_id === grant_root_id && i.pattern_category === pattern_category
             : kind === 'empty_track'
               ? i.kind === 'empty_track' && i.company_id === company_id && i.goal_track === goal_track
-              : i.kind === 'chat' && i.chat_turn_ref === chat_turn_ref));
+              : kind === 'grant_deadline'
+                ? i.kind === 'grant_deadline' && i.grant_root_id === grant_root_id
+                : i.kind === 'chat' && i.chat_turn_ref === chat_turn_ref));
         if (clash) return { rows: [] };
         const it = { id: ++ids.item, kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id, goal_track,
           status: 'new', owner: null,
           diagnosis: null, narrative: null, client_notice: null, flagged_again: false, flag_count: 0,
           expected_match: null, close_note: null, closed_by: null, closed_at: null,
-          snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null };
+          snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null,
+          staff_answer: null, staff_answer_by: null, staff_answer_at: null };
         items.push(it);
         return { rows: [{ id: it.id }] };
       }
@@ -62,6 +68,16 @@ function fakeHub() {
         return one(items.find((i) => i.kind === 'empty_track' && i.company_id === p[0] && i.goal_track === p[1]));
       case LOCK_PATTERN_SQL:
         return one(items.find((i) => i.kind === 'grant_pattern' && i.grant_root_id === p[0] && i.pattern_category === p[1]));
+      case LOCK_DEADLINE_SQL:
+        return one(items.find((i) => i.kind === 'grant_deadline' && i.grant_root_id === p[0]));
+      case SET_ANSWER_SQL:
+        return update(p[0], { staff_answer: p[1], staff_answer_by: p[2], staff_answer_at: 'now' });
+      case INSERT_KNOWLEDGE_SQL: {
+        const [item_id, conversation_id, company_id, question, question_rewritten, ai_reply, answer, approved_by] = p;
+        const k = { id: ++ids.knowledge, item_id, conversation_id, company_id, question, question_rewritten, ai_reply, answer, approved_by, status: 'pending' };
+        knowledge.push(k);
+        return one(k);
+      }
       case SET_SNAPSHOT_SQL: {
         const it = byId(p[0]);
         if (it.snapshot) return { rows: [] };
@@ -101,7 +117,8 @@ function fakeHub() {
         return update(p[0], { flag_count: byId(p[0]).flag_count + 1, status: 'new', flagged_again: true,
           owner: null, diagnosis: null, narrative: null, client_notice: null,
           expected_match: null, close_note: null, closed_by: null, closed_at: null,
-          snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null });
+          snapshot: null, snapshot_at: null, diagnosis_attempts: 0, last_error: null,
+          staff_answer: null, staff_answer_by: null, staff_answer_at: null });
       case DIAGNOSE_SQL: {
         const it = byId(p[0]);
         return update(p[0], { owner: p[1], diagnosis: p[2], narrative: p[3], client_notice: p[4],
@@ -142,8 +159,27 @@ function fakeHub() {
   }
 
   const deps = { hubQuery: q, hubTransaction: (cb) => cb({ query: q }) };
-  return { items, flags, events, links, clock, q, deps };
+  return { items, flags, events, links, knowledge, clock, q, deps };
 }
+
+/** A consulting-question chat card as the daily chat review files it (migration 057). */
+const consultingFlag = (over = {}) => ({
+  kind: 'chat', chat_turn_ref: 'conv:290:consulting_question', conversation_id: 290, company_id: 135,
+  source: 'oracle_detected', source_ref: 'oracle:290:consulting_question:t3', actor: 'system:oracle-chat-review',
+  comment: 'Consulting question the chat only partly answered.',
+  snapshot: {
+    source: 'oracle_detected', conversation_id: 290, issue: 'consulting_question',
+    rule_evidence: { rule: 'consulting_question', unmet_need: 'Consulting or application writing', answer: 'partly', unanswered_reason: null,
+      question: 'Can the consulting team manage the application end to end?' },
+    flagged_turn_index: 3,
+    turns: [
+      { turn_index: 2, client: 'Hi there', assistant: 'Hello! How can I help?', tools_used: [], flagged: false },
+      { turn_index: 3, client: 'What does it entail to have your consulting team manage the application end to end?',
+        assistant: 'GetGranted helps you find grants; for hands-on help, contact help@granted.ca.', tools_used: [], flagged: true }
+    ]
+  },
+  ...over
+});
 
 const matchFlag = (over = {}) => ({
   kind: 'match', company_id: 81, grant_root_id: 1196, source: 'client_thumbs_down',
@@ -517,6 +553,9 @@ describe('reads', () => {
 
 // The 👎 tests leave the pattern path out; it has its own tests below.
 const noPatterns = async () => ({ qualifying: [] });
+const noDeadlines = async () => ({ passed: 0, rows: [], filed: 0 });
+/** An event's detail, stored as JSON text. */
+const det = (e) => (typeof e.detail === 'string' ? JSON.parse(e.detail) : e.detail);
 
 describe('addComment', () => {
   test('logs one comment event with the author and text; status, owner and updated_at untouched', async () => {
@@ -566,7 +605,7 @@ describe('runReviewSweep', () => {
   test('dry run counts and writes nothing', async () => {
     const hub = fakeHub();
     const appQuery = jest.fn(async () => ({ rows: [...downs, downs[0]] })); // a repeated row is counted once
-    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery, runPatternSweep: noPatterns }, log: () => {} });
+    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery, runPatternSweep: noPatterns, runDeadlineSweep: noDeadlines }, log: () => {} });
     expect(appQuery).toHaveBeenCalledWith(DOWNS_SQL, [null]);
     expect(s).toMatchObject({ downs_read: 3, already_filed: 0, to_file: 3, items: 2, new_items: 2, written: false });
     expect(hub.items).toHaveLength(0);
@@ -577,7 +616,7 @@ describe('runReviewSweep', () => {
     const appQuery = jest.fn(async () => ({ rows: downs }));
     const flag = (input) => addFlag(input, hub.deps);
     const diag = (id) => runDiagnosis(id, { ...hub.deps, diagnoseFn: async () => null }); // not configured
-    const deps = { hubQuery: hub.q, appQuery, addFlag: flag, runDiagnosis: diag, runPatternSweep: noPatterns };
+    const deps = { hubQuery: hub.q, appQuery, addFlag: flag, runDiagnosis: diag, runPatternSweep: noPatterns, runDeadlineSweep: noDeadlines };
 
     const first = await runReviewSweep({ write: true, deps, log: () => {} });
     expect(first).toMatchObject({ filed: 3, new_items: 2, diagnosed: 0, left_new: 2, failed: 0 });
@@ -595,7 +634,7 @@ describe('runReviewSweep', () => {
     const { item } = await addFlag(matchFlag({ source_ref: 'old' }), hub.deps);
     await close(item.id, { expected_match: 'should' }, 'a', hub.deps);
     const appQuery = async () => ({ rows: [downs[0]] });
-    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery, runPatternSweep: noPatterns }, log: () => {} });
+    const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery, runPatternSweep: noPatterns, runDeadlineSweep: noDeadlines }, log: () => {} });
     expect(s).toMatchObject({ to_file: 1, items: 1, new_items: 0, reopened: 1 });
   });
 
@@ -605,7 +644,7 @@ describe('runReviewSweep', () => {
     await close(item.id, { expected_match: 'should' }, 'a', hub.deps);
     const previewDiagnoses = jest.fn(async () => ({ rows: [], cost: 0 }));
     const appQuery = async () => ({ rows: downs });
-    const s = await runReviewSweep({ preview: true, deps: { hubQuery: hub.q, appQuery, previewDiagnoses, runPatternSweep: noPatterns }, log: () => {} });
+    const s = await runReviewSweep({ preview: true, deps: { hubQuery: hub.q, appQuery, previewDiagnoses, runPatternSweep: noPatterns, runDeadlineSweep: noDeadlines }, log: () => {} });
     expect(previewDiagnoses.mock.calls[0][0]).toEqual([
       { company_id: 81, grant_root_id: 1196, reopen: true },
       { company_id: 83, grant_root_id: 1097, reopen: false }
@@ -885,5 +924,188 @@ describe('runReviewSweep → grant patterns', () => {
     const s = await runReviewSweep({ deps: { hubQuery: hub.q, appQuery: async () => ({ rows: [] }),
       runPatternSweep: async () => { throw Object.assign(new Error('x'), { code: 'not_configured' }); } }, log: () => {} });
     expect(s).toMatchObject({ downs_read: 0, patterns: { error: 'not_configured' } });
+  });
+});
+
+describe('grant_deadline items (migration 057)', () => {
+  const deadlineFlag = (over = {}) => ({
+    kind: 'grant_deadline', grant_root_id: 1822, source: 'catalogue_check', source_ref: 'deadline:1822:2021-04-15',
+    actor: 'system:deadline-check', comment: 'Deadline "15/04/2021" (2021-04-15) is 2016 days past; the grant is still active',
+    snapshot: { source: 'catalogue_check', checked_on: '2026-10-22', grant: { id: 1822, title: 'Old Fund', deadline_text: '15/04/2021', deadline: '2021-04-15', days_over: 2016, status: 'active' } },
+    ...over
+  });
+
+  test('the kind and the flag source are registered; a deadline flag needs a grant and nothing else', () => {
+    expect(KINDS).toContain('grant_deadline');
+    expect(SOURCES).toContain('catalogue_check');
+    expect(validateFlag(deadlineFlag())).toMatchObject({ kind: 'grant_deadline', grant_root_id: 1822, company_id: null, chat_turn_ref: null });
+    expect(() => validateFlag(deadlineFlag({ grant_root_id: undefined }))).toThrow(/grant_root_id/);
+    expect(() => validateFlag(deadlineFlag({ company_id: 5 }))).toThrow(/company_id/);
+    expect(() => validateFlag(deadlineFlag({ chat_turn_ref: 'x' }))).toThrow(/chat_turn_ref/);
+  });
+
+  test('one card per grant: the same date is a duplicate, a new past date is a second flag on the same card', async () => {
+    const hub = fakeHub();
+    const a = await addFlag(deadlineFlag(), hub.deps);
+    expect(a.created).toBe(true);
+    expect(hub.items[0]).toMatchObject({ kind: 'grant_deadline', grant_root_id: 1822, company_id: null, snapshot: { grant: { id: 1822 } } });
+    expect((await addFlag(deadlineFlag(), hub.deps)).duplicate).toBe(true);
+    const b = await addFlag(deadlineFlag({ source_ref: 'deadline:1822:2026-09-30' }), hub.deps);
+    expect(b.created).toBe(false);
+    expect(hub.items).toHaveLength(1);
+    expect(hub.items[0].flag_count).toBe(2);
+  });
+
+  test('a closed deadline card reopens on a flag with a newer date, and takes that flag\'s evidence', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(deadlineFlag(), hub.deps);
+    await close(item.id, { close_note: 'closed the grant' }, 'a@granted.ca', hub.deps);
+    const r = await addFlag(deadlineFlag({ source_ref: 'deadline:1822:2026-09-30',
+      snapshot: { source: 'catalogue_check', checked_on: '2026-11-01', grant: { id: 1822, deadline: '2026-09-30', days_over: 32 } } }), hub.deps);
+    expect(r.reopened).toBe(true);
+    expect(hub.items[0]).toMatchObject({ status: 'new', flagged_again: true, snapshot: { grant: { deadline: '2026-09-30' } } });
+  });
+});
+
+describe('consulting cards: answer, send to Chris, approve for AI (migration 057)', () => {
+  const STAFF = 'consultant@granted.ca';
+
+  test('isConsultingCard reads the ref: kind chat with the consulting issue', () => {
+    expect(isConsultingCard({ kind: 'chat', chat_turn_ref: 'conv:290:consulting_question' })).toBe(true);
+    expect(isConsultingCard({ kind: 'chat', chat_turn_ref: 'conv:290:pushback' })).toBe(false);
+    expect(isConsultingCard({ kind: 'match', chat_turn_ref: null })).toBe(false);
+  });
+
+  test('setAnswer saves the answer with its author and logs it; only on an open consulting card', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(consultingFlag(), hub.deps);
+    const updated = await setAnswer(item.id, '  We offer end-to-end application management; a consultant will reach out.  ', STAFF, hub.deps);
+    expect(updated).toMatchObject({ staff_answer: 'We offer end-to-end application management; a consultant will reach out.', staff_answer_by: STAFF });
+    expect(hub.events.at(-1)).toMatchObject({ action: 'answered', actor: STAFF });
+    expect(det(hub.events.at(-1))).toEqual({ text: 'We offer end-to-end application management; a consultant will reach out.' });
+    expect(hub.items[0].status).toBe('new');
+
+    await expectStatus(setAnswer(item.id, '', STAFF, hub.deps), 400);
+    await expectStatus(setAnswer(item.id, 'x'.repeat(ANSWER_MAX + 1), STAFF, hub.deps), 400);
+    await expectStatus(setAnswer(item.id, 'ok', null, hub.deps), 400);
+    await expectStatus(setAnswer(999, 'ok', STAFF, hub.deps), 404);
+    const { item: match } = await addFlag(matchFlag(), hub.deps);
+    await expectStatus(setAnswer(match.id, 'ok', STAFF, hub.deps), 400);
+    await close(item.id, {}, STAFF, hub.deps);
+    await expectStatus(setAnswer(item.id, 'late', STAFF, hub.deps), 409);
+  });
+
+  test('sendToChris saves the answer, hands the card to chris and moves it off new; a second send changes nothing else', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(consultingFlag(), hub.deps);
+    const sent = await sendToChris(item.id, 'Draft answer', STAFF, hub.deps);
+    expect(sent).toMatchObject({ owner: 'chris', status: 'in_progress', staff_answer: 'Draft answer', staff_answer_by: STAFF });
+    expect(hub.events.slice(-3).map((e) => e.action)).toEqual(['answered', 'owner', 'status']);
+    expect(det(hub.events.at(-2))).toEqual({ from: null, to: 'chris' });
+    expect(hub.events.at(-1)).toMatchObject({ from_status: 'new', to_status: 'in_progress' });
+    const n = hub.events.length;
+    await sendToChris(item.id, 'Draft answer v2', STAFF, hub.deps);
+    expect(hub.events.slice(n).map((e) => e.action)).toEqual(['answered']);
+    expect(hub.items[0].staff_answer).toBe('Draft answer v2');
+  });
+
+  test('approveForAi: only once the card is with chris and answered; queues the pair and closes the card', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(consultingFlag(), hub.deps);
+    await expectStatus(approveForAi(item.id, 'chris@granted.ca', {}, hub.deps), 409);           // not with chris yet
+    await setOwner(item.id, 'chris', 'chris@granted.ca', hub.deps);
+    await expectStatus(approveForAi(item.id, 'chris@granted.ca', {}, hub.deps), 400);           // no answer yet
+    await sendToChris(item.id, 'Yes — Granted manages applications end to end; book a call.', STAFF, hub.deps);
+
+    const r = await approveForAi(item.id, 'chris@granted.ca', {}, hub.deps);
+    expect(r.item).toMatchObject({ status: 'closed', close_note: APPROVED_NOTE, closed_by: 'chris@granted.ca', expected_match: null });
+    expect(r.knowledge).toMatchObject({
+      item_id: item.id, conversation_id: 290, company_id: 135,
+      question: 'What does it entail to have your consulting team manage the application end to end?',
+      question_rewritten: 'Can the consulting team manage the application end to end?',
+      ai_reply: 'GetGranted helps you find grants; for hands-on help, contact help@granted.ca.',
+      answer: 'Yes — Granted manages applications end to end; book a call.', approved_by: 'chris@granted.ca', status: 'pending'
+    });
+    expect(hub.knowledge).toHaveLength(1);
+    expect(hub.events.slice(-2).map((e) => [e.action, e.from_status, e.to_status])).toEqual([
+      ['approved_for_ai', 'in_progress', 'closed'], ['closed', 'in_progress', 'closed']]);
+    expect(det(hub.events.at(-2))).toEqual({ knowledge_id: 1 });
+    expect(det(hub.events.at(-1))).toEqual({ expected_match: null, close_note: APPROVED_NOTE });
+    await expectStatus(approveForAi(item.id, 'chris@granted.ca', {}, hub.deps), 409);           // already closed
+  });
+
+  test('approveForAi with an answer in the call saves it first; a bad one is a 400 and nothing is queued', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(consultingFlag(), hub.deps);
+    await sendToChris(item.id, 'Draft', STAFF, hub.deps);
+    await expectStatus(approveForAi(item.id, 'chris@granted.ca', { answer: 'x'.repeat(ANSWER_MAX + 1) }, hub.deps), 400);
+    expect(hub.knowledge).toHaveLength(0);
+    const r = await approveForAi(item.id, 'chris@granted.ca', { answer: 'Final wording' }, hub.deps);
+    expect(r.knowledge.answer).toBe('Final wording');
+    expect(det(hub.events.filter((e) => e.action === 'answered').at(-1))).toEqual({ text: 'Final wording' });
+  });
+
+  test('a reopen clears the consultant\'s answer (the answered event keeps the text)', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(consultingFlag(), hub.deps);
+    await sendToChris(item.id, 'Draft', STAFF, hub.deps);
+    await approveForAi(item.id, 'chris@granted.ca', {}, hub.deps);
+    const r = await addFlag(consultingFlag({ source_ref: 'oracle:290:consulting_question:t5' }), hub.deps);
+    expect(r.reopened).toBe(true);
+    expect(hub.items[0]).toMatchObject({ status: 'new', owner: null, staff_answer: null, staff_answer_by: null });
+    expect(hub.events.some((e) => e.action === 'answered' && det(e).text === 'Draft')).toBe(true);
+  });
+
+  test('runDiagnosis keeps a code-made consulting owner (not the chris default)', async () => {
+    const hub = fakeHub();
+    const { item } = await addFlag(consultingFlag(), hub.deps);
+    const r = await runDiagnosis(item.id, { ...hub.deps, diagnoseFn: async () => ({
+      ok: true, owner: 'consulting', verdict: 'consulting_question', narrative: 'A consultant should answer.', client_notice: null,
+      diagnosis: { verdict: 'consulting_question', rule: 'consulting_question', model: null }, snapshotTaken: false, cost: 0 }) });
+    expect(r.diagnosed).toBe(true);
+    expect(hub.items[0]).toMatchObject({ status: 'diagnosed', owner: 'consulting', snapshot: { issue: 'consulting_question' } });
+    expect(hub.events.at(-1)).toMatchObject({ action: 'diagnosed' });
+    expect(det(hub.events.at(-1))).toEqual({ owner: 'consulting', verdict: 'consulting_question' });
+  });
+});
+
+describe('runReviewSweep: deadline cards', () => {
+  const downs = [{ id: 'r1', company_id: 81, grant_root_id: 1196, created_at: new Date('2026-10-09T16:25:53Z'), clerk_id: 'user_a' }];
+
+  test('the deadline sweep runs after the pattern sweep with the sweep\'s own addFlag, and its result is reported', async () => {
+    const hub = fakeHub();
+    const appQuery = jest.fn(async () => ({ rows: downs }));
+    const flag = (input) => addFlag(input, hub.deps);
+    const runDeadlineSweep = jest.fn(async ({ write, deps }) => {
+      expect(write).toBe(true);
+      expect(deps.appQuery).toBe(appQuery);
+      expect(deps.addFlag).toBe(flag);
+      return { passed: 2, rows: [], filed: 2, new_items: 2 };
+    });
+    const s = await runReviewSweep({ write: true, deps: { hubQuery: hub.q, appQuery, addFlag: flag, runDiagnosis: async () => ({ diagnosed: false }),
+      runPatternSweep: noPatterns, runDeadlineSweep }, log: () => {} });
+    expect(runDeadlineSweep).toHaveBeenCalledTimes(1);
+    expect(s.deadlines).toEqual({ passed: 2, rows: [], filed: 2, new_items: 2 });
+    expect(s.filed).toBe(1);
+  });
+
+  test('a failing deadline sweep is reported and never stops the 👎 path', async () => {
+    const hub = fakeHub();
+    const appQuery = jest.fn(async () => ({ rows: downs }));
+    const s = await runReviewSweep({ write: true, deps: { hubQuery: hub.q, appQuery, addFlag: (i) => addFlag(i, hub.deps),
+      runDiagnosis: async () => ({ diagnosed: false }), runPatternSweep: noPatterns,
+      runDeadlineSweep: async () => { throw Object.assign(new Error('app down'), { code: 'ECONNRESET' }); } }, log: () => {} });
+    expect(s.deadlines).toEqual({ error: 'ECONNRESET' });
+    expect(s.filed).toBe(1);
+    expect(hub.items).toHaveLength(1);
+  });
+
+  test('the dry-run preview includes the deadline cards it would file, with their evidence', async () => {
+    const hub = fakeHub();
+    const previewDiagnoses = jest.fn(async () => ({ rows: [], cost: 0 }));
+    const snapshot = { source: 'catalogue_check', grant: { id: 1822, deadline: '2021-04-15', days_over: 2016 } };
+    await runReviewSweep({ preview: true, deps: { hubQuery: hub.q, appQuery: async () => ({ rows: [] }), previewDiagnoses,
+      runPatternSweep: noPatterns, runDeadlineSweep: async () => ({ passed: 1, rows: [{ grant_id: 1822, flag: { snapshot } }] }) }, log: () => {} });
+    expect(previewDiagnoses).toHaveBeenCalledWith([{ kind: 'grant_deadline', grant_root_id: 1822, snapshot }], expect.anything());
   });
 });

@@ -425,6 +425,14 @@ export async function loadGrantWindow(range, overrides = {}) {
     range,
     current: { from, to },
     days,
+    // The previous window's days, sign-ups and chats ride along for the
+    // Department views (one cached load for "now vs before"); the list and
+    // page don't read them.
+    previous_days: rows.w.previous.days,
+    w: rows.w,
+    signups: rows.signups,
+    chats: rows.chats,
+    chatCompany: rows.chatCompany,
     grants,
     matches: rows.matches,
     views: rows.views,

@@ -830,7 +830,7 @@ function internalAskedText(d) {
 }
 
 const STATUS_WORDS = { new: 'new', diagnosed: 'diagnosed', in_progress: 'in progress', closed: 'closed' };
-const OWNER_WORDS = { client: 'client', research: 'Research', chris: 'Chris', jason: 'Jason' };
+const OWNER_WORDS = { client: 'client', research: 'Research', chris: 'Chris', jason: 'Jason', consulting: 'Consulting' };
 
 /** "in progress · Research" — a card's state in words. */
 export function issueState(i) {

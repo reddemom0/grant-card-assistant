@@ -6,8 +6,10 @@
  *                     breakdowns by province, goal track / grant type and grant
  *                     vs loan — client-only and with internal accounts
  *   changes(range)    what changed in the catalogue in the range: grants that
- *                     went live, closed or were removed, edits, deadlines passed
- *                     and due in the next 30 days
+ *                     went live, closed, were removed or republished, edits,
+ *                     and today's deadlines: passed (a live grant whose
+ *                     deadline text is a past date), due in the next 30 days,
+ *                     blank, unreadable (parseDeadline — one parser, src/tools/deadline.js)
  *
  * Coverage counts are today's catalogue (live grants and their tags). Matches,
  * AI-review cuts, goal-track gaps and changes follow the range.
@@ -50,6 +52,7 @@ import { grantLink, cardLink } from './links.js';
 import { CLIENTS_SQL, ALL_GOALS_SECTION } from './companies.js';
 import { shapeEdits } from './grants.js';
 import { splitGrantTypes } from '../tools/grant-data-modes.js';
+import { parseDeadline as readDeadline } from '../tools/deadline.js';
 import { MAIN_INDUSTRIES, tokenMains, profileMains, canonicalToken, specificsByMain } from './industry-vocabulary.js';
 
 export const THIN_MIN_CLIENTS = 2;
@@ -211,36 +214,18 @@ export function fundingOf(grantType) {
   return types.every((t) => /^loan$/i.test(t)) ? 'loan' : 'both';
 }
 
-const MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-const monthOf = (word) => {
-  const w = String(word).toLowerCase().replace(/\.$/, '');
-  const i = MONTHS.findIndex((m) => m === w || (w.length >= 3 && m.startsWith(w)));
-  return i < 0 ? null : i + 1;
-};
-const ymd = (y, m, d) => {
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
-  return `${String(y).padStart(4, '0')}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-};
-
 /**
- * A free-text deadline → 'YYYY-MM-DD', or null when it isn't a date ("Open
- * Until Filled", French text, blank). Reads 2026-07-15, 15/04/2021 (day first;
- * month first only when the day can't be a month), "May 27, 2026",
- * "August 13 2026", "6 November 2026", "1st December 2026".
+ * A free-text deadline → 'YYYY-MM-DD', or null when it isn't one date: blank,
+ * rolling ("Open Until Filled", "Ouvert jusqu'à épuisement des fonds") or
+ * unreadable (an ambiguous 04/09/2026, a month with no day, two dates). One
+ * parser for the whole Hub — src/tools/deadline.js — which also reads French
+ * months and ordinals and never guesses. The app DB has no structured due
+ * date (checked 2026-10-22: grants.deadline is the only deadline column), so
+ * this text is the source for every deadline the Control Centre shows.
  */
 export function parseDeadline(text) {
-  const s = String(text ?? '').trim();
-  if (!s) return null;
-  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
-  if (m) return ymd(+m[1], +m[2], +m[3]);
-  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
-  if (m) return +m[2] > 12 ? ymd(+m[3], +m[1], +m[2]) : ymd(+m[3], +m[2], +m[1]);
-  m = /^([A-Za-z]+)\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/.exec(s);
-  if (m && monthOf(m[1])) return ymd(+m[3], monthOf(m[1]), +m[2]);
-  m = /^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]+)\.?,?\s+(\d{4})$/.exec(s);
-  if (m && monthOf(m[2])) return ymd(+m[3], monthOf(m[2]), +m[1]);
-  return null;
+  const d = readDeadline(text);
+  return d.kind === 'date' ? d.date : null;
 }
 
 /** Pure: a gg3_grants row → the tags coverage reads. */
@@ -416,7 +401,7 @@ export function breakdowns(ctx) {
     const clientIds = ctx.clients.filter((c) => c.provinces.some((x) => provinceOf(x) === p || provinceOf(x) === 'national')).map((c) => c.id);
     const act = activity(clientIds, ctx);
     return { province: p, restricted: tagged.filter((g) => !g.tags.national && g.tags.provinces.has(p)).length, national,
-      clients: act.clients, ran_matching: act.ran_matching, avg_matches: act.avg_matches, thin: act.thin,
+      clients: act.clients, ran_matching: act.ran_matching, grant_matches: act.grant_matches, avg_matches: act.avg_matches, thin: act.thin,
       ...summarise(gapsFor(clientIds)) };
   });
 
@@ -591,10 +576,15 @@ export function buildCoverage(input, { isInternal = isInternalCompany } = {}) {
   };
 }
 
-/** Pure: audit transitions in the range → added / closed / removed per root. */
+/**
+ * Pure: audit transitions in the range → added / closed / removed / republished
+ * per root. Republished = a version.publish of a grant that was live before and
+ * after (active → active): the live card changed. A grant that went live in
+ * the range is `added` only, never also `republished`.
+ */
 export function catalogueTransitions(rows, deletedLive, liveIds) {
   const per = new Map();
-  const at = (id) => { if (!per.has(id)) per.set(id, { grant_id: id, went_live: null, closed: null, removed: null, to_status: null }); return per.get(id); };
+  const at = (id) => { if (!per.has(id)) per.set(id, { grant_id: id, went_live: null, closed: null, removed: null, to_status: null, republished: null }); return per.get(id); };
   for (const r of rows) {
     const e = at(Number(r.grant_id));
     const when = iso(r.created_at);
@@ -605,17 +595,19 @@ export function catalogueTransitions(rows, deletedLive, liveIds) {
     if (r.action === 'status.amend' && next && /^\d+$/.test(next)) continue;
     if (next === 'active' && prev !== 'active') { e.went_live = when; e.to_status = 'active'; }
     else if (prev === 'active' && next && next !== 'active') { e.closed = when; e.to_status = next; }
+    else if (r.action === 'version.publish' && prev === 'active' && next === 'active') e.republished = when;
   }
   for (const r of deletedLive) at(Number(r.grant_id)).removed = iso(r.deleted_at);
-  const added = []; const closed = []; const removed = [];
+  const added = []; const closed = []; const removed = []; const republished = [];
   for (const e of per.values()) {
     const live = liveIds.has(e.grant_id);
     if (e.removed && !live) removed.push({ grant_id: e.grant_id, at: e.removed });
     else if (e.went_live && live && !(e.closed && e.closed > e.went_live)) added.push({ grant_id: e.grant_id, at: e.went_live });
     else if (e.closed && !live) closed.push({ grant_id: e.grant_id, at: e.closed, status: e.to_status });
+    else if (e.republished && live) republished.push({ grant_id: e.grant_id, at: e.republished });
   }
   const newest = (a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : a.grant_id - b.grant_id);
-  return { added: added.sort(newest), closed: closed.sort(newest), removed: removed.sort(newest) };
+  return { added: added.sort(newest), closed: closed.sort(newest), removed: removed.sort(newest), republished: republished.sort(newest) };
 }
 
 /** Pure: edit rows (newest first) → one entry per grant. */
@@ -634,47 +626,41 @@ export function editsByGrant(rows) {
     .sort((a, b) => (a.last_at < b.last_at ? 1 : a.last_at > b.last_at ? -1 : 0));
 }
 
-/** Pure: live grants → deadline passed / due in the next DUE_SOON_DAYS days. */
-export function deadlineFlags(grants, today) {
-  const soon = addDays(today, DUE_SOON_DAYS);
-  const passed = []; const dueSoon = []; let noDate = 0;
-  for (const g of grants) {
-    const d = parseDeadline(g.deadline);
-    if (!d) { noDate += 1; continue; }
-    const row = { grant_id: g.root_id, deadline: d, deadline_text: g.deadline };
-    if (d < today) passed.push(row);
-    else if (d <= soon) dueSoon.push(row);
-  }
-  return { passed: passed.sort((a, b) => a.deadline.localeCompare(b.deadline)),
-    due_soon: dueSoon.sort((a, b) => a.deadline.localeCompare(b.deadline)), no_date: noDate };
-}
-
-/** Deadline text that means "no fixed date, apply any time" — not a problem to fix. */
-export const ROLLING_DEADLINE = /until filled|ongoing|rolling|continuous|year[- ]round|no deadline|jusqu|en continu|en tout temps/i;
-export const HYGIENE_DAYS = 90;
+/** Signed whole days from `today` to `day` (both 'YYYY-MM-DD'): −12 = twelve days ago. */
+export const daysFrom = (today, day) =>
+  Math.round((Date.parse(`${day}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
 
 /**
- * Pure: the Research "deadline hygiene" counts. Same parse as deadlineFlags
- * (which, with DUE_SOON_DAYS, stays as it is for the Changes list) but a wider
- * window, and the no-date grants split: blank, rolling ("Open Until Filled" and
- * the like — fine), and text that isn't a date or a rolling phrase (unreadable).
+ * Pure: today's live grants by what their deadline text says, one parse each
+ * (parseDeadline). A date before today is `passed` — the grant is still
+ * active, so its status and its deadline disagree; a date up to DUE_SOON_DAYS
+ * ahead is `due_soon`; no text is `blank`; a rolling phrase ("Open Until
+ * Filled") is `rolling` and fine; anything else is `unreadable`. Each row:
+ * {grant_id, title, grantor, deadline (ISO or null), deadline_text, days}
+ * with `days` signed from today. `no_date` counts blank, rolling and
+ * unreadable together, as the Changes list and Oracle's tool always have.
  */
-export function deadlineHygiene(grants, today, days = HYGIENE_DAYS) {
-  const until = addDays(today, days);
-  const passed = []; const dueWithin = []; const blank = []; const unreadable = []; let rolling = 0;
+export function deadlineFlags(grants, today) {
+  const soon = addDays(today, DUE_SOON_DAYS);
+  const out = { passed: [], due_soon: [], blank: [], rolling: [], unreadable: [], no_date: 0 };
   for (const g of grants) {
-    const text = String(g.deadline ?? '').trim();
-    const d = parseDeadline(text);
-    const row = { grant_id: g.root_id, title: g.title, deadline: d, deadline_text: g.deadline ?? null };
-    if (d) {
-      if (d < today) passed.push(row);
-      else if (d <= until) dueWithin.push(row);
-    } else if (!text) blank.push(row);
-    else if (ROLLING_DEADLINE.test(text)) rolling += 1;
-    else unreadable.push(row);
+    const text = g.deadline == null ? null : (String(g.deadline).trim() || null);
+    const d = readDeadline(text);
+    const row = { grant_id: g.root_id, title: g.title ?? null, grantor: g.grantor ?? null,
+      deadline: d.kind === 'date' ? d.date : null, deadline_text: text,
+      days: d.kind === 'date' ? daysFrom(today, d.date) : null };
+    if (d.kind === 'date') {
+      if (d.date < today) out.passed.push(row);
+      else if (d.date <= soon) out.due_soon.push(row);
+      continue;
+    }
+    out.no_date += 1;
+    out[d.kind].push(row);
   }
-  const byDate = (a, b) => a.deadline.localeCompare(b.deadline);
-  return { days, passed: passed.sort(byDate), due_within: dueWithin.sort(byDate), blank, unreadable, rolling };
+  const byDate = (a, b) => a.deadline.localeCompare(b.deadline) || a.grant_id - b.grant_id;
+  out.passed.sort(byDate);
+  out.due_soon.sort(byDate);
+  return out;
 }
 
 /** What changed in the catalogue in the range. */
@@ -710,11 +696,14 @@ export async function changes(range = 'month', overrides = {}) {
       added: moves.added.map(named),
       closed: moves.closed.map(named),
       removed: moves.removed.map(named),
+      republished: moves.republished.map(named),
       edited: edited.map(named),
       deadline_passed: deadlines.passed.map(named),
       due_soon: deadlines.due_soon.map(named),
+      deadline_blank: deadlines.blank.map(named),
+      deadline_unreadable: deadlines.unreadable.map(named),
       definitions: { due_soon_days: DUE_SOON_DAYS, deadlines_without_a_date: deadlines.no_date,
-        audit_from: '2026-03-05', publishes_from: '2026-07-02' },
+        deadlines_rolling: deadlines.rolling.length, audit_from: '2026-03-05', publishes_from: '2026-07-02' },
       generated_at: new Date(now).toISOString()
     };
   });

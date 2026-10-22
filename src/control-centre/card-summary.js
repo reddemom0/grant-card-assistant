@@ -22,6 +22,14 @@ export const CATEGORY_WORDS = Object.freeze({
   other: 'other reason'
 });
 
+/**
+ * The daily chat review's consulting-question card (chat-daily.js): a client
+ * asked for consulting or application writing and the chat didn't fully
+ * answer. Lives here, not in chat-daily.js, so diagnosis.js and review-queue.js
+ * can read it without an import cycle (chat-daily imports diagnosis).
+ */
+export const CONSULTING_ISSUE = 'consulting_question';
+
 /** Chat card issues (the <issue> in conv:<id>:<issue>) in words. */
 export const ISSUE_WORDS = Object.freeze({
   asked_for_human: 'Client asked for a person',
@@ -31,7 +39,8 @@ export const ISSUE_WORDS = Object.freeze({
   chat_broke: 'Chat broke mid-answer',
   empty_reply: 'Empty reply or refusal',
   no_cards_for_funding_ask: 'Funding ask, no grant cards shown',
-  card_for_rejected_grant: 'Card shown for a grant the reply ruled out'
+  card_for_rejected_grant: 'Card shown for a grant the reply ruled out',
+  [CONSULTING_ISSUE]: 'Consulting or application-writing question'
 });
 
 export const categoryWords = (c) => CATEGORY_WORDS[c] ?? String(c ?? '').replace(/_/g, ' ');
@@ -54,6 +63,7 @@ export function cardTitle(item) {
     return `${item.goal_track || 'A goal'} track showed ${company} nothing`;
   }
   if (item.kind === 'grant_pattern') return `${grant} — cut for several companies (${categoryWords(item.pattern_category)})`;
+  if (item.kind === 'grant_deadline') return `${grant} — deadline passed, still live`;
   if (item.kind === 'match') {
     const company = item.company_name || (item.company_id != null ? `company #${item.company_id}` : 'a company');
     return `${grant} matched to ${company}`;

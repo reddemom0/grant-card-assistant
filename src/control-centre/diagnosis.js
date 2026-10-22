@@ -44,6 +44,7 @@
  */
 
 import { calculateRequestCost } from '../config/cost-settings.js';
+import { chatIssue, CONSULTING_ISSUE } from './card-summary.js';
 
 export const DIAGNOSIS_MODEL = 'claude-sonnet-5-5';
 export const MAX_DIAGNOSIS_ATTEMPTS = 3;
@@ -54,7 +55,7 @@ export const PRIOR_CHAT_TURNS = 3;
 export const COST_SOURCE = 'cc-review-diagnosis';
 
 /** Mirrors OWNERS in review-queue.js (asserted equal in the tests); kept local to avoid an import cycle. */
-const ALL_OWNERS = ['client', 'research', 'chris', 'jason'];
+const ALL_OWNERS = ['client', 'research', 'chris', 'jason', 'consulting'];
 
 export const VERDICTS = Object.freeze([
   'tag_missed_restriction',
@@ -71,6 +72,9 @@ export const VERDICTS = Object.freeze([
   'chat_results_not_shown',
   'chat_carded_rejected_grant',
   'no_grants_for_goal',
+  // Set by code, never by the model (migration 057 cards).
+  CONSULTING_ISSUE,
+  'deadline_passed',
   'unclear'
 ]);
 /** Set by code only, after the third failed attempt. */
@@ -135,6 +139,18 @@ export function routeFor(item, snapshot) {
       verdicts: ['tag_missed_restriction', 'card_missing_restriction', 'unclear'],
       ownerByVerdict: { tag_missed_restriction: 'chris', card_missing_restriction: 'research', unclear: 'chris' }
     };
+  }
+  // Two kinds of card need no judgement: the owner and verdict are set in code
+  // and no model is called (diagnoseDeadline / diagnoseConsulting).
+  if (item.kind === 'grant_deadline') {
+    return { rule: 'deadline_passed', allowed: ['research'], default: 'research', verdicts: ['deadline_passed'],
+      forcedVerdict: 'deadline_passed', codeOnly: true };
+  }
+  // Keyed on the card's ref, not its snapshot: a reopen clears the snapshot and
+  // a staff re-flag stores none, and the ref never changes.
+  if (isConsultingItem(item)) {
+    return { rule: CONSULTING_ISSUE, allowed: ['consulting'], default: 'consulting', verdicts: [CONSULTING_ISSUE],
+      forcedVerdict: CONSULTING_ISSUE, codeOnly: true, chatFields: true };
   }
   // The daily chat pass's two rules (chat-daily.js): owner chris, the verdict
   // set from the evidence the rule recorded, not chosen by the model.
@@ -437,9 +453,10 @@ export async function takeSnapshot(item, deps) {
     if (!r.ok) return { ok: false, code: r.code, notConfigured: r.code === 'not_configured' };
     return { ok: true, snapshot: { source: 'match_explain', fetched_at: now, response: r.body }, snapshotAt: now, taken: true };
   }
-  // An empty-track card's evidence is taken when it is filed; a reopened card
-  // gets a fresh one from the flag that reopened it.
+  // An empty-track or deadline card's evidence is taken when it is filed; a
+  // reopened card gets a fresh one from the flag that reopened it.
   if (item.kind === 'empty_track') return { ok: false, code: 'empty_track_no_evidence' };
+  if (item.kind === 'grant_deadline') return { ok: false, code: 'deadline_no_evidence' };
   if (!deps.opsQuery) return { ok: false, code: 'not_configured', notConfigured: true };
   if (item.kind === 'grant_pattern') {
     let r;
@@ -520,6 +537,9 @@ const RULE_TEXT = {
   pattern_tag: 'An automatic review removed this grant from several companies\' lists for the same reason, so the grant\'s own data is the likely problem. Some companies may be Granted\'s own internal accounts; call them internal accounts, never test accounts. Read the card text. If the card text DOES state the restriction the reviews give, verdict tag_missed_restriction (owner chris — the tagger missed it). If the card text does NOT state it, verdict card_missing_restriction (owner research — the card needs it added). If the reviews look wrong for these companies, verdict unclear (owner chris) and say why. Name the restriction and how many companies were affected.',
   empty_track: 'A goal track showed this client no grants at all in their latest recorded match run. The evidence says how many grants were considered and at which step they were removed, and gives the client\'s profile with its gaps. If a missing or unreadable profile field explains it (for example most grants removed at eligibility on a field the profile lacks or gets wrong), verdict profile_incomplete (owner client) and write client_notice starting "Tell the client to:". If the grants for this goal simply don\'t cover the client\'s province or industry, verdict no_grants_for_goal (owner research — grant coverage). Otherwise unclear (owner chris — the engine). Say which step removed most grants, in plain words.',
   pattern_region: 'An automatic review removed this grant from several companies\' lists because of where they are. The grant\'s list of regions is grant data, not a tagger output, so owner must be research. If the card text states a narrower location than the listed regions, verdict region_list_wrong; if it does not state one, verdict card_missing_restriction.',
+  // Never sent: these two rules are decided in code (diagnoseDeadline / diagnoseConsulting).
+  deadline_passed: 'A live grant whose deadline text is a past date. Owner must be research; verdict deadline_passed.',
+  [CONSULTING_ISSUE]: 'A client asked for consulting or application writing and the chat did not fully answer. Owner must be consulting; verdict consulting_question.',
   unclear: 'The cause is unclear from the evidence. Owner must be chris. Say what is known and what is missing.'
 };
 
@@ -697,6 +717,11 @@ export async function diagnoseItem(item, ctx = {}) {
     patternSnapshot: ctx.patternSnapshot,
     cutIds: ctx.cutIds
   };
+  // Code-only cards: owner and verdict are known from the kind or the ref, so no
+  // model is called and no API key is needed.
+  if (item.kind === 'grant_deadline') return diagnoseDeadline(item);
+  if (isConsultingItem(item)) return diagnoseConsulting(item, deps);
+
   if (!ctx.createMessage && !String(env.ANTHROPIC_API_KEY || '').trim()) {
     console.warn('⚠️  CC review diagnosis skipped — ANTHROPIC_API_KEY not set');
     return null;
@@ -764,6 +789,93 @@ export async function diagnoseItem(item, ctx = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Code-only diagnoses (migration 057): no model call
+// ---------------------------------------------------------------------------
+
+/** A consulting-question chat card — by its ref, which survives a reopen. */
+export function isConsultingItem(item) {
+  return item?.kind === 'chat' && chatIssue(item.chat_turn_ref) === CONSULTING_ISSUE;
+}
+
+/** The flagged turn of a chat snapshot: marked `flagged`, else by index, else the last one. */
+export function flaggedTurn(snapshot) {
+  const turns = Array.isArray(snapshot?.turns) ? snapshot.turns : [];
+  return turns.find((t) => t?.flagged)
+    ?? (snapshot?.flagged_turn_index != null ? turns.find((t) => t?.turn_index === snapshot.flagged_turn_index) : null)
+    ?? turns.at(-1)
+    ?? null;
+}
+
+const ANSWER_WORDS = { answered: 'answered it', partly: 'only partly answered it', not_answered: "didn't answer it" };
+const REASON_WORDS = {
+  no_answer: 'the reply gave no answer',
+  asked_for_person: 'the client asked for a person',
+  left_after_bad_reply: 'the client left after a weak reply'
+};
+
+/** Pure: the fixed narrative of a consulting card, from the rule's evidence. */
+export function consultingNarrative(ev = {}) {
+  const need = ev.unmet_need ? `"${ev.unmet_need}"` : 'consulting or application-writing help';
+  const how = ANSWER_WORDS[ev.answer] ?? "couldn't fully answer it";
+  const why = REASON_WORDS[ev.unanswered_reason];
+  return `The client asked for ${need} and the chat ${how}${why ? ` (${why})` : ''}. A consultant should answer the client; once Chris approves the answer, it goes to the AI.`;
+}
+
+/**
+ * A consulting card: owner consulting, verdict consulting_question, the
+ * flagged turn as the chat fields. The stored snapshot is used as is; a
+ * reopened card with none re-reads the conversation (takeSnapshot), which
+ * needs the ops DB — not configured → null, as for any card.
+ */
+export async function diagnoseConsulting(item, deps) {
+  const snap = await takeSnapshot(item, deps);
+  if (!snap.ok) {
+    if (snap.notConfigured) return null;
+    return { ok: false, error: snap.code, snapshotTaken: false, cost: 0 };
+  }
+  const ev = snap.snapshot?.rule_evidence ?? {};
+  const turn = flaggedTurn(snap.snapshot);
+  return {
+    ok: true,
+    owner: 'consulting',
+    verdict: CONSULTING_ISSUE,
+    narrative: consultingNarrative(ev),
+    client_notice: null,
+    diagnosis: {
+      verdict: CONSULTING_ISSUE, rule: CONSULTING_ISSUE, candidate_cause: null, candidate_rule: null, evidence: null,
+      chat: { client_asked: clip(turn?.client ?? null, CHAT_FIELD_CHARS), assistant_replied: clip(turn?.assistant ?? null, CHAT_FIELD_CHARS),
+        unmet_need: ev.unmet_need ?? null, answer: ev.answer ?? null, unanswered_reason: ev.unanswered_reason ?? null },
+      model: null,
+      snapshot_at: snap.snapshotAt
+    },
+    snapshot: snap.snapshot, snapshotAt: snap.snapshotAt, snapshotTaken: snap.taken,
+    cost: 0
+  };
+}
+
+/** A deadline card: owner research, verdict deadline_passed, from the evidence filed with the flag. */
+export function diagnoseDeadline(item) {
+  const g = item.snapshot?.grant;
+  if (!g) return { ok: false, error: 'deadline_no_evidence', snapshotTaken: false, cost: 0 };
+  const days = Number(g.days_over) || 0;
+  return {
+    ok: true,
+    owner: 'research',
+    verdict: 'deadline_passed',
+    narrative: `The card says the deadline was "${g.deadline_text ?? g.deadline}" (${g.deadline}), ${days} ${days === 1 ? 'day' : 'days'} ago, but the grant is still active. Either the deadline text is stale or the grant should be closed.`,
+    client_notice: null,
+    diagnosis: {
+      verdict: 'deadline_passed', rule: 'deadline_passed', candidate_cause: null, candidate_rule: null,
+      evidence: { deadline: g.deadline ?? null, deadline_text: g.deadline_text ?? null, days_over: days, checked_on: item.snapshot?.checked_on ?? null },
+      model: null,
+      snapshot_at: item.snapshot_at ?? null
+    },
+    snapshot: item.snapshot, snapshotAt: item.snapshot_at ?? null, snapshotTaken: false,
+    cost: 0
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Three strikes
 // ---------------------------------------------------------------------------
 
@@ -779,6 +891,7 @@ const PLAIN_ERRORS = [
   [/^chat_turn_not_found/, "the flagged chat turn couldn't be found"],
   [/^pattern_no_cuts/, "the automatic reviews behind this pattern couldn't be found"],
   [/^empty_track_no_evidence/, 'the empty track was flagged without its evidence'],
+  [/^deadline_no_evidence/, 'the deadline card was filed without its evidence'],
   [/^pattern_/, "the grant data or automatic reviews couldn't be read"],
   [/^chat_/, "the flagged chat turn couldn't be read"],
   [/^ops_/, "the chat history couldn't be read"],

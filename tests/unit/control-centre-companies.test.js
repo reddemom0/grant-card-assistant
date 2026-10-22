@@ -37,30 +37,33 @@ describe('companyActivity + buildCompanyList', () => {
     expect(a.get(135)).toMatchObject({ last_day: '2026-10-15' });
   });
 
-  test('one row per client: names first, internal tagged, last active = the latest of all sources', () => {
+  test('one row per client: names first, internal tagged, last active = the latest client action, null when there is none', () => {
     const list = C.buildCompanyList({
       clients: [{ id: 83, name: 'Expanding Domestically', created_at: '2026-09-14T17:00:00Z' }, { id: 81, name: 'Maximizer', created_at: '2026-09-14T17:00:00Z' },
         { id: 99, name: '', created_at: '2026-10-01T17:00:00Z' }],
-      metadata: new Map([[83, { provinces: ['Alberta'], industries: ['Agriculture'] }]]),
+      metadata: new Map([[83, { provinces: ['Alberta'], industries: ['Agriculture'], size: '5-10 employees', revenue: '$500k-$1M CAD' }]]),
       activity: C.companyActivity(rows, days),
       rolledLast: new Map([[83, '2026-10-12'], [81, '2026-10-16']]),
       chatLast: new Map([[83, '2026-10-13']]),
       openCards: new Map([[83, 2]]),
+      plans: new Map([[83, { company_id: 83, plan_slug: 'starter', stripe_status: 'active' }]]),
       isInternal: (id) => id === 81
     });
     expect(list[0]).toEqual({ id: 83, name: 'Expanding Domestically', internal: false, provinces: ['Alberta'], industries: ['Agriculture'],
+      size: '5-10 employees', revenue: '$500k-$1M CAD', plan: 'starter', plan_status: 'active',
       signed_up: '2026-09-14', last_active: '2026-10-15', grant_matches: 1, cards_opened: 3, chats: 1, open_cards: 2 });
-    expect(list[1]).toMatchObject({ internal: true, last_active: '2026-10-16', provinces: [] });
-    expect(list[2]).toMatchObject({ name: 'Company #99', last_active: '2026-10-01', grant_matches: 0 });
+    expect(list[1]).toMatchObject({ internal: true, last_active: '2026-10-16', provinces: [], size: null, revenue: null, plan: null, plan_status: null });
+    // No client action on record: no "last active" — the sign-up date never stands in for it.
+    expect(list[2]).toMatchObject({ name: 'Company #99', signed_up: '2026-10-01', last_active: null, grant_matches: 0 });
   });
 
-  test('match runs are ours, not client activity: a client with only runs is last active at sign-up', () => {
+  test('match runs are ours, not client activity: a client with only runs has no last active', () => {
     const runsOnly = { matches: [{ day: '2026-10-15', company_id: 77, grant_id: 1, times_computed: 3, times_shown: 2 }], views: [], ratings: [], chats: [], chatCompany: new Map() };
     const a = C.companyActivity(runsOnly, days);
     expect(a.get(77)).toEqual({ grant_matches: 1, cards_opened: 0, chats: 0, last_day: null });
     const [row] = C.buildCompanyList({ clients: [{ id: 77, name: 'Quiet Co', created_at: '2026-09-01T17:00:00Z' }], metadata: new Map(), activity: a,
       rolledLast: new Map(), chatLast: new Map(), openCards: new Map(), isInternal: () => false });
-    expect(row).toMatchObject({ grant_matches: 1, last_active: '2026-09-01' });
+    expect(row).toMatchObject({ grant_matches: 1, signed_up: '2026-09-01', last_active: null });
     // The rolled history reads opens and ratings only.
     expect(C.LAST_ROLLED_ACTIVITY_SQL).not.toMatch(/cc_daily_matches|times_computed/);
     expect(C.LAST_ROLLED_ACTIVITY_SQL).toMatch(/cc_daily_views/);
@@ -252,6 +255,15 @@ describe('companyDetail', () => {
     const feed = await C.companyFeed('135', { ...deps, opsQuery: opsLateRun });
     expect(feed.timeline[0].type).toBe('matches');
     expect(feed.last_active).toBe('2026-10-13T19:22:00.000Z'); // the watchlist removal
+  });
+
+  test('a company whose only timeline entry is its sign-up has no last active', async () => {
+    const quietApp = jest.fn(async (sql, p) => ([C.OPENS_SQL, C.RATINGS_SQL, C.WATCHLIST_EVENTS_SQL].includes(sql) ? { rows: [] } : app(sql, p)));
+    const quietOps = jest.fn(async (sql, p) => ([C.RUNS_SQL, C.CONVERSATIONS_SQL].includes(sql) ? { rows: [] } : ops(sql, p)));
+    const quietHub = jest.fn(async (sql, p) => (sql === C.COMPANY_CARDS_SQL ? { rows: [] } : hub(sql, p)));
+    const feed = await C.companyFeed('135', { ...deps, appQuery: quietApp, opsQuery: quietOps, hubQuery: quietHub });
+    expect(feed.timeline.map((e) => e.type)).toEqual(['signed_up']);
+    expect(feed.last_active).toBeNull();
   });
 
   test('bad id 400, unknown company 404', async () => {

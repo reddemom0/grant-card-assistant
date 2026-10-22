@@ -42,7 +42,8 @@ export const INTERNAL_COMPANY_IDS = Object.freeze([
   81, //  Maximizer — staff test account; profile re-edited repeatedly (2026-10)
   82, //  Erics Antique Treasures — very high activity, created with Maximizer
   85, //  CL Test
-  126 //  LouLouFry Testing
+  126, // LouLouFry Testing
+  146 //  Granted Consulting Inc. — our own company name (confirmed by Chris 2026-10-22)
 ]);
 
 const INTERNAL = new Set(INTERNAL_COMPANY_IDS);

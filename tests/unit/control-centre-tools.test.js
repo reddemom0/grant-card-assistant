@@ -139,6 +139,16 @@ describe('list_cards', () => {
     expect((await run({ mode: 'list_cards', owner: 'bob' }, deps)).error).toMatch(/owner must be one of/);
     expect((await run({ mode: 'list_cards', kind: 'grant' }, deps)).error).toMatch(/kind must be one of/);
   });
+
+  test('the consulting owner and the grant_deadline kind are accepted filters', async () => {
+    const { deps } = makeDeps();
+    const byOwner = await run({ mode: 'list_cards', owner: 'consulting' }, deps);
+    expect(byOwner.error).toBeUndefined();
+    expect(deps.hubQuery.mock.calls.find(([sql]) => sql === T.LIST_SQL)[1][1]).toBe('consulting');
+    const byKind = await run({ mode: 'list_cards', kind: 'grant_deadline' }, deps);
+    expect(byKind.error).toBeUndefined();
+    expect(deps.hubQuery.mock.calls.filter(([sql]) => sql === T.LIST_SQL).at(-1)[1][2]).toBe('grant_deadline');
+  });
 });
 
 describe('card', () => {

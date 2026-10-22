@@ -13,7 +13,8 @@ import {
   sentenceCount, wordCount, regionBlamed,
   buildUserPrompt, evidenceForMatch, plainError, couldNotDiagnose, DIAGNOSIS_TOOL, VERDICTS,
   CHAT_TURN_SQL, CHAT_TURN_ROWS_SQL, CONVERSATION_MESSAGES_SQL, DIAGNOSIS_MODEL,
-  CHAT_FIELDS, chatTurnsAround, parseConversationRef, evidenceForPattern
+  CHAT_FIELDS, chatTurnsAround, parseConversationRef, evidenceForPattern,
+  isConsultingItem, flaggedTurn, consultingNarrative, diagnoseDeadline
 } from '../../src/control-centre/diagnosis.js';
 import {
   patternSnapshot, grantEvidence, groupCuts, qualifies, CUTS_SQL, CUTS_BY_ID_SQL, GRANT_ROW_SQL, PATTERN_FLAG_REFS_SQL
@@ -518,5 +519,74 @@ describe('conversation-level chat snapshots', () => {
     expect(r).toMatchObject({ ok: true, body: { conversation_id: 42, issue: 'pushback', flagged_turn_index: 4 } });
     expect(opsQuery).toHaveBeenCalledWith(CONVERSATION_MESSAGES_SQL, [42]);
     expect(opsQuery).not.toHaveBeenCalledWith(CHAT_TURN_SQL, expect.anything());
+  });
+});
+
+describe('code-only cards (migration 057): consulting questions and deadline cards', () => {
+  const stored = {
+    source: 'oracle_detected', conversation_id: 290, issue: 'consulting_question',
+    rule_evidence: { rule: 'consulting_question', unmet_need: 'Consulting or application writing', answer: 'partly', unanswered_reason: 'left_after_bad_reply',
+      question: 'Can the consulting team manage the application end to end?' },
+    flagged_turn_index: 3,
+    turns: [
+      { turn_index: 2, client: 'Hi', assistant: 'Hello', tools_used: [], flagged: false },
+      { turn_index: 3, client: 'What does it entail to have your consulting team manage the application end to end?',
+        assistant: 'GetGranted helps you find grants.', tools_used: [], flagged: true }
+    ]
+  };
+  const consulting = { id: 9, kind: 'chat', chat_turn_ref: 'conv:290:consulting_question', conversation_id: 290, company_id: 135, snapshot: stored, snapshot_at: 't' };
+  const deadline = { id: 10, kind: 'grant_deadline', grant_root_id: 1822, snapshot_at: 't',
+    snapshot: { source: 'catalogue_check', checked_on: '2026-10-22', grant: { id: 1822, title: 'Old Fund', deadline_text: '15/04/2021', deadline: '2021-04-15', days_over: 2016, status: 'active' } } };
+
+  test('a consulting card is known by its ref, not its snapshot', () => {
+    expect(isConsultingItem(consulting)).toBe(true);
+    expect(isConsultingItem({ ...consulting, snapshot: null })).toBe(true);
+    expect(isConsultingItem({ ...consulting, chat_turn_ref: 'conv:290:pushback' })).toBe(false);
+    expect(isConsultingItem({ kind: 'match' })).toBe(false);
+  });
+
+  test('routeFor: consulting → consulting only, forced verdict; grant_deadline → research only; both code-only', () => {
+    expect(routeFor(consulting, null)).toMatchObject({ rule: 'consulting_question', allowed: ['consulting'], forcedVerdict: 'consulting_question', codeOnly: true });
+    expect(routeFor(deadline, null)).toMatchObject({ rule: 'deadline_passed', allowed: ['research'], forcedVerdict: 'deadline_passed', codeOnly: true });
+    expect(VERDICTS).toEqual(expect.arrayContaining(['consulting_question', 'deadline_passed']));
+    expect(DIAGNOSIS_TOOL.input_schema.properties.owner.enum).toContain('consulting');
+  });
+
+  test('flaggedTurn: the flagged turn, else by index, else the last; null without turns', () => {
+    expect(flaggedTurn(stored).turn_index).toBe(3);
+    expect(flaggedTurn({ flagged_turn_index: 2, turns: stored.turns.map((t) => ({ ...t, flagged: false })) }).turn_index).toBe(2);
+    expect(flaggedTurn({ turns: stored.turns.map((t) => ({ ...t, flagged: false })) }).turn_index).toBe(3);
+    expect(flaggedTurn({ turns: [] })).toBeNull();
+    expect(flaggedTurn(null)).toBeNull();
+  });
+
+  test('diagnoseItem on a consulting card: no model, no API key, cost 0, owner consulting, the flagged turn as the chat fields', async () => {
+    const createMessage = jest.fn();
+    const r = await diagnoseItem(consulting, { env: {}, createMessage, opsQuery: async () => { throw new Error('must not read'); } });
+    expect(createMessage).not.toHaveBeenCalled();
+    expect(r).toMatchObject({ ok: true, owner: 'consulting', verdict: 'consulting_question', cost: 0, snapshotTaken: false, client_notice: null,
+      diagnosis: { verdict: 'consulting_question', rule: 'consulting_question', model: null,
+        chat: { client_asked: expect.stringContaining('consulting team'), assistant_replied: 'GetGranted helps you find grants.',
+          unmet_need: 'Consulting or application writing', answer: 'partly', unanswered_reason: 'left_after_bad_reply' } } });
+    expect(r.narrative).toBe(consultingNarrative(stored.rule_evidence));
+    expect(r.narrative).toMatch(/only partly answered it \(the client left after a weak reply\)/);
+  });
+
+  test('a consulting card with no snapshot and no ops DB is left alone (null), as any card', async () => {
+    expect(await diagnoseItem({ ...consulting, snapshot: null }, { env: {}, opsQuery: null })).toBeNull();
+  });
+
+  test('a deadline card: research, deadline_passed, the narrative from the filed evidence; no evidence is a plain failure', () => {
+    const r = diagnoseDeadline(deadline);
+    expect(r).toMatchObject({ ok: true, owner: 'research', verdict: 'deadline_passed', cost: 0, snapshotTaken: false,
+      diagnosis: { rule: 'deadline_passed', model: null, evidence: { deadline: '2021-04-15', days_over: 2016, checked_on: '2026-10-22' } } });
+    expect(r.narrative).toMatch(/"15\/04\/2021" \(2021-04-15\), 2016 days ago, but the grant is still active/);
+    expect(diagnoseDeadline({ ...deadline, snapshot: null })).toMatchObject({ ok: false, error: 'deadline_no_evidence' });
+    expect(plainError('deadline_no_evidence')).toMatch(/without its evidence/);
+  });
+
+  test('diagnoseItem on a deadline card needs no API key either', async () => {
+    const r = await diagnoseItem(deadline, { env: {}, opsQuery: null });
+    expect(r).toMatchObject({ ok: true, owner: 'research', verdict: 'deadline_passed' });
   });
 });

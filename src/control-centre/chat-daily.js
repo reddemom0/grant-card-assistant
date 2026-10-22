@@ -34,8 +34,14 @@
  *                             searched_found_nothing / searched_not_shown
  *   card_for_rejected_grant   a grant card shown for a grant the reply said
  *                             doesn't fit
- * The hourly sweep diagnoses them (diagnosis.js): owner chris, the verdict
- * forced from that evidence.
+ *   consulting_question       the client asked for consulting or application
+ *                             writing (unmet_need matches CONSULTING_NEED) and
+ *                             the reply wasn't a full answer (answer partly /
+ *                             not_answered, or an unanswered reason) —
+ *                             isConsultingCandidate, the one place to loosen
+ * The hourly sweep diagnoses the first two (diagnosis.js): owner chris, the
+ * verdict forced from that evidence. A consulting card is diagnosed in code,
+ * no model call: owner consulting, for a consultant to answer on the card.
  *
  * Reads the ops and app DBs through db.js (read-only). Writes only the Hub.
  * Off unless CC_CHAT_DAILY_ENABLED=true. Dry run and backfill:
@@ -48,6 +54,7 @@ import { TIME_ZONE, vancouverDay, addDays } from './rollup.js';
 import { identitiesForClerkIds } from './identity.js';
 import { chatTurnsAround } from './diagnosis.js';
 import { grantLink } from './links.js';
+import { CONSULTING_ISSUE } from './card-summary.js';
 import { ROUNDUP_MODEL, HUMAN_ASK, DETECTOR_ACTOR } from '../services/pulse-roundup.js';
 import { BROKE_OUTCOMES, FAILED_OUTCOMES, EXCLUDED_CATEGORIES } from '../services/pulse-spike.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from '../claude/tool-output.js';
@@ -61,7 +68,13 @@ const QUESTION_CHARS = 300;
 const THEME_CHARS = 60;
 const NEED_CHARS = 60;
 const MODEL_TIMEOUT_MS = 60000;
-export const ISSUES = Object.freeze({ NO_CARDS: 'no_cards_for_funding_ask', REJECTED: 'card_for_rejected_grant' });
+export const ISSUES = Object.freeze({ NO_CARDS: 'no_cards_for_funding_ask', REJECTED: 'card_for_rejected_grant', CONSULTING: CONSULTING_ISSUE });
+/**
+ * An unmet-need label that means the client asked for consulting or application
+ * writing: the seed label and the ones the model is likely to invent. Loans,
+ * SR&ED and "a grant we don't carry" don't match.
+ */
+export const CONSULTING_NEED = /consult|application[- ]?writ|grant[- ]?writ|proposal[- ]?writ|writing help|writ(e|ing) (my|the|an|our|a) (application|proposal)/i;
 const SEARCH_TOOLS = new Set(['search_grants', 'lookup_grant_by_name']);
 /** Roundup flags on a turn that mean the reply was bad. */
 const BAD_REPLY_FLAGS = new Set(['left_unanswered', 'pushback', 'repeated_question']);
@@ -476,6 +489,26 @@ export const SEARCH_WORDS = Object.freeze({
   searched_not_shown: 'The chat searched and found grants but showed none as cards.'
 });
 
+/** How the chat did on a consulting question, in words: by the unanswered reason first, else the answer. */
+export const CONSULTING_WORDS = Object.freeze({
+  no_answer: 'The chat didn\'t answer it.',
+  asked_for_person: 'The client asked for a person.',
+  left_after_bad_reply: 'The client left after the reply.',
+  partly: 'The chat only partly answered it.',
+  not_answered: 'The chat didn\'t answer it.'
+});
+
+/**
+ * Pure: a stored row is a consulting-card candidate when the client asked for
+ * consulting or application writing and the reply wasn't a full answer. The
+ * daily prompt counts an honest "we don't do that" as answered, so those are
+ * left out; drop the second condition to file every consulting ask.
+ */
+export function isConsultingCandidate(r) {
+  return Boolean(r?.unmet_need) && CONSULTING_NEED.test(r.unmet_need)
+    && (r.answer !== 'answered' || r.unanswered_reason != null);
+}
+
 /**
  * Pure: the rows → card candidates. One card per chat per issue; every
  * qualifying turn is a flag on it (its own source_ref, so re-runs add nothing).
@@ -498,6 +531,15 @@ export function cardCandidates(rows, { names = new Map(), env = process.env } = 
         company_id: r.company_id, at: r.occurred_at,
         evidence: { rule: ISSUES.REJECTED, rejected_grants: grants },
         take: `A grant card was shown for ${grants.map((g) => g.name).join(', ')}, which the reply said doesn't fit.`
+      });
+    }
+    if (isConsultingCandidate(r)) {
+      const how = CONSULTING_WORDS[r.unanswered_reason] ?? CONSULTING_WORDS[r.answer] ?? 'The chat didn\'t fully answer it.';
+      out.push({
+        issue: ISSUES.CONSULTING, conversation_id: r.conversation_id, turn_index: r.turn_index, clerk_id: r.clerk_id,
+        company_id: r.company_id, at: r.occurred_at,
+        evidence: { rule: ISSUES.CONSULTING, unmet_need: r.unmet_need, answer: r.answer, unanswered_reason: r.unanswered_reason ?? null, question: r.question },
+        take: `Consulting question (${r.unmet_need}). ${how} A consultant's answer is needed.`
       });
     }
   }

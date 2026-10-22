@@ -31,7 +31,7 @@
   ];
   const ELIGIBILITY_WORDS = { Likely: 'Likely eligible', Possible: 'Possibly eligible', Unlikely: 'Unlikely eligible' };
   const STATUS_WORDS = { new: 'New', diagnosed: 'Diagnosed', in_progress: 'In progress', closed: 'Closed' };
-  const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason' };
+  const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason', consulting: 'Consulting' };
   const TYPE_WORDS = { match: 'Match', grant_pattern: 'Grant pattern', chat: 'Chat', empty_track: 'Empty track' };
   const TIMELINE_PAGE = 30;
 
@@ -120,6 +120,8 @@
       || c.provinces.join(' ').toLowerCase().includes(needle) || c.industries.join(' ').toLowerCase().includes(needle));
     rows.sort((a, b) => {
       const va = valueOf(a, sort); const vb = valueOf(b, sort);
+      // No value (a company with no activity yet) sorts last whichever way.
+      if ((va == null) !== (vb == null)) return va == null ? 1 : -1;
       const cmp = va < vb ? -1 : va > vb ? 1 : a.name.localeCompare(b.name);
       return dir === 'asc' ? cmp : -cmp;
     });
@@ -143,7 +145,7 @@
           <td><span class="co-name">${esc(c.name)}</span>${internalTag(c.internal)} <span class="cc-muted co-id">#${c.id}</span></td>
           <td class="co-clip">${firstPlus(c.provinces)}</td>
           <td class="co-clip">${firstPlus(c.industries)}</td>
-          <td>${esc(day(c.last_active))}</td>
+          <td>${c.last_active ? esc(day(c.last_active)) : '<span class="cc-muted">No activity yet</span>'}</td>
           <td class="num">${ctx.fmt(c.grant_matches)}</td><td class="num">${ctx.fmt(c.cards_opened)}</td><td class="num">${ctx.fmt(c.chats)}</td>
           <td class="num">${c.open_cards ? `<span class="co-open">${ctx.fmt(c.open_cards)}</span>` : '0'}</td></tr>`).join('')
     : `<tr><td colspan="${COLUMNS.length}" class="cc-empty">No company matches “${esc(q)}”.</td></tr>`}</tbody>
@@ -252,7 +254,7 @@
   function fillFeed(panel, data, feed) {
     data.chats = feed.chats;
     const c = data.company;
-    panel.querySelector('[data-head-meta]').innerHTML = `Signed up ${esc(day(c.signed_up))} · last active ${esc(day(feed.last_active || c.signed_up))} · ${ctx.plural(feed.users, 'sign-in')}${c.deleted ? ' · <b>deleted</b>' : ''}`;
+    panel.querySelector('[data-head-meta]').innerHTML = `Signed up ${esc(day(c.signed_up))} · ${feed.last_active ? `last active ${esc(day(feed.last_active))}` : 'no activity yet'} · ${ctx.plural(feed.users, 'sign-in')}${c.deleted ? ' · <b>deleted</b>' : ''}`;
     panel.querySelector('[data-feed="tiles"]').innerHTML = tilesHtml(feed.tiles);
     panel.querySelector('[data-slot="timeline"]').innerHTML = timelineHtml(feed.timeline);
     panel.querySelector('[data-slot="chats"]').innerHTML = chatsHtml(feed.chats);

@@ -39,8 +39,8 @@
   const DEFAULT_SORT = { all: ['clients_matched', 'desc'], most_ignored: ['ignored', 'desc'], not_matching: ['last_matched', 'asc'] };
   const ELIGIBILITY_WORDS = { Likely: 'Likely eligible', Possible: 'Possibly eligible', Unlikely: 'Unlikely eligible' };
   const STATUS_WORDS = { new: 'New', diagnosed: 'Diagnosed', in_progress: 'In progress', closed: 'Closed' };
-  const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason' };
-  const TYPE_WORDS = { match: 'Match', grant_pattern: 'Grant pattern', chat: 'Chat', empty_track: 'Empty track' };
+  const OWNER_WORDS = { client: 'Client', research: 'Research', chris: 'Chris', jason: 'Jason', consulting: 'Consulting' };
+  const TYPE_WORDS = { match: 'Match', grant_pattern: 'Grant pattern', chat: 'Chat', empty_track: 'Empty track', grant_deadline: 'Deadline' };
   const TREND = [
     { key: 'opens', label: 'Card opens' },
     { key: 'saves', label: 'Saves' },

@@ -1,48 +1,67 @@
 /**
  * Control Centre — Department views (the landing page). Reads only.
  *
- *   departmentViews(range)   three short snapshots, Research, Consulting/Sales
- *                            and Marketing, each a few items built from what the
- *                            other tabs already read; every item links through
- *                            to the tab (and filter) that holds the detail
+ *   departmentViews(range)   three panel sets, Research, Consulting/Sales and
+ *                            Marketing: plain data panels (tables, bars, a
+ *                            series, tiles) built from what the other tabs
+ *                            already read; every row links to the company,
+ *                            grant, card, chat or industry it names
  *
  * Nothing here is a new source. It composes the tabs' own functions — each
- * keeps its own 5-minute cache — and reads one more Hub table directly
- * (cc_chat_questions, grouped by company). An item whose source fails comes
- * back as {error} and the rest still render.
+ * keeps its own 5-minute cache — plus a few small reads: the daily chat
+ * review's rows (cc_chat_questions), goals created (app), first actions of the
+ * range's sign-ups (app), and the deadline and consulting cards (Hub). A panel
+ * whose source fails comes back as {error} and the rest still render.
  *
- * Every item: { key, label (the question it answers), note?, error? | clients, all }
- * where clients / all are the two variants (internal accounts left out / in) and
- * each is { headline: {n, words}, counts: [{n, words}], sub?, line?, groups:
- * [{title, rows: [{title, meta, detail?, hash}], see_all: {label, hash, range?}}] }. A see_all
- * with a range opens the tab on that range (the item's own fixed window).
- * An item shows at most MAX_ROWS rows across its groups.
+ * Payload (both variants, internal accounts left out / in):
+ *   panel = { key, title, kind: 'table'|'bars'|'series'|'tiles', wide?, note?,
+ *             see_all?: {label, hash, range?}, error? | clients: V, all: V }
+ *   table  V = { columns: [{key, label, kind}], rows: [{cells, href?, flag?}] }
+ *            cell kinds: text, num, money, date, delta, days, link ({text, hash}), badge
+ *   bars   V = { unit, rows: [{label, value, previous?, href?}] }
+ *   series V = { label, total, previous_total, delta, current: [{day, value}], previous: [...] }
+ *   tiles  V = { tiles: [{label, n, words?, href?}] }
+ * An empty variant is rows: [] / tiles: []; the page shows "Nothing this period".
  *
- * Fixed windows, whatever the range: deadlines (next HYGIENE_DAYS days), quiet
- * clients (shown matches in the last 30 days, no client action for
- * QUIET_DAYS), new grants and "what changed" (the last 7 days).
- * Docs: docs/control-centre.md, Department views.
+ * Ranges follow the picker (Month by default on this tab). Two things are
+ * today's catalogue whatever the range: status mismatches (deadline text that
+ * is a past date on a live grant) and upcoming deadlines (the next
+ * DUE_SOON_DAYS days). Docs: docs/control-centre.md, Department views.
  */
 
 import { query as hubQueryDefault } from '../database/connection.js';
 import { appQuery as appQueryDefault } from './db.js';
-import { vancouverDay, addDays } from './rollup.js';
-import { windowsFor, OPEN_SOURCES, openSourceKey, rangeError, trimCache } from './overview.js';
+import { vancouverDay, addDays, TIME_ZONE } from './rollup.js';
+import { windowsFor, openSources, rangeError, trimCache } from './overview.js';
 import { liveGrants as liveGrantsDefault } from './live-sources.js';
 import { companyNamesForIds, withCompanyNames, internalClerkIds as internalClerkIdsDefault } from './identity.js';
 import { isInternalCompany } from './internal-accounts.js';
 import { cardTitle } from './card-summary.js';
-import { tokenMains } from './industry-vocabulary.js';
-import { coverage as coverageDefault, changes as changesDefault, deadlineHygiene, clientIndustries, HYGIENE_DAYS } from './coverage.js';
+import { profileMains } from './industry-vocabulary.js';
+import { coverage as coverageDefault, changes as changesDefault, deadlineFlags as deadlineFlagsDefault, DUE_SOON_DAYS } from './coverage.js';
 import { loadGrantWindow as loadGrantWindowDefault, buildGrantList } from './grants.js';
-import { listItems as listItemsDefault, STUCK_DAYS } from './review-queue.js';
+import { listItems as listItemsDefault, STUCK_DAYS, LAST_ACTIVITY, LAST_ACTIVITY_JOIN, stuckWhen } from './review-queue.js';
 import { chatOverview as chatOverviewDefault } from './chat-themes.js';
 import { companyList as companyListDefault } from './companies.js';
+import { CONSULTING_NEED } from './chat-daily.js';
 
-export const MAX_ROWS = 5;
-export const QUIET_DAYS = 14;
+export const MAX_ROWS = 10;
+export const BARS_MAX = 14;
+/** A fast starter set a goal track and opened a card within this many days of signing up. */
+export const FAST_DAYS = 7;
+/** "Big-money" = app grants.value at or above this (CAD). */
+export const BIG_GRANT_VALUE = 100000;
 export const CACHE_MS = 5 * 60 * 1000;
 export const DEPARTMENTS = Object.freeze(['research', 'consulting', 'marketing']);
+
+/** A rewritten question that asks how to do something. */
+export const HOWTO = /^(how|where|can i|could i|is there a way|what do i|what should i|do i need to)\b/i;
+// The consulting label rule is the daily chat review's (chat-daily.js
+// CONSULTING_NEED, imported above), so the panel and the card rule can't drift.
+export { CONSULTING_NEED };
+/** An unmet-need label for a program GetGranted doesn't carry (seed: "A grant we don't carry"). */
+export const NOT_CARRIED = /grant|program|carry/i;
+const OTHER_NEEDS = /loan|sr&ed|tax credit/i;
 
 export class ViewsError extends Error {
   constructor(status, message) {
@@ -52,14 +71,66 @@ export class ViewsError extends Error {
   }
 }
 
-// Hub: the daily chat review's questions that went unanswered or named an
-// unmet need, for grouping by company (migration 049).
-export const CHAT_SIGNALS_SQL = `
-  SELECT day::text AS day, conversation_id, clerk_id, company_id, question, theme, unanswered_reason, unmet_need
+// ---------------------------------------------------------------------------
+// SQL (all reads)
+// ---------------------------------------------------------------------------
+
+// Hub: the daily chat review's rows in the window (migration 049).
+export const CHAT_ROWS_SQL = `
+  SELECT day::text AS day, conversation_id, turn_index, clerk_id, company_id, question, theme, funding_ask,
+         answer, unanswered_reason, unmet_need, cards_shown, grants_named
     FROM cc_chat_questions
    WHERE day BETWEEN $1::date AND $2::date
-     AND (unanswered_reason IS NOT NULL OR unmet_need IS NOT NULL)
    ORDER BY day DESC, conversation_id DESC, turn_index`;
+
+// Hub: the deadline cards (kind grant_deadline, one per grant root).
+export const DEADLINE_CARDS_SQL = `
+  SELECT id, grant_root_id, status FROM cc_review_items WHERE kind = 'grant_deadline'`;
+
+// Hub: open consulting cards with the frozen turns, so the panel can quote the
+// client's question; stuck as the board defines it (review-queue.js).
+export const CONSULTING_CARDS_SQL = `
+  SELECT i.id, i.company_id, i.status, i.owner, i.created_at, i.updated_at, i.chat_turn_ref, i.conversation_id,
+         i.snapshot->'turns' AS turns, i.snapshot->'flagged_turn_index' AS flagged_turn_index,
+         ${LAST_ACTIVITY} AS last_activity_at,
+         ${stuckWhen(STUCK_DAYS)} AS stuck,
+         floor(EXTRACT(EPOCH FROM (now() - ${LAST_ACTIVITY})) / 86400)::int AS idle_days
+    FROM cc_review_items i${LAST_ACTIVITY_JOIN}
+   WHERE i.kind = 'chat' AND i.owner = 'consulting' AND i.status <> 'closed'
+   ORDER BY i.updated_at DESC, i.id DESC`;
+
+// [from 00:00, to+1 00:00) Vancouver — the Overview's window rule. App
+// timestamps without a zone are UTC (the chat-themes.js convention).
+const utc = (col) => `(${col} AT TIME ZONE 'UTC')`;
+const betweenUtc = (col) =>
+  `${utc(col)} >= ($1::date)::timestamp AT TIME ZONE '${TIME_ZONE}'
+     AND ${utc(col)} < ($2::date + 1)::timestamp AT TIME ZONE '${TIME_ZONE}'`;
+const between = (col) =>
+  `${col} >= ($1::date)::timestamp AT TIME ZONE '${TIME_ZONE}'
+     AND ${col} < ($2::date + 1)::timestamp AT TIME ZONE '${TIME_ZONE}'`;
+
+// App (read-only): goals created in the window (previous window included, for the "before" bars).
+export const GOALS_SQL = `
+  SELECT g.company_id, g.name,
+         to_char(${utc('g.created_at')} AT TIME ZONE '${TIME_ZONE}', 'YYYY-MM-DD') AS day
+    FROM goals g
+   WHERE g.deleted_at IS NULL AND ${betweenUtc('g.created_at')}
+   ORDER BY g.created_at`;
+
+// App (read-only): for the companies that signed up in the window (the
+// Overview's sign-up rule), their first goal and first grant card open.
+export const FIRST_ACTIONS_SQL = `
+  SELECT c.id AS company_id,
+         (SELECT min(${utc('g.created_at')}) FROM goals g WHERE g.company_id = c.id AND g.deleted_at IS NULL) AS first_goal,
+         (SELECT min(v.started_at) FROM grant_view_sessions v WHERE v.company_id = c.id) AS first_open
+    FROM companies c
+   WHERE c.deleted_at IS NULL
+     AND ${between('c.created_at')}
+     AND EXISTS (
+       SELECT 1 FROM company_users cu
+         JOIN users_clerk uc ON uc.user_id = cu.user_id AND uc.deleted_at IS NULL
+        WHERE cu.company_id = c.id AND cu.deleted_at IS NULL
+          AND uc.clerk_id LIKE 'user\\_%')`;
 
 // ---------------------------------------------------------------------------
 // Pure helpers
@@ -76,136 +147,359 @@ const clip = (s, n = 140) => {
   const t = String(s ?? '').replace(/\s+/g, ' ').trim();
   return t.length > n ? `${t.slice(0, n - 1)}…` : t;
 };
+const num = (v) => Number(v) || 0;
+const dash = (v) => (v == null || v === '' ? '—' : String(v));
+const dayOf = (ts) => (ts == null ? null : vancouverDay(ts instanceof Date ? ts : new Date(ts)));
+
 const grantHash = (id) => `#grants/${id}`;
 const companyHash = (id) => `#companies/${id}`;
 const industryHash = (name) => `#coverage/industry/${encodeURIComponent(name)}`;
+const cardHash = (id) => `#review/${Number(id)}`;
+const chatHash = (id) => `#chat/${id}`;
 
-/**
- * Pure: at most `max` rows across the groups, handed out in turn (one each,
- * then again) so every group with rows shows at least one.
- */
-export function capRows(groups, max = MAX_ROWS) {
-  const take = groups.map(() => 0);
-  let left = max;
-  let moved = true;
-  while (left > 0 && moved) {
-    moved = false;
-    groups.forEach((g, i) => {
-      if (left > 0 && take[i] < g.rows.length) { take[i] += 1; left -= 1; moved = true; }
-    });
-  }
-  return groups.map((g, i) => ({ ...g, rows: g.rows.slice(0, take[i]) }));
-}
-
-const body = ({ headline, counts = [], sub = null, line = null, groups = [] }) =>
-  ({ headline, counts, sub, line, groups: capRows(groups) });
-
+const col = (key, label, kind = 'text') => ({ key, label, kind });
+const link = (text, hash) => ({ text, hash });
+const table = (columns, rows, max = MAX_ROWS) => ({ columns, rows: rows.slice(0, max) });
+const bars = (unit, rows, max = BARS_MAX) => ({ unit, rows: rows.slice(0, max) });
+const same = (v) => ({ clients: v, all: v });
 /** Both variants from one builder: `keep(companyId)` leaves internal accounts out of `clients`. */
 const bothVariants = (build, isInternal) => ({
   clients: build((id) => !isInternal(id), 'clients'),
   all: build(() => true, 'all')
 });
+/** A chat-review row's variant rule: `all` keeps everyone; `clients` drops internal accounts by company, else by Clerk id. */
+const keepRow = (keep, internalClerks = new Set(), name = 'clients') => (r) =>
+  (name === 'all' ? true : r.company_id != null ? keep(r.company_id) : !internalClerks.has(r.clerk_id));
 
-/** Pure: per grant, where its cards were opened from (sessions), for one variant. */
-export function sourcesByGrant(views, keep) {
-  const out = new Map();
-  for (const r of views) {
-    if (r.company_id != null && !keep(r.company_id)) continue;
-    const n = Number(r.sessions) || 0;
-    if (!n) continue;
-    if (!out.has(r.grant_root_id)) out.set(r.grant_root_id, new Map());
-    const m = out.get(r.grant_root_id);
-    const k = openSourceKey(r.source);
-    m.set(k, (m.get(k) ?? 0) + n);
-  }
-  return out;
+const STATUS_WORDS = { new: 'New', diagnosed: 'Diagnosed', in_progress: 'In progress', closed: 'Closed' };
+const KIND_WORDS = { match: 'Match', chat: 'Chat', grant_pattern: 'Grant pattern', empty_track: 'Empty track', grant_deadline: 'Deadline' };
+const ANSWER_WORDS = { answered: 'Answered', partly: 'Partly answered', not_answered: 'Not answered' };
+const REASON_WORDS = { no_answer: 'no answer', asked_for_person: 'asked for a person', left_after_bad_reply: 'left after a bad reply' };
+
+const companyMap = (list) => new Map((list?.companies ?? []).map((c) => [c.id, c]));
+const titlesOf = (win) => new Map((win?.grants ?? []).map((g) => [g.root_id, g.title]));
+const titleOf = (titles, id) => titles.get(id) ?? `Grant #${id}`;
+
+/** "Name · size · revenue · plan" as a link cell; a company the list doesn't know by its name or id. */
+export function companyCell(c, id = null, names = new Map()) {
+  if (c) return link(`${c.name} · ${dash(c.size)} · ${dash(c.revenue)} · ${dash(c.plan)}`, companyHash(c.id));
+  if (id == null) return { text: 'Company not recorded', hash: null };
+  return link(names.get(id) ?? `Company #${id}`, companyHash(id));
+}
+const plainCompany = (id, names) => (id == null ? { text: 'Not recorded', hash: null } : link(names.get(id) ?? `Company #${id}`, companyHash(id)));
+
+/** The flagged turn of a chat card's frozen turns (the one marked, else by index, else the last). */
+export function flaggedTurnOf(turns, flaggedIndex = null) {
+  const list = Array.isArray(turns) ? turns : [];
+  return list.find((t) => t?.flagged) ?? (flaggedIndex == null ? null : list.find((t) => t?.turn_index === Number(flaggedIndex))) ?? list.at(-1) ?? null;
 }
 
-const SOURCE_LABEL = new Map(OPEN_SOURCES.map((s) => [s.key, s.key === 'other' ? 'direct links' : s.label]));
-/** "found through Goal tracks (3), Chat (1)", or null when no opens. */
-export function foundWords(bySource) {
-  if (!bySource || !bySource.size) return null;
-  const parts = [...bySource].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${SOURCE_LABEL.get(k) ?? k} (${n})`);
-  return `found through ${parts.join(', ')}`;
+/** Pure: per grant, clients matched and opens in the current vs the previous window, for one variant. */
+export function grantTrends(win, keep) {
+  const C = new Set(win.days);
+  const P = new Set(win.previous_days ?? []);
+  const titles = titlesOf(win);
+  const by = new Map();
+  const at = (id) => { if (!by.has(id)) by.set(id, { grant_id: id, title: titleOf(titles, id), cur: new Set(), prev: new Set(), opens_now: 0, opens_before: 0 }); return by.get(id); };
+  for (const r of win.matches ?? []) {
+    if (!(num(r.times_shown) > 0) || !keep(r.company_id)) continue;
+    if (C.has(r.day)) at(r.grant_id).cur.add(r.company_id);
+    else if (P.has(r.day)) at(r.grant_id).prev.add(r.company_id);
+  }
+  for (const r of win.views ?? []) {
+    if (!keep(r.company_id)) continue;
+    if (C.has(r.day)) at(r.grant_root_id).opens_now += num(r.sessions);
+    else if (P.has(r.day)) at(r.grant_root_id).opens_before += num(r.sessions);
+  }
+  return [...by.values()].map((g) => ({ grant_id: g.grant_id, title: g.title, before: g.prev.size, now: g.cur.size,
+    change: g.cur.size - g.prev.size, opens_before: g.opens_before, opens_now: g.opens_now }));
+}
+
+const TREND_COLUMNS = [col('grant', 'Grant', 'link'), col('before', 'Before', 'num'), col('now', 'Now', 'num'), col('change', 'Change', 'delta'),
+  col('opens_before', 'Opens before', 'num'), col('opens_now', 'Opens now', 'num')];
+const trendRow = (g, flag) => ({ cells: { grant: link(g.title, grantHash(g.grant_id)), before: g.before, now: g.now, change: g.change,
+  opens_before: g.opens_before, opens_now: g.opens_now }, href: grantHash(g.grant_id), flag });
+
+/** Pure: the trends table — top five up, top five down. */
+export function trendingGrantsPanel(win, isInternal = isInternalCompany) {
+  return bothVariants((keep) => {
+    const rows = grantTrends(win, keep);
+    const up = rows.filter((g) => g.change > 0).sort((a, b) => b.change - a.change || b.now - a.now || a.title.localeCompare(b.title)).slice(0, 5);
+    const down = rows.filter((g) => g.change < 0).sort((a, b) => a.change - b.change || b.before - a.before || a.title.localeCompare(b.title)).slice(0, 5);
+    return table(TREND_COLUMNS, [...up.map((g) => trendRow(g, 'up')), ...down.map((g) => trendRow(g, 'down'))]);
+  }, isInternal);
+}
+
+// ---------------------------------------------------------------------------
+// Marketing
+// ---------------------------------------------------------------------------
+
+export function chatThemesPanel(chat) {
+  const rows = (chat.themes ?? []).filter((t) => t.current > 0).map((t) => ({
+    cells: { theme: link(t.theme, '#chat'), questions: t.current, change: t.delta ?? t.current - (t.previous ?? 0), example: t.examples?.[0]?.question ?? '' },
+    href: '#chat'
+  }));
+  const v = table([col('theme', 'Theme', 'link'), col('questions', 'Questions', 'num'), col('change', 'Change', 'delta'), col('example', 'Example question')], rows);
+  return { ...same(v), ...(chat.store?.ok === false ? { note: "The nightly chat review isn't set up on this server, so there are no themes." } : {}) };
+}
+
+const chatRowColumns = (first) => [first, col('question', 'Question', 'link'), col('theme', 'Theme'), col('day', 'Day', 'date')];
+
+export function howtoPanel(rows, names, internalClerks, isInternal = isInternalCompany) {
+  return bothVariants((keep, name) => {
+    const hits = rows.filter((r) => r.unanswered_reason && HOWTO.test(String(r.question ?? '').trim())).filter(keepRow(keep, internalClerks, name));
+    return table([col('question', 'Question', 'link'), col('theme', 'Theme'), col('company', 'Company', 'link'), col('day', 'Day', 'date')],
+      hits.map((r) => ({ cells: { question: link(clip(r.question), chatHash(r.conversation_id)), theme: r.theme ?? '', company: plainCompany(r.company_id, names), day: r.day },
+        href: chatHash(r.conversation_id) })));
+  }, isInternal);
+}
+
+const grantRow = (g, cells) => ({ cells: { grant: link(g.title, grantHash(g.grant_id)), ...cells }, href: grantHash(g.grant_id) });
+
+export function mostMatchedPanel(win, isInternal = isInternalCompany) {
+  const lists = buildGrantList(win, { view: 'all', isInternal });
+  return bothVariants((keep, name) => table(
+    [col('grant', 'Grant', 'link'), col('clients_matched', 'Clients matched', 'num'), col('opens', 'Opens', 'num'), col('saves', 'Saves', 'num')],
+    lists[name].filter((g) => g.clients_matched > 0).map((g) => grantRow(g, { clients_matched: g.clients_matched, opens: g.opens, saves: g.saves }))
+  ), isInternal);
+}
+
+export function mostOpenedPanel(win, isInternal = isInternalCompany) {
+  const lists = buildGrantList(win, { view: 'all', isInternal });
+  return bothVariants((keep, name) => table(
+    [col('grant', 'Grant', 'link'), col('opens', 'Opens', 'num'), col('clients_matched', 'Clients matched', 'num'), col('bounced', 'Bounced', 'num')],
+    lists[name].filter((g) => g.opens > 0).sort((a, b) => b.opens - a.opens || b.clients_matched - a.clients_matched || String(a.title).localeCompare(String(b.title)))
+      .map((g) => grantRow(g, { opens: g.opens, clients_matched: g.clients_matched, bounced: g.bounced }))
+  ), isInternal);
+}
+
+/** Pure: went live in the range, or due within DUE_SOON_DAYS, ranked by clients matched. */
+export function timelyPanel(changed, flags, win, isInternal = isInternalCompany) {
+  const lists = buildGrantList(win, { view: 'all', isInternal });
+  const why = new Map();
+  for (const g of changed.added ?? []) why.set(g.grant_id, { title: g.title, words: [`Went live ${dayWords(dayOf(g.at))}`] });
+  for (const g of flags.due_soon ?? []) {
+    const w = why.get(g.grant_id) ?? { title: g.title, words: [] };
+    w.words.push(`Due ${dayWords(g.deadline)} (${plural(g.days, 'day')} left)`);
+    why.set(g.grant_id, w);
+  }
+  return bothVariants((keep, name) => {
+    const metrics = new Map(lists[name].map((g) => [g.grant_id, g]));
+    const rows = [...why].map(([grant_id, w]) => ({ grant_id, title: w.title ?? metrics.get(grant_id)?.title ?? `Grant #${grant_id}`, why: w.words.join(' · '),
+      clients_matched: metrics.get(grant_id)?.clients_matched ?? 0, opens: metrics.get(grant_id)?.opens ?? 0 }))
+      .sort((a, b) => b.clients_matched - a.clients_matched || b.opens - a.opens || a.title.localeCompare(b.title));
+    return table([col('grant', 'Grant', 'link'), col('why', 'Why now'), col('clients_matched', 'Clients matched', 'num'), col('opens', 'Opens', 'num')],
+      rows.map((g) => grantRow(g, { why: g.why, clients_matched: g.clients_matched, opens: g.opens })));
+  }, isInternal);
+}
+
+/** Pure: goals created per goal type, now vs the previous window. */
+export function goalDemandPanel(goals, C, P, isInternal = isInternalCompany) {
+  const inC = new Set(C); const inP = new Set(P);
+  return bothVariants((keep) => {
+    const by = new Map();
+    for (const g of goals) {
+      if (!keep(g.company_id)) continue;
+      if (!by.has(g.name)) by.set(g.name, { label: g.name, value: 0, previous: 0 });
+      if (inC.has(g.day)) by.get(g.name).value += 1;
+      else if (inP.has(g.day)) by.get(g.name).previous += 1;
+    }
+    return bars('goal tracks set', [...by.values()].filter((r) => r.value || r.previous)
+      .sort((a, b) => b.value - a.value || b.previous - a.previous || a.label.localeCompare(b.label)));
+  }, isInternal);
+}
+
+const demandColumns = (first) => [first, col('clients', 'Clients', 'num'), col('grant_matches', 'Grant matches', 'num'), col('avg_matches', 'Avg per client', 'num')];
+
+export function demandIndustryPanel(cov) {
+  const build = (v) => table(demandColumns(col('industry', 'Industry', 'link')),
+    [...v.industries, ...(v.not_mapped ? [v.not_mapped] : [])].filter((r) => r.clients > 0 || r.grant_matches > 0)
+      .sort((a, b) => b.clients - a.clients || b.grant_matches - a.grant_matches || a.industry.localeCompare(b.industry))
+      .map((r) => ({ cells: { industry: link(r.industry, industryHash(r.industry)), clients: r.clients, grant_matches: r.grant_matches ?? 0, avg_matches: r.avg_matches ?? null },
+        href: industryHash(r.industry) })), BARS_MAX);
+  return { clients: build(cov.clients_variant), all: build(cov.all_variant) };
+}
+
+export function demandProvincePanel(cov) {
+  const build = (v) => table(demandColumns(col('province', 'Province')),
+    (v.breakdowns?.province ?? []).filter((r) => r.clients > 0 || num(r.grant_matches) > 0)
+      .sort((a, b) => b.clients - a.clients || num(b.grant_matches) - num(a.grant_matches) || a.province.localeCompare(b.province))
+      .map((r) => ({ cells: { province: r.province, clients: r.clients, grant_matches: r.grant_matches ?? null, avg_matches: r.avg_matches ?? null }, href: '#coverage' })), BARS_MAX);
+  return { clients: build(cov.clients_variant), all: build(cov.all_variant) };
+}
+
+/** Pure: grant card opens by where they were opened from, now vs before. */
+export function foundViaPanel(win, C, P, isInternal = isInternalCompany) {
+  return bothVariants((keep) => bars('card opens', openSources((win.views ?? []).filter((r) => keep(r.company_id)), C, P)
+    .map((s) => ({ label: s.label, value: s.current, previous: s.previous }))), isInternal);
+}
+
+export function totalsPanel(win, goals, C, isInternal = isInternalCompany) {
+  const inC = new Set(C);
+  const titles = titlesOf(win);
+  return bothVariants((keep) => {
+    const shown = (win.matches ?? []).filter((r) => inC.has(r.day) && num(r.times_shown) > 0 && keep(r.company_id));
+    const byGrant = new Map();
+    for (const r of shown) { if (!byGrant.has(r.grant_id)) byGrant.set(r.grant_id, new Set()); byGrant.get(r.grant_id).add(r.company_id); }
+    const top = [...byGrant].map(([id, s]) => ({ id, n: s.size })).sort((a, b) => b.n - a.n || a.id - b.id)[0] ?? null;
+    const opens = (win.views ?? []).filter((r) => inC.has(r.day) && keep(r.company_id)).reduce((s, r) => s + num(r.sessions), 0);
+    const goalCounts = new Map();
+    for (const g of goals ?? []) if (inC.has(g.day) && keep(g.company_id)) goalCounts.set(g.name, (goalCounts.get(g.name) ?? 0) + 1);
+    const topGoal = [...goalCounts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0] ?? null;
+    return { tiles: [
+      { label: 'Businesses matched', n: new Set(shown.map((r) => r.company_id).filter((id) => id != null)).size },
+      { label: 'Grants matched', n: byGrant.size },
+      { label: 'Cards opened', n: opens },
+      { label: 'Top goal type', n: topGoal ? topGoal[0] : '—', ...(topGoal ? { words: `${plural(topGoal[1], 'goal track')} set` } : {}) },
+      { label: 'Top grant', n: top ? titleOf(titles, top.id) : '—', ...(top ? { words: `${plural(top.n, 'client')} matched`, href: grantHash(top.id) } : {}) }
+    ] };
+  }, isInternal);
+}
+
+/** Pure: sign-ups per day, now vs before. */
+export function signupsPanel(win, C, P, isInternal = isInternalCompany) {
+  return bothVariants((keep) => {
+    const rows = (win.signups ?? []).filter((r) => keep(r.company_id));
+    const perDay = (days) => {
+      const m = new Map(days.map((d) => [d, new Set()]));
+      for (const r of rows) m.get(r.day)?.add(r.company_id);
+      return days.map((day) => ({ day, value: m.get(day).size }));
+    };
+    const distinct = (days) => { const set = new Set(days); return new Set(rows.filter((r) => set.has(r.day)).map((r) => r.company_id)).size; };
+    const total = distinct(C); const previous_total = distinct(P);
+    return { label: 'Sign-ups', total, previous_total, delta: total - previous_total, current: perDay(C), previous: perDay(P) };
+  }, isInternal);
 }
 
 // ---------------------------------------------------------------------------
 // Research
 // ---------------------------------------------------------------------------
 
-export function deadlineItem(grants, today) {
-  const h = deadlineHygiene(grants, today);
-  const missing = [...h.blank, ...h.unreadable];
-  const b = body({
-    headline: { n: h.passed.length, words: 'live grants past their deadline' },
-    counts: [
-      { n: h.due_within.length, words: `due in the next ${h.days} days` },
-      { n: missing.length, words: 'with a blank or unreadable deadline' }
-    ],
-    sub: `${plural(h.rolling, 'grant')} with a rolling deadline ("Open Until Filled" and the like) aren't counted as a problem.`,
-    groups: [
-      { title: 'Past deadline', rows: h.passed.map((g) => ({ title: g.title, meta: `Deadline was ${dayWords(g.deadline)}`, hash: grantHash(g.grant_id) })),
-        see_all: { label: 'Coverage & changes', hash: '#coverage' } },
-      { title: `Due in the next ${h.days} days`, rows: h.due_within.map((g) => ({ title: g.title, meta: `Due ${dayWords(g.deadline)}`, hash: grantHash(g.grant_id) })),
-        see_all: { label: 'Coverage & changes', hash: '#coverage' } },
-      { title: 'Blank or unreadable', rows: missing.map((g) => ({ title: g.title, meta: g.deadline_text ? `Says "${clip(g.deadline_text, 60)}"` : 'Blank', hash: grantHash(g.grant_id) })),
-        see_all: { label: 'Grants', hash: '#grants' } }
-    ]
-  });
-  return { clients: b, all: b };
+const keepCard = (keep) => (i) => i.company_id == null || keep(i.company_id);
+const openOwnedBy = (items, owner) => items.filter((i) => i.owner === owner && i.status !== 'closed');
+const byStuck = (a, b) => Number(Boolean(b.stuck)) - Number(Boolean(a.stuck)) || num(b.idle_days) - num(a.idle_days) || Number(b.id) - Number(a.id);
+
+export function flaggedCardsPanel(items, isInternal = isInternalCompany) {
+  return bothVariants((keep) => table(
+    [col('card', 'Card', 'link'), col('type', 'Type', 'badge'), col('status', 'Status', 'badge'), col('idle', 'Idle days', 'num'), col('company', 'Company', 'link')],
+    openOwnedBy(items, 'research').filter(keepCard(keep)).sort(byStuck).map((i) => ({
+      cells: { card: link(cardTitle(i), cardHash(i.id)), type: KIND_WORDS[i.kind] ?? i.kind, status: STATUS_WORDS[i.status] ?? i.status, idle: num(i.idle_days),
+        company: i.company_id == null ? { text: '—', hash: null } : link(i.company_name ?? `Company #${i.company_id}`, companyHash(i.company_id)) },
+      href: cardHash(i.id), ...(i.stuck ? { flag: 'stuck' } : {})
+    }))
+  ), isInternal);
 }
 
-const KIND_WORDS = { match: 'Match', chat: 'Chat', grant_pattern: 'Grant pattern', empty_track: 'Empty track' };
-const STATUS_WORDS = { new: 'new', diagnosed: 'diagnosed', in_progress: 'in progress', closed: 'closed' };
-const cardRow = (i, meta) => ({ title: cardTitle(i), meta, hash: `#review/${Number(i.id)}` });
-const openResearch = (items) => items.filter((i) => i.owner === 'research' && i.status !== 'closed');
-const keepCard = (keep) => (i) => i.company_id == null || keep(i.company_id);
+/** Pure: live grants whose deadline text is a past date, with their Research card. Today's catalogue. */
+export function statusMismatchesPanel(flags, cards) {
+  const cardOf = new Map(cards.map((c) => [Number(c.grant_root_id), c]));
+  const rows = [...(flags.passed ?? [])].sort((a, b) => String(a.deadline).localeCompare(String(b.deadline)) || a.grant_id - b.grant_id).map((g) => {
+    const c = cardOf.get(Number(g.grant_id));
+    return { cells: { grant: link(g.title, grantHash(g.grant_id)), deadline_text: g.deadline_text ?? '', deadline: g.deadline, over: Math.max(0, -num(g.days)),
+      card: c ? link(`#${Number(c.id)} · ${STATUS_WORDS[c.status] ?? c.status}`, cardHash(c.id)) : { text: 'Filed on the next sweep', hash: null } }, href: grantHash(g.grant_id) };
+  });
+  return same(table([col('grant', 'Grant', 'link'), col('deadline_text', 'Deadline text'), col('deadline', 'Reads as', 'date'), col('over', 'Days past', 'num'), col('card', 'Card', 'link')], rows, 25));
+}
 
-export function cardsLookWrongItem(items, grantList, isInternal = isInternalCompany) {
+/** Pure: live grants with a blank or unreadable deadline (not filed as cards). */
+export function deadlineUnreadablePanel(flags) {
+  const rows = [...(flags.blank ?? []).map((g) => ({ g, kind: 'Blank' })), ...(flags.unreadable ?? []).map((g) => ({ g, kind: 'Unreadable' }))]
+    .map(({ g, kind }) => ({ cells: { grant: link(g.title, grantHash(g.grant_id)), kind, deadline_text: g.deadline_text ?? '' }, href: grantHash(g.grant_id) }));
+  const v = table([col('grant', 'Grant', 'link'), col('kind', 'Problem', 'badge'), col('deadline_text', 'Deadline text')], rows);
+  const rolling = Array.isArray(flags.rolling) ? flags.rolling.length : num(flags.rolling);
+  return { ...same(v), note: `${plural((flags.blank ?? []).length, 'live grant')} with a blank deadline and ${(flags.unreadable ?? []).length} unreadable; ${rolling} rolling ("Open Until Filled" and the like) are fine. Not filed as cards.` };
+}
+
+export function upcomingDeadlinesPanel(flags, win, isInternal = isInternalCompany) {
+  const lists = buildGrantList(win, { view: 'all', isInternal });
   return bothVariants((keep, name) => {
-    const cards = openResearch(items).filter(keepCard(keep));
-    const ignored = grantList[name];
-    return body({
-      headline: { n: cards.length, words: 'open review cards owned by Research' },
-      counts: [{ n: ignored.length, words: 'grants shown to 3+ clients, ranked by how many never opened them' }],
-      groups: [
-        { title: 'Open Research cards', rows: cards.map((i) => cardRow(i, `${KIND_WORDS[i.kind] ?? i.kind} · ${STATUS_WORDS[i.status] ?? i.status}`)),
-          see_all: { label: 'Review queue, Research', hash: '#review?owner=research' } },
-        { title: 'Shown but never opened', rows: ignored.map((g) => ({ title: g.title, meta: `${g.ignored} of ${g.displayed_clients} clients never opened it`, hash: grantHash(g.grant_id) })),
-          see_all: { label: 'Grants, most ignored', hash: '#grants?view=most_ignored' } }
-      ]
-    });
+    const metrics = new Map(lists[name].map((g) => [g.grant_id, g]));
+    return table([col('grant', 'Grant', 'link'), col('due', 'Due', 'date'), col('days_left', 'Days left', 'num'), col('clients_matched', 'Clients matched', 'num'), col('opens', 'Opens', 'num')],
+      [...(flags.due_soon ?? [])].sort((a, b) => String(a.deadline).localeCompare(String(b.deadline)) || a.grant_id - b.grant_id).map((g) => ({
+        cells: { grant: link(g.title, grantHash(g.grant_id)), due: g.deadline, days_left: num(g.days),
+          clients_matched: metrics.get(g.grant_id)?.clients_matched ?? 0, opens: metrics.get(g.grant_id)?.opens ?? 0 }, href: grantHash(g.grant_id) })));
   }, isInternal);
 }
 
-export function coverageGapsItem(cov, notMatching) {
-  const build = (variant, name) => {
-    const thin = variant.industries.flatMap((r) => [r, ...r.specifics]).filter((r) => r.thin)
-      .sort((a, b) => (a.avg_matches ?? 0) - (b.avg_matches ?? 0) || b.clients - a.clients);
-    const none = notMatching[name];
-    return body({
-      headline: { n: thin.length, words: 'thin industries (clients who ran matching average under 3 grant matches)' },
-      counts: [{ n: none.length, words: 'live grants matched to no one in the range' }],
-      groups: [
-        { title: 'Thin industries', rows: thin.map((r) => ({ title: r.industry, meta: `${plural(r.ran_matching, 'client')} ran matching · ${r.avg_matches} grant matches on average`, hash: industryHash(r.industry) })),
-          see_all: { label: 'Coverage', hash: '#coverage' } },
-        { title: 'Matching no one', rows: none.map((g) => ({ title: g.title, meta: g.last_matched ? `Last matched ${dayWords(g.last_matched)}` : 'Never matched', hash: grantHash(g.grant_id) })),
-          see_all: { label: 'Grants, not matching', hash: '#grants?view=not_matching' } }
-      ]
-    });
-  };
-  return { clients: build(cov.clients_variant, 'clients'), all: build(cov.all_variant, 'all') };
+export function askedNotCarriedPanel(rows, names, internalClerks, isInternal = isInternalCompany) {
+  return bothVariants((keep, name) => {
+    const hits = rows.filter((r) => r.unmet_need && NOT_CARRIED.test(r.unmet_need) && !CONSULTING_NEED.test(r.unmet_need) && !OTHER_NEEDS.test(r.unmet_need))
+      .filter(keepRow(keep, internalClerks, name));
+    return table([col('question', 'Question', 'link'), col('company', 'Company', 'link'), col('day', 'Day', 'date')],
+      hits.map((r) => ({ cells: { question: link(clip(r.question), chatHash(r.conversation_id)), company: plainCompany(r.company_id, names), day: r.day }, href: chatHash(r.conversation_id) })));
+  }, isInternal);
 }
 
-export function stuckItem(items, isInternal = isInternalCompany) {
+export function industryCoveragePanel(cov) {
+  const build = (v) => table(
+    [col('industry', 'Industry', 'link'), col('clients', 'Clients', 'num'), col('restricted', 'Industry grants', 'num'), col('open_to_all', 'Open to every industry', 'num'),
+      col('avg_matches', 'Avg matches', 'num'), col('thin', '', 'badge')],
+    [...v.industries, ...(v.not_mapped ? [v.not_mapped] : [])]
+      .sort((a, b) => b.clients - a.clients || num(b.restricted) - num(a.restricted) || a.industry.localeCompare(b.industry))
+      .map((r) => ({ cells: { industry: link(r.industry, industryHash(r.industry)), clients: r.clients, restricted: r.restricted ?? null, open_to_all: r.open_to_all ?? 0,
+        avg_matches: r.avg_matches ?? null, thin: r.thin ? 'Thin' : '' }, href: industryHash(r.industry) })), BARS_MAX);
+  return { clients: build(cov.clients_variant), all: build(cov.all_variant) };
+}
+
+export function goalCoveragePanel(cov) {
+  const build = (v) => table(
+    [col('track', 'Goal track'), col('clients', 'Clients', 'num'), col('grants_shown', 'Grants shown on track', 'num'), col('empty', 'Empty', 'num'), col('few', 'Few', 'num')],
+    [...(v.breakdowns?.goal_tracks ?? [])].sort((a, b) => (b.empty_tracks + b.few_tracks) - (a.empty_tracks + a.few_tracks) || b.clients - a.clients || a.label.localeCompare(b.label))
+      .map((t) => ({ cells: { track: t.label, clients: t.clients, grants_shown: t.grants_shown_on_track, empty: t.empty_tracks, few: t.few_tracks }, href: '#coverage' })), 12);
+  return { clients: build(cov.clients_variant), all: build(cov.all_variant) };
+}
+
+/** Pure: grant matches per clients' profile main industry, now vs before, for one variant. */
+export function industryTrends(win, cov, keep) {
+  const C = new Set(win.days); const P = new Set(win.previous_days ?? []);
+  const mainsOf = new Map();
+  const mains = (id) => {
+    if (!mainsOf.has(id)) mainsOf.set(id, new Set((cov.clients?.[id]?.industries ?? []).flatMap((v) => profileMains(v))));
+    return mainsOf.get(id);
+  };
+  const cur = new Set(); const prev = new Set();
+  for (const r of win.matches ?? []) {
+    if (r.company_id == null || !(num(r.times_shown) > 0) || !keep(r.company_id)) continue;
+    const k = `${r.company_id}:${r.grant_id}`;
+    if (C.has(r.day)) cur.add(k); else if (P.has(r.day)) prev.add(k);
+  }
+  const by = new Map();
+  const bump = (set, field) => { for (const k of set) for (const m of mains(Number(k.split(':')[0]))) { if (!by.has(m)) by.set(m, { industry: m, before: 0, now: 0 }); by.get(m)[field] += 1; } };
+  bump(cur, 'now'); bump(prev, 'before');
+  return [...by.values()].map((r) => ({ ...r, change: r.now - r.before })).filter((r) => r.change !== 0)
+    .sort((a, b) => Math.abs(b.change) - Math.abs(a.change) || b.now - a.now || a.industry.localeCompare(b.industry));
+}
+
+export function trendingIndustriesPanel(win, cov, isInternal = isInternalCompany) {
+  return bothVariants((keep) => table([col('industry', 'Industry', 'link'), col('before', 'Before', 'num'), col('now', 'Now', 'num'), col('change', 'Change', 'delta')],
+    industryTrends(win, cov, keep).map((r) => ({ cells: { industry: link(r.industry, industryHash(r.industry)), before: r.before, now: r.now, change: r.change },
+      href: industryHash(r.industry), flag: r.change > 0 ? 'up' : 'down' }))), isInternal);
+}
+
+export function ignoredPanel(win, isInternal = isInternalCompany) {
+  const lists = buildGrantList(win, { view: 'most_ignored', isInternal });
+  return bothVariants((keep, name) => table(
+    [col('grant', 'Grant', 'link'), col('displayed_clients', 'Clients shown it', 'num'), col('ignored', 'Never opened it', 'num'), col('opens', 'Opens', 'num')],
+    [...lists[name]].sort((a, b) => b.displayed_clients - a.displayed_clients || b.ignored - a.ignored || String(a.title).localeCompare(String(b.title)))
+      .map((g) => grantRow(g, { displayed_clients: g.displayed_clients, ignored: g.ignored, opens: g.opens }))
+  ), isInternal);
+}
+
+/** Pure: grants that went live or were republished in the range, with matches and opens since. */
+export function recentLaunchesPanel(changed, win, isInternal = isInternalCompany) {
+  const events = new Map();
+  const add = (list, event) => { for (const g of list ?? []) { const day = dayOf(g.at); const cur = events.get(g.grant_id); if (!cur || (day ?? '') > (cur.day ?? '')) events.set(g.grant_id, { grant_id: g.grant_id, title: g.title, event, day }); } };
+  add(changed.added, 'Went live');
+  add(changed.republished, 'Republished');
   return bothVariants((keep) => {
-    const stuck = openResearch(items).filter((i) => i.stuck).filter(keepCard(keep))
-      .sort((a, b) => (b.idle_days ?? 0) - (a.idle_days ?? 0));
-    return body({
-      headline: { n: stuck.length, words: `Research cards with no activity for ${STUCK_DAYS}+ days` },
-      groups: [{ title: 'Stuck', rows: stuck.map((i) => cardRow(i, `No activity for ${plural(i.idle_days ?? STUCK_DAYS, 'day')} · ${STATUS_WORDS[i.status] ?? i.status}`)),
-        see_all: { label: 'Review queue, Research', hash: '#review?owner=research' } }]
-    });
+    const rows = [...events.values()].map((e) => {
+      const since = (r) => e.day == null || r.day >= e.day;
+      const clients = new Set((win.matches ?? []).filter((r) => r.grant_id === e.grant_id && num(r.times_shown) > 0 && keep(r.company_id) && since(r)).map((r) => r.company_id));
+      const opens = (win.views ?? []).filter((r) => r.grant_root_id === e.grant_id && keep(r.company_id) && since(r)).reduce((s, r) => s + num(r.sessions), 0);
+      return { ...e, clients_since: clients.size, opens_since: opens };
+    }).sort((a, b) => String(b.day ?? '').localeCompare(String(a.day ?? '')) || a.title.localeCompare(b.title));
+    return table([col('grant', 'Grant', 'link'), col('event', 'Event', 'badge'), col('when', 'When', 'date'), col('clients_since', 'Clients matched since', 'num'), col('opens_since', 'Opens since', 'num')],
+      rows.map((e) => ({ cells: { grant: link(e.title, grantHash(e.grant_id)), event: e.event, when: e.day, clients_since: e.clients_since, opens_since: e.opens_since }, href: grantHash(e.grant_id) })));
   }, isInternal);
 }
 
@@ -213,170 +507,81 @@ export function stuckItem(items, isInternal = isInternalCompany) {
 // Consulting / Sales
 // ---------------------------------------------------------------------------
 
-export function quietClientsItem(list, isInternal = isInternalCompany) {
-  const today = list.current.to;
-  const cutoff = addDays(today, -QUIET_DAYS);
-  return bothVariants((keep) => {
-    const shown = list.companies.filter((c) => keep(c.id) && c.grant_matches > 0);
-    const quiet = shown.filter((c) => c.last_active <= cutoff).sort((a, b) => a.last_active.localeCompare(b.last_active));
-    const unopened = shown.filter((c) => c.cards_opened === 0).sort((a, b) => b.grant_matches - a.grant_matches);
-    return body({
-      headline: { n: quiet.length, words: `clients with grant matches and no client activity for ${QUIET_DAYS}+ days` },
-      counts: [{ n: unopened.length, words: 'shown grant matches in the last 30 days and opened none' }],
-      groups: [
-        { title: `Quiet ${QUIET_DAYS}+ days`, rows: quiet.map((c) => ({ title: c.name, meta: `Last active ${dayWords(c.last_active)} · ${plural(c.grant_matches, 'grant match', 'grant matches')}`, hash: companyHash(c.id) })),
-          see_all: { label: 'Companies, least recently active', hash: '#companies?sort=last_active&dir=asc', range: 'month' } },
-        { title: 'Shown matches, opened none', rows: unopened.map((c) => ({ title: c.name, meta: `${plural(c.grant_matches, 'grant match', 'grant matches')}, none opened`, hash: companyHash(c.id) })),
-          see_all: { label: 'Companies', hash: '#companies?sort=cards_opened&dir=asc', range: 'month' } }
-      ]
-    });
-  }, isInternal);
+export function consultingCardsPanel(cards, list, isInternal = isInternalCompany) {
+  const companies = companyMap(list);
+  return bothVariants((keep) => table(
+    [col('company', 'Company', 'link'), col('question', 'Question', 'link'), col('status', 'Status', 'badge'), col('idle', 'Idle days', 'num')],
+    cards.filter(keepCard(keep)).sort(byStuck).map((i) => {
+      const turn = flaggedTurnOf(i.turns, i.flagged_turn_index);
+      const names = new Map(i.company_name ? [[i.company_id, i.company_name]] : []);
+      return { cells: { company: companyCell(companies.get(i.company_id), i.company_id, names), question: link(clip(turn?.client) || cardTitle(i), cardHash(i.id)),
+        status: STATUS_WORDS[i.status] ?? i.status, idle: num(i.idle_days) }, href: cardHash(i.id), ...(i.stuck ? { flag: 'stuck' } : {}) };
+    })
+  ), isInternal);
 }
 
-/** Pure: unanswered / unmet rows → per company, most signals first. */
-export function signalsByCompany(rows, names) {
-  const by = new Map();
-  for (const r of rows) {
-    const key = r.company_id ?? 'none';
-    if (!by.has(key)) by.set(key, { company_id: r.company_id ?? null, unanswered: 0, unmet: 0, example: null, needs: new Set() });
-    const c = by.get(key);
-    if (r.unanswered_reason) c.unanswered += 1;
-    if (r.unmet_need) { c.unmet += 1; c.needs.add(r.unmet_need); }
-    if (!c.example) c.example = r.question;
-  }
-  return [...by.values()]
-    .map((c) => ({ ...c, needs: [...c.needs], name: c.company_id == null ? 'Company not recorded' : names.get(c.company_id) ?? `Company #${c.company_id}` }))
-    .sort((a, b) => (b.unanswered + b.unmet) - (a.unanswered + a.unmet) || b.unmet - a.unmet || String(a.name).localeCompare(String(b.name)));
+export function helpWeSellPanel(rows, list, names, internalClerks, isInternal = isInternalCompany) {
+  const companies = companyMap(list);
+  return bothVariants((keep, name) => table(
+    [col('company', 'Company', 'link'), col('question', 'Question', 'link'), col('answer', 'Chat reply', 'badge'), col('day', 'Day', 'date')],
+    rows.filter((r) => r.unmet_need && CONSULTING_NEED.test(r.unmet_need)).filter(keepRow(keep, internalClerks, name)).map((r) => ({
+      cells: { company: companyCell(companies.get(r.company_id), r.company_id, names), question: link(clip(r.question), chatHash(r.conversation_id)),
+        answer: [ANSWER_WORDS[r.answer] ?? '', r.unanswered_reason ? REASON_WORDS[r.unanswered_reason] : null].filter(Boolean).join(' · '), day: r.day },
+      href: chatHash(r.conversation_id) }))
+  ), isInternal);
 }
 
-export function paidWorkItem(rows, names, internalClerks, isInternal = isInternalCompany) {
+/** Pure: companies that asked the chat about, or opened the card of, a grant worth BIG_GRANT_VALUE or more. */
+export function bigMoneyPanel(rows, win, grants, list, names, internalClerks, C, isInternal = isInternalCompany) {
+  const big = new Map(grants.filter((g) => num(g.value) >= BIG_GRANT_VALUE).map((g) => [g.root_id, { title: g.title, value: num(g.value) }]));
+  const inC = new Set(C);
+  const companies = companyMap(list);
+  const ids = (v) => (Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
   return bothVariants((keep, name) => {
-    const vRows = name === 'all' ? rows
-      : rows.filter((r) => (r.company_id != null ? keep(r.company_id) : !internalClerks.has(r.clerk_id)));
-    const companies = signalsByCompany(vRows, names);
-    const known = companies.filter((c) => c.company_id != null).length;
-    return body({
-      headline: { n: known, words: 'companies with unanswered questions or unmet needs in chat' },
-      counts: [
-        { n: vRows.filter((r) => r.unanswered_reason).length, words: 'questions left unanswered' },
-        { n: vRows.filter((r) => r.unmet_need).length, words: 'unmet needs' }
-      ],
-      groups: [{ title: 'By company', rows: companies.map((c) => ({
-        title: c.name,
-        meta: [c.unanswered && plural(c.unanswered, 'unanswered question'), c.unmet && `${plural(c.unmet, 'unmet need')} (${c.needs.slice(0, 2).join(', ')})`].filter(Boolean).join(' · '),
-        detail: c.example ? `“${clip(c.example)}”` : null,
-        hash: c.company_id != null ? companyHash(c.company_id) : '#chat'
-      })), see_all: { label: 'Chat themes', hash: '#chat' } }]
-    });
+    const seen = new Map();
+    const note = (company_id, grant_id, how, day, hash) => {
+      const k = `${company_id}:${grant_id}:${how}`;
+      if (!seen.has(k) || seen.get(k).day < day) seen.set(k, { company_id, grant_id, how, day, hash });
+    };
+    for (const r of rows.filter(keepRow(keep, internalClerks, name))) {
+      if (r.company_id == null) continue;
+      for (const id of new Set([...ids(r.cards_shown), ...ids(r.grants_named)])) if (big.has(id)) note(r.company_id, id, 'Asked in chat', r.day, chatHash(r.conversation_id));
+    }
+    for (const r of win.views ?? []) {
+      if (!inC.has(r.day) || r.company_id == null || !keep(r.company_id) || !big.has(r.grant_root_id) || !(num(r.sessions) > 0)) continue;
+      note(r.company_id, r.grant_root_id, 'Opened the card', r.day, grantHash(r.grant_root_id));
+    }
+    return table([col('company', 'Company', 'link'), col('grant', 'Grant', 'link'), col('value', 'Value', 'money'), col('how', 'How', 'badge'), col('day', 'Day', 'date')],
+      [...seen.values()].sort((a, b) => b.day.localeCompare(a.day) || b.company_id - a.company_id).map((e) => ({
+        cells: { company: companyCell(companies.get(e.company_id), e.company_id, names), grant: link(big.get(e.grant_id).title, grantHash(e.grant_id)),
+          value: big.get(e.grant_id).value, how: e.how, day: e.day }, href: e.hash })));
   }, isInternal);
 }
 
-/** Pure: how many of the variant's clients a grant could reach, by its industry tag. */
-export function clientsForGrant(grant, clients) {
-  if (!grant || !grant.level) return null;
-  if (grant.level === 'agnostic') return { n: clients.length, open_to_all: true };
-  const mains = new Set((grant.tokens ?? []).flatMap(tokenMains));
-  const n = clients.filter((c) => [...clientIndustries(c.industries).mains].some((m) => mains.has(m))).length;
-  return { n, open_to_all: false };
+export function mostEngagedPanel(list, goals, C, isInternal = isInternalCompany) {
+  const inC = new Set(C);
+  const goalCount = new Map();
+  for (const g of goals ?? []) if (inC.has(g.day)) goalCount.set(g.company_id, (goalCount.get(g.company_id) ?? 0) + 1);
+  return bothVariants((keep) => table(
+    [col('company', 'Company', 'link'), col('goals', 'Goal tracks set', 'num'), col('cards_opened', 'Cards opened', 'num'), col('chats', 'Chats', 'num'), col('last_active', 'Last active')],
+    (list.companies ?? []).filter((c) => keep(c.id)).map((c) => ({ c, goals: goalCount.get(c.id) ?? 0, score: (goalCount.get(c.id) ?? 0) + num(c.cards_opened) + num(c.chats) }))
+      .filter((x) => x.score > 0).sort((a, b) => b.score - a.score || String(b.c.last_active ?? '').localeCompare(String(a.c.last_active ?? '')) || a.c.name.localeCompare(b.c.name))
+      .map(({ c, goals: n }) => ({ cells: { company: companyCell(c), goals: n, cards_opened: num(c.cards_opened), chats: num(c.chats),
+        last_active: c.last_active ? dayWords(c.last_active) : 'No activity yet' }, href: companyHash(c.id) }))
+  ), isInternal);
 }
 
-export function newGrantsItem(changed, cov) {
-  const clientsOf = (keep) => Object.entries(cov.clients).filter(([id]) => keep(Number(id))).map(([, c]) => c);
-  const build = (clients) => {
-    const rows = changed.added.map((g) => ({ g, reach: clientsForGrant(cov.grants[g.grant_id], clients) }))
-      .sort((a, b) => (b.reach?.n ?? -1) - (a.reach?.n ?? -1) || String(a.g.title).localeCompare(String(b.g.title)))
-      .map(({ g, reach }) => ({
-        title: g.title,
-        meta: `Went live ${dayWords(g.at)} · ${!reach ? 'industry not tagged yet'
-          : reach.open_to_all ? `open to every industry, all ${plural(reach.n, 'client')}` : `${plural(reach.n, 'client')} in its industries`}`,
-        hash: grantHash(g.grant_id)
-      }));
-    return body({
-      headline: { n: changed.added.length, words: 'grants went live in the last 7 days' },
-      groups: [{ title: 'Went live', rows, see_all: { label: 'Coverage & changes', hash: '#coverage' } }]
-    });
-  };
-  return { clients: build(clientsOf((id) => !cov.clients[id]?.internal)), all: build(clientsOf(() => true)) };
-}
-
-// ---------------------------------------------------------------------------
-// Marketing
-// ---------------------------------------------------------------------------
-
-export function askedItem(chat) {
-  const build = (v) => body({
-    headline: { n: v.unanswered.reduce((s, g) => s + g.count, 0), words: 'client questions left unanswered' },
-    counts: [{ n: v.unmet_needs.reduce((s, g) => s + g.count, 0), words: 'unmet needs' }],
-    sub: chat.store.ok ? null : "The nightly chat review isn't set up, so there are no themes yet.",
-    groups: [{ title: 'Top themes (clients only)', rows: chat.themes.filter((t) => t.current > 0).map((t) => ({
-      title: t.theme, meta: plural(t.current, 'question'),
-      detail: t.examples[0] ? `“${clip(t.examples[0].question)}”` : null, hash: '#chat'
-    })), see_all: { label: 'Chat themes', hash: '#chat' } }]
-  });
-  return { clients: build(chat.clients_variant), all: build(chat.all_variant) };
-}
-
-export function engagementItem(win, chat, isInternal = isInternalCompany) {
-  const lists = buildGrantList(win, { view: 'all', isInternal });
-  const ignoredLists = buildGrantList(win, { view: 'most_ignored', isInternal });
-  const titles = new Map(win.grants.map((g) => [g.root_id, g.title]));
-  return bothVariants((keep, name) => {
-    const found = sourcesByGrant(win.views, keep);
-    const why = (id) => foundWords(found.get(id));
-    const opened = lists[name].filter((g) => g.opens > 0).sort((a, b) => b.opens - a.opens || String(a.title).localeCompare(String(b.title)));
-    const discussed = chat[`${name}_variant`].grants_discussed;
-    return body({
-      headline: { n: opened.reduce((s, g) => s + g.opens, 0), words: 'grant cards opened' },
-      counts: [{ n: ignoredLists[name].length, words: 'grants shown to 3+ clients, ranked by how many never opened them' }],
-      groups: [
-        { title: 'Most opened', rows: opened.map((g) => ({ title: g.title, meta: [plural(g.opens, 'open'), why(g.grant_id)].filter(Boolean).join(' · '), hash: grantHash(g.grant_id) })),
-          see_all: { label: 'Grants, most opened', hash: '#grants?sort=opens&dir=desc' } },
-        { title: 'Most discussed in chat', rows: discussed.map((g) => ({
-          title: chat.grants[g.grant_id] ?? titles.get(g.grant_id) ?? `Grant #${g.grant_id}`,
-          meta: [plural(g.chats, 'chat'), why(g.grant_id) ?? 'not opened as a card'].join(' · '), hash: grantHash(g.grant_id) })),
-          see_all: { label: 'Chat themes', hash: '#chat' } },
-        { title: 'Shown, never opened', rows: ignoredLists[name].map((g) => ({ title: g.title, meta: `Shown on goal tracks to ${plural(g.displayed_clients, 'client')}, ${g.ignored} never opened it`, hash: grantHash(g.grant_id) })),
-          see_all: { label: 'Grants, most ignored', hash: '#grants?view=most_ignored' } }
-      ]
-    });
-  }, isInternal);
-}
-
-/** Restricted-grant thresholds for "don't line up". Open-to-every-industry grants are the same on every row, so they're left out. */
-export const MANY_GRANTS = 3;
-export const FEW_CLIENTS = 1;
-export const MANY_CLIENTS = 2;
-export const FEW_GRANTS_FOR = 1;
-
-export function mismatchItem(cov) {
-  const build = (variant) => {
-    const flat = variant.industries.flatMap((r) => [r, ...r.specifics]).filter((r) => r.restricted != null && !r.general);
-    const grantsHeavy = flat.filter((r) => r.restricted >= MANY_GRANTS && r.clients <= FEW_CLIENTS)
-      .sort((a, b) => b.restricted - a.restricted || a.industry.localeCompare(b.industry));
-    const clientsHeavy = flat.filter((r) => r.clients >= MANY_CLIENTS && r.restricted <= FEW_GRANTS_FOR)
-      .sort((a, b) => b.clients - a.clients || a.industry.localeCompare(b.industry));
-    const row = (r) => ({ title: r.industry, meta: `${plural(r.restricted, 'industry grant')} · ${plural(r.clients, 'client')}`, hash: industryHash(r.industry) });
-    return body({
-      headline: { n: grantsHeavy.length + clientsHeavy.length, words: "industries where grants and clients don't line up" },
-      counts: [
-        { n: grantsHeavy.length, words: `with ${MANY_GRANTS}+ industry grants and at most ${plural(FEW_CLIENTS, 'client')}` },
-        { n: clientsHeavy.length, words: `with ${MANY_CLIENTS}+ clients and at most ${plural(FEW_GRANTS_FOR, 'industry grant')}` }
-      ],
-      groups: [
-        { title: 'Many grants, few clients', rows: grantsHeavy.map(row), see_all: { label: 'Coverage', hash: '#coverage' } },
-        { title: 'Many clients, few grants', rows: clientsHeavy.map(row), see_all: { label: 'Coverage', hash: '#coverage' } }
-      ]
-    });
-  };
-  return { clients: build(cov.clients_variant), all: build(cov.all_variant) };
-}
-
-export function changedLine(changed) {
-  const n = (k) => changed[k].length;
-  const line = `This week: ${n('added')} went live, ${n('closed')} closed, ${n('removed')} removed, ${plural(n('edited'), 'grant')} edited.`;
-  const b = { headline: { n: n('added') + n('closed') + n('removed') + n('edited'), words: 'catalogue changes this week' },
-    counts: [], sub: null, line, groups: [{ title: 'Changes', rows: [], see_all: { label: 'Coverage & changes', hash: '#coverage' } }] };
-  return { clients: b, all: b };
+/** Pure: signed up in the range, and set a goal track and opened a card within FAST_DAYS of signing up. */
+export function fastStartersPanel(list, firstActions, C, isInternal = isInternalCompany) {
+  const inC = new Set(C);
+  const first = new Map(firstActions.map((r) => [Number(r.company_id), { goal: dayOf(r.first_goal), open: dayOf(r.first_open) }]));
+  return bothVariants((keep) => table(
+    [col('company', 'Company', 'link'), col('signed_up', 'Signed up', 'date'), col('first_goal', 'First goal track', 'date'), col('first_open', 'First card open', 'date'), col('plan', 'Plan')],
+    (list.companies ?? []).filter((c) => keep(c.id) && c.signed_up && inC.has(c.signed_up)).map((c) => ({ c, f: first.get(c.id) }))
+      .filter(({ c, f }) => f?.goal && f?.open && f.goal <= addDays(c.signed_up, FAST_DAYS) && f.open <= addDays(c.signed_up, FAST_DAYS))
+      .sort((a, b) => b.c.signed_up.localeCompare(a.c.signed_up) || a.c.name.localeCompare(b.c.name))
+      .map(({ c, f }) => ({ cells: { company: companyCell(c), signed_up: c.signed_up, first_goal: f.goal, first_open: f.open, plan: dash(c.plan) }, href: companyHash(c.id) }))
+  ), isInternal);
 }
 
 // ---------------------------------------------------------------------------
@@ -387,42 +592,53 @@ export function defaultDeps() {
   return {
     hubQuery: hubQueryDefault, appQuery: appQueryDefault, storeQuery: hubQueryDefault, now: () => new Date(),
     liveGrants: liveGrantsDefault, coverage: coverageDefault, changes: changesDefault, loadGrantWindow: loadGrantWindowDefault,
-    chatOverview: chatOverviewDefault, listItems: listItemsDefault, companyList: companyListDefault,
+    chatOverview: chatOverviewDefault, listItems: listItemsDefault, companyList: companyListDefault, deadlineFlags: deadlineFlagsDefault,
     internalClerkIds: () => internalClerkIdsDefault(), isInternal: isInternalCompany
   };
 }
 
-/** An item's error in words the page can show: not configured, a missing table, or anything else. */
+/** A panel's error in words the page can show: not configured, a missing table, or anything else. */
 export function errorCode(err) {
   if (err?.code === 'not_configured' || err?.name === 'NotConfiguredError') return 'not_configured';
   if (err?.code === '42P01') return 'migration_missing';
   return 'error';
 }
 
-const LABELS = {
-  deadlines: 'Which live grants have a deadline that is past, coming up, or missing?',
-  cards_wrong: 'Which grant cards look wrong to clients or to us?',
-  coverage_gaps: 'Where is the catalogue thin, and which grants reach no one?',
-  stuck: 'Which Research review cards have stalled?',
-  quiet_clients: 'Which clients have grant matches but have gone quiet?',
-  paid_work: 'Which companies asked chat things it couldn\'t answer — a sign of paid work?',
-  new_grants: 'Which new grants could reach our clients?',
-  asked: 'What do clients ask that chat doesn\'t answer?',
-  engagement: 'Which grants do clients open, discuss, or ignore — and how did they find them?',
-  mismatch: 'Where do grants and clients not line up by industry?',
-  changed: 'What changed in the catalogue this week?'
-};
-const NOTES = {
-  quiet_clients: `Saves aren't counted yet. Matches are the last 30 days; quiet means no card open, rating or chat for ${QUIET_DAYS}+ days. Our own match runs don't count as activity.`,
-  engagement: "Saves aren't counted yet.",
-  new_grants: 'Went live = published as active in the last 7 days; a reopened grant counts too. Clients are counted by their profile industries against the grant\'s industry tag.',
-  deadlines: `Today's live catalogue, not the range. Due = the next ${HYGIENE_DAYS} days.`
-};
+const seeAll = (label, hash, range) => ({ label, hash, ...(range ? { range } : {}) });
+export const META = Object.freeze({
+  chat_themes: { title: 'Chat themes', kind: 'table', note: 'Clients only, with an example question each.', see_all: seeAll('Chat themes', '#chat') },
+  howto_unanswered: { title: 'Unanswered how-to questions', kind: 'table', note: 'Unanswered questions (no answer, asked for a person, left after a bad reply) whose wording asks how to do something.', see_all: seeAll('Chat themes, unanswered', '#chat?sort=left_after') },
+  most_matched: { title: 'Most matched grants', kind: 'table', see_all: seeAll('Grants', '#grants') },
+  most_opened: { title: 'Most opened grants', kind: 'table', see_all: seeAll('Grants, most opened', '#grants?sort=opens&dir=desc') },
+  trending_grants: { title: 'Trending grants', kind: 'table', note: 'Clients matched now vs the previous period of the same length: the five biggest rises and the five biggest drops.', see_all: seeAll('Grants', '#grants') },
+  timely: { title: 'Timely grants', kind: 'table', note: `Went live in the range, or due within ${DUE_SOON_DAYS} days of today.`, see_all: seeAll('Coverage & changes', '#coverage') },
+  goal_demand: { title: 'Demand by goal type', kind: 'bars', note: 'Goal tracks set in the range; the faint bar is the previous period.' },
+  demand_industry: { title: 'Demand by industry', kind: 'table', note: "Clients by profile industry (today) and the grant matches they were shown in the range.", see_all: seeAll('Coverage', '#coverage') },
+  demand_province: { title: 'Demand by province', kind: 'table', see_all: seeAll('Coverage', '#coverage') },
+  found_via: { title: 'How clients find grants', kind: 'bars', note: 'Grant card opens by where the card was opened from; the faint bar is the previous period.' },
+  totals: { title: 'Totals for the range', kind: 'tiles', wide: true },
+  signups: { title: 'Sign-ups', kind: 'series' },
+  flagged_cards: { title: 'Flagged cards', kind: 'table', note: `Open review cards owned by Research. Stuck = no activity for ${STUCK_DAYS}+ days.`, see_all: seeAll('Review queue, Research', '#review?owner=research') },
+  status_mismatches: { title: 'Status mismatches', kind: 'table', wide: true, note: "Live grants whose deadline text is a date before today — today's catalogue, not the range. Each is filed as a Research card by the hourly sweep.", see_all: seeAll('Coverage & changes', '#coverage') },
+  deadline_unreadable: { title: 'No readable deadline', kind: 'table', see_all: seeAll('Coverage & changes', '#coverage') },
+  upcoming_deadlines: { title: 'Upcoming deadlines', kind: 'table', note: `Due within ${DUE_SOON_DAYS} days of today; matches and opens follow the range.`, see_all: seeAll('Coverage & changes', '#coverage') },
+  asked_not_carried: { title: "Grants asked for that GetGranted doesn't carry", kind: 'table', note: "From the daily chat review's unmet needs. Only the rewritten question is stored, so the program's name appears inside it.", see_all: seeAll('Chat themes', '#chat') },
+  industry_coverage: { title: 'Industry coverage', kind: 'table', wide: true, note: "Clients by profile industry against industry-restricted grants, today's catalogue. Thin = 2+ clients ran matching and averaged under 3 grant matches.", see_all: seeAll('Coverage', '#coverage') },
+  goal_coverage: { title: 'Goal coverage', kind: 'table', note: "Each client's latest matching run in the range: tracks that showed 0 (empty) or under 3 (few) grants.", see_all: seeAll('Coverage', '#coverage') },
+  trending_industries: { title: 'Trending industries', kind: 'table', note: "Grant matches by clients' profile industry, now vs the previous period." },
+  ignored: { title: 'Ignored cards', kind: 'table', note: 'Grants shown on goal tracks to 3+ clients, ranked by how many clients saw them and never opened them.', see_all: seeAll('Grants, most ignored', '#grants?view=most_ignored') },
+  recent_launches: { title: 'Recent launches', kind: 'table', note: 'Published as active or republished in the range, with clients matched and opens since that day.', see_all: seeAll('Coverage & changes', '#coverage') },
+  consulting_cards: { title: 'Consulting questions', kind: 'table', wide: true, note: 'Open review cards owned by Consulting. Company · size · revenue · plan.', see_all: seeAll('Review queue, Consulting', '#review?owner=consulting') },
+  help_we_sell: { title: 'Clients asking for help we sell', kind: 'table', wide: true, note: 'Chat messages the daily review labelled as an unmet need for consulting or application writing.', see_all: seeAll('Chat themes', '#chat') },
+  big_money: { title: 'Interest in big-money grants', kind: 'table', wide: true, note: `Grants valued at $${BIG_GRANT_VALUE.toLocaleString('en-CA')} or more (the app's grants.value), asked about in chat or opened as a card in the range.`, see_all: seeAll('Grants', '#grants') },
+  most_engaged: { title: 'Most engaged clients', kind: 'table', wide: true, note: 'Goal tracks set, cards opened and chats in the range.', see_all: seeAll('Companies', '#companies') },
+  fast_starters: { title: 'Fast starters', kind: 'table', wide: true, note: `Signed up in the range and set a goal track and opened a grant card within ${FAST_DAYS} days.`, see_all: seeAll('Companies', '#companies') }
+});
 
 const cache = new Map();
 
 /** The three departments for a range (cached CACHE_MS per range). */
-export async function departmentViews(range = 'week', overrides = {}) {
+export async function departmentViews(range = 'month', overrides = {}) {
   const deps = { ...defaultDeps(), ...overrides };
   const now = deps.now();
   const rangeProblem = rangeError(range, now);
@@ -433,41 +649,51 @@ export async function departmentViews(range = 'week', overrides = {}) {
   const w = windowsFor(range, now);
   const today = vancouverDay(now);
   const { from, to } = w.current;
+  const C = w.current.days;
+  const P = w.previous.days;
   const settle = (p) => Promise.resolve().then(p).then((value) => ({ ok: true, value }), (error) => ({ ok: false, error }));
   // The four window readers each read the app DB's small read-only pool hard
   // (APP_POOL_MAX connections, 5 s to get one). Run together on a cold cache
-  // they time out waiting for a connection, so they go one after another;
-  // each has its own cache, so a warm load is quick either way.
+  // they time out waiting for a connection, so they go one after another; the
+  // other app reads form a second chain beside them. Hub reads run freely.
   const sequential = async (tasks) => {
     const out = [];
     for (const t of tasks) out.push(await settle(t));
     return out;
   };
-  const [[cov, win, list, chat], [grants, changed, items, signals]] = await Promise.all([
+  const named = (rows) => withCompanyNames(rows, { query: deps.appQuery }).catch(() => rows);
+  const [[cov, win, list, chat], [grants, changed, goals, firstActions], [items, chatRows, deadlineCards, consultingCards]] = await Promise.all([
     sequential([
       () => deps.coverage(range),
       () => deps.loadGrantWindow(range),
-      () => deps.companyList('month'),
+      () => deps.companyList(range),
       () => deps.chatOverview(range)
     ]),
+    sequential([
+      () => deps.liveGrants({ query: deps.appQuery }),
+      () => deps.changes(range),
+      () => deps.appQuery(GOALS_SQL, [w.previous.from, to]).then((r) => r.rows),
+      () => deps.appQuery(FIRST_ACTIONS_SQL, [from, to]).then((r) => r.rows)
+    ]),
     Promise.all([
-      settle(() => deps.liveGrants({ query: deps.appQuery })),
-      settle(() => deps.changes('week')),
-      settle(() => deps.listItems({ owner: 'research' }).then((rows) => withCompanyNames(rows, { query: deps.appQuery }).catch(() => rows))),
+      settle(() => deps.listItems().then(named)),
       settle(async () => {
-        const rows = (await deps.storeQuery(CHAT_SIGNALS_SQL, [from, to])).rows;
+        const rows = (await deps.storeQuery(CHAT_ROWS_SQL, [from, to])).rows;
         const [names, internalClerks] = await Promise.all([
           companyNamesForIds(rows.map((r) => r.company_id), { query: deps.appQuery }).catch(() => new Map()),
           deps.internalClerkIds().catch(() => new Set())
         ]);
         return { rows, names, internalClerks };
-      })
+      }),
+      settle(() => deps.hubQuery(DEADLINE_CARDS_SQL).then((r) => r.rows)),
+      settle(() => deps.hubQuery(CONSULTING_CARDS_SQL).then((r) => named(r.rows)))
     ])
   ]);
+  const flags = grants.ok ? await settle(() => deps.deadlineFlags(grants.value, today)) : grants;
 
-  const item = (key, sources, build) => {
+  const panel = (key, sources, build) => {
     const failed = sources.find((s) => !s.ok);
-    const base = { key, label: LABELS[key], ...(NOTES[key] ? { note: NOTES[key] } : {}) };
+    const base = { key, ...META[key] };
     if (failed) {
       console.error(`Control Centre views ${key} failed (code: ${failed.error?.code || failed.error?.name || 'unknown'})`);
       return { ...base, error: errorCode(failed.error) };
@@ -479,35 +705,53 @@ export async function departmentViews(range = 'week', overrides = {}) {
       return { ...base, error: 'error' };
     }
   };
-  const lists = (view) => (w2) => buildGrantList(w2, { view, isInternal: deps.isInternal });
+  const isInternal = deps.isInternal;
 
   const value = {
     range,
     current: { from, to },
+    previous: { from: w.previous.from, to: w.previous.to },
     today,
     departments: {
       research: [
-        item('deadlines', [grants], (g) => deadlineItem(g, today)),
-        item('cards_wrong', [items, win], (it, w2) => cardsLookWrongItem(it, lists('most_ignored')(w2), deps.isInternal)),
-        item('coverage_gaps', [cov, win], (c, w2) => coverageGapsItem(c, lists('not_matching')(w2))),
-        item('stuck', [items], (it) => stuckItem(it, deps.isInternal))
+        panel('flagged_cards', [items], (it) => flaggedCardsPanel(it, isInternal)),
+        panel('status_mismatches', [flags, deadlineCards], (f, cards) => statusMismatchesPanel(f, cards)),
+        panel('deadline_unreadable', [flags], (f) => deadlineUnreadablePanel(f)),
+        panel('upcoming_deadlines', [flags, win], (f, w2) => upcomingDeadlinesPanel(f, w2, isInternal)),
+        panel('asked_not_carried', [chatRows], (c) => askedNotCarriedPanel(c.rows, c.names, c.internalClerks, isInternal)),
+        panel('industry_coverage', [cov], (c) => industryCoveragePanel(c)),
+        panel('goal_coverage', [cov], (c) => goalCoveragePanel(c)),
+        panel('trending_grants', [win], (w2) => trendingGrantsPanel(w2, isInternal)),
+        panel('trending_industries', [win, cov], (w2, c) => trendingIndustriesPanel(w2, c, isInternal)),
+        panel('ignored', [win], (w2) => ignoredPanel(w2, isInternal)),
+        panel('recent_launches', [changed, win], (ch, w2) => recentLaunchesPanel(ch, w2, isInternal))
       ],
       consulting: [
-        item('quiet_clients', [list], (l) => quietClientsItem(l, deps.isInternal)),
-        item('paid_work', [signals], (s) => paidWorkItem(s.rows, s.names, s.internalClerks, deps.isInternal)),
-        item('new_grants', [changed, cov], (ch, c) => newGrantsItem(ch, c))
+        panel('consulting_cards', [consultingCards, list], (cards, l) => consultingCardsPanel(cards, l, isInternal)),
+        panel('help_we_sell', [chatRows, list], (c, l) => helpWeSellPanel(c.rows, l, c.names, c.internalClerks, isInternal)),
+        panel('big_money', [chatRows, win, grants, list], (c, w2, g, l) => bigMoneyPanel(c.rows, w2, g, l, c.names, c.internalClerks, C, isInternal)),
+        panel('most_engaged', [list, goals], (l, g) => mostEngagedPanel(l, g, C, isInternal)),
+        panel('fast_starters', [list, firstActions], (l, f) => fastStartersPanel(l, f, C, isInternal))
       ],
       marketing: [
-        item('asked', [chat], (c) => askedItem(c)),
-        item('engagement', [win, chat], (w2, c) => engagementItem(w2, c, deps.isInternal)),
-        item('mismatch', [cov], (c) => mismatchItem(c)),
-        item('changed', [changed], (ch) => changedLine(ch))
+        panel('chat_themes', [chat], (c) => chatThemesPanel(c)),
+        panel('howto_unanswered', [chatRows], (c) => howtoPanel(c.rows, c.names, c.internalClerks, isInternal)),
+        panel('most_matched', [win], (w2) => mostMatchedPanel(w2, isInternal)),
+        panel('most_opened', [win], (w2) => mostOpenedPanel(w2, isInternal)),
+        panel('trending_grants', [win], (w2) => trendingGrantsPanel(w2, isInternal)),
+        panel('timely', [changed, flags, win], (ch, f, w2) => timelyPanel(ch, f, w2, isInternal)),
+        panel('goal_demand', [goals], (g) => goalDemandPanel(g, C, P, isInternal)),
+        panel('demand_industry', [cov], (c) => demandIndustryPanel(c)),
+        panel('demand_province', [cov], (c) => demandProvincePanel(c)),
+        panel('found_via', [win], (w2) => foundViaPanel(w2, C, P, isInternal)),
+        panel('totals', [win, goals], (w2, g) => totalsPanel(w2, g, C, isInternal)),
+        panel('signups', [win], (w2) => signupsPanel(w2, C, P, isInternal))
       ]
     },
     generated_at: new Date(now).toISOString()
   };
-  // A failed item isn't kept: the next load tries its source again.
-  const failed = Object.values(value.departments).flat().some((i) => i.error);
+  // A failed panel isn't kept: the next load tries its source again.
+  const failed = Object.values(value.departments).flat().some((p) => p.error);
   if (!overrides.noCache && !failed) { cache.set(range, { at: now.getTime(), value }); trimCache(cache); }
   return value;
 }

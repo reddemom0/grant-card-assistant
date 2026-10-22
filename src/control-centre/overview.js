@@ -249,8 +249,11 @@ export const OPS_TRACKING_SQL = `
     FROM conversations
    WHERE user_id LIKE 'user\\_%' AND jsonb_array_length(messages) > 0`;
 
+// Size and revenue as the engine reads them (live-sources.js shapeCompanyProfile):
+// the range text first, the number as a fallback. Mostly ranges ("5-10 employees").
 export const COMPANY_METADATA_SQL = `
-  SELECT DISTINCT ON (company_id) company_id, primary_industries, provinces
+  SELECT DISTINCT ON (company_id) company_id, primary_industries, provinces,
+         employee_range, num_employees, recurring_revenue_range, annual_revenue
     FROM company_metadata
    WHERE company_id = ANY($1::int[])
    ORDER BY company_id, id DESC`;
@@ -534,10 +537,13 @@ async function readLiveDays(days, deps) {
   return out;
 }
 
+const textOrNull = (v) => (v == null || String(v).trim() === '' ? null : String(v).trim());
 export const shapeMetadata = (rows) => new Map(rows.map((r) => [r.company_id, {
   industries: [...new Set((Array.isArray(r.primary_industries) ? r.primary_industries : [])
     .filter((x) => typeof x === 'string' && x.trim()).map((x) => x.trim()))],
-  provinces: splitProvinces(r.provinces)
+  provinces: splitProvinces(r.provinces),
+  size: textOrNull(r.employee_range) ?? textOrNull(r.num_employees),
+  revenue: textOrNull(r.recurring_revenue_range) ?? textOrNull(r.annual_revenue)
 }]));
 
 /** Read everything for one range and build the payload. Uncached. */

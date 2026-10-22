@@ -14,6 +14,10 @@
  *   PATCH  /:id/status        {to}  ('closed' refused — use close)
  *   PATCH  /:id/owner         {owner}  (null clears it)
  *   POST   /:id/close         {expected_match, close_note}
+ *   PATCH  /:id/answer        {answer}  consulting cards: the consultant's answer
+ *   POST   /:id/send-to-chris {answer}  save the answer, owner chris, in progress
+ *   POST   /:id/approve-for-ai {answer?} Chris only: queue the Q&A for the AI
+ *                             (cc_ai_knowledge, knowledge.js) and close the card
  *
  * Bad input → 400, unknown id → 404, already closed → 409, app or ops DB not
  * configured → 503 (names and conversations only; the queue lives in the Hub DB).
@@ -250,6 +254,33 @@ export function createReviewRouter(overrides = {}) {
       res.json({ item: await (await deps()).close(req.params.id, { expected_match: b.expected_match, close_note: b.close_note }, req.user.email) });
     } catch (error) {
       sendError(res, error, 'close');
+    }
+  });
+
+  // Consulting cards (chat-daily.js consulting_question): the consultant's
+  // answer, handing it to Chris, and Chris approving it for the AI.
+  router.patch('/:id/answer', async (req, res) => {
+    try {
+      res.json({ item: await (await deps()).setAnswer(req.params.id, req.body?.answer, req.user.email) });
+    } catch (error) {
+      sendError(res, error, 'answer');
+    }
+  });
+
+  router.post('/:id/send-to-chris', async (req, res) => {
+    try {
+      res.json({ item: await (await deps()).sendToChris(req.params.id, req.body?.answer, req.user.email) });
+    } catch (error) {
+      sendError(res, error, 'send-to-chris');
+    }
+  });
+
+  router.post('/:id/approve-for-ai', async (req, res) => {
+    try {
+      const r = await (await deps()).approveForAi(req.params.id, req.user.email, { answer: req.body?.answer });
+      res.json({ item: r.item, knowledge: r.knowledge ?? null });
+    } catch (error) {
+      sendError(res, error, 'approve-for-ai');
     }
   });
 

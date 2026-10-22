@@ -1,8 +1,8 @@
 /**
- * control-centre Department views: each item's shaping (headline, counts, at
- * most five rows, See all), the internal-accounts variants, a failing source
- * failing only its own items, reads only, and the route. Fixtures and
- * injected deps only — no DB, no network.
+ * control-centre Department views v2: each panel builder's shaping (columns,
+ * rows, both variants, empty → rows: []), the composition (a failing source
+ * fails only its panels, reads only, cached per range), and the route.
+ * Fixtures and injected deps only — no DB, no network.
  *
  * Run with: NODE_OPTIONS=--experimental-vm-modules npx jest --config tests/jest.config.cjs tests/unit/control-centre-views.test.js
  */
@@ -16,217 +16,387 @@ const { createViewsRouter } = await import('../../src/control-centre/views-route
 beforeEach(() => { V._clearCacheForTests(); jest.spyOn(console, 'error').mockImplementation(() => {}); });
 
 const internal = (id) => id === 81;
-const rowsOf = (b) => b.groups.flatMap((g) => g.rows);
+const C = ['2026-10-20', '2026-10-21'];
+const P = ['2026-10-18', '2026-10-19'];
+const cellsOf = (v) => v.rows.map((r) => r.cells);
+const firstText = (v) => v.rows.map((r) => Object.values(r.cells)[0].text ?? Object.values(r.cells)[0]);
 
-describe('capRows', () => {
-  test('at most five rows across groups, handed out in turn', () => {
-    const g = (n) => ({ title: 't', rows: Array.from({ length: n }, (_, i) => ({ title: String(i) })), see_all: { label: 'x', hash: '#x' } });
-    expect(V.capRows([g(10)]).map((x) => x.rows.length)).toEqual([5]);
-    expect(V.capRows([g(10), g(10)]).map((x) => x.rows.length)).toEqual([3, 2]);
-    expect(V.capRows([g(10), g(10), g(10)]).map((x) => x.rows.length)).toEqual([2, 2, 1]);
-    expect(V.capRows([g(1), g(10)]).map((x) => x.rows.length)).toEqual([1, 4]);
-    expect(V.capRows([g(0), g(2)]).map((x) => x.rows.length)).toEqual([0, 2]);
+// The Grants tab's window: two live grants, matches and opens over the
+// current and previous windows, one internal account (81).
+const shown = (day, company_id, grant_id, times_shown = 1) => ({ day, company_id, grant_id, times_computed: 1, times_shown });
+const win = () => ({
+  days: C, previous_days: P,
+  grants: [{ root_id: 12, title: 'CanExport SMEs', value: '250000' }, { root_id: 13, title: 'Voucher', value: 5000 }],
+  matches: [
+    shown('2026-10-21', 83, 12), shown('2026-10-20', 84, 12), shown('2026-10-19', 83, 13), shown('2026-10-21', 81, 13),
+    shown('2026-10-21', 85, 13, 0), shown('2026-10-21', 86, 12)
+  ],
+  views: [
+    { day: '2026-10-21', company_id: 83, grant_root_id: 12, source: 'suggested', sessions: 3 },
+    { day: '2026-10-21', company_id: 83, grant_root_id: 12, source: 'advisor', sessions: 1 },
+    { day: '2026-10-19', company_id: 84, grant_root_id: 12, source: 'browse', sessions: 2 },
+    { day: '2026-10-21', company_id: 81, grant_root_id: 13, source: 'browse', sessions: 2 }
+  ],
+  signups: [{ day: '2026-10-21', company_id: 90 }, { day: '2026-10-21', company_id: 91 }, { day: '2026-10-19', company_id: 92 }, { day: '2026-10-20', company_id: 81 }],
+  sessions: [], adds: [], removals: [], openedPairs: new Set(['83|12']), lastShown: [], openCards: new Map()
+});
+const goals = () => [
+  { company_id: 83, name: 'Hire and Train People', day: '2026-10-21' },
+  { company_id: 84, name: 'Hire and Train People', day: '2026-10-19' },
+  { company_id: 81, name: 'Build Something New', day: '2026-10-21' },
+  { company_id: 85, name: 'Domestic Growth', day: '2026-10-20' }
+];
+const flags = () => ({
+  passed: [
+    { grant_id: 1, title: 'Old', grantor: null, deadline: '2026-10-01', deadline_text: '2026-10-01', days: -20 },
+    { grant_id: 2, title: 'Older', grantor: null, deadline: '2021-04-15', deadline_text: '15/04/2021', days: -2000 }
+  ],
+  due_soon: [{ grant_id: 12, title: 'CanExport SMEs', grantor: null, deadline: '2026-11-02', deadline_text: 'November 2, 2026', days: 12 }],
+  blank: [{ grant_id: 3, title: 'Blank', grantor: null, deadline: null, deadline_text: '' }],
+  unreadable: [{ grant_id: 5, title: 'Odd', grantor: null, deadline: null, deadline_text: 'Spring intake' }],
+  rolling: 150, no_date: 152
+});
+const variant = () => ({
+  industries: [
+    { industry: 'Agriculture', level: 'main', clients: 3, grant_matches: 5, avg_matches: 2.5, restricted: 4, open_to_all: 9, thin: false, specifics: [] },
+    { industry: 'Energy', level: 'main', clients: 0, grant_matches: 0, avg_matches: null, restricted: 2, open_to_all: 9, thin: false, specifics: [] }
+  ],
+  not_mapped: { industry: 'Not mapped', level: 'main', clients: 1, grant_matches: 0, avg_matches: null, restricted: null, open_to_all: 9, thin: false, specifics: [] },
+  breakdowns: {
+    province: [{ province: 'British Columbia', clients: 2, ran_matching: 2, avg_matches: 2, grant_matches: 4 }, { province: 'Yukon', clients: 0, ran_matching: 0, avg_matches: null, grant_matches: 0 }],
+    goal_tracks: [
+      { section: 'Hire or Train People', label: 'Hire or Train People', clients: 3, grants_shown_on_track: 5, empty_tracks: 1, few_tracks: 0 },
+      { section: 'funding_matches', label: 'All goals', clients: 3, grants_shown_on_track: 12, empty_tracks: 0, few_tracks: 0 },
+      { section: 'Domestic Growth', label: 'Domestic Growth', clients: 2, grants_shown_on_track: 1, empty_tracks: 1, few_tracks: 1 }
+    ]
+  }
+});
+const cov = () => ({
+  clients_variant: variant(), all_variant: variant(),
+  clients: { 83: { industries: ['Agriculture'] }, 84: { industries: ['Agriculture'] }, 86: { industries: ['Agriculture'] }, 81: { industries: ['Agriculture'] } },
+  grants: {}
+});
+const list = () => ({ current: { from: C[0], to: C[1] }, companies: [
+  { id: 83, name: 'NYA Ventures', size: '5-10 employees', revenue: '$500k-$1M CAD', plan: 'starter', plan_status: 'active', signed_up: '2026-09-14', last_active: '2026-10-21', grant_matches: 1, cards_opened: 4, chats: 1 },
+  { id: 84, name: 'Quiet', size: null, revenue: null, plan: null, signed_up: '2026-09-01', last_active: null, grant_matches: 1, cards_opened: 0, chats: 0 },
+  { id: 87, name: 'Browser', size: 'Just me', revenue: null, plan: 'lite', signed_up: '2026-09-01', last_active: null, grant_matches: 0, cards_opened: 1, chats: 0 },
+  { id: 90, name: 'New Co', size: null, revenue: null, plan: 'starter', signed_up: '2026-10-20', last_active: '2026-10-22', grant_matches: 0, cards_opened: 0, chats: 0 },
+  { id: 91, name: 'Newer Co', size: null, revenue: null, plan: null, signed_up: '2026-10-21', last_active: null, grant_matches: 0, cards_opened: 0, chats: 0 },
+  { id: 92, name: 'Earlier Co', size: null, revenue: null, plan: null, signed_up: '2026-10-19', last_active: null, grant_matches: 0, cards_opened: 0, chats: 0 },
+  { id: 81, name: 'Maximizer', size: null, revenue: null, plan: null, signed_up: '2026-10-20', last_active: '2026-10-21', grant_matches: 5, cards_opened: 2, chats: 0 }
+] });
+const chatRows = () => [
+  { company_id: 83, clerk_id: 'user_a', conversation_id: 290, turn_index: 1, day: '2026-10-21', question: 'How do I build a watchlist?', theme: 'Watchlist and saved grants', answer: 'not_answered', unanswered_reason: 'no_answer', unmet_need: null, cards_shown: [12], grants_named: [13] },
+  { company_id: 83, clerk_id: 'user_a', conversation_id: 290, turn_index: 2, day: '2026-10-21', question: 'Can you write my CanExport application?', theme: 'Application help', answer: 'partly', unanswered_reason: 'left_after_bad_reply', unmet_need: 'Consulting or application writing', cards_shown: [], grants_named: [] },
+  { company_id: 83, clerk_id: 'user_a', conversation_id: 290, turn_index: 3, day: '2026-10-21', question: 'Is the BC Launch Online grant available?', theme: 'Finding grants for my business', answer: 'answered', unanswered_reason: null, unmet_need: "A grant we don't carry", cards_shown: [], grants_named: [] },
+  { company_id: null, clerk_id: 'user_staff', conversation_id: 291, turn_index: 0, day: '2026-10-20', question: 'Where do I upload documents?', theme: 'Company profile and account', answer: 'answered', unanswered_reason: 'asked_for_person', unmet_need: 'Grant writing help', cards_shown: [], grants_named: [] },
+  { company_id: 84, clerk_id: 'user_b', conversation_id: 292, turn_index: 0, day: '2026-10-19', question: 'What loans are there?', theme: 'Loans and financing', answer: 'answered', unanswered_reason: null, unmet_need: 'Loans', cards_shown: [], grants_named: [] },
+  { company_id: 81, clerk_id: 'user_m', conversation_id: 300, turn_index: 0, day: '2026-10-21', question: 'How do I apply?', theme: 'Application help', answer: 'answered', unanswered_reason: null, unmet_need: null, cards_shown: [12], grants_named: [] },
+  { company_id: null, clerk_id: 'user_z', conversation_id: 301, turn_index: 0, day: '2026-10-20', question: 'Program X?', theme: 'Other', answer: 'answered', unanswered_reason: null, unmet_need: 'A program we do not carry', cards_shown: [], grants_named: [] }
+];
+const names = () => new Map([[83, 'NYA Ventures'], [84, 'Quiet']]);
+const internalClerks = () => new Set(['user_staff']);
+
+describe('Marketing', () => {
+  test('chat themes: themes with questions in the range, change and an example; a note when the review is not set up', () => {
+    const chat = { store: { ok: true }, themes: [
+      { theme: 'Hiring', current: 4, previous: 1, delta: 3, examples: [{ question: 'Wage subsidies for a junior dev?' }] },
+      { theme: 'Old', current: 0, previous: 2, delta: -2, examples: [] }
+    ] };
+    const p = V.chatThemesPanel(chat);
+    expect(p.clients).toBe(p.all);
+    expect(p.clients.columns.map((c) => c.kind)).toEqual(['link', 'num', 'delta', 'text']);
+    expect(cellsOf(p.clients)).toEqual([{ theme: { text: 'Hiring', hash: '#chat' }, questions: 4, change: 3, example: 'Wage subsidies for a junior dev?' }]);
+    expect(p.note).toBeUndefined();
+    expect(V.chatThemesPanel({ store: { ok: false }, themes: [] }).note).toMatch(/isn't set up/);
+    expect(V.chatThemesPanel({ store: { ok: true }, themes: [] }).clients.rows).toEqual([]);
+  });
+
+  test('how-to questions: unanswered rows whose wording asks how; internal left out by company or Clerk id', () => {
+    const p = V.howtoPanel(chatRows(), names(), internalClerks(), internal);
+    expect(cellsOf(p.clients)).toEqual([{ question: { text: 'How do I build a watchlist?', hash: '#chat/290' }, theme: 'Watchlist and saved grants',
+      company: { text: 'NYA Ventures', hash: '#companies/83' }, day: '2026-10-21' }]);
+    expect(p.clients.rows[0].href).toBe('#chat/290');
+    expect(firstText(p.all)).toEqual(['How do I build a watchlist?', 'Where do I upload documents?']);
+    expect(p.all.rows[1].cells.company).toEqual({ text: 'Not recorded', hash: null });
+  });
+
+  test('most matched and most opened: from the Grants tab rows, both variants', () => {
+    const m = V.mostMatchedPanel(win(), internal);
+    expect(cellsOf(m.clients)).toEqual([{ grant: { text: 'CanExport SMEs', hash: '#grants/12' }, clients_matched: 3, opens: 4, saves: 0 }]);
+    expect(firstText(m.all)).toEqual(['CanExport SMEs', 'Voucher']);
+    expect(m.all.rows[1].cells).toMatchObject({ clients_matched: 1, opens: 2 });
+    const o = V.mostOpenedPanel(win(), internal);
+    expect(cellsOf(o.clients)).toEqual([{ grant: { text: 'CanExport SMEs', hash: '#grants/12' }, opens: 4, clients_matched: 3, bounced: 0 }]);
+    expect(firstText(o.all)).toEqual(['CanExport SMEs', 'Voucher']);
+  });
+
+  test('trending grants: clients matched now vs before, five up then five down, flagged', () => {
+    const rows = V.grantTrends(win(), (id) => !internal(id));
+    expect(rows).toEqual(expect.arrayContaining([
+      { grant_id: 12, title: 'CanExport SMEs', before: 0, now: 3, change: 3, opens_before: 2, opens_now: 4 },
+      { grant_id: 13, title: 'Voucher', before: 1, now: 0, change: -1, opens_before: 0, opens_now: 0 }
+    ]));
+    const p = V.trendingGrantsPanel(win(), internal);
+    expect(p.clients.rows.map((r) => [r.cells.grant.text, r.cells.change, r.flag])).toEqual([['CanExport SMEs', 3, 'up'], ['Voucher', -1, 'down']]);
+    // With the internal account in, Voucher is 1 → 1: no change, so it drops out.
+    expect(p.all.rows.map((r) => r.cells.grant.text)).toEqual(['CanExport SMEs']);
+  });
+
+  test('timely: went live in the range or due within 30 days, ranked by clients matched', () => {
+    const changed = { added: [{ grant_id: 13, title: 'Voucher', at: '2026-10-20T17:00:00Z' }] };
+    const p = V.timelyPanel(changed, flags(), win(), internal);
+    expect(cellsOf(p.clients)).toEqual([
+      { grant: { text: 'CanExport SMEs', hash: '#grants/12' }, why: 'Due Nov 2, 2026 (12 days left)', clients_matched: 3, opens: 4 },
+      { grant: { text: 'Voucher', hash: '#grants/13' }, why: 'Went live Oct 20, 2026', clients_matched: 0, opens: 0 }
+    ]);
+    expect(p.all.rows[1].cells).toMatchObject({ clients_matched: 1, opens: 2 });
+    expect(V.timelyPanel({ added: [] }, { due_soon: [] }, win(), internal).clients.rows).toEqual([]);
+  });
+
+  test('demand by goal type: goals created now vs before, as bars', () => {
+    const p = V.goalDemandPanel(goals(), C, P, internal);
+    expect(p.clients).toEqual({ unit: 'goal tracks set', rows: [{ label: 'Hire and Train People', value: 1, previous: 1 }, { label: 'Domestic Growth', value: 1, previous: 0 }] });
+    expect(p.all.rows.map((r) => r.label)).toEqual(['Hire and Train People', 'Build Something New', 'Domestic Growth']);
+    expect(V.goalDemandPanel([], C, P, internal).clients.rows).toEqual([]);
+  });
+
+  test('demand by industry and province: clients and grant matches, rows with neither left out', () => {
+    const i = V.demandIndustryPanel(cov());
+    expect(cellsOf(i.clients)).toEqual([
+      { industry: { text: 'Agriculture', hash: '#coverage/industry/Agriculture' }, clients: 3, grant_matches: 5, avg_matches: 2.5 },
+      { industry: { text: 'Not mapped', hash: '#coverage/industry/Not%20mapped' }, clients: 1, grant_matches: 0, avg_matches: null }
+    ]);
+    const pr = V.demandProvincePanel(cov());
+    expect(cellsOf(pr.clients)).toEqual([{ province: 'British Columbia', clients: 2, grant_matches: 4, avg_matches: 2 }]);
+    expect(pr.clients.rows[0].href).toBe('#coverage');
+  });
+
+  test('how clients find grants: opens by source now vs before, every source listed', () => {
+    const p = V.foundViaPanel(win(), C, P, internal);
+    expect(p.clients).toEqual({ unit: 'card opens', rows: [
+      { label: 'Goal tracks', value: 3, previous: 0 }, { label: 'Browse', value: 0, previous: 2 }, { label: 'Chat', value: 1, previous: 0 },
+      { label: 'Watchlist', value: 0, previous: 0 }, { label: 'Other (direct links)', value: 0, previous: 0 }
+    ] });
+    expect(p.all.rows[1]).toEqual({ label: 'Browse', value: 2, previous: 2 });
+  });
+
+  test('totals: businesses and grants matched, cards opened, top goal type and top grant', () => {
+    const p = V.totalsPanel(win(), goals(), C, internal);
+    expect(p.clients.tiles).toEqual([
+      { label: 'Businesses matched', n: 3 }, { label: 'Grants matched', n: 1 }, { label: 'Cards opened', n: 4 },
+      { label: 'Top goal type', n: 'Domestic Growth', words: '1 goal track set' },
+      { label: 'Top grant', n: 'CanExport SMEs', words: '3 clients matched', href: '#grants/12' }
+    ]);
+    expect(p.all.tiles.slice(0, 3).map((t) => t.n)).toEqual([4, 2, 6]);
+    expect(V.totalsPanel({ ...win(), matches: [], views: [] }, [], C, internal).clients.tiles.map((t) => t.n)).toEqual([0, 0, 0, '—', '—']);
+  });
+
+  test('sign-ups: a per-day series now vs before, internal accounts left out of clients', () => {
+    const p = V.signupsPanel(win(), C, P, internal);
+    expect(p.clients).toEqual({ label: 'Sign-ups', total: 2, previous_total: 1, delta: 1,
+      current: [{ day: '2026-10-20', value: 0 }, { day: '2026-10-21', value: 2 }], previous: [{ day: '2026-10-18', value: 0 }, { day: '2026-10-19', value: 1 }] });
+    expect(p.all).toMatchObject({ total: 3, delta: 2 });
   });
 });
 
 describe('Research', () => {
-  test('deadline hygiene: passed headline, due in 90 days and blank/unreadable counts, rolling as a sub-line', () => {
-    const grants = [
-      { root_id: 1, title: 'Old', deadline: '2026-10-01' }, { root_id: 2, title: 'Soon', deadline: '2026-12-01' },
-      { root_id: 3, title: 'Blank', deadline: '' }, { root_id: 4, title: 'Rolling', deadline: 'Open Until Filled' },
-      { root_id: 5, title: 'Odd', deadline: 'Spring intake' }
-    ];
-    const it = V.deadlineItem(grants, '2026-10-21');
-    expect(it.clients).toBe(it.all);
-    expect(it.clients.headline).toEqual({ n: 1, words: 'live grants past their deadline' });
-    expect(it.clients.counts.map((c) => c.n)).toEqual([1, 2]);
-    expect(it.clients.sub).toMatch(/^1 grant with a rolling deadline/);
-    expect(rowsOf(it.clients)).toEqual([
-      { title: 'Old', meta: 'Deadline was Oct 1, 2026', hash: '#grants/1' },
-      { title: 'Soon', meta: 'Due Dec 1, 2026', hash: '#grants/2' },
-      { title: 'Blank', meta: 'Blank', hash: '#grants/3' },
-      { title: 'Odd', meta: 'Says "Spring intake"', hash: '#grants/5' }
-    ]);
-  });
-
   const items = [
     { id: '1', kind: 'grant_pattern', owner: 'research', status: 'diagnosed', grant_name: 'Green Corps', pattern_category: 'wrong_industry', stuck: true, idle_days: 6, company_id: null },
     { id: '2', kind: 'match', owner: 'research', status: 'new', grant_name: 'Voucher', company_id: 81, company_name: 'Maximizer', stuck: true, idle_days: 4 },
     { id: '3', kind: 'match', owner: 'research', status: 'closed', grant_name: 'Closed one', company_id: 83, stuck: false },
-    { id: '4', kind: 'chat', owner: 'chris', status: 'new', company_id: 83, stuck: true, idle_days: 9 }
+    { id: '4', kind: 'chat', owner: 'chris', status: 'new', company_id: 83, stuck: true, idle_days: 9 },
+    { id: '5', kind: 'grant_deadline', owner: 'research', status: 'diagnosed', grant_name: 'Old grant', grant_root_id: 7, company_id: null, stuck: false, idle_days: 1 }
   ];
 
-  test('cards that look wrong: open Research cards (internal left out by default) and most-ignored grants', () => {
-    const ignored = { clients: [{ grant_id: 9, title: 'Ignored', ignored: 4, displayed_clients: 5 }], all: [] };
-    const it = V.cardsLookWrongItem(items, ignored, internal);
-    expect(it.clients.headline.n).toBe(1);
-    expect(it.all.headline.n).toBe(2);
-    expect(it.clients.groups[0].rows[0]).toEqual({ title: 'Green Corps — cut for several companies (wrong industry)', meta: 'Grant pattern · diagnosed', hash: '#review/1' });
-    expect(it.clients.groups[1].rows[0]).toMatchObject({ title: 'Ignored', meta: '4 of 5 clients never opened it', hash: '#grants/9' });
-    expect(it.clients.groups.map((g) => g.see_all.hash)).toEqual(['#review?owner=research', '#grants?view=most_ignored']);
+  test('flagged cards: open Research cards, stuck first; internal left out of clients', () => {
+    const p = V.flaggedCardsPanel(items, internal);
+    expect(p.clients.rows.map((r) => [r.cells.card.text, r.cells.type, r.cells.status, r.cells.idle, r.flag ?? null])).toEqual([
+      ['Green Corps — cut for several companies (wrong industry)', 'Grant pattern', 'Diagnosed', 6, 'stuck'],
+      ['Old grant — deadline passed, still live', 'Deadline', 'Diagnosed', 1, null]
+    ]);
+    expect(p.clients.rows[0]).toMatchObject({ href: '#review/1' });
+    expect(p.all.rows.map((r) => r.cells.card.hash)).toEqual(['#review/1', '#review/2', '#review/5']);
+    expect(p.all.rows[1].cells.company).toEqual({ text: 'Maximizer', hash: '#companies/81' });
   });
 
-  test('stuck: open Research cards with no activity for 3+ days, longest first', () => {
-    const it = V.stuckItem(items, internal);
-    expect(rowsOf(it.all).map((r) => r.hash)).toEqual(['#review/1', '#review/2']);
-    expect(rowsOf(it.clients).map((r) => r.meta)).toEqual(['No activity for 6 days · diagnosed']);
+  test('status mismatches: past-dated live grants, oldest first, with their card or a "next sweep" note', () => {
+    const p = V.statusMismatchesPanel(flags(), [{ id: '44', grant_root_id: 1, status: 'diagnosed' }]);
+    expect(p.clients).toBe(p.all);
+    expect(cellsOf(p.clients)).toEqual([
+      { grant: { text: 'Older', hash: '#grants/2' }, deadline_text: '15/04/2021', deadline: '2021-04-15', over: 2000, card: { text: 'Filed on the next sweep', hash: null } },
+      { grant: { text: 'Old', hash: '#grants/1' }, deadline_text: '2026-10-01', deadline: '2026-10-01', over: 20, card: { text: '#44 · Diagnosed', hash: '#review/44' } }
+    ]);
+    expect(V.statusMismatchesPanel({ passed: [] }, []).clients.rows).toEqual([]);
   });
 
-  test('coverage gaps: thin rows (mains and specifics) and grants matching no one', () => {
-    const variant = { industries: [
-      { industry: 'Agriculture', thin: true, avg_matches: 1.5, ran_matching: 2, clients: 3, specifics: [
-        { industry: 'Aquaculture', thin: true, avg_matches: 0.5, ran_matching: 2, clients: 2 }] },
-      { industry: 'Energy', thin: false, avg_matches: 9, ran_matching: 4, clients: 4, specifics: [] }
-    ] };
-    const it = V.coverageGapsItem({ clients_variant: variant, all_variant: variant }, { clients: [{ grant_id: 7, title: 'Nobody', last_matched: null }], all: [] });
-    expect(it.clients.headline.n).toBe(2);
-    expect(it.clients.groups[0].rows.map((r) => r.title)).toEqual(['Aquaculture', 'Agriculture']);
-    expect(it.clients.groups[0].rows[0].hash).toBe('#coverage/industry/Aquaculture');
-    expect(it.clients.groups[1].rows[0]).toMatchObject({ meta: 'Never matched', hash: '#grants/7' });
-    expect(it.all.counts[0].n).toBe(0);
+  test('no readable deadline: blank and unreadable grants, rolling counted in the note', () => {
+    const p = V.deadlineUnreadablePanel(flags());
+    expect(cellsOf(p.clients)).toEqual([
+      { grant: { text: 'Blank', hash: '#grants/3' }, kind: 'Blank', deadline_text: '' },
+      { grant: { text: 'Odd', hash: '#grants/5' }, kind: 'Unreadable', deadline_text: 'Spring intake' }
+    ]);
+    expect(p.note).toBe('1 live grant with a blank deadline and 1 unreadable; 150 rolling ("Open Until Filled" and the like) are fine. Not filed as cards.');
+  });
+
+  test('upcoming deadlines: soonest first, with the range\'s matches and opens', () => {
+    const p = V.upcomingDeadlinesPanel(flags(), win(), internal);
+    expect(cellsOf(p.clients)).toEqual([{ grant: { text: 'CanExport SMEs', hash: '#grants/12' }, due: '2026-11-02', days_left: 12, clients_matched: 3, opens: 4 }]);
+  });
+
+  test('asked for, not carried: unmet needs for a program we don\'t carry, not loans or consulting', () => {
+    const p = V.askedNotCarriedPanel(chatRows(), names(), internalClerks(), internal);
+    expect(cellsOf(p.clients)).toEqual([
+      { question: { text: 'Is the BC Launch Online grant available?', hash: '#chat/290' }, company: { text: 'NYA Ventures', hash: '#companies/83' }, day: '2026-10-21' },
+      { question: { text: 'Program X?', hash: '#chat/301' }, company: { text: 'Not recorded', hash: null }, day: '2026-10-20' }
+    ]);
+    expect(p.all.rows.length).toBe(2);
+  });
+
+  test('industry coverage and goal coverage tables', () => {
+    const i = V.industryCoveragePanel(cov());
+    expect(i.clients.rows.map((r) => [r.cells.industry.text, r.cells.clients, r.cells.restricted, r.cells.thin])).toEqual([['Agriculture', 3, 4, ''], ['Not mapped', 1, null, ''], ['Energy', 0, 2, '']]);
+    const g = V.goalCoveragePanel(cov());
+    expect(g.clients.rows.map((r) => r.cells.track)).toEqual(['Domestic Growth', 'Hire or Train People', 'All goals']);
+    expect(g.clients.rows[0].cells).toEqual({ track: 'Domestic Growth', clients: 2, grants_shown: 1, empty: 1, few: 1 });
+  });
+
+  test('trending industries: matched pairs by profile main industry, now vs before', () => {
+    expect(V.industryTrends(win(), cov(), (id) => !internal(id))).toEqual([{ industry: 'Agriculture', before: 1, now: 3, change: 2 }]);
+    const p = V.trendingIndustriesPanel(win(), cov(), internal);
+    expect(p.clients.rows[0]).toEqual({ cells: { industry: { text: 'Agriculture', hash: '#coverage/industry/Agriculture' }, before: 1, now: 3, change: 2 }, href: '#coverage/industry/Agriculture', flag: 'up' });
+    expect(p.all.rows[0].cells).toMatchObject({ now: 4, change: 3 });
+  });
+
+  test('ignored cards: shown to 3+ clients, ranked by how many saw them, then never opened', () => {
+    const p = V.ignoredPanel(win(), internal);
+    expect(cellsOf(p.clients)).toEqual([{ grant: { text: 'CanExport SMEs', hash: '#grants/12' }, displayed_clients: 3, ignored: 2, opens: 4 }]);
+  });
+
+  test('recent launches: went live or republished in the range, with matches and opens since that day', () => {
+    const changed = { added: [{ grant_id: 13, title: 'Voucher', at: '2026-10-20T17:00:00Z' }], republished: [{ grant_id: 12, title: 'CanExport SMEs', at: '2026-10-21T15:00:00Z' }] };
+    const p = V.recentLaunchesPanel(changed, win(), internal);
+    expect(cellsOf(p.clients)).toEqual([
+      { grant: { text: 'CanExport SMEs', hash: '#grants/12' }, event: 'Republished', when: '2026-10-21', clients_since: 2, opens_since: 4 },
+      { grant: { text: 'Voucher', hash: '#grants/13' }, event: 'Went live', when: '2026-10-20', clients_since: 0, opens_since: 0 }
+    ]);
+    expect(p.all.rows[1].cells).toMatchObject({ clients_since: 1, opens_since: 2 });
+    expect(V.recentLaunchesPanel({ added: [] }, win(), internal).clients.rows).toEqual([]);
   });
 });
 
 describe('Consulting/Sales', () => {
-  test('quiet clients: matches and no client action for 14+ days; shown matches but no opens', () => {
-    const list = { current: { from: '2026-09-22', to: '2026-10-21' }, companies: [
-      { id: 83, name: 'Quiet', last_active: '2026-10-01', grant_matches: 4, cards_opened: 2 },
-      { id: 84, name: 'Busy', last_active: '2026-10-20', grant_matches: 3, cards_opened: 0 },
-      { id: 85, name: 'Edge', last_active: '2026-10-07', grant_matches: 1, cards_opened: 0 },
-      { id: 86, name: 'No matches', last_active: '2026-01-01', grant_matches: 0, cards_opened: 0 },
-      { id: 81, name: 'Internal', last_active: '2026-01-01', grant_matches: 5, cards_opened: 0 }
-    ] };
-    const it = V.quietClientsItem(list, internal);
-    expect(it.clients.headline.n).toBe(2); // 83, and 85 exactly 14 days back
-    expect(it.clients.groups[0].rows.map((r) => r.title)).toEqual(['Quiet', 'Edge']);
-    expect(it.clients.counts[0].n).toBe(2); // 84, 85
-    expect(it.all.headline.n).toBe(3);
-    expect(it.clients.groups[0].see_all).toEqual({ label: 'Companies, least recently active', hash: '#companies?sort=last_active&dir=asc', range: 'month' });
+  const cards = [
+    { id: '10', company_id: 83, company_name: 'NYA Ventures', status: 'diagnosed', owner: 'consulting', chat_turn_ref: 'conv:290:consulting_question', conversation_id: 290, stuck: true, idle_days: 3,
+      flagged_turn_index: 1, turns: [{ turn_index: 0, client: 'Hi', assistant: 'Hello' }, { turn_index: 1, client: 'What does it entail to have your consulting team manage the application end to end?', assistant: '…', flagged: true }] },
+    { id: '11', company_id: 81, company_name: 'Maximizer', status: 'in_progress', owner: 'consulting', chat_turn_ref: 'conv:300:consulting_question', conversation_id: 300, stuck: false, idle_days: 0,
+      flagged_turn_index: 0, turns: [{ turn_index: 0, client: 'Internal question', assistant: 'a' }] }
+  ];
+
+  test('flaggedTurnOf: the marked turn, else by index, else the last', () => {
+    expect(V.flaggedTurnOf(cards[0].turns, 0).client).toMatch(/^What does it entail/);
+    expect(V.flaggedTurnOf([{ turn_index: 0, client: 'a' }, { turn_index: 1, client: 'b' }], 0).client).toBe('a');
+    expect(V.flaggedTurnOf([{ turn_index: 0, client: 'a' }, { turn_index: 1, client: 'b' }], null).client).toBe('b');
+    expect(V.flaggedTurnOf(null)).toBeNull();
   });
 
-  test('paid work: unanswered and unmet grouped by company; internal by company or Clerk id', () => {
-    const rows = [
-      { company_id: 83, clerk_id: 'user_a', question: 'Can you write my CanExport application?', unanswered_reason: 'no_answer', unmet_need: 'application writing' },
-      { company_id: 83, clerk_id: 'user_a', question: 'Second', unanswered_reason: 'no_answer', unmet_need: null },
-      { company_id: 81, clerk_id: 'user_m', question: 'Internal', unanswered_reason: 'no_answer', unmet_need: null },
-      { company_id: null, clerk_id: 'user_staff', question: 'Staff test', unanswered_reason: null, unmet_need: 'x' },
-      { company_id: null, clerk_id: 'user_z', question: 'Unknown', unanswered_reason: 'no_answer', unmet_need: null }
+  test('consulting questions: open Consulting cards with the client\'s question and the company line', () => {
+    const p = V.consultingCardsPanel(cards, list(), internal);
+    expect(p.clients.rows).toEqual([{ cells: {
+      company: { text: 'NYA Ventures · 5-10 employees · $500k-$1M CAD · starter', hash: '#companies/83' },
+      question: { text: 'What does it entail to have your consulting team manage the application end to end?', hash: '#review/10' },
+      status: 'Diagnosed', idle: 3 }, href: '#review/10', flag: 'stuck' }]);
+    expect(p.all.rows.map((r) => r.cells.company.text)).toEqual(['NYA Ventures · 5-10 employees · $500k-$1M CAD · starter', 'Maximizer · — · — · —']);
+  });
+
+  test('help we sell: consulting or application-writing unmet needs, by company', () => {
+    const p = V.helpWeSellPanel(chatRows(), list(), names(), internalClerks(), internal);
+    expect(cellsOf(p.clients)).toEqual([{ company: { text: 'NYA Ventures · 5-10 employees · $500k-$1M CAD · starter', hash: '#companies/83' },
+      question: { text: 'Can you write my CanExport application?', hash: '#chat/290' }, answer: 'Partly answered · left after a bad reply', day: '2026-10-21' }]);
+    expect(p.all.rows.map((r) => r.cells.company.text)).toEqual(['NYA Ventures · 5-10 employees · $500k-$1M CAD · starter', 'Company not recorded']);
+    expect(p.all.rows[1].cells.answer).toBe('Answered · asked for a person');
+  });
+
+  test('big money: grants worth $100k+ asked about in chat or opened as a card', () => {
+    const p = V.bigMoneyPanel(chatRows(), win(), win().grants, list(), names(), internalClerks(), C, internal);
+    expect(p.clients.rows.map((r) => [r.cells.company.text, r.cells.grant.text, r.cells.value, r.cells.how, r.cells.day, r.href])).toEqual([
+      ['NYA Ventures · 5-10 employees · $500k-$1M CAD · starter', 'CanExport SMEs', 250000, 'Asked in chat', '2026-10-21', '#chat/290'],
+      ['NYA Ventures · 5-10 employees · $500k-$1M CAD · starter', 'CanExport SMEs', 250000, 'Opened the card', '2026-10-21', '#grants/12']
+    ]);
+    expect(p.all.rows.length).toBe(3);
+    expect(V.bigMoneyPanel([], { ...win(), views: [] }, win().grants, list(), names(), internalClerks(), C, internal).clients.rows).toEqual([]);
+  });
+
+  test('most engaged: goal tracks set, cards opened and chats, scored; no activity reads so', () => {
+    const p = V.mostEngagedPanel(list(), goals(), C, internal);
+    expect(cellsOf(p.clients)).toEqual([
+      { company: { text: 'NYA Ventures · 5-10 employees · $500k-$1M CAD · starter', hash: '#companies/83' }, goals: 1, cards_opened: 4, chats: 1, last_active: 'Oct 21, 2026' },
+      { company: { text: 'Browser · Just me · — · lite', hash: '#companies/87' }, goals: 0, cards_opened: 1, chats: 0, last_active: 'No activity yet' }
+    ]);
+    expect(p.all.rows.map((r) => r.cells.company.hash)).toEqual(['#companies/83', '#companies/81', '#companies/87']);
+  });
+
+  test('fast starters: signed up in the range, a goal track and a card open within 7 days', () => {
+    const first = [
+      { company_id: 90, first_goal: new Date('2026-10-21T18:00:00Z'), first_open: new Date('2026-10-22T18:00:00Z') },
+      { company_id: 91, first_goal: new Date('2026-10-21T18:00:00Z'), first_open: null },
+      { company_id: 81, first_goal: new Date('2026-10-20T18:00:00Z'), first_open: new Date('2026-10-20T19:00:00Z') }
     ];
-    const it = V.paidWorkItem(rows, new Map([[83, 'NYA Ventures']]), new Set(['user_staff']), internal);
-    expect(it.clients.headline.n).toBe(1);
-    expect(it.clients.counts.map((c) => c.n)).toEqual([3, 1]);
-    expect(it.clients.groups[0].rows[0]).toEqual({ title: 'NYA Ventures', meta: '2 unanswered questions · 1 unmet need (application writing)',
-      detail: '“Can you write my CanExport application?”', hash: '#companies/83' });
-    expect(it.clients.groups[0].rows[1]).toMatchObject({ title: 'Company not recorded', hash: '#chat' });
-    expect(it.all.headline.n).toBe(2);
-  });
-
-  test('new grants: clients reached by the industry tag; open to all = every client; untagged says so', () => {
-    expect(V.clientsForGrant({ level: 'agnostic', tokens: [] }, [{ industries: [] }, { industries: [] }])).toEqual({ n: 2, open_to_all: true });
-    expect(V.clientsForGrant({ level: null }, [])).toBeNull();
-    expect(V.clientsForGrant(undefined, [])).toBeNull();
-    const cov = {
-      grants: { 1: { level: 'agnostic', tokens: [] }, 2: { level: null, tokens: [] } },
-      clients: { 83: { internal: false, industries: [] }, 81: { internal: true, industries: [] } }
-    };
-    const changed = { added: [{ grant_id: 2, title: 'Untagged', at: '2026-10-20T10:00:00Z' }, { grant_id: 1, title: 'Open', at: '2026-10-19T10:00:00Z' }] };
-    const it = V.newGrantsItem(changed, cov);
-    expect(it.clients.headline.n).toBe(2);
-    expect(rowsOf(it.clients).map((r) => r.meta)).toEqual(['Went live Oct 19, 2026 · open to every industry, all 1 client', 'Went live Oct 20, 2026 · industry not tagged yet']);
-    expect(rowsOf(it.all)[0].meta).toMatch(/all 2 clients/);
-  });
-});
-
-describe('Marketing', () => {
-  const chat = {
-    store: { ok: true },
-    themes: [{ theme: 'Hiring', current: 4, examples: [{ question: 'Wage subsidies for a junior dev?' }] }, { theme: 'Old', current: 0, examples: [] }],
-    grants: { 12: 'CanExport SMEs' },
-    clients_variant: { unanswered: [{ count: 3 }], unmet_needs: [{ count: 1 }], grants_discussed: [{ grant_id: 12, chats: 2, carded: 2, mentioned_only: 0 }] },
-    all_variant: { unanswered: [{ count: 3 }, { count: 2 }], unmet_needs: [], grants_discussed: [] }
-  };
-
-  test('asked: unanswered and unmet totals, themes with an example', () => {
-    const it = V.askedItem(chat);
-    expect(it.clients.headline.n).toBe(3);
-    expect(it.all.headline.n).toBe(5);
-    expect(rowsOf(it.clients)).toEqual([{ title: 'Hiring', meta: '4 questions', detail: '“Wage subsidies for a junior dev?”', hash: '#chat' }]);
-    expect(V.askedItem({ ...chat, store: { ok: false }, themes: [] }).clients.sub).toMatch(/isn't set up/);
-  });
-
-  test('engagement: most opened with how it was found, discussed in chat, shown never opened', () => {
-    const win = {
-      days: ['2026-10-20', '2026-10-21'], grants: [{ root_id: 12, title: 'CanExport SMEs' }, { root_id: 13, title: 'Voucher' }],
-      matches: [], views: [
-        { day: '2026-10-21', company_id: 83, grant_root_id: 12, source: 'suggested', sessions: 3 },
-        { day: '2026-10-21', company_id: 83, grant_root_id: 12, source: 'advisor', sessions: 1 },
-        { day: '2026-10-21', company_id: 81, grant_root_id: 13, source: 'browse', sessions: 2 }
-      ],
-      sessions: [], adds: [], removals: [], openedPairs: new Set(), lastShown: [], openCards: new Map()
-    };
-    const sources = V.sourcesByGrant(win.views, (id) => !internal(id));
-    expect(V.foundWords(sources.get(12))).toBe('found through Goal tracks (3), Chat (1)');
-    expect(sources.has(13)).toBe(false);
-    const it = V.engagementItem(win, chat, internal);
-    expect(it.clients.groups[1].rows[0]).toMatchObject({ title: 'CanExport SMEs', meta: '2 chats · found through Goal tracks (3), Chat (1)', hash: '#grants/12' });
-    expect(it.clients.groups.map((g) => g.title)).toEqual(['Most opened', 'Most discussed in chat', 'Shown, never opened']);
-    expect(rowsOf(it.clients).length).toBeLessThanOrEqual(V.MAX_ROWS);
-  });
-
-  test("don't line up: many industry grants and few clients, and the reverse; open-to-all and general rows left out", () => {
-    const variant = { industries: [
-      { industry: 'Fisheries', restricted: 5, clients: 0, specifics: [{ industry: 'Fisheries, general', general: true, restricted: 9, clients: 0 }] },
-      { industry: 'Retail', restricted: 1, clients: 6, specifics: [] },
-      { industry: 'Energy', restricted: 4, clients: 4, specifics: [] }
-    ] };
-    const it = V.mismatchItem({ clients_variant: variant, all_variant: variant });
-    expect(it.clients.headline.n).toBe(2);
-    expect(it.clients.groups[0].rows).toEqual([{ title: 'Fisheries', meta: '5 industry grants · 0 clients', hash: '#coverage/industry/Fisheries' }]);
-    expect(it.clients.groups[1].rows[0].title).toBe('Retail');
-  });
-
-  test('what changed this week: one line', () => {
-    const it = V.changedLine({ added: [1], closed: [], removed: [1, 2], edited: [1] });
-    expect(it.clients.line).toBe('This week: 1 went live, 0 closed, 2 removed, 1 grant edited.');
+    const p = V.fastStartersPanel(list(), first, C, internal);
+    expect(cellsOf(p.clients)).toEqual([{ company: { text: 'New Co · — · — · starter', hash: '#companies/90' }, signed_up: '2026-10-20', first_goal: '2026-10-21', first_open: '2026-10-22', plan: 'starter' }]);
+    expect(p.all.rows.map((r) => r.cells.company.hash)).toEqual(['#companies/81', '#companies/90']);
+    expect(V.fastStartersPanel(list(), [], C, internal).clients.rows).toEqual([]);
   });
 });
 
 describe('departmentViews', () => {
+  const emptyWin = () => ({ days: C, previous_days: P, grants: [], matches: [], views: [], signups: [], sessions: [], adds: [], removals: [], openedPairs: new Set(), lastShown: [], openCards: new Map() });
+  const flagsOf = (grants, today) => ({ passed: grants.filter((g) => g.deadline < today).map((g) => ({ grant_id: g.root_id, title: g.title, deadline: g.deadline, deadline_text: g.deadline, days: -1 })),
+    due_soon: [], blank: [], unreadable: [], rolling: 0, no_date: 0 });
   const deps = () => ({
     now: () => new Date('2026-10-21T18:00:00Z'),
     appQuery: jest.fn(async () => ({ rows: [] })),
+    hubQuery: jest.fn(async () => ({ rows: [] })),
     storeQuery: jest.fn(async () => ({ rows: [] })),
-    liveGrants: jest.fn(async () => [{ root_id: 1, title: 'Old', deadline: '2026-01-01' }]),
+    liveGrants: jest.fn(async () => [{ root_id: 1, title: 'Old', deadline: '2026-01-01', value: 1 }]),
+    deadlineFlags: flagsOf,
     coverage: jest.fn(async () => { const e = new Error('nc'); e.code = 'not_configured'; throw e; }),
-    changes: jest.fn(async () => ({ added: [], closed: [], removed: [], edited: [] })),
-    loadGrantWindow: jest.fn(async () => ({ days: [], grants: [], matches: [], views: [], sessions: [], adds: [], removals: [], openedPairs: new Set(), lastShown: [], openCards: new Map() })),
+    changes: jest.fn(async () => ({ added: [], closed: [], removed: [], edited: [], republished: [] })),
+    loadGrantWindow: jest.fn(async () => emptyWin()),
     chatOverview: jest.fn(async () => { const e = new Error('missing'); e.code = '42P01'; throw e; }),
     listItems: jest.fn(async () => []),
-    companyList: jest.fn(async () => ({ current: { from: '2026-09-22', to: '2026-10-21' }, companies: [] })),
+    companyList: jest.fn(async () => ({ current: { from: '2026-10-15', to: '2026-10-21' }, companies: [] })),
     internalClerkIds: async () => new Set(),
     isInternal: internal
   });
+  const keysOf = (out) => Object.fromEntries(Object.entries(out.departments).map(([d, ps]) => [d, ps.map((p) => p.key)]));
 
-  test('three departments; a failing source fails only its items; reads only; cached per range', async () => {
+  test('three departments of panels; a failing source fails only its panels; reads only; a failed load is not cached', async () => {
     const d = deps();
     const out = await V.departmentViews('week', d);
-    expect(Object.keys(out.departments)).toEqual(['research', 'consulting', 'marketing']);
-    const byKey = Object.fromEntries(Object.values(out.departments).flat().map((i) => [i.key, i]));
-    expect(byKey.deadlines.clients.headline.n).toBe(1);
-    expect(byKey.coverage_gaps.error).toBe('not_configured');
-    expect(byKey.new_grants.error).toBe('not_configured');
-    expect(byKey.mismatch.error).toBe('not_configured');
-    expect(byKey.asked.error).toBe('migration_missing');
-    expect(byKey.engagement.error).toBe('migration_missing');
-    expect(byKey.quiet_clients.clients.headline.n).toBe(0);
-    expect(byKey.changed.clients.line).toMatch(/^This week: 0 went live/);
-    for (const it of Object.values(byKey)) expect(typeof it.label).toBe('string');
-    expect(d.storeQuery).toHaveBeenCalledWith(V.CHAT_SIGNALS_SQL, ['2026-10-15', '2026-10-21']);
+    expect(keysOf(out)).toEqual({
+      research: ['flagged_cards', 'status_mismatches', 'deadline_unreadable', 'upcoming_deadlines', 'asked_not_carried', 'industry_coverage', 'goal_coverage', 'trending_grants', 'trending_industries', 'ignored', 'recent_launches'],
+      consulting: ['consulting_cards', 'help_we_sell', 'big_money', 'most_engaged', 'fast_starters'],
+      marketing: ['chat_themes', 'howto_unanswered', 'most_matched', 'most_opened', 'trending_grants', 'timely', 'goal_demand', 'demand_industry', 'demand_province', 'found_via', 'totals', 'signups']
+    });
+    const byKey = Object.fromEntries(Object.values(out.departments).flat().map((p) => [p.key, p]));
+    for (const k of ['industry_coverage', 'goal_coverage', 'trending_industries', 'demand_industry', 'demand_province']) expect(byKey[k].error).toBe('not_configured');
+    expect(byKey.chat_themes.error).toBe('migration_missing');
+    expect(byKey.status_mismatches.clients.rows.map((r) => r.cells.grant.text)).toEqual(['Old']);
+    expect(byKey.flagged_cards.clients.rows).toEqual([]);
+    expect(byKey.totals.clients.tiles[0]).toEqual({ label: 'Businesses matched', n: 0 });
+    expect(byKey.signups.clients.current.length).toBe(7);
+    for (const p of Object.values(byKey)) { expect(typeof p.title).toBe('string'); expect(['table', 'bars', 'series', 'tiles']).toContain(p.kind); }
+    expect(out).toMatchObject({ range: 'week', current: { from: '2026-10-15', to: '2026-10-21' }, previous: { from: '2026-10-08', to: '2026-10-14' }, today: '2026-10-21' });
+    expect(d.storeQuery).toHaveBeenCalledWith(V.CHAT_ROWS_SQL, ['2026-10-15', '2026-10-21']);
+    expect(d.appQuery).toHaveBeenCalledWith(V.GOALS_SQL, ['2026-10-08', '2026-10-21']);
+    expect(d.appQuery).toHaveBeenCalledWith(V.FIRST_ACTIONS_SQL, ['2026-10-15', '2026-10-21']);
+    expect(d.hubQuery).toHaveBeenCalledWith(V.DEADLINE_CARDS_SQL);
+    expect(d.hubQuery).toHaveBeenCalledWith(V.CONSULTING_CARDS_SQL);
     expect(d.changes).toHaveBeenCalledWith('week');
-    expect(d.companyList).toHaveBeenCalledWith('month');
-    expect(d.listItems).toHaveBeenCalledWith({ owner: 'research' });
-    for (const q of [d.appQuery, d.storeQuery]) expect(q.mock.calls.every(([sql]) => /^\s*SELECT/i.test(sql))).toBe(true);
-    // A response with a failed item isn't cached: the next load tries again.
+    expect(d.companyList).toHaveBeenCalledWith('week');
+    expect(d.listItems).toHaveBeenCalledWith();
+    for (const q of [d.appQuery, d.storeQuery, d.hubQuery]) expect(q.mock.calls.every(([sql]) => /^\s*SELECT/i.test(sql))).toBe(true);
     await V.departmentViews('week', d);
     expect(d.liveGrants).toHaveBeenCalledTimes(2);
     await expect(V.departmentViews('decade', d)).rejects.toMatchObject({ status: 400 });
@@ -236,13 +406,13 @@ describe('departmentViews', () => {
     const d = deps();
     const order = [];
     const slow = (name, value) => jest.fn(async () => { order.push(`${name}:start`); await new Promise((r) => setTimeout(r, 5)); order.push(`${name}:end`); return value; });
-    const variant = { unanswered: [], unmet_needs: [], grants_discussed: [], industries: [] };
-    d.coverage = slow('coverage', { clients_variant: variant, all_variant: variant, grants: {}, clients: {} });
-    d.loadGrantWindow = slow('window', { days: [], grants: [], matches: [], views: [], sessions: [], adds: [], removals: [], openedPairs: new Set(), lastShown: [], openCards: new Map() });
-    d.companyList = slow('companies', { current: { from: '2026-09-22', to: '2026-10-21' }, companies: [] });
-    d.chatOverview = slow('chat', { store: { ok: true }, themes: [], grants: {}, clients_variant: variant, all_variant: variant });
+    const v = { industries: [], not_mapped: null, breakdowns: { province: [], goal_tracks: [] } };
+    d.coverage = slow('coverage', { clients_variant: v, all_variant: v, grants: {}, clients: {} });
+    d.loadGrantWindow = slow('window', emptyWin());
+    d.companyList = slow('companies', { current: { from: '2026-10-15', to: '2026-10-21' }, companies: [] });
+    d.chatOverview = slow('chat', { store: { ok: true }, themes: [] });
     const out = await V.departmentViews('week', d);
-    expect(Object.values(out.departments).flat().filter((i) => i.error)).toEqual([]);
+    expect(Object.values(out.departments).flat().filter((p) => p.error)).toEqual([]);
     expect(order).toEqual(['coverage:start', 'coverage:end', 'window:start', 'window:end', 'companies:start', 'companies:end', 'chat:start', 'chat:end']);
     await V.departmentViews('week', d);
     expect(d.coverage).toHaveBeenCalledTimes(1);
@@ -253,15 +423,21 @@ describe('departmentViews', () => {
     const out = await V.departmentViews('2026-09-01..2026-10-15', d);
     expect(out).toMatchObject({ range: '2026-09-01..2026-10-15', current: { from: '2026-09-01', to: '2026-10-15' } });
     expect(d.coverage).toHaveBeenCalledWith('2026-09-01..2026-10-15');
-    expect(d.storeQuery).toHaveBeenCalledWith(V.CHAT_SIGNALS_SQL, ['2026-09-01', '2026-10-15']);
+    expect(d.storeQuery).toHaveBeenCalledWith(V.CHAT_ROWS_SQL, ['2026-09-01', '2026-10-15']);
     await expect(V.departmentViews('2026-10-15..2026-09-01', d)).rejects.toMatchObject({ status: 400 });
     await expect(V.departmentViews('2026-10-01..2026-10-30', d)).rejects.toMatchObject({ status: 400 }); // ends after today
   });
 
-  test('no write SQL in the module', () => {
+  test('no write SQL in the module; every panel has neutral metadata', () => {
     const sql = Object.values(V).filter((v) => typeof v === 'string' && /\bSELECT\b/i.test(v));
     expect(sql.length).toBeGreaterThan(0);
     for (const s of sql) expect(s).not.toMatch(/\b(INSERT|UPDATE|DELETE|ALTER|DROP)\b/i);
+    for (const [key, m] of Object.entries(V.META)) {
+      expect(m.title).not.toMatch(/\?/);
+      expect(['table', 'bars', 'series', 'tiles']).toContain(m.kind);
+      if (m.see_all) expect(m.see_all.hash).toMatch(/^#/);
+      expect(key).toMatch(/^[a-z_]+$/);
+    }
   });
 });
 
@@ -276,12 +452,12 @@ describe('routes', () => {
     } finally { server.close(); }
   };
 
-  test('passes the range through; 400 bad range; 503 not configured; 500 otherwise', async () => {
+  test('passes the range through, Month by default; 400 bad range; 503 not configured; 500 otherwise', async () => {
     const departmentViews = jest.fn(async (range) => ({ range }));
-    expect(await call(createViewsRouter({ departmentViews }), '/?range=month')).toEqual({ status: 200, body: { range: 'month' } });
-    expect(departmentViews).toHaveBeenCalledWith('month');
+    expect(await call(createViewsRouter({ departmentViews }), '/?range=week')).toEqual({ status: 200, body: { range: 'week' } });
+    expect(departmentViews).toHaveBeenCalledWith('week');
     await call(createViewsRouter({ departmentViews }), '/');
-    expect(departmentViews).toHaveBeenLastCalledWith('week');
+    expect(departmentViews).toHaveBeenLastCalledWith('month');
     expect((await call(createViewsRouter(), '/?range=decade')).status).toBe(400);
     const nc = Object.assign(new Error('x'), { code: 'not_configured' });
     expect(await call(createViewsRouter({ departmentViews: async () => { throw nc; } }), '/')).toEqual({ status: 503, body: { error: 'not_configured' } });

@@ -12,6 +12,16 @@ Format:
 
 ---
 
+## 2026-10-22 — Deadlines read from free text; due_at doesn't exist
+**What:** The Control Centre's deadline logic (Coverage & changes, Department views, Research `grant_deadline` cards, Oracle's `changes` mode) parses the app DB's free-text `grants.deadline` with the one Hub parser, `src/tools/deadline.js` (`coverage.js parseDeadline` is a wrapper). "Status mismatch" = a live grant whose parsed deadline is a past date; blank / rolling / unreadable are counted apart and never filed.
+**Why:** `due_at` / `open_until_filled` / `published_at` / `significantly_changed_at` exist nowhere the Hub can read — not on app `grants` (30 columns, checked via `pg_attribute`), not in Hub `gg3_grants`, not in ai-api-backend's schema or search-context contract. The 12 "past deadline but live" grants carry past dates in their deadline text while their status is `active`; the only structured date (`grant_dates`, `internal_deadline`) is a staff-side date. Chris chose the free-text route over waiting on a backend column (2026-10-22).
+**Impact:** `src/tools/deadline.js`, `src/control-centre/coverage.js` (`deadlineFlags`, `republished`), `deadline-cards.js`, `review-queue.js`, `diagnosis.js`, migration 057, `views.js`; an ambiguous `dd/mm` date is now unreadable rather than guessed day-first.
+
+## 2026-10-22 — Consulting cards are diagnosed in code, no model call
+**What:** Review cards with ref `conv:<id>:consulting_question` (the daily chat review's third rule) and `grant_deadline` cards get their owner and verdict from `diagnosis.js` code paths (`diagnoseConsulting`, `diagnoseDeadline`) that run before the API-key check; Sonnet is never called for them. Consulting cards are recognised by their ref, not their snapshot, and `sendToChris` moves them to `in_progress` so the hourly sweep can't hand them back.
+**Why:** The brief forbade new AI calls; the owner is known from the kind or the ref, and a reopen clears the snapshot while the ref never changes.
+**Impact:** `diagnosis.js`, `review-queue.js` (`setAnswer`, `sendToChris`, `approveForAi`), `knowledge.js`, migration 057.
+
 ## 2026-10-22 — Steph brief runs at 07:00, not 08:00
 **What:** `SCHEDULE` in `steph-brief.js` is now `0 7 * * 1-5` with `timezone: 'America/Vancouver'`, so the brief posts at 07:00 Vancouver on weekdays in both PDT and PST. The 2026-10-19 entry's "08:00" is superseded.
 **Why:** Chris asked to move it from 08:00 to 07:00.

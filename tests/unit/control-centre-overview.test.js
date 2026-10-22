@@ -320,7 +320,7 @@ describe('how clients found grant cards', () => {
 
 describe('internal accounts', () => {
   test('the confirmed list: 28 companies including 81, no duplicates, frozen', () => {
-    expect(INTERNAL_COMPANY_IDS).toEqual([1, 5, 7, 8, 9, 10, 11, 13, 15, 18, 20, 23, 24, 25, 27, 33, 34, 35, 48, 50, 51, 58, 71, 73, 81, 82, 85, 126]);
+    expect(INTERNAL_COMPANY_IDS).toEqual([1, 5, 7, 8, 9, 10, 11, 13, 15, 18, 20, 23, 24, 25, 27, 33, 34, 35, 48, 50, 51, 58, 71, 73, 81, 82, 85, 126, 146]);
     expect(new Set(INTERNAL_COMPANY_IDS).size).toBe(INTERNAL_COMPANY_IDS.length);
     expect(Object.isFrozen(INTERNAL_COMPANY_IDS)).toBe(true);
     expect(isInternalCompany(81)).toBe(true);

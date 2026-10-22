@@ -132,6 +132,56 @@ describe('card rule: card_for_rejected_grant', () => {
   });
 });
 
+describe('card rule: consulting_question', () => {
+  const ask = (over = {}) => row({ funding_ask: false, unmet_need: 'Consulting or application writing', answer: 'partly',
+    question: 'Can the consulting team manage the application end to end?', ...over });
+
+  test('a consulting ask the chat only partly answered → a card, owner-free here, with the stored classification as evidence', () => {
+    const [c] = D.cardCandidates([ask()]);
+    expect(c).toMatchObject({ issue: 'consulting_question', conversation_id: 289, turn_index: 1, company_id: 135,
+      evidence: { rule: 'consulting_question', unmet_need: 'Consulting or application writing', answer: 'partly', unanswered_reason: null,
+        question: 'Can the consulting team manage the application end to end?' } });
+    expect(D.cardRef(c)).toBe('conv:289:consulting_question');
+    expect(D.flagRef(c)).toBe('oracle:289:consulting_question:t1');
+    expect(c.take).toMatch(/^Consulting question \(Consulting or application writing\)\. The chat only partly answered it\./);
+    expect(D.ISSUES.CONSULTING).toBe('consulting_question');
+  });
+
+  test('fires when the reply did not answer, and when it "answered" but the client asked for a person or left', () => {
+    expect(D.cardCandidates([ask({ answer: 'not_answered' })])[0].take).toMatch(/didn't answer it/);
+    expect(D.cardCandidates([ask({ answer: 'answered', unanswered_reason: 'asked_for_person' })])[0].take).toMatch(/asked for a person/);
+    expect(D.cardCandidates([ask({ answer: 'answered', unanswered_reason: 'left_after_bad_reply' })])[0].evidence.unanswered_reason).toBe('left_after_bad_reply');
+  });
+
+  test('no card: a consulting ask the chat answered (an honest "we don\'t do that" counts), or another unmet need', () => {
+    expect(D.cardCandidates([ask({ answer: 'answered', unanswered_reason: null })])).toEqual([]);
+    expect(D.cardCandidates([ask({ unmet_need: 'Loans' })])).toEqual([]);
+    expect(D.cardCandidates([ask({ unmet_need: 'SR&ED / tax credits' })])).toEqual([]);
+    expect(D.cardCandidates([ask({ unmet_need: "A grant we don't carry" })])).toEqual([]);
+    expect(D.cardCandidates([ask({ unmet_need: null })])).toEqual([]);
+  });
+
+  test('the label match covers the seed label and likely variants; isConsultingCandidate is the one switch', () => {
+    for (const label of ['Consulting or application writing', 'Grant writing help', 'Someone to write the application', 'Proposal writing', 'consultant']) {
+      expect(D.CONSULTING_NEED.test(label)).toBe(true);
+      expect(D.isConsultingCandidate(ask({ unmet_need: label }))).toBe(true);
+    }
+    expect(D.isConsultingCandidate(ask({ answer: 'answered' }))).toBe(false);
+    expect(D.isConsultingCandidate({ unmet_need: null, answer: 'partly' })).toBe(false);
+  });
+
+  test('one card per chat: two qualifying messages share the card, each its own flag', () => {
+    const cs = D.cardCandidates([ask({ turn_index: 2 }), ask({ turn_index: 5, answer: 'not_answered' })]);
+    expect(new Set(cs.map(D.cardRef))).toEqual(new Set(['conv:289:consulting_question']));
+    expect(cs.map(D.flagRef)).toEqual(['oracle:289:consulting_question:t2', 'oracle:289:consulting_question:t5']);
+  });
+
+  test('a message can be both a funding ask with no cards and a consulting question: two cards, two refs', () => {
+    const refs = D.cardCandidates([ask({ funding_ask: true })]).map(D.cardRef);
+    expect(refs).toEqual(['conv:289:no_cards_for_funding_ask', 'conv:289:consulting_question']);
+  });
+});
+
 describe('diagnosis of the two card types', () => {
   test('owner chris and the verdict set from the evidence, chat fields still required', () => {
     const chat = { kind: 'chat' };

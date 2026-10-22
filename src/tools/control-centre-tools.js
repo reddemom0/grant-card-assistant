@@ -75,8 +75,8 @@ const FLAG_ROWS = 25;
 const EVENT_ROWS = 30;
 
 const STATUSES = ['new', 'diagnosed', 'in_progress', 'closed'];
-const OWNERS = ['client', 'research', 'chris', 'jason'];
-const KINDS = ['match', 'chat', 'grant_pattern', 'empty_track'];
+const OWNERS = ['client', 'research', 'chris', 'jason', 'consulting'];
+const KINDS = ['match', 'chat', 'grant_pattern', 'empty_track', 'grant_deadline'];
 
 const codeOf = (err) => err?.status ?? err?.code ?? err?.name ?? 'unknown';
 const clip = (s, n) => {

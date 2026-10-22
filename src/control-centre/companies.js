@@ -82,6 +82,14 @@ export const CLIENTS_SQL = `
    WHERE c.deleted_at IS NULL AND ${CLERK_USER}
    ORDER BY c.id`;
 
+// Plan tier (read-only): the latest subscription row per company. Plans are
+// starter / lite / plus / pro; stripe_status is active, canceled, trialing or
+// null. The Control Centre never writes to the app DB.
+export const SUBSCRIPTIONS_SQL = `
+  SELECT DISTINCT ON (company_id) company_id, plan_slug, stripe_status
+    FROM company_subscriptions
+   ORDER BY company_id, updated_at DESC NULLS LAST, created_at DESC NULLS LAST`;
+
 // The company with its latest metadata extras in one round trip.
 export const COMPANY_SQL = `
   SELECT c.id, c.name, c.created_at, c.deleted_at, ${CLERK_USER} AS is_client,
@@ -314,11 +322,18 @@ export function companyActivity({ matches, views, ratings, chats, chatCompany },
   return new Map([...out].map(([id, a]) => [id, { grant_matches: a.grants.size, cards_opened: a.cards_opened, chats: a.chats, last_day: a.last_day }]));
 }
 
-/** Pure: one list row per client, names first, internal tagged. */
-export function buildCompanyList({ clients, metadata, activity, rolledLast, chatLast, openCards, isInternal = isInternalCompany }) {
+/**
+ * Pure: one list row per client, names first, internal tagged. last_active is
+ * the latest client action (a card open, a rating, a chat) and null when there
+ * has been none — a sign-up isn't activity, so it never stands in for it.
+ * size / revenue are the profile as matching reads it; plan is the latest
+ * subscription's plan_slug (null when the company has none).
+ */
+export function buildCompanyList({ clients, metadata, activity, rolledLast, chatLast, openCards, plans = new Map(), isInternal = isInternalCompany }) {
   return clients.map((c) => {
     const m = metadata.get(c.id);
     const a = activity.get(c.id) ?? { grant_matches: 0, cards_opened: 0, chats: 0, last_day: null };
+    const p = plans.get(c.id);
     const signup = iso(c.created_at)?.slice(0, 10) ?? null;
     const last = [rolledLast.get(c.id), a.last_day, chatLast.get(c.id)].reduce(laterDay, null);
     return {
@@ -327,8 +342,12 @@ export function buildCompanyList({ clients, metadata, activity, rolledLast, chat
       internal: isInternal(c.id),
       provinces: m?.provinces ?? [],
       industries: m?.industries ?? [],
+      size: m?.size ?? null,
+      revenue: m?.revenue ?? null,
+      plan: p?.plan_slug ?? null,
+      plan_status: p?.stripe_status ?? null,
       signed_up: signup,
-      last_active: last ?? signup,
+      last_active: last ?? null,
       grant_matches: a.grant_matches,
       cards_opened: a.cards_opened,
       chats: a.chats,
@@ -440,13 +459,18 @@ export async function companyList(range = 'week', overrides = {}) {
   const hit = listCache.get(range);
   if (hit && now - hit.at < LIST_CACHE_MS && !overrides.noCache) return hit.value;
 
-  const [rows, clients, clerks, rolled, openCards, lastChats] = await Promise.all([
+  const [rows, clients, clerks, rolled, openCards, lastChats, subscriptions] = await Promise.all([
     loadWindowRows(range, deps),
     deps.appQuery(CLIENTS_SQL),
     deps.appQuery(COMPANY_CLERKS_SQL, [null]),
     deps.hubQuery(LAST_ROLLED_ACTIVITY_SQL),
     deps.hubQuery(OPEN_CARDS_SQL),
-    deps.opsQuery(LAST_CHATS_SQL)
+    deps.opsQuery(LAST_CHATS_SQL),
+    // Plan tiers are a nicety: a failed read leaves plan null, never fails the list.
+    deps.appQuery(SUBSCRIPTIONS_SQL).catch((err) => {
+      console.error(`Control Centre companies: subscriptions unreadable (code: ${err?.code || err?.name || 'unknown'})`);
+      return { rows: [] };
+    })
   ]);
   const ids = clients.rows.map((c) => c.id);
   const metadata = ids.length ? shapeMetadata((await deps.appQuery(COMPANY_METADATA_SQL, [ids])).rows) : new Map();
@@ -467,7 +491,8 @@ export async function companyList(range = 'week', overrides = {}) {
       activity: companyActivity(rows, rows.w.current.days),
       rolledLast: new Map(rolled.rows.map((r) => [r.company_id, r.day])),
       chatLast,
-      openCards: new Map(openCards.rows.map((r) => [r.company_id, r.n]))
+      openCards: new Map(openCards.rows.map((r) => [r.company_id, r.n])),
+      plans: new Map(subscriptions.rows.map((r) => [r.company_id, r]))
     }),
     generated_at: new Date(now).toISOString()
   };
@@ -669,7 +694,8 @@ export async function companyFeed(idInput, overrides = {}) {
     company_id: id,
     users: clerkIds.length,
     // Client actions only: not our match runs or review cards.
-    last_active: timeline.find((e) => !['matches', 'card_filed', 'card_closed'].includes(e.type))?.at ?? null,
+    // Client actions only: not our match runs, not review cards, and not the sign-up itself.
+    last_active: timeline.find((e) => !['matches', 'card_filed', 'card_closed', 'signed_up'].includes(e.type))?.at ?? null,
     tiles: { grant_views: ot.views, grants_opened: ot.grants, minutes_on_grants: Math.round(Number(ot.visible_ms) / 6000) / 10,
       thumbs_up: ratingCount('up'), thumbs_down: ratingCount('down'), chats: chats.length },
     timeline,

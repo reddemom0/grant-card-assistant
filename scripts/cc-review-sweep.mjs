@@ -79,6 +79,14 @@ function printPatterns(p, write) {
   if (write) console.log(`  filed ${p.filed} cuts: ${p.new_items} new cards, ${p.reopened} reopened, ${p.late} late evidence; ${p.linked ?? 0} new links`);
 }
 
+function printDeadlines(d, write) {
+  if (!d) return;
+  if (d.error) { console.log(`\nDeadline cards: FAILED (code ${d.error})`); return; }
+  console.log(`\nDeadline cards: ${d.passed} of ${d.live} live grants have a past deadline (${d.blank} blank, ${d.unreadable} unreadable, ${d.rolling} rolling — not filed)`);
+  for (const r of d.rows) console.log(`  grant ${r.grant_id}: "${r.deadline_text}" → ${r.deadline}, ${r.days_over} days over`);
+  if (write) console.log(`  filed ${d.filed}: ${d.new_items} new cards, ${d.reopened} reopened; ${d.duplicate} already on file, ${d.failed} failed`);
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   console.log(`Control Centre review sweep (${args.write ? 'WRITE to Hub DB' : 'dry run, nothing written'})\n`);
@@ -96,6 +104,7 @@ async function main() {
     if (s.preview) printPreview(s.preview);
   }
   printPatterns(s.patterns, args.write);
+  printDeadlines(s.deadlines, args.write);
   return s.failed ? 1 : 0;
 }
 

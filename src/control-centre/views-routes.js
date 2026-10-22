@@ -5,7 +5,8 @@
  * mounts this behind authenticateUser + requireAuth.
  *
  *   GET /?range=day|week|month|year   Research, Consulting/Sales and Marketing
- *                                     items, both variants (cached 5 min)
+ *                                     panels, both variants (cached 5 min);
+ *                                     Month when no range is given
  *
  * Bad input → 400. A source that isn't configured fails only its own items
  * (each carries `error`), so the response is still 200. Logic: views.js.
@@ -31,7 +32,7 @@ export function createViewsRouter(overrides = {}) {
   router.get('/', async (req, res) => {
     try {
       res.set('Cache-Control', 'private, no-store');
-      res.json(await f.departmentViews(typeof req.query.range === 'string' && req.query.range ? req.query.range : 'week'));
+      res.json(await f.departmentViews(typeof req.query.range === 'string' && req.query.range ? req.query.range : 'month'));
     } catch (error) {
       sendError(res, error, 'views');
     }

@@ -15,6 +15,17 @@
  *                       (source_ref = ai_review:<id>)
  *   oracle_detected     Oracle's morning chat review, pulse-roundup.js
  *                       (source_ref = oracle:<conversation>:<issue>:<date>)
+ *   catalogue_check     a live grant whose deadline text is a past date, filed
+ *                       hourly by deadline-cards.js on a 'grant_deadline' card
+ *                       (source_ref = deadline:<root>:<date>, migration 057)
+ *
+ * Consulting cards (migration 057): the daily chat review's chat cards with
+ * ref conv:<id>:consulting_question — a client asked for consulting or
+ * application writing and the chat didn't fully answer. Owner 'consulting'
+ * (set in code, no model call). A consultant writes the answer on the card
+ * (setAnswer), sends it to Chris (sendToChris: owner chris, in progress — off
+ * 'new', which the sweep would re-diagnose), and Chris approves it for the AI
+ * (approveForAi: the pair goes to cc_ai_knowledge, knowledge.js; the card closes).
  *
  * source_ref is UNIQUE, so a re-sweep never double-counts. A new flag on a
  * closed item reopens it to 'new' with flagged_again and clears the old
@@ -45,13 +56,15 @@ import { randomUUID } from 'node:crypto';
 import { query, transaction } from '../database/connection.js';
 import { appQuery, isAppDbConfigured } from './db.js';
 import { TIME_ZONE } from './rollup.js';
-import { diagnoseItem, couldNotDiagnose, MAX_DIAGNOSIS_ATTEMPTS } from './diagnosis.js';
+import { diagnoseItem, couldNotDiagnose, MAX_DIAGNOSIS_ATTEMPTS, flaggedTurn } from './diagnosis.js';
 import { runPatternSweep } from './grant-patterns.js';
+import { chatIssue, CONSULTING_ISSUE } from './card-summary.js';
+import { INSERT_KNOWLEDGE_SQL } from './knowledge.js';
 
-export const KINDS = Object.freeze(['match', 'chat', 'grant_pattern', 'empty_track']);
+export const KINDS = Object.freeze(['match', 'chat', 'grant_pattern', 'empty_track', 'grant_deadline']);
 export const STATUSES = Object.freeze(['new', 'diagnosed', 'in_progress', 'closed']);
-export const OWNERS = Object.freeze(['client', 'research', 'chris', 'jason']);
-export const SOURCES = Object.freeze(['client_thumbs_down', 'staff_flag', 'ai_review_cut', 'oracle_detected']);
+export const OWNERS = Object.freeze(['client', 'research', 'chris', 'jason', 'consulting']);
+export const SOURCES = Object.freeze(['client_thumbs_down', 'staff_flag', 'ai_review_cut', 'oracle_detected', 'catalogue_check']);
 export const EXPECTED = Object.freeze(['should', 'shouldnt']);
 
 /** Who fixes what. chris is also the default when the cause is unclear. */
@@ -59,12 +72,16 @@ export const OWNER_ROUTING = Object.freeze({
   client: 'company profile',
   research: 'grant data / card copy',
   chris: 'tagger, engine, chat answers; default when the cause is unclear',
-  jason: 'app bugs'
+  jason: 'app bugs',
+  consulting: 'consulting / application-writing questions from clients'
 });
 export const DEFAULT_OWNER = 'chris';
 
 export const MAX_TEXT = 4000;
 export const MAX_REF = 200;
+/** A consultant's answer on a consulting card. */
+export const ANSWER_MAX = 8000;
+export const APPROVED_NOTE = 'Approved for AI';
 /** The sweep re-reads this far behind its cursor; source_ref dedupes the overlap. */
 export const SWEEP_OVERLAP_MS = 60 * 60 * 1000;
 export const SWEEP_ACTOR = 'system:review-sweep';
@@ -134,6 +151,10 @@ export function validateFlag(input = {}) {
     if (!out.pattern_category) throw bad('pattern_category is required for grant_pattern items');
     if (input.company_id != null) throw bad('company_id is not used on grant_pattern items');
     if (input.chat_turn_ref != null) throw bad('chat_turn_ref is only for chat items');
+  } else if (kind === 'grant_deadline') {
+    out.grant_root_id = requiredId(input.grant_root_id, 'grant_root_id');
+    if (input.company_id != null) throw bad('company_id is not used on grant_deadline items');
+    if (input.chat_turn_ref != null) throw bad('chat_turn_ref is only for chat items');
   } else {
     out.chat_turn_ref = optionalText(input.chat_turn_ref, 'chat_turn_ref', MAX_REF);
     if (!out.chat_turn_ref) throw bad('chat_turn_ref is required for chat items');
@@ -163,8 +184,8 @@ export function validateFlag(input = {}) {
 // SQL (Hub DB)
 // ---------------------------------------------------------------------------
 
-// No conflict target: covers all three partial unique keys (match pair, chat
-// turn, grant pattern).
+// No conflict target: covers all five partial unique keys (match pair, chat
+// turn, grant pattern, empty track, grant deadline).
 export const INSERT_ITEM_SQL = `
   INSERT INTO cc_review_items (kind, company_id, grant_root_id, chat_turn_ref, pattern_category, conversation_id, goal_track)
   VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -179,6 +200,11 @@ export const LOCK_EMPTY_TRACK_SQL = `
 export const LOCK_PATTERN_SQL = `
   SELECT * FROM cc_review_items
    WHERE kind = 'grant_pattern' AND grant_root_id = $1 AND pattern_category = $2
+   FOR UPDATE`;
+
+export const LOCK_DEADLINE_SQL = `
+  SELECT * FROM cc_review_items
+   WHERE kind = 'grant_deadline' AND grant_root_id = $1
    FOR UPDATE`;
 
 // Evidence handed in by the filer, kept only when the item has none.
@@ -218,14 +244,24 @@ export const BUMP_SQL = `
   RETURNING *`;
 
 // A closed item that gets a new flag starts over; the close is kept in the
-// events log.
+// events log. A consulting card's answer goes too (a reopen is a new flagged
+// turn; the text stays in its 'answered' event and, once approved, in
+// cc_ai_knowledge).
 export const REOPEN_SQL = `
   UPDATE cc_review_items
      SET flag_count = flag_count + 1, status = 'new', flagged_again = TRUE,
          owner = NULL, diagnosis = NULL, narrative = NULL, client_notice = NULL,
          expected_match = NULL, close_note = NULL, closed_by = NULL, closed_at = NULL,
          snapshot = NULL, snapshot_at = NULL, diagnosis_attempts = 0, last_error = NULL,
+         staff_answer = NULL, staff_answer_by = NULL, staff_answer_at = NULL,
          updated_at = NOW()
+   WHERE id = $1
+  RETURNING *`;
+
+// The consultant's answer on a consulting card (migration 057).
+export const SET_ANSWER_SQL = `
+  UPDATE cc_review_items
+     SET staff_answer = $2, staff_answer_by = $3, staff_answer_at = NOW(), updated_at = NOW()
    WHERE id = $1
   RETURNING *`;
 
@@ -395,7 +431,9 @@ export async function addFlag(input, { hubTransaction = transaction } = {}) {
         ? await client.query(LOCK_PATTERN_SQL, [f.grant_root_id, f.pattern_category])
         : f.kind === 'empty_track'
           ? await client.query(LOCK_EMPTY_TRACK_SQL, [f.company_id, f.goal_track])
-          : await client.query(LOCK_CHAT_SQL, [f.chat_turn_ref]);
+          : f.kind === 'grant_deadline'
+            ? await client.query(LOCK_DEADLINE_SQL, [f.grant_root_id])
+            : await client.query(LOCK_CHAT_SQL, [f.chat_turn_ref]);
     let item = locked.rows[0];
     if (created) await logEvent(client, item.id, f.actor, 'created', null, 'new', { source: f.source });
 
@@ -515,6 +553,104 @@ export async function close(id, { expected_match, close_note } = {}, actor, { hu
 }
 
 // ---------------------------------------------------------------------------
+// Consulting cards: the answer, Send to Chris, Approve for AI (migration 057)
+// ---------------------------------------------------------------------------
+
+/** A consulting-question chat card (the daily chat review's third rule). */
+export const isConsultingCard = (item) => item?.kind === 'chat' && chatIssue(item.chat_turn_ref) === CONSULTING_ISSUE;
+
+function answerText(v) {
+  const body = typeof v === 'string' ? v.trim() : '';
+  if (!body) throw bad('answer is required');
+  if (body.length > ANSWER_MAX) throw bad(`answer is longer than ${ANSWER_MAX} characters`);
+  return body;
+}
+function assertConsulting(item) {
+  if (!isConsultingCard(item)) throw bad('only a consulting card takes an answer');
+}
+function assertOpen(item) {
+  if (item.status === 'closed') throw new ReviewQueueError(409, 'item is already closed');
+}
+
+/** Save the consultant's answer on a consulting card: one 'answered' event with the text. */
+export async function setAnswer(id, text, actor, { hubTransaction = transaction } = {}) {
+  const itemId = requiredId(id, 'id');
+  const body = answerText(text);
+  if (!actor) throw bad('a signed-in author is required');
+  return hubTransaction(async (client) => {
+    const item = await lockItem(client, itemId);
+    assertConsulting(item);
+    assertOpen(item);
+    const updated = (await client.query(SET_ANSWER_SQL, [itemId, body, actor])).rows[0];
+    await logEvent(client, itemId, actor, 'answered', item.status, item.status, { text: body });
+    return updated;
+  }, 'cc review setAnswer');
+}
+
+/**
+ * Save the answer and hand the card to Chris: owner chris, status in_progress.
+ * Off 'new' on purpose — the hourly sweep diagnoses every new card and would
+ * give it back to consulting.
+ */
+export async function sendToChris(id, text, actor, { hubTransaction = transaction } = {}) {
+  const itemId = requiredId(id, 'id');
+  const body = answerText(text);
+  if (!actor) throw bad('a signed-in author is required');
+  return hubTransaction(async (client) => {
+    let item = await lockItem(client, itemId);
+    assertConsulting(item);
+    assertOpen(item);
+    item = (await client.query(SET_ANSWER_SQL, [itemId, body, actor])).rows[0];
+    await logEvent(client, itemId, actor, 'answered', item.status, item.status, { text: body, sent_to: 'chris' });
+    if (item.owner !== 'chris') {
+      const from = item.owner;
+      item = (await client.query(SET_OWNER_SQL, [itemId, 'chris'])).rows[0];
+      await logEvent(client, itemId, actor, 'owner', item.status, item.status, { from, to: 'chris' });
+    }
+    if (item.status !== 'in_progress') {
+      const from = item.status;
+      item = (await client.query(SET_STATUS_SQL, [itemId, 'in_progress'])).rows[0];
+      await logEvent(client, itemId, actor, 'status', from, 'in_progress');
+    }
+    return item;
+  }, 'cc review sendToChris');
+}
+
+/**
+ * Chris approves the answer for the AI: the question (verbatim and the daily
+ * review's rewrite), the chat's reply and the answer go to cc_ai_knowledge
+ * (pending export), and the card closes with the note "Approved for AI".
+ * An `answer` in the call replaces the stored one first.
+ *
+ * @returns {Promise<{item: object, knowledge: object}>}
+ */
+export async function approveForAi(id, actor, { answer } = {}, { hubTransaction = transaction } = {}) {
+  const itemId = requiredId(id, 'id');
+  const given = answer == null || answer === '' ? null : answerText(answer);
+  if (!actor) throw bad('a signed-in approver is required');
+  return hubTransaction(async (client) => {
+    let item = await lockItem(client, itemId);
+    assertConsulting(item);
+    assertOpen(item);
+    if (item.owner !== 'chris') throw new ReviewQueueError(409, 'send the card to Chris before approving it for the AI');
+    if (given && given !== item.staff_answer) {
+      item = (await client.query(SET_ANSWER_SQL, [itemId, given, actor])).rows[0];
+      await logEvent(client, itemId, actor, 'answered', item.status, item.status, { text: given });
+    }
+    if (!item.staff_answer) throw bad('an answer is required before approving');
+    const turn = flaggedTurn(item.snapshot);
+    if (!turn?.client) throw bad('the card has no client question in its evidence');
+    const knowledge = (await client.query(INSERT_KNOWLEDGE_SQL, [itemId, item.conversation_id ?? null, item.company_id ?? null,
+      turn.client, item.snapshot?.rule_evidence?.question ?? null, turn.assistant ?? null, item.staff_answer, actor])).rows[0] ?? null;
+    const from = item.status;
+    const updated = (await client.query(CLOSE_SQL, [itemId, null, APPROVED_NOTE, actor])).rows[0];
+    await logEvent(client, itemId, actor, 'approved_for_ai', from, 'closed', { knowledge_id: knowledge?.id ?? null });
+    await logEvent(client, itemId, actor, 'closed', from, 'closed', { expected_match: null, close_note: APPROVED_NOTE });
+    return { item: updated, knowledge };
+  }, 'cc review approveForAi');
+}
+
+// ---------------------------------------------------------------------------
 // Diagnosis
 // ---------------------------------------------------------------------------
 
@@ -612,8 +748,11 @@ export async function previewDiagnoses(wouldFile = [], { hubQuery = query, diagn
       item: p.kind === 'grant_pattern'
         ? { id: null, kind: 'grant_pattern', company_id: null, grant_root_id: p.grant_root_id, pattern_category: p.pattern_category,
           status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0 }
-        : { id: null, kind: 'match', company_id: p.company_id, grant_root_id: p.grant_root_id,
-          status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0 },
+        : p.kind === 'grant_deadline'
+          ? { id: null, kind: 'grant_deadline', company_id: null, grant_root_id: p.grant_root_id,
+            status: 'new', snapshot: p.snapshot ?? null, snapshot_at: null, diagnosis_attempts: 0 }
+          : { id: null, kind: 'match', company_id: p.company_id, grant_root_id: p.grant_root_id,
+            status: 'new', snapshot: null, snapshot_at: null, diagnosis_attempts: 0 },
       cutIds: p.cut_ids ?? null
     }))
   ];
@@ -740,6 +879,17 @@ export async function runReviewSweep({ write = false, preview = false, deps = {}
     console.error(`❌ CC pattern sweep failed — code: ${summary.patterns.error}`);
   }
 
+  // Deadline cards (deadline-cards.js): live grants whose deadline text is a
+  // past date. Loaded late — it reads coverage.js, which reaches back here
+  // through companies.js. Its failure never stops the 👎 path either.
+  const deadlineSweep = deps.runDeadlineSweep ?? (async (o) => (await import('./deadline-cards.js')).runDeadlineSweep(o));
+  try {
+    summary.deadlines = await deadlineSweep({ write, deps: { appQuery: app, addFlag: flag, ...(deps.deadlineDeps ?? {}) }, log });
+  } catch (err) {
+    summary.deadlines = { error: String(err?.code ?? err?.name ?? 'unknown') };
+    console.error(`❌ CC deadline sweep failed — code: ${summary.deadlines.error}`);
+  }
+
   if (!write) {
     let existing = [];
     if (pairs.size) {
@@ -763,6 +913,10 @@ export async function runReviewSweep({ write = false, preview = false, deps = {}
           wouldFile.push({ kind: 'grant_pattern', grant_root_id: p.grant_id, pattern_category: p.category,
             cut_ids: p.group.cuts.map((c) => c.id), reopen: p.action === 'reopen' });
         }
+      }
+      // Deadline cards, previewed from the evidence the flag would carry (code-only, no model call).
+      for (const r of summary.deadlines?.rows ?? []) {
+        wouldFile.push({ kind: 'grant_deadline', grant_root_id: r.grant_id, snapshot: r.flag?.snapshot ?? null });
       }
       summary.preview = await (deps.previewDiagnoses ?? previewDiagnoses)(wouldFile, { hubQuery });
     }

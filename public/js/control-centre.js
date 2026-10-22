@@ -1001,6 +1001,8 @@
   /** What the Department views module gets from this page. */
   const viewsCtx = {
     esc, fmt, plural, api, rangeWords, previousLabel, reduceMotion,
+    // The Overview's sparkline, for the sign-ups series panel.
+    sparkline,
     state: () => state,
     go: (next, opts) => go({ tab: 'views', ...next }, opts),
     // A row or See all link: a full ?range=…#… URL, read the way a pasted link is.

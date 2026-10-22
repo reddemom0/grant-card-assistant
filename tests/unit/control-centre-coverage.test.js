@@ -226,7 +226,7 @@ describe('breakdowns', () => {
 });
 
 describe('deadlines', () => {
-  test('parses the formats on record; "Open Until Filled" and French text are no date', () => {
+  test('one parser (src/tools/deadline.js): the formats on record, French months, ordinals; rolling, blank and ambiguous are no date', () => {
     expect(C.parseDeadline('2026-07-15')).toBe('2026-07-15');
     expect(C.parseDeadline('15/04/2021')).toBe('2021-04-15');
     expect(C.parseDeadline('09/09/2026')).toBe('2026-09-09');
@@ -234,38 +234,45 @@ describe('deadlines', () => {
     expect(C.parseDeadline('August 13 2026')).toBe('2026-08-13');
     expect(C.parseDeadline('6 November 2026')).toBe('2026-11-06');
     expect(C.parseDeadline('1st December 2026')).toBe('2026-12-01');
+    expect(C.parseDeadline('15 mars 2027')).toBe('2027-03-15');
     expect(C.parseDeadline('Open Until Filled')).toBeNull();
     expect(C.parseDeadline('Ouvert jusqu’à épuisement des fonds')).toBeNull();
+    expect(C.parseDeadline('en tout temps')).toBeNull();
     expect(C.parseDeadline('31/02/2026')).toBeNull();
+    // Day and month could swap: never guessed (the old coverage parser read it day-first).
+    expect(C.parseDeadline('04/09/2026')).toBeNull();
     expect(C.parseDeadline(null)).toBeNull();
   });
 
-  test('deadline passed (before today) and due within 30 days; today itself is due, not passed', () => {
+  test('deadline passed (before today) and due within 30 days; today itself is due, not passed; days signed from today', () => {
     const f = C.deadlineFlags([
       live(1, { deadline: '2026-10-18' }), live(2, { deadline: '2026-10-19' }), live(3, { deadline: '6 November 2026' }),
       live(4, { deadline: '2026-11-18' }), live(5, { deadline: '2026-11-19' }), live(6, { deadline: 'Open Until Filled' })
     ], '2026-10-19');
     expect(f.passed.map((x) => x.grant_id)).toEqual([1]);
-    expect(f.due_soon.map((x) => x.grant_id)).toEqual([2, 3, 4]);
+    expect(f.passed[0]).toMatchObject({ grant_id: 1, deadline: '2026-10-18', deadline_text: '2026-10-18', days: -1 });
+    expect(f.due_soon.map((x) => [x.grant_id, x.days])).toEqual([[2, 0], [3, 18], [4, 30]]);
     expect(f.no_date).toBe(1);
+    expect(C.DUE_SOON_DAYS).toBe(30);
+    expect(C.daysFrom('2026-10-19', '2026-10-07')).toBe(-12);
   });
 
-  test('hygiene: passed, due within 90 days (inclusive), blank, rolling and unreadable kept apart; the 30-day flags are unchanged', () => {
+  test('blank, rolling and unreadable deadlines are kept apart (and all count as no date)', () => {
     const grants = [
       live(1, { deadline: '2026-10-18' }), live(2, { deadline: '2026-10-19' }), live(3, { deadline: '2027-01-17' }),
       live(4, { deadline: '2027-01-18' }), live(5, { deadline: '' }), live(6, { deadline: null }),
       live(7, { deadline: 'Open Until Filled' }), live(8, { deadline: 'open until filled' }), live(9, { deadline: 'Ouvert jusqu’à épuisement des fonds' }),
       live(10, { deadline: 'Spring intake' })
     ];
-    const h = C.deadlineHygiene(grants, '2026-10-19');
-    expect(h.days).toBe(90);
-    expect(h.passed.map((x) => x.grant_id)).toEqual([1]);
-    expect(h.due_within.map((x) => x.grant_id)).toEqual([2, 3]);
-    expect(h.blank.map((x) => x.grant_id)).toEqual([5, 6]);
-    expect(h.rolling).toBe(3);
-    expect(h.unreadable.map((x) => x.grant_id)).toEqual([10]);
-    expect(C.DUE_SOON_DAYS).toBe(30);
-    expect(C.deadlineFlags(grants, '2026-10-19')).toMatchObject({ due_soon: [{ grant_id: 2 }], no_date: 6 });
+    const f = C.deadlineFlags(grants, '2026-10-19');
+    expect(f.passed.map((x) => x.grant_id)).toEqual([1]);
+    expect(f.due_soon.map((x) => x.grant_id)).toEqual([2]);
+    expect(f.blank.map((x) => x.grant_id)).toEqual([5, 6]);
+    expect(f.blank.map((x) => x.deadline_text)).toEqual([null, null]);
+    expect(f.rolling.map((x) => x.grant_id)).toEqual([7, 8, 9]);
+    expect(f.unreadable.map((x) => x.grant_id)).toEqual([10]);
+    expect(f.unreadable[0]).toMatchObject({ deadline: null, deadline_text: 'Spring intake', days: null });
+    expect(f.no_date).toBe(6);
   });
 });
 

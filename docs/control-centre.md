@@ -6,10 +6,11 @@ queue, the `/control-centre` page (Overview live, other tabs coming), and the kn
 of the data.
 
 Code: `src/control-centre/` — `db.js`, `health.js`, `identity.js`, `live-sources.js`,
-`rollup.js`, `review-queue.js`, `review-routes.js`, `diagnosis.js`, `overview.js`,
+`rollup.js`, `review-queue.js`, `review-routes.js`, `diagnosis.js`, `deadline-cards.js`,
+`knowledge.js`, `knowledge-routes.js`, `overview.js`,
 `overview-routes.js`, `companies.js`, `companies-routes.js`, `grants.js`, `grants-routes.js`,
 `coverage.js`, `coverage-routes.js`, `industry-vocabulary.js`, `chat-daily.js`, `chat-themes.js`, `chat-routes.js`,
-`views.js`, `views-routes.js`.
+`views.js`, `views-routes.js`. Deadlines everywhere come from the one parser, `src/tools/deadline.js`.
 Page: `control-centre.html`, `public/js/control-centre.js` (plus `-review`, `-companies`, `-grants`, `-coverage`, `-chat`, `-views`),
 `public/css/control-centre.css`.
 Tests: `tests/unit/control-centre-*.test.js`.
@@ -227,22 +228,26 @@ A dry run is the default and writes nothing. Only `--write` touches the Hub DB. 
 `.env` `DATABASE_URL` is the **production** Hub DB, so `--write` from a laptop writes to
 production. The script prints per-day source-row and output-row counts.
 
-## Review queue (migrations 044, 045, 047)
+## Review queue (migrations 044, 045, 047, 048, 057)
 
-Staff review bad matches, bad chat answers and grant patterns in one queue in the Hub DB.
-Code: `review-queue.js` (logic, sweep), `grant-patterns.js` (grant-pattern cards),
-`diagnosis.js` (step 5 diagnosis) and `review-routes.js` (API). Oracle's chat-issue detector
-(`src/services/pulse-roundup.js`) and its `log_issue` (`src/tools/gg3-conversations.js`) file
-chat cards; Oracle reads the queue with `control_centre` (below).
+Staff review bad matches, bad chat answers, grant patterns, empty goal tracks, past
+deadlines and consulting questions in one queue in the Hub DB.
+Code: `review-queue.js` (logic, sweep, the consulting answer flow), `grant-patterns.js`
+(grant-pattern cards), `deadline-cards.js` (deadline cards), `diagnosis.js` (step 5 diagnosis),
+`knowledge.js` (the AI knowledge queue) and `review-routes.js` / `knowledge-routes.js` (API).
+Oracle's chat-issue detector (`src/services/pulse-roundup.js`) and its `log_issue`
+(`src/tools/gg3-conversations.js`) file chat cards; the daily chat review (`chat-daily.js`)
+files its three card types; Oracle reads the queue with `control_centre` (below).
 
 ### Tables
 
 | Table | What it holds |
 |---|---|
-| `cc_review_items` | One row per thing to review. `kind='match'` is keyed on `(company_id, grant_root_id)`. `kind='chat'` is keyed on `chat_turn_ref`. `kind='grant_pattern'` is keyed on `(grant_root_id, pattern_category)` with no company. `kind='empty_track'` (048) is keyed on `(company_id, goal_track)` — a goal track that showed the client nothing, flagged from the Companies tab. All four keys are partial unique indexes. |
+| `cc_review_items` | One row per thing to review. `kind='match'` is keyed on `(company_id, grant_root_id)`. `kind='chat'` is keyed on `chat_turn_ref`. `kind='grant_pattern'` is keyed on `(grant_root_id, pattern_category)` with no company. `kind='empty_track'` (048) is keyed on `(company_id, goal_track)` — a goal track that showed the client nothing, flagged from the Companies tab. `kind='grant_deadline'` (057) is keyed on `grant_root_id` — a live grant whose deadline text is a past date. All five keys are partial unique indexes. 057 also adds `staff_answer`, `staff_answer_by`, `staff_answer_at` (a consulting card's answer). |
 | `cc_review_flags` | Each flag on an item. `source_ref` is UNIQUE, so re-sweeps never double-count. `source_created_at` is the source event's own time. |
-| `cc_review_events` | The audit log. Every mutation writes one row: `created`, `flagged`, `reopened`, `diagnosed`, `diagnosis_failed`, `status`, `owner`, `closed`, and `recheck` (on a match card, when a pattern card linked to it closes). |
+| `cc_review_events` | The audit log. Every mutation writes one row: `created`, `flagged`, `reopened`, `diagnosed`, `diagnosis_failed`, `status`, `owner`, `closed`, `recheck` (on a match card, when a pattern card linked to it closes), `answered` and `approved_for_ai` (consulting cards). |
 | `cc_review_links` | Related cards (047): `item_id` a grant-pattern card, `linked_item_id` a match card for the same grant root, `relation = 'same_grant'`. Unique per pair. |
+| `cc_ai_knowledge` | (057) Consultant answers Chris approved for the AI: `question` (the client's words), `question_rewritten` (the daily review's anonymised rewrite), `ai_reply`, `answer`, `approved_by`/`approved_at`, `status` `pending` → `exported` with `exported_at` and `export_batch`. Never deleted by the app. |
 
 Migration 045 adds the diagnosis columns to `cc_review_items`: `snapshot` (the frozen
 evidence), `snapshot_at`, `diagnosis_attempts` (default 0) and `last_error`. Migration 047
@@ -262,6 +267,7 @@ for chat.
 | `staff_flag` | `staff:<uuid>` | staff email (from Oracle's `log_issue`: the asker's email) |
 | `ai_review_cut` | `ai_review:<ai_review_log id>` | the client's Clerk id |
 | `oracle_detected` | `oracle:<conversation>:<issue>:t<turn>` (a conversation review) or `oracle:turn:<turn_id>` (a failed turn) | `system:oracle-chat-review` |
+| `catalogue_check` | `deadline:<grant root>:<parsed date>` (057; a deadline edited to another past date is a new flag) | `system:deadline-check` |
 
 `addFlag` creates the item on its first flag and bumps `flag_count` on each new one. A
 duplicate `source_ref` changes nothing, not even on a closed item. A new flag on a
@@ -283,9 +289,10 @@ accepts one.
 | Owner | Fixes |
 |---|---|
 | `client` | company profile |
-| `research` | grant data / card copy |
+| `research` | grant data / card copy, past deadlines |
 | `chris` | tagger, engine, chat answers; **default when the cause is unclear** |
 | `jason` | app bugs |
+| `consulting` | (057) a client's consulting / application-writing question — answered by a consultant, approved by Chris (below) |
 
 ### Where client 👎s come from
 
@@ -405,6 +412,65 @@ is no longer read or written. `src/services/pulse-errors-sheet.js` is deleted.
 - Neither job needs the two sheet variables any more; they can be removed from Railway. The
   sheet itself is left in place.
 
+### Deadline cards (migration 057)
+
+A live grant whose deadline text parses to a date before today has a status that
+disagrees with its deadline. `deadline-cards.js` `runDeadlineSweep` reads today's live
+grants (`liveGrants`), parses each deadline once (`coverage.js deadlineFlags` →
+`src/tools/deadline.js`) and files one `grant_deadline` card per grant root, flag source
+`catalogue_check`, `source_ref = deadline:<root>:<date>` — so the same date is never filed
+twice and a deadline edited to another past date adds a flag (and reopens a closed card).
+Blank, rolling ("Open Until Filled") and unreadable deadlines are counted, never filed. The
+snapshot is taken at filing: `{source, checked_on, grant: {id, title, grantor, deadline_text,
+deadline, days_over, status}}`.
+
+It runs inside the hourly review sweep after the grant-pattern sweep (loaded late, since
+`coverage.js` reaches back to `review-queue.js` through `companies.js`), in its own try/catch,
+and `scripts/cc-review-sweep.mjs` prints it. Diagnosis is **in code, no model call**
+(`diagnosis.js diagnoseDeadline`): owner research, verdict `deadline_passed`, a fixed
+narrative from the evidence. On 2026-10-22, 12 of 212 live grants qualified, 28 were blank.
+
+### Consulting cards and the AI knowledge queue (migration 057)
+
+The daily chat review's third rule (`chat-daily.js`, see "Three chat-card rules") files a
+chat card with ref `conv:<conversation>:consulting_question` when a client's stored
+`unmet_need` is consulting or application writing (`CONSULTING_NEED`, which also matches
+labels Haiku invents) **and** the reply wasn't a full answer (`answer` not `answered`, or an
+`unanswered_reason`) — `isConsultingCandidate`, one line to loosen. Haiku is told that
+honestly declining IS an answer, so a politely declined consulting ask doesn't file. One card
+per conversation, one flag per turn, verbatim snapshot (`chatTurnsAround`) plus
+`rule_evidence {rule, unmet_need, answer, unanswered_reason, question}`.
+
+- **Owner:** `consulting`, set in code with no model call (`diagnosis.js diagnoseConsulting`,
+  before the API-key check), verdict `consulting_question`, `diagnosis.chat` = the flagged
+  turn. A card is recognised by its **ref**, never its snapshot (a reopen clears the snapshot).
+- **Answer:** `PATCH /:id/answer {answer}` → `setAnswer` (1–8,000 characters, open consulting
+  cards only) stores `staff_answer*` and logs `answered {text}`.
+- **Send to Chris:** `POST /:id/send-to-chris {answer}` → `sendToChris` saves the answer,
+  owner → `chris`, status → `in_progress` (off `new` on purpose: the hourly sweep diagnoses
+  every `new` card and would hand it back to consulting).
+- **Approve for AI:** `POST /:id/approve-for-ai {answer?}` → `approveForAi`: only with owner
+  chris and a stored (or supplied) answer; inserts the `cc_ai_knowledge` row (the flagged
+  turn's client text, the review's rewritten question, the chat's reply, the answer), closes
+  the card with the note "Approved for AI", logs `approved_for_ai` then `closed`.
+- **Reopen:** a new flag clears `staff_answer*` with the rest; the text stays in the
+  `answered` event and, once approved, in `cc_ai_knowledge`.
+- **Queue:** `knowledge.js` / `knowledge-routes.js` at `/api/control-centre/knowledge`:
+  `GET /?status=pending|exported` → `{items, counts}` (company names added, internal tagged);
+  `POST /export` marks every pending row `exported` under one batch id and returns one
+  markdown file (`text/markdown`, attachment `ai-knowledge-<batch>.md`; `{count: 0}` when
+  nothing is pending); `GET /export/<batch>` re-serves a batch so a failed download never loses
+  answers. The file prefers the rewritten question and carries **no company names** (it's for
+  a model); each entry links back to its card. Hand it to Claude Code for gg3-ai-service.
+- **On the board:** a "Consulting" type chip, the question and the AI's reply, the company
+  link, the Answer box with Save answer / Send to Chris / Approve for AI, and the queue view at
+  `#review?view=knowledge` (pending / exported, Export). Filter `#review?owner=consulting`.
+- **Before 057 is applied:** owner `consulting` fails the CHECK (the sweep logs the code and
+  the card stays `new`); the answer and knowledge routes answer 503 `migration_missing`.
+  Apply with `node migrations/run-migration.js migrations/057_cc_consulting.sql` (or
+  `railway run node scripts/run-migration.js migrations/057_cc_consulting.sql`). 057 drops the
+  owner CHECK by what it says (044 declared it inline, auto-named) and re-adds it by name.
+
 ### Card links
 
 `src/control-centre/links.js`: `cardLink(id)` = `${PUBLIC_URL}/control-centre#review/<id>`
@@ -452,6 +518,9 @@ with no admin check.
 | `PATCH /:id/status` | `{to}`; `closed` is refused (use close) |
 | `PATCH /:id/owner` | `{owner}`; `null` clears it |
 | `POST /:id/close` | `{expected_match, close_note}` |
+| `PATCH /:id/answer` | (057) `{answer}` on a consulting card → `setAnswer` |
+| `POST /:id/send-to-chris` | (057) `{answer}` → `sendToChris`: owner chris, in progress |
+| `POST /:id/approve-for-ai` | (057) `{answer?}` → `approveForAi`: queues the pair, closes the card; `{item, knowledge}` |
 
 Bad input returns 400, an unknown id 404, closing twice 409. A 503 (`not_configured`)
 comes back only when the app DB is needed and unset. Client names aren't in the app DB
@@ -486,6 +555,8 @@ so the next diagnosis takes a fresh one.
 | chat item | chris; research only for `chat_wrong_grant_facts` | `chat_answer_problem` / `chat_wrong_grant_facts` / `unclear`, plus the five chat fields (required) |
 | grant pattern, `wrong_region` | research | `region_list_wrong` / `card_missing_restriction` |
 | grant pattern, other categories | chris or research | `tag_missed_restriction` → chris, `card_missing_restriction` → research, `unclear` → chris |
+| `grant_deadline` (057) | research | `deadline_passed` — **in code, no model call** |
+| chat card with ref `conv:<id>:consulting_question` (057) | consulting | `consulting_question` — **in code, no model call**, keyed on the ref |
 | anything else (no cause, `not_passing_now`, a language twin, an unknown cause) | chris | any |
 
 When the rule ties owner to verdict, the verdict decides. An owner or verdict the rule
@@ -733,8 +804,9 @@ ids). It is cached for an hour, and on a failed refresh it keeps the last good l
 the only staff source; `GG3_INTERNAL_USER_IDS` is retired and nothing reads it. On 2026-10-15
 the 28 companies gave 39 Clerk ids, including all 8 users with a staff app role.
 
-The list holds **28 companies**, all confirmed by Chris on 2026-10-15: Maximizer (#81), plus
-every company in the table below. Add an id only after Chris confirms it.
+The list holds **29 companies**: 28 confirmed by Chris on 2026-10-15 — Maximizer (#81, since
+renamed Growclass), plus every company in the table below — and Granted Consulting Inc.
+(#146, our own company name, confirmed 2026-10-22). Add an id only after Chris confirms it.
 
 **Week of Oct 9–15, clients only.** All of the previous week's (Oct 2–8) dashboard matching came
 from internal accounts. With the toggle off, every grant's "before" is 0, so the movers show 52
@@ -771,6 +843,7 @@ Turn the toggle on to see the full picture.
 | CL Test | 71, 85 | test-like name |
 | Jades Testing Company | 73 | test-like name |
 | LouLouFry Testing | 126 | test-like name |
+| Granted Consulting Inc. | 146 | our own company name (added 2026-10-22; it was showing as the week's most recently active "client" from its sign-up alone) |
 
 ### Chat section (Overview)
 
@@ -863,10 +936,12 @@ white frame, filter chips, four grey columns.
 - **Stuck:** open and no activity for 3+ days — an orange left edge and "Stuck Nd". Activity is
   the later of `updated_at` and the newest comment (`LIST_SQL` `last_activity_at`), so a comment
   resets the timer without moving the card in the updated-first order.
-- **Filters:** owner (Client, Research, Chris, Jason, Unassigned), type, and the Overview's
-  "Include internal accounts" switch (same remembered setting). Off hides match and chat cards
-  whose company is an internal account; grant-pattern cards always show, and their evidence tags
-  the internal companies.
+- **Filters:** owner (Client, Research, Chris, Jason, Consulting, Unassigned), type (Match,
+  Grant pattern, Chat, Empty track, Deadline), and the Overview's "Include internal accounts"
+  switch (same remembered setting). Off hides match and chat cards whose company is an
+  internal account; grant-pattern and deadline cards always show, and pattern evidence tags
+  the internal companies. A consulting-question chat card shows a "Consulting" chip.
+  `#review?view=knowledge` opens the AI knowledge queue (057) instead of the board.
 - **Drag and drop (desktop):** dropping a card on another column moves it (`PATCH /:id/status`,
   shown at once and put back if the server refuses). Dropping on Closed opens the close dialog;
   cancelling leaves the card where it was. Below 640px the columns stack and the panel's "Move
@@ -881,6 +956,11 @@ white frame, filter chips, four grey columns.
   - **Chat:** the flagged client message with the assistant's reply (highlighted) and the turns
     before it (clamped; click to read), the five diagnosis fields, and "Show the full
     conversation" (`GET /:id/conversation`, inline — the Hub has no conversation page).
+  - **Consulting (057):** the client's question and the AI's reply, the unmet need and how the
+    chat did, the company link, then the Answer box: Save answer, Send to Chris (hidden once
+    the owner is chris), Approve for AI (owner chris, open card).
+  - **Deadline (057):** the deadline text, the parsed date, days over, when it was checked, the
+    grant link.
   - **History:** every event in words, newest first, with who (staff name, client company,
     "the hourly review sweep", "Oracle's morning chat review") and when; a run of identical flags
     reads as one line ("Flagged — an AI review cut ×17").
@@ -917,16 +997,22 @@ read-only pool, and running them together delayed the part that matters.
 | Timeline | app `companies.created_at`, `grant_view_sessions` (source → Goal tracks / Browse / Chat / Watchlist / Direct link), `grant_recommendation_feedback_events`, `watchlist_grants` (added / removed); ops match runs and the company's users' `conversations`; Hub review cards filed / closed. Newest first, 300 at most. |
 
 - **List** (`GET /?range=`): every company with a real Clerk user (the sign-up rule without
-  the date). Province and industry are the engine source. Grant matches (distinct grants
-  shown), cards opened and chats count in the page's range, from the Overview's own rows
-  (`loadWindowRows`, factored out of `computeOverview` — the Overview is unchanged). Last
-  active is any time and counts **client actions only**: card opens and ratings (all-time
-  roll-up days and the window's live days) and the latest conversation. Our own match runs
-  (`cc_daily_matches.times_computed`) don't count — a refresh or backfill isn't the client.
-  Saves and profile edits aren't counted: nothing the list reads carries a profile-edit time,
-  and saves are an app-DB read the list doesn't make. The company page's "last active" skips
-  match-run and review-card entries the same way. Open review cards from the Hub. Cached 5 minutes per range. Sortable by every
-  column, filterable, and the "Include internal accounts" switch hides internal accounts.
+  the date). Province and industry are the engine source; each row also carries `size` and
+  `revenue` as matching reads them (`company_metadata` range text, number as fallback) and
+  `plan` / `plan_status` from the latest `company_subscriptions` row (`SUBSCRIPTIONS_SQL`,
+  read-only; plans are starter / lite / plus / pro; a failed read leaves them null). Grant
+  matches (distinct grants shown), cards opened and chats count in the page's range, from the
+  Overview's own rows (`loadWindowRows`, factored out of `computeOverview` — the Overview is
+  unchanged). Last active is any time and counts **client actions only**: card opens and
+  ratings (all-time roll-up days and the window's live days) and the latest conversation.
+  **A company with no client action has `last_active: null`** and the page shows "No
+  activity yet" (sorted last whichever way); the sign-up date never stands in for it. Our own
+  match runs (`cc_daily_matches.times_computed`) don't count — a refresh or backfill isn't the
+  client. Saves and profile edits aren't counted: nothing the list reads carries a
+  profile-edit time, and saves are an app-DB read the list doesn't make. The company page's
+  "last active" skips match-run, review-card and sign-up entries the same way. Open review
+  cards from the Hub. Cached 5 minutes per range. Sortable by every column, filterable, and
+  the "Include internal accounts" switch hides internal accounts.
 - **Company page** (`#companies/<id>`): header and tiles (grant card views, grants
   opened, time on grant cards, 👍 / 👎, chats — all-time); the profile as matching sees it with
   gaps in plain words (`profileGaps`: no industry or province — those limits aren't applied;
@@ -1108,14 +1194,21 @@ specific row is a finer view of the same grants, not a finer gate.
 | Added | a `version.publish` in the range whose new version is `active` and whose previous version wasn't (or there was none), still live |
 | Closed | a publish or `status.amend` from `active` to another status in the range, not live now |
 | Removed | `grant.delete` in the range, or the live version soft-deleted in the range |
+| Republished | (057) a `version.publish` of a grant that was `active` before and after — the live card changed. A grant that went live in the range is Added only |
 | Edited | every grant with `grant_audit_logs` rows in the range except `version.fork*` (unpublished drafts): count, kinds in words (`shapeEdits`), last editor as "app user #N" plus email when known |
-| Deadline passed | a live grant whose `grants.deadline` parses to a day before today (Vancouver). **Flagged only; no card is filed** |
+| Deadline passed | a live grant whose `grants.deadline` parses to a day before today (Vancouver): its status and its deadline disagree. The hourly sweep files a `grant_deadline` card for each (057) |
 | Due soon | a deadline from today to 30 days ahead, whatever the range |
+| Blank / unreadable | (057) `deadline_blank` (no text) and `deadline_unreadable` (text that is neither a date nor a rolling phrase); `definitions.deadlines_rolling` counts the rolling ones |
 
 `version.publish` stores `grants.id` values (previous → new live version), so a transition is the
-two versions' statuses. Deadlines are free text: ISO, DD/MM/YYYY, "May 27, 2026", "6 November
-2026", "1st December 2026" parse; "Open Until Filled" and French text are "no date" (184 of 212
-live grants on 2026-10-19). Edit history starts 2026-03-05, publishing history 2026-07-02.
+two versions' statuses. Deadlines are free text and there is **no structured due date anywhere
+the Hub can read** (checked 2026-10-22: not on app `grants`, not in `gg3_grants`, not in the
+backend's schema), so `parseDeadline` is the source — one parser for the whole Hub,
+`src/tools/deadline.js`: ISO, DD/MM/YYYY, "May 27, 2026", "6 November 2026", "1st December
+2026", "15 mars 2027" parse; "Open Until Filled" / "Ouvert jusqu'à épuisement des fonds" are
+rolling; an ambiguous DD/MM (04/09/2026) is **unreadable, never guessed**. On 2026-10-22: 212
+live grants, 156 rolling, 28 blank, 28 dated of which 12 past. Edit history starts 2026-03-05,
+publishing history 2026-07-02.
 
 ### Data sources (checked 2026-10-19)
 
@@ -1190,7 +1283,7 @@ A day's rows are replaced whole when it runs again.
 | **Grant card / mention** | a card is `chat_turns.surfaced_grant_ids` for that reply; a mention is a grant the turn's tools returned whose full name the reply contains, without a card |
 | **24-hour outcome** | a chat is followed by an action when the chat's company opened a grant card (any source; "from chat" = source `advisor`), saved to a watchlist or created a goal, from the chat's first message to **24 hours after its last** (`OUTCOME_HOURS`). Chats whose Clerk id has no company aren't in the share. App naive timestamps are read as UTC |
 
-### Two chat-card rules
+### Three chat-card rules
 
 Filed by the daily pass through `addFlag` like the roundup's cards: `kind 'chat'`, source
 `oracle_detected`, actor `system:oracle-chat-review`, **one card per chat per issue**
@@ -1198,14 +1291,17 @@ Filed by the daily pass through `addFlag` like the roundup's cards: `kind 'chat'
 re-run adds nothing), `company_id` from the app DB (internal accounts get the Internal tag), and a
 verbatim snapshot (`chatTurnsAround`) with `rule_evidence`.
 
-| Issue | Fires when | Diagnosis (owner chris, verdict set by code) |
+| Issue | Fires when | Diagnosis (verdict set by code) |
 |---|---|---|
-| `no_cards_for_funding_ask` | a funding ask whose reply showed **no** grant card. Only when `chat_turns` recorded the turn (cards unknown never fires it) | `chat_did_not_search` (no search ran), `chat_search_found_nothing` (a search returned nothing) or `chat_results_not_shown` (a search found grants, none carded) |
-| `card_for_rejected_grant` | a card was shown for a grant the reply itself said doesn't fit | `chat_carded_rejected_grant`, the grants listed with links |
+| `no_cards_for_funding_ask` | a funding ask whose reply showed **no** grant card. Only when `chat_turns` recorded the turn (cards unknown never fires it) | owner chris: `chat_did_not_search` (no search ran), `chat_search_found_nothing` (a search returned nothing) or `chat_results_not_shown` (a search found grants, none carded) |
+| `card_for_rejected_grant` | a card was shown for a grant the reply itself said doesn't fit | owner chris: `chat_carded_rejected_grant`, the grants listed with links |
+| `consulting_question` (057) | the stored `unmet_need` is consulting / application writing (`CONSULTING_NEED`) **and** the reply wasn't a full answer (`isConsultingCandidate`) | owner **consulting**, `consulting_question`, **no model call** — see "Consulting cards and the AI knowledge queue" |
 
-`diagnosis.js` `routeFor` forces the verdict from `rule_evidence`; Sonnet still writes the
-narrative and the five chat fields. The 30-day dry run on 2026-10-19 found 7 chats for the first
-(#289's "What about loan programs" — `chat_did_not_search`) and 6 for the second.
+For the first two, `diagnosis.js` `routeFor` forces the verdict from `rule_evidence` and Sonnet
+still writes the narrative and the five chat fields; the third is diagnosed in code. The 30-day
+dry run on 2026-10-19 found 7 chats for the first (#289's "What about loan programs" —
+`chat_did_not_search`) and 6 for the second. The Chat tab's health counts and `RULE_CARDS_SQL`
+stay on the two defect issues: a consulting card is a lead, not a chat defect.
 
 **By hand:** `scripts/cc-chat-daily.mjs` — dry run by default (`--days N`, `--since YYYY-MM-DD`,
 `--save rows.json`): prints themes, unanswered groups, unmet needs, every card it would file (and
@@ -1238,7 +1334,7 @@ Range picker and "Include internal accounts" as on the other tabs (both variants
 
 On a database without 049, sections 1–3 say the nightly review isn't set up and 4–7 still load.
 
-## Department views (the landing tab)
+## Department views (the landing tab) — v2, 2026-10-22
 
 `/control-centre` opens here. A toggle at the top picks **Research**, **Consulting/Sales** or
 **Marketing**; the choice is in the hash (`#views?dept=…`) and remembered per browser in
@@ -1247,35 +1343,66 @@ the **Include internal accounts** switch (off by default, same `cc.includeIntern
 With no range in the link and none picked, the tab opens on **Month**; custom ranges work here as
 everywhere, and row and See all links carry them as `?from=&to=`.
 
-`src/control-centre/views.js` (`departmentViews`), `views-routes.js`
-(`GET /api/control-centre/views?range=`, `authenticateUser` + `requireAuth`, cached 5 minutes
-per range) and `public/js/control-centre-views.js`. **No new source:** it composes the tabs' own
-functions (`coverage`, `changes`, `loadGrantWindow` / `buildGrantList`, `listItems`,
-`chatOverview`, `companyList`, `liveGrants`), each with its own cache, plus one Hub read
-(`CHAT_SIGNALS_SQL` on `cc_chat_questions`). Both variants come back, so the switch needs no
-refetch. An item whose source fails (not configured, a missing table) shows that on its own card;
-the rest load, and a response with a failed item isn't cached. The four window readers
-(`coverage`, `loadGrantWindow`, `companyList`, `chatOverview`) run one after another: together
-on a cold cache they queued past the app pool's 5-second connection wait (3 connections). A cold
-load took about 12 s locally on 2026-10-21; warm loads come from the caches.
+**Rules.** Data panels only, with neutral noun titles — no questions, no advice. Tables where
+the rows matter, CSS bars for a distribution, the Overview's sparkline for a trend, tiles for
+totals. Every panel follows the range except the two that read today's catalogue (status
+mismatches, upcoming deadlines — their notes say so). An empty panel shows one line, **"Nothing
+this period"**. Every row links to its company (`#companies/<id>`), grant (`#grants/<id>`),
+card (`#review/<id>`), chat (`#chat/<id>`) or industry (`#coverage/industry/<name>`). The v1
+question-shaped items (deadline hygiene, cards that look wrong, coverage gaps, stuck flags,
+quiet clients, paid work, new grants, asked, engagement, mismatch, changed) are gone.
 
-Every item has a one-line question, a headline count, at most **5 rows** (`MAX_ROWS`, shared in
-turn across its lists), and a **See all** link to the tab and filter with the detail. Rows link to
-the grant, company, industry or review card.
+`src/control-centre/views.js` (`departmentViews`, one exported pure builder per panel, `META`
+for titles / kinds / notes / See all), `views-routes.js` (`GET /api/control-centre/views?range=`,
+default `month`, `authenticateUser` + `requireAuth`, cached 5 minutes per range) and
+`public/js/control-centre-views.js` (`tableHtml`, `barsHtml`, `seriesHtml`, `tilesHtml`).
+**No new source:** it composes the tabs' own functions (`coverage(range)`, `changes(range)`,
+`loadGrantWindow(range)` / `buildGrantList`, `listItems()`, `chatOverview(range)`,
+`companyList(range)`, `liveGrants()`, `deadlineFlags`), each with its own cache, plus a few
+read-only SQLs of its own: `CHAT_ROWS_SQL` (Hub, the window's `cc_chat_questions` rows),
+`GOALS_SQL` and `FIRST_ACTIONS_SQL` (app: goals created in both windows; a sign-up's first
+goal and first card open), `DEADLINE_CARDS_SQL` and `CONSULTING_CARDS_SQL` (Hub). Both
+variants come back, so the switch needs no refetch. A panel whose source fails (not
+configured, a missing table) shows that on its own card; the rest load, and a response with a
+failed panel isn't cached. The window readers run one after another (the app pool has 3
+connections).
 
-| Department | Item | Definition | See all |
+Payload: `departments.<dept>` is an array of panels `{key, title, kind, wide?, note?,
+see_all?, clients, all}` (or `error`); a table variant is `{columns: [{key, label, kind}],
+rows: [{cells, href?, flag?}]}` with cell kinds `text | num | money | date | delta | days |
+link | badge`; bars `{unit, rows: [{label, value, previous?, href?}]}`; series `{label, total,
+previous_total, delta, current, previous}`; tiles `{tiles: [{label, n, words?, href?}]}`.
+Tables show at most `MAX_ROWS` (10; status mismatches 25, industry tables 14, goal coverage 12).
+
+| Department | Panel (`key`) | What it shows | Source |
 |---|---|---|---|
-| Research | Deadline hygiene | Live grants (today's catalogue) whose deadline is past; due in the next 90 days (`HYGIENE_DAYS`); blank or unreadable. Rolling text ("Open Until Filled", `ROLLING_DEADLINE`) is counted apart, not as a problem. `deadlineHygiene` in `coverage.js` reuses `parseDeadline`; `deadlineFlags` / `DUE_SOON_DAYS` (30, the Changes list) are unchanged. | `#coverage`, `#grants` |
-| | Cards that look wrong | Open review cards owned by Research; grants shown to 3+ clients that most never opened (Grants `most_ignored`). | `#review?owner=research`, `#grants?view=most_ignored` |
-| | Coverage gaps | Thin industries (Coverage's `thin`, mains and specifics); live grants matched to no one in the range (Grants `not_matching`). | `#coverage`, `#grants?view=not_matching` |
-| | Stuck flags | Open Research cards with no activity for 3+ days (the board's `stuck`). | `#review?owner=research` |
-| Consulting/Sales | Quiet clients | Clients shown ≥1 grant match in the last 30 days whose last active (client actions only, see Companies) is 14+ days ago (`QUIET_DAYS`); and those shown matches who opened none. Fixed 30-day window, whatever the range. Saves aren't counted yet. | `#companies?sort=last_active&dir=asc` (month) |
-| | Chat questions that signal paid work | Unanswered questions and unmet needs from the daily chat review in the range, grouped by company, with an example. Rows with no company show as "Company not recorded". | `#chat` |
-| | New grants for client industries | Grants that went live in the last 7 days (`changes('week').added`, publish history from 2026-07-02; a reopened grant counts), each with the clients its industry tag reaches: profile main industry ∩ the grant's tokens' mains; open to every industry = every client; not in the Hub copy = "not tagged yet". | `#coverage` |
-| Marketing | What clients ask and don't get answered | Unanswered and unmet totals in the range; top themes (clients only) with an example question. | `#chat` |
-| | Engagement | Most opened, most discussed in chat (`grants_discussed`) and shown but never opened, each with how clients found the grant (opens by source, the Overview's `OPEN_SOURCES`). Saves aren't counted yet. | `#grants?sort=opens&dir=desc`, `#chat`, `#grants?view=most_ignored` |
-| | Where grants and clients don't line up | Industries (mains and specifics, not "general" rows) with 3+ industry-restricted grants and at most 1 client, and with 2+ clients and at most 1 restricted grant. Open-to-every-industry grants are left out: they're the same on every row. | `#coverage` |
-| | What changed this week | One line from `changes('week')`: went live, closed, removed, edited. | `#coverage` |
+| Marketing | Chat themes (`chat_themes`) | theme · questions · change vs the previous window · an example question; clients only | `chatOverview().themes` |
+| | Unanswered how-to questions (`howto_unanswered`) | unanswered rows (no answer, asked for a person, left after a bad reply) whose rewritten question starts with how-to wording (`HOWTO`: how / where / can I / is there a way / what do I / do I need to) — question · theme · company · day → chat | `CHAT_ROWS_SQL` |
+| | Most matched grants (`most_matched`) · Most opened grants (`most_opened`) | grant · clients matched · opens · saves / bounced | `buildGrantList(win, 'all')` |
+| | Trending grants (`trending_grants`) | clients matched before → now, the five biggest rises and drops; opens before → now (`grantTrends`) | `win.matches` / `win.views` split by window |
+| | Timely grants (`timely`) | went live in the range (`changes.added`) or due within 30 days (`deadlineFlags().due_soon`), ranked by clients matched | `changes`, `deadlineFlags`, `win` |
+| | Demand by goal type (`goal_demand`, bars) | goal tracks set in the range by goal name; faint bar = previous window | `GOALS_SQL` |
+| | Demand by industry / province (`demand_industry`, `demand_province`) | clients (today's profiles) · grant matches · average | `coverage()` industries (main rows + Not mapped) and `breakdowns.province` (now carries `grant_matches`) |
+| | How clients find grants (`found_via`, bars) | card opens by source now vs before | `openSources(win.views)` |
+| | Totals for the range (`totals`, tiles) | businesses matched · grants matched · cards opened · top goal type · top grant | `win`, goals |
+| | Sign-ups (`signups`, series) | count now vs before with a per-day sparkline; the clients variant drops internal ids | `win.signups` (kept by `loadGrantWindow`) |
+| Research | Flagged cards (`flagged_cards`) | open cards owned by Research: card · type · status · idle days (stuck marked) · company | `listItems()` |
+| | Status mismatches (`status_mismatches`) · No readable deadline (`deadline_unreadable`) | live grants whose deadline text is a past date: grant · text · parsed date · days over · card (or "filed on the next sweep"); blank / unreadable grants apart. Today's catalogue | `deadlineFlags(liveGrants, today)`, `DEADLINE_CARDS_SQL` |
+| | Upcoming deadlines (`upcoming_deadlines`) | due within 30 days of today, soonest first, with the range's clients matched and opens | `deadlineFlags().due_soon`, `win` |
+| | Grants asked for that GetGranted doesn't carry (`asked_not_carried`) | unmet needs matching `NOT_CARRIED` (grant / program / carry) and not loans, SR&ED or consulting: question (the program's name is inside it — only the rewrite is stored) · company · day → chat | `CHAT_ROWS_SQL` |
+| | Industry coverage (`industry_coverage`) | industry · clients · industry grants · open-to-all · avg matches · thin; main rows + Not mapped | `coverage()` |
+| | Goal coverage (`goal_coverage`) | goal track · clients · grants shown on track · empty · few | `coverage().breakdowns.goal_tracks` |
+| | Trending grants (`trending_grants`) · Trending industries (`trending_industries`) | as Marketing's; industries = matched pairs by clients' profile main industry now vs before (`industryTrends`) | `win.matches`, `coverage().clients` |
+| | Ignored cards (`ignored`) | grants shown on goal tracks to 3+ clients, ranked by how many saw them and never opened: clients shown · never opened · opens | `buildGrantList(win, 'most_ignored')` |
+| | Recent launches (`recent_launches`) | published as active or republished in the range: grant · event · when · clients matched since · opens since | `changes().added ∪ republished`, `win` |
+| Consulting/Sales (every company cell reads **Name · size · revenue · plan**, "—" when unknown; `companyList` rows) | Consulting questions (`consulting_cards`) | open cards owned by Consulting: company · the flagged question · status · idle days → card | `CONSULTING_CARDS_SQL` (the snapshot's flagged turn) |
+| | Clients asking for help we sell (`help_we_sell`) | rows whose unmet need matches `CONSULTING_NEED` (the daily review's own rule, imported from `chat-daily.js`): company · question · day → chat | `CHAT_ROWS_SQL` |
+| | Interest in big-money grants (`big_money`) | companies that asked about (`cards_shown ∪ grants_named`) or opened the card of a grant with app `grants.value ≥ 100,000` (`BIG_GRANT_VALUE`): company · grant · value · how · day | `CHAT_ROWS_SQL`, `win.views`, `liveGrants` |
+| | Most engaged clients (`most_engaged`) | goal tracks set · cards opened · chats · last active, top 10 by the sum | `GOALS_SQL`, `companyList` |
+| | Fast starters (`fast_starters`) | signed up in the range and set a goal **and** opened a card within 7 days (`FAST_DAYS`): signed up · first goal · first card open · plan | `companyList`, `FIRST_ACTIONS_SQL` |
+
+Tests: `tests/unit/control-centre-views.test.js` — one test per builder on fixtures, both
+variants, the composition with a failing source, the route default.
 
 ## Oracle: `control_centre` (read-only)
 
