@@ -73,6 +73,21 @@ describe('shape and feedback', () => {
     expect(isFeedbackAsk('please vote on the logo')).toBe(true);
     expect(isFeedbackAsk('everyone switch your meeting links')).toBe(false);
   });
+
+  test('answers collected on the card are feedback; answers sent elsewhere are a Done checklist', () => {
+    const dmMe = 'everyone, feedback on the deck please — DM me by Friday';
+    expect(detectShape(dmMe)).toBe('everyone');
+    expect(isFeedbackAsk(dmMe)).toBe(false);
+    expect(isFeedbackAsk('team, email me your thoughts on the logo')).toBe(false);
+    expect(isFeedbackAsk('everyone, leave your feedback as comments in the doc')).toBe(false);
+    expect(isFeedbackAsk('all: thoughts? send them to Sam by Thursday')).toBe(false);
+    expect(isFeedbackAsk('team, please give feedback on the draft by DM')).toBe(false);
+
+    expect(isFeedbackAsk('everyone, share your thoughts in this thread')).toBe(true);
+    expect(isFeedbackAsk('team, reply with your pick here')).toBe(true);
+    // Feedback *on* a doc is about the doc, not sent to it.
+    expect(isFeedbackAsk('team, your feedback on the sheet design please')).toBe(true);
+  });
 });
 
 describe('holder', () => {

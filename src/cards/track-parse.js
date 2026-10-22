@@ -63,13 +63,19 @@ export function typedCommand(text) {
 const EVERYONE = /(?:^|\s)@all\b|\b(?:everyone|everybody|all of you|y'?all|folks|all hands)\b|^\s*(?:hi\s+|hey\s+)?(?:team|all)\s*[,:—-]/i;
 const FEEDBACK = /\b(?:feedback|thoughts|input|opinions?|vote|votes|respond|responses?|reply with|let me know (?:what|which|your|if)|what do you (?:all )?think|which (?:one )?(?:do|would) you (?:prefer|like))\b/i;
 
+// Answers sent somewhere other than the card (a DM, an email, a doc, a person):
+// the card is a Done checklist that people tick off once they have sent theirs.
+const ANSWER_ELSEWHERE = /\b(?:dm|pm|message|e-?mail|text|ping)\s+(?:me|it to me|them to me)\b|\b(?:in|via|by|over)\s+(?:a\s+|the\s+)?(?:dm|pm|private message|e-?mail)\b|\bsend\s+(?:me\b|(?:it|them|those|yours|your\s+\w+(?:\s+\w+)?)\s+(?:to|over to|my way)\b)|\bprivately\b|\b(?:(?:comments?|notes?|suggestions?)\s+(?:directly\s+)?(?:in|on|into|to)|(?:reply|respond|feedback|thoughts|input)\s+(?:directly\s+)?(?:in|into))\s+(?:the|this|that|my|our)\s+(?:google\s+)?(?:doc|document|sheet|spreadsheet|slides?|deck|file|form|survey)\b|\b(?:fill (?:in|out)|complete)\s+(?:the|this|my|our)\s+(?:form|survey)\b/i;
+
 /** @returns {'everyone'|'one'} */
 export function detectShape(text, mentionsAll = false) {
   return mentionsAll || EVERYONE.test(String(text || '')) ? 'everyone' : 'one';
 }
 
+/** Answers collected on the card — not an ask that sends them elsewhere. */
 export function isFeedbackAsk(text) {
-  return FEEDBACK.test(String(text || ''));
+  const t = String(text || '');
+  return FEEDBACK.test(t) && !ANSWER_ELSEWHERE.test(t);
 }
 
 /**

@@ -101,7 +101,7 @@ const TRACK_SCHEMA = {
   properties: {
     title: { type: 'string', description: '3–8 word title naming the ask, e.g. "Team reads Oracle guide". Never copy the message.' },
     shape: { type: 'string', enum: ['one', 'everyone'], description: '"everyone" when every person in the space (the team, all of us, everybody) must each act; "one" when one person holds it.' },
-    feedback: { type: 'boolean', description: 'For "everyone": true when each person is asked for an answer, opinion or vote rather than to do something.' },
+    feedback: { type: 'boolean', description: 'For "everyone": true when each person is asked for an answer, opinion or vote rather than to do something, and the answers are to be given on this card, not sent elsewhere (a DM, an email, a doc).' },
     holder_id: { type: ['string', 'null'], description: 'For "one": the id of the mentioned person the ask is directed at, or null.' },
     due: {
       type: ['object', 'null'],
@@ -142,7 +142,8 @@ const SPECS = {
     instructions: [
       'You set up a card that tracks an ask made in a team chat thread: who has the ball, or — when everyone must act — a checklist of the team.',
       'Choose the shape from what the requester wants done, not from exact words: "the full team to read this" is everyone.',
-      'Pick only buttons that fit this ask. A reading or to-do ask for everyone does not need "Submit response"; one that asks for opinions does not need "I’ve done it".',
+      'Pick only buttons that fit this ask. A reading or to-do ask for everyone does not need "Submit response"; one that asks for opinions given on this card does not need "I’ve done it".',
+      'Where the answers go decides feedback. If the post tells people to send their answer somewhere other than this card — "DM me", "email me", "comment in the doc", "send it to Sam" — set feedback to false and use "I’ve done it": the card is a Done checklist and people tick off once they have sent it. Set feedback to true only when the answers are meant to be collected on this card (e.g. "reply here", "share your thoughts in this thread").',
       'Due dates: resolve relative words ("Friday", "tomorrow", "EOD") against the time the ask was written, in the requester’s time zone. No deadline stated → null.'
     ],
     context: ({ mentions }) => [

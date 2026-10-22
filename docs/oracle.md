@@ -180,6 +180,12 @@ matching Chat API command in the Cloud console.
 - Refresh, Switch and Remove people… are always in the card's "More" overflow menu
   (`moreMenu` in `src/cards/render.js`, the `more` argument of `trackedCard`). Each menu item
   is a `button()` result, so a press reaches the same handler.
+- An everyone-shape /track card shows "Submit response" (`data.feedback` true) or "I've done
+  it" (false). Answers sent elsewhere ("DM me", "email me", "comment in the doc") make it a
+  Done checklist, in both the interpreter rule and `isFeedbackAsk`. Its More menu adds
+  "Switch to responses" / "Switch to Done checklist" (`track.switchFeedback`): everyone sees
+  it, only the requester (`owner_chat_id`) can use it, and rows and stored responses are kept.
+  Switch from one ball to everyone re-reads the ask to set `feedback`.
 - /meet's only optional button is "Ignore working hours". It can be dropped only while times
   are shown, because the no-times text points to it.
 - /watch's buttons are not chosen.

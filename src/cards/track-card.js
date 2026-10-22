@@ -68,6 +68,7 @@ export const TRACK_ACTIONS = {
   'track.dismiss': { personal: false, label: 'dismissed the suggestion' },
   'track.not_right': { personal: false, label: 'undid the best guess' },
   'track.switch': { personal: false, label: 'switched the card’s shape' },
+  'track.switchFeedback': { personal: false, label: 'switched between responses and a Done checklist' },
   'track.done': { personal: true, label: 'marked their part done' },
   'track.help': { personal: true, label: 'asked for help' },
   'track.respond': { personal: true, label: 'submitted a response', dialog: true, saved: 'Response saved' },
@@ -641,8 +642,17 @@ async function handleAction({ card, actor, action, now = new Date() }) {
       const build = shape === 'everyone' && !d.checklist?.built;
       if (build) patch.busy = { kind: 'checklist', text: BUSY.checklist, by: actor.name || null, at: now.toISOString() };
       await store.patchCardData(card.id, patch);
-      return { changed: true, background: build ? () => buildChecklist(card.id, actor) : null };
+      return { changed: true, background: shape === 'everyone' ? () => toEveryone(card.id, actor, build) : null };
     }
+
+    case 'track.switchFeedback':
+      if (!everyone) return { changed: false, ignored: 'one_ball_shape', reply: 'This card tracks one person — switch it to everyone first.' };
+      if (actor.chatUserId !== card.owner_chat_id) {
+        return { changed: false, ignored: 'not_the_owner', reply: 'Only the person who asked can switch this card.' };
+      }
+      // Rows and stored responses stay: switching back shows them again.
+      await store.patchCardData(card.id, { feedback: !d.feedback });
+      return { changed: true };
 
     case 'track.done':
     case 'track.help': {
@@ -741,6 +751,21 @@ async function buildChecklist(cardId, actor) {
   const list = await listSpaceHumans(card.space_name, { exclude: [card.owner_chat_id], lookupAsUserId: card.owner_user_id });
   await store.addParticipants(cardId, list.people.map(p => ({ chatUserId: p.chatUserId, role: 'member', displayName: p.name, status: 'pending' })));
   await store.patchCardData(cardId, { busy: null, checklist: { built: true, code: list.ok ? null : list.code } });
+}
+
+/** One ball → everyone: the list (once), and responses or Done read again from the ask. */
+async function toEveryone(cardId, actor, build) {
+  if (build) await buildChecklist(cardId, actor);
+  const card = await store.getCard(cardId);
+  if (!card) return;
+  const read = await readAsk({
+    spaceName: card.space_name, threadName: card.thread_name, userIds: [card.owner_user_id, card.data?.trackedBy?.userId]
+  }).catch(err => ({ ok: false, code: codeOf(err) }));
+  if (!read.ok) {
+    console.log(`🗂️  Track switch kept responses/Done as it was — code: ${read.code}`);
+    return;
+  }
+  await store.patchCardData(cardId, { feedback: isFeedbackAsk(read.ask.text) });
 }
 
 async function startFromOffer(cardId, actor, now) {
@@ -1126,7 +1151,11 @@ function render(card, participants = [], latestClick = null, now = new Date()) {
     refreshing
       ? button('Reading…', { cardId: id, action: 'track.refresh' }, { disabled: true })
       : button('Refresh', { cardId: id, action: 'track.refresh' }),
-    button(everyone ? 'Switch to one ball' : 'Switch to everyone', { cardId: id, action: 'track.switch' }, { disabled: busy?.kind === 'checklist' })
+    button(everyone ? 'Switch to one ball' : 'Switch to everyone', { cardId: id, action: 'track.switch' }, { disabled: busy?.kind === 'checklist' }),
+    // Everyone to see; only the requester's press applies (handleAction says so to anyone else).
+    ...(everyone
+      ? [button(d.feedback ? 'Switch to Done checklist' : 'Switch to responses', { cardId: id, action: 'track.switchFeedback' }, { disabled: busy?.kind === 'checklist' })]
+      : [])
   );
 
   const closedLabel = card.status === 'closed' ? CLOSED_REASONS[card.closed_reason] : null;

@@ -328,13 +328,13 @@ describe('reading the ask with the interpreter', () => {
     expect(cardsV2[0].card.header).toEqual({ title: 'Team reads Oracle guide', subtitle: `Track · asked by ${NAMES[CHRIS]} · Everyone` });
     expect(cardText(cardsV2)).toContain(`<a href="${DOC_URL}">Open doc: Oracle guide</a>`);
     // The model left Remove people… out; it is in the More menu regardless.
-    expect(buttonRowOf(cardsV2)).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Remove people…'] });
+    expect(buttonRowOf(cardsV2)).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Switch to responses', 'Remove people…'] });
     expect(logged()).toContain('interpreted: yes, docs: 1');
 
     // The choice is on the card row: Refresh re-renders with the same buttons.
     await press(card, 'track.refresh', CHRIS);
     await whenCardsIdle();
-    expect(buttonRowOf(lastPatch())).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Remove people…'] });
+    expect(buttonRowOf(lastPatch())).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Switch to responses', 'Remove people…'] });
     expect(cardText(lastPatch())).toContain('Open doc: Oracle guide');
 
     // After Switch the other shape shows its full set; switching back restores the choice.
@@ -686,7 +686,7 @@ describe('the holder and the shape', () => {
     expect(text).toContain('People in this space only through a Google Group aren’t listed.');
     expect(text).toMatch(/Still to do: [^<]*$/m);
     expect(/Still to do: ([^<\n]*)/.exec(text)[1]).not.toContain(NAMES[NAT]);   // the requester has no part
-    expect(buttonRowOf(cardsV2)).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Remove people…'] });
+    expect(buttonRowOf(cardsV2)).toEqual({ primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Switch to responses', 'Remove people…'] });
   });
 
   test('Switch keeps the card; the everyone list is built once, after answering', async () => {
@@ -1174,6 +1174,78 @@ describe('everyone asks and due dates', () => {
     await say({ text: 'remove @Steph', sender: NAT, mentions: [STEPH] });
     expect(await members(card.id)).toEqual({ [JASON]: 'pending', [CHRIS]: 'pending' });
     expect(cardText(lastPatch())).toContain('<b>0 of 2 done</b>');
+  });
+
+  test('"feedback … DM me" is a Done checklist: people tick off once they have sent it', async () => {
+    setThread([chatMessage({ id: 'ask', text: 'everyone, feedback on the deck please — DM me by Oct 1, 2030', mentions: [] })]);
+    fakes.chat.members.set(SPACE, [NAT, JASON, STEPH].map(id => ({ chatUserId: id })));
+    await command();
+    const card = await liveCard();
+    expect(card.data).toMatchObject({ shape: 'everyone', feedback: false, interpreted: false });
+    expect(buttonRowOf(cardPosts()[0].cardsV2)).toEqual({
+      primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Switch to responses', 'Remove people…']
+    });
+  });
+
+  test('the requester switches between responses and a Done checklist; rows and responses are kept', async () => {
+    feedbackAsk();
+    fakes.chat.members.set(SPACE, [NAT, JASON, STEPH].map(id => ({ chatUserId: id })));
+    await command();
+    const card = await liveCard();
+    await say({ text: 'response: I prefer option A', sender: JASON });
+    await press(card, 'track.help', STEPH);
+    await whenCardsIdle();
+    expect(buttonRowOf(lastPatch())).toEqual({
+      primary: ['Submit response', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Switch to Done checklist', 'Remove people…']
+    });
+
+    // Anyone else is told privately; nothing changes.
+    await press(card, 'track.switchFeedback', JASON);
+    await whenCardsIdle();
+    expect(privateReplies().at(-1)).toEqual([JASON, 'Only the person who asked can switch this card.']);
+    expect((await liveCard()).data.feedback).toBe(true);
+
+    await press(card, 'track.switchFeedback', NAT);
+    await whenCardsIdle();
+    let now = await liveCard();
+    expect(now.data.feedback).toBe(false);
+    expect(now.data.responses[JASON]).toMatchObject({ text: 'I prefer option A' });
+    expect(await members(card.id)).toEqual({ [JASON]: 'done', [STEPH]: 'needs_help' });
+    expect(buttonRowOf(lastPatch())).toEqual({
+      primary: ['I’ve done it', 'I need help'], more: ['Refresh', 'Switch to one ball', 'Switch to responses', 'Remove people…']
+    });
+
+    await press(card, 'track.switchFeedback', NAT);
+    await whenCardsIdle();
+    now = await liveCard();
+    expect(now.data.feedback).toBe(true);
+    expect(now.data.responses[JASON]).toMatchObject({ text: 'I prefer option A' });
+    expect(buttonTexts(lastPatch())[0]).toBe('Submit response');
+    expect(cardText(lastPatch())).toContain('1 response so far');
+    expect(cardPosts()).toHaveLength(1);                                         // patched in place, never re-posted
+  });
+
+  test('One ball → everyone reads responses or Done from the ask', async () => {
+    setThread([oneBallAsk({ text: '@Jason Sentinel what do you think of the new template?' })]);
+    fakes.chat.members.set(SPACE, [NAT, JASON, STEPH].map(id => ({ chatUserId: id })));
+    await command();
+    let card = await liveCard();
+    expect(card.data).toMatchObject({ shape: 'one', feedback: false });
+
+    await press(card, 'track.switch', NAT);
+    await whenCardsIdle();
+    card = await liveCard();
+    expect(card.data).toMatchObject({ shape: 'everyone', feedback: true });
+    expect(buttonTexts(lastPatch())[0]).toBe('Submit response');
+  });
+
+  test('One ball → everyone on a to-do ask stays a Done checklist', async () => {
+    setThread([oneBallAsk()]);
+    await command();
+    await press(await liveCard(), 'track.switch', NAT);
+    await whenCardsIdle();
+    expect((await liveCard()).data).toMatchObject({ shape: 'everyone', feedback: false });
+    expect(buttonTexts(lastPatch())[0]).toBe('I’ve done it');
   });
 });
 
