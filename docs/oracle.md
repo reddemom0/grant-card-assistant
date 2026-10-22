@@ -745,7 +745,7 @@ not an agent tool: there is no schema in `definitions.js` and no executor dispat
 
 ## Morning brief (Steph)
 
-`src/services/steph-brief.js`. On weekdays at 08:00 America/Vancouver (the Ruk schedule),
+`src/services/steph-brief.js`. On weekdays at 07:00 America/Vancouver (local time in PDT and PST),
 one Chat card in Steph's DM lists the inbox threads she hasn't answered. Each item gets a
 one- or two-line assessment, an in-thread Gmail **draft** saved in her mailbox, and a Done
 button.

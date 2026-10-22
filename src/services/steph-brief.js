@@ -1,7 +1,8 @@
 /**
  * Steph's morning brief — the daily job.
  *
- * Weekdays 08:00 America/Vancouver (the pre-call briefings schedule), gated by
+ * Weekdays 07:00 America/Vancouver (node-cron's timezone option, so 07:00 local
+ * in both PDT and PST), an hour before the 08:00 jobs, gated by
  * STEPH_BRIEF_ENABLED === 'true'. One card in Steph's DM listing the inbox
  * threads she hasn't answered, grouped Clients → Partners → Leads → Team →
  * Government (Docs notifications last), each with a short assessment, an
@@ -44,7 +45,7 @@ import { contextForItem, ledgerTotal, sourcesOf } from './steph-brief-context.js
 import { loadStyleGuide } from './style-guides.js';
 import { meetingLinksFor } from './meeting-links.js';
 
-export const SCHEDULE = '0 8 * * 1-5';
+export const SCHEDULE = '0 7 * * 1-5';
 const TZ = 'America/Vancouver';
 export const DEFAULT_OWNER_EMAIL = 'ssang@granted.ca';
 export const DEFAULT_MAX_DRAFTS = 15;
@@ -584,6 +585,6 @@ export function startStephBrief(cron, env = process.env) {
     }
   };
   cron.schedule(SCHEDULE, run, { name: 'steph-brief', timezone: TZ, noOverlap: true });
-  console.log('✅ Steph morning brief scheduled (08:00 America/Vancouver, Mon–Fri)');
+  console.log('✅ Steph morning brief scheduled (07:00 America/Vancouver, Mon–Fri)');
   return true;
 }

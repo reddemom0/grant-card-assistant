@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-10-22 — Steph brief runs at 07:00, not 08:00
+**What:** `SCHEDULE` in `steph-brief.js` is now `0 7 * * 1-5` with `timezone: 'America/Vancouver'`, so the brief posts at 07:00 Vancouver on weekdays in both PDT and PST. The 2026-10-19 entry's "08:00" is superseded.
+**Why:** Chris asked to move it from 08:00 to 07:00.
+**Impact:** `src/services/steph-brief.js`, comments in `server.js` and `src/api/steph-brief-run.js`, `docs/oracle.md`, test `steph-brief`
+
 ## 2026-10-21 — Filing sweep: weekday suggest-only pilot
 **What:** Chris's 11 decisions:
 1. **Suggest only:** each card proposes a move and/or rename through `file_move_rename` (Confirm, `drive_actions`, undo).

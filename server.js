@@ -1444,10 +1444,11 @@ async function startServer() {
     // RUK_BRIEFINGS_ENABLED=true. Needs migration 049.
     startRukBriefings(cron);
 
-    // Steph's 08:00 morning brief: her unanswered inbox triaged into one Chat
-    // card with a Done button per item and an in-thread Gmail DRAFT saved for
-    // each (never sent). Off unless STEPH_BRIEF_ENABLED=true; needs her Gmail
-    // connected (/api/auth/gmail) and migration 051.
+    // Steph's 07:00 morning brief (Mon–Fri, America/Vancouver): her unanswered
+    // inbox triaged into one Chat card with a Done button per item and an
+    // in-thread Gmail DRAFT saved for each (never sent). Off unless
+    // STEPH_BRIEF_ENABLED=true; needs her Gmail connected (/api/auth/gmail)
+    // and migration 051.
     startStephBrief(cron);
 
     // Filing sweep (pilot): weekdays 08:30, Oracle DMs whoever added new

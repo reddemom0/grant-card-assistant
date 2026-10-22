@@ -1071,7 +1071,19 @@ describe('startStephBrief', () => {
     expect(B.startStephBrief(cron, { STEPH_BRIEF_ENABLED: '1' })).toBe(false);
     expect(cron.schedule).not.toHaveBeenCalled();
     expect(B.startStephBrief(cron, { STEPH_BRIEF_ENABLED: 'true' })).toBe(true);
-    expect(cron.schedule).toHaveBeenCalledWith('0 8 * * 1-5', expect.any(Function), { name: 'steph-brief', timezone: 'America/Vancouver', noOverlap: true });
+    expect(cron.schedule).toHaveBeenCalledWith('0 7 * * 1-5', expect.any(Function), { name: 'steph-brief', timezone: 'America/Vancouver', noOverlap: true });
+  });
+  test('fires at 07:00 Vancouver on weekdays, in PDT and PST (node-cron\'s own matcher)', async () => {
+    const { TimeMatcher } = await import('../../node_modules/node-cron/dist/esm/time/time-matcher.js');
+    const m = new TimeMatcher(B.SCHEDULE, 'America/Vancouver');
+    const at = (iso) => m.match(new Date(iso));
+    expect(at('2026-10-23T14:00:00Z')).toBe(true);    // Fri 07:00 PDT
+    expect(at('2026-10-23T15:00:00Z')).toBe(false);   // Fri 08:00 PDT — the old time
+    expect(at('2026-10-31T14:00:00Z')).toBe(false);   // Sat
+    expect(at('2026-11-02T15:00:00Z')).toBe(true);    // Mon 07:00 PST (DST ended Nov 1)
+    expect(at('2026-11-02T14:00:00Z')).toBe(false);   // Mon 06:00 PST
+    expect(at('2027-03-15T14:00:00Z')).toBe(true);    // Mon 07:00 PDT (DST began Mar 14)
+    expect(at('2027-03-15T15:00:00Z')).toBe(false);   // Mon 08:00 PDT
   });
   test('window: the last 14 days', () => {
     expect(B.windowStart(NOW).getTime()).toBe(NOW.getTime() - 14 * DAY);

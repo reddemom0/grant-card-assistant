@@ -12,7 +12,7 @@
  *     DM of the INBOX OWNER — never the caller's, unless the caller is that
  *     owner. No reachable DM for the owner → 409 inbox_owner_has_no_dm.
  *     The answer and the logs carry no mail content (quietLogs).
- *   dry_run=0 — a real run, through the same daily claim as the 08:00 job
+ *   dry_run=0 — a real run, through the same daily claim as the 07:00 job
  *     (so it can't double-post a day the job already ran).
  *
  *   inbox=<email> (dry runs only) — read that consented inbox instead of
