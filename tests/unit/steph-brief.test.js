@@ -291,7 +291,7 @@ describe('runStephBrief', () => {
     }
     expect(prompt).toContain('$500K–$1M');
     expect(cardText(d)).toContain('est. $45,000');
-    expect(d.matchLead).toHaveBeenCalledWith(expect.objectContaining({ province: 'British Columbia', industry: 'Manufacturing' }));
+    expect(d.matchLead).toHaveBeenCalledWith(expect.objectContaining({ province: 'British Columbia', industry: ['Manufacturing'] }));
   });
 
   test('match-lead insufficient_profile is noted on the card', async () => {

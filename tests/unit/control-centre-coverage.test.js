@@ -66,7 +66,7 @@ describe('industry rows', () => {
     expect(ind(cov, 'Agriculture - Crop').restricted).toBe(0);
     // The main name is itself a tag token: its "general" row counts grants tagged with it.
     expect(ind(cov, 'Agriculture, general')).toMatchObject({ general: true, restricted: 1 });
-    expect(cov.clients_variant.industries).toHaveLength(12);
+    expect(cov.clients_variant.industries).toHaveLength(16);
   });
 
   test('a grant missing from the Hub copy is counted apart, not as open to every industry', () => {

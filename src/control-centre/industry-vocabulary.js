@@ -1,17 +1,18 @@
 /**
  * Control Centre — the matching engine's industry vocabulary, COPIED.
  *
- * Source: gg3-ai-service src/lib/matching/vocabulary.ts @ 9f3d489 (2026-09-23):
- *   CANONICAL_INDUSTRIES          → MAIN_INDUSTRIES (the 12 main industries)
+ * Source: gg3-ai-service src/lib/matching/vocabulary.ts @ c3792e3 (2026-10-22):
+ *   CANONICAL_INDUSTRIES          → MAIN_INDUSTRIES (the 16 main industries)
  *   GRANT_INDUSTRY_TO_CANONICAL   → TOKEN_TO_MAINS (84 specific tokens → main)
  *   PROFILE_INDUSTRY_ALIASES      → PROFILE_ALIASES
+ *   PROFILE_INDUSTRY_EXPANSIONS   → PROFILE_EXPANSIONS
  *
  * The Hub can't read these anywhere else: no table or endpoint holds them, and
  * app `tags` has the 84 tokens but parents only for Agriculture and
  * Manufacturing. Chris chose a checked-in copy (2026-10-19) over a new
  * gg3-ai-service endpoint. tests/unit/control-centre-industry-vocabulary.test.js
  * fails when this copy and the sibling repo's file disagree (skipped when the
- * sibling repo isn't on disk). To refresh: copy the three literals again and
+ * sibling repo isn't on disk). To refresh: copy the four literals again and
  * update the commit above. Never edit the values by hand.
  *
  * The engine gates industry at the MAIN level (evaluateIndustryMatch compares
@@ -30,10 +31,15 @@ export const MAIN_INDUSTRIES = Object.freeze([
   'Manufacturing',
   'Professional Services',
   'Retail',
-  'Software'
+  'Software',
+  'Transportation & Logistics',
+  'Natural Resources',
+  'Hospitality & Tourism',
+  'Food & Beverage'
 ]);
 
 // Specific token → its main(s). [] = a business type or placeholder, not an industry.
+// This is the GRANT side; a company's industry also goes through PROFILE_EXPANSIONS.
 export const TOKEN_TO_MAINS = Object.freeze({
   'Agriculture': ['Agriculture'],
   'Agriculture - Crop': ['Agriculture'],
@@ -52,7 +58,6 @@ export const TOKEN_TO_MAINS = Object.freeze({
   'Tech - Animation': ['Digital Media'],
   'Educational Services': ['Education'],
   'Environmental - Education': ['Education'],
-  'Oil & Gas Extraction': ['Energy'],
   'Utilities': ['Energy'],
   'Financial': ['Finance'],
   'Insurance': ['Finance'],
@@ -68,7 +73,6 @@ export const TOKEN_TO_MAINS = Object.freeze({
   'Veterinary': ['Health'],
   'Manufacturing': ['Manufacturing'],
   'Manufacturing - Industrial': ['Manufacturing'],
-  'Manufacturing - Food & Beverage': ['Manufacturing'],
   'Manufacturing - Electronic': ['Manufacturing'],
   'Manufacturing - Wood Products': ['Manufacturing'],
   'Manufacturing - Metal': ['Manufacturing'],
@@ -76,7 +80,19 @@ export const TOKEN_TO_MAINS = Object.freeze({
   'Manufacturing - Paper/Print': ['Manufacturing'],
   'Manufacturing - Consumer Goods': ['Manufacturing'],
   'Manufacturing - Apparel/Textiles': ['Manufacturing'],
-  'Food Processing': ['Manufacturing'],
+  'Food Processing': ['Food & Beverage'],
+  'Manufacturing - Food & Beverage': ['Food & Beverage'],
+  'Fishery': ['Food & Beverage'],
+  'Mining & Quarrying': ['Natural Resources'],
+  'Critical Minerals': ['Natural Resources'],
+  'Oil & Gas Extraction': ['Natural Resources', 'Energy'],
+  'Forestry': ['Natural Resources'],
+  'Logistics & Trucking': ['Transportation & Logistics'],
+  'Warehousing': ['Transportation & Logistics'],
+  'Hospitality/Lodging/Tourism': ['Hospitality & Tourism'],
+  'Recreation': ['Hospitality & Tourism'],
+  'Travel': ['Hospitality & Tourism'],
+  'Restaurants & Cafes': ['Hospitality & Tourism'],
   'Consulting - Business': ['Professional Services'],
   'Legal': ['Professional Services'],
   'Accounting': ['Professional Services'],
@@ -98,20 +114,10 @@ export const TOKEN_TO_MAINS = Object.freeze({
   'Ship Building/Repair & Maritime Operations': ['Manufacturing'],
   'Tech - Defense': ['Manufacturing'],
   'Defense': ['Manufacturing'],
-  'Forestry': ['Agriculture'],
-  'Fishery': ['Agriculture'],
   'Arts & Culture': ['Digital Media'],
-  'Restaurants & Cafes': ['Retail'],
   'Wholesaling': ['Retail'],
-  'Hospitality/Lodging/Tourism': ['Retail'],
-  'Recreation': ['Retail'],
-  'Travel': ['Retail'],
   'Esthetics & Spas': ['Retail'],
   'Auto Repairs & Auto Parts': ['Retail'],
-  'Mining & Quarrying': ['Energy'],
-  'Critical Minerals': ['Energy'],
-  'Logistics & Trucking': ['Professional Services'],
-  'Warehousing': ['Professional Services'],
   'Real Estate': ['Professional Services'],
   'Other': [],
   'Charity/Non-profit': [],
@@ -124,8 +130,22 @@ export const TOKEN_TO_MAINS = Object.freeze({
 export const PROFILE_ALIASES = Object.freeze({
   'software and it': 'Software',
   'healthcare': 'Health',
-  'food and beverage': 'Manufacturing',
-  'technology hardware': 'Manufacturing'
+  'food and beverage': 'Food & Beverage',
+  'technology hardware': 'Manufacturing',
+  'transportation and logistics': 'Transportation & Logistics',
+  'logistics': 'Transportation & Logistics',
+  'hospitality and tourism': 'Hospitality & Tourism',
+  'hospitality': 'Hospitality & Tourism',
+  'tourism': 'Hospitality & Tourism'
+});
+
+// A COMPANY in one of these also belongs to the parent main(s); a GRANT with the
+// same token means the narrow main only (TOKEN_TO_MAINS). Checked first.
+export const PROFILE_EXPANSIONS = Object.freeze({
+  'food processing': ['Food & Beverage', 'Manufacturing'],
+  'manufacturing - food & beverage': ['Food & Beverage', 'Manufacturing'],
+  'forestry': ['Natural Resources', 'Agriculture'],
+  'fishery': ['Natural Resources', 'Agriculture', 'Food & Beverage']
 });
 
 const TOKEN_INDEX_LC = new Map(Object.entries(TOKEN_TO_MAINS).map(([k, v]) => [k.toLowerCase(), v]));
@@ -135,12 +155,13 @@ export const tokenMains = (token) => TOKEN_TO_MAINS[String(token ?? '').trim()] 
 
 /**
  * One profile industry value → its main industries, the engine's
- * normalizeProfileIndustry: alias, then a main name, then a token, all
- * case-insensitive. [] when it maps to nothing.
+ * normalizeProfileIndustry: expansion, then alias, then a main name, then a
+ * token, all case-insensitive. [] when it maps to nothing.
  */
 export function profileMains(raw) {
   const lower = String(raw ?? '').trim().toLowerCase();
   if (!lower) return [];
+  if (PROFILE_EXPANSIONS[lower]) return [...PROFILE_EXPANSIONS[lower]];
   if (PROFILE_ALIASES[lower]) return [PROFILE_ALIASES[lower]];
   const main = MAIN_INDUSTRIES.find((m) => m.toLowerCase() === lower);
   if (main) return [main];

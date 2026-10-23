@@ -163,7 +163,8 @@ export async function leadFacts(item, deps, ledger = newLedger()) {
   let matches = [];
   let matchNote = null;
   const m = await deps.matchLead({
-    province, industry: industryName,
+    // The whole list (≤2): to the engine a food processor is Food & Beverage AND Manufacturing.
+    province, industry: industry.canonical?.length ? industry.canonical : null,
     employee_count: calc.employees_band || undefined,
     annual_revenue: calc.revenue_band || undefined,
     description: website?.description || undefined

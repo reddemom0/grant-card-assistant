@@ -390,7 +390,7 @@ describe('Step 4: calculator decoding', () => {
 describe('Step 5: industry lookup', () => {
   test('HubSpot first; website only when HubSpot has none', async () => {
     const pages = jest.fn(async () => ['General contractor. Construction management, renovations and construction of homes. Construction since 1990.']);
-    expect(await G.industryFor({ companyIndustry: 'Food Processing', pages })).toMatchObject({ source: 'hubspot', canonical: ['Manufacturing'] });
+    expect(await G.industryFor({ companyIndustry: 'Food Processing', pages })).toMatchObject({ source: 'hubspot', canonical: ['Manufacturing', 'Food & Beverage'] });
     expect(pages).not.toHaveBeenCalled();
     expect(await G.industryFor({ companyIndustry: null, pages })).toMatchObject({ source: 'website', industries: ['Construction'] });
     expect(await G.industryFor({ companyIndustry: null, pages: async () => ['We build great things'] })).toMatchObject({ source: 'none', industries: [] });

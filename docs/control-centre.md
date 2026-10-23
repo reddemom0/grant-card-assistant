@@ -1143,7 +1143,7 @@ counts them by tag level only, as open to every industry.
 
 ### Industry table
 
-One row per main industry (the engine's 12), each expanding into its specific industries. A row
+One row per main industry (the engine's 16), each expanding into its specific industries. A row
 expands to list its restricted grants (restricted first, then the grants open to every industry,
 collapsed), its clients, and the grants cut for wrong industry. Every grant links to `#grants/<id>`
 and every client to `#companies/<id>`.
@@ -1152,7 +1152,7 @@ and every client to `#companies/<id>`.
 |---|---|
 | Restricted grants | live grants tagged `umbrella` or `specific` with a token that maps to this main industry; a specific row counts grants tagged with that exact token |
 | Open to every industry | live grants tagged `agnostic` (the same for every row) |
-| Clients | companies with a real Clerk user whose profile industry maps here, today. A profile value that is a main name ("Software") counts in "<Main>, general"; a value that maps to nothing goes in "Not mapped" |
+| Clients | companies with a real Clerk user whose profile industry maps here, today. A profile value that is a main name ("Software") counts in "<Main>, general"; a value that maps to nothing goes in "Not mapped". The engine's profile expansions apply, so a client whose profile says "Food Processing" counts under both Food & Beverage and Manufacturing |
 | Ran matching | those clients with any match row in the range |
 | Avg grant matches | distinct grants shown in the range ÷ clients who ran matching (dormant clients aren't averaged in as 0, or nearly every industry would read thin) |
 | Wrong-industry cuts | distinct (company, grant) pairs the AI review cut with category `wrong_industry` in the range, for these clients; a client in two main industries counts in both. Click it for the grants and how many clients each was cut for |

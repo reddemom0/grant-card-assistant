@@ -270,10 +270,13 @@ export function decodeCalculator(c = {}) {
   };
 }
 
-/** The engine's 12 canonical industries (gg3-ai-service vocabulary.ts) and the words that signal each. */
+/**
+ * The engine's 16 canonical industries (gg3-ai-service vocabulary.ts) and the words that signal each.
+ * Food processing and oil and gas also signal Manufacturing and Energy: the engine counts those companies as both.
+ */
 export const INDUSTRY_SIGNALS = {
   Construction: /construct|contractor|renovat|home ?build|civil works|roofing|framing|concrete|excavat/g,
-  Manufacturing: /manufactur|fabricat|food processing|machin(e|ing)|factory|production line|metal ?work/g,
+  Manufacturing: /manufactur|fabricat|food (processing|production)|machin(e|ing)|factory|production line|metal ?work/g,
   Agriculture: /agricultur|farm|crop|livestock|dairy|orchard|vineyard|greenhouse|ranch/g,
   'Clean Technology': /clean ?tech|renewable|solar|wind power|carbon capture|emissions? reduc/g,
   'Digital Media': /digital media|video game|animation|film production|interactive media|post-production/g,
@@ -283,7 +286,11 @@ export const INDUSTRY_SIGNALS = {
   Health: /health ?care|clinic|medical|dental|physio|pharma|wellness|therap/g,
   'Professional Services': /consult(ing|ancy)|marketing agency|advertis|law firm|legal services|accounting|bookkeep|engineering services|architect/g,
   Retail: /retail|e-?commerce|online store|boutique|storefront/g,
-  Software: /software|\bsaas\b|app development|\bit services|cloud platform/g
+  Software: /software|\bsaas\b|app development|\bit services|cloud platform/g,
+  'Transportation & Logistics': /logistics|trucking|freight|transport(ation)? (company|services)|courier|warehous|shipping/g,
+  'Natural Resources': /mining|\bmines?\b|quarr|mineral|forestry|logging|timber|fisher(y|ies)|oil and gas/g,
+  'Hospitality & Tourism': /hospitality|hotel|motel|lodg|tourism|tour operator|restaurant|\bcafe\b|catering|resort/g,
+  'Food & Beverage': /food (processing|processor|manufactur|production)|food and beverage|food & beverage|bakery|brewer|winery|distiller|seafood|meat process|beverage/g
 };
 
 /**
