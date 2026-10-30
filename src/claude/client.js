@@ -28,6 +28,7 @@ import {
 import { logAPICost } from '../utils/cost-logger.js';
 import { pulseContextBlock } from '../services/pulse-posts.js';
 import { briefingContextBlock } from '../services/briefing-posts.js';
+import { quotedContextBlock } from '../services/quoted-message.js';
 
 // Initialize Anthropic client
 const anthropic = new Anthropic({
@@ -872,6 +873,13 @@ export async function runAgent({
       // briefing DM (src/services/briefing-posts.js); absent for everything else.
       if (chatContext?.briefingPost) {
         systemBlocks.push({ type: 'text', text: briefingContextBlock(chatContext.briefingPost) });
+      }
+
+      // A quote of one of Oracle's own messages: its text, and a sweep card's files - NOT CACHED
+      // chat-google.js read the quoted message and looked it up in
+      // filing_sweep_suggestions (src/services/quoted-message.js); absent otherwise.
+      if (chatContext?.quotedMessage) {
+        systemBlocks.push({ type: 'text', text: quotedContextBlock(chatContext.quotedMessage) });
       }
 
       // DEBUG: Log full system prompt structure for lead-gen conversations

@@ -182,7 +182,7 @@ export async function readRecent({ spaceName, userIds = [], limit = RECENT_MESSA
  * @param {number[]} p.userIds - whose grant to try, in order
  * @returns {Promise<{ok: true, message: Object}|{ok: false, code: string}>}
  */
-export async function readMessage({ name, userIds = [] }) {
+export async function readMessage({ name, userIds = [], raw = false }) {
   if (!name) return { ok: false, code: 'no_message' };
   let code = 'no_user';
   for (const userId of [...new Set(userIds.filter(Boolean))]) {
@@ -195,7 +195,8 @@ export async function readMessage({ name, userIds = [] }) {
       const res = await chat.spaces.messages.get({ name });
       const message = normalizeMessage(res.data || {});
       await fillNames([message], userId);
-      return { ok: true, message };
+      // raw: the API's own message too, for its cards (src/services/quoted-message.js).
+      return raw ? { ok: true, message, raw: res.data || {} } : { ok: true, message };
     } catch (err) {
       code = isInsufficientScopeError(err) ? 'needs_reconsent' : `read_failed_${codeOf(err)}`;
     }

@@ -5,7 +5,8 @@
  * READ-ONLY. Lists files created in Granted Files in the last N days (default 7)
  * as the reader (drive.readonly), runs the same rule checks, Haiku suggestions
  * and planFileMove checks as the weekday job (src/services/filing-sweep.js), and
- * prints each person's cards, "not sure" lines and the rest. Sends nothing,
+ * prints each person's cards (one per destination folder: move, advise or not
+ * sure) and the rest. Sends nothing,
  * logs nothing, saves no pending action. The database is read (users) and never
  * written: every query that isn't a SELECT is refused.
  *
@@ -13,6 +14,8 @@
  * moved in; a dry run can't look back with it, so moved-in files aren't shown.
  *
  * Usage: node --network-family-autoselection-attempt-timeout=5000 scripts/filing-sweep-dryrun.mjs [--days 7] [--pilot a@granted.ca,b@granted.ca]
+ *          [--match <regex>]  only check files whose name or folder matches (fewer Haiku calls)
+ *          [--render]         also print each card's Chat JSON
  * Costs a few cents of Haiku (one call per file that fails a check).
  */
 
@@ -70,8 +73,13 @@ const deps = { ...S.defaultDeps(), query: offline ? offlineQuery : readOnlyQuery
 const reader = String(env.FILING_SWEEP_READER_EMAIL || S.fallbackEmail(env));
 const drive = await deps.readDrive(reader);
 const since = new Date(Date.now() - DAYS * 864e5).toISOString();
-const files = await S.createdSince(drive, since);
-console.log(`Filing sweep DRY RUN — files created in Granted Files since ${since.slice(0, 10)} (${DAYS} days), read as ${reader}: ${files.length}\n`);
+const all = await S.createdSince(drive, since);
+const match = opt('--match') ? new RegExp(opt('--match'), 'i') : null;
+const walk = S.pathWalker(drive);
+const files = [];
+for (const f of all) if (!match || match.test(`${(await walk(f)).map(p => p.name).join('/')}/${f.name}`)) files.push(f);
+console.log(`Filing sweep DRY RUN — files created in Granted Files since ${since.slice(0, 10)} (${DAYS} days), read as ${reader}: ${all.length}${match ? `, ${files.length} matching ${match}` : ''}\n`);
+const { renderSweepCard } = await import('../src/cards/sweep-card.js');
 
 const items = await S.evaluate(files, { drive, deps, env, meta: { dry_run: true } });
 const pilot = S.pilotEmails(env);
@@ -79,17 +87,27 @@ const { groups, held } = S.groupByRecipient(items, { pilot });
 const counts = S.countsOf(items);
 const cost = items.reduce((s, i) => s + (i.costUsd || 0), 0);
 
+const BUTTONS = { move: (n) => `[${n === 1 ? 'Confirm' : 'Confirm all'}] [Skip]`, advise: () => '[Leave it here]', unsure: () => '[Leave it here]' };
 for (const [email, g] of groups) {
-  console.log(`=== ${email} — ${g.cards.length} card(s), ${g.listed.length} listed, ${g.unsure.length} not sure`);
-  for (const c of g.cards) {
-    console.log(`  CARD  ${c.file.name}`);
-    console.log(`        now:  ${c.plan.path_before}`);
-    console.log(`        to:   ${c.plan.path_after}${c.plan.folders_to_create?.length ? `  (new folders: ${c.plan.folders_to_create.join('/')})` : ''}`);
-    if (c.plan.name_after !== c.plan.name_before) console.log(`        name: ${c.plan.name_after}`);
-    console.log(`        why:  ${c.failures.join(', ')} — ${c.suggestion?.reason || ''}`);
+  const files = (cards) => cards.reduce((t, c) => t + c.items.length, 0);
+  console.log(`=== ${email} — ${g.cards.length} card(s) for ${files(g.cards)} file(s), ${files(g.listed)} listed`);
+  console.log(`  HEADER  ${S.headerText(g).replace(/\n+/g, ' ')}`);
+  for (const [n, c] of g.cards.entries()) {
+    const view = S.cardView(c);
+    console.log(`  CARD ${n + 1} (${c.kind})  ${S.summaryLine(view)}`);
+    if (view.forLine) console.log(`        ${view.forLine}`);
+    if (view.foldersToCreate?.length && view.moving) console.log(`        new folders: ${view.foldersToCreate.join('/')}`);
+    for (const i of c.items) {
+      const to = c.kind === 'move' && i.plan.name_after !== i.plan.name_before ? ` → ${i.plan.name_after}` : '';
+      console.log(`        - ${i.file.name}${to}`);
+      console.log(`            now: ${i.path.map(p => p.name).join('/')} · why: ${i.failures.join(', ')}${i.note ? ` — ${i.note}` : (i.suggestion?.reason ? ` — ${i.suggestion.reason}` : '')}`);
+    }
+    console.log(`        ${BUTTONS[c.kind](c.items.length)}`);
+    if (args.includes('--render')) {
+      console.log(JSON.stringify(renderSweepCard(view, { groupId: '00000000-0000-0000-0000-00000000000' + (n % 10), askerName: g.recipient.name || email }), null, 2).replace(/^/gm, '        '));
+    }
   }
-  for (const l of g.listed) console.log(`  LIST  ${l.file.name} → ${l.plan.path_after}`);
-  for (const u of g.unsure) console.log(`  UNSURE ${u.file.name} (${u.failures.join(', ')}) — ${u.note || ''}`);
+  if (g.listed.length) console.log(`  LISTED  ${S.overflowText(g.listed).replace(/\n/g, '\n          ')}`);
   console.log('');
 }
 if (held.length) {

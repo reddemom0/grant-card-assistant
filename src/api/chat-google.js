@@ -28,6 +28,7 @@ import { isListenSpace } from '../chat-listen/config.js';
 import { takeCardReply, findAppCommand } from '../cards/registry.js';
 import { findPulsePost } from '../services/pulse-posts.js';
 import { findBriefingPost } from '../services/briefing-posts.js';
+import { findQuotedMessage } from '../services/quoted-message.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -970,6 +971,21 @@ export async function runOracleAndReply(evt, user, conversationId, messageText) 
       : null;
     if (briefingPost) console.log(`📋 Reply to a pre-call briefing (${briefingPost.meetingType}, matched by ${briefingPost.matchedBy}) — the briefing goes in context`);
 
+    // A quote of one of Oracle's own messages: its text, and for a filing-sweep
+    // card the files it is about (src/services/quoted-message.js), so a reply
+    // like "put it in Clients/X/…" never has to ask which file. Chat sends only
+    // the quoted message's name. Nothing found → nothing added.
+    const quotedMessage = evt.quotedMessageName && evt.spaceIsResourceName
+      ? await findQuotedMessage({
+        quotedMessageName: evt.quotedMessageName,
+        spaceName: evt.spaceId,
+        isDm: evt.isDm,
+        userIds: [user.id],
+        appChat: (() => { try { return createChatClient(); } catch { return null; } })()
+      })
+      : null;
+    if (quotedMessage) console.log(`💬 Quote of an Oracle message — text: ${quotedMessage.text ? 'yes' : 'no'}, sweep files: ${quotedMessage.files.length}`);
+
     const result = await runAgent({
       agentType: 'internal-oracle',
       message: messageText,
@@ -995,7 +1011,8 @@ export async function runOracleAndReply(evt, user, conversationId, messageText) 
         attachmentNames: evt.files.map(f => f.name),
         messageText: messageText,
         ...(pulsePost ? { pulsePost } : {}),
-        ...(briefingPost ? { briefingPost } : {})
+        ...(briefingPost ? { briefingPost } : {}),
+        ...(quotedMessage ? { quotedMessage } : {})
       }
     });
 

@@ -6,9 +6,13 @@
  * there, or moved in), and runs cheap rule checks (filing-rules.js). Only files
  * that fail get one Haiku call for a suggested home and name, which is then
  * checked with planFileMove as the person who will confirm it. That person gets
- * a Google Chat DM thread from Oracle: a short header, then one Confirm card
- * per file (the existing file_move_rename flow — Confirm, drive_actions, undo)
- * with a Skip button. Nothing moves without their Confirm.
+ * a Google Chat DM thread from Oracle: a short header, then one card per
+ * destination folder. Files going to the same folder share a card with one
+ * Confirm all / Skip; each file underneath is still its own file_move_rename
+ * pending action (drive_actions, undo). Files it can't place get a "not sure"
+ * card with Leave it here; a wage-subsidy paystub whose employer has no client
+ * folder gets an advisory card (planFileMove won't create a client folder).
+ * Nothing moves without their Confirm.
  *
  * Who gets it: the file's lastModifyingUser. The Drive Activity scope (which
  * would name who added or moved it) is not granted to the delegation, so a file
@@ -19,14 +23,15 @@
  * Off unless FILING_SWEEP_ENABLED=true. While FILING_SWEEP_PILOT_EMAILS is set,
  * only those people get DMs; everyone else's suggestions are logged as
  * would_suggest. Every file is logged once in filing_sweep_suggestions
- * (migration 055); a file is never suggested twice.
+ * (migrations 055, 058); a file is never suggested twice.
  *
  * Reads Drive with drive.readonly as the reader (FILING_SWEEP_READER_EMAIL,
  * default the fallback). Never opens a file's content.
  */
 
+import { randomUUID } from 'crypto';
 import { GRANTED_FILES_DRIVE_ID, FOLDER_MIME, folderKey } from '../tools/google-drive.js';
-import { checkFile, programLines, typePatterns } from './filing-rules.js';
+import { CLAIM_NAME, TYPES, baseName, checkFile, claimFolder, inClaims, isPaystubConvention, paystubHome, programLines, typePatterns } from './filing-rules.js';
 
 export const SWEEP_SCHEDULE = '30 8 * * 1-5';
 export const SUMMARY_SCHEDULE = '45 8 * * 1';
@@ -116,6 +121,7 @@ export function defaultDeps() {
     query: async (...a) => (await import('../database/connection.js')).query(...a),
     readDrive: async (email) => (await drive()).delegatedDriveClient(email),
     childFolders: async (...a) => (await drive()).childFolders(...a),
+    resolvePath: async (...a) => (await drive()).resolveGrantedFilesPath(...a),
     planFileMove: async (...a) => (await import('../tools/drive-actions.js')).planFileMove(...a),
     savePendingAction: async (...a) => (await pending()).savePendingAction(...a),
     summarizeAction: async (...a) => (await pending()).summarizeAction(...a),
@@ -124,6 +130,7 @@ export function defaultDeps() {
     findDm: async (id) => (await chat()).findDmSpace(id),
     post: async (args) => (await chat()).postMessageWithThread(args),
     renderCard: async (...a) => (await import('../cards/sweep-card.js')).renderSweepCard(...a),
+    newId: () => randomUUID(),
     conversationFor: async (key) => { const { v5 } = await import('uuid'); return v5(key, v5.URL); },
     cost: async (usage) => { const c = (await import('../config/cost-settings.js')).calculateRequestCost(usage, MODEL); return Number(c?.totalCost ?? c) || 0; },
     createMessage: defaultCreateMessage,
@@ -239,6 +246,11 @@ Folder rules:
 
 Name rules (new files): follow the type's pattern exactly (below), hyphens with no spaces around them. {Program} in a name is the program's code; {Client} is the client folder's name. Dates: YYYYMM, YYYYMM-YYYYMM, YYYYMMDD, YYYY, FY2024. Internal docs: DEPT-###-Short Name (controlled), Type-YYYYMMDD-Topic (everyday), Type-Topic (living). No v2/FINAL/draft/Copy of. Keep the file's own key words. Photos and video: keep the name.
 
+Claims and paystubs (these override the type list below):
+- A file already inside a claim folder is never moved. A claim folder is a folder in Claims that is not a YYYYMM month (e.g. ".../claims/CHFA 2026"), or a folder below a student or intake folder whose name signals a claim or pay period (e.g. ".../2026/Fall 2026/Fall intake first claim paystubs", ".../2026/Electrical Apprentice - Amir Beheshtian/Oct 8 to Oct 23"), or any folder below one. For such a file: leave destination_path empty and suggest a rename only, as {Type}-Exp{N}-{YYYYMMDD}-{Vendor}, keeping the expense number and the full date (e.g. "Expense 10 - Proof of Payment - Kickback Social - 11 August 2026" → "Proof of Payment-Exp10-20260811-Kickback Social"). No expense number in the name: {Type}-{YYYYMMDD}-{Vendor}. No full date in the name: not confident.
+- Paystubs for wage-subsidy programs (Eco Canada SWPP, Eco Canada YNR, WorkBC and similar) are filed under the EMPLOYER as the client: Clients/{Employer}/{Program}/{YYYY}/Claims, with no month folder inside. If the file already sits in a student or intake/season folder directly under the year (e.g. "2026/Electrical Apprentice - Amir Beheshtian/...", "2026/Fall 2026/..."), put Claims inside that folder ("2026/Electrical Apprentice - Amir Beheshtian/Claims", "2026/Fall 2026/Claims"); only use {YYYY}/Claims when there is no such folder. A paystub already in a claim or pay-period folder stays where it is. Reuse a program folder the employer already has for that program (e.g. "Eco-Canada CO-OP" for Eco Canada SWPP); otherwise SWPP → "ECO Canada", YNR → "ECO Canada-YNR - STIP", WorkBC → "WorkBC Wage Subsidy". If the client, program, year or Claims folder doesn't exist, propose it anyway (this is the one case where a new client folder may be proposed); a missing folder is not a reason to be unsure.
+- "Paystubs-{Program}-{Employee}-{Employer}-{Pay period}" is an official name: leave new_name empty for a file named this way.
+
 Dates: use only a month or day you can see in the file name or folder names (e.g. "September 2026" → 202609). Never make one up. If the pattern or a Claims month folder needs a date you can't see, set confident to false.
 If the client, program or year can't be told from the facts, set confident to false. A wrong confident guess is worse than "not sure".
 
@@ -333,6 +345,43 @@ export function inventedDates(suggestion, file, path) {
   return [...new Set(bad)];
 }
 
+/** Full dates (YYYYMMDD) a text shows: 20260811, 2026-08-11, "11 August 2026", "August 11 2026", "Aug 11, 2026". */
+export function visibleDays(text) {
+  const out = new Set();
+  const t = String(text).toLowerCase();
+  const add = (y, m, d) => { if (m >= 1 && m <= 12 && d >= 1 && d <= 31) out.add(`${y}${String(m).padStart(2, '0')}${String(d).padStart(2, '0')}`); };
+  for (const m of t.matchAll(/(?<!\d)(20\d{2})[-_ ]?(0[1-9]|1[0-2])[-_ ]?(0[1-9]|[12]\d|3[01])(?!\d)/g)) add(m[1], Number(m[2]), Number(m[3]));
+  const month = (w) => MONTHS.findIndex(n => n.startsWith(w)) + 1;
+  for (const m of t.matchAll(/(?<!\d)(\d{1,2})(?:st|nd|rd|th)?[\s,.-]+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s,.-]+(20\d{2})\b/g)) add(m[3], month(m[2]), Number(m[1]));
+  for (const m of t.matchAll(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?[\s,.-]+(\d{1,2})(?:st|nd|rd|th)?[\s,.-]+(20\d{2})\b/g)) add(m[3], month(m[1]), Number(m[2]));
+  return out;
+}
+
+/** The expense number a file's own name shows ("Expense 10 - …", "Exp 10", "Exp#10"), or null. */
+export function expenseNumber(name) {
+  const m = String(name).match(/\bexp(?:ense)?\.?\s*#?\s*(\d{1,4})(?!\d)/i);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Why a claim-folder rename breaks the rule, or null when it keeps it:
+ * {Type}-Exp{N}-{YYYYMMDD}-{Vendor} with the file's own expense number and full date
+ * ({Type}-{YYYYMMDD}-{Vendor} when its name has no expense number).
+ */
+export function claimRenameProblem(name, newName) {
+  const proposed = String(newName || '').trim();
+  if (!proposed) return 'claim folder: no rename suggested';
+  const days = visibleDays(name);
+  if (!days.size) return 'claim folder: no full date in the name';
+  const m = proposed.match(CLAIM_NAME);
+  if (!m) return 'claim folder: rename is not {Type}-Exp{N}-{YYYYMMDD}-{Vendor}';
+  const n = expenseNumber(name);
+  if (n !== null && Number(m[2]) !== n) return `claim folder: rename drops or changes the expense number (Exp${n})`;
+  if (n === null && m[2]) return 'claim folder: rename adds an expense number the name does not show';
+  if (!days.has(m[3])) return `claim folder: date ${m[3]} is not the full date in the name`;
+  return null;
+}
+
 async function userByEmail(query, email) {
   if (!email) return null;
   const r = await query('SELECT id, email, name, chat_user_id FROM users WHERE LOWER(email) = LOWER($1) AND is_active = true LIMIT 1', [email]);
@@ -366,10 +415,40 @@ export async function evaluate(files, { drive, deps, env, meta = {} }) {
       items.push({ ...item, status: 'unsure', note: `model ${err?.code || err?.status || 'error'}` });
       continue;
     }
+    // The pilot rules (reference.md "Claims, paystubs and wage subsidies"), enforced whatever the model said:
+    // nothing leaves a claim folder, and Delpreet's paystub names are kept. Cleared first, so a dropped part can't fail a check.
+    const inClaimFolder = claimFolder(path.map(p => p.name));
+    const conventionName = isPaystubConvention(file.name, file.mimeType);
+    if (inClaimFolder) suggestion.destination_path = '';
+    if (conventionName) suggestion.new_name = '';
     if (/^(Type|\{)|[{}]/.test(suggestion.new_name)) { items.push({ ...item, status: 'unsure', suggestion, costUsd: suggestion.costUsd, note: 'name still has a pattern placeholder' }); continue; }
     const invented = inventedDates(suggestion, file, path);
     if (invented.length) { items.push({ ...item, status: 'unsure', suggestion, costUsd: suggestion.costUsd, note: `date not in the file's name or folders (${invented.join(', ')})` }); continue; }
     if (!suggestion.confident) { items.push({ ...item, status: 'unsure', suggestion, costUsd: suggestion.costUsd, note: suggestion.reason }); continue; }
+    const unsure = (note) => items.push({ ...item, status: 'unsure', suggestion, costUsd: suggestion.costUsd, note });
+    if (inClaimFolder) {
+      const problem = claimRenameProblem(file.name, suggestion.new_name);
+      if (problem) { unsure(problem); continue; }
+    }
+    let destParts = suggestion.destination_path.split('/').map(p => p.trim()).filter(Boolean);
+    if (conventionName) {
+      // Same client, program and year as now: keep its student or intake folder (Claims inside it), never flatten.
+      const home = paystubHome(path.map(p => p.name));
+      if (home && destParts.length >= 4 && home.slice(0, 4).every((p, i) => folderKey(p) === folderKey(destParts[i]))) {
+        destParts = home;
+        suggestion.destination_path = home.join('/');
+      }
+      if (!destParts.length) { unsure('paystub: no folder suggested'); continue; }
+      if (!inClaims(destParts)) { unsure(`paystub: ${suggestion.destination_path} is not a year's Claims folder`); continue; }
+    }
+    // A paystub's employer with no client folder: planFileMove only creates folders below a client, so advise instead.
+    if (deps.resolvePath && destParts.length > 1 && folderKey(destParts[0]) === 'clients' && /paystub/i.test(`${file.name} ${suggestion.new_name}`)) {
+      const walk = await deps.resolvePath(drive, destParts).catch(() => null);
+      if (walk?.missingAt === 1) {
+        items.push({ ...item, status: 'advised', suggestion, costUsd: suggestion.costUsd, foldersToCreate: destParts.slice(1), note: `${destParts[0]}/${destParts[1]} doesn't exist yet` });
+        continue;
+      }
+    }
     const planned = await deps.planFileMove(
       { file: file.id, destination_path: suggestion.destination_path || null, new_name: suggestion.new_name || null },
       { askerEmail: recipient.email, askerUserId: recipient.id });
@@ -384,23 +463,33 @@ export async function evaluate(files, { drive, deps, env, meta = {} }) {
 
 /**
  * Per-recipient groups for the items that would reach someone. Pilot: anyone
- * not on the list is held back (would_suggest). At most MAX_CARDS cards each;
- * the rest are listed.
- * @returns {{groups: Map<string, {recipient, cards, listed, unsure}>, held: Array}}
+ * not on the list is held back (would_suggest). Items going to the same folder
+ * share one card: {kind: 'move'|'advise'|'unsure', key, items}. At most
+ * MAX_CARDS cards each (moves first); the rest are listed.
+ * @returns {{groups: Map<string, {recipient, cards, listed}>, held: Array}}
  */
+const KIND = { card: 'move', advised: 'advise', unsure: 'unsure' };
+const KIND_ORDER = ['move', 'advise', 'unsure'];
 export function groupByRecipient(items, { pilot = null } = {}) {
-  const groups = new Map();
+  const byEmail = new Map();
   const held = [];
   for (const item of items) {
-    if (item.status !== 'card' && item.status !== 'unsure') continue;
+    const kind = KIND[item.status];
+    if (!kind) continue;
     const email = String(item.recipient?.email || '').toLowerCase();
     if (!email) continue;
     if (!inPilot(email, pilot)) { if (item.status === 'card') held.push(item); continue; }
-    if (!groups.has(email)) groups.set(email, { recipient: item.recipient, cards: [], listed: [], unsure: [] });
-    const g = groups.get(email);
-    if (item.status === 'unsure') g.unsure.push(item);
-    else if (g.cards.length < MAX_CARDS) g.cards.push(item);
-    else g.listed.push(item);
+    if (!byEmail.has(email)) byEmail.set(email, { recipient: item.recipient, byKey: new Map() });
+    const g = byEmail.get(email);
+    // One card per destination (and per person a fallback item was meant for).
+    const key = `${kind}|${destinationOf(item).toLowerCase()}|${String(item.originalEmail || '').toLowerCase()}`;
+    if (!g.byKey.has(key)) g.byKey.set(key, { kind, key, items: [] });
+    g.byKey.get(key).items.push(item);
+  }
+  const groups = new Map();
+  for (const [email, { recipient, byKey }] of byEmail) {
+    const all = [...byKey.values()].sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+    groups.set(email, { recipient, cards: all.slice(0, MAX_CARDS), listed: all.slice(MAX_CARDS) });
   }
   return { groups, held };
 }
@@ -410,26 +499,117 @@ export function groupByRecipient(items, { pilot = null } = {}) {
 // ---------------------------------------------------------------------------
 
 const homeOf = (plan) => String(plan.path_after || '').replace(/^Granted Files\//, '');
-const forLine = (item) => (item.routed === 'fallback_unreachable' ? ` (for ${item.originalEmail}, not reachable on Chat)` : '');
+const folderOf = (item) => item.path.map(p => p.name).join('/');
+/** The folder a card is about: where the files go, or (not sure) the model's guess, else where they are now. */
+export function destinationOf(item) {
+  if (item.status === 'card') return homeOf(item.plan);
+  return String(item.suggestion?.destination_path || '') || folderOf(item);
+}
+
+/** "Delpreet", from users.name, else the start of their address. */
+export function firstName(name, email = '') {
+  const fromName = String(name || '').trim();
+  if (fromName && !fromName.includes('@')) return fromName.split(/\s+/)[0];
+  const local = String(email || name || '').split('@')[0].split(/[._-]/)[0];
+  return local ? local[0].toUpperCase() + local.slice(1) : 'Someone';
+}
+
+/** For a card that came to the fallback because its person has no DM with Oracle yet. */
+export function forLine(items) {
+  const first = items.find(i => i.routed === 'fallback_unreachable');
+  if (!first) return '';
+  const who = firstName(first.originalName, first.originalEmail);
+  return items.length === 1
+    ? `${who}'s file — they're not on Chat yet, so it's come to you.`
+    : `${who}'s files — they're not on Chat yet, so they've come to you.`;
+}
+
+/**
+ * What a card shows, from the items at send time or from the log rows at press
+ * time (sweep-card.js): {kind, destination, moving, foldersToCreate, files: [{id, name, link, nameAfter}], note, forLine}.
+ */
+export function cardView(card) {
+  const first = card.items[0];
+  const files = card.items.map(i => ({
+    id: i.file.id,
+    name: i.file.name,
+    link: i.file.webViewLink || `https://drive.google.com/open?id=${i.file.id}`,
+    nameAfter: card.kind === 'move' && i.plan.name_after !== i.plan.name_before ? i.plan.name_after
+      : (card.kind === 'advise' && i.suggestion?.new_name ? i.suggestion.new_name : null)
+  }));
+  return {
+    kind: card.kind,
+    destination: card.kind === 'move' ? homeOf(first.plan) : destinationOf(first),
+    moving: card.kind === 'move' ? card.items.some(i => i.plan.moving !== false && i.plan.path_after !== i.plan.path_before) : card.kind === 'advise',
+    foldersToCreate: card.kind === 'move' ? (first.plan.folders_to_create || []) : (first.foldersToCreate || []),
+    files,
+    note: card.kind === 'move' ? null : ([...new Set(card.items.map(i => i.note).filter(Boolean))].join('; ') || null),
+    forLine: forLine(card.items)
+  };
+}
+
+/** "9 Eco Canada SWPP paystubs for AME Consulting Group", "3 Proof of Payment files", "Invoice 4.pdf", "4 files". */
+export function whatLine(files) {
+  const n = files.length;
+  if (n === 1) return files[0].name;
+  if (files.every(f => isPaystubConvention(f.name))) {
+    const parts = files.map(f => baseName(f.name).split('-').map(p => p.trim()));
+    const [program, employer] = [parts[0][1], parts[0][3]];
+    return parts.every(p => p[1] === program && p[3] === employer) ? `${n} ${program} paystubs for ${employer}` : `${n} paystubs`;
+  }
+  const typeOf = (f) => TYPES.find(t => String(f.nameAfter || f.name).toLowerCase().startsWith(`${t.toLowerCase()}-`)) || null;
+  const type = typeOf(files[0]);
+  if (type && files.every(f => typeOf(f) === type)) return `${n} ${type} files`;
+  return `${n} files`;
+}
+
+/** The card's one-line summary. */
+export function summaryLine(view) {
+  const what = whatLine(view.files);
+  if (view.kind === 'unsure') return view.files.length === 1 ? `Not sure where ${what} goes` : `Not sure where these ${view.files.length} files go`;
+  if (view.kind === 'move' && !view.moving) return `${what} — rename${view.files.length === 1 ? '' : 's'} in ${view.destination}`;
+  return `${what} → ${view.destination}`;
+}
 
 export function headerText(group) {
-  const n = group.cards.length + group.listed.length;
-  const lines = [];
-  if (n) lines.push(`**Filing suggestions** — ${n} new file${n === 1 ? '' : 's'} in Granted Files look${n === 1 ? 's' : ''} misfiled or misnamed. Each card below suggests a home and a name; nothing moves until you press Confirm. Press Skip if a file is fine where it is.`);
-  for (const u of group.unsure) lines.push(`Not sure where ${u.file.name} goes. Reply and tell me.${forLine(u)}`);
-  return lines.join('\n\n');
+  const moves = [...group.cards, ...group.listed].filter(c => c.kind === 'move').reduce((n, c) => n + c.items.length, 0);
+  const others = [...group.cards, ...group.listed].filter(c => c.kind !== 'move').reduce((n, c) => n + c.items.length, 0);
+  const s = (n) => (n === 1 ? '' : 's');
+  if (moves) {
+    return [`**Filing suggestions** — ${moves} new file${s(moves)} in Granted Files look${moves === 1 ? 's' : ''} misfiled or misnamed. Files going to the same folder share one card; nothing moves until you press Confirm. Press Skip if they're fine where they are.`,
+      others ? `${others} more I couldn't file myself — see the cards below.` : null].filter(Boolean).join('\n\n');
+  }
+  return `**Filing check** — ${others} new file${s(others)} in Granted Files I couldn't file myself. Reply in this thread to tell me where ${others === 1 ? 'it goes' : 'they go'}, or press Leave it here.`;
 }
 
 export function overflowText(listed) {
-  return [`${listed.length} more I'd suggest moving (no card — reply if you want any of them filed):`,
-    ...listed.map(i => `- [${i.file.name}](${i.file.webViewLink || `https://drive.google.com/open?id=${i.file.id}`}) → ${homeOf(i.plan)}${i.plan.name_after !== i.plan.name_before ? `, as "${i.plan.name_after}"` : ''}${forLine(i)}`)].join('\n');
+  const lines = [];
+  for (const card of listed) {
+    for (const i of card.items) {
+      const link = `[${i.file.name}](${i.file.webViewLink || `https://drive.google.com/open?id=${i.file.id}`})`;
+      if (card.kind === 'move') lines.push(`- ${link} → ${homeOf(i.plan)}${i.plan.name_after !== i.plan.name_before ? `, as "${i.plan.name_after}"` : ''}`);
+      else if (card.kind === 'advise') lines.push(`- ${link} → ${destinationOf(i)} (${i.note})`);
+      else lines.push(`- ${link} — not sure where it goes`);
+    }
+    const f = forLine(card.items);
+    if (f) lines.push(`  ${f}`);
+  }
+  const n = listed.reduce((t, c) => t + c.items.length, 0);
+  return [`${n} more (no card — reply if you want any of them filed):`, ...lines].join('\n');
 }
 
 /** What a reply in the thread needs to know (saved as a system note in the thread's conversation). */
 export function threadNote(group) {
-  return ['[System event — recorded by Granted\'s systems, not typed by anyone] Oracle posted filing suggestions in this thread:',
-    ...[...group.cards, ...group.listed].map(i => `- ${i.file.name} (Drive file ID: ${i.file.id}) — now in ${String(i.plan.path_before)}; suggested ${homeOf(i.plan)}${i.plan.name_after !== i.plan.name_before ? `, as "${i.plan.name_after}"` : ''}`),
-    ...group.unsure.map(u => `- ${u.file.name} (Drive file ID: ${u.file.id}) — not sure where it goes; asked the person`)].join('\n');
+  const lines = ['[System event — recorded by Granted\'s systems, not typed by anyone] Oracle posted filing suggestions in this thread:'];
+  for (const card of [...group.cards, ...group.listed]) {
+    for (const i of card.items) {
+      const id = `${i.file.name} (Drive file ID: ${i.file.id})`;
+      if (card.kind === 'move') lines.push(`- ${id} — now in ${String(i.plan.path_before)}; suggested ${homeOf(i.plan)}${i.plan.name_after !== i.plan.name_before ? `, as "${i.plan.name_after}"` : ''}`);
+      else if (card.kind === 'advise') lines.push(`- ${id} — now in Granted Files/${folderOf(i)}; suggested ${destinationOf(i)}${i.suggestion?.new_name ? `, as "${i.suggestion.new_name}"` : ''}, but ${i.note}: asked the person to create it, then reply`);
+      else lines.push(`- ${id} — not sure where it goes; asked the person`);
+    }
+  }
+  return lines.join('\n');
 }
 
 async function logItem(q, runId, item, status, extra = {}) {
@@ -451,7 +631,9 @@ async function logItem(q, runId, item, status, extra = {}) {
   return id;
 }
 
-/** Send one recipient's thread: header, one card per suggestion, overflow list. Logs each item. */
+const LOG_STATUS = { move: 'listed', advise: 'advised', unsure: 'unsure' };
+
+/** Send one recipient's thread: header, one card per destination, overflow list. Logs each item. */
 async function sendGroup(group, { runId, deps, spaceName, date }) {
   const q = deps.query;
   const header = headerText(group);
@@ -462,25 +644,37 @@ async function sendGroup(group, { runId, deps, spaceName, date }) {
     await deps.createConversation(threadConversation, group.recipient.id, 'internal-oracle', `Filing suggestions ${date}`).catch(() => {});
     await deps.saveMessage(threadConversation, 'system', threadNote(group)).catch(() => {});
   }
-  for (const item of group.cards) {
-    const conversationId = await deps.conversationFor(`filing-sweep:${item.file.id}`);
-    // Log first: file_id is unique, so a file an earlier run already logged gets no second card.
-    const suggestionId = await logItem(q, runId, item, 'suggested', { conversation_id: conversationId, space_name: spaceName, thread_name: threadName });
-    if (!suggestionId) continue;
-    await deps.createConversation(conversationId, group.recipient.id, 'internal-oracle', `Filing: ${item.file.name}`.slice(0, 200)).catch(() => {});
-    const summary = await deps.summarizeAction('file_move_rename', item.plan);
-    const action = await deps.savePendingAction({ conversationId, toolName: 'file_move_rename', input: item.plan, userId: group.recipient.id, summary });
-    await q(`UPDATE pending_actions SET expires_at = NOW() + INTERVAL '${IGNORE_DAYS} days' WHERE id = $1`, [action.id]);
-    await q('UPDATE filing_sweep_suggestions SET pending_action_id = $2 WHERE id = $1', [suggestionId, action.id]);
-    const cardsV2 = await deps.renderCard(action, suggestionId, { askerName: group.recipient.name || group.recipient.email });
-    const msg = await deps.post({ spaceName, threadName, cardsV2, fallbackText: summary });
-    if (msg?.messageName) await q('UPDATE filing_sweep_suggestions SET message_name = $2 WHERE id = $1', [suggestionId, msg.messageName]);
+  const askerName = group.recipient.name || group.recipient.email;
+  for (const card of group.cards) {
+    const groupId = deps.newId ? deps.newId() : randomUUID();
+    const sent = [];
+    for (const item of card.items) {
+      if (card.kind !== 'move') {
+        // Log first: file_id is unique, so a file an earlier run already logged gets no second card.
+        if (await logItem(q, runId, item, LOG_STATUS[card.kind], { space_name: spaceName, thread_name: threadName, group_id: groupId })) sent.push(item);
+        continue;
+      }
+      const conversationId = await deps.conversationFor(`filing-sweep:${item.file.id}`);
+      const suggestionId = await logItem(q, runId, item, 'suggested', { conversation_id: conversationId, space_name: spaceName, thread_name: threadName, group_id: groupId });
+      if (!suggestionId) continue;
+      // Each file stays its own pending action (Confirm gate, drive_actions, undo); the card confirms them together.
+      await deps.createConversation(conversationId, group.recipient.id, 'internal-oracle', `Filing: ${item.file.name}`.slice(0, 200)).catch(() => {});
+      const summary = await deps.summarizeAction('file_move_rename', item.plan);
+      const action = await deps.savePendingAction({ conversationId, toolName: 'file_move_rename', input: item.plan, userId: group.recipient.id, summary });
+      await q(`UPDATE pending_actions SET expires_at = NOW() + INTERVAL '${IGNORE_DAYS} days' WHERE id = $1`, [action.id]);
+      await q('UPDATE filing_sweep_suggestions SET pending_action_id = $2 WHERE id = $1', [suggestionId, action.id]);
+      sent.push(item);
+    }
+    if (!sent.length) continue;
+    const view = cardView({ ...card, items: sent });
+    const cardsV2 = await deps.renderCard(view, { groupId, askerName });
+    const msg = await deps.post({ spaceName, threadName, cardsV2, fallbackText: summaryLine(view) });
+    if (msg?.messageName) await q('UPDATE filing_sweep_suggestions SET message_name = $2 WHERE group_id = $1', [groupId, msg.messageName]);
   }
   if (group.listed.length) {
     await deps.post({ spaceName, threadName, text: overflowText(group.listed) });
-    for (const item of group.listed) await logItem(q, runId, item, 'listed', { space_name: spaceName, thread_name: threadName });
+    for (const card of group.listed) for (const item of card.items) await logItem(q, runId, item, LOG_STATUS[card.kind], { space_name: spaceName, thread_name: threadName });
   }
-  for (const item of group.unsure) await logItem(q, runId, item, 'unsure', { space_name: spaceName, thread_name: threadName });
 }
 
 /** Where a recipient's thread goes: their DM, else the fallback's (items marked for them). */
@@ -539,11 +733,12 @@ export async function runFilingSweep({ now = new Date(), env = process.env, deps
     // Unreachable recipients: their items go to the fallback's thread.
     const fallback = await userByEmail(q, fallbackEmail(env));
     const spaces = new Map();
-    for (const item of items.filter(i => i.status === 'card' || i.status === 'unsure')) {
+    for (const item of items.filter(i => i.status === 'card' || i.status === 'unsure' || i.status === 'advised')) {
       const email = item.recipient.email.toLowerCase();
       if (!spaces.has(email)) spaces.set(email, await reachable(item.recipient, deps));
       if (!spaces.get(email) && fallback && email !== fallback.email.toLowerCase()) {
         item.originalEmail = item.recipient.email;
+        item.originalName = item.recipient.name || null;
         item.recipient = fallback;
         item.routed = 'fallback_unreachable';
         // Only the asker can confirm a move, so the card is re-planned as the fallback.
@@ -557,15 +752,16 @@ export async function runFilingSweep({ now = new Date(), env = process.env, deps
     const pilot = pilotEmails(env);
     const { groups, held } = groupByRecipient(items, { pilot });
     for (const item of held) await logItem(q, runId, item, 'would_suggest');
-    // Unsure items for people outside the pilot are logged without a message.
-    for (const item of items.filter(i => i.status === 'unsure' && !inPilot(i.recipient?.email, pilot))) await logItem(q, runId, item, 'unsure');
+    // Unsure and advised items for people outside the pilot are logged without a message.
+    for (const item of items.filter(i => (i.status === 'unsure' || i.status === 'advised') && !inPilot(i.recipient?.email, pilot))) await logItem(q, runId, item, item.status === 'advised' ? 'advised' : 'unsure');
 
     let sent = 0;
     for (const [email, group] of groups) {
       const spaceName = spaces.get(email) ?? await reachable(group.recipient, deps);
       if (!spaceName) {
-        for (const item of [...group.cards, ...group.listed]) await logItem(q, runId, item, 'would_suggest');
-        for (const item of group.unsure) await logItem(q, runId, item, 'unsure');
+        for (const card of [...group.cards, ...group.listed]) {
+          for (const item of card.items) await logItem(q, runId, item, card.kind === 'move' ? 'would_suggest' : LOG_STATUS[card.kind]);
+        }
         continue;
       }
       await sendGroup(group, { runId, deps, spaceName, date });

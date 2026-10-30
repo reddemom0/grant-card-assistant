@@ -40,6 +40,7 @@ Paths below are **inside the year folder** (`Clients/{Client}/{Program}/{YYYY}/`
 | Receipt | Supporting | `Receipt-{YYYYMM}-{Vendor}` | Receipt-202405-Air Canada | `Reimbursements/` | Reuse an existing variant (Reimbursement, Reim, Reimb…) |
 | Timesheet | Supporting | `Timesheet-{YYYYMM}-{Person}` | Timesheet-202409-Igor Soreas | `Claims/{YYYYMM}/` |  |
 | Paystub | Supporting | `Paystub-{YYYYMM-YYYYMM}-{Student Name}` | Paystub-202401-202403-Igor Soreas | `Paystubs/` | Hiring programs only |
+| Paystub (wage subsidy) | Supporting | `Paystubs-{Program}-{Employee}-{Employer}-{Pay period}` | Paystubs-Eco Canada SWPP-Yeji Kang-AME Consulting Group-October 01 to October 15 | `Clients/{Employer}/{Program}/{YYYY}/[student or intake folder]/Claims/` | Delpreet's convention, official: a file named this way is never renamed. {Program} as the paystub names it (Eco Canada SWPP, WorkBC). No month folder inside Claims |
 
 ### Hiring — per student (in the student's folder)
 
@@ -104,6 +105,14 @@ Full path: `Clients/{Client}/{Program}/{YYYY}/…` (program work) or `Clients/{C
 | Approval docs | The funding agreement and approval letter go in `Approval Docs/` | |
 
 Full example: `Clients/Nightingale Electrical/Destination Trade/2026/Electrical Apprentice-Igor Soreas/Claims/202409/`
+
+## Claims, paystubs and wage subsidies
+
+Three rules from the filing-sweep pilot (30 Oct 2026, see DECISIONS.md). They override the type tables above where the two differ.
+
+- **Claim folders.** A named folder inside `Claims/` (anything but a `YYYYMM` month), such as `Clients/49th Parallel/BCAFE/2026/claims/CHFA 2026`, is a claim folder. So is any folder **below a student or intake folder** whose name signals a claim or a pay period (`…/2026/Fall 2026/Fall intake first claim paystubs`, `…/2026/Electrical Apprentice - Amir Beheshtian/Oct 8 to Oct 23`). Files in a claim folder, or in a folder below it, are **never moved** and no month subfolders are created. In a claim or pay-period folder under a student or intake folder, files are left exactly as they are (no rename either). In a named folder inside `Claims/`, suggest a rename only, keeping the expense number and the full date: `{Type}-Exp{N}-{YYYYMMDD}-{Vendor}`. Example: `Expense 10 - Proof of Payment - Kickback Social - 11 August 2026.pdf` → `Proof of Payment-Exp10-20260811-Kickback Social.pdf`. No expense number in the name → `{Type}-{YYYYMMDD}-{Vendor}`. No full date in the name → don't guess; ask.
+- **Wage-subsidy paystubs** (Eco Canada SWPP, Eco Canada YNR, WorkBC and similar). The **employer** is the client: `Clients/{Employer}/{Program}/{YYYY}/…/Claims/`, with no month folder inside. **Keep an existing student or intake folder:** if the paystub already sits in a student (`{Role}-{Student}`) or intake/season folder directly under the year, `Claims` goes inside that folder (`…/2026/Electrical Apprentice - Amir Beheshtian/Claims/`, `…/2026/Fall 2026/Claims/`). A paystub already in a claim or pay-period folder there stays put. Only when there is no such folder does it go in `{YYYY}/Claims/`. Reuse a program folder the employer already has for that program (e.g. `Eco-Canada CO-OP`). Otherwise use the standard name: Eco Canada SWPP → `ECO Canada`, Eco Canada YNR → `ECO Canada-YNR - STIP`, WorkBC → `WorkBC Wage Subsidy`. A missing client, program, year or Claims folder is proposed as **(new)**, never a reason to say "not sure".
+- **Delpreet's paystub convention.** `Paystubs-{Program}-{Employee}-{Employer}-{Pay period}` is an official name. A file named this way is never renamed; it can still be moved to the right folder.
 
 Sharing with a client: share the **year** folder, never the client folder, as **Contributor** (not the default Content manager).
 

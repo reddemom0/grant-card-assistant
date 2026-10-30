@@ -115,6 +115,51 @@ const INTERNAL_PATTERNS = [
 
 const isMedia = (mimeType) => /^(image|video)\//.test(String(mimeType || ''));
 
+// Pilot rules (reference.md "Claims, paystubs and wage subsidies").
+const escape = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** A claim-folder name: {Type}-Exp{N}-{YYYYMMDD}-{Vendor}, or {Type}-{YYYYMMDD}-{Vendor} with no expense number. Groups: type, N, date. */
+export const CLAIM_NAME = new RegExp(`^(${TYPES.map(escape).join('|')})-(?:Exp(\\d+)-)?(\\d{8})-\\S`, 'i');
+/** Delpreet's paystub convention: Paystubs-{Program}-{Employee}-{Employer}-{Pay period}. Never renamed. */
+export const PAYSTUB_CONVENTION = /^Paystubs-[^-]+-[^-]+-[^-]+-\s*\S/i;
+export const isPaystubConvention = (name, mimeType = '') => PAYSTUB_CONVENTION.test(baseName(name, mimeType).trim());
+
+const isClaimsStage = (key) => key === 'claim' || key.startsWith('claims');
+const MONTH = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?';
+/** A folder name that signals a claim or a pay period: "first claim", "Claim 2", "Oct 8 to Oct 23", "8 Oct", "Pay period 3", "2026-10-08", "202610". */
+export const CLAIM_OR_PERIOD = new RegExp(`\\bclaims?\\b|\\bpay\\s*period|\\b${MONTH}\\s*\\d{1,2}\\b|\\b\\d{1,2}(?:st|nd|rd|th)?\\s*${MONTH}(?![a-z])|(?<!\\d)20\\d{2}-?(?:0[1-9]|1[0-2])(?:-?\\d{2})?(?!\\d)`, 'i');
+/**
+ * True when the path is inside a claim folder:
+ * - a named folder in a Claims stage (anything but a YYYYMM month), e.g. …/claims/CHFA 2026, or
+ * - a folder below a student or intake folder whose name signals a claim or pay period,
+ *   e.g. …/2026/Fall 2026/Fall intake first claim paystubs, …/2026/{Role}-{Student}/Oct 8 to Oct 23.
+ */
+export function claimFolder(path = []) {
+  const i = path.findIndex((p, n) => n >= 3 && isClaimsStage(folderKey(p)));
+  if (i !== -1 && i + 1 < path.length && !/^\d{6}$/.test(String(path[i + 1]).trim())) return true;
+  return periodFolder(path);
+}
+/** The second kind only: a claim or pay-period folder below a student or intake folder. Files in it are left as they are. */
+export const periodFolder = (path = []) => studentOrIntake(path) && path.slice(5).some(p => CLAIM_OR_PERIOD.test(String(p)));
+// Clients/{Client}/{Program}/{YYYY}/{folder that isn't a stage}/…
+const studentOrIntake = (path) => path.length > 5 && folderKey(path[0]) === 'clients' && /^\d{4}$/.test(String(path[3]).trim()) && !isStage(folderKey(path[4]));
+/** True when the path has a Claims stage folder below the year (Clients/{Client}/{Program}/{YYYY}/…/Claims). */
+export const inClaims = (path = []) => path.some((p, n) => n >= 4 && isClaimsStage(folderKey(p)));
+
+// Stage folder names (reference.md "Client folders", aliases included): not a student or intake folder.
+const isStage = (key) => isClaimsStage(key) || key.startsWith('reim') || key.endsWith('reimbursements')
+  || ['application', 'approvaldocs', 'paystubs', 'reporting', 'hiring'].includes(key);
+
+/**
+ * Where a wage-subsidy paystub in this client/program/year belongs: Claims inside the student or
+ * intake folder it already sits in (the folder directly under the year), else {YYYY}/Claims.
+ * Null when the path isn't Clients/{Client}/{Program}/{YYYY}/….
+ */
+export function paystubHome(path = []) {
+  if (path.length < 4 || folderKey(path[0]) !== 'clients' || !/^\d{4}$/.test(String(path[3]).trim())) return null;
+  const keep = path[4] !== undefined && !isStage(folderKey(path[4])) ? [path[4]] : [];
+  return [...path.slice(0, 4), ...keep, 'Claims'];
+}
+
 /**
  * @param {{path: string[], name: string, mimeType?: string}} file - path = folder
  *   names below the Granted Files root (e.g. ['Clients','Caliber Projects','CanExport','2026'])
@@ -148,7 +193,15 @@ export function checkFile({ path = [], name = '', mimeType = '' }, { programSet 
       if (path.length === 3) failures.push('no_year');
       else if (!/^\d{4}$/.test(path[3].trim()) && !(general && keys[3] === 'undated')) failures.push('no_year');
     }
-    if (!isMedia(mimeType) && !startsWithType(base)) failures.push('name_pattern');
+    if (periodFolder(path)) {
+      // A claim or pay-period folder under a student or intake folder: left as it is, name included.
+    } else if (isPaystubConvention(name, mimeType)) {
+      // An official name; only its folder is checked: wage-subsidy paystubs go in a Claims or claim folder.
+      if (path.length > 3 && !inClaims(path) && !claimFolder(path)) failures.push('paystub_not_in_claims');
+    } else if (claimFolder(path)) {
+      // Never moved out of a claim folder; only the name can be wrong.
+      if (!isMedia(mimeType) && !CLAIM_NAME.test(base)) failures.push('claim_folder_name');
+    } else if (!isMedia(mimeType) && !startsWithType(base)) failures.push('name_pattern');
   } else if (top === 'departments') {
     if (path.length === 1) failures.push('loose_departments_root');
     else if (path.length === 2) failures.push('loose_department_root');

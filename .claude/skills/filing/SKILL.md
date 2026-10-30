@@ -9,6 +9,11 @@ Give every file a **home** (folder path) and a **name**. Every type, pattern and
 
 **Load `filing/reference` first** (`load_skill(skill_name="filing", sub_skill="reference")`), before answering anything.
 
+**Claims and paystubs** (full rules in reference.md, "Claims, paystubs and wage subsidies"):
+- A file already in a claim folder stays put: a named folder in Claims (e.g. `…/claims/CHFA 2026`), or a folder under a student or intake folder named for a claim or pay period (`…/Fall 2026/Fall intake first claim paystubs`, `…/Oct 8 to Oct 23`). Rename only, as `{Type}-Exp{N}-{YYYYMMDD}-{Vendor}`, keeping the expense number and full date.
+- Wage-subsidy paystubs (Eco Canada SWPP/YNR, WorkBC) go under the **employer**: `Clients/{Employer}/{Program}/{YYYY}/Claims/`, but inside an existing student or intake folder under the year when the paystub is already in one (`…/2026/Fall 2026/Claims/`). Propose missing folders as (new) rather than saying you're not sure.
+- `Paystubs-{Program}-{Employee}-{Employer}-{Pay period}` is an official name: never rename it.
+
 **Never file here:** `Active Clients/` (shortcuts to live clients only; everything client is under `Clients/`), `Old Files/` (stays as-is; unclear old material goes to the separate Granted Archive drive), `Departments/Mindfulness` (legacy, not a department), `Review/` (an internal working folder), `Pre-Call Briefings/` (owned by Oracle's scheduled jobs).
 
 ## 1. Identify the file

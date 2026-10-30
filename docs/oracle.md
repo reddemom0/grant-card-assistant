@@ -227,6 +227,24 @@ matching Chat API command in the Cloud console.
 - `normalizeChatEvent` carries `quotedMessageName`.
 - googleapis 128 (`Schema$QuotedMessageMetadata`) has only the quoted message's name and
   time, never its text, so reading it is a separate `spaces.messages.get` as the asker.
+- **A quote of an Oracle message goes into Oracle's context** (`findQuotedMessage` in
+  `src/services/quoted-message.js`, called in `chat-google.js` beside the Pulse and briefing
+  lookups). It reads the message as the asker (`readMessage` with `raw: true`), else as the
+  app (chat.bot). A card message has no `text`, so its card text is flattened instead
+  (`cardText`: titles and widgets, link targets kept, buttons dropped).
+  - **Oracle's messages only.** The sender must be a BOT; in a space its display name must
+    also say Oracle. A quoted person's message adds nothing.
+  - `client.js` adds an uncached "The message the user is replying to" block
+    (`quotedContextBlock`), with the text wrapped as `<tool_output tool="quoted_message">`.
+  - **Filing-sweep cards:** the quoted message name is looked up in `filing_sweep_suggestions`
+    (`space_name` + `message_name`). Every file on that card, with its Drive file ID, the
+    folder it was in, the sweep's guess and its status, is listed in the block
+    (`filing_sweep_log` envelope), with "never ask which file". This works even when the read
+    fails, because a sweep row proves the message was Oracle's.
+  - A failed read logs `Quoted message: read failed — code: …` and the turn runs without the
+    text. Only the quoted message is added; thread replies already have the thread's history.
+  - The block is per-turn and isn't saved, so a later message in that new thread doesn't see
+    it unless it quotes again.
 
 **/watch choice card.**
 - When /watch can't tell the program, it posts a public card in the thread, not a private
@@ -483,9 +501,9 @@ folder never lands on a prefix guess.
 
 ## Filing sweep (pilot)
 
-`src/services/filing-sweep.js` (rules in `src/services/filing-rules.js`, Skip in
-`src/cards/sweep-card.js`, log in migration 055). **Suggest-only:** nothing moves without the
-recipient's Confirm.
+`src/services/filing-sweep.js` (rules in `src/services/filing-rules.js`, cards and presses in
+`src/cards/sweep-card.js`, log in migrations 055 and 058). **Suggest-only:** nothing moves
+without the recipient's Confirm.
 - **When:** weekdays 08:30 America/Vancouver (`SWEEP_SCHEDULE`); a summary to the fallback
   (Chris) Mondays 08:45. Both off unless `FILING_SWEEP_ENABLED=true` (`startFilingSweep` in
   `server.js`). A per-day claim in `filing_sweep_runs` stops a second server copy.
@@ -499,36 +517,81 @@ recipient's Confirm.
   files, and loose files (client root, `_Unsorted`, top of a department or of `Programs/`).
   Excluded: Old Files, Active Clients, Review, Pre-Call Briefings, Departments/Mindfulness,
   HR and FINANCE, sensitive names, folders and shortcuts. A file that passes is logged `ok`.
+- **Pilot rules** (reference.md "Claims, paystubs and wage subsidies"; DECISIONS 2026-10-30).
+  The checks spot them, the prompt states them, and `evaluate` enforces them whatever the
+  model says:
+  - **Claim folder** (`claimFolder`): a named folder in `Claims` (not a `YYYYMM` month), or a
+    folder below a student or intake folder whose name signals a claim or pay period
+    (`CLAIM_OR_PERIOD`: "claim", "pay period", "Oct 8 to Oct 23", "2026-10-08"), or anything
+    below either. Files in the second kind (`periodFolder`) are left as they are, name included (`ok`, no card); only the first kind gets the rename-only rule. Never moved: the destination is cleared, so it's a rename only. The
+    rename must be `{Type}-Exp{N}-{YYYYMMDD}-{Vendor}` with the file's own expense number and
+    full date (`claimRenameProblem`, `visibleDays`), else "not sure". Check: `claim_folder_name`.
+  - **Delpreet's paystub name** (`PAYSTUB_CONVENTION`,
+    `Paystubs-{Program}-{Employee}-{Employer}-{Pay period}`). Never renamed (`new_name`
+    cleared). It must sit in a year's `Claims` folder (`paystub_not_in_claims`), and a
+    suggested move must land in one.
+  - **Wage-subsidy paystubs** are filed under the employer,
+    `Clients/{Employer}/{Program}/{YYYY}/Claims`. An existing student or intake folder
+    directly under the year is kept: `Claims` goes inside it (`paystubHome`). When the
+    suggestion stays in the same client, program and year, the code sets this path itself, so
+    the model can't flatten it. If the employer has no client folder
+    (`resolveGrantedFilesPath` `missingAt === 1`), the item is `advised`, not "not sure":
+    `planFileMove` only creates folders below a client, and it stays unchanged.
 - **Suggestion:** one Haiku call per failing file (`claude-haiku-4-5-20251001`, forced tool),
   on metadata only: name, folder, the client's program and year folders, the type patterns
-  and the program table. It is refused, so the person gets a "Not sure where X goes. Reply
-  and tell me." line instead of a card, when:
+  and the program table. It is refused, so the file goes on a "not sure" card instead, when:
   - the model isn't confident
   - the suggestion has a month the file's name and folders don't show
   - the name still has a pattern placeholder
   - another new file would get the same home and name
   - `planFileMove`, run as the recipient, refuses it
+  - a pilot rule above is broken
 - **Who gets it:** the file's `lastModifyingUser`. The Drive Activity scope, which would name
   who added it, is refused by the delegation, so a file moved in without edits goes to its last
   editor. No @granted.ca person → the fallback (`FILING_SWEEP_FALLBACK_EMAIL`, default
-  writers@). No DM with Oracle yet → the fallback's thread, marked for them, re-planned as the
-  fallback (only the asker can confirm a move).
-- **The DM:** one thread per person per run, because a card press re-renders its whole message:
-  a header (with the "not sure" lines), then one confirm card per file (at most 10), each its
-  own `file_move_rename` pending action on its own conversation with a 7-day expiry, Confirm
-  and **Skip**. Anything over 10 is listed in a final reply (`listed`). The thread's
-  conversation is seeded with a system note listing the suggestions, so a reply has context.
+  writers@). No DM with Oracle yet → the fallback's thread, re-planned as the fallback (only
+  the asker can confirm a move). The card says "{First name}'s file — they're not on Chat yet,
+  so it's come to you." (`forLine`; "files … they've" for several).
+- **The DM:** one thread per person per run, because a card press re-renders its whole message.
+  A header comes first, then **one card per destination folder** (`groupByRecipient`, keyed by
+  kind + folder + the person a fallback item was meant for). At most 10 cards, moves first;
+  the rest are listed in a final reply. The thread's conversation is seeded with a system note
+  listing the suggestions, so a reply has context. Three kinds of card (`renderSweepCard`):
+  - **move:** a summary line ("9 Eco Canada SWPP paystubs for AME Consulting Group → …", or
+    "… — renames in …"), the file list in a collapsible section, and one **Confirm all** /
+    **Skip**. Each file is still its own `file_move_rename` pending action on its own
+    conversation (7-day expiry, undo). Confirm all (`confirmGroup`) answers "Moving N files…"
+    at once, runs each one through the unchanged `canConfirm` / `runPendingAction`, records
+    each as `handlePendingClick` does, then patches the card. It also saves the results to the
+    thread's conversation.
+  - **advise:** the suggested path and the client folder to create by hand, "then reply 'file
+    them'". **Leave it here** only.
+  - **unsure:** "Not sure where X goes" / "these N files", reply to tell me, and **Leave it
+    here** (marks them `left`, nothing moves). Not-sure files with the same guessed (or current)
+    folder share a card.
+  - Presses carry the card's `group_id` and `kind`. Only the recipient may press. Cards posted
+    before 058 carry a `suggestionId` and still work.
 - **Pilot:** while `FILING_SWEEP_PILOT_EMAILS` is set, only those people get DMs; the rest
   are logged `would_suggest`.
 - **Log:** `filing_sweep_suggestions`, one row per new file (file_id unique, so a file is
-  never suggested twice). Statuses: `ok`, `excluded`, `unsure`, `would_suggest`,
-  `suggested`, `listed`, `confirmed`, `skipped`, `ignored`, `failed`.
-  - A Confirm press updates it in `handlePendingClick`; Skip in `handleSweepClick`.
+  never suggested twice), with the card's `group_id`. Statuses: `ok`, `excluded`, `unsure`,
+  `advised`, `would_suggest`, `suggested`, `listed`, `confirmed`, `skipped`, `ignored`,
+  `failed`, `left`.
+  - Card presses update it in `handleSweepClick`, and a pre-058 card's Confirm in
+    `handlePendingClick`.
+  - **Migration 058 must be applied before the grouped-card code deploys:** it adds
+    `group_id` and the `advised` / `left` statuses.
+  - `message_name` is set on every row of a card group, so a **quote of a card** (the DM
+    reply arrow) brings that card's files and their Drive IDs into Oracle's context (see
+    Quote-replies). A reply *in* the thread still gets them from the thread's system note.
   - Each run reconciles against `pending_actions` and marks `suggested` rows older than 7 days `ignored`, expiring their cards.
 - **Dry run:** `node --network-family-autoselection-attempt-timeout=5000 scripts/filing-sweep-dryrun.mjs --days 7`
   lists files *created* in the last N days (the change feed can't look back, so moved-in
-  files aren't shown) and prints what each person would get. It sends nothing and writes
-  nothing (non-SELECT queries are refused). It does spend a little on Haiku.
+  files aren't shown) and prints each person's cards. `--match <regex>` limits it to matching
+  paths and names; `--render` prints each card's JSON. It sends nothing and writes nothing
+  (non-SELECT queries are refused). It does spend a little on Haiku (about $0.008 a file),
+  and it needs a working `ANTHROPIC_API_KEY`: a model 401 shows up as every file being "not
+  sure".
 
 ## Prompt
 
