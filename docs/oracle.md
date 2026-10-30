@@ -243,8 +243,24 @@ matching Chat API command in the Cloud console.
     fails, because a sweep row proves the message was Oracle's.
   - A failed read logs `Quoted message: read failed — code: …` and the turn runs without the
     text. Only the quoted message is added; thread replies already have the thread's history.
-  - The block is per-turn and isn't saved, so a later message in that new thread doesn't see
-    it unless it quotes again.
+  - **Kept for the rest of the thread** (`src/services/quoted-context-store.js`, table
+    `quoted_contexts`, migration 059: one row per conversation). A found quote is saved
+    against the thread's conversation (`saveQuotedContext`). On a later turn with no new
+    Oracle quote, `loadQuotedContext` returns it and the block is headed "The message this
+    conversation started from". The Chat API isn't called again. A sweep card's files are
+    re-read from `filing_sweep_suggestions` so their status is current (the saved list is
+    used if that finds nothing).
+  - **A newer Oracle quote in the same thread replaces the saved one.** A quote of a
+    person's message leaves it in place.
+  - **DM fallback:** in a DM, a message typed in the main box starts a new thread, so a new
+    conversation. When that has nothing saved, the newest quote saved in the same DM in
+    the last 30 minutes (`DM_FALLBACK_MINUTES`) is used. The block then says it may be
+    about something else ("use it only if it fits"). The quote is copied to the new
+    conversation (`fromDm: true`, so it stays labelled that way), which restarts the
+    30 minutes.
+  - Logs: `💬 Quoted message carried forward — from: thread|dm, sweep files: N`. Until
+    migration 059 is applied, save and load skip silently and only the quoting turn has the
+    block.
 
 **/watch choice card.**
 - When /watch can't tell the program, it posts a public card in the thread, not a private

@@ -12,6 +12,11 @@ Format:
 
 ---
 
+## 2026-10-30 — Quoted Oracle message kept for the rest of the thread, with a 30-minute DM fallback
+**What:** A quote found by `findQuotedMessage` is saved in a new table, `quoted_contexts` (migration 059, one row per conversation), by `src/services/quoted-context-store.js`. Later turns in that thread get it back under "The message this conversation started from", without calling the Chat API again. A sweep card's files are re-read from `filing_sweep_suggestions`. A newer Oracle quote in the thread replaces the saved one. In a DM, a conversation with nothing saved uses the newest quote saved in that DM in the last 30 minutes, labelled "may be about something else", and copies it forward.
+**Why:** The block was per-turn, so a second reply lost the quoted message and file. A table beats a system message in history because it can be shown under its own heading, replaced in place, and isn't lost to compaction. Chris chose the DM fallback (2026-10-30) because a follow-up typed in the main DM box is a new thread, and so a new conversation.
+**Impact:** new `src/services/quoted-context-store.js`, `migrations/059_quoted_contexts.sql`; `src/api/chat-google.js`; `quotedContextBlock` in `src/services/quoted-message.js` (`carried` heading only; detection unchanged); `docs/oracle.md`; test `quoted-context-store`. Migration 059 must be applied before deploying (until then the code skips silently).
+
 ## 2026-10-30 — Filing sweep pilot fixes: three filing rules, one card per destination
 **What:** Decisions from the first pilot week:
 1. **Claim folders:** a file in a named folder inside `Claims/` (not a `YYYYMM` month, e.g. `…/claims/CHFA 2026`), or in a folder under a student or intake folder whose name signals a claim or pay period (`…/Fall intake first claim paystubs`, `…/Oct 8 to Oct 23`; Chris; files there are left as they are, no rename, no card), is never moved and gets no month folder. Rename only, to `{Type}-Exp{N}-{YYYYMMDD}-{Vendor}`, keeping the file's own expense number and full date. With no expense number: `{Type}-{YYYYMMDD}-{Vendor}`.

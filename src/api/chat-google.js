@@ -29,6 +29,7 @@ import { takeCardReply, findAppCommand } from '../cards/registry.js';
 import { findPulsePost } from '../services/pulse-posts.js';
 import { findBriefingPost } from '../services/briefing-posts.js';
 import { findQuotedMessage } from '../services/quoted-message.js';
+import { saveQuotedContext, loadQuotedContext } from '../services/quoted-context-store.js';
 
 // Which service account signs inbound requests depends on how the Chat app is
 // built, and the two Google docs disagree:
@@ -975,7 +976,7 @@ export async function runOracleAndReply(evt, user, conversationId, messageText) 
     // card the files it is about (src/services/quoted-message.js), so a reply
     // like "put it in Clients/X/…" never has to ask which file. Chat sends only
     // the quoted message's name. Nothing found → nothing added.
-    const quotedMessage = evt.quotedMessageName && evt.spaceIsResourceName
+    const quotedNow = evt.quotedMessageName && evt.spaceIsResourceName
       ? await findQuotedMessage({
         quotedMessageName: evt.quotedMessageName,
         spaceName: evt.spaceId,
@@ -984,7 +985,19 @@ export async function runOracleAndReply(evt, user, conversationId, messageText) 
         appChat: (() => { try { return createChatClient(); } catch { return null; } })()
       })
       : null;
-    if (quotedMessage) console.log(`💬 Quote of an Oracle message — text: ${quotedMessage.text ? 'yes' : 'no'}, sweep files: ${quotedMessage.files.length}`);
+    if (quotedNow) console.log(`💬 Quote of an Oracle message — text: ${quotedNow.text ? 'yes' : 'no'}, sweep files: ${quotedNow.files.length}`);
+
+    // Kept for the rest of the thread (src/services/quoted-context-store.js): a
+    // new Oracle quote is saved against this conversation, replacing any earlier
+    // one; a turn without one gets the saved quote back, or in a DM the newest
+    // one from the last 30 minutes. No Chat API read on later turns.
+    let quotedMessage = quotedNow;
+    if (quotedNow) {
+      await saveQuotedContext({ conversationId, spaceName: evt.spaceId, quotedMessage: quotedNow });
+    } else if (evt.spaceIsResourceName) {
+      quotedMessage = await loadQuotedContext({ conversationId, spaceName: evt.spaceId, isDm: evt.isDm });
+      if (quotedMessage) console.log(`💬 Quoted message carried forward — from: ${quotedMessage.carried}, sweep files: ${quotedMessage.files.length}`);
+    }
 
     const result = await runAgent({
       agentType: 'internal-oracle',
