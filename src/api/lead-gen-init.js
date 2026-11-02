@@ -28,7 +28,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logAPICost } from '../utils/cost-logger.js';
 import { categorizeProspect } from '../services/grant-categorization.js';
 import { buildProspectDataFromForm } from '../services/build-prospect-data.js';
-import { computeBestFitProduct } from './lead-gen-helpers.js';
+import { computeBestFitProduct, isTierPendingFirstEstimate } from './lead-gen-helpers.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -259,9 +259,14 @@ async function runIntakeCategorization(sessionId, prospectDataFromForm) {
       null
     );
 
+    // A $0 baseline means no rate table or no data, not a $0 lead: leave the
+    // product unset so it locks at the model's first estimate instead
+    // (lockBestFitProduct in lead-gen-helpers.js).
+    const tierPending = isTierPendingFirstEstimate(categorization, bestFitProduct);
+
     const prospectDataPatch = {
       service_tier: serviceTier,
-      best_fit_product: bestFitProduct
+      ...(tierPending ? {} : { best_fit_product: bestFitProduct })
     };
     if (estimatedFunding !== null) {
       prospectDataPatch.estimated_funding = estimatedFunding;
@@ -274,7 +279,7 @@ async function runIntakeCategorization(sessionId, prospectDataFromForm) {
       [JSON.stringify(prospectDataPatch), sessionId]
     );
 
-    console.log(`✅ INTAKE CATEGORIZATION COMPLETE — tier=${serviceTier}, best_fit=${bestFitProduct}, estimate=${estimatedFunding ?? '(omitted for not_a_fit)'}\n`);
+    console.log(`✅ INTAKE CATEGORIZATION COMPLETE — tier=${serviceTier}, best_fit=${tierPending ? '(pending first estimate — $0 baseline)' : bestFitProduct}, estimate=${estimatedFunding ?? '(omitted for not_a_fit)'}\n`);
 
   } catch (err) {
     console.error(

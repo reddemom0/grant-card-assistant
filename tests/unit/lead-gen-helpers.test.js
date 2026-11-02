@@ -16,7 +16,14 @@ jest.unstable_mockModule('../../src/database/connection.js', () => ({
   query: jest.fn(), getPool: jest.fn(), transaction: jest.fn()
 }));
 
-const { computeBestFitProduct, parseFundingEstimate } = await import('../../src/api/lead-gen-helpers.js');
+const { query } = await import('../../src/database/connection.js');
+const {
+  computeBestFitProduct,
+  parseFundingEstimate,
+  isTierPendingFirstEstimate,
+  lockBestFitProduct,
+  describeRecommendedProduct
+} = await import('../../src/api/lead-gen-helpers.js');
 
 // Clears the gate on rule (a).
 const PRO_SHAPED = { revenue_range: '$5M+', employee_count: '50 – 99', industry: 'Retail' };
@@ -156,5 +163,81 @@ describe('parseFundingEstimate — whole dollars, low end of a range', () => {
     [undefined]
   ])('no amount: %p → null', (input) => {
     expect(parseFundingEstimate(input)).toBeNull();
+  });
+});
+
+// ============================================================================
+// The locked tier — decided once, then only read
+// ============================================================================
+
+describe('isTierPendingFirstEstimate — a $0 baseline does not lock at intake', () => {
+  const zero = { service_tier: 'starter', baseline_estimate: { total_low: 0, total_high: 0 } };
+
+  test('$0 baseline, Get Granted only because of the $0 → pending', () => {
+    expect(isTierPendingFirstEstimate(zero, 'Get Granted')).toBe(true);
+  });
+  test('not_a_fit locks at intake even on a $0 baseline', () => {
+    expect(isTierPendingFirstEstimate({ ...zero, service_tier: 'not_a_fit' }, 'Get Granted')).toBe(false);
+  });
+  test('Nonprofit locks at intake even on a $0 baseline', () => {
+    expect(isTierPendingFirstEstimate(zero, 'Nonprofit')).toBe(false);
+  });
+  test('a non-zero baseline locks at intake', () => {
+    const c = { service_tier: 'starter', baseline_estimate: { total_low: 9000, total_high: 12000 } };
+    expect(isTierPendingFirstEstimate(c, 'Get Granted')).toBe(false);
+  });
+});
+
+describe('lockBestFitProduct', () => {
+  beforeEach(() => query.mockReset());
+
+  test('a stored value wins over a later, different estimate — no recompute, no write', async () => {
+    const session = { estimated_funding: '$40K-$80K', prospect_data: { ...BELOW_GATE, best_fit_product: 'Get Granted' } };
+    await expect(lockBestFitProduct('s1', session, { estimated_funding: '$40K-$80K' })).resolves.toBe('Get Granted');
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  test('pending ($0 baseline): locks from the first estimate and persists it', async () => {
+    query.mockResolvedValueOnce({ rows: [{ bfp: 'Get Granted' }] });
+    const session = { estimated_funding: '$14,063–$28,125', prospect_data: { ...BELOW_GATE, estimated_funding: '$0K-$0K' } };
+    // Low end $14,063 is under $15K → Get Granted; the model's range decides, not the $0 baseline.
+    const r = await lockBestFitProduct('s2', session, null);
+    expect(r).toBe('Get Granted');
+    const [sql, params] = query.mock.calls[0];
+    expect(sql).toMatch(/NOT \(COALESCE\(prospect_data, '\{\}'::jsonb\) \? 'best_fit_product'\)/);
+    expect(JSON.parse(params[0])).toEqual({ best_fit_product: 'Get Granted' });
+  });
+
+  test('pending: a first estimate of $15K+ locks Starter', async () => {
+    query.mockResolvedValueOnce({ rows: [{ bfp: 'Granted Starter' }] });
+    const session = { estimated_funding: '$18K-$30K', prospect_data: { ...BELOW_GATE, estimated_funding: '$0K-$0K' } };
+    await expect(lockBestFitProduct('s3', session, null)).resolves.toBe('Granted Starter');
+  });
+
+  test('lost the race: returns the value the other caller locked', async () => {
+    query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockResolvedValueOnce({ rows: [{ bfp: 'Granted Starter' }] });
+    const session = { estimated_funding: '$5K-$8K', prospect_data: { ...BELOW_GATE } };
+    await expect(lockBestFitProduct('s4', session, null)).resolves.toBe('Granted Starter');
+  });
+
+  test('DB error: still returns a product (non-blocking)', async () => {
+    query.mockRejectedValueOnce(new Error('down'));
+    const session = { estimated_funding: '$18K-$30K', prospect_data: { ...BELOW_GATE } };
+    await expect(lockBestFitProduct('s5', session, null)).resolves.toBe('Granted Starter');
+  });
+});
+
+describe('describeRecommendedProduct — the line the model sees', () => {
+  test('locked: names the product', () => {
+    expect(describeRecommendedProduct({ best_fit_product: 'Granted Starter' }))
+      .toMatch(/^Recommended product: Granted Starter \(set by the system/);
+  });
+  test('pending, below the gate: states the $15,000 low-end rule', () => {
+    expect(describeRecommendedProduct({ ...BELOW_GATE })).toMatch(/not set yet.*LOW end.*\$15,000.*Granted Starter.*Get Granted/);
+  });
+  test('pending, Pro-shaped: any dollar estimate is Pro', () => {
+    expect(describeRecommendedProduct({ ...PRO_SHAPED })).toMatch(/not set yet.*Granted Pro/);
   });
 });

@@ -968,10 +968,20 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
 
                 console.log(`  ✅ Auto-captured ${grantNames.length} grant names from focused search`);
 
-                // Step 6.5: Add tier-specific reminder for Not-a-Fit prospects
+                // Step 6.5: Tier-specific reminder, every tier. The product is
+                // the locked best_fit_product (or the rule it will lock by, for
+                // a $0-baseline lead) — the same line <lead_info> carries — so
+                // the agent never picks a tier of its own.
                 const tier = categorization.service_tier?.toLowerCase();
                 let tierReminder = null;
-                if (tier === 'not_a_fit') {
+                if (tier !== 'not_a_fit') {
+                  const { describeRecommendedProduct } = await import('../api/lead-gen-helpers.js');
+                  const pdRow = await dbQuery(
+                    `SELECT prospect_data FROM lead_gen_conversations WHERE session_id = $1`,
+                    [conversationId]
+                  );
+                  tierReminder = `CRITICAL REMINDER: ${describeRecommendedProduct(pdRow.rows[0]?.prospect_data)} Follow the rules in <tier_routing> for that product (service page link, booking link or none). Do not recommend any other tier in chat or in email_summary_body.`;
+                } else {
                   tierReminder = "CRITICAL REMINDER: This prospect is not yet ready for Granted's paid services (pre-revenue, solo founder, unincorporated, or non-profit). Do NOT recommend or pitch GrantedPro or Granted Starter, and don't upsell beyond GetGranted. Do NOT include a booking link — no {{BOOKING_LINK}} sentinel, no meetings.hubspot.com URL, no booking CTA paragraph anywhere. Lead with the smaller funding opportunities that may suit their current stage (no dollar figure), then point them to 'GetGranted, our grant-matching platform, with an affordable subscription, to explore and track programs as your business grows,' plus supporting resources (Small Business Guidebook, Startup Grants Guide, Granted Blog). Then mention what opens up larger programs (incorporation, revenue, first hire, hiring a second person). Don't open with a disclaimer about being honest or candid, and don't tell them they aren't a fit for our services. Capture the lead for nurture via save_lead_data with hs_lead_status appropriate for a non-qualifying lead.";
                 }
 
@@ -984,7 +994,7 @@ export async function executeToolCall(toolName, input, conversationId, userId = 
                     [conversationId, JSON.stringify(tierReminder)]
                   );
 
-                  console.log(`  ✅ Added tier-specific reminder for ${tier} prospect`);
+                  console.log(`  ✅ Added tier-specific reminder (${tier})`);
                 }
 
                 // Step 7: Format result to match expected structure

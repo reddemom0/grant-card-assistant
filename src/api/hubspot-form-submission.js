@@ -128,8 +128,10 @@ export function buildFormFields(sessionData, agentInput) {
   const growthPlans   = input.growth_plans   || pd.growth_plans   || null;
 
   // Routing decision (also written via PATCH as backstop, but submitted with form
-  // so a single submission carries the final value)
-  const bestFitProduct = computeBestFitProduct(sessionData, input);
+  // so a single submission carries the final value). The locked value —
+  // finalizeLeadGenConversation locks it before calling here; computing is
+  // only a fallback for a caller that didn't.
+  const bestFitProduct = pd.best_fit_product || computeBestFitProduct(sessionData, input);
 
   // Fields that must appear in the submission even when their resolved value
   // is empty — HubSpot rejects the form with a REQUIRED_FIELD error if these

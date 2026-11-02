@@ -52,6 +52,25 @@ export async function applyChatBookingSubstitution(text, conversationId) {
 }
 
 /**
+ * Would this reply show the visitor anything?
+ *
+ * False for text that is only the <!--suggestions:[...]--> comment, markup or
+ * whitespace — the widget strips the comment (parseSuggestions) and would
+ * render an empty bubble. Same comment regex as the widget's parseSuggestions.
+ *
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function hasVisibleText(text) {
+  if (!text || typeof text !== 'string') return false;
+  return text
+    .replace(/<!--suggestions:\s*(\[.*?\])\s*-->/gs, '')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .trim().length > 0;
+}
+
+/**
  * Convert markdown formatting to HTML (safety net)
  * Handles bold, links, and basic formatting that the model might output
  */
@@ -317,7 +336,13 @@ export async function streamToSSE(stream, res, sessionId, agentType = null, conv
 
           // For lead-gen: only stream buffered text if this is the final iteration (end_turn)
           if (agentType === 'lead-gen') {
-            if (event.delta.stop_reason === 'end_turn' && textBuffer && res) {
+            if (event.delta.stop_reason === 'end_turn' && textBuffer && !hasVisibleText(textBuffer)) {
+              // Nothing the visitor can see (e.g. only the suggestions comment,
+              // because the estimate went out alongside a tool call). Hold it
+              // back: runAgent pairs it with the earlier text, or falls back.
+              console.log(`  ⏸️  Holding back final iteration with no visible text: ${textBuffer.length} chars (lead-gen mode)`);
+              fullResponse.leadGenFinalUnstreamed = true;
+            } else if (event.delta.stop_reason === 'end_turn' && textBuffer && res) {
               // This is the final iteration - stream the buffered text
               console.log(`  📝 Streaming final iteration text: ${textBuffer.length} chars (lead-gen mode)`);
 

@@ -15,7 +15,7 @@ import { loadLearningMemory } from '../tools/learning-memory.js';
 import { getLeadGenFormContext } from '../utils/lead-gen-context.js';
 import { executeToolCall } from '../tools/executor.js';
 import { getToolsForAgent } from '../tools/definitions.js';
-import { streamToSSE, setupSSE, closeSSE, sendSSE, applyChatBookingSubstitution } from './streaming.js';
+import { streamToSSE, setupSSE, closeSSE, sendSSE, applyChatBookingSubstitution, hasVisibleText } from './streaming.js';
 import { wrapToolOutput, UNTRUSTED_DATA_INSTRUCTION } from './tool-output.js';
 import { attachmentPlaceholder } from '../tools/chat-attachments.js';
 import { BookingLinkRoutingError } from '../api/booking-link-routing.js';
@@ -952,9 +952,18 @@ export async function runAgent({
 
           if (isEndTurn || isSubstantiveToolText) {
             // Substantive text: accumulate it (likely the actual response, not narration)
-            if (isEndTurn) {
+            if (isEndTurn && fullResponse.leadGenFinalUnstreamed && hasVisibleText(accumulatedText)) {
+              // Final step is only the suggestions comment (streamToSSE held it
+              // back): the reply is the text written alongside the earlier tool
+              // call. Keep it, add the suggestions, flush both before done.
+              accumulatedText += '\n' + iterationText;
+              hasUnstreamedText = true;
+            } else if (isEndTurn) {
               accumulatedText = iterationText; // Replace (final text)
-              hasUnstreamedText = false; // end_turn text is already streamed by streamToSSE
+              // end_turn text is already streamed by streamToSSE — unless it was
+              // held back for having nothing visible, in which case the empty-
+              // response fallback below takes over.
+              hasUnstreamedText = false;
             } else {
               // Append substantive tool text (NOT streamed yet - will be flushed before done event)
               if (accumulatedText) {
@@ -1065,7 +1074,7 @@ export async function runAgent({
           const userText = typeof message === 'string' ? message : JSON.stringify(message);
           let assistantText = accumulatedText || ''; // Use accumulated text across all iterations
 
-          if (!assistantText || assistantText.trim() === '') {
+          if (!hasVisibleText(assistantText)) {
             console.warn('⚠️  Empty assistant response detected - injecting fallback message');
 
             // Get contact name from form data for personalization

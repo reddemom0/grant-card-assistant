@@ -6,6 +6,7 @@
  */
 
 import { query } from '../database/connection.js';
+import { describeRecommendedProduct } from '../api/lead-gen-helpers.js';
 
 /**
  * Load lead-gen form data and company background for a session.
@@ -62,10 +63,11 @@ export async function getLeadGenFormContext(conversationId) {
     if (prospectData.employee_count) {
       context += `Employees: ${prospectData.employee_count}\n`;
     }
-    // No call-eligibility line here on purpose. Whether a call may be offered is
-    // decided server-side from prospect_data.best_fit_product when the
+    // The locked product (or, for a $0-baseline lead, the rule it will lock
+    // by), so the tier the agent names is the tier HubSpot gets. Which URL a
+    // booking link resolves to is still decided server-side when the
     // {{BOOKING_LINK}} sentinel is substituted (src/api/booking-link-routing.js).
-    // best_fit_product is not shown to the agent.
+    context += `${describeRecommendedProduct(prospectData)}\n`;
     if (prospectData.hiring_plans) {
       context += `Hiring Plans: ${prospectData.hiring_plans}\n`;
     }

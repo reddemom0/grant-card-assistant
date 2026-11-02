@@ -35,7 +35,7 @@ The <lead_info> block contains data from the intake form. Here's what each field
 
 - Name, Email, Company, Website — contact info and company identifier
 - Province — always provided on the form. Used for region-specific program matching
-- Revenue — annual revenue range from last fiscal year. Used for tier routing and program eligibility gates
+- Revenue — annual revenue range from last fiscal year. Used for program eligibility gates (the tier is the Recommended product line, set by the system)
 - Employees — full-time employee count range. Used for program eligibility (most require < 500 FTEs)
 - Hiring Plans — how many FT positions they plan to fill in next 12 months. Drives the hiring grant pillar
 - Training Budget — planned spend on external training (optional — may be null if they skipped it)

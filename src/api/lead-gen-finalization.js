@@ -14,9 +14,8 @@
 
 import { query } from '../database/connection.js';
 import {
-  determineServiceTier,
   loadEnrichedSessionData,
-  computeBestFitProduct
+  lockBestFitProduct
 } from './lead-gen-helpers.js';
 import {
   submitLeadGenForm,
@@ -314,10 +313,9 @@ function buildNoteBody(sessionData, trigger) {
  *
  * @param {Object} sessionData - Session record with all data
  * @param {string} trigger - 'estimate_delivered' | 'contact_captured' | 'inactivity_timeout'
- * @param {string} serviceTier - 'pro' | 'starter' | 'getgranted' | null
  * @returns {string} Plain text note body
  */
-function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
+function buildNoteBodyComprehensive(sessionData, trigger) {
   const {
     prospect_data,
     company_background,
@@ -536,11 +534,10 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
         lines.push(`Baseline Estimate: $${totalLow}K–$${totalHigh}K (from rate tables)`);
       }
 
-      // Service Tier
-      if (categorizationData.service_tier) {
-        const tierDisplay = categorizationData.service_tier.toUpperCase().replace('_', ' ');
-        const reasoning = categorizationData.tier_reasoning || '';
-        lines.push(`Service Tier: ${tierDisplay} (${reasoning})`);
+      // Tier reasoning only — the tier itself is the locked best_fit_product
+      // under "Service Tier Recommended", so the note never names two.
+      if (categorizationData.tier_reasoning) {
+        lines.push(`Tier Reasoning: ${categorizationData.tier_reasoning}`);
       }
 
       // Consultant Assignment
@@ -589,23 +586,12 @@ function buildNoteBodyComprehensive(sessionData, trigger, serviceTier = null) {
     lines.push('');
   }
 
-  // Service tier recommendation
-  // Check if agent stored a recommended tier (overrides computed value)
-  const agentRecommendedTier = sessionData.service_tier_recommended || pd.service_tier_recommended;
-  const finalServiceTier = agentRecommendedTier || serviceTier;
-
-  if (agentRecommendedTier && serviceTier && agentRecommendedTier !== serviceTier) {
-    console.log(`✅ Using agent-recommended tier: ${agentRecommendedTier} (computed was: ${serviceTier})`);
-  }
-
-  if (finalServiceTier) {
-    const tierLabels = {
-      pro: 'GrantedPro ($30K+)',
-      starter: 'Granted Starter ($15K-$29,999)',
-      getgranted: 'GetGranted (under $15K)',
-      not_a_fit: 'Not a Fit — Nurture'
-    };
-    lines.push(`Service Tier Recommended: ${tierLabels[finalServiceTier] || finalServiceTier}`);
+  // Service tier recommendation — the locked best_fit_product, the same value
+  // the chat named and the form/PATCH wrote. No agent override, no second calc.
+  const recommendedProduct = sessionData.best_fit_product || pd.best_fit_product;
+  if (recommendedProduct) {
+    const notAFit = (pd.service_tier || sessionData.service_tier) === 'not_a_fit';
+    lines.push(`Service Tier Recommended: ${recommendedProduct}${notAFit ? ' (Not a Fit — Nurture)' : ''}`);
     lines.push('');
   }
 
@@ -1429,6 +1415,16 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
 
   const prospectData = session.prospect_data || {};
 
+  // Lock the product before anything reads it. Already locked at intake for
+  // most leads; for a $0-baseline lead this is the model's first estimate
+  // (save_lead_data wrote it to the estimated_funding column just before).
+  // Runs ahead of the HubSpot-token check so the lock never depends on it.
+  prospectData.best_fit_product = await lockBestFitProduct(
+    sessionId,
+    { ...session, prospect_data: prospectData },
+    agentInput
+  );
+
   // Merge form data as fallbacks (form data doesn't override agent-collected data)
   if (!prospectData.company_name && session.company_name) {
     prospectData.company_name = session.company_name;
@@ -1534,7 +1530,8 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
   //    failed for sessions where HubSpot contact lookup retries exhausted.
   // -------------------------------------------------------------------------
 
-  const bestFitProduct  = computeBestFitProduct(enrichedSession, agentInput);
+  // Locked in step 1 — read back, never recomputed from this call's estimate.
+  const bestFitProduct  = prospectData.best_fit_product;
   const emailSummaryBody = (agentInput && agentInput.email_summary_body) ||
                            enrichedSession.prospect_data?.email_summary_body ||
                            null;
@@ -1640,13 +1637,9 @@ export async function finalizeLeadGenConversation(sessionId, trigger, agentInput
       console.log(`  prospect_summary (top-level): ${enrichedSession.prospect_summary}`);
       console.log(`  prospect_summary (prospect_data): ${pd.prospect_summary}`);
 
-      // Determine service tier from funding estimate
-      const serviceTier = determineServiceTier(
-        enrichedSession.estimated_funding || enrichedSession.prospect_data?.estimated_funding
-      );
-
-      // Build comprehensive note with ALL data sources
-      const noteBody = buildNoteBodyComprehensive(enrichedSession, trigger, serviceTier);
+      // Build comprehensive note with ALL data sources. The tier it names is
+      // enrichedSession.best_fit_product, set from the lock in step 6.
+      const noteBody = buildNoteBodyComprehensive(enrichedSession, trigger);
 
       // 🔍 DEBUG: Log note body preview
       console.log('\n🔍 DEBUG: Note body (first 500 chars):');

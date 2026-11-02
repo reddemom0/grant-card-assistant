@@ -310,12 +310,19 @@
     return html;
   }
 
+  // Shown instead of an empty bubble when a reply arrives with nothing visible
+  // in it (only the suggestions comment, or markup and whitespace).
+  const EMPTY_REPLY_FALLBACK = "Sorry, that reply didn't come through. Please send your message again.";
+
   function formatAssistantMessage(html) {
     // Assistant messages may contain safe HTML like <strong>, <br>, <a>
     // First parse and remove suggestions metadata
     html = parseSuggestions(html);
     // Then sanitize but don't escape - allow whitelisted tags to render
-    return sanitizeHtml(html).replace(/\n/g, '<br>');
+    const formatted = sanitizeHtml(html).replace(/\n/g, '<br>');
+    // Never render an empty bubble
+    const visible = formatted.replace(/<[^>]*>/g, '').replace(/&nbsp;/gi, ' ').trim();
+    return visible ? formatted : escapeHtml(EMPTY_REPLY_FALLBACK);
   }
 
   // ============================================================================

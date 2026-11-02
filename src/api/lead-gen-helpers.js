@@ -8,28 +8,6 @@ import { query } from '../database/connection.js';
 import { lookupRangeMap } from './hubspot-form-mappings.js';
 
 /**
- * Determine service tier from funding estimate
- *
- * @param {string} estimatedFunding - Funding range like "$25K-$60K"
- * @returns {string} 'pro' | 'starter' | 'getgranted' | null
- */
-export function determineServiceTier(estimatedFunding) {
-  if (!estimatedFunding) return null;
-
-  // Extract numeric values from funding estimate
-  // Handles formats like "$25K-$60K", "$30K+", "under $15K", etc.
-  const numberMatch = estimatedFunding.match(/\$?(\d+(?:,\d{3})*(?:\.\d+)?)\s*K?/i);
-  if (!numberMatch) return null;
-
-  const firstNumber = parseInt(numberMatch[1].replace(/,/g, ''), 10);
-
-  // Thresholds
-  if (firstNumber >= 30) return 'pro';           // $30K+ → GrantedPro
-  if (firstNumber >= 15) return 'starter';       // $15K-$29,999 → Granted Starter
-  return 'getgranted';                            // Under $15K → GetGranted
-}
-
-/**
  * Load enriched session data for comprehensive note building
  *
  * Merges data from:
@@ -344,8 +322,8 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
   const serviceTier = pd.service_tier || sessionData?.service_tier || null;
   if (serviceTier === 'not_a_fit') return 'Get Granted';
 
-  // Column, then agent input, then the intake estimate — the same fallback
-  // finalizeLeadGenConversation uses for determineServiceTier.
+  // Column, then agent input, then the intake estimate. For a $0-baseline lead
+  // locking at its first estimate, the column holds the model's range.
   const estimate = sessionData?.estimated_funding || input.estimated_funding ||
                    pd.estimated_funding || null;
   const fundingNum = parseFundingEstimate(estimate);
@@ -363,4 +341,100 @@ export function computeBestFitProduct(sessionData, agentInput = null) {
   // here by design — a lead that should be Pro cleared the gate above.
   if (fundingNum !== null && fundingNum >= STARTER_MIN_ESTIMATE) return 'Granted Starter';
   return 'Get Granted';
+}
+
+// ============================================================================
+// THE LOCKED TIER
+//
+// best_fit_product is decided once and then only read. Chat, the HubSpot form,
+// the AI-property PATCH and the note all name the stored value, so they cannot
+// disagree. It is locked at intake from the baseline estimate — unless that
+// baseline is $0 (no rate table or no data), in which case it stays unset and
+// locks at the model's first estimate, via finalizeLeadGenConversation (the
+// first save_lead_data call).
+// ============================================================================
+
+/**
+ * Does the intake product depend on an estimate the baseline couldn't give?
+ *
+ * True when the baseline came back $0 and the only reason the product is
+ * Get Granted is that $0. Nonprofit and not_a_fit leads are decided by the
+ * form alone, so they lock at intake whatever the baseline says.
+ *
+ * @param {Object} categorization - categorizeProspect() result
+ * @param {string} bestFitProduct - computeBestFitProduct() on the baseline
+ * @returns {boolean}
+ */
+export function isTierPendingFirstEstimate(categorization, bestFitProduct) {
+  if (categorization?.service_tier === 'not_a_fit') return false;
+  if (bestFitProduct !== 'Get Granted') return false;
+  return (categorization?.baseline_estimate?.total_high || 0) === 0;
+}
+
+/**
+ * Return the locked best_fit_product, locking it now if it isn't yet.
+ *
+ * The first caller computes it with computeBestFitProduct and persists it;
+ * every later caller gets the stored value back, whatever estimate it holds.
+ * The UPDATE only writes when no value is stored, so concurrent callers can't
+ * lock two different products.
+ *
+ * @param {string} sessionId
+ * @param {Object} sessionData - session row (or enriched session) with prospect_data
+ * @param {Object} [agentInput] - save_lead_data input, when locking at the first estimate
+ * @returns {Promise<string>}
+ */
+export async function lockBestFitProduct(sessionId, sessionData, agentInput = null) {
+  const stored = sessionData?.prospect_data?.best_fit_product;
+  if (stored) return stored;
+
+  const bestFitProduct = computeBestFitProduct(sessionData, agentInput);
+  let r;
+  try {
+    r = await query(
+      `UPDATE lead_gen_conversations
+          SET prospect_data = COALESCE(prospect_data, '{}'::jsonb) || $1::jsonb
+        WHERE session_id = $2
+          AND NOT (COALESCE(prospect_data, '{}'::jsonb) ? 'best_fit_product')
+        RETURNING prospect_data->>'best_fit_product' AS bfp`,
+      [JSON.stringify({ best_fit_product: bestFitProduct }), sessionId]
+    );
+  } catch (err) {
+    // Same non-blocking contract as the old finalization persist: callers
+    // still get a product; the next caller will try the lock again.
+    console.warn(`[BEST-FIT-PRODUCT-LOCK-FAIL] session=${sessionId} err=${err.message} — using computed ${bestFitProduct} unlocked`);
+    return bestFitProduct;
+  }
+  if (r.rows.length > 0) {
+    console.log(`🔒 best_fit_product locked: ${bestFitProduct} (session ${sessionId})`);
+    return bestFitProduct;
+  }
+
+  // Someone locked it between our read and our write — theirs stands.
+  const existing = await query(
+    `SELECT prospect_data->>'best_fit_product' AS bfp FROM lead_gen_conversations WHERE session_id = $1`,
+    [sessionId]
+  );
+  return existing.rows[0]?.bfp || bestFitProduct;
+}
+
+/**
+ * The tier line the model sees in <lead_info>.
+ *
+ * Locked: the product, to name exactly. Pending ($0 baseline): the rule
+ * computeBestFitProduct will apply to the model's own estimate, stated for
+ * this lead, so the product the model names is the one that gets locked.
+ *
+ * @param {Object} prospectData - prospect_data JSONB
+ * @returns {string}
+ */
+export function describeRecommendedProduct(prospectData) {
+  const pd = prospectData || {};
+  if (pd.best_fit_product) {
+    return `Recommended product: ${pd.best_fit_product} (set by the system — name exactly this product; never choose or switch it yourself)`;
+  }
+  if (isProCallEligible(pd)) {
+    return 'Recommended product: not set yet — it locks from your first estimate. If you give a dollar estimate it is Granted Pro; if you give no dollar figure it is Get Granted.';
+  }
+  return `Recommended product: not set yet — it locks from your first estimate. If the LOW end of the total range you give (and save in estimated_funding) is $${STARTER_MIN_ESTIMATE.toLocaleString('en-US')} or more, it is Granted Starter; below that, or with no dollar figure, it is Get Granted.`;
 }

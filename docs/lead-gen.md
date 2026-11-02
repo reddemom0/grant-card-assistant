@@ -106,28 +106,41 @@ the constant is 12 — the comment is stale.
 **`LEAD_GEN_TEST_MODE` is misnamed.** It mocks HubSpot writes across *all* agents, at
 fifteen call sites. It does **not** stop email sending.
 
-## Tier policy lives in four places
+## Tier: one value, locked once
 
-This is the most important thing on this page. Tier and product decisions are expressed in
-four independent locations that do not agree.
+This is the most important thing on this page. The product a lead is told about is
+`best_fit_product`, computed by `computeBestFitProduct` in `src/api/lead-gen-helpers.js`
+and **locked**: decided once, then only read. Chat, the HubSpot form, the AI-property
+PATCH and the note's "Service Tier Recommended" all name the stored value, so they can't
+disagree. (Before 2026-11-02 they came from three sources and did: the prompt's own ladder,
+`computeBestFitProduct` on the model's later range, and `determineServiceTier`, now deleted.)
 
-| # | Where | What it decides |
-|---|---|---|
-| 1 | Variant-B prompt files | `lead_score` rubric (8 signals, −2 to +2), thresholds 10+ HOT / 5–9 WARM / 0–4 COOL, and a tier ladder |
-| 2 | `data/rates/tier-rules.json` via `determineTier` in `src/services/grant-categorization.js` | `service_tier` — ordered rules through a hand-rolled condition evaluator; default fallback is `starter` |
-| 3 | `computeBestFitProduct` in `src/api/lead-gen-helpers.js` | `best_fit_product` — **the value that actually governs the outcome** |
-| 4 | `tierReminder` injected by `src/tools/executor.js` | Runtime guidance forbidding tier talk, pitches, and booking links for not-a-fit leads |
+**When it locks.** At intake, in `runIntakeCategorization`, from the baseline estimate —
+unless that baseline is $0 (no rate table or no data; `isTierPendingFirstEstimate`). Then
+the key stays unset and `lockBestFitProduct` locks it in `finalizeLeadGenConversation`, i.e.
+at the model's first `save_lead_data`, from the range it saved in `estimated_funding`.
+Non-profit and `not_a_fit` leads always lock at intake. The lock UPDATE only writes when no
+value is stored, so a later estimate can't change it.
+
+**How the model learns it.** `describeRecommendedProduct` puts a "Recommended product"
+line in `<lead_info>` (`getLeadGenFormContext`) on every turn. A pending lead gets the rule
+instead (low end ≥ $15,000 → Starter, else Get Granted; Pro-eligible → Pro once there is a
+dollar figure), so what the model names is what locks. The search handler's
+`tier_specific_reminder` repeats the same line for every tier (not_a_fit keeps its own
+text). The Variant B prompt no longer has a tier ladder; it names the given product.
+
+| Where | What it decides |
+|---|---|
+| Variant-B prompt files | `lead_score` rubric (8 signals, −2 to +2), thresholds 10+ HOT / 5–9 WARM / 0–4 COOL. **Not** the tier |
+| `data/rates/tier-rules.json` via `determineTier` in `src/services/grant-categorization.js` | `service_tier` — ordered rules through a hand-rolled condition evaluator; default fallback is `starter`. Feeds `computeBestFitProduct` (`not_a_fit`) |
+| `computeBestFitProduct` + `lockBestFitProduct` in `src/api/lead-gen-helpers.js` | `best_fit_product` — the tier, everywhere |
 
 **`lead_score` is prompt-only.** Nothing in code computes, validates, or clamps it. The
 model emits it in `save_lead_data` and it is stored as given.
 
-**The thresholds disagree.** `$30K` appears in the prompt rubric and in
-`determineServiceTier`, but `computeBestFitProduct` — whose output drives the booking link —
-uses a single `$15K` threshold and never sees `$30K`.
-
 **Hard disqualifiers** are in both layers. `tier-rules.json` lists four `not_a_fit` rules:
 non-profit, not incorporated ≥1 year, pre-revenue, and fewer than 2 FTEs. The prompt
-restates a readiness gate, and the executor injects the third layer at runtime.
+restates a readiness gate for framing.
 
 **`not_a_fit` is enforced structurally, not just by prompt.** `computeBestFitProduct` maps
 it to `Get Granted`, which is in `NO_LINK_PRODUCTS`, so the booking link is stripped
@@ -208,8 +221,8 @@ with both values.
 **HubSpot write shape** — deliberately *not* a direct object create. It goes through
 `submitLeadGenForm` as a form submission so leads land in the same reporting bucket as
 legacy forms and HubSpot auto-associates the company by email domain. Then: resolve contact
-by email with retry (HubSpot's eventual-consistency window), persist `best_fit_product`
-locally **unconditionally**, PATCH the AI-derived properties, look up the company, and
+by email with retry (HubSpot's eventual-consistency window), write the locked
+`best_fit_product` (locked right after the claim, before the HubSpot-token check), PATCH the AI-derived properties, look up the company, and
 create-or-update a Note attached to both.
 
 **Email** — `sendLeadGenEmail` via the Gmail REST API (Railway blocks SMTP), branded
@@ -260,6 +273,12 @@ disabling the cron is the only thing that stops real mail to real prospects from
 - **Lead-gen streaming is not the shared path.** `streamToSSE` buffers text instead of
   streaming when `agentType` is lead-gen, specifically to keep tool narration from leaking
   to a public visitor, and applies booking-link substitution at end-turn flush.
+- **No empty replies.** When the model writes the reply alongside a tool call, the final
+  step can be only the `<!--suggestions-->` comment. `streamToSSE` holds such a step back
+  (`hasVisibleText`), and `runAgent` keeps the earlier substantive text (200+ chars) and
+  flushes it with the suggestions, instead of replacing it. With no earlier text, the
+  empty-response fallback runs. The widget's `formatAssistantMessage` shows a short
+  "didn't come through" line rather than an empty bubble.
 - **Cost caps are a first-class control** and live only in `src/api/lead-gen.js`. Tuning the
   model or iteration count spends against them; the failure mode is a 429 reading "We're
   experiencing high demand."
@@ -276,7 +295,8 @@ Nothing in `docs/` covers lead-gen. What exists:
 
 ## Open items
 
-- Tier policy expressed in four disagreeing places; `$30K` vs `$15K` threshold split
+- Tier *policy* (thresholds, the Pro gate) is pending the GetGranted launch; the mechanism is single-source since 2026-11-02
+- A $0 baseline: the prompt still says not to manufacture estimates, so a pending lead with no dollar figure locks to Get Granted
 - `lead_score` is model-emitted and never validated
 - `lead-gen-variant-a.md` is dead but still on disk and still documented as live
 - Two widget files on disk; live embed target unconfirmed
